@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
@@ -23,6 +23,9 @@ type LeftPanelProps = {
   machines: MachineNode[];
   onOpenMenu: (x: number, y: number, target: ContextMenuTarget, canAddMachine: boolean) => void;
   onCreateProject: () => void;
+  // Optional block pinned to the bottom of the sidebar (e.g. the web account
+  // strip). Expo never passes it, so the shared tree stays untouched there.
+  footer?: ReactNode;
 };
 
 function FolderBranch({
@@ -108,6 +111,7 @@ export function LeftPanel({
   machines,
   onOpenMenu,
   onCreateProject,
+  footer,
 }: LeftPanelProps) {
   const { isDark } = useAppTheme();
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
@@ -169,9 +173,13 @@ export function LeftPanel({
         <View className={cn('w-0 border-r', lineClass)} />
       ) : (
         <View
-          className={cn('w-64 border-r pb-4', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}
-          style={{ paddingTop: 56 }}
+          className={cn('w-64 border-r', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}
         >
+          <ScrollView
+            className="flex-1"
+            contentContainerStyle={{ paddingTop: 56, paddingBottom: 16 }}
+            showsVerticalScrollIndicator={false}
+          >
           {activeTab === 'hierarchy' && (
             <View className="mb-5">
               {projects.length === 0 ? (
@@ -217,6 +225,11 @@ export function LeftPanel({
               )}
             </View>
           )}
+          </ScrollView>
+
+          {footer ? (
+            <View className={cn('border-t', isDark ? 'border-line-dark' : 'border-line-light')}>{footer}</View>
+          ) : null}
         </View>
       )}
     </>

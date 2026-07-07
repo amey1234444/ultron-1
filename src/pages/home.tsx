@@ -7,6 +7,8 @@ const GOLD = '#C9A15C';
 const BG = '#0A0A0A';
 const INK = '#F5F5F5';
 const MUTED = '#8A8A8A';
+const BLUE = '#58A6FF';
+const GREEN = '#3FB950';
 
 const FONT_HEAD = 'SpaceGrotesk_600SemiBold, system-ui, sans-serif';
 const FONT_BODY = 'Inter_400Regular, system-ui, sans-serif';
@@ -100,6 +102,21 @@ export default function HomePage() {
   const consoleHref = user ? '/' : '/login';
   const consoleLabel = user ? 'Open console' : 'Sign in';
 
+  // Scroll-driven perspective on the hero dashboard — it starts tilted back
+  // (like Gigaton's product hero) and straightens as you scroll into the page.
+  const [scrollProgress, setScrollProgress] = useState(0);
+  useEffect(() => {
+    const onScroll = () => {
+      const p = Math.min(1, window.scrollY / 520);
+      setScrollProgress(p);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+  const tilt = 20 * (1 - scrollProgress);
+  const lift = 40 * (1 - scrollProgress);
+
   return (
     <div style={{ background: BG, color: INK, minHeight: '100vh', fontFamily: FONT_BODY, overflowX: 'hidden' }}>
       <style>{keyframes}</style>
@@ -120,27 +137,38 @@ export default function HomePage() {
         }}
       >
         <span style={{ fontFamily: FONT_HEAD, fontSize: 22, letterSpacing: '0.28em' }}>ULTRON</span>
-        <Link
-          href={consoleHref}
-          style={{
-            fontFamily: FONT_MED,
-            fontSize: 14,
-            color: BG,
-            background: INK,
-            padding: '9px 18px',
-            borderRadius: 10,
-            textDecoration: 'none',
-          }}
-        >
-          {consoleLabel}
-        </Link>
+        <nav style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
+          <a href="#features" style={navLink} className="ultron-navlink">
+            Features
+          </a>
+          <a href="#dashboard" style={navLink} className="ultron-navlink">
+            Dashboard
+          </a>
+          <a href="#contact" style={navLink} className="ultron-navlink">
+            Contact
+          </a>
+          <Link
+            href={consoleHref}
+            style={{
+              fontFamily: FONT_MED,
+              fontSize: 14,
+              color: BG,
+              background: INK,
+              padding: '9px 18px',
+              borderRadius: 10,
+              textDecoration: 'none',
+            }}
+          >
+            {consoleLabel}
+          </Link>
+        </nav>
       </header>
 
       {/* Hero */}
       <section
         style={{
           position: 'relative',
-          padding: 'clamp(72px, 12vw, 160px) clamp(20px, 6vw, 72px) clamp(64px, 10vw, 120px)',
+          padding: 'clamp(64px, 10vw, 130px) clamp(20px, 6vw, 72px) clamp(24px, 4vw, 48px)',
           textAlign: 'center',
           overflow: 'hidden',
         }}
@@ -229,15 +257,40 @@ export default function HomePage() {
             <Link href={consoleHref} style={{ ...ctaPrimary }}>
               {user ? 'Open console →' : 'Launch console →'}
             </Link>
-            <a href="#features" style={{ ...ctaGhost }}>
-              Explore features
+            <a href="#dashboard" style={{ ...ctaGhost }}>
+              See it live
             </a>
+          </div>
+        </div>
+
+        {/* Animated live dashboard — the Gigaton-style product hero. Tilts back
+            in 3D and straightens on scroll. */}
+        <div
+          id="dashboard"
+          style={{
+            perspective: 1600,
+            maxWidth: 1080,
+            margin: '56px auto 0',
+            opacity: 0,
+            animation: 'fadeUp 1s ease 0.6s forwards',
+            scrollMarginTop: 90,
+          }}
+        >
+          <div
+            style={{
+              transform: `rotateX(${tilt}deg) translateY(${lift}px)`,
+              transformStyle: 'preserve-3d',
+              transition: 'transform 0.15s linear',
+              willChange: 'transform',
+            }}
+          >
+            <LiveDashboard />
           </div>
         </div>
       </section>
 
       {/* Stats */}
-      <section style={{ padding: '0 clamp(20px, 6vw, 72px)', marginTop: -20 }}>
+      <section style={{ padding: 'clamp(48px, 8vw, 90px) clamp(20px, 6vw, 72px) 0' }}>
         <Reveal>
           <div
             style={{
@@ -265,7 +318,7 @@ export default function HomePage() {
       </section>
 
       {/* Features */}
-      <section id="features" style={{ padding: 'clamp(80px, 12vw, 140px) clamp(20px, 6vw, 72px)' }}>
+      <section id="features" style={{ padding: 'clamp(80px, 12vw, 140px) clamp(20px, 6vw, 72px)', scrollMarginTop: 70 }}>
         <Reveal>
           <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 56px' }}>
             <div style={sectionKicker}>WHAT IT DOES</div>
@@ -324,7 +377,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer CTA */}
-      <section style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(90px, 12vw, 150px)', textAlign: 'center' }}>
+      <section style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(70px, 10vw, 120px)', textAlign: 'center' }}>
         <Reveal>
           <h2 style={{ fontFamily: FONT_HEAD, fontSize: 'clamp(30px, 5vw, 52px)', letterSpacing: '-0.02em' }}>
             Ready to see your machines think?
@@ -337,22 +390,265 @@ export default function HomePage() {
         </Reveal>
       </section>
 
-      <footer
+      <SiteFooter />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Live, animated product dashboard shown in the hero.
+// ---------------------------------------------------------------------------
+
+const CHART_POINTS = 44;
+
+function LiveDashboard() {
+  // Streaming series that scroll left, plus a couple of live KPI values and a
+  // health gauge — all driven by one interval so the whole panel feels alive.
+  const [series, setSeries] = useState<number[]>(() =>
+    Array.from({ length: CHART_POINTS }, (_, i) => 50 + Math.sin(i / 3) * 18),
+  );
+  const [series2, setSeries2] = useState<number[]>(() =>
+    Array.from({ length: CHART_POINTS }, (_, i) => 40 + Math.cos(i / 4) * 12),
+  );
+  const [vib, setVib] = useState(3.1);
+  const [temp, setTemp] = useState(61);
+  const [rpm, setRpm] = useState(1480);
+  const [health, setHealth] = useState(92);
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setTick((t) => t + 1);
+      setSeries((prev) => {
+        const next = prev.slice(1);
+        const last = prev[prev.length - 1];
+        next.push(Math.max(10, Math.min(90, last + (Math.random() - 0.5) * 16)));
+        return next;
+      });
+      setSeries2((prev) => {
+        const next = prev.slice(1);
+        const last = prev[prev.length - 1];
+        next.push(Math.max(8, Math.min(80, last + (Math.random() - 0.5) * 12)));
+        return next;
+      });
+      setVib((v) => +(Math.max(1.5, Math.min(6, v + (Math.random() - 0.5) * 0.5)).toFixed(2)));
+      setTemp((t) => Math.round(Math.max(52, Math.min(74, t + (Math.random() - 0.5) * 2))));
+      setRpm((r) => Math.round(Math.max(1440, Math.min(1520, r + (Math.random() - 0.5) * 14))));
+      setHealth((h) => Math.round(Math.max(78, Math.min(99, h + (Math.random() - 0.5) * 3))));
+    }, 1100);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <div
+      style={{
+        borderRadius: 18,
+        overflow: 'hidden',
+        border: '1px solid rgba(255,255,255,0.1)',
+        background: 'linear-gradient(180deg, #101010, #0B0B0B)',
+        boxShadow: '0 40px 120px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,161,92,0.06)',
+      }}
+    >
+      {/* window chrome */}
+      <div
         style={{
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          padding: '26px clamp(20px, 6vw, 72px)',
           display: 'flex',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          color: MUTED,
-          fontSize: 13,
+          alignItems: 'center',
+          gap: 8,
+          padding: '12px 16px',
+          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          background: 'rgba(255,255,255,0.02)',
         }}
       >
-        <span style={{ fontFamily: FONT_HEAD, letterSpacing: '0.2em', color: INK }}>ULTRON</span>
-        <span style={{ fontFamily: FONT_MONO }}>© {new Date().getFullYear()} — Industrial intelligence platform</span>
-      </footer>
+        <span style={{ width: 11, height: 11, borderRadius: 999, background: '#EF4444' }} />
+        <span style={{ width: 11, height: 11, borderRadius: 999, background: '#F2A93B' }} />
+        <span style={{ width: 11, height: 11, borderRadius: 999, background: GREEN }} />
+        <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: MUTED, marginLeft: 10 }}>ULTRON · RAV-01 · Live</span>
+        <span
+          style={{
+            marginLeft: 'auto',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontFamily: FONT_MONO,
+            fontSize: 11,
+            color: GREEN,
+          }}
+        >
+          <span style={{ width: 7, height: 7, borderRadius: 999, background: GREEN, animation: 'pulse 1.6s infinite' }} />
+          STREAMING
+        </span>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 0 }}>
+        {/* main chart column */}
+        <div style={{ padding: 18, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
+            <span style={{ fontFamily: FONT_MED, fontSize: 13, color: INK }}>Vibration &amp; temperature</span>
+            <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: MUTED }}>last 60s</span>
+          </div>
+          <StreamChart series={series} series2={series2} />
+          <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
+            <Legend color={GOLD} label="Vibration" />
+            <Legend color={BLUE} label="Temperature" />
+          </div>
+
+          {/* animated capacity bars */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 18 }}>
+            {[0, 1, 2, 3].map((i) => {
+              const pct = 40 + ((Math.sin(tick / 2 + i) + 1) / 2) * 55;
+              return (
+                <div key={i}>
+                  <div style={{ height: 46, display: 'flex', alignItems: 'flex-end', gap: 3 }}>
+                    {[0, 1, 2].map((b) => (
+                      <div
+                        key={b}
+                        style={{
+                          flex: 1,
+                          height: `${Math.max(12, pct - b * 12)}%`,
+                          background: i === 3 ? BLUE : GOLD,
+                          opacity: 0.35 + b * 0.25,
+                          borderRadius: 2,
+                          transition: 'height 0.9s cubic-bezier(0.22,1,0.36,1)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 9, color: MUTED, marginTop: 6, letterSpacing: '0.06em' }}>
+                    CH{i + 1}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* sidebar KPIs + gauge */}
+        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
+          <Gauge value={health} />
+          <Kpi label="Vibration" value={`${vib}`} unit="mm/s" tone={vib > 5 ? '#EF4444' : vib > 4 ? GOLD : GREEN} />
+          <Kpi label="Bearing temp" value={`${temp}`} unit="°C" tone={temp > 70 ? GOLD : GREEN} />
+          <Kpi label="Shaft speed" value={rpm.toLocaleString()} unit="rpm" tone={INK} />
+        </div>
+      </div>
     </div>
+  );
+}
+
+function StreamChart({ series, series2 }: { series: number[]; series2: number[] }) {
+  const W = 520;
+  const H = 150;
+  const toPath = (data: number[]) =>
+    data
+      .map((v, i) => {
+        const x = (i / (data.length - 1)) * W;
+        const y = H - (v / 100) * H;
+        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      })
+      .join(' ');
+  const areaPath = `${toPath(series)} L ${W} ${H} L 0 ${H} Z`;
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="150" preserveAspectRatio="none">
+      <defs>
+        <linearGradient id="ultronArea" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={GOLD} stopOpacity="0.28" />
+          <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      {[0.25, 0.5, 0.75].map((f) => (
+        <line key={f} x1="0" y1={H * f} x2={W} y2={H * f} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
+      ))}
+      <path d={areaPath} fill="url(#ultronArea)" style={{ transition: 'all 0.9s ease' }} />
+      <path
+        d={toPath(series2)}
+        fill="none"
+        stroke={BLUE}
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ transition: 'all 0.9s ease', opacity: 0.8 }}
+      />
+      <path
+        d={toPath(series)}
+        fill="none"
+        stroke={GOLD}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        style={{ transition: 'all 0.9s ease' }}
+      />
+    </svg>
+  );
+}
+
+function Gauge({ value }: { value: number }) {
+  const r = 34;
+  const c = 2 * Math.PI * r;
+  const offset = c * (1 - value / 100);
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 14,
+        padding: 14,
+        borderRadius: 12,
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}
+    >
+      <svg width="84" height="84" viewBox="0 0 84 84">
+        <circle cx="42" cy="42" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
+        <circle
+          cx="42"
+          cy="42"
+          r={r}
+          fill="none"
+          stroke={value > 90 ? GREEN : value > 82 ? GOLD : '#EF4444'}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          transform="rotate(-90 42 42)"
+          style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(0.22,1,0.36,1), stroke 0.9s ease' }}
+        />
+        <text x="42" y="46" textAnchor="middle" fontSize="20" fontFamily={FONT_HEAD} fill={INK}>
+          {value}
+        </text>
+      </svg>
+      <div>
+        <div style={{ fontFamily: FONT_MED, fontSize: 13, color: INK }}>Health score</div>
+        <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: MUTED, marginTop: 4 }}>AI · updated live</div>
+      </div>
+    </div>
+  );
+}
+
+function Kpi({ label, value, unit, tone }: { label: string; value: string; unit: string; tone: string }) {
+  return (
+    <div
+      style={{
+        padding: 14,
+        borderRadius: 12,
+        background: 'rgba(255,255,255,0.03)',
+        border: '1px solid rgba(255,255,255,0.06)',
+      }}
+    >
+      <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: MUTED, letterSpacing: '0.08em' }}>{label.toUpperCase()}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginTop: 6 }}>
+        <span style={{ fontFamily: FONT_HEAD, fontSize: 24, color: tone, transition: 'color 0.6s ease' }}>{value}</span>
+        <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: MUTED }}>{unit}</span>
+      </div>
+    </div>
+  );
+}
+
+function Legend({ color, label }: { color: string; label: string }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: FONT_MONO, fontSize: 11, color: MUTED }}>
+      <span style={{ width: 14, height: 3, borderRadius: 2, background: color }} />
+      {label}
+    </span>
   );
 }
 
@@ -360,8 +656,8 @@ export default function HomePage() {
 function MiniChart() {
   const series = [
     { colour: GOLD, d: 'M0 70 C 40 60, 60 40, 100 44 S 170 30, 220 34 S 300 20, 340 26' },
-    { colour: '#58A6FF', d: 'M0 96 C 50 92, 70 78, 120 82 S 200 70, 250 74 S 310 64, 340 68' },
-    { colour: '#3FB950', d: 'M0 118 C 45 116, 80 108, 130 110 S 210 104, 260 106 S 320 100, 340 102' },
+    { colour: BLUE, d: 'M0 96 C 50 92, 70 78, 120 82 S 200 70, 250 74 S 310 64, 340 68' },
+    { colour: GREEN, d: 'M0 118 C 45 116, 80 108, 130 110 S 210 104, 260 106 S 320 100, 340 102' },
   ];
   return (
     <div
@@ -395,6 +691,193 @@ function MiniChart() {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Site footer — company, product, resources, contact + social links.
+// ---------------------------------------------------------------------------
+
+const SOCIALS: { label: string; href: string; icon: ReactNode }[] = [
+  {
+    label: 'LinkedIn',
+    href: 'https://www.linkedin.com/company/ultron-industrial',
+    icon: (
+      <path d="M4.98 3.5A2.5 2.5 0 1 1 0 3.5a2.5 2.5 0 0 1 4.98 0zM0 8.98h4.96V24H0zM8.98 8.98h4.75v2.05h.07c.66-1.25 2.28-2.57 4.69-2.57 5.02 0 5.95 3.3 5.95 7.6V24h-4.96v-6.9c0-1.65-.03-3.77-2.3-3.77-2.3 0-2.65 1.8-2.65 3.65V24H8.98z" />
+    ),
+  },
+  {
+    label: 'X',
+    href: 'https://x.com',
+    icon: (
+      <path d="M18.9 2H22l-7.5 8.6L23.4 22h-6.9l-5.4-7-6.2 7H1.8l8-9.2L1 2h7l4.9 6.5L18.9 2zm-2.4 18h1.9L7.6 4H5.6l10.9 16z" />
+    ),
+  },
+  {
+    label: 'GitHub',
+    href: 'https://github.com',
+    icon: (
+      <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.3-5.26-1.28-5.26-5.7 0-1.26.45-2.3 1.2-3.1-.12-.3-.52-1.48.11-3.08 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.18-1.18 3.18-1.18.63 1.6.23 2.78.11 3.08.75.8 1.2 1.84 1.2 3.1 0 4.43-2.7 5.4-5.28 5.68.42.36.79 1.08.79 2.18v3.23c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z" />
+    ),
+  },
+];
+
+function SiteFooter() {
+  const cols: { title: string; links: { label: string; href: string }[] }[] = [
+    {
+      title: 'Product',
+      links: [
+        { label: 'Features', href: '#features' },
+        { label: 'Live dashboard', href: '#dashboard' },
+        { label: 'Console', href: '/login' },
+      ],
+    },
+    {
+      title: 'Company',
+      links: [
+        { label: 'About us', href: '#contact' },
+        { label: 'Careers', href: '#contact' },
+        { label: 'Blog', href: '#contact' },
+      ],
+    },
+    {
+      title: 'Resources',
+      links: [
+        { label: 'Documentation', href: '#contact' },
+        { label: 'API reference', href: '#contact' },
+        { label: 'Support', href: '#contact' },
+      ],
+    },
+  ];
+
+  return (
+    <footer id="contact" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#080808', scrollMarginTop: 70 }}>
+      <div
+        style={{
+          maxWidth: 1200,
+          margin: '0 auto',
+          padding: 'clamp(48px, 8vw, 72px) clamp(20px, 6vw, 72px) 32px',
+          display: 'grid',
+          gridTemplateColumns: 'minmax(240px, 1.4fr) repeat(3, minmax(120px, 1fr))',
+          gap: 40,
+        }}
+      >
+        {/* brand + contact */}
+        <div>
+          <span style={{ fontFamily: FONT_HEAD, fontSize: 24, letterSpacing: '0.22em', color: INK }}>ULTRON</span>
+          <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.7, margin: '16px 0 0', maxWidth: 300 }}>
+            Industrial intelligence platform for real-time monitoring and predictive maintenance of rotating equipment.
+          </p>
+          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <a href="mailto:hello@ultron.io" style={contactLink} className="ultron-navlink">
+              hello@ultron.io
+            </a>
+            <a href="tel:+18005551234" style={contactLink} className="ultron-navlink">
+              +1 (800) 555-1234
+            </a>
+            <span style={{ ...contactLink, color: MUTED }}>San Francisco, CA · Remote-first</span>
+          </div>
+          <div style={{ marginTop: 22, display: 'flex', gap: 12 }}>
+            {SOCIALS.map((s) => (
+              <a
+                key={s.label}
+                href={s.href}
+                target="_blank"
+                rel="noreferrer noopener"
+                aria-label={s.label}
+                title={s.label}
+                className="ultron-social"
+                style={socialBtn}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                  {s.icon}
+                </svg>
+              </a>
+            ))}
+          </div>
+        </div>
+
+        {cols.map((col) => (
+          <div key={col.title}>
+            <div style={{ fontFamily: FONT_MED, fontSize: 13, color: INK, marginBottom: 16 }}>{col.title}</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {col.links.map((l) =>
+                l.href.startsWith('#') || l.href.startsWith('/') ? (
+                  <Link key={l.label} href={l.href} style={footerLink} className="ultron-navlink">
+                    {l.label}
+                  </Link>
+                ) : (
+                  <a key={l.label} href={l.href} style={footerLink} className="ultron-navlink">
+                    {l.label}
+                  </a>
+                ),
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div
+        style={{
+          borderTop: '1px solid rgba(255,255,255,0.06)',
+          padding: '20px clamp(20px, 6vw, 72px)',
+          maxWidth: 1200,
+          margin: '0 auto',
+          display: 'flex',
+          justifyContent: 'space-between',
+          flexWrap: 'wrap',
+          gap: 12,
+          color: MUTED,
+          fontSize: 13,
+        }}
+      >
+        <span style={{ fontFamily: FONT_MONO }}>© {new Date().getFullYear()} ULTRON — Industrial intelligence platform</span>
+        <span style={{ display: 'flex', gap: 20 }}>
+          <a href="#contact" style={footerLink} className="ultron-navlink">
+            Privacy
+          </a>
+          <a href="#contact" style={footerLink} className="ultron-navlink">
+            Terms
+          </a>
+        </span>
+      </div>
+    </footer>
+  );
+}
+
+const navLink: CSSProperties = {
+  fontFamily: FONT_MED,
+  fontSize: 14,
+  color: MUTED,
+  textDecoration: 'none',
+  transition: 'color 0.2s ease',
+};
+
+const footerLink: CSSProperties = {
+  fontFamily: FONT_BODY,
+  fontSize: 14,
+  color: MUTED,
+  textDecoration: 'none',
+  transition: 'color 0.2s ease',
+};
+
+const contactLink: CSSProperties = {
+  fontFamily: FONT_MED,
+  fontSize: 14,
+  color: INK,
+  textDecoration: 'none',
+  transition: 'color 0.2s ease',
+};
+
+const socialBtn: CSSProperties = {
+  width: 38,
+  height: 38,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 10,
+  border: '1px solid rgba(255,255,255,0.12)',
+  color: MUTED,
+  transition: 'color 0.2s ease, border-color 0.2s ease, transform 0.2s ease',
+};
 
 const orb: CSSProperties = {
   position: 'absolute',
@@ -480,4 +963,9 @@ const keyframes = `
 @keyframes shimmer { to { background-position: 200% center; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 .ultron-card:hover { transform: translateY(-6px); border-color: rgba(201,161,92,0.5) !important; }
+.ultron-navlink:hover { color: ${INK} !important; }
+.ultron-social:hover { color: ${GOLD} !important; border-color: rgba(201,161,92,0.5) !important; transform: translateY(-2px); }
+@media (max-width: 720px) {
+  header nav a[href^="#"] { display: none; }
+}
 `;
