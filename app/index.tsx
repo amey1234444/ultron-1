@@ -1,0 +1,510 @@
+import { useEffect, useRef, useState } from 'react';
+import { Text, useWindowDimensions, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+import { ActionButton } from '../components/studio/ActionButton';
+import { AddDeviceDialog, type NewDevice } from '../components/studio/AddDeviceDialog';
+import { AssignProjectDialog } from '../components/studio/AssignProjectDialog';
+import { ConfirmDialog } from '../components/studio/ConfirmDialog';
+import { ContextMenu, type ContextMenuState, type ContextMenuTarget } from '../components/studio/ContextMenu';
+import { CreateFolderDialog, type NewFolder } from '../components/studio/CreateFolderDialog';
+import { CreateProjectDialog, type NewProject } from '../components/studio/CreateProjectDialog';
+import { DeviceDetail } from '../components/studio/DeviceDetail';
+import { DeviceMenu, type DeviceMenuState } from '../components/studio/DeviceMenu';
+import { DevicesTable } from '../components/studio/DevicesTable';
+import { EmptyState } from '../components/studio/EmptyState';
+import { LeftPanel } from '../components/studio/LeftPanel';
+import { AddMachineDialog, type NewMachine } from '../components/studio/machine/AddMachineDialog';
+import { MachineWorkspace } from '../components/studio/machine/MachineWorkspace';
+import { MoveDialog } from '../components/studio/MoveDialog';
+import { PanelToggle } from '../components/studio/PanelToggle';
+import { RenameDialog } from '../components/studio/RenameDialog';
+import { RackDetail } from '../components/studio/rack/RackDetail';
+import { TopBar } from '../components/studio/TopBar';
+import { useAppTheme } from '../hooks/useAppTheme';
+import { cn } from '../lib/cn';
+import type { DeviceNode } from '../lib/devices';
+import {
+  duplicateFolderSubtree,
+  duplicateProject,
+  folderPath,
+  folderSubtreeIds,
+  type FolderNode,
+  type ProjectNode,
+  type SelectedNode,
+} from '../lib/hierarchy';
+import { componentsForTemplate, type MachineNode } from '../lib/machines';
+import { PERMISSIONS } from '../lib/permissions';
+import type { CardConfig, CardNode, CardType } from '../lib/rack';
+import { createSeedData } from '../lib/seedData';
+
+const LEFT_PANEL_WIDTH = 256;
+
+function makeId() {
+  return Math.random().toString(36).slice(2, 10);
+}
+
+const SEED = createSeedData(makeId);
+
+export default function Home() {
+  const { isDark } = useAppTheme();
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+
+  // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
+  // workspace stays usable; users can still toggle it back open via PanelToggle.
+  const { width } = useWindowDimensions();
+  const isNarrow = width > 0 && width < 768;
+
+  const [selected, setSelected] = useState<SelectedNode>({ kind: 'none' });
+  const [leftCollapsed, setLeftCollapsed] = useState(isNarrow);
+
+  const prevNarrow = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (prevNarrow.current !== isNarrow) {
+      prevNarrow.current = isNarrow;
+      setLeftCollapsed(isNarrow);
+    }
+  }, [isNarrow]);
+  // A machine's Actual View is a full-screen dashboard preview — the hierarchy
+  // sidebar hides entirely while it's active, reported up by MachineWorkspace.
+  const [machineWorkspaceMode, setMachineWorkspaceMode] = useState<'design' | 'mapping' | 'live' | 'actual'>('design');
+  const hideSidebar = selected.kind === 'machine' && machineWorkspaceMode === 'actual';
+
+  const [projects, setProjects] = useState<ProjectNode[]>(SEED.projects);
+  const [folders, setFolders] = useState<FolderNode[]>(SEED.folders);
+  const [devices, setDevices] = useState<DeviceNode[]>(SEED.devices);
+  const [cards, setCards] = useState<CardNode[]>(SEED.cards);
+  const [machines, setMachines] = useState<MachineNode[]>(SEED.machines);
+
+  const [createProjectVisible, setCreateProjectVisible] = useState(false);
+  const [menu, setMenu] = useState<ContextMenuState | null>(null);
+  const [createFolderTarget, setCreateFolderTarget] = useState<{ projectId: string; parentId: string | null } | null>(null);
+  const [createMachineTarget, setCreateMachineTarget] = useState<{ projectId: string; folderId: string } | null>(null);
+  const [renameTarget, setRenameTarget] = useState<ContextMenuTarget | null>(null);
+  const [moveFolderId, setMoveFolderId] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<ContextMenuTarget | null>(null);
+
+  const [addDeviceVisible, setAddDeviceVisible] = useState(false);
+  const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
+  const [deviceMenu, setDeviceMenu] = useState<DeviceMenuState | null>(null);
+  const [assignDeviceId, setAssignDeviceId] = useState<string | null>(null);
+  const [deleteDeviceId, setDeleteDeviceId] = useState<string | null>(null);
+
+  const handleCreateProject = (newProject: NewProject) => {
+    // spec §4.2: add under Hierarchy, auto-select, show name in top bar.
+    const id = makeId();
+    setProjects((prev) => [...prev, { id, ...newProject }]);
+    setSelected({ kind: 'project', id });
+    setCreateProjectVisible(false);
+  };
+
+  const openCreateFolder = (target: ContextMenuTarget) => {
+    setMenu(null);
+    setCreateFolderTarget(target.kind === 'project' ? { projectId: target.id, parentId: null } : { projectId: target.projectId, parentId: target.id });
+  };
+
+  const handleCreateFolder = (newFolder: NewFolder) => {
+    if (!createFolderTarget) return;
+    const id = makeId();
+    setFolders((prev) => [...prev, { id, projectId: createFolderTarget.projectId, parentId: createFolderTarget.parentId, ...newFolder }]);
+    setSelected({ kind: 'folder', id });
+    setCreateFolderTarget(null);
+  };
+
+  const openCreateMachine = (target: ContextMenuTarget) => {
+    if (target.kind !== 'folder') return;
+    setMenu(null);
+    setCreateMachineTarget({ projectId: target.projectId, folderId: target.id });
+  };
+
+  const handleCreateMachine = (newMachine: NewMachine) => {
+    if (!createMachineTarget) return;
+    const id = makeId();
+    const components = componentsForTemplate(newMachine.template, makeId);
+    setMachines((prev) => [
+      ...prev,
+      { id, projectId: createMachineTarget.projectId, folderId: createMachineTarget.folderId, name: newMachine.name, template: newMachine.template, components },
+    ]);
+    setSelected({ kind: 'machine', id });
+    setCreateMachineTarget(null);
+  };
+
+  const handleRename = (name: string) => {
+    if (!renameTarget) return;
+    if (renameTarget.kind === 'project') {
+      setProjects((prev) => prev.map((p) => (p.id === renameTarget.id ? { ...p, name } : p)));
+    } else {
+      setFolders((prev) => prev.map((f) => (f.id === renameTarget.id ? { ...f, name } : f)));
+    }
+    setRenameTarget(null);
+  };
+
+  const handleDuplicate = (target: ContextMenuTarget) => {
+    if (target.kind === 'project') {
+      const project = projects.find((p) => p.id === target.id);
+      if (!project) return;
+      const { project: newProject, folders: newFolders } = duplicateProject(project, folders, makeId);
+      setProjects((prev) => [...prev, newProject]);
+      setFolders((prev) => [...prev, ...newFolders]);
+      setSelected({ kind: 'project', id: newProject.id });
+    } else {
+      const folder = folders.find((f) => f.id === target.id);
+      if (!folder) return;
+      const clones = duplicateFolderSubtree(folders, folder.id, folder.parentId, makeId);
+      setFolders((prev) => [...prev, ...clones]);
+      setSelected({ kind: 'folder', id: clones[0].id });
+    }
+  };
+
+  const handleMove = (newParentId: string | null) => {
+    if (!moveFolderId) return;
+    setFolders((prev) => prev.map((f) => (f.id === moveFolderId ? { ...f, parentId: newParentId } : f)));
+    setMoveFolderId(null);
+  };
+
+  const handleDelete = () => {
+    if (!deleteTarget) return;
+    if (deleteTarget.kind === 'project') {
+      setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id));
+      setFolders((prev) => prev.filter((f) => f.projectId !== deleteTarget.id));
+      setMachines((prev) => prev.filter((m) => m.projectId !== deleteTarget.id));
+      if (selected.kind === 'project' && selected.id === deleteTarget.id) setSelected({ kind: 'none' });
+      if (selected.kind === 'folder' && folders.find((f) => f.id === selected.id)?.projectId === deleteTarget.id) {
+        setSelected({ kind: 'none' });
+      }
+      if (selected.kind === 'machine' && machines.find((m) => m.id === selected.id)?.projectId === deleteTarget.id) {
+        setSelected({ kind: 'none' });
+      }
+    } else {
+      const removedIds = folderSubtreeIds(folders, deleteTarget.id);
+      setFolders((prev) => prev.filter((f) => !removedIds.has(f.id)));
+      setMachines((prev) => prev.filter((m) => !removedIds.has(m.folderId)));
+      if (selected.kind === 'folder' && removedIds.has(selected.id)) setSelected({ kind: 'project', id: deleteTarget.projectId });
+      if (selected.kind === 'machine' && removedIds.has(machines.find((m) => m.id === selected.id)?.folderId ?? '')) {
+        setSelected({ kind: 'project', id: deleteTarget.projectId });
+      }
+    }
+    setDeleteTarget(null);
+  };
+
+  const handleSaveDevice = (device: NewDevice) => {
+    if (editingDeviceId) {
+      setDevices((prev) => prev.map((d) => (d.id === editingDeviceId ? { ...d, ...device } : d)));
+      setEditingDeviceId(null);
+    } else {
+      setDevices((prev) => [...prev, { id: makeId(), projectId: null, archived: false, ...device }]);
+    }
+    setAddDeviceVisible(false);
+  };
+
+  const handleTestConnectionFromMenu = (device: DeviceNode) => {
+    // Same simulated test as the Add/Edit dialog, applied in place.
+    setDevices((prev) => prev.map((d) => (d.id === device.id ? { ...d, status: Math.random() > 0.3 ? 'Online' : 'Not Connected' } : d)));
+  };
+
+  const handleAssignDevice = (projectId: string) => {
+    if (!assignDeviceId) return;
+    setDevices((prev) => prev.map((d) => (d.id === assignDeviceId ? { ...d, projectId } : d)));
+    setAssignDeviceId(null);
+  };
+
+  const handleUnassignDevice = (device: DeviceNode) => {
+    setDevices((prev) => prev.map((d) => (d.id === device.id ? { ...d, projectId: null, archived: false } : d)));
+  };
+
+  const handleArchiveDevice = (device: DeviceNode) => {
+    setDevices((prev) => prev.map((d) => (d.id === device.id ? { ...d, archived: true } : d)));
+  };
+
+  const handleDeleteDevice = () => {
+    if (!deleteDeviceId) return;
+    setDevices((prev) => prev.filter((d) => d.id !== deleteDeviceId));
+    if (selected.kind === 'device' && selected.id === deleteDeviceId) setSelected({ kind: 'devices' });
+    setDeleteDeviceId(null);
+  };
+
+  const handleInstallCard = (deviceId: string, slot: number, type: CardType, config: CardConfig, enabled: boolean) => {
+    setCards((prev) => [...prev, { id: makeId(), deviceId, slot, type, config, enabled }]);
+  };
+
+  const handleUpdateCard = (cardId: string, config: CardConfig, enabled: boolean) => {
+    setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, config, enabled } : c)));
+  };
+
+  const handleRemoveCard = (cardId: string) => {
+    setCards((prev) => prev.filter((c) => c.id !== cardId));
+  };
+
+  const parentLabel = (() => {
+    if (!createFolderTarget) return '';
+    const project = projects.find((p) => p.id === createFolderTarget.projectId);
+    if (createFolderTarget.parentId === null) return project?.name ?? '';
+    const path = folderPath(folders, createFolderTarget.parentId);
+    return [project?.name, ...path.map((f) => f.name)].filter(Boolean).join(' / ');
+  })();
+
+  const machineParentLabel = (() => {
+    if (!createMachineTarget) return '';
+    const project = projects.find((p) => p.id === createMachineTarget.projectId);
+    const path = folderPath(folders, createMachineTarget.folderId);
+    return [project?.name, ...path.map((f) => f.name)].filter(Boolean).join(' / ');
+  })();
+
+  const selectedProject = selected.kind === 'project' ? projects.find((p) => p.id === selected.id) : undefined;
+  const selectedFolder = selected.kind === 'folder' ? folders.find((f) => f.id === selected.id) : undefined;
+  const selectedDevice = selected.kind === 'device' ? devices.find((d) => d.id === selected.id) : undefined;
+  const selectedMachine = selected.kind === 'machine' ? machines.find((m) => m.id === selected.id) : undefined;
+  const editingDevice = editingDeviceId ? devices.find((d) => d.id === editingDeviceId) : null;
+  const deleteDeviceInfo = deleteDeviceId ? devices.find((d) => d.id === deleteDeviceId) : null;
+  const topBarProjectName = selectedProject?.name ?? (selectedFolder ? projects.find((p) => p.id === selectedFolder.projectId)?.name : undefined);
+
+  const projectFolderCount = selectedProject ? folders.filter((f) => f.projectId === selectedProject.id && f.parentId === null).length : 0;
+  const childFolderCount = selectedFolder ? folders.filter((f) => f.parentId === selectedFolder.id).length : 0;
+
+  const renameCurrentName =
+    renameTarget?.kind === 'project'
+      ? (projects.find((p) => p.id === renameTarget.id)?.name ?? '')
+      : renameTarget
+        ? (folders.find((f) => f.id === renameTarget.id)?.name ?? '')
+        : '';
+
+  const deleteInfo = (() => {
+    if (!deleteTarget) return null;
+    if (deleteTarget.kind === 'project') {
+      const project = projects.find((p) => p.id === deleteTarget.id);
+      const count = folders.filter((f) => f.projectId === deleteTarget.id).length;
+      return {
+        title: 'Delete Project',
+        message: `Delete "${project?.name}"${count > 0 ? ` and its ${count} folder(s)` : ''}? This cannot be undone.`,
+      };
+    }
+    const folder = folders.find((f) => f.id === deleteTarget.id);
+    const count = folderSubtreeIds(folders, deleteTarget.id).size - 1;
+    return {
+      title: 'Delete Folder',
+      message: `Delete "${folder?.name}"${count > 0 ? ` and its ${count} subfolder(s)` : ''}? This cannot be undone.`,
+    };
+  })();
+
+  return (
+    <SafeAreaView className={cn('flex-1', isDark ? 'bg-surface-dark' : 'bg-surface-light')} edges={['top', 'bottom']}>
+      <TopBar projectName={topBarProjectName} />
+
+      <View className="flex-1 flex-row">
+        {!hideSidebar && (
+          <>
+            <LeftPanel
+              collapsed={leftCollapsed}
+              onCollapsedChange={setLeftCollapsed}
+              selected={selected}
+              onSelect={setSelected}
+              projects={projects}
+              folders={folders}
+              machines={machines}
+              onOpenMenu={(x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine })}
+              onCreateProject={() => setCreateProjectVisible(true)}
+            />
+
+            <PanelToggle
+              collapsed={leftCollapsed}
+              onPress={() => setLeftCollapsed((v) => !v)}
+              left={leftCollapsed ? 8 : LEFT_PANEL_WIDTH - 12}
+            />
+          </>
+        )}
+
+        <View className="flex-1">
+          {selected.kind === 'machine' && selectedMachine ? (
+            <MachineWorkspace
+              machine={selectedMachine}
+              devices={devices}
+              cards={cards}
+              onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
+              onModeChange={setMachineWorkspaceMode}
+            />
+          ) : selected.kind === 'device' && selectedDevice && selectedDevice.type === 'Rack' ? (
+            <RackDetail
+              device={selectedDevice}
+              cards={cards.filter((c) => c.deviceId === selectedDevice.id)}
+              onBack={() => setSelected({ kind: 'devices' })}
+              onInstallCard={(slot, type, config, enabled) => handleInstallCard(selectedDevice.id, slot, type, config, enabled)}
+              onUpdateCard={handleUpdateCard}
+              onRemoveCard={handleRemoveCard}
+            />
+          ) : selected.kind === 'device' && selectedDevice ? (
+            <DeviceDetail device={selectedDevice} onBack={() => setSelected({ kind: 'devices' })} />
+          ) : selected.kind === 'devices' ? (
+            devices.length === 0 ? (
+              <EmptyState title="DEVICES" description="No devices added.">
+                <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />
+              </EmptyState>
+            ) : (
+              <View className="flex-1">
+                {/* Extra clearance when the sidebar is collapsed — the floating
+                    Hierarchy/Devices toggle then sits right over this corner. */}
+                <View className="flex-row items-center justify-between px-6 pt-5" style={leftCollapsed ? { paddingTop: 56 } : undefined}>
+                  <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>Devices</Text>
+                  <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />
+                </View>
+                <DevicesTable
+                  devices={devices}
+                  projects={projects}
+                  onOpenDevice={(id) => setSelected({ kind: 'device', id })}
+                  onOpenMenu={(x, y, deviceId) => {
+                    const device = devices.find((d) => d.id === deviceId);
+                    if (device) setDeviceMenu({ x, y, device });
+                  }}
+                />
+              </View>
+            )
+          ) : selected.kind === 'none' || projects.length === 0 ? (
+            <EmptyState title="NO PROJECT CREATED" description="Create your first project to begin.">
+              <ActionButton
+                label="Create Project"
+                permission={PERMISSIONS.PROJECT_CREATE}
+                onPress={() => setCreateProjectVisible(true)}
+              />
+            </EmptyState>
+          ) : selectedProject ? (
+            <EmptyState
+              title={selectedProject.name.toUpperCase()}
+              description={projectFolderCount === 0 ? 'This project is empty.' : 'Select a folder from the hierarchy to continue.'}
+            >
+              <ActionButton
+                label="Create Folder"
+                permission={PERMISSIONS.HIERARCHY_FOLDER_CREATE}
+                onPress={() => openCreateFolder({ kind: 'project', id: selectedProject.id })}
+              />
+              <ActionButton
+                label="Create Machine"
+                disabled
+                permission={PERMISSIONS.MACHINE_CREATE}
+                onPress={() => {}}
+              />
+            </EmptyState>
+          ) : selectedFolder ? (
+            <View className="flex-1">
+              <Text className={cn('px-6 pt-5 font-body text-xs', mutedClass)}>
+                {[projects.find((p) => p.id === selectedFolder.projectId)?.name, ...folderPath(folders, selectedFolder.id).map((f) => f.name)].join(' / ')}
+              </Text>
+              <EmptyState
+                title={selectedFolder.name.toUpperCase()}
+                description={childFolderCount === 0 ? 'This folder is empty.' : `${childFolderCount} subfolder(s).`}
+              >
+                <ActionButton
+                  label="Add Folder"
+                  permission={PERMISSIONS.HIERARCHY_FOLDER_CREATE}
+                  onPress={() => openCreateFolder({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
+                />
+                <ActionButton
+                  label="Add Machine"
+                  permission={PERMISSIONS.MACHINE_CREATE}
+                  onPress={() => openCreateMachine({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
+                />
+              </EmptyState>
+            </View>
+          ) : null}
+        </View>
+      </View>
+
+      <CreateProjectDialog
+        visible={createProjectVisible}
+        onCancel={() => setCreateProjectVisible(false)}
+        onCreate={handleCreateProject}
+      />
+
+      <CreateFolderDialog
+        visible={createFolderTarget !== null}
+        parentLabel={parentLabel}
+        onCancel={() => setCreateFolderTarget(null)}
+        onCreate={handleCreateFolder}
+      />
+
+      <AddMachineDialog
+        visible={createMachineTarget !== null}
+        parentLabel={machineParentLabel}
+        onCancel={() => setCreateMachineTarget(null)}
+        onCreate={handleCreateMachine}
+      />
+
+      <RenameDialog
+        visible={renameTarget !== null}
+        currentName={renameCurrentName}
+        onCancel={() => setRenameTarget(null)}
+        onRename={handleRename}
+      />
+
+      <MoveDialog
+        visible={moveFolderId !== null}
+        folderId={moveFolderId ?? ''}
+        project={moveFolderId ? projects.find((p) => p.id === folders.find((f) => f.id === moveFolderId)?.projectId) : undefined}
+        folders={folders}
+        onCancel={() => setMoveFolderId(null)}
+        onMove={handleMove}
+      />
+
+      {deleteInfo && (
+        <ConfirmDialog
+          visible={deleteTarget !== null}
+          title={deleteInfo.title}
+          message={deleteInfo.message}
+          confirmLabel="Delete"
+          onCancel={() => setDeleteTarget(null)}
+          onConfirm={handleDelete}
+        />
+      )}
+
+      <ContextMenu
+        state={menu}
+        onClose={() => setMenu(null)}
+        onAddFolder={openCreateFolder}
+        onAddMachine={openCreateMachine}
+        onRename={(target) => setRenameTarget(target)}
+        onDuplicate={handleDuplicate}
+        onMove={(target) => target.kind === 'folder' && setMoveFolderId(target.id)}
+        onDelete={(target) => setDeleteTarget(target)}
+      />
+
+      <AddDeviceDialog
+        visible={addDeviceVisible || editingDeviceId !== null}
+        editingDevice={editingDevice}
+        onCancel={() => {
+          setAddDeviceVisible(false);
+          setEditingDeviceId(null);
+        }}
+        onCreate={handleSaveDevice}
+      />
+
+      <AssignProjectDialog
+        visible={assignDeviceId !== null}
+        deviceName={assignDeviceId ? (devices.find((d) => d.id === assignDeviceId)?.name ?? '') : ''}
+        projects={projects}
+        onCancel={() => setAssignDeviceId(null)}
+        onAssign={handleAssignDevice}
+      />
+
+      {deleteDeviceInfo && (
+        <ConfirmDialog
+          visible={deleteDeviceId !== null}
+          title="Delete Device"
+          message={`Delete "${deleteDeviceInfo.name}"? This cannot be undone.`}
+          confirmLabel="Delete"
+          onCancel={() => setDeleteDeviceId(null)}
+          onConfirm={handleDeleteDevice}
+        />
+      )}
+
+      <DeviceMenu
+        state={deviceMenu}
+        onClose={() => setDeviceMenu(null)}
+        onOpen={(d) => setSelected({ kind: 'device', id: d.id })}
+        onEdit={(d) => setEditingDeviceId(d.id)}
+        onTestConnection={handleTestConnectionFromMenu}
+        onAssign={(d) => setAssignDeviceId(d.id)}
+        onUnassign={handleUnassignDevice}
+        onDelete={(d) => setDeleteDeviceId(d.id)}
+        onArchive={handleArchiveDevice}
+      />
+    </SafeAreaView>
+  );
+}
