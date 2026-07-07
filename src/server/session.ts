@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 import { serialize, parse } from 'cookie';
 import jwt from 'jsonwebtoken';
 import type { NextApiRequest, NextApiResponse } from 'next';
@@ -9,8 +11,18 @@ import type { PublicUser } from '../lib/roles';
 const COOKIE_NAME = 'ultron_session';
 const MAX_AGE_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
+let ephemeralSecret: string | null = null;
+
 function secret(): string {
-  return process.env.AUTH_SECRET || 'ultron-dev-secret-change-me';
+  if (process.env.AUTH_SECRET) return process.env.AUTH_SECRET;
+  // Never fall back to a hardcoded, source-visible key in production — that would
+  // let anyone forge sessions. Use a random per-instance key instead (sessions then
+  // don't survive restarts until AUTH_SECRET is configured — set it in Vercel).
+  if (process.env.NODE_ENV === 'production') {
+    if (!ephemeralSecret) ephemeralSecret = crypto.randomBytes(48).toString('hex');
+    return ephemeralSecret;
+  }
+  return 'ultron-dev-secret-change-me';
 }
 
 type TokenPayload = { sub: string; role: Role };

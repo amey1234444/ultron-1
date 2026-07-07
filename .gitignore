@@ -40,8 +40,9 @@ yarn-error.*
 /ios
 /android
 .vercel
-.env*
-.env.local
+.env
+.env.*
+!.env.example
 .next/
 next-env.d.ts
 /build

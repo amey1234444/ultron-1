@@ -132,6 +132,10 @@ export async function updateUser(userId: string, patch: UpdateUserInput): Promis
   if (patch.email !== undefined) user.email = patch.email.trim();
   if (patch.role !== undefined) {
     if (!isRole(patch.role)) throw new ApiError(400, 'Invalid role.');
+    if (user.role === 'super_admin' && patch.role !== 'super_admin') {
+      const remainingSupers = store().users.filter((u) => u.role === 'super_admin' && u.id !== userId).length;
+      if (remainingSupers === 0) throw new ApiError(400, 'Cannot demote the last super admin.');
+    }
     user.role = patch.role;
   }
   if (patch.password !== undefined && patch.password !== '') {
