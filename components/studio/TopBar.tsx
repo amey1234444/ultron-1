@@ -3,10 +3,9 @@ import { Image, Text, View } from 'react-native';
 
 import { ThemeToggle } from '../ThemeToggle';
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { LOGO_DARK, LOGO_LIGHT } from '../../lib/brandLogos';
 import { cn } from '../../lib/cn';
 
-const LOGO_DARK = require('../../assets/brand/logo-dark.png');
-const LOGO_LIGHT = require('../../assets/brand/logo-light.png');
 const LOGO_ASPECT = 284 / 77;
 const LOGO_HEIGHT = 24;
 
