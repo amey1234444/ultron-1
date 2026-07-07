@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+
 import { ActionButton } from '../components/studio/ActionButton';
 import { AddDeviceDialog, type NewDevice } from '../components/studio/AddDeviceDialog';
 import { AssignProjectDialog } from '../components/studio/AssignProjectDialog';
