@@ -40,6 +40,28 @@ const PAD_TOP = 12;
 const PAD_BOTTOM = 20;
 const HISTORY_POINTS = 40; // matches useLiveHistory's rolling buffer length
 
+type Pt = { x: number; y: number };
+
+// Catmull-Rom spline (uniform, tension 0) expressed as cubic Béziers — turns the
+// jagged straight-segment polyline into a smooth curve through every sample.
+function smoothPath(points: Pt[]): string {
+  if (points.length < 2) return '';
+  if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
+  let d = `M ${points[0].x} ${points[0].y}`;
+  for (let i = 0; i < points.length - 1; i++) {
+    const p0 = points[i - 1] ?? points[i];
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const p3 = points[i + 2] ?? p2;
+    const cp1x = p1.x + (p2.x - p0.x) / 6;
+    const cp1y = p1.y + (p2.y - p0.y) / 6;
+    const cp2x = p2.x - (p3.x - p1.x) / 6;
+    const cp2y = p2.y - (p3.y - p1.y) / 6;
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+  }
+  return d;
+}
+
 type SeriesMeta = { id: string; letter: LiveKindLetter; colour: string; code: string; label: string; unit: string };
 
 // One overlaid line. Runs its own rolling history walk (demo data) and, whenever
@@ -86,7 +108,7 @@ function SeriesLine({
 
   if (!visible || points.length < 2) return null;
 
-  const d = points.reduce((acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), '');
+  const d = smoothPath(points);
   const last = points[points.length - 1];
 
   return (

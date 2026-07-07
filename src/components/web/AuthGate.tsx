@@ -19,7 +19,7 @@ export function AuthGate({ children, minRole }: AuthGateProps) {
   useEffect(() => {
     if (loading) return;
     if (!user) {
-      void router.replace(`/login?next=${encodeURIComponent(router.asPath)}`);
+      void router.replace('/home');
       return;
     }
     if (minRole && !hasAtLeast(user.role, minRole)) {
