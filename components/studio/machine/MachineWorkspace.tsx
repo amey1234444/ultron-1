@@ -14,6 +14,7 @@ import { ComponentTypeIcon } from './machineIcons';
 import { MachineCanvas } from './MachineCanvas';
 import { computePointCode, PointCard } from './PointCard';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
+import { createRavDefaultLayout, hasDefaultLayout } from './ravDefaultLayout';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { StageGrid, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
@@ -162,14 +163,22 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   // Actual View is meant to preview the deployed dashboard, not in-progress
   // unsaved edits. The "Machine" tab reads live in-memory state directly via
   // TrailBoard(readOnly) instead, so it's excluded here.
+  const allChannels = useMemo(() => listChannels(devices, cards), [devices, cards]);
+
   const [savedBoxes, setSavedBoxes] = useState<Box[]>([]);
   useEffect(() => {
     if (!isActual || actualTab === 'machine') return;
     const saved = loadLocal<SavedLayout>(trailBoardStorageKey(machine.id));
-    setSavedBoxes(saved?.boxes ?? []);
-  }, [isActual, actualTab, machine.id]);
+    if (saved?.boxes && saved.boxes.length > 0) {
+      setSavedBoxes(saved.boxes);
+      return;
+    }
+    // No saved config yet: fall back to the template's default wiring (RAV ships
+    // one) so the Actual View dashboards render live demo data out of the box
+    // instead of an empty "nothing mapped" state.
+    setSavedBoxes(hasDefaultLayout(machine.template) ? createRavDefaultLayout(allChannels).boxes : []);
+  }, [isActual, actualTab, machine.id, machine.template, allChannels]);
 
-  const allChannels = useMemo(() => listChannels(devices, cards), [devices, cards]);
   const mappedChannels = useMemo<MappedChannel[]>(
     () =>
       savedBoxes
