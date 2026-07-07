@@ -8,10 +8,7 @@ export default function StudioScreen() {
   return (
     <AuthGate>
       <View className="flex-1 bg-surface-dark">
-        <AccountBar />
-        <View className="flex-1">
-          <Home />
-        </View>
+        <Home sidebarFooter={<AccountBar />} />
       </View>
     </AuthGate>
   );

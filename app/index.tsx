@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -48,7 +48,7 @@ function makeId() {
 
 const SEED = createSeedData(makeId);
 
-export default function Home() {
+export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = {}) {
   const { isDark } = useAppTheme();
 
   // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
@@ -301,6 +301,7 @@ export default function Home() {
               machines={machines}
               onOpenMenu={(x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine })}
               onCreateProject={() => setCreateProjectVisible(true)}
+              footer={sidebarFooter}
             />
 
             <PanelToggle
@@ -314,6 +315,7 @@ export default function Home() {
         <View className="flex-1">
           {selected.kind === 'machine' && selectedMachine ? (
             <MachineWorkspace
+              key={selectedMachine.id}
               machine={selectedMachine}
               devices={devices}
               cards={cards}
