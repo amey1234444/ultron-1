@@ -13,6 +13,7 @@ import { DeviceDetail } from '../components/studio/DeviceDetail';
 import { DeviceMenu, type DeviceMenuState } from '../components/studio/DeviceMenu';
 import { DevicesTable } from '../components/studio/DevicesTable';
 import { EmptyState } from '../components/studio/EmptyState';
+import { HierarchyContents } from '../components/studio/HierarchyContents';
 import { LeftPanel } from '../components/studio/LeftPanel';
 import { AddMachineDialog, type NewMachine } from '../components/studio/machine/AddMachineDialog';
 import { MachineWorkspace } from '../components/studio/machine/MachineWorkspace';
@@ -48,7 +49,6 @@ const SEED = createSeedData(makeId);
 
 export default function Home() {
   const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
   // workspace stays usable; users can still toggle it back open via PanelToggle.
@@ -258,9 +258,6 @@ export default function Home() {
   const deleteDeviceInfo = deleteDeviceId ? devices.find((d) => d.id === deleteDeviceId) : null;
   const topBarProjectName = selectedProject?.name ?? (selectedFolder ? projects.find((p) => p.id === selectedFolder.projectId)?.name : undefined);
 
-  const projectFolderCount = selectedProject ? folders.filter((f) => f.projectId === selectedProject.id && f.parentId === null).length : 0;
-  const childFolderCount = selectedFolder ? folders.filter((f) => f.parentId === selectedFolder.id).length : 0;
-
   const renameCurrentName =
     renameTarget?.kind === 'project'
       ? (projects.find((p) => p.id === renameTarget.id)?.name ?? '')
@@ -366,43 +363,34 @@ export default function Home() {
               />
             </EmptyState>
           ) : selectedProject ? (
-            <EmptyState
-              title={selectedProject.name.toUpperCase()}
-              description={projectFolderCount === 0 ? 'This project is empty.' : 'Select a folder from the hierarchy to continue.'}
-            >
-              <ActionButton
-                label="Create Folder"
-                permission={PERMISSIONS.HIERARCHY_FOLDER_CREATE}
-                onPress={() => openCreateFolder({ kind: 'project', id: selectedProject.id })}
-              />
-              <ActionButton
-                label="Create Machine"
-                disabled
-                permission={PERMISSIONS.MACHINE_CREATE}
-                onPress={() => {}}
-              />
-            </EmptyState>
+            <HierarchyContents
+              title={selectedProject.name}
+              breadcrumb=""
+              childFolders={folders.filter((f) => f.projectId === selectedProject.id && f.parentId === null)}
+              childMachines={[]}
+              folders={folders}
+              machines={machines}
+              onOpenFolder={(id) => setSelected({ kind: 'folder', id })}
+              onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
+              onAddFolder={() => openCreateFolder({ kind: 'project', id: selectedProject.id })}
+              topPad={leftCollapsed}
+            />
           ) : selectedFolder ? (
-            <View className="flex-1">
-              <Text className={cn('px-6 pt-5 font-body text-xs', mutedClass)}>
-                {[projects.find((p) => p.id === selectedFolder.projectId)?.name, ...folderPath(folders, selectedFolder.id).map((f) => f.name)].join(' / ')}
-              </Text>
-              <EmptyState
-                title={selectedFolder.name.toUpperCase()}
-                description={childFolderCount === 0 ? 'This folder is empty.' : `${childFolderCount} subfolder(s).`}
-              >
-                <ActionButton
-                  label="Add Folder"
-                  permission={PERMISSIONS.HIERARCHY_FOLDER_CREATE}
-                  onPress={() => openCreateFolder({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
-                />
-                <ActionButton
-                  label="Add Machine"
-                  permission={PERMISSIONS.MACHINE_CREATE}
-                  onPress={() => openCreateMachine({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
-                />
-              </EmptyState>
-            </View>
+            <HierarchyContents
+              title={selectedFolder.name}
+              breadcrumb={[projects.find((p) => p.id === selectedFolder.projectId)?.name, ...folderPath(folders, selectedFolder.id).map((f) => f.name)]
+                .filter(Boolean)
+                .join(' / ')}
+              childFolders={folders.filter((f) => f.parentId === selectedFolder.id)}
+              childMachines={machines.filter((m) => m.folderId === selectedFolder.id)}
+              folders={folders}
+              machines={machines}
+              onOpenFolder={(id) => setSelected({ kind: 'folder', id })}
+              onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
+              onAddFolder={() => openCreateFolder({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
+              onAddMachine={() => openCreateMachine({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
+              topPad={leftCollapsed}
+            />
           ) : null}
         </View>
       </View>
