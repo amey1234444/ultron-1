@@ -372,16 +372,14 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
             )}
           </View>
 
-          {!isActual && (
-            <PanelToggle
-              collapsed={rightCollapsed}
-              onPress={() => setRightCollapsed((v) => !v)}
-              right={rightCollapsed ? 8 : RIGHT_PANEL_WIDTH - 12}
-              testID="ui.panel.right.toggle"
-            />
-          )}
+          <PanelToggle
+            collapsed={rightCollapsed}
+            onPress={() => setRightCollapsed((v) => !v)}
+            right={rightCollapsed ? 8 : RIGHT_PANEL_WIDTH - 12}
+            testID="ui.panel.right.toggle"
+          />
 
-          {!isActual && !rightCollapsed && (
+          {!rightCollapsed && (
             <View className={cn('w-72 border-l', lineClass)}>
               <View className={cn('flex-row border-b', lineClass)}>
                 <RightTabButton label="Components" active={rightTab === 'components'} onPress={() => setRightTab('components')} />

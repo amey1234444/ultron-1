@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -6,6 +7,7 @@ import type { FolderNode } from '../../lib/hierarchy';
 import type { MachineNode } from '../../lib/machines';
 import { PERMISSIONS } from '../../lib/permissions';
 import { ActionButton } from './ActionButton';
+import type { ContextMenuTarget } from './ContextMenu';
 import { MachineTemplateIcon } from './machine/machineIcons';
 import { FolderTypeIcon } from './tree/FolderTypeIcon';
 
@@ -20,6 +22,10 @@ type HierarchyContentsProps = {
   onOpenMachine: (id: string) => void;
   onAddFolder: () => void;
   onAddMachine?: () => void;
+  // Opens the shared hierarchy action menu (Add Folder/Machine, Rename, Move,
+  // View Details, Delete) for a card, so the workspace cards get the same ⋯
+  // affordance the sidebar tree has.
+  onOpenMenu?: (x: number, y: number, target: ContextMenuTarget, canAddMachine: boolean) => void;
   topPad?: boolean;
 };
 
@@ -28,19 +34,28 @@ function AssetCard({
   name,
   subtitle,
   onPress,
+  onOpenMenu,
 }: {
   icon: React.ReactNode;
   name: string;
   subtitle: string;
   onPress: () => void;
+  onOpenMenu?: (x: number, y: number) => void;
 }) {
   const { isDark } = useAppTheme();
+  const [hovered, setHovered] = useState(false);
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   return (
     <Pressable
       onPress={onPress}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      // Right-click / long-press also opens the actions menu, matching the tree.
+      onLongPress={onOpenMenu ? (e) => onOpenMenu(e.nativeEvent.pageX, e.nativeEvent.pageY) : undefined}
       className={cn(
         'flex-row items-center gap-3 rounded-xl border px-3.5 py-3',
         isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel',
+        hovered && (isDark ? 'border-ink/40' : 'border-ink-inverse/40'),
       )}
       style={{ width: 240 }}
     >
@@ -53,10 +68,23 @@ function AssetCard({
         <Text numberOfLines={1} className={cn('font-body-medium text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
           {name}
         </Text>
-        <Text numberOfLines={1} className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+        <Text numberOfLines={1} className={cn('font-body text-[11px]', mutedClass)}>
           {subtitle}
         </Text>
       </View>
+      {onOpenMenu ? (
+        <Pressable
+          hitSlop={8}
+          onPress={(e) => onOpenMenu(e.nativeEvent.pageX, e.nativeEvent.pageY)}
+          className={cn(
+            'h-6 w-6 items-center justify-center rounded-md',
+            hovered ? 'opacity-100' : 'opacity-0',
+            isDark ? 'bg-white/5' : 'bg-black/5',
+          )}
+        >
+          <Text className={cn('text-[15px] leading-none', mutedClass)}>⋯</Text>
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -76,6 +104,7 @@ export function HierarchyContents({
   onOpenMachine,
   onAddFolder,
   onAddMachine,
+  onOpenMenu,
   topPad,
 }: HierarchyContentsProps) {
   const { isDark } = useAppTheme();
@@ -140,6 +169,11 @@ export function HierarchyContents({
                     name={folder.name}
                     subtitle={folderSubtitle(folder)}
                     onPress={() => onOpenFolder(folder.id)}
+                    onOpenMenu={
+                      onOpenMenu
+                        ? (x, y) => onOpenMenu(x, y, { kind: 'folder', id: folder.id, projectId: folder.projectId }, true)
+                        : undefined
+                    }
                   />
                 ))}
               </View>
@@ -156,6 +190,17 @@ export function HierarchyContents({
                     name={machine.name}
                     subtitle={machine.template}
                     onPress={() => onOpenMachine(machine.id)}
+                    onOpenMenu={
+                      onOpenMenu
+                        ? (x, y) =>
+                            onOpenMenu(
+                              x,
+                              y,
+                              { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId },
+                              false,
+                            )
+                        : undefined
+                    }
                   />
                 ))}
               </View>

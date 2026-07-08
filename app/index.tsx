@@ -314,7 +314,7 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
 
   return (
     <SafeAreaView className={cn('flex-1', isDark ? 'bg-surface-dark' : 'bg-surface-light')} edges={['top', 'bottom']}>
-      <TopBar projectName={topBarProjectName} />
+      <TopBar projectName={topBarProjectName} devices={devices} />
 
       <View className="flex-1 flex-row">
         {!hideSidebar && (
@@ -404,6 +404,7 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
               onOpenFolder={(id) => setSelected({ kind: 'folder', id })}
               onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
               onAddFolder={() => openCreateFolder({ kind: 'project', id: selectedProject.id })}
+              onOpenMenu={(x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine })}
               topPad={leftCollapsed}
             />
           ) : selectedFolder ? (
@@ -420,6 +421,7 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
               onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
               onAddFolder={() => openCreateFolder({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
               onAddMachine={() => openCreateMachine({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
+              onOpenMenu={(x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine })}
               topPad={leftCollapsed}
             />
           ) : null}
