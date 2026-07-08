@@ -35,4 +35,12 @@ export type PublicUser = {
   email: string;
   role: Role;
   createdAt: string;
+  // When the user last authenticated, and when they were last seen active
+  // (heartbeat). Null until the first login / activity. Used to show live
+  // "online" status and last-seen times in User Management.
+  lastLoginAt: string | null;
+  lastSeenAt: string | null;
 };
+
+// A user counts as "online" if their last heartbeat is within this window.
+export const ONLINE_WINDOW_MS = 2 * 60 * 1000;

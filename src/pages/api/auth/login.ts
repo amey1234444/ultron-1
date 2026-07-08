@@ -1,7 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { issueSession } from '../../../server/session';
-import { toPublic, verifyCredentials } from '../../../server/users';
+import { recordLogin, toPublic, verifyCredentials } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
@@ -16,6 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!user) {
     return res.status(401).json({ error: 'Invalid username or password.' });
   }
+  recordLogin(user.id);
   issueSession(res, user);
   return res.status(200).json({ user: toPublic(user) });
 }

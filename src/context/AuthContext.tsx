@@ -32,6 +32,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refresh();
   }, [refresh]);
 
+  // Heartbeat: while signed in, ping /api/auth/me periodically so the server
+  // keeps this user's "last seen" fresh and they show as online to admins.
+  useEffect(() => {
+    if (!user) return;
+    const id = setInterval(() => {
+      void fetch('/api/auth/me').catch(() => {});
+    }, 45_000);
+    return () => clearInterval(id);
+  }, [user]);
+
   const login = useCallback(async (username: string, password: string) => {
     const res = await fetch('/api/auth/login', {
       method: 'POST',

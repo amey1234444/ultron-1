@@ -1,5 +1,5 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Image, Text, View } from 'react-native';
+import { Image, Text, View, type ViewStyle } from 'react-native';
 
 import { ThemeToggle } from '../ThemeToggle';
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -17,8 +17,19 @@ export function TopBar({ projectName }: TopBarProps) {
   const { isDark } = useAppTheme();
   const fade = isDark ? 'rgba(255,255,255,0.14)' : 'rgba(10,10,10,0.12)';
 
+  // Frosted-glass bar: translucent surface + backdrop blur so anything behind
+  // (menus, scrolling content) shows through softly. Web-only CSS keys are cast
+  // through ViewStyle, matching the pattern used elsewhere in the studio.
+  const glassStyle = {
+    backgroundColor: isDark ? 'rgba(10,10,10,0.55)' : 'rgba(250,250,250,0.6)',
+    backdropFilter: 'blur(16px) saturate(160%)',
+    WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+    borderBottomWidth: 1,
+    borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,10,0.08)',
+  } as unknown as ViewStyle;
+
   return (
-    <View className={cn('relative flex-row items-center justify-between px-4 py-1.5', isDark ? 'bg-surface-dark' : 'bg-surface-light')}>
+    <View className="relative z-10 flex-row items-center justify-between px-4 py-1.5" style={glassStyle}>
       <View className="flex-row items-center gap-3">
         <Image
           source={isDark ? LOGO_DARK : LOGO_LIGHT}

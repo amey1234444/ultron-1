@@ -4,7 +4,37 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 
 import { AuthGate } from '../components/web/AuthGate';
 import { useAuth } from '../context/AuthContext';
-import { ROLE_LABEL, ROLES, type PublicUser, type Role } from '../lib/roles';
+import { ONLINE_WINDOW_MS, ROLE_LABEL, ROLES, type PublicUser, type Role } from '../lib/roles';
+
+// Human-friendly "time ago" for last-login / last-seen timestamps.
+function timeAgo(iso: string | null, now: number): string {
+  if (!iso) return 'Never';
+  const diff = Math.max(0, now - new Date(iso).getTime());
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hrs = Math.floor(min / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+function isOnline(u: PublicUser, now: number): boolean {
+  return !!u.lastSeenAt && now - new Date(u.lastSeenAt).getTime() < ONLINE_WINDOW_MS;
+}
+
+function StatusPill({ user, now }: { user: PublicUser; now: number }) {
+  const online = isOnline(user, now);
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <View className={`h-2 w-2 rounded-full ${online ? 'bg-status-success' : 'bg-ink-muted'}`} />
+      <Text className={`font-body-medium text-[11px] ${online ? 'text-status-success' : 'text-ink-muted'}`}>
+        {online ? 'Online' : `Last seen ${timeAgo(user.lastSeenAt, now)}`}
+      </Text>
+    </View>
+  );
+}
 
 type FormState = {
   username: string;
@@ -76,9 +106,10 @@ function UsersScreenInner() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [now, setNow] = useState(() => Date.now());
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await fetch('/api/users');
       const data = await res.json();
@@ -87,12 +118,23 @@ function UsersScreenInner() {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load users.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, []);
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // Keep statuses live: re-fetch the directory and advance the clock so
+  // online/last-seen labels stay accurate without a manual refresh.
+  useEffect(() => {
+    const poll = setInterval(() => void load(true), 30_000);
+    const tick = setInterval(() => setNow(Date.now()), 15_000);
+    return () => {
+      clearInterval(poll);
+      clearInterval(tick);
+    };
   }, [load]);
 
   const resetForm = () => {
@@ -253,6 +295,12 @@ function UsersScreenInner() {
                     @{u.username}
                     {u.email ? ` · ${u.email}` : ''}
                   </Text>
+                  <View className="mt-1.5 flex-row items-center gap-3">
+                    <StatusPill user={u} now={now} />
+                    <Text className="font-body text-[11px] text-ink-muted">
+                      Last login: {timeAgo(u.lastLoginAt, now)}
+                    </Text>
+                  </View>
                 </View>
 
                 <View className="flex-row gap-2">

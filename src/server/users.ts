@@ -50,6 +50,8 @@ function seed(): Store {
       email: s.email,
       role: s.role,
       createdAt: now,
+      lastLoginAt: null,
+      lastSeenAt: null,
       passwordHash: bcrypt.hashSync(s.password, 10),
     })),
   };
@@ -87,6 +89,22 @@ export async function verifyCredentials(username: string, password: string): Pro
   return ok ? user : null;
 }
 
+// Stamp a successful login: records both the login time and initial activity.
+export function recordLogin(userId: string): void {
+  const user = findById(userId);
+  if (!user) return;
+  const now = new Date().toISOString();
+  user.lastLoginAt = now;
+  user.lastSeenAt = now;
+}
+
+// Refresh the user's activity heartbeat (drives live "online" status).
+export function touchLastSeen(userId: string): void {
+  const user = findById(userId);
+  if (!user) return;
+  user.lastSeenAt = new Date().toISOString();
+}
+
 export type CreateUserInput = {
   username: string;
   name: string;
@@ -111,6 +129,8 @@ export async function createUser(input: CreateUserInput): Promise<PublicUser> {
     email: input.email.trim(),
     role: input.role,
     createdAt: new Date().toISOString(),
+    lastLoginAt: null,
+    lastSeenAt: null,
     passwordHash: await bcrypt.hash(input.password, 10),
   };
   store().users.push(user);

@@ -1,5 +1,12 @@
 import Link from 'next/link';
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type ReactNode,
+} from 'react';
 
 import { useAuth } from '../context/AuthContext';
 
@@ -41,6 +48,53 @@ function Reveal({ children, delay = 0, style }: { children: ReactNode; delay?: n
         opacity: shown ? 1 : 0,
         transform: shown ? 'translateY(0)' : 'translateY(28px)',
         transition: `opacity 0.7s ease ${delay}ms, transform 0.7s cubic-bezier(0.22,1,0.36,1) ${delay}ms`,
+        ...style,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+// Pointer-reactive 3D tilt wrapper. The card leans toward the cursor and, when
+// `grow` is set, scales up on hover — used for the live-dashboard KPI cards.
+function TiltCard({
+  children,
+  grow = false,
+  max = 12,
+  style,
+}: {
+  children: ReactNode;
+  grow?: boolean;
+  max?: number;
+  style?: CSSProperties;
+}) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [tilt, setTilt] = useState({ rx: 0, ry: 0, active: false });
+
+  const onMove = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const el = ref.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const px = (e.clientX - r.left) / r.width - 0.5;
+    const py = (e.clientY - r.top) / r.height - 0.5;
+    setTilt({ rx: -py * max, ry: px * max, active: true });
+  };
+  const reset = () => setTilt({ rx: 0, ry: 0, active: false });
+
+  const scale = tilt.active && grow ? 1.06 : 1;
+  return (
+    <div
+      ref={ref}
+      onMouseMove={onMove}
+      onMouseLeave={reset}
+      style={{
+        transform: `perspective(700px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) scale(${scale})`,
+        transformStyle: 'preserve-3d',
+        transition: tilt.active ? 'transform 0.08s linear' : 'transform 0.4s cubic-bezier(0.22,1,0.36,1)',
+        cursor: 'pointer',
+        willChange: 'transform',
+        zIndex: tilt.active ? 2 : 1,
         ...style,
       }}
     >
@@ -131,9 +185,11 @@ export default function HomePage() {
           alignItems: 'center',
           justifyContent: 'space-between',
           padding: '18px clamp(20px, 6vw, 72px)',
-          backdropFilter: 'blur(12px)',
-          background: 'rgba(10,10,10,0.6)',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          backdropFilter: 'blur(18px) saturate(160%)',
+          WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+          background: 'linear-gradient(180deg, rgba(18,18,18,0.7), rgba(10,10,10,0.45))',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          boxShadow: '0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 30px rgba(0,0,0,0.25)',
         }}
       >
         <span style={{ fontFamily: FONT_HEAD, fontSize: 22, letterSpacing: '0.28em' }}>ULTRON</span>
@@ -523,12 +579,20 @@ function LiveDashboard() {
           </div>
         </div>
 
-        {/* sidebar KPIs + gauge */}
+        {/* sidebar KPIs + gauge — each card tilts toward the cursor and grows on hover */}
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <Gauge value={health} />
-          <Kpi label="Vibration" value={`${vib}`} unit="mm/s" tone={vib > 5 ? '#EF4444' : vib > 4 ? GOLD : GREEN} />
-          <Kpi label="Bearing temp" value={`${temp}`} unit="°C" tone={temp > 70 ? GOLD : GREEN} />
-          <Kpi label="Shaft speed" value={rpm.toLocaleString()} unit="rpm" tone={INK} />
+          <TiltCard grow>
+            <Gauge value={health} />
+          </TiltCard>
+          <TiltCard grow>
+            <Kpi label="Vibration" value={`${vib}`} unit="mm/s" tone={vib > 5 ? '#EF4444' : vib > 4 ? GOLD : GREEN} />
+          </TiltCard>
+          <TiltCard grow>
+            <Kpi label="Bearing temp" value={`${temp}`} unit="°C" tone={temp > 70 ? GOLD : GREEN} />
+          </TiltCard>
+          <TiltCard grow>
+            <Kpi label="Shaft speed" value={rpm.toLocaleString()} unit="rpm" tone={INK} />
+          </TiltCard>
         </div>
       </div>
     </div>
