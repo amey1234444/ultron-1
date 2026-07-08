@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
@@ -78,6 +78,9 @@ function FolderBranch({
               kind="machine"
               selected={selected.kind === 'machine' && selected.id === machine.id}
               onPress={() => onSelect({ kind: 'machine', id: machine.id })}
+              onOpenMenu={(x, y) =>
+                onOpenMenu(x, y, { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId }, false)
+              }
               testID={`tree-node:machine:${machine.id}`}
             />
           ))}
@@ -115,6 +118,14 @@ export function LeftPanel({
 }: LeftPanelProps) {
   const { isDark } = useAppTheme();
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [query, setQuery] = useState('');
+
+  const q = query.trim().toLowerCase();
+  const searching = q.length > 0;
+  const matchedProjects = searching ? projects.filter((p) => p.name.toLowerCase().includes(q)) : [];
+  const matchedFolders = searching ? folders.filter((f) => f.name.toLowerCase().includes(q)) : [];
+  const matchedMachines = searching ? machines.filter((m) => m.name.toLowerCase().includes(q)) : [];
+  const matchCount = matchedProjects.length + matchedFolders.length + matchedMachines.length;
 
   const toggleExpand = (id: string) => {
     setCollapsedIds((prev) => {
@@ -182,7 +193,68 @@ export function LeftPanel({
           >
           {activeTab === 'hierarchy' && (
             <View className="mb-5">
-              {projects.length === 0 ? (
+              <View className="mb-3 px-3">
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search hierarchy…"
+                  placeholderTextColor={isDark ? '#5A5A5A' : '#9A9A9A'}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 font-body text-[13px]',
+                    isDark ? 'border-line-dark bg-surface-darkpanel text-ink' : 'border-line-light bg-surface-lightpanel text-ink-inverse',
+                  )}
+                />
+              </View>
+
+              {searching ? (
+                matchCount === 0 ? (
+                  <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                    No matches for “{query.trim()}”
+                  </Text>
+                ) : (
+                  <>
+                    {matchedProjects.map((project) => (
+                      <TreeNode
+                        key={`s-p-${project.id}`}
+                        label={project.name}
+                        depth={0}
+                        kind="project"
+                        selected={selected.kind === 'project' && selected.id === project.id}
+                        onPress={() => onSelect({ kind: 'project', id: project.id })}
+                        onOpenMenu={(x, y) => onOpenMenu(x, y, { kind: 'project', id: project.id }, false)}
+                        testID={`tree-node:project:${project.id}`}
+                      />
+                    ))}
+                    {matchedFolders.map((folder) => (
+                      <TreeNode
+                        key={`s-f-${folder.id}`}
+                        label={folder.name}
+                        depth={0}
+                        kind="folder"
+                        folderType={folder.type}
+                        selected={selected.kind === 'folder' && selected.id === folder.id}
+                        onPress={() => onSelect({ kind: 'folder', id: folder.id })}
+                        onOpenMenu={(x, y) => onOpenMenu(x, y, { kind: 'folder', id: folder.id, projectId: folder.projectId }, true)}
+                        testID={`tree-node:folder:${folder.id}`}
+                      />
+                    ))}
+                    {matchedMachines.map((machine) => (
+                      <TreeNode
+                        key={`s-m-${machine.id}`}
+                        label={machine.name}
+                        depth={0}
+                        kind="machine"
+                        selected={selected.kind === 'machine' && selected.id === machine.id}
+                        onPress={() => onSelect({ kind: 'machine', id: machine.id })}
+                        onOpenMenu={(x, y) =>
+                          onOpenMenu(x, y, { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId }, false)
+                        }
+                        testID={`tree-node:machine:${machine.id}`}
+                      />
+                    ))}
+                  </>
+                )
+              ) : projects.length === 0 ? (
                 <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
                   No project yet
                 </Text>

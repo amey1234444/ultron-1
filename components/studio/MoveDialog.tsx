@@ -14,9 +14,10 @@ type MoveDialogProps = {
   folders: FolderNode[];
   onCancel: () => void;
   onMove: (newParentId: string | null) => void;
+  title?: string;
 };
 
-export function MoveDialog({ visible, folderId, project, folders, onCancel, onMove }: MoveDialogProps) {
+export function MoveDialog({ visible, folderId, project, folders, onCancel, onMove, title = 'Move Folder' }: MoveDialogProps) {
   const { isDark } = useAppTheme();
   const [destination, setDestination] = useState<string | null>(null);
 
@@ -33,7 +34,7 @@ export function MoveDialog({ visible, folderId, project, folders, onCancel, onMo
   return (
     <Dialog
       visible={visible}
-      title="Move Folder"
+      title={title}
       onRequestClose={onCancel}
       footer={
         <>

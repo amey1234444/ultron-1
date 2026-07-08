@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -38,6 +38,7 @@ export function TreeNode({
 }: TreeNodeProps) {
   const { isDark } = useAppTheme();
   const ref = useRef<View>(null);
+  const [hovered, setHovered] = useState(false);
 
   const iconColor = selected ? (isDark ? '#F5F5F5' : '#0A0A0A') : isDark ? '#8A8A8A' : '#6B6B6B';
   const textColorClass = selected ? (isDark ? 'text-ink' : 'text-ink-inverse') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
@@ -61,8 +62,10 @@ export function TreeNode({
     <View ref={ref} testID={testID} className="relative">
       <Pressable
         onPress={onPress}
+        onHoverIn={() => setHovered(true)}
+        onHoverOut={() => setHovered(false)}
         onLongPress={onOpenMenu ? (e) => onOpenMenu(e.nativeEvent.pageX, e.nativeEvent.pageY) : undefined}
-        className={cn('flex-row items-center gap-2 rounded-r-lg py-2 pr-2', selected && (isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel'))}
+        className={cn('flex-row items-center gap-2 rounded-r-lg py-2 pr-2', (selected || hovered) && (isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel'))}
         style={{ paddingLeft: 10 + depth * 18 }}
       >
         {hasChildren ? (
@@ -86,6 +89,22 @@ export function TreeNode({
         <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[13px]', textColorClass)}>
           {label}
         </Text>
+
+        {onOpenMenu ? (
+          <Pressable
+            hitSlop={8}
+            onPress={(e) => onOpenMenu(e.nativeEvent.pageX, e.nativeEvent.pageY)}
+            accessibilityLabel="Item actions"
+            testID={testID ? `${testID}:menu` : undefined}
+            className={cn(
+              'h-5 w-5 items-center justify-center rounded',
+              (hovered || selected) ? 'opacity-100' : 'opacity-0',
+              isDark ? 'active:bg-surface-dark' : 'active:bg-surface-light',
+            )}
+          >
+            <Text className={cn('text-[15px] leading-none', textColorClass)}>⋯</Text>
+          </Pressable>
+        ) : null}
       </Pressable>
       {selected && (
         <View className={cn('absolute bottom-1 left-0 top-1 w-[3px] rounded-full', isDark ? 'bg-ink' : 'bg-ink-inverse')} />

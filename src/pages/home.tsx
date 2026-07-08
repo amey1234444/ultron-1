@@ -17,9 +17,13 @@ const MUTED = '#8A8A8A';
 const BLUE = '#58A6FF';
 const GREEN = '#3FB950';
 
-const FONT_HEAD = 'SpaceGrotesk_600SemiBold, system-ui, sans-serif';
-const FONT_BODY = 'Inter_400Regular, system-ui, sans-serif';
-const FONT_MED = 'Inter_500Medium, system-ui, sans-serif';
+// Landing-page typography — DM Sans for body/headings and Bebas Neue as the
+// tall condensed display face, mirroring oswarteck.com. Loaded via Google Fonts
+// in _document.tsx (falls back to the bundled faces / system fonts).
+const FONT_DISPLAY = "'Bebas Neue', 'DM Sans', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
+const FONT_HEAD = "'DM Sans', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
+const FONT_BODY = "'DM Sans', Inter_400Regular, system-ui, sans-serif";
+const FONT_MED = "'DM Sans', Inter_500Medium, system-ui, sans-serif";
 const FONT_MONO = 'IBMPlexMono_400Regular, ui-monospace, monospace';
 
 // Fades a block up into place the first time it scrolls into view.
@@ -159,10 +163,14 @@ export default function HomePage() {
   // Scroll-driven perspective on the hero dashboard — it starts tilted back
   // (like Gigaton's product hero) and straightens as you scroll into the page.
   const [scrollProgress, setScrollProgress] = useState(0);
+  // Whether the page has scrolled past the top — drives the oswarteck-style nav
+  // that starts transparent and condenses into a frosted-glass bar on scroll.
+  const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => {
       const p = Math.min(1, window.scrollY / 520);
       setScrollProgress(p);
+      setScrolled(window.scrollY > 24);
     };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -184,15 +192,19 @@ export default function HomePage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: '18px clamp(20px, 6vw, 72px)',
-          backdropFilter: 'blur(18px) saturate(160%)',
-          WebkitBackdropFilter: 'blur(18px) saturate(160%)',
-          background: 'linear-gradient(180deg, rgba(18,18,18,0.7), rgba(10,10,10,0.45))',
-          borderBottom: '1px solid rgba(255,255,255,0.08)',
-          boxShadow: '0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 30px rgba(0,0,0,0.25)',
+          padding: scrolled ? '11px clamp(20px, 6vw, 72px)' : '20px clamp(20px, 6vw, 72px)',
+          backdropFilter: scrolled ? 'blur(18px) saturate(160%)' : 'blur(0px)',
+          WebkitBackdropFilter: scrolled ? 'blur(18px) saturate(160%)' : 'blur(0px)',
+          background: scrolled
+            ? 'linear-gradient(180deg, rgba(18,18,18,0.72), rgba(10,10,10,0.48))'
+            : 'transparent',
+          borderBottom: `1px solid ${scrolled ? 'rgba(255,255,255,0.08)' : 'transparent'}`,
+          boxShadow: scrolled ? '0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 30px rgba(0,0,0,0.28)' : 'none',
+          transition:
+            'padding 0.35s cubic-bezier(0.22,1,0.36,1), background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease',
         }}
       >
-        <span style={{ fontFamily: FONT_HEAD, fontSize: 22, letterSpacing: '0.28em' }}>ULTRON</span>
+        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, letterSpacing: '0.28em' }}>ULTRON</span>
         <nav style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
           <a href="#features" style={navLink} className="ultron-navlink">
             Features
@@ -260,11 +272,11 @@ export default function HomePage() {
 
           <h1
             style={{
-              fontFamily: FONT_HEAD,
-              fontSize: 'clamp(40px, 7vw, 82px)',
-              lineHeight: 1.02,
+              fontFamily: FONT_DISPLAY,
+              fontSize: 'clamp(48px, 8vw, 96px)',
+              lineHeight: 0.98,
               margin: '26px 0 0',
-              letterSpacing: '-0.02em',
+              letterSpacing: '0.01em',
               opacity: 0,
               animation: 'fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 0.15s forwards',
             }}
@@ -363,7 +375,7 @@ export default function HomePage() {
           >
             {STATS.map((s) => (
               <div key={s.label} style={{ background: '#0E0E0E', padding: '26px 20px', textAlign: 'center' }}>
-                <div style={{ fontFamily: FONT_HEAD, fontSize: 30, color: GOLD }}>{s.value}</div>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 40, color: GOLD }}>{s.value}</div>
                 <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: MUTED, marginTop: 6, letterSpacing: '0.08em' }}>
                   {s.label}
                 </div>
@@ -435,7 +447,7 @@ export default function HomePage() {
       {/* Footer CTA */}
       <section style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(70px, 10vw, 120px)', textAlign: 'center' }}>
         <Reveal>
-          <h2 style={{ fontFamily: FONT_HEAD, fontSize: 'clamp(30px, 5vw, 52px)', letterSpacing: '-0.02em' }}>
+          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 'clamp(34px, 5.5vw, 60px)', letterSpacing: '0.01em' }}>
             Ready to see your machines think?
           </h2>
           <div style={{ marginTop: 28 }}>
@@ -543,7 +555,9 @@ function LiveDashboard() {
             <span style={{ fontFamily: FONT_MED, fontSize: 13, color: INK }}>Vibration &amp; temperature</span>
             <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: MUTED }}>last 60s</span>
           </div>
-          <StreamChart series={series} series2={series2} />
+          <TiltCard max={8}>
+            <StreamChart series={series} series2={series2} />
+          </TiltCard>
           <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
             <Legend color={GOLD} label="Vibration" />
             <Legend color={BLUE} label="Temperature" />
@@ -826,7 +840,7 @@ function SiteFooter() {
       >
         {/* brand + contact */}
         <div>
-          <span style={{ fontFamily: FONT_HEAD, fontSize: 24, letterSpacing: '0.22em', color: INK }}>ULTRON</span>
+          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, letterSpacing: '0.22em', color: INK }}>ULTRON</span>
           <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.7, margin: '16px 0 0', maxWidth: 300 }}>
             Industrial intelligence platform for real-time monitoring and predictive maintenance of rotating equipment.
           </p>
@@ -994,10 +1008,10 @@ const sectionKicker: CSSProperties = {
 };
 
 const sectionTitle: CSSProperties = {
-  fontFamily: FONT_HEAD,
-  fontSize: 'clamp(26px, 4vw, 40px)',
-  lineHeight: 1.15,
-  letterSpacing: '-0.02em',
+  fontFamily: FONT_DISPLAY,
+  fontSize: 'clamp(30px, 4.5vw, 46px)',
+  lineHeight: 1.05,
+  letterSpacing: '0.01em',
   margin: 0,
 };
 
@@ -1027,7 +1041,10 @@ const keyframes = `
 @keyframes shimmer { to { background-position: 200% center; } }
 @keyframes draw { to { stroke-dashoffset: 0; } }
 .ultron-card:hover { transform: translateY(-6px); border-color: rgba(201,161,92,0.5) !important; }
+.ultron-navlink { position: relative; }
+.ultron-navlink::after { content: ''; position: absolute; left: 0; bottom: -5px; height: 1.5px; width: 0; background: ${GOLD}; transition: width 0.32s cubic-bezier(0.22,1,0.36,1); }
 .ultron-navlink:hover { color: ${INK} !important; }
+.ultron-navlink:hover::after { width: 100%; }
 .ultron-social:hover { color: ${GOLD} !important; border-color: rgba(201,161,92,0.5) !important; transform: translateY(-2px); }
 @media (max-width: 720px) {
   header nav a[href^="#"] { display: none; }

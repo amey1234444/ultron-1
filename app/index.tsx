@@ -83,6 +83,7 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
   const [createMachineTarget, setCreateMachineTarget] = useState<{ projectId: string; folderId: string } | null>(null);
   const [renameTarget, setRenameTarget] = useState<ContextMenuTarget | null>(null);
   const [moveFolderId, setMoveFolderId] = useState<string | null>(null);
+  const [moveMachineId, setMoveMachineId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<ContextMenuTarget | null>(null);
 
   const [addDeviceVisible, setAddDeviceVisible] = useState(false);
@@ -134,6 +135,8 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
     if (!renameTarget) return;
     if (renameTarget.kind === 'project') {
       setProjects((prev) => prev.map((p) => (p.id === renameTarget.id ? { ...p, name } : p)));
+    } else if (renameTarget.kind === 'machine') {
+      setMachines((prev) => prev.map((m) => (m.id === renameTarget.id ? { ...m, name } : m)));
     } else {
       setFolders((prev) => prev.map((f) => (f.id === renameTarget.id ? { ...f, name } : f)));
     }
@@ -163,6 +166,21 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
     setMoveFolderId(null);
   };
 
+  // Machines always live inside a folder, so the project-root option is a no-op.
+  const handleMoveMachine = (destFolderId: string | null) => {
+    if (!moveMachineId) return;
+    if (destFolderId) {
+      setMachines((prev) => prev.map((m) => (m.id === moveMachineId ? { ...m, folderId: destFolderId } : m)));
+    }
+    setMoveMachineId(null);
+  };
+
+  const viewDetails = (target: ContextMenuTarget) => {
+    if (target.kind === 'project') setSelected({ kind: 'project', id: target.id });
+    else if (target.kind === 'folder') setSelected({ kind: 'folder', id: target.id });
+    else setSelected({ kind: 'machine', id: target.id });
+  };
+
   const handleDelete = () => {
     if (!deleteTarget) return;
     if (deleteTarget.kind === 'project') {
@@ -176,6 +194,10 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
       if (selected.kind === 'machine' && machines.find((m) => m.id === selected.id)?.projectId === deleteTarget.id) {
         setSelected({ kind: 'none' });
       }
+    } else if (deleteTarget.kind === 'machine') {
+      const folderId = deleteTarget.folderId;
+      setMachines((prev) => prev.filter((m) => m.id !== deleteTarget.id));
+      if (selected.kind === 'machine' && selected.id === deleteTarget.id) setSelected({ kind: 'folder', id: folderId });
     } else {
       const removedIds = folderSubtreeIds(folders, deleteTarget.id);
       setFolders((prev) => prev.filter((f) => !removedIds.has(f.id)));
@@ -262,9 +284,11 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
   const renameCurrentName =
     renameTarget?.kind === 'project'
       ? (projects.find((p) => p.id === renameTarget.id)?.name ?? '')
-      : renameTarget
-        ? (folders.find((f) => f.id === renameTarget.id)?.name ?? '')
-        : '';
+      : renameTarget?.kind === 'machine'
+        ? (machines.find((m) => m.id === renameTarget.id)?.name ?? '')
+        : renameTarget
+          ? (folders.find((f) => f.id === renameTarget.id)?.name ?? '')
+          : '';
 
   const deleteInfo = (() => {
     if (!deleteTarget) return null;
@@ -275,6 +299,10 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
         title: 'Delete Project',
         message: `Delete "${project?.name}"${count > 0 ? ` and its ${count} folder(s)` : ''}? This cannot be undone.`,
       };
+    }
+    if (deleteTarget.kind === 'machine') {
+      const machine = machines.find((m) => m.id === deleteTarget.id);
+      return { title: 'Delete Machine', message: `Delete "${machine?.name}"? This cannot be undone.` };
     }
     const folder = folders.find((f) => f.id === deleteTarget.id);
     const count = folderSubtreeIds(folders, deleteTarget.id).size - 1;
@@ -434,6 +462,16 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
         onMove={handleMove}
       />
 
+      <MoveDialog
+        visible={moveMachineId !== null}
+        title="Move Machine"
+        folderId={moveMachineId ? (machines.find((m) => m.id === moveMachineId)?.folderId ?? '') : ''}
+        project={moveMachineId ? projects.find((p) => p.id === machines.find((m) => m.id === moveMachineId)?.projectId) : undefined}
+        folders={folders}
+        onCancel={() => setMoveMachineId(null)}
+        onMove={handleMoveMachine}
+      />
+
       {deleteInfo && (
         <ConfirmDialog
           visible={deleteTarget !== null}
@@ -452,8 +490,12 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
         onAddMachine={openCreateMachine}
         onRename={(target) => setRenameTarget(target)}
         onDuplicate={handleDuplicate}
-        onMove={(target) => target.kind === 'folder' && setMoveFolderId(target.id)}
+        onMove={(target) => {
+          if (target.kind === 'folder') setMoveFolderId(target.id);
+          else if (target.kind === 'machine') setMoveMachineId(target.id);
+        }}
         onDelete={(target) => setDeleteTarget(target)}
+        onViewDetails={viewDetails}
       />
 
       <AddDeviceDialog

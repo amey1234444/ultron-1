@@ -5,10 +5,12 @@ import { Pressable, Text, View } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { AUTH_FONT_BODY, AuthButton, AuthField, AuthShell } from './AuthShell';
 
-export default function LoginScreen() {
+export default function SignupScreen() {
   const router = useRouter();
-  const { user, loading, login } = useAuth();
+  const { user, loading, signup } = useAuth();
   const [username, setUsername] = useState('');
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -22,34 +24,40 @@ export default function LoginScreen() {
 
   const onSubmit = async () => {
     setError(null);
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await login(username.trim(), password);
+      await signup({ username: username.trim(), name: name.trim(), email: email.trim(), password });
       const next = typeof router.query.next === 'string' ? router.query.next : '/';
       await router.replace(next);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Login failed.');
+      setError(e instanceof Error ? e.message : 'Sign up failed.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <AuthShell subtitle="Sign in to continue">
+    <AuthShell subtitle="Create your account">
+      <AuthField label="Username" value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="jdoe" />
+      <AuthField label="Full name" value={name} onChangeText={setName} placeholder="Jane Doe" />
       <AuthField
-        label="Username"
-        value={username}
-        onChangeText={setUsername}
+        label="Email"
+        value={email}
+        onChangeText={setEmail}
         autoCapitalize="none"
-        placeholder="username"
-        onSubmitEditing={onSubmit}
+        keyboardType="email-address"
+        placeholder="jane@company.com"
       />
       <AuthField
         label="Password"
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        placeholder="••••••••"
+        placeholder="min 6 chars"
         onSubmitEditing={onSubmit}
       />
 
@@ -59,22 +67,18 @@ export default function LoginScreen() {
         </Text>
       ) : null}
 
-      <AuthButton label="Sign In" submitting={submitting} onPress={onSubmit} />
+      <AuthButton label="Create Account" submitting={submitting} onPress={onSubmit} />
 
       <View className="mt-6 flex-row items-center gap-1">
         <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
-          Don&apos;t have an account?
+          Already have an account?
         </Text>
-        <Pressable onPress={() => router.push('/signup')}>
+        <Pressable onPress={() => router.push('/login')}>
           <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-accent">
-            Create one
+            Sign in
           </Text>
         </Pressable>
       </View>
-
-      <Text style={{ fontFamily: AUTH_FONT_BODY }} className="mt-4 text-xs leading-5 text-ink-muted">
-        Demo accounts — superadmin / admin / user (default passwords in README).
-      </Text>
     </AuthShell>
   );
 }

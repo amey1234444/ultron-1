@@ -198,22 +198,13 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   // geometry is stored in stage units, so the layout is identical on every
   // screen — only the scale factor changes.
   //
-  // Design mode "contains" (scales to the smaller ratio, letterboxed) so
-  // nothing you're editing is ever cropped out of view. Actual View leans
-  // toward "cover" instead, to use more of a wide/tall window instead of
-  // leaving empty letterbox bars — but capped: content (cards) only has a
-  // modest margin baked into the 1600×900 stage, so scaling all the way to a
-  // full cover would crop real cards, not just empty space. Capping the
-  // overscan keeps it inside that safe margin on any reasonable window shape.
-  const MAX_ACTUAL_OVERSCAN = 1.08;
-  const stageScale = canvasSize
-    ? isActual
-      ? Math.min(
-          Math.max(canvasSize.width / STAGE_WIDTH, canvasSize.height / STAGE_HEIGHT),
-          (Math.min(canvasSize.width / STAGE_WIDTH, canvasSize.height / STAGE_HEIGHT)) * MAX_ACTUAL_OVERSCAN,
-        )
-      : Math.min(canvasSize.width / STAGE_WIDTH, canvasSize.height / STAGE_HEIGHT)
-    : 1;
+  // Both Design and Actual View use the same "contain" fit (scale to the
+  // smaller ratio, letterboxed) so the machine schema — every card, box, trail
+  // and gauge — appears at the exact same size and position in Actual View as
+  // it does in Design. An earlier "cover" overscan in Actual made the two
+  // views disagree and could crop cards near the stage edges; keeping a single
+  // shared scale guarantees 1:1 geometry parity.
+  const stageScale = canvasSize ? Math.min(canvasSize.width / STAGE_WIDTH, canvasSize.height / STAGE_HEIGHT) : 1;
   const stageStyle = canvasSize
     ? {
         position: 'absolute' as const,

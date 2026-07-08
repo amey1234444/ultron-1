@@ -2,10 +2,13 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 
 import type { PublicUser } from '../lib/roles';
 
+type SignupInput = { username: string; name: string; email: string; password: string };
+
 type AuthState = {
   user: PublicUser | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
+  signup: (input: SignupInput) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -53,14 +56,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user as PublicUser);
   }, []);
 
+  const signup = useCallback(async (input: SignupInput) => {
+    const res = await fetch('/api/auth/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(input),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Sign up failed.');
+    setUser(data.user as PublicUser);
+  }, []);
+
   const logout = useCallback(async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
   }, []);
 
   const value = useMemo<AuthState>(
-    () => ({ user, loading, login, logout, refresh }),
-    [user, loading, login, logout, refresh],
+    () => ({ user, loading, login, signup, logout, refresh }),
+    [user, loading, login, signup, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
