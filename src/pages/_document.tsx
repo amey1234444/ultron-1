@@ -1,0 +1,31 @@
+import { Html, Head, Main, NextScript } from 'next/document';
+
+export default function Document() {
+  return (
+    <Html lang="en">
+      <Head>
+        {/* Landing-page typography (DM Sans body + Bebas Neue display), matching
+            the oswarteck.com look. Loaded from Google Fonts for the web pages. */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+          rel="stylesheet"
+        />
+      </Head>
+      <body>
+        {/* react-native-web relies on the root elements filling the viewport so
+            top-level `flex: 1` layouts expand correctly. */}
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `html,body,#__next{height:100%;margin:0;padding:0;}
+#__next{display:flex;flex-direction:column;}
+body{background:#0A0A0A;}`,
+          }}
+        />
+        <Main />
+        <NextScript />
+      </body>
+    </Html>
+  );
+}
