@@ -268,7 +268,7 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
 
   return (
     <View className="flex-1">
-      {isActual ? (
+      {isActual && actualTab !== 'machine' ? (
         // Actual View is a full-screen dashboard preview — the mode switcher
         // (and the hierarchy sidebar, hidden by the parent) stay out of the
         // way entirely, so Back, the name, and the sub-tabs share one compact
@@ -302,7 +302,7 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
                   setStubNote('Live View mode is coming in a later step.');
                 }}
               />
-              <ModeTab label="Actual View" active={false} onPress={() => setMode('actual')} />
+              <ModeTab label="Actual View" active={mode === 'actual'} onPress={() => setMode('actual')} />
             </View>
           </View>
 
@@ -339,7 +339,7 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
             {stageStyle && (
               <>
                 <View pointerEvents="box-none" style={stageStyle} className="items-center justify-center">
-                  {!isActual && <StageGrid />}
+                  <StageGrid />
                   <View
                     onLayout={(e) => {
                       const { x, y, width, height } = e.nativeEvent.layout;
@@ -364,10 +364,10 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
                   machineTemplate={machine.template}
                   stageStyle={stageStyle}
                   stageScale={stageScale}
-                  readOnly={isActual}
+                  hideUnlink={isActual && actualTab === 'machine'}
                 />
 
-                {!isActual && <ZoomControls zoom={zoom} onZoomOut={zoomOut} onReset={resetZoom} onZoomIn={zoomIn} />}
+                <ZoomControls zoom={zoom} onZoomOut={zoomOut} onReset={resetZoom} onZoomIn={zoomIn} />
               </>
             )}
           </View>

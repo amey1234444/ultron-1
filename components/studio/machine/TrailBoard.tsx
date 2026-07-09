@@ -68,6 +68,7 @@ type TrailBoardProps = {
   // Actual View: clean dashboard-monitor rendering — no toolbar, no selection,
   // no dragging/editing. Live values and status colours keep updating.
   readOnly?: boolean;
+  hideUnlink?: boolean;
 };
 
 export type SavedLayout = { trails: Trail[]; boxes: Box[] };
@@ -106,7 +107,17 @@ function worseStatus(a: TrailStatus, b: TrailStatus): TrailStatus {
   return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
 }
 
-export function TrailBoard({ devices, cards, machineRect, machineId, machineTemplate, stageStyle, stageScale, readOnly = false }: TrailBoardProps) {
+export function TrailBoard({
+  devices,
+  cards,
+  machineRect,
+  machineId,
+  machineTemplate,
+  stageStyle,
+  stageScale,
+  readOnly = false,
+  hideUnlink = false,
+}: TrailBoardProps) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
@@ -456,6 +467,7 @@ export function TrailBoard({ devices, cards, machineRect, machineId, machineTemp
             canvasHeight={boardSize.height}
             stageScale={stageScale}
             readOnly={readOnly}
+            hideUnlink={hideUnlink}
             onDrag={(point) => updateBoxPosition(box.id, point)}
             onLabelChange={(label) => updateBoxLabel(box.id, label)}
             onPickChannel={(channel) => pickBoxChannel(box.id, channel)}

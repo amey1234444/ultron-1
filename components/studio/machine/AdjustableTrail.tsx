@@ -228,8 +228,8 @@ export type AdjustableTrailProps = {
   canvasHeight: number;
   // Current stage scale — converts screen-pixel gesture deltas to stage units.
   stageScale?: number;
-  // false = display-only (Actual View): path + endpoint nodes, no bend markers,
-  // no drag handles, no tap-to-select.
+  // false = display-only (Actual View): path + endpoint/bend nodes, no drag
+  // handles, no tap-to-select.
   interactive?: boolean;
   onPointsChange: (points: Point[]) => void;
   onSelect?: () => void;
@@ -254,7 +254,8 @@ export function AdjustableTrail({
   const { isDark } = useAppTheme();
   const statusColour = statusColourFor(status, isDark);
   const trailColour = selected ? '#C9A15C' : statusColour;
-  const showControls = interactive && showControlPoints;
+  const showBendMarkers = showControlPoints;
+  const showDraggableControls = interactive && showControlPoints;
 
   const path = useMemo(() => createRoundedPath(points, 12), [points]);
 
@@ -271,7 +272,7 @@ export function AdjustableTrail({
 
         {points.map((point, index) => {
           const isEndpoint = index === 0 || index === points.length - 1;
-          if (!isEndpoint && !showControls) return null;
+          if (!isEndpoint && !showBendMarkers) return null;
 
           return (
             <Circle
@@ -281,8 +282,8 @@ export function AdjustableTrail({
               r={isEndpoint ? 9 : 4}
               // Matches the page background per theme, so the ring reads as a
               // clean "cut-out" dot rather than a fixed dark blob on a light page.
-              fill={isDark ? '#0A0A0A' : '#FAFAFA'}
-              stroke={isEndpoint ? trailColour : '#C9A15C'}
+              fill={isEndpoint ? (isDark ? '#0A0A0A' : '#FAFAFA') : '#0A0A0A'}
+              stroke={isEndpoint ? trailColour : '#0A0A0A'}
               strokeWidth={isEndpoint ? 2 : 1}
             />
           );
@@ -298,7 +299,7 @@ export function AdjustableTrail({
       {interactive &&
         points.map((point, index) => {
           const isEndpoint = index === 0 || index === points.length - 1;
-          if (!isEndpoint && !showControls) return null;
+          if (!isEndpoint && !showDraggableControls) return null;
 
           const which: 'start' | 'end' | null = index === 0 ? 'start' : index === points.length - 1 ? 'end' : null;
 

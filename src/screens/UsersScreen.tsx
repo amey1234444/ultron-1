@@ -4,7 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 
 import { AuthGate } from '../components/web/AuthGate';
 import { useAuth } from '../context/AuthContext';
-import { ONLINE_WINDOW_MS, ROLE_LABEL, ROLES, type PublicUser, type Role } from '../lib/roles';
+import { ONLINE_WINDOW_MS, ROLE_LABEL, ROLES, USER_PERMISSIONS, userHasPermission, type PublicUser, type Role } from '../lib/roles';
 
 // Human-friendly "time ago" for last-login / last-seen timestamps.
 function timeAgo(iso: string | null, now: number): string {
@@ -42,9 +42,10 @@ type FormState = {
   email: string;
   password: string;
   role: Role;
+  canEditDeleteSchema: boolean;
 };
 
-const EMPTY_FORM: FormState = { username: '', name: '', email: '', password: '', role: 'user' };
+const EMPTY_FORM: FormState = { username: '', name: '', email: '', password: '', role: 'user', canEditDeleteSchema: false };
 
 function RoleChips({ value, onChange }: { value: Role; onChange: (r: Role) => void }) {
   return (
@@ -144,8 +145,18 @@ function UsersScreenInner() {
 
   const startEdit = (u: PublicUser) => {
     setEditingId(u.id);
-    setForm({ username: u.username, name: u.name, email: u.email, password: '', role: u.role });
+    setForm({
+      username: u.username,
+      name: u.name,
+      email: u.email,
+      password: '',
+      role: u.role,
+      canEditDeleteSchema: userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE),
+    });
   };
+
+  const hasSchemaAccessInForm = form.role === 'super_admin' || form.canEditDeleteSchema;
+  const formPermissions = hasSchemaAccessInForm ? [USER_PERMISSIONS.SCHEMA_EDIT_DELETE] : [];
 
   const submit = async () => {
     setError(null);
@@ -160,6 +171,7 @@ function UsersScreenInner() {
             email: form.email,
             role: form.role,
             password: form.password || undefined,
+            permissions: formPermissions,
           }),
         });
         const data = await res.json();
@@ -168,7 +180,14 @@ function UsersScreenInner() {
         const res = await fetch('/api/users', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify({
+            username: form.username,
+            name: form.name,
+            email: form.email,
+            password: form.password,
+            role: form.role,
+            permissions: formPermissions,
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Create failed.');
@@ -242,7 +261,36 @@ function UsersScreenInner() {
 
           <View className="mt-4 gap-1.5">
             <Text className="font-body-medium text-xs uppercase tracking-wide text-ink-muted">Role</Text>
-            <RoleChips value={form.role} onChange={(r) => setForm((f) => ({ ...f, role: r }))} />
+            <RoleChips
+              value={form.role}
+              onChange={(r) =>
+                setForm((f) => ({
+                  ...f,
+                  role: r,
+                  canEditDeleteSchema: r === 'super_admin' ? true : f.canEditDeleteSchema,
+                }))
+              }
+            />
+          </View>
+
+          <View className="mt-4 gap-1.5">
+            <Text className="font-body-medium text-xs uppercase tracking-wide text-ink-muted">Access</Text>
+            <Pressable
+              onPress={
+                form.role === 'super_admin'
+                  ? undefined
+                  : () => setForm((f) => ({ ...f, canEditDeleteSchema: !f.canEditDeleteSchema }))
+              }
+              accessibilityState={{ disabled: form.role === 'super_admin' }}
+              className={`flex-row items-center gap-2 self-start rounded-lg border px-3 py-2 ${
+                hasSchemaAccessInForm ? 'border-accent bg-accent-soft' : 'border-line-dark'
+              }`}
+            >
+              <View className={`h-3.5 w-3.5 rounded border ${hasSchemaAccessInForm ? 'border-accent bg-accent' : 'border-ink-muted'}`} />
+              <Text className={`font-body-medium text-xs ${hasSchemaAccessInForm ? 'text-accent' : 'text-ink-muted'}`}>
+                Edit or delete hierarchy and rack schema
+              </Text>
+            </Pressable>
           </View>
 
           {editingId ? (
@@ -289,6 +337,11 @@ function UsersScreenInner() {
                     </View>
                     {me?.id === u.id ? (
                       <Text className="font-body text-[11px] text-ink-muted">(you)</Text>
+                    ) : null}
+                    {userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE) ? (
+                      <View className="rounded-full border border-line-dark px-2 py-0.5">
+                        <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Schema Access</Text>
+                      </View>
                     ) : null}
                   </View>
                   <Text className="mt-0.5 font-body text-xs text-ink-muted">

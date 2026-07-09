@@ -24,6 +24,7 @@ type RackDetailProps = {
   onInstallCard: (slot: number, type: CardType, config: CardConfig, enabled: boolean) => void;
   onUpdateCard: (cardId: string, config: CardConfig, enabled: boolean) => void;
   onRemoveCard: (cardId: string) => void;
+  canEditDeleteSchema: boolean;
 };
 
 function ModeTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
@@ -40,7 +41,7 @@ function ModeTab({ label, active, onPress }: { label: string; active: boolean; o
   );
 }
 
-export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard, onRemoveCard }: RackDetailProps) {
+export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<ViewMode>('visual');
   const [installMenu, setInstallMenu] = useState<InstallCardMenuState | null>(null);
@@ -58,6 +59,7 @@ export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard,
           card={pageCard}
           onBack={() => setCardPage(null)}
           onEdit={() => setCardPage({ cardId: pageCard.id, view: 'config' })}
+          canEditDeleteSchema={canEditDeleteSchema}
         />
       );
     }
@@ -106,7 +108,9 @@ export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard,
         {mode === 'visual' && (
           <RackFaceplate
             cards={cards}
-            onPressEmpty={(slot, x, y) => setInstallMenu({ slot, x, y })}
+            onPressEmpty={(slot, x, y) => {
+              if (canEditDeleteSchema) setInstallMenu({ slot, x, y });
+            }}
             onPressCard={(card, x, y) => setCardMenu({ card, x, y })}
           />
         )}
@@ -130,6 +134,7 @@ export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard,
         onRunDiagnostics={() => setStubNote('Run Diagnostics is coming in a later step.')}
         onViewHistory={() => setStubNote('View History is coming in a later step.')}
         onRemoveCard={(card) => setRemoveTarget(card)}
+        canEditDeleteSchema={canEditDeleteSchema}
       />
 
       <ConfirmDialog

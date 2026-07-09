@@ -39,6 +39,7 @@ import { componentsForTemplate, type MachineNode } from '../lib/machines';
 import { PERMISSIONS } from '../lib/permissions';
 import type { CardConfig, CardNode, CardType } from '../lib/rack';
 import { createSeedData } from '../lib/seedData';
+import { USER_PERMISSIONS, userHasPermission, type PublicUser } from '../src/lib/roles';
 
 const LEFT_PANEL_WIDTH = 256;
 
@@ -48,8 +49,11 @@ function makeId() {
 
 const SEED = createSeedData(makeId);
 
-export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = {}) {
+export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: ReactNode; currentUser?: PublicUser | null } = {}) {
   const { isDark } = useAppTheme();
+  const canEditDeleteSchema = currentUser
+    ? userHasPermission(currentUser, USER_PERMISSIONS.SCHEMA_EDIT_DELETE)
+    : true;
 
   // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
   // workspace stays usable; users can still toggle it back open via PanelToggle.
@@ -354,6 +358,7 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
             <RackDetail
               device={selectedDevice}
               cards={cards.filter((c) => c.deviceId === selectedDevice.id)}
+              canEditDeleteSchema={canEditDeleteSchema}
               onBack={() => setSelected({ kind: 'devices' })}
               onInstallCard={(slot, type, config, enabled) => handleInstallCard(selectedDevice.id, slot, type, config, enabled)}
               onUpdateCard={handleUpdateCard}
@@ -498,6 +503,7 @@ export default function Home({ sidebarFooter }: { sidebarFooter?: ReactNode } = 
         }}
         onDelete={(target) => setDeleteTarget(target)}
         onViewDetails={viewDetails}
+        canEditDeleteSchema={canEditDeleteSchema}
       />
 
       <AddDeviceDialog

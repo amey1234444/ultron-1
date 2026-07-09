@@ -26,6 +26,7 @@ export type PointCard18Props = {
   dragHandlers?: GestureResponderHandlers;
   onDelete?: () => void;
   onUnlink?: () => void;
+  hideUnlink?: boolean;
 };
 
 // The channel readout card, shared by Design mode (editable) and Actual View
@@ -45,6 +46,7 @@ export function PointCard18({
   dragHandlers,
   onDelete,
   onUnlink,
+  hideUnlink = false,
 }: PointCard18Props) {
   const { isDark } = useAppTheme();
   const statusColour = STATUS_COLOUR[status];
@@ -110,7 +112,7 @@ export function PointCard18({
           Inline style, not a NativeWind className: margin/z-index utilities
           here have repeatedly lost to React Native Web's own generated atomic
           classes on specificity, so inline style is the reliable option. */}
-      {interactive && onUnlink && (
+      {interactive && onUnlink && !hideUnlink && (
         <Pressable onPress={onUnlink} hitSlop={6} style={{ marginTop: 8, alignSelf: 'flex-start' }}>
           <Text className={cn('font-body text-[10px] underline', mutedClass)}>Unlink</Text>
         </Pressable>

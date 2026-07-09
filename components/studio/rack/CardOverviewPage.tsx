@@ -10,6 +10,7 @@ type CardOverviewPageProps = {
   card: CardNode;
   onBack: () => void;
   onEdit: () => void;
+  canEditDeleteSchema: boolean;
 };
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
@@ -41,7 +42,7 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
   return [];
 }
 
-export function CardOverviewPage({ card, onBack, onEdit }: CardOverviewPageProps) {
+export function CardOverviewPage({ card, onBack, onEdit, canEditDeleteSchema }: CardOverviewPageProps) {
   const { isDark } = useAppTheme();
   const inkColor = isDark ? '#F5F5F5' : '#0A0A0A';
 
@@ -56,7 +57,7 @@ export function CardOverviewPage({ card, onBack, onEdit }: CardOverviewPageProps
           <CardTypeIcon type={card.type} color={inkColor} size={18} />
           <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{card.type}</Text>
         </View>
-        <ActionButton label="Edit Configuration" onPress={onEdit} />
+        {canEditDeleteSchema && <ActionButton label="Edit Configuration" onPress={onEdit} />}
       </View>
 
       <View className={cn('mx-6 mt-4 rounded-xl border', isDark ? 'border-line-dark' : 'border-line-light')}>

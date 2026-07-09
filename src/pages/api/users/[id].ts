@@ -11,12 +11,13 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   try {
     if (req.method === 'PATCH') {
       requireUser(req, 'super_admin');
-      const { name, email, role, password } = (req.body ?? {}) as Record<string, string>;
+      const { name, email, role, password, permissions } = (req.body ?? {}) as Record<string, unknown>;
       const user = await updateUser(userId, {
-        name,
-        email,
+        name: name === undefined ? undefined : String(name),
+        email: email === undefined ? undefined : String(email),
         role: role as never,
-        password,
+        password: password === undefined ? undefined : String(password),
+        permissions: Array.isArray(permissions) ? (permissions as never) : undefined,
       });
       return res.status(200).json({ user });
     }

@@ -24,6 +24,7 @@ type ContextMenuProps = {
   onMove: (target: ContextMenuTarget) => void;
   onDelete: (target: ContextMenuTarget) => void;
   onViewDetails: (target: ContextMenuTarget) => void;
+  canEditDeleteSchema: boolean;
 };
 
 export function ContextMenu({
@@ -36,6 +37,7 @@ export function ContextMenu({
   onMove,
   onDelete,
   onViewDetails,
+  canEditDeleteSchema,
 }: ContextMenuProps) {
   if (!state) return null;
 
@@ -62,17 +64,23 @@ export function ContextMenu({
           <MenuDivider />
         </>
       )}
-      <MenuItem label="Rename" onPress={run(onRename)} />
-      {!isMachine && <MenuItem label="Duplicate" onPress={run(onDuplicate)} />}
-      <MenuItem
-        label="Move"
-        onPress={run(onMove)}
-        disabled={!isFolder && !isMachine}
-        hint={!isFolder && !isMachine ? 'Projects can’t be moved' : undefined}
-      />
+      {canEditDeleteSchema && <MenuItem label="Rename" onPress={run(onRename)} />}
+      {canEditDeleteSchema && !isMachine && <MenuItem label="Duplicate" onPress={run(onDuplicate)} />}
+      {canEditDeleteSchema && (
+        <MenuItem
+          label="Move"
+          onPress={run(onMove)}
+          disabled={!isFolder && !isMachine}
+          hint={!isFolder && !isMachine ? 'Projects can’t be moved' : undefined}
+        />
+      )}
       <MenuItem label="View Details" onPress={run(onViewDetails)} />
-      <MenuDivider />
-      <MenuItem label="Delete" onPress={run(onDelete)} danger />
+      {canEditDeleteSchema && (
+        <>
+          <MenuDivider />
+          <MenuItem label="Delete" onPress={run(onDelete)} danger />
+        </>
+      )}
     </MenuContainer>
   );
 }

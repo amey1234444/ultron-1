@@ -13,9 +13,6 @@ const LOGO_HEIGHT = 24;
 
 type TopBarProps = {
   projectName?: string | null;
-  // Optional live-status inputs; sensible defaults keep the header useful even
-  // before real telemetry/alarm wiring exists.
-  online?: boolean;
   alarmCount?: number;
   // Devices power the "Connections" dropdown (active/inactive IPs + machine ids).
   devices?: DeviceNode[];
@@ -139,7 +136,7 @@ function ConnectionsMenu({
             <View className={cn('flex-row items-center justify-between border-b px-3 py-2.5', lineClass)}>
               <Text className={cn('font-body-bold text-xs uppercase tracking-wider', inkClass)}>Connections</Text>
               <Text className={cn('font-body-medium text-[11px]', mutedClass)}>
-                {active.length} of {total} online
+                {active.length} of {total} active
               </Text>
             </View>
 
@@ -176,7 +173,7 @@ function ConnectionsMenu({
   );
 }
 
-export function TopBar({ projectName, online = true, alarmCount = 0, devices = [] }: TopBarProps) {
+export function TopBar({ projectName, alarmCount = 0, devices = [] }: TopBarProps) {
   const { isDark } = useAppTheme();
   const { width } = useWindowDimensions();
   // Progressive disclosure: drop the least-essential chrome first as the header
@@ -222,20 +219,9 @@ export function TopBar({ projectName, online = true, alarmCount = 0, devices = [
         )}
       </View>
 
-      {/* Right: connections + live status cluster + theme toggle */}
+      {/* Right: connections + alarms + clock + theme toggle */}
       <View className="flex-row items-center gap-3">
         <ConnectionsMenu devices={devices} compact={isMid} />
-
-        {showDividers && <Divider color={dividerColor} />}
-
-        <View className="flex-row items-center gap-1.5">
-          <View className={cn('h-2 w-2 rounded-full', online ? 'bg-status-success' : 'bg-ink-muted')} />
-          {!isMid && (
-            <Text className={cn('font-body-medium text-[11px]', online ? 'text-status-success' : mutedClass)}>
-              {online ? 'Online' : 'Offline'}
-            </Text>
-          )}
-        </View>
 
         {showDividers && <Divider color={dividerColor} />}
 

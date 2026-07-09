@@ -45,6 +45,7 @@ export type MappableBoxProps = {
   // Actual View: no dragging, no editing, no delete/unlink — just the label or
   // the live channel readout.
   readOnly?: boolean;
+  hideUnlink?: boolean;
   onDrag: (point: Point) => void;
   onLabelChange: (label: string) => void;
   onPickChannel: (channel: ChannelRef | null) => void;
@@ -71,6 +72,7 @@ export function MappableBox({
   canvasHeight,
   stageScale = 1,
   readOnly = false,
+  hideUnlink = false,
   onDrag,
   onLabelChange,
   onPickChannel,
@@ -160,6 +162,7 @@ export function MappableBox({
             dragHandlers={panResponder.panHandlers}
             onDelete={onDelete}
             onUnlink={() => onPickChannel(null)}
+            hideUnlink={hideUnlink}
           />
         </View>
       </>

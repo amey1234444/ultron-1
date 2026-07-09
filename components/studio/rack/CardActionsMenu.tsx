@@ -13,6 +13,7 @@ type CardActionsMenuProps = {
   onRemoveCard: (card: CardNode) => void;
   onRunDiagnostics: (card: CardNode) => void;
   onViewHistory: (card: CardNode) => void;
+  canEditDeleteSchema: boolean;
 };
 
 export function CardActionsMenu({
@@ -25,6 +26,7 @@ export function CardActionsMenu({
   onRemoveCard,
   onRunDiagnostics,
   onViewHistory,
+  canEditDeleteSchema,
 }: CardActionsMenuProps) {
   if (!state) return null;
   const { card } = state;
@@ -35,16 +37,24 @@ export function CardActionsMenu({
 
   return (
     <MenuContainer x={state.x} y={state.y} onClose={onClose}>
-      <MenuItem label="Configure" onPress={run(onConfigure)} />
+      {canEditDeleteSchema && <MenuItem label="Configure" onPress={run(onConfigure)} />}
       <MenuItem label="View Channels" onPress={run(onViewChannels)} />
-      <MenuDivider />
-      <MenuItem label="Move Card" onPress={run(onMoveCard)} />
-      <MenuItem label="Replace Card" onPress={run(onReplaceCard)} />
+      {canEditDeleteSchema && (
+        <>
+          <MenuDivider />
+          <MenuItem label="Move Card" onPress={run(onMoveCard)} />
+          <MenuItem label="Replace Card" onPress={run(onReplaceCard)} />
+        </>
+      )}
       <MenuDivider />
       <MenuItem label="Run Diagnostics" onPress={run(onRunDiagnostics)} />
       <MenuItem label="View History" onPress={run(onViewHistory)} />
-      <MenuDivider />
-      <MenuItem label="Remove Card" onPress={run(onRemoveCard)} danger />
+      {canEditDeleteSchema && (
+        <>
+          <MenuDivider />
+          <MenuItem label="Remove Card" onPress={run(onRemoveCard)} danger />
+        </>
+      )}
     </MenuContainer>
   );
 }

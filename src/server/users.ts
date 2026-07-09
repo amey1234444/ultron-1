@@ -1,6 +1,6 @@
 import bcrypt from 'bcryptjs';
 
-import { isRole, type PublicUser, type Role } from '../lib/roles';
+import { isRole, isUserPermission, USER_PERMISSIONS, type PublicUser, type Role, type UserPermission } from '../lib/roles';
 
 export type StoredUser = PublicUser & { passwordHash: string };
 
@@ -49,6 +49,7 @@ function seed(): Store {
       name: s.name,
       email: s.email,
       role: s.role,
+      permissions: s.role === 'super_admin' ? [USER_PERMISSIONS.SCHEMA_EDIT_DELETE] : [],
       createdAt: now,
       lastLoginAt: null,
       lastSeenAt: null,
@@ -66,7 +67,16 @@ function store(): Store {
 
 export function toPublic(u: StoredUser): PublicUser {
   const { passwordHash: _passwordHash, ...pub } = u;
-  return pub;
+  return {
+    ...pub,
+    permissions: normalizePermissions(pub.permissions, pub.role),
+  };
+}
+
+function normalizePermissions(permissions: unknown, role: Role): UserPermission[] {
+  if (role === 'super_admin') return [USER_PERMISSIONS.SCHEMA_EDIT_DELETE];
+  if (!Array.isArray(permissions)) return [];
+  return permissions.filter(isUserPermission);
 }
 
 export function listUsers(): PublicUser[] {
@@ -111,6 +121,7 @@ export type CreateUserInput = {
   email: string;
   role: Role;
   password: string;
+  permissions?: UserPermission[];
 };
 
 export async function createUser(input: CreateUserInput): Promise<PublicUser> {
@@ -128,6 +139,7 @@ export async function createUser(input: CreateUserInput): Promise<PublicUser> {
     name: input.name.trim() || username,
     email: input.email.trim(),
     role: input.role,
+    permissions: normalizePermissions(input.permissions, input.role),
     createdAt: new Date().toISOString(),
     lastLoginAt: null,
     lastSeenAt: null,
@@ -142,6 +154,7 @@ export type UpdateUserInput = Partial<{
   email: string;
   role: Role;
   password: string;
+  permissions: UserPermission[];
 }>;
 
 export async function updateUser(userId: string, patch: UpdateUserInput): Promise<PublicUser> {
@@ -157,6 +170,10 @@ export async function updateUser(userId: string, patch: UpdateUserInput): Promis
       if (remainingSupers === 0) throw new ApiError(400, 'Cannot demote the last super admin.');
     }
     user.role = patch.role;
+    user.permissions = normalizePermissions(user.permissions, user.role);
+  }
+  if (patch.permissions !== undefined) {
+    user.permissions = normalizePermissions(patch.permissions, user.role);
   }
   if (patch.password !== undefined && patch.password !== '') {
     if (patch.password.length < 6) throw new ApiError(400, 'Password must be at least 6 characters.');

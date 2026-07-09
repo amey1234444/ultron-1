@@ -8,6 +8,10 @@ declare module '*.otf' {
   const src: string;
   export default src;
 }
+declare module '*.png' {
+  const src: string | { src: string };
+  export default src;
+}
 
 // Side-effect CSS imports (global.css) processed by Next/PostCSS.
 declare module '*.css';

@@ -12,8 +12,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     if (req.method === 'POST') {
       requireUser(req, 'super_admin');
-      const { username, name, email, role, password } = (req.body ?? {}) as Record<string, string>;
-      const user = await createUser({ username, name, email, role: role as never, password });
+      const { username, name, email, role, password, permissions } = (req.body ?? {}) as Record<string, unknown>;
+      const user = await createUser({
+        username: String(username ?? ''),
+        name: String(name ?? ''),
+        email: String(email ?? ''),
+        role: role as never,
+        password: String(password ?? ''),
+        permissions: Array.isArray(permissions) ? (permissions as never) : [],
+      });
       return res.status(201).json({ user });
     }
     res.setHeader('Allow', 'GET, POST');
