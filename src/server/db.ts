@@ -106,4 +106,6 @@ async function migrate(): Promise<void> {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS rate_events_lookup ON rate_events (bucket, key, ts);`);
+  // Primary lookup path is by key + time window (see rateLimit.ts).
+  await query(`CREATE INDEX IF NOT EXISTS rate_events_key_ts ON rate_events (key, ts);`);
 }

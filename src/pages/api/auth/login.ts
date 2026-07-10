@@ -1,15 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { enforceRateLimit } from '../../../server/rateLimit';
+import { guardRequest } from '../../../server/security';
 import { issueSession } from '../../../server/session';
 import { ApiError, recordLogin, toPublic, verifyCredentials } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed.' });
-  }
   try {
+    if (guardRequest(req, res)) return;
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST');
+      return res.status(405).json({ error: 'Method not allowed.' });
+    }
     await enforceRateLimit(req, res, 'login');
 
     const { username, password } = (req.body ?? {}) as { username?: string; password?: string };

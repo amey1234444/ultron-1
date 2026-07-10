@@ -58,13 +58,74 @@ can never be self-elevated. Accounts have three statuses:
 
 ### Bot protection & rate limiting
 
-- **CAPTCHA** on registration — a self-contained, signed/expiring image
-  challenge (`/api/captcha`); no third-party service or key needed. The token
-  carries only a salted hash of the answer, so it can't be solved by decoding.
-- **Rate limiting** on every API, keyed on **client IP + device fingerprint**.
-  Signup is hardcoded to **3 requests/hour**; login and general API limits are
-  tunable by a super admin at `/admin/users` (persisted in the DB). Over-limit
-  requests get HTTP `429`.
+#### CAPTCHA (`src/server/captcha.ts`)
+
+A self-contained, **stateless** image CAPTCHA — no third-party service, key, or
+server-side session needed, so it works on serverless out of the box.
+
+- `GET /api/captcha` returns `{ token, svg }`. The SVG is a distorted, noisy
+  render of a random 5-char code (ambiguous glyphs like `0/O/1/I` excluded).
+- The `token` is `base64url(payload).hmacSHA256(payload)` where the payload is
+  `{ h, e, n }`:
+  - `h` = `HMAC_SHA256(secret, "<nonce>:<answer>")` — a **salted hash** of the
+    answer, never the plaintext. A bot cannot base64-decode the token to learn
+    the answer; it must actually OCR the image.
+  - `e` = expiry (**5 minutes**), `n` = random nonce.
+- On signup the client echoes `captchaToken` + `captchaAnswer`. The server
+  recomputes the HMAC (rejects tampering), checks expiry, and timing-safe
+  compares `HMAC(secret, nonce:answer)` to `h`.
+- The signing secret is `CAPTCHA_SECRET` (falls back to `AUTH_SECRET`). The
+  challenge auto-rotates on any failed attempt.
+
+#### Rate limiting (`src/server/rateLimit.ts`)
+
+Every API route is throttled with a **sliding window**. Each request is checked
+against **two windows that must both pass**:
+
+1. **IP + device fingerprint** — the precise per-client limit.
+2. **IP only**, at 10× the cap — a safety net so an attacker can't bypass (1) by
+   rotating the `x-device-id` header from a single IP, while still allowing many
+   real users behind one shared NAT/office IP.
+
+- The device fingerprint = `sha256(x-device-id + user-agent)`; `x-device-id` is a
+  random id the browser persists in `localStorage`. It's advisory (raises attack
+  cost), never a security boundary on its own — the IP window backs it up.
+- Defaults (`src/server/settings.ts`): **signup 3/hour** (hardcoded product
+  requirement), **login 10 / 15 min**, **general API 300 / 60 s**. Login and API
+  limits are tunable by a super admin at `/admin/users` → `GET/PUT
+  /api/config/rate-limits` (persisted in `app_settings`).
+- Over-limit requests get **HTTP 429** with a `Retry-After` header. A rejected
+  request does **not** consume quota (all windows are counted before any is
+  recorded). The limiter **fails open** if its storage backend errors, so a DB
+  hiccup never locks out legitimate users.
+- Backed by the `rate_events` table in Postgres (holds across serverless
+  instances) or an in-memory window when no `DATABASE_URL`.
+
+### Web security (CSRF, XSS, CORS, SQL injection, headers)
+
+- **CSRF** — the session cookie is `httpOnly` + `SameSite=Lax`, and every
+  state-changing request (`POST/PUT/PATCH/DELETE`) additionally passes a
+  server-side **same-origin check** (`src/server/security.ts`): if an
+  `Origin`/`Referer` is present and its host ≠ the request host, it's rejected
+  with `403`. Non-browser callers (no Origin) still work.
+- **CORS** — same-origin only. The API **never** emits
+  `Access-Control-Allow-Origin: *`; it reflects the origin *only* when it matches
+  our own host, and answers preflight `OPTIONS` accordingly. Cross-origin reads
+  are blocked by the browser.
+- **XSS** — React/react-native-web auto-escape all rendered text; the CAPTCHA is
+  delivered as an `<img>` data-URI (never injected as raw HTML), and the SVG
+  itself XML-escapes its glyphs. A strict **Content-Security-Policy**
+  (`script-src 'self'` in production, `object-src 'none'`, `base-uri 'self'`,
+  `frame-ancestors 'none'`) is set in `next.config.js` as defense-in-depth.
+- **SQL injection** — every query uses **parameterized** `$1,$2,…` placeholders
+  (`pg`); no string concatenation of user input into SQL anywhere.
+- **Security headers** (all routes): `Content-Security-Policy`,
+  `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`,
+  `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`,
+  `Cross-Origin-Opener-Policy: same-origin`, and `Strict-Transport-Security`
+  (production). `X-Powered-By` is disabled.
+- **Passwords** hashed with **bcrypt**; sessions are signed JWTs and rejected
+  unless the account is still `active` (a valid token alone is never enough).
 
 ### Seed accounts
 

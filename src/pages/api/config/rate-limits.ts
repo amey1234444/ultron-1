@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { enforceRateLimit } from '../../../server/rateLimit';
+import { guardRequest } from '../../../server/security';
 import { requireUser } from '../../../server/session';
 import { DEFAULT_RATE_LIMITS, getRateLimits, sanitizeSettings, setRateLimits } from '../../../server/settings';
 import { ApiError } from '../../../server/users';
@@ -9,6 +10,7 @@ import { ApiError } from '../../../server/users';
 // PUT overwrites them (super admin only).
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    if (guardRequest(req, res)) return;
     await enforceRateLimit(req, res, 'api');
     if (req.method === 'GET') {
       await requireUser(req, 'super_admin');
