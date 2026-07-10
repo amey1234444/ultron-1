@@ -265,7 +265,12 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   );
 
   const actualSubTabs = (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', gap: 8, paddingVertical: 2 }}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ alignItems: 'center', gap: 8, paddingVertical: 2 }}
+      style={{ flexGrow: 0, flexShrink: 1, marginLeft: 'auto' }}
+    >
       <ActualSubTab label="Machine" active={actualTab === 'machine'} onPress={() => setActualTab('machine')} />
       <ActualSubTab label="Rack" active={actualTab === 'rack'} onPress={() => setActualTab('rack')} />
       <ActualSubTab label="Overview" active={actualTab === 'overview'} onPress={() => setActualTab('overview')} />
@@ -297,6 +302,7 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ alignItems: 'center' }}
               className={cn('max-w-full rounded-full border p-1', lineClass)}
+              style={{ flexGrow: 0, flexShrink: 1, marginLeft: 'auto' }}
             >
               <ModeTab label="Design" active={mode === 'design'} onPress={() => setMode('design')} />
               <ModeTab

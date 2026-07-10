@@ -1,5 +1,3 @@
-import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
-
 // Thin Postgres access layer. The whole app degrades gracefully to an in-memory
 // store when DATABASE_URL is not configured (local `npm run dev` without a DB,
 // CI builds, etc.), so `isDbEnabled()` is the single switch every store checks.
@@ -8,8 +6,19 @@ import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg
 // managed Postgres (a free Neon / Vercel Postgres instance works well). SSL is
 // enabled automatically for non-local hosts.
 
+type QueryResultRow = Record<string, unknown>;
+type QueryResult<T extends QueryResultRow = QueryResultRow> = { rows: T[]; rowCount: number | null };
+type PoolClient = {
+  query<T extends QueryResultRow = QueryResultRow>(text: string, params?: never[]): Promise<QueryResult<T>>;
+  release(): void;
+};
+type PgPool = {
+  query<T extends QueryResultRow = QueryResultRow>(text: string, params?: never[]): Promise<QueryResult<T>>;
+  connect(): Promise<PoolClient>;
+};
+
 const globalRef = globalThis as unknown as {
-  __ultronPgPool?: Pool;
+  __ultronPgPool?: PgPool;
   __ultronPgReady?: Promise<void>;
 };
 
@@ -23,12 +32,25 @@ function needsSsl(url: string): boolean {
   return true;
 }
 
-export function pool(): Pool {
+function loadPgPool(): new (config: { connectionString: string; max: number; ssl?: { rejectUnauthorized: boolean } }) => PgPool {
+  try {
+    // Keep local/no-DB builds from failing when the optional Postgres package is
+    // absent. If DATABASE_URL is configured, this still requires the `pg`
+    // dependency and fails loudly with a useful message.
+    const nodeRequire = eval('require') as NodeRequire;
+    return (nodeRequire('pg') as { Pool: new (config: { connectionString: string; max: number; ssl?: { rejectUnauthorized: boolean } }) => PgPool }).Pool;
+  } catch {
+    throw new Error('DATABASE_URL is set, but the pg package is not installed. Run npm install before starting the server.');
+  }
+}
+
+export function pool(): PgPool {
   if (!process.env.DATABASE_URL) {
     throw new Error('DATABASE_URL is not set.');
   }
   if (!globalRef.__ultronPgPool) {
     const connectionString = process.env.DATABASE_URL;
+    const Pool = loadPgPool();
     globalRef.__ultronPgPool = new Pool({
       connectionString,
       max: 5,
