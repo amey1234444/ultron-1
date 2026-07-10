@@ -1,6 +1,42 @@
+const isProd = process.env.NODE_ENV === 'production';
+
+// Content-Security-Policy. react-native-web injects styles inline, so
+// style-src needs 'unsafe-inline'. In dev, Next's HMR needs 'unsafe-eval' and a
+// websocket connection; production locks scripts down to same-origin.
+const csp = [
+  "default-src 'self'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "object-src 'none'",
+  "img-src 'self' data: blob:",
+  "font-src 'self' data:",
+  "style-src 'self' 'unsafe-inline'",
+  isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  isProd ? "connect-src 'self'" : "connect-src 'self' ws: wss:",
+  "form-action 'self'",
+  'upgrade-insecure-requests',
+].join('; ');
+
+const securityHeaders = [
+  { key: 'Content-Security-Policy', value: csp },
+  { key: 'X-Frame-Options', value: 'DENY' },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  { key: 'X-DNS-Prefetch-Control', value: 'off' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()' },
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
+  ...(isProd
+    ? [{ key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains; preload' }]
+    : []),
+];
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  poweredByHeader: false, // don't advertise the framework/version
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }];
+  },
   // Keep the Expo tsconfig untouched — Next uses its own. Type-checking is skipped
   // during the build because the shared React Native component tree legitimately
   // uses react-native-web-only style props (userSelect, cursor, ...) that RN core

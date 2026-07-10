@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { verifyCaptcha } from '../../../server/captcha';
 import { enforceRateLimit } from '../../../server/rateLimit';
+import { guardRequest } from '../../../server/security';
 import { ApiError, createUser, findByUsername } from '../../../server/users';
 
 // Public self-service sign-up. New accounts:
@@ -11,11 +12,12 @@ import { ApiError, createUser, findByUsername } from '../../../server/users';
 //    dashboard access.
 //  - are gated by CAPTCHA and a strict rate limit (3/hour per IP+device by default).
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed.' });
-  }
   try {
+    if (guardRequest(req, res)) return;
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST');
+      return res.status(405).json({ error: 'Method not allowed.' });
+    }
     await enforceRateLimit(req, res, 'signup');
 
     const { username, name, email, password, captchaToken, captchaAnswer } = (req.body ?? {}) as Record<

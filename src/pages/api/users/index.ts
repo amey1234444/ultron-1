@@ -2,11 +2,13 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isUserStatus } from '../../../lib/roles';
 import { enforceRateLimit } from '../../../server/rateLimit';
+import { guardRequest } from '../../../server/security';
 import { requireUser } from '../../../server/session';
 import { ApiError, createUser, listUsers } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
+    if (guardRequest(req, res)) return;
     await enforceRateLimit(req, res, 'api');
     if (req.method === 'GET') {
       // Any authenticated user can view the directory; only super admins mutate it.

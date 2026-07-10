@@ -2,15 +2,17 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isUserStatus } from '../../../lib/roles';
 import { enforceRateLimit } from '../../../server/rateLimit';
+import { guardRequest } from '../../../server/security';
 import { requireUser } from '../../../server/session';
 import { ApiError, deleteUser, updateUser } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
   const userId = Array.isArray(id) ? id[0] : id;
-  if (!userId) return res.status(400).json({ error: 'Missing user id.' });
 
   try {
+    if (guardRequest(req, res)) return;
+    if (!userId) return res.status(400).json({ error: 'Missing user id.' });
     await enforceRateLimit(req, res, 'api');
     if (req.method === 'PATCH') {
       await requireUser(req, 'super_admin');
