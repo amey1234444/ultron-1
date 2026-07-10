@@ -41,6 +41,31 @@ Three role levels, ranked `super_admin > admin > user`:
 Sessions are JWT cookies (`httpOnly`). Every `/api/users*` mutation is enforced
 server-side (super admin only), not just hidden in the UI.
 
+### Account approval (new signups are gated)
+
+Self-service signups no longer grant access. A new account is created with
+status **`pending`** and receives **no session** — a super admin must approve it
+at `/admin/users` before the user can sign in. Login, `/api/auth/me`, and every
+session check reject any account whose status is not `active`, so a valid JWT
+alone is not enough. Self-signup always forces the lowest (`user`) role; roles
+can never be self-elevated. Accounts have three statuses:
+
+| Status     | Meaning                                                        |
+| ---------- | ------------------------------------------------------------- |
+| `pending`  | Awaiting super-admin approval; cannot sign in.               |
+| `active`   | Approved; normal access per role.                            |
+| `disabled` | Suspended by a super admin; cannot sign in.                  |
+
+### Bot protection & rate limiting
+
+- **CAPTCHA** on registration — a self-contained, signed/expiring image
+  challenge (`/api/captcha`); no third-party service or key needed. The token
+  carries only a salted hash of the answer, so it can't be solved by decoding.
+- **Rate limiting** on every API, keyed on **client IP + device fingerprint**.
+  Signup is hardcoded to **3 requests/hour**; login and general API limits are
+  tunable by a super admin at `/admin/users` (persisted in the DB). Over-limit
+  requests get HTTP `429`.
+
 ### Seed accounts
 
 Created on first server start (passwords overridable via env — set these in Vercel):
@@ -53,10 +78,24 @@ Created on first server start (passwords overridable via env — set these in Ve
 
 Set `AUTH_SECRET` in production to a strong random value (JWT signing key).
 
-> **Persistence note:** users are stored in-memory per server instance, so
-> super-admin edits persist while the instance is warm but reset on cold starts.
-> For durable persistence, back `src/server/users.ts` with a database
-> (e.g. set a `DATABASE_URL` and implement the same functions).
+### Database (PostgreSQL)
+
+Users, tunable rate-limit settings, and rate-limit events are persisted in
+**PostgreSQL** when a `DATABASE_URL` is set. The schema is created and seeded
+automatically on first use — no manual migration step. If `DATABASE_URL` is
+**not** set, the app transparently falls back to an in-memory store (handy for
+local dev), which resets on restart.
+
+```bash
+# Local Postgres example
+DATABASE_URL=postgres://user:pass@localhost:5432/ultron
+```
+
+**Free hosted Postgres** (recommended for Vercel): create a free database on
+[Neon](https://neon.tech) or [Supabase](https://supabase.com), copy the
+connection string into the Vercel project's `DATABASE_URL` env var. Managed TLS
+connections work out of the box (`PGSSLMODE=require` is honored). See
+`.env.example` for all supported variables.
 
 ## Deployment (Vercel)
 

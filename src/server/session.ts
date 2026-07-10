@@ -56,23 +56,27 @@ export function clearSession(res: NextApiResponse): void {
   );
 }
 
-export function getSessionUser(req: NextApiRequest): PublicUser | null {
+export async function getSessionUser(req: NextApiRequest): Promise<PublicUser | null> {
   const header = req.headers.cookie;
   if (!header) return null;
   const token = parse(header)[COOKIE_NAME];
   if (!token) return null;
   try {
     const payload = jwt.verify(token, secret()) as TokenPayload;
-    const user = findById(payload.sub);
-    return user ? toPublic(user) : null;
+    const user = await findById(payload.sub);
+    if (!user) return null;
+    // A valid token is not enough — the account must still be active. Suspended
+    // or (edge-case) not-yet-approved accounts are rejected even with a cookie.
+    if (user.status !== 'active') return null;
+    return toPublic(user);
   } catch {
     return null;
   }
 }
 
 // Throws ApiError(401/403) unless the caller is authenticated with >= minRole.
-export function requireUser(req: NextApiRequest, minRole?: Role): PublicUser {
-  const user = getSessionUser(req);
+export async function requireUser(req: NextApiRequest, minRole?: Role): Promise<PublicUser> {
+  const user = await getSessionUser(req);
   if (!user) throw new ApiError(401, 'Not authenticated.');
   if (minRole && !hasAtLeastRank(user.role, minRole)) throw new ApiError(403, 'Forbidden.');
   return user;
