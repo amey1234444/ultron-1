@@ -22,12 +22,14 @@ export function getDeviceId(): string {
 
 function randomId(): string {
   try {
+    
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID();
   } catch {
     /* fall through */
   }
   return `${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 }
+
 
 export async function apiFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
