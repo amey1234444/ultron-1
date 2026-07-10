@@ -446,6 +446,7 @@ export function TrailBoard({
             canvasHeight={boardSize.height}
             stageScale={stageScale}
             interactive={!readOnly}
+            showControlPoints={!readOnly}
             onPointsChange={(points) => updateTrailPoints(trail.id, points)}
             onSelect={() => setSelectedId(trail.id)}
             onEndpointGrab={(which) => detachEndpoint(trail.id, which)}

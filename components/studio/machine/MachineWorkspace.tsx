@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
@@ -27,6 +27,7 @@ type MachineWorkspaceProps = {
   devices: DeviceNode[];
   cards: CardNode[];
   onBack: () => void;
+  canConfigure?: boolean;
   // Actual View is meant to be a full-screen "deployed dashboard" preview — the
   // parent uses this to hide the hierarchy sidebar while it's active.
   onModeChange?: (mode: WorkspaceMode) => void;
@@ -128,8 +129,10 @@ function ComponentRow({ component, selected, onPress }: { component: MachineComp
   );
 }
 
-export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange }: MachineWorkspaceProps) {
+export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange, canConfigure = false }: MachineWorkspaceProps) {
   const { isDark } = useAppTheme();
+  const { width } = useWindowDimensions();
+  const isNarrow = width > 0 && width < 900;
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
@@ -157,6 +160,11 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   const resetZoom = () => setZoom(1);
 
   const isActual = mode === 'actual';
+  const readOnlyCanvas = !canConfigure || isActual;
+
+  useEffect(() => {
+    if (isNarrow) setRightCollapsed(true);
+  }, [isNarrow]);
 
   // Rack/Overview/Alarm/Trend reflect the last *saved* box↔channel mappings
   // (the same localStorage layout TrailBoard persists via "Save Config") —
@@ -257,23 +265,23 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   );
 
   const actualSubTabs = (
-    <View className="flex-row items-center gap-2">
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', gap: 8, paddingVertical: 2 }}>
       <ActualSubTab label="Machine" active={actualTab === 'machine'} onPress={() => setActualTab('machine')} />
       <ActualSubTab label="Rack" active={actualTab === 'rack'} onPress={() => setActualTab('rack')} />
       <ActualSubTab label="Overview" active={actualTab === 'overview'} onPress={() => setActualTab('overview')} />
       <ActualSubTab label="Alarm" active={actualTab === 'alarm'} onPress={() => setActualTab('alarm')} />
       <ActualSubTab label="Trend" active={actualTab === 'trend'} onPress={() => setActualTab('trend')} />
-    </View>
+    </ScrollView>
   );
 
   return (
     <View className="flex-1">
-      {isActual && actualTab !== 'machine' ? (
+      {isActual ? (
         // Actual View is a full-screen dashboard preview — the mode switcher
         // (and the hierarchy sidebar, hidden by the parent) stay out of the
         // way entirely, so Back, the name, and the sub-tabs share one compact
         // row instead of leaving a mostly-empty strip above it.
-        <View className="flex-row items-center justify-between px-6 py-5">
+        <View className="gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
           <View className="flex-row items-center gap-4">
             {backButton}
             {nameBlock}
@@ -282,9 +290,14 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
         </View>
       ) : (
         <>
-          <View className="flex-row items-center justify-between px-6 pt-5">
+          <View className="gap-3 px-4 pt-4 md:flex-row md:items-center md:justify-between md:px-6 md:pt-5">
             {backButton}
-            <View className={cn('flex-row rounded-full border p-1', lineClass)}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ alignItems: 'center' }}
+              className={cn('max-w-full rounded-full border p-1', lineClass)}
+            >
               <ModeTab label="Design" active={mode === 'design'} onPress={() => setMode('design')} />
               <ModeTab
                 label="Mapping"
@@ -302,11 +315,11 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
                   setStubNote('Live View mode is coming in a later step.');
                 }}
               />
-              <ModeTab label="Actual View" active={mode === 'actual'} onPress={() => setMode('actual')} />
-            </View>
+              <ModeTab label="Actual View" active={false} onPress={() => setMode('actual')} />
+            </ScrollView>
           </View>
 
-          <View className="flex-row items-center justify-between px-6 pt-3">{nameBlock}</View>
+          <View className="flex-row items-center justify-between px-4 pt-3 md:px-6">{nameBlock}</View>
         </>
       )}
 
@@ -364,7 +377,8 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
                   machineTemplate={machine.template}
                   stageStyle={stageStyle}
                   stageScale={stageScale}
-                  hideUnlink={isActual && actualTab === 'machine'}
+                  readOnly={readOnlyCanvas}
+                  hideUnlink={readOnlyCanvas}
                 />
 
                 <ZoomControls zoom={zoom} onZoomOut={zoomOut} onReset={resetZoom} onZoomIn={zoomIn} />
@@ -372,14 +386,16 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
             )}
           </View>
 
-          <PanelToggle
-            collapsed={rightCollapsed}
-            onPress={() => setRightCollapsed((v) => !v)}
-            right={rightCollapsed ? 8 : RIGHT_PANEL_WIDTH - 12}
-            testID="ui.panel.right.toggle"
-          />
+          {!isActual && (
+            <PanelToggle
+              collapsed={rightCollapsed}
+              onPress={() => setRightCollapsed((v) => !v)}
+              right={rightCollapsed ? 8 : RIGHT_PANEL_WIDTH - 12}
+              testID="ui.panel.right.toggle"
+            />
+          )}
 
-          {!rightCollapsed && (
+          {!isActual && !rightCollapsed && (
             <View className={cn('w-72 border-l', lineClass)}>
               <View className={cn('flex-row border-b', lineClass)}>
                 <RightTabButton label="Components" active={rightTab === 'components'} onPress={() => setRightTab('components')} />

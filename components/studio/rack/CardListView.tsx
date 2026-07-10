@@ -7,7 +7,7 @@ import { CardTypeIcon } from './cardIcons';
 
 type CardListViewProps = {
   cards: CardNode[];
-  onOpenMenu: (card: CardNode, x: number, y: number) => void;
+  onOpenMenu?: (card: CardNode, x: number, y: number) => void;
 };
 
 function labelFor(card: CardNode): string {
@@ -51,7 +51,7 @@ export function CardListView({ cards, onOpenMenu }: CardListViewProps) {
       {sorted.map((card) => (
         <Pressable
           key={card.id}
-          onPress={(e) => onOpenMenu(card, e.nativeEvent.pageX, e.nativeEvent.pageY)}
+          onPress={onOpenMenu ? (e) => onOpenMenu(card, e.nativeEvent.pageX, e.nativeEvent.pageY) : undefined}
           className={cn('mb-2 flex-row items-center gap-3 rounded-xl border px-4 py-3', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
         >
           <Text style={{ flex: 0.5 }} className={cn('font-mono text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>

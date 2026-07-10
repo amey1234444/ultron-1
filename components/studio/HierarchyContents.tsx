@@ -22,6 +22,7 @@ type HierarchyContentsProps = {
   onOpenMachine: (id: string) => void;
   onAddFolder: () => void;
   onAddMachine?: () => void;
+  canConfigure?: boolean;
   // Opens the shared hierarchy action menu (Add Folder/Machine, Rename, Move,
   // View Details, Delete) for a card, so the workspace cards get the same ⋯
   // affordance the sidebar tree has.
@@ -104,6 +105,7 @@ export function HierarchyContents({
   onOpenMachine,
   onAddFolder,
   onAddMachine,
+  canConfigure = false,
   onOpenMenu,
   topPad,
 }: HierarchyContentsProps) {
@@ -134,26 +136,28 @@ export function HierarchyContents({
             {title}
           </Text>
         </View>
-        <View className="flex-row gap-2">
-          <ActionButton
-            label="Add Folder"
-            variant="secondary"
-            permission={PERMISSIONS.HIERARCHY_FOLDER_CREATE}
-            onPress={onAddFolder}
-          />
-          <ActionButton
-            label="Add Machine"
-            permission={PERMISSIONS.MACHINE_CREATE}
-            disabled={!onAddMachine}
-            onPress={onAddMachine}
-          />
-        </View>
+        {canConfigure && (
+          <View className="flex-row flex-wrap justify-end gap-2">
+            <ActionButton
+              label="Add Folder"
+              variant="secondary"
+              permission={PERMISSIONS.HIERARCHY_FOLDER_CREATE}
+              onPress={onAddFolder}
+            />
+            <ActionButton
+              label="Add Machine"
+              permission={PERMISSIONS.MACHINE_CREATE}
+              disabled={!onAddMachine}
+              onPress={onAddMachine}
+            />
+          </View>
+        )}
       </View>
 
       {isEmpty ? (
         <View className="px-6 py-4">
           <Text className={cn('font-body text-sm', mutedClass)}>
-            This level is empty — use Add Folder or Add Machine to get started.
+            {canConfigure ? 'This level is empty - use Add Folder or Add Machine to get started.' : 'This level is empty.'}
           </Text>
         </View>
       ) : (

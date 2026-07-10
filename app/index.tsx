@@ -51,9 +51,15 @@ const SEED = createSeedData(makeId);
 
 export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: ReactNode; currentUser?: PublicUser | null } = {}) {
   const { isDark } = useAppTheme();
-  const canEditDeleteSchema = currentUser
+  const hasConfigureAccess = currentUser
     ? userHasPermission(currentUser, USER_PERMISSIONS.SCHEMA_EDIT_DELETE)
     : true;
+  const [configureMode, setConfigureMode] = useState(false);
+  const canEditDeleteSchema = hasConfigureAccess && configureMode;
+
+  useEffect(() => {
+    if (!hasConfigureAccess && configureMode) setConfigureMode(false);
+  }, [hasConfigureAccess, configureMode]);
 
   // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
   // workspace stays usable; users can still toggle it back open via PanelToggle.
@@ -318,7 +324,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   return (
     <SafeAreaView className={cn('flex-1', isDark ? 'bg-surface-dark' : 'bg-surface-light')} edges={['top', 'bottom']}>
-      <TopBar projectName={topBarProjectName} devices={devices} />
+      <TopBar
+        projectName={topBarProjectName}
+        devices={devices}
+        canConfigure={hasConfigureAccess}
+        configureMode={configureMode}
+        onConfigureModeChange={setConfigureMode}
+      />
 
       <View className="flex-1 flex-row">
         {!hideSidebar && (
@@ -331,8 +343,9 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               projects={projects}
               folders={folders}
               machines={machines}
-              onOpenMenu={(x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine })}
-              onCreateProject={() => setCreateProjectVisible(true)}
+              onOpenMenu={canEditDeleteSchema ? (x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine }) : undefined}
+              onCreateProject={canEditDeleteSchema ? () => setCreateProjectVisible(true) : undefined}
+              canConfigure={canEditDeleteSchema}
               footer={sidebarFooter}
             />
 
@@ -353,6 +366,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               cards={cards}
               onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
               onModeChange={setMachineWorkspaceMode}
+              canConfigure={canEditDeleteSchema}
             />
           ) : selected.kind === 'device' && selectedDevice && selectedDevice.type === 'Rack' ? (
             <RackDetail
@@ -369,7 +383,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           ) : selected.kind === 'devices' ? (
             devices.length === 0 ? (
               <EmptyState title="DEVICES" description="No devices added.">
-                <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />
+                {canEditDeleteSchema && <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />}
               </EmptyState>
             ) : (
               <View className="flex-1">
@@ -377,26 +391,28 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
                     Hierarchy/Devices toggle then sits right over this corner. */}
                 <View className="flex-row items-center justify-between px-6 pt-5" style={leftCollapsed ? { paddingTop: 56 } : undefined}>
                   <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>Devices</Text>
-                  <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />
+                  {canEditDeleteSchema && <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />}
                 </View>
                 <DevicesTable
                   devices={devices}
                   projects={projects}
                   onOpenDevice={(id) => setSelected({ kind: 'device', id })}
-                  onOpenMenu={(x, y, deviceId) => {
+                  onOpenMenu={canEditDeleteSchema ? (x, y, deviceId) => {
                     const device = devices.find((d) => d.id === deviceId);
                     if (device) setDeviceMenu({ x, y, device });
-                  }}
+                  } : undefined}
                 />
               </View>
             )
           ) : selected.kind === 'none' || projects.length === 0 ? (
             <EmptyState title="NO PROJECT CREATED" description="Create your first project to begin.">
-              <ActionButton
-                label="Create Project"
-                permission={PERMISSIONS.PROJECT_CREATE}
-                onPress={() => setCreateProjectVisible(true)}
-              />
+              {canEditDeleteSchema && (
+                <ActionButton
+                  label="Create Project"
+                  permission={PERMISSIONS.PROJECT_CREATE}
+                  onPress={() => setCreateProjectVisible(true)}
+                />
+              )}
             </EmptyState>
           ) : selectedProject ? (
             <HierarchyContents
@@ -409,7 +425,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onOpenFolder={(id) => setSelected({ kind: 'folder', id })}
               onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
               onAddFolder={() => openCreateFolder({ kind: 'project', id: selectedProject.id })}
-              onOpenMenu={(x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine })}
+              onOpenMenu={canEditDeleteSchema ? (x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine }) : undefined}
+              canConfigure={canEditDeleteSchema}
               topPad={leftCollapsed}
             />
           ) : selectedFolder ? (
@@ -426,7 +443,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
               onAddFolder={() => openCreateFolder({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
               onAddMachine={() => openCreateMachine({ kind: 'folder', id: selectedFolder.id, projectId: selectedFolder.projectId })}
-              onOpenMenu={(x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine })}
+              onOpenMenu={canEditDeleteSchema ? (x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine }) : undefined}
+              canConfigure={canEditDeleteSchema}
               topPad={leftCollapsed}
             />
           ) : null}

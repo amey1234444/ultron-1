@@ -22,6 +22,7 @@ type SlotCardProps = {
   slot: number;
   card: CardNode | null;
   width: number;
+  editable?: boolean;
   onPressEmpty: (x: number, y: number) => void;
   onPressCard: (x: number, y: number) => void;
 };
@@ -263,19 +264,33 @@ function PeakWaistBackground({
   );
 }
 
-function EmptySlotCard({ slot, isDark, width, height, onPress }: { slot: number; isDark: boolean; width: number; height: number; onPress: (event: GestureResponderEvent) => void }) {
+function EmptySlotCard({
+  slot,
+  isDark,
+  width,
+  height,
+  editable,
+  onPress,
+}: {
+  slot: number;
+  isDark: boolean;
+  width: number;
+  height: number;
+  editable: boolean;
+  onPress: (event: GestureResponderEvent) => void;
+}) {
   const s = width / BASE_WIDTH;
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Add card to slot ${slot}`}
-      onPress={onPress}
+      onPress={editable ? onPress : undefined}
       style={({ pressed }) => ({ width, height, opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
     >
       <PeakWaistBackground slot={slot} accent="#64748B" isDark={isDark} width={width} height={height} empty />
 
-      <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' }}>
+      {editable && <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' }}>
         <View
           style={{
             width: 25 * s,
@@ -302,7 +317,7 @@ function EmptySlotCard({ slot, isDark, width, height, onPress }: { slot: number;
         >
           Empty
         </Text>
-      </View>
+      </View>}
     </Pressable>
   );
 }
@@ -313,6 +328,7 @@ function InstalledSlotCard({
   isDark,
   width,
   height,
+  editable,
   onPress,
   onContextMenu,
 }: {
@@ -321,6 +337,7 @@ function InstalledSlotCard({
   isDark: boolean;
   width: number;
   height: number;
+  editable: boolean;
   onPress: (event: GestureResponderEvent) => void;
   onContextMenu: (x: number, y: number) => void;
 }) {
@@ -332,7 +349,7 @@ function InstalledSlotCard({
   const ref = useRef<View>(null);
 
   useEffect(() => {
-    if (Platform.OS !== 'web') return;
+    if (!editable || Platform.OS !== 'web') return;
     const node = ref.current as unknown as HTMLElement | null;
     if (!node) return;
     const handler = (e: MouseEvent) => {
@@ -341,7 +358,7 @@ function InstalledSlotCard({
     };
     node.addEventListener('contextmenu', handler);
     return () => node.removeEventListener('contextmenu', handler);
-  }, [onContextMenu]);
+  }, [editable, onContextMenu]);
 
   const textColour = '#161A1F';
 
@@ -350,7 +367,7 @@ function InstalledSlotCard({
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${config.title} card in slot ${slot}`}
-        onPress={onPress}
+        onPress={editable ? onPress : undefined}
         style={({ pressed }) => ({
           width,
           height,
@@ -416,7 +433,7 @@ function InstalledSlotCard({
   );
 }
 
-export function SlotCard({ slot, card, width, onPressEmpty, onPressCard }: SlotCardProps) {
+export function SlotCard({ slot, card, width, editable = true, onPressEmpty, onPressCard }: SlotCardProps) {
   const { isDark } = useAppTheme();
   const height = width * (BASE_HEIGHT / BASE_WIDTH);
 
@@ -427,6 +444,7 @@ export function SlotCard({ slot, card, width, onPressEmpty, onPressCard }: SlotC
         isDark={isDark}
         width={width}
         height={height}
+        editable={editable}
         onPress={(event) => {
           const { x, y } = getPressCoordinates(event);
           onPressEmpty(x, y);
@@ -442,6 +460,7 @@ export function SlotCard({ slot, card, width, onPressEmpty, onPressCard }: SlotC
       isDark={isDark}
       width={width}
       height={height}
+      editable={editable}
       onPress={(event) => {
         const { x, y } = getPressCoordinates(event);
         onPressCard(x, y);

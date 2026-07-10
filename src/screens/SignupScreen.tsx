@@ -117,16 +117,16 @@ export default function SignupScreen() {
         placeholder="min 8 chars"
       />
 
-      <View className="mt-4 gap-1.5">
+      <View className="mt-3 gap-1">
         <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-[11px] uppercase tracking-wider text-ink-muted">
           CAPTCHA
         </Text>
-        <View className="flex-row items-center gap-3">
-          <View className="h-[70px] w-[200px] max-w-full items-center justify-center overflow-hidden rounded-xl border border-line-dark bg-surface-dark">
+        <View className="flex-row flex-wrap items-center gap-3">
+          <View className="h-[60px] w-[180px] max-w-full items-center justify-center overflow-hidden rounded-xl border border-line-dark bg-surface-dark">
             {captchaLoading ? (
               <ActivityIndicator color="#C9A15C" />
             ) : captchaSvg ? (
-              <Image source={{ uri: svgToDataUri(captchaSvg) }} style={{ width: 200, height: 70 }} resizeMode="contain" />
+              <Image source={{ uri: svgToDataUri(captchaSvg) }} style={{ width: 180, height: 60 }} resizeMode="contain" />
             ) : (
               <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
                 Unavailable
@@ -157,7 +157,7 @@ export default function SignupScreen() {
 
       <AuthButton label="Create Account" submitting={submitting} onPress={onSubmit} />
 
-      <View className="mt-6 flex-row items-center gap-1">
+      <View className="mt-4 flex-row items-center gap-1">
         <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
           Already have an account?
         </Text>

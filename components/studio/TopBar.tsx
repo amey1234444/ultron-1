@@ -16,6 +16,9 @@ type TopBarProps = {
   alarmCount?: number;
   // Devices power the "Connections" dropdown (active/inactive IPs + machine ids).
   devices?: DeviceNode[];
+  canConfigure?: boolean;
+  configureMode?: boolean;
+  onConfigureModeChange?: (enabled: boolean) => void;
 };
 
 function formatClock(d: Date): string {
@@ -173,7 +176,14 @@ function ConnectionsMenu({
   );
 }
 
-export function TopBar({ projectName, alarmCount = 0, devices = [] }: TopBarProps) {
+export function TopBar({
+  projectName,
+  alarmCount = 0,
+  devices = [],
+  canConfigure = false,
+  configureMode = false,
+  onConfigureModeChange,
+}: TopBarProps) {
   const { isDark } = useAppTheme();
   const { width } = useWindowDimensions();
   // Progressive disclosure: drop the least-essential chrome first as the header
@@ -220,7 +230,39 @@ export function TopBar({ projectName, alarmCount = 0, devices = [] }: TopBarProp
       </View>
 
       {/* Right: connections + alarms + clock + theme toggle */}
-      <View className="flex-row items-center gap-3">
+      <View className="flex-row flex-wrap items-center justify-end gap-3">
+        {canConfigure && (
+          <>
+            <Pressable
+              onPress={() => onConfigureModeChange?.(!configureMode)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: configureMode }}
+              className={cn(
+                'flex-row items-center gap-2 rounded-full border px-2.5 py-1',
+                configureMode
+                  ? isDark
+                    ? 'border-accent bg-accent/15'
+                    : 'border-accent bg-accent/15'
+                  : isDark
+                    ? 'border-line-dark'
+                    : 'border-line-light',
+              )}
+            >
+              <View
+                style={{
+                  width: 7,
+                  height: 7,
+                  borderRadius: 4,
+                  backgroundColor: configureMode ? '#C9A15C' : isDark ? '#5A5A5A' : '#9A9A9A',
+                }}
+              />
+              <Text className={cn('font-body-medium text-[11px]', configureMode ? 'text-accent' : mutedClass)}>Configure</Text>
+            </Pressable>
+
+            {showDividers && <Divider color={dividerColor} />}
+          </>
+        )}
+
         <ConnectionsMenu devices={devices} compact={isMid} />
 
         {showDividers && <Divider color={dividerColor} />}

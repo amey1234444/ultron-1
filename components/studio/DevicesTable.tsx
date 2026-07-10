@@ -12,7 +12,7 @@ type DevicesTableProps = {
   devices: DeviceNode[];
   projects: ProjectNode[];
   onOpenDevice: (id: string) => void;
-  onOpenMenu: (x: number, y: number, deviceId: string) => void;
+  onOpenMenu?: (x: number, y: number, deviceId: string) => void;
 };
 
 type SortKey = 'name' | 'type' | 'status';
@@ -100,7 +100,7 @@ function DeviceRow({
   device: DeviceNode;
   projectName: string;
   onOpenDevice: (id: string) => void;
-  onOpenMenu: (x: number, y: number, deviceId: string) => void;
+  onOpenMenu?: (x: number, y: number, deviceId: string) => void;
 }) {
   const { isDark } = useAppTheme();
   const [hovered, setHovered] = useState(false);
@@ -161,18 +161,20 @@ function DeviceRow({
       <Text style={{ flex: FLEX.mapping }} className={cn('font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
         {total > 0 ? `${mapped} / ${total}` : '—'}
       </Text>
-      <Pressable
-        hitSlop={8}
-        testID={`device-row-menu:${device.id}`}
-        onPress={(e) => {
-          e.stopPropagation();
-          const { pageX, pageY } = e.nativeEvent;
-          onOpenMenu(pageX, pageY, device.id);
-        }}
-        style={{ width: MENU_WIDTH }}
-      >
-        <MaterialCommunityIcons name="dots-vertical" size={16} color={isDark ? '#8A8A8A' : '#6B6B6B'} />
-      </Pressable>
+      {onOpenMenu ? (
+        <Pressable
+          hitSlop={8}
+          testID={`device-row-menu:${device.id}`}
+          onPress={(e) => {
+            e.stopPropagation();
+            const { pageX, pageY } = e.nativeEvent;
+            onOpenMenu(pageX, pageY, device.id);
+          }}
+          style={{ width: MENU_WIDTH }}
+        >
+          <MaterialCommunityIcons name="dots-vertical" size={16} color={isDark ? '#8A8A8A' : '#6B6B6B'} />
+        </Pressable>
+      ) : null}
     </Pressable>
   );
 }
@@ -199,30 +201,34 @@ export function DevicesTable({ devices, projects, onOpenDevice, onOpenMenu }: De
   };
 
   return (
-    <View className="flex-1 px-6 py-5">
-      <View className={cn('flex-row items-center gap-3 border-b px-5 pb-3 mb-4', lineClass)}>
-        <HeaderCell label="Device Name" flex={FLEX.name} sortKey="name" activeSort={sort} onSort={toggleSort} />
-        <HeaderCell label="Type" flex={FLEX.type} sortKey="type" activeSort={sort} onSort={toggleSort} />
-        <HeaderCell label="Model" flex={FLEX.model} />
-        <HeaderCell label="IP Address" flex={FLEX.ip} />
-        <HeaderCell label="Port" flex={FLEX.port} align="right" />
-        <HeaderCell label="Status" flex={FLEX.status} sortKey="status" activeSort={sort} onSort={toggleSort} />
-        <HeaderCell label="Project" flex={FLEX.project} />
-        <HeaderCell label="Last Comm." flex={FLEX.lastComm} />
-        <HeaderCell label="Mapping" flex={FLEX.mapping} />
-        <View style={{ width: MENU_WIDTH }} />
-      </View>
+    <View className="flex-1 px-4 py-5 md:px-6">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1 }}>
+        <View style={{ minWidth: 980, flex: 1 }}>
+          <View className={cn('mb-4 flex-row items-center gap-3 border-b px-5 pb-3', lineClass)}>
+            <HeaderCell label="Device Name" flex={FLEX.name} sortKey="name" activeSort={sort} onSort={toggleSort} />
+            <HeaderCell label="Type" flex={FLEX.type} sortKey="type" activeSort={sort} onSort={toggleSort} />
+            <HeaderCell label="Model" flex={FLEX.model} />
+            <HeaderCell label="IP Address" flex={FLEX.ip} />
+            <HeaderCell label="Port" flex={FLEX.port} align="right" />
+            <HeaderCell label="Status" flex={FLEX.status} sortKey="status" activeSort={sort} onSort={toggleSort} />
+            <HeaderCell label="Project" flex={FLEX.project} />
+            <HeaderCell label="Last Comm." flex={FLEX.lastComm} />
+            <HeaderCell label="Mapping" flex={FLEX.mapping} />
+            {onOpenMenu ? <View style={{ width: MENU_WIDTH }} /> : null}
+          </View>
 
-      <ScrollView>
-        {sorted.map((d) => (
-          <DeviceRow
-            key={d.id}
-            device={d}
-            projectName={d.projectId ? (projectNameById.get(d.projectId) ?? 'Unassigned') : 'Unassigned'}
-            onOpenDevice={onOpenDevice}
-            onOpenMenu={onOpenMenu}
-          />
-        ))}
+          <ScrollView>
+            {sorted.map((d) => (
+              <DeviceRow
+                key={d.id}
+                device={d}
+                projectName={d.projectId ? (projectNameById.get(d.projectId) ?? 'Unassigned') : 'Unassigned'}
+                onOpenDevice={onOpenDevice}
+                onOpenMenu={onOpenMenu}
+              />
+            ))}
+          </ScrollView>
+        </View>
       </ScrollView>
     </View>
   );

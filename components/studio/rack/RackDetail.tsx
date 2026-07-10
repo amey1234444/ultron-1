@@ -108,13 +108,16 @@ export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard,
         {mode === 'visual' && (
           <RackFaceplate
             cards={cards}
+            editable={canEditDeleteSchema}
             onPressEmpty={(slot, x, y) => {
               if (canEditDeleteSchema) setInstallMenu({ slot, x, y });
             }}
-            onPressCard={(card, x, y) => setCardMenu({ card, x, y })}
+            onPressCard={(card, x, y) => {
+              if (canEditDeleteSchema) setCardMenu({ card, x, y });
+            }}
           />
         )}
-        {mode === 'cards' && <CardListView cards={cards} onOpenMenu={(card, x, y) => setCardMenu({ card, x, y })} />}
+        {mode === 'cards' && <CardListView cards={cards} onOpenMenu={canEditDeleteSchema ? (card, x, y) => setCardMenu({ card, x, y }) : undefined} />}
         {mode === 'channels' && <ChannelListView cards={cards} />}
       </View>
 

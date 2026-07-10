@@ -9,6 +9,7 @@ import { SlotCard } from './SlotCard';
 
 type RackFaceplateProps = {
   cards: CardNode[];
+  editable?: boolean;
   onPressEmpty: (slot: number, x: number, y: number) => void;
   onPressCard: (card: CardNode, x: number, y: number) => void;
 };
@@ -91,6 +92,7 @@ function RackVent({ isDark }: { isDark: boolean }) {
 
 export function RackFaceplate({
   cards,
+  editable = true,
   onPressEmpty,
   onPressCard,
 }: RackFaceplateProps) {
@@ -219,6 +221,7 @@ export function RackFaceplate({
                       slot={slot}
                       card={card}
                       width={cardWidth}
+                      editable={editable}
                       onPressEmpty={(x, y) =>
                         onPressEmpty(slot, x, y)
                       }

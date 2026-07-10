@@ -21,8 +21,9 @@ type LeftPanelProps = {
   projects: ProjectNode[];
   folders: FolderNode[];
   machines: MachineNode[];
-  onOpenMenu: (x: number, y: number, target: ContextMenuTarget, canAddMachine: boolean) => void;
-  onCreateProject: () => void;
+  onOpenMenu?: (x: number, y: number, target: ContextMenuTarget, canAddMachine: boolean) => void;
+  onCreateProject?: () => void;
+  canConfigure?: boolean;
   // Optional block pinned to the bottom of the sidebar (e.g. the web account
   // strip). Expo never passes it, so the shared tree stays untouched there.
   footer?: ReactNode;
@@ -36,6 +37,7 @@ function FolderBranch({
   selected,
   onSelect,
   onOpenMenu,
+  canConfigure,
   collapsedIds,
   onToggleExpand,
 }: {
@@ -46,6 +48,7 @@ function FolderBranch({
   selected: SelectedNode;
   onSelect: (node: SelectedNode) => void;
   onOpenMenu: LeftPanelProps['onOpenMenu'];
+  canConfigure: boolean;
   collapsedIds: Set<string>;
   onToggleExpand: (id: string) => void;
 }) {
@@ -65,7 +68,7 @@ function FolderBranch({
         onToggleExpand={() => onToggleExpand(folder.id)}
         selected={selected.kind === 'folder' && selected.id === folder.id}
         onPress={() => onSelect({ kind: 'folder', id: folder.id })}
-        onOpenMenu={(x, y) => onOpenMenu(x, y, { kind: 'folder', id: folder.id, projectId: folder.projectId }, true)}
+        onOpenMenu={canConfigure && onOpenMenu ? (x, y) => onOpenMenu(x, y, { kind: 'folder', id: folder.id, projectId: folder.projectId }, true) : undefined}
         testID={`tree-node:folder:${folder.id}`}
       />
       {expanded && (
@@ -78,8 +81,10 @@ function FolderBranch({
               kind="machine"
               selected={selected.kind === 'machine' && selected.id === machine.id}
               onPress={() => onSelect({ kind: 'machine', id: machine.id })}
-              onOpenMenu={(x, y) =>
-                onOpenMenu(x, y, { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId }, false)
+              onOpenMenu={
+                canConfigure && onOpenMenu
+                  ? (x, y) => onOpenMenu(x, y, { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId }, false)
+                  : undefined
               }
               testID={`tree-node:machine:${machine.id}`}
             />
@@ -94,6 +99,7 @@ function FolderBranch({
               selected={selected}
               onSelect={onSelect}
               onOpenMenu={onOpenMenu}
+              canConfigure={canConfigure}
               collapsedIds={collapsedIds}
               onToggleExpand={onToggleExpand}
             />
@@ -114,6 +120,7 @@ export function LeftPanel({
   machines,
   onOpenMenu,
   onCreateProject,
+  canConfigure = false,
   footer,
 }: LeftPanelProps) {
   const { isDark } = useAppTheme();
@@ -169,7 +176,7 @@ export function LeftPanel({
             <SectionLabel active={activeTab === 'devices'}>Devices</SectionLabel>
           </Pressable>
         </View>
-        {!collapsed && activeTab === 'hierarchy' && (
+        {!collapsed && activeTab === 'hierarchy' && canConfigure && onCreateProject && (
           <Pressable
             onPress={onCreateProject}
             testID={`permission:${PERMISSIONS.PROJECT_CREATE}`}
@@ -221,7 +228,7 @@ export function LeftPanel({
                         kind="project"
                         selected={selected.kind === 'project' && selected.id === project.id}
                         onPress={() => onSelect({ kind: 'project', id: project.id })}
-                        onOpenMenu={(x, y) => onOpenMenu(x, y, { kind: 'project', id: project.id }, false)}
+                        onOpenMenu={canConfigure && onOpenMenu ? (x, y) => onOpenMenu(x, y, { kind: 'project', id: project.id }, false) : undefined}
                         testID={`tree-node:project:${project.id}`}
                       />
                     ))}
@@ -234,7 +241,7 @@ export function LeftPanel({
                         folderType={folder.type}
                         selected={selected.kind === 'folder' && selected.id === folder.id}
                         onPress={() => onSelect({ kind: 'folder', id: folder.id })}
-                        onOpenMenu={(x, y) => onOpenMenu(x, y, { kind: 'folder', id: folder.id, projectId: folder.projectId }, true)}
+                        onOpenMenu={canConfigure && onOpenMenu ? (x, y) => onOpenMenu(x, y, { kind: 'folder', id: folder.id, projectId: folder.projectId }, true) : undefined}
                         testID={`tree-node:folder:${folder.id}`}
                       />
                     ))}
@@ -246,8 +253,10 @@ export function LeftPanel({
                         kind="machine"
                         selected={selected.kind === 'machine' && selected.id === machine.id}
                         onPress={() => onSelect({ kind: 'machine', id: machine.id })}
-                        onOpenMenu={(x, y) =>
-                          onOpenMenu(x, y, { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId }, false)
+                        onOpenMenu={
+                          canConfigure && onOpenMenu
+                            ? (x, y) => onOpenMenu(x, y, { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId }, false)
+                            : undefined
                         }
                         testID={`tree-node:machine:${machine.id}`}
                       />
@@ -273,7 +282,7 @@ export function LeftPanel({
                         onToggleExpand={() => toggleExpand(project.id)}
                         selected={selected.kind === 'project' && selected.id === project.id}
                         onPress={() => onSelect({ kind: 'project', id: project.id })}
-                        onOpenMenu={(x, y) => onOpenMenu(x, y, { kind: 'project', id: project.id }, false)}
+                        onOpenMenu={canConfigure && onOpenMenu ? (x, y) => onOpenMenu(x, y, { kind: 'project', id: project.id }, false) : undefined}
                         testID={`tree-node:project:${project.id}`}
                       />
                       {expanded &&
@@ -287,6 +296,7 @@ export function LeftPanel({
                             selected={selected}
                             onSelect={onSelect}
                             onOpenMenu={onOpenMenu}
+                            canConfigure={canConfigure}
                             collapsedIds={collapsedIds}
                             onToggleExpand={toggleExpand}
                           />
