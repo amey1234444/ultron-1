@@ -1,14 +1,27 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
+import { apiFetch } from '../lib/apiClient';
 import type { PublicUser } from '../lib/roles';
 
-type SignupInput = { username: string; name: string; email: string; password: string };
+type SignupInput = {
+  username: string;
+  name: string;
+  email: string;
+  password: string;
+  captchaToken: string;
+  captchaAnswer: string;
+};
+
+// Self-service signups no longer log the user in — they create a pending account
+// that a super admin must approve. `signup` therefore returns the outcome rather
+// than setting the current user.
+type SignupResult = { pending: boolean; message: string };
 
 type AuthState = {
   user: PublicUser | null;
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  signup: (input: SignupInput) => Promise<void>;
+  signup: (input: SignupInput) => Promise<SignupResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 };
@@ -21,7 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await apiFetch('/api/auth/me');
       const data = await res.json();
       setUser(res.ok ? (data.user ?? null) : null);
     } catch {
@@ -40,15 +53,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!user) return;
     const id = setInterval(() => {
-      void fetch('/api/auth/me').catch(() => {});
+      void apiFetch('/api/auth/me').catch(() => {});
     }, 45_000);
     return () => clearInterval(id);
   }, [user]);
 
   const login = useCallback(async (username: string, password: string) => {
-    const res = await fetch('/api/auth/login', {
+    const res = await apiFetch('/api/auth/login', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
     const data = await res.json();
@@ -56,19 +68,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(data.user as PublicUser);
   }, []);
 
-  const signup = useCallback(async (input: SignupInput) => {
-    const res = await fetch('/api/auth/signup', {
+  const signup = useCallback(async (input: SignupInput): Promise<SignupResult> => {
+    const res = await apiFetch('/api/auth/signup', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(input),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Sign up failed.');
-    setUser(data.user as PublicUser);
+    // No session is issued; the account is pending approval.
+    return {
+      pending: !!data.pending,
+      message: data.message || 'Account created. Awaiting super-admin approval.',
+    };
   }, []);
 
   const logout = useCallback(async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
+    await apiFetch('/api/auth/logout', { method: 'POST' });
     setUser(null);
   }, []);
 

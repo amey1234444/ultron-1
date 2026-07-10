@@ -1,5 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { isUserStatus } from '../../../lib/roles';
+import { enforceRateLimit } from '../../../server/rateLimit';
 import { requireUser } from '../../../server/session';
 import { ApiError, deleteUser, updateUser } from '../../../server/users';
 
@@ -9,24 +11,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (!userId) return res.status(400).json({ error: 'Missing user id.' });
 
   try {
+    await enforceRateLimit(req, res, 'api');
     if (req.method === 'PATCH') {
-      requireUser(req, 'super_admin');
-      const { name, email, role, password, permissions } = (req.body ?? {}) as Record<string, unknown>;
+      await requireUser(req, 'super_admin');
+      const { name, email, role, password, permissions, status } = (req.body ?? {}) as Record<string, unknown>;
       const user = await updateUser(userId, {
         name: name === undefined ? undefined : String(name),
         email: email === undefined ? undefined : String(email),
         role: role as never,
+        status: status === undefined ? undefined : isUserStatus(status) ? status : (undefined as never),
         password: password === undefined ? undefined : String(password),
         permissions: Array.isArray(permissions) ? (permissions as never) : undefined,
       });
       return res.status(200).json({ user });
     }
     if (req.method === 'DELETE') {
-      const actor = requireUser(req, 'super_admin');
+      const actor = await requireUser(req, 'super_admin');
       if (actor.id === userId) {
         return res.status(400).json({ error: 'You cannot delete your own account.' });
       }
-      deleteUser(userId);
+      await deleteUser(userId);
       return res.status(200).json({ ok: true });
     }
     res.setHeader('Allow', 'PATCH, DELETE');

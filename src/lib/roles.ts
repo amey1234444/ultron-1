@@ -29,6 +29,23 @@ export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }
 
+// Account lifecycle. New self-service signups start as `pending` and have NO
+// access until a super admin approves them (-> `active`). `disabled` accounts
+// are kept for the record but cannot sign in. Only `active` accounts hold a
+// usable session.
+export const USER_STATUSES = ['pending', 'active', 'disabled'] as const;
+export type UserStatus = (typeof USER_STATUSES)[number];
+
+export const STATUS_LABEL: Record<UserStatus, string> = {
+  pending: 'Pending approval',
+  active: 'Active',
+  disabled: 'Disabled',
+};
+
+export function isUserStatus(value: unknown): value is UserStatus {
+  return typeof value === 'string' && (USER_STATUSES as readonly string[]).includes(value);
+}
+
 export function hasAtLeast(role: Role, min: Role): boolean {
   return ROLE_RANK[role] >= ROLE_RANK[min];
 }
@@ -44,6 +61,7 @@ export type PublicUser = {
   name: string;
   email: string;
   role: Role;
+  status: UserStatus;
   permissions: UserPermission[];
   createdAt: string;
   // When the user last authenticated, and when they were last seen active

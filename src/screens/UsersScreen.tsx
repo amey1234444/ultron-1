@@ -4,7 +4,18 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 
 import { AuthGate } from '../components/web/AuthGate';
 import { useAuth } from '../context/AuthContext';
-import { ONLINE_WINDOW_MS, ROLE_LABEL, ROLES, USER_PERMISSIONS, userHasPermission, type PublicUser, type Role } from '../lib/roles';
+import { apiFetch } from '../lib/apiClient';
+import {
+  ONLINE_WINDOW_MS,
+  ROLE_LABEL,
+  ROLES,
+  STATUS_LABEL,
+  USER_PERMISSIONS,
+  userHasPermission,
+  type PublicUser,
+  type Role,
+  type UserStatus,
+} from '../lib/roles';
 
 // Human-friendly "time ago" for last-login / last-seen timestamps.
 function timeAgo(iso: string | null, now: number): string {
@@ -21,7 +32,7 @@ function timeAgo(iso: string | null, now: number): string {
 }
 
 function isOnline(u: PublicUser, now: number): boolean {
-  return !!u.lastSeenAt && now - new Date(u.lastSeenAt).getTime() < ONLINE_WINDOW_MS;
+  return u.status === 'active' && !!u.lastSeenAt && now - new Date(u.lastSeenAt).getTime() < ONLINE_WINDOW_MS;
 }
 
 function StatusPill({ user, now }: { user: PublicUser; now: number }) {
@@ -31,6 +42,22 @@ function StatusPill({ user, now }: { user: PublicUser; now: number }) {
       <View className={`h-2 w-2 rounded-full ${online ? 'bg-status-success' : 'bg-ink-muted'}`} />
       <Text className={`font-body-medium text-[11px] ${online ? 'text-status-success' : 'text-ink-muted'}`}>
         {online ? 'Online' : `Last seen ${timeAgo(user.lastSeenAt, now)}`}
+      </Text>
+    </View>
+  );
+}
+
+function AccountStatusBadge({ status }: { status: UserStatus }) {
+  const tone =
+    status === 'active'
+      ? 'border-status-success/50 text-status-success'
+      : status === 'pending'
+        ? 'border-status-warning/60 text-status-warning'
+        : 'border-status-critical/60 text-status-critical';
+  return (
+    <View className={`rounded-full border px-2 py-0.5 ${tone}`}>
+      <Text className={`font-body-medium text-[11px] uppercase tracking-wide ${tone.split(' ')[1]}`}>
+        {STATUS_LABEL[status]}
       </Text>
     </View>
   );
@@ -97,6 +124,121 @@ function Field({
   );
 }
 
+// --- rate-limit config panel ----------------------------------------------
+
+type RateRule = { max: number; windowSec: number };
+type RateLimits = { signup: RateRule; login: RateRule; api: RateRule };
+
+const RATE_ROWS: { key: keyof RateLimits; label: string; hint: string }[] = [
+  { key: 'signup', label: 'Signup', hint: 'New-account requests per IP + device.' },
+  { key: 'login', label: 'Login', hint: 'Sign-in attempts per IP + device.' },
+  { key: 'api', label: 'General API', hint: 'All other API requests per IP + device.' },
+];
+
+function RateLimitsPanel() {
+  const [limits, setLimits] = useState<RateLimits | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await apiFetch('/api/config/rate-limits');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load limits.');
+      setLimits(data.rateLimits as RateLimits);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Failed to load limits.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const update = (key: keyof RateLimits, field: keyof RateRule, raw: string) => {
+    const n = Math.max(0, Math.floor(Number(raw) || 0));
+    setLimits((prev) => (prev ? { ...prev, [key]: { ...prev[key], [field]: n } } : prev));
+  };
+
+  const save = async () => {
+    if (!limits) return;
+    setSaving(true);
+    setMsg(null);
+    setErr(null);
+    try {
+      const res = await apiFetch('/api/config/rate-limits', { method: 'PUT', body: JSON.stringify(limits) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Save failed.');
+      setLimits(data.rateLimits as RateLimits);
+      setMsg('Rate limits saved.');
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Save failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
+      <Text className="font-body-bold text-sm text-ink">Rate Limits & Bot Protection</Text>
+      <Text className="mt-1 font-body text-xs text-ink-muted">
+        Requests are throttled per IP + device fingerprint. Signup also requires a CAPTCHA.
+      </Text>
+      {loading || !limits ? (
+        <View className="items-center py-6">
+          <ActivityIndicator color="#F5F5F5" />
+        </View>
+      ) : (
+        <View className="mt-4 gap-3">
+          {RATE_ROWS.map((row) => (
+            <View key={row.key} className="flex-row flex-wrap items-end gap-3 border-t border-line-dark pt-3">
+              <View className="min-w-[140px] flex-1">
+                <Text className="font-body-medium text-sm text-ink">{row.label}</Text>
+                <Text className="font-body text-[11px] text-ink-muted">{row.hint}</Text>
+              </View>
+              <View className="gap-1">
+                <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Max</Text>
+                <TextInput
+                  value={String(limits[row.key].max)}
+                  onChangeText={(t) => update(row.key, 'max', t)}
+                  keyboardType="numeric"
+                  className="w-24 rounded-lg border border-line-dark bg-surface-dark px-3 py-2 font-body text-sm text-ink"
+                />
+              </View>
+              <View className="gap-1">
+                <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Per (seconds)</Text>
+                <TextInput
+                  value={String(limits[row.key].windowSec)}
+                  onChangeText={(t) => update(row.key, 'windowSec', t)}
+                  keyboardType="numeric"
+                  className="w-28 rounded-lg border border-line-dark bg-surface-dark px-3 py-2 font-body text-sm text-ink"
+                />
+              </View>
+            </View>
+          ))}
+          {err ? <Text className="font-body text-sm text-status-critical">{err}</Text> : null}
+          {msg ? <Text className="font-body text-sm text-status-success">{msg}</Text> : null}
+          <View className="flex-row">
+            <Pressable
+              onPress={saving ? undefined : save}
+              className={`items-center rounded-xl bg-ink px-4 py-2.5 ${saving ? 'opacity-50' : ''}`}
+            >
+              <Text className="font-body-bold text-sm text-ink-inverse">Save Limits</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// --- main screen -----------------------------------------------------------
+
 function UsersScreenInner() {
   const router = useRouter();
   const { user: me } = useAuth();
@@ -112,7 +254,7 @@ function UsersScreenInner() {
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const res = await fetch('/api/users');
+      const res = await apiFetch('/api/users');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load users.');
       setUsers(data.users as PublicUser[]);
@@ -163,9 +305,8 @@ function UsersScreenInner() {
     setBusy(true);
     try {
       if (editingId) {
-        const res = await fetch(`/api/users/${editingId}`, {
+        const res = await apiFetch(`/api/users/${editingId}`, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             name: form.name,
             email: form.email,
@@ -177,9 +318,8 @@ function UsersScreenInner() {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Update failed.');
       } else {
-        const res = await fetch('/api/users', {
+        const res = await apiFetch('/api/users', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             username: form.username,
             name: form.name,
@@ -187,6 +327,7 @@ function UsersScreenInner() {
             password: form.password,
             role: form.role,
             permissions: formPermissions,
+            status: 'active',
           }),
         });
         const data = await res.json();
@@ -201,11 +342,26 @@ function UsersScreenInner() {
     }
   };
 
+  const setStatus = async (u: PublicUser, status: UserStatus) => {
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await apiFetch(`/api/users/${u.id}`, { method: 'PATCH', body: JSON.stringify({ status }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Update failed.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Update failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const remove = async (u: PublicUser) => {
     setError(null);
     setBusy(true);
     try {
-      const res = await fetch(`/api/users/${u.id}`, { method: 'DELETE' });
+      const res = await apiFetch(`/api/users/${u.id}`, { method: 'DELETE' });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Delete failed.');
       if (editingId === u.id) resetForm();
@@ -217,6 +373,13 @@ function UsersScreenInner() {
     }
   };
 
+  // Pending accounts float to the top so approvals are impossible to miss.
+  const sorted = [...users].sort((a, b) => {
+    const rank = (s: UserStatus) => (s === 'pending' ? 0 : s === 'active' ? 1 : 2);
+    return rank(a.status) - rank(b.status);
+  });
+  const pendingCount = users.filter((u) => u.status === 'pending').length;
+
   return (
     <View className="flex-1 bg-surface-dark">
       <View className="flex-row items-center justify-between border-b border-line-dark px-4 py-3">
@@ -227,10 +390,16 @@ function UsersScreenInner() {
       </View>
 
       <ScrollView contentContainerClassName="p-4 gap-6" className="flex-1">
+        {pendingCount > 0 ? (
+          <View className="rounded-xl border border-status-warning/50 bg-status-warning/10 px-4 py-3">
+            <Text className="font-body-medium text-sm text-status-warning">
+              {pendingCount} account{pendingCount === 1 ? '' : 's'} awaiting your approval.
+            </Text>
+          </View>
+        ) : null}
+
         <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
-          <Text className="font-body-bold text-sm text-ink">
-            {editingId ? 'Edit User' : 'Add User'}
-          </Text>
+          <Text className="font-body-bold text-sm text-ink">{editingId ? 'Edit User' : 'Add User'}</Text>
           <View className="mt-4 flex-row flex-wrap gap-3">
             <Field
               label="Username"
@@ -238,12 +407,7 @@ function UsersScreenInner() {
               onChangeText={(t) => setForm((f) => ({ ...f, username: t }))}
               placeholder="jdoe"
             />
-            <Field
-              label="Name"
-              value={form.name}
-              onChangeText={(t) => setForm((f) => ({ ...f, name: t }))}
-              placeholder="Jane Doe"
-            />
+            <Field label="Name" value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} placeholder="Jane Doe" />
             <Field
               label="Email"
               value={form.email}
@@ -254,7 +418,7 @@ function UsersScreenInner() {
               label={editingId ? 'New Password (optional)' : 'Password'}
               value={form.password}
               onChangeText={(t) => setForm((f) => ({ ...f, password: t }))}
-              placeholder="min 6 chars"
+              placeholder="min 8 chars"
               secureTextEntry
             />
           </View>
@@ -293,20 +457,16 @@ function UsersScreenInner() {
             </Pressable>
           </View>
 
-          {editingId ? (
-            <Text className="mt-3 font-body text-xs text-ink-muted">Username cannot be changed.</Text>
-          ) : null}
+          {editingId ? <Text className="mt-3 font-body text-xs text-ink-muted">Username cannot be changed.</Text> : null}
 
           {error ? <Text className="mt-3 font-body text-sm text-status-critical">{error}</Text> : null}
 
-          <View className="mt-4 flex-row gap-2">
+          <View className="mt-4 flex-row flex-wrap gap-2">
             <Pressable
               onPress={busy ? undefined : submit}
               className={`items-center rounded-xl bg-ink px-4 py-2.5 ${busy ? 'opacity-50' : ''}`}
             >
-              <Text className="font-body-bold text-sm text-ink-inverse">
-                {editingId ? 'Save Changes' : 'Create User'}
-              </Text>
+              <Text className="font-body-bold text-sm text-ink-inverse">{editingId ? 'Save Changes' : 'Create User'}</Text>
             </Pressable>
             {editingId ? (
               <Pressable onPress={resetForm} className="items-center rounded-xl border border-line-dark px-4 py-2.5">
@@ -322,22 +482,19 @@ function UsersScreenInner() {
               <ActivityIndicator color="#F5F5F5" />
             </View>
           ) : (
-            users.map((u, i) => (
+            sorted.map((u, i) => (
               <View
                 key={u.id}
                 className={`flex-row flex-wrap items-center justify-between gap-3 px-4 py-3 ${i > 0 ? 'border-t border-line-dark' : ''}`}
               >
                 <View className="min-w-[160px] flex-1">
-                  <View className="flex-row items-center gap-2">
+                  <View className="flex-row flex-wrap items-center gap-2">
                     <Text className="font-body-bold text-sm text-ink">{u.name}</Text>
                     <View className="rounded-full bg-accent-soft px-2 py-0.5">
-                      <Text className="font-body-medium text-[11px] uppercase tracking-wide text-accent">
-                        {ROLE_LABEL[u.role]}
-                      </Text>
+                      <Text className="font-body-medium text-[11px] uppercase tracking-wide text-accent">{ROLE_LABEL[u.role]}</Text>
                     </View>
-                    {me?.id === u.id ? (
-                      <Text className="font-body text-[11px] text-ink-muted">(you)</Text>
-                    ) : null}
+                    <AccountStatusBadge status={u.status} />
+                    {me?.id === u.id ? <Text className="font-body text-[11px] text-ink-muted">(you)</Text> : null}
                     {userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE) ? (
                       <View className="rounded-full border border-line-dark px-2 py-0.5">
                         <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Schema Access</Text>
@@ -348,15 +505,37 @@ function UsersScreenInner() {
                     @{u.username}
                     {u.email ? ` · ${u.email}` : ''}
                   </Text>
-                  <View className="mt-1.5 flex-row items-center gap-3">
+                  <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
                     <StatusPill user={u} now={now} />
-                    <Text className="font-body text-[11px] text-ink-muted">
-                      Last login: {timeAgo(u.lastLoginAt, now)}
-                    </Text>
+                    <Text className="font-body text-[11px] text-ink-muted">Last login: {timeAgo(u.lastLoginAt, now)}</Text>
                   </View>
                 </View>
 
-                <View className="flex-row gap-2">
+                <View className="flex-row flex-wrap gap-2">
+                  {u.status === 'pending' ? (
+                    <Pressable
+                      onPress={busy ? undefined : () => setStatus(u, 'active')}
+                      className="rounded-lg border border-status-success px-3 py-1.5"
+                    >
+                      <Text className="font-body-medium text-xs text-status-success">Approve</Text>
+                    </Pressable>
+                  ) : null}
+                  {u.status === 'active' && me?.id !== u.id ? (
+                    <Pressable
+                      onPress={busy ? undefined : () => setStatus(u, 'disabled')}
+                      className="rounded-lg border border-status-warning px-3 py-1.5"
+                    >
+                      <Text className="font-body-medium text-xs text-status-warning">Suspend</Text>
+                    </Pressable>
+                  ) : null}
+                  {u.status === 'disabled' ? (
+                    <Pressable
+                      onPress={busy ? undefined : () => setStatus(u, 'active')}
+                      className="rounded-lg border border-status-success px-3 py-1.5"
+                    >
+                      <Text className="font-body-medium text-xs text-status-success">Reactivate</Text>
+                    </Pressable>
+                  ) : null}
                   <Pressable onPress={() => startEdit(u)} className="rounded-lg border border-line-dark px-3 py-1.5">
                     <Text className="font-body-medium text-xs text-ink">Edit</Text>
                   </Pressable>
@@ -371,6 +550,8 @@ function UsersScreenInner() {
             ))
           )}
         </View>
+
+        <RateLimitsPanel />
       </ScrollView>
     </View>
   );
