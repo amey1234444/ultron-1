@@ -20,10 +20,10 @@ const GREEN = '#3FB950';
 // Landing-page typography — DM Sans for body/headings and Bebas Neue as the
 // tall condensed display face, mirroring oswarteck.com. Loaded via Google Fonts
 // in _document.tsx (falls back to the bundled faces / system fonts).
-const FONT_DISPLAY = "'Bebas Neue', 'DM Sans', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
-const FONT_HEAD = "'DM Sans', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
-const FONT_BODY = "'DM Sans', Inter_400Regular, system-ui, sans-serif";
-const FONT_MED = "'DM Sans', Inter_500Medium, system-ui, sans-serif";
+const FONT_DISPLAY = "'Bebas Neue', 'Space Grotesk', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
+const FONT_HEAD = "'Sora', 'Space Grotesk', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
+const FONT_BODY = "'Sora', 'DM Sans', Inter_400Regular, system-ui, sans-serif";
+const FONT_MED = "'Sora', 'DM Sans', Inter_500Medium, system-ui, sans-serif";
 const FONT_MONO = 'IBMPlexMono_400Regular, ui-monospace, monospace';
 
 // Fades a block up into place the first time it scrolls into view.
@@ -159,6 +159,14 @@ export default function HomePage() {
   const { user } = useAuth();
   const consoleHref = user ? '/' : '/login';
   const consoleLabel = user ? 'Open console' : 'Sign in';
+  const [pointer, setPointer] = useState({ x: 50, y: 34 });
+  const handleHeroMove = (event: ReactMouseEvent<HTMLElement>) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    setPointer({
+      x: ((event.clientX - rect.left) / rect.width) * 100,
+      y: ((event.clientY - rect.top) / rect.height) * 100,
+    });
+  };
 
   // Scroll-driven perspective on the hero dashboard — it starts tilted back
   // (like Gigaton's product hero) and straightens as you scroll into the page.
@@ -178,6 +186,10 @@ export default function HomePage() {
   }, []);
   const tilt = 20 * (1 - scrollProgress);
   const lift = 40 * (1 - scrollProgress);
+  const pointerTiltX = (pointer.y - 50) * 0.04;
+  const pointerTiltY = (50 - pointer.x) * 0.04;
+  const pointerShiftX = (pointer.x - 50) * 0.18;
+  const pointerShiftY = (pointer.y - 50) * 0.18;
 
   return (
     <div style={{ background: BG, color: INK, minHeight: '100vh', fontFamily: FONT_BODY, overflowX: 'hidden' }}>
@@ -234,6 +246,8 @@ export default function HomePage() {
 
       {/* Hero */}
       <section
+        onMouseMove={handleHeroMove}
+        onMouseLeave={() => setPointer({ x: 50, y: 34 })}
         style={{
           position: 'relative',
           padding: 'clamp(64px, 10vw, 130px) clamp(20px, 6vw, 72px) clamp(24px, 4vw, 48px)',
@@ -242,11 +256,34 @@ export default function HomePage() {
         }}
       >
         {/* animated backdrop */}
-        <div aria-hidden style={heroGrid} />
-        <div aria-hidden style={{ ...orb, top: '-140px', left: '-120px', background: 'rgba(201,161,92,0.22)' }} />
+        <div aria-hidden style={{ ...heroGrid, backgroundPosition: `${pointerShiftX}px ${pointerShiftY}px` }} />
         <div
           aria-hidden
-          style={{ ...orb, bottom: '-160px', right: '-120px', background: 'rgba(88,166,255,0.16)', animationDelay: '3s' }}
+          style={{
+            ...heroSpotlight,
+            background: `radial-gradient(circle at ${pointer.x}% ${pointer.y}%, rgba(201,161,92,0.28), rgba(88,166,255,0.13) 32%, transparent 64%)`,
+          }}
+        />
+        <div
+          aria-hidden
+          style={{
+            ...orb,
+            top: '-140px',
+            left: '-120px',
+            background: 'rgba(201,161,92,0.22)',
+            transform: `translate3d(${pointerShiftX}px, ${pointerShiftY}px, 0)`,
+          }}
+        />
+        <div
+          aria-hidden
+          style={{
+            ...orb,
+            bottom: '-160px',
+            right: '-120px',
+            background: 'rgba(88,166,255,0.16)',
+            animationDelay: '3s',
+            transform: `translate3d(${-pointerShiftX}px, ${-pointerShiftY}px, 0)`,
+          }}
         />
 
         <div style={{ position: 'relative', maxWidth: 920, margin: '0 auto' }}>
@@ -346,7 +383,7 @@ export default function HomePage() {
         >
           <div
             style={{
-              transform: `rotateX(${tilt}deg) translateY(${lift}px)`,
+              transform: `rotateX(${tilt + pointerTiltX}deg) rotateY(${pointerTiltY}deg) translateY(${lift}px)`,
               transformStyle: 'preserve-3d',
               transition: 'transform 0.15s linear',
               willChange: 'transform',
@@ -975,6 +1012,14 @@ const heroGrid: CSSProperties = {
   backgroundSize: '48px 48px',
   maskImage: 'radial-gradient(circle at 50% 30%, black, transparent 72%)',
   WebkitMaskImage: 'radial-gradient(circle at 50% 30%, black, transparent 72%)',
+  pointerEvents: 'none',
+};
+
+const heroSpotlight: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  opacity: 0.9,
+  transition: 'background 0.18s ease-out',
   pointerEvents: 'none',
 };
 

@@ -4,12 +4,12 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        {/* Landing-page typography (DM Sans body + Bebas Neue display), matching
-            the oswarteck.com look. Loaded from Google Fonts for the web pages. */}
+        {/* Landing-page typography: sharp display plus premium UI faces, loaded
+            from Google Fonts for the web pages. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
           rel="stylesheet"
         />
       </Head>

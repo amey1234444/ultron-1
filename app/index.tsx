@@ -78,7 +78,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   }, [isNarrow]);
   // A machine's Actual View is a full-screen dashboard preview — the hierarchy
   // sidebar hides entirely while it's active, reported up by MachineWorkspace.
-  const [machineWorkspaceMode, setMachineWorkspaceMode] = useState<'design' | 'mapping' | 'live' | 'actual'>('design');
+  const [machineWorkspaceMode, setMachineWorkspaceMode] = useState<'design' | 'actual'>('design');
   const hideSidebar = selected.kind === 'machine' && machineWorkspaceMode === 'actual';
 
   const [projects, setProjects] = useState<ProjectNode[]>(SEED.projects);

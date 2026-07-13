@@ -20,7 +20,7 @@ import { StageGrid, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
 import { TrendView } from './TrendView';
 
-type WorkspaceMode = 'design' | 'mapping' | 'live' | 'actual';
+type WorkspaceMode = 'design' | 'actual';
 
 type MachineWorkspaceProps = {
   machine: MachineNode;
@@ -136,15 +136,17 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
-  const [mode, setMode] = useState<WorkspaceMode>('design');
+  const [mode, setMode] = useState<WorkspaceMode>(() => (canConfigure ? 'design' : 'actual'));
   useEffect(() => {
     onModeChange?.(mode);
     return () => onModeChange?.('design');
   }, [mode, onModeChange]);
+  useEffect(() => {
+    setMode(canConfigure ? 'design' : 'actual');
+  }, [canConfigure]);
   const [actualTab, setActualTab] = useState<ActualTab>('machine');
   const [rightTab, setRightTab] = useState<RightTab>('components');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(machine.components[0]?.id ?? null);
-  const [stubNote, setStubNote] = useState<string | null>(null);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [zoom, setZoom] = useState(1);
   // Layout of the machine wrapper in *stage coordinates* (the stage is a fixed
@@ -305,34 +307,12 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
               style={{ flexGrow: 0, flexShrink: 1, marginLeft: 'auto' }}
             >
               <ModeTab label="Design" active={mode === 'design'} onPress={() => setMode('design')} />
-              <ModeTab
-                label="Mapping"
-                active={mode === 'mapping'}
-                onPress={() => {
-                  setMode('mapping');
-                  setStubNote('Mapping mode is coming in a later step.');
-                }}
-              />
-              <ModeTab
-                label="Live View"
-                active={mode === 'live'}
-                onPress={() => {
-                  setMode('live');
-                  setStubNote('Live View mode is coming in a later step.');
-                }}
-              />
               <ModeTab label="Actual View" active={false} onPress={() => setMode('actual')} />
             </ScrollView>
           </View>
 
           <View className="flex-row items-center justify-between px-4 pt-3 md:px-6">{nameBlock}</View>
         </>
-      )}
-
-      {stubNote && (mode === 'mapping' || mode === 'live') && (
-        <View className="mx-6 mt-3 rounded-lg border border-status-warning/40 bg-status-warning/10 px-3 py-2">
-          <Text className="font-body text-xs text-status-warning">{stubNote}</Text>
-        </View>
       )}
 
       {isActual && actualTab === 'rack' && (
