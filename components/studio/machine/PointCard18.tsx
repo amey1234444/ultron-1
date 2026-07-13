@@ -13,8 +13,8 @@ const STATUS_COLOUR: Record<TrailStatus, string> = {
 };
 
 export const POINT_CARD_WIDTH = 248;
-export const POINT_CARD_HEIGHT = 128;
-const POINT_CARD_FOOTER_HEIGHT = 14;
+export const POINT_CARD_HEIGHT = 104;
+const POINT_CARD_FOOTER_HEIGHT = 8;
 
 export type PointCard18Props = {
   tag: string; // Example: V1, T1, T2
@@ -67,9 +67,9 @@ export function PointCard18({
       style={{
         width: POINT_CARD_WIDTH,
         height: POINT_CARD_HEIGHT,
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        gap: 10,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        gap: 8,
         borderColor: borderColour,
         shadowColor: '#000000',
         shadowOpacity: isDark ? 0.3 : 0.08,
@@ -84,7 +84,7 @@ export function PointCard18({
         style={interactive ? { userSelect: 'none', cursor: 'grab' } : undefined}
         className="flex-row items-center gap-2"
       >
-        <Text numberOfLines={1} className={cn('font-body-bold flex-1 text-base', inkClass)}>
+        <Text numberOfLines={1} ellipsizeMode="tail" style={{ minWidth: 0 }} className={cn('font-body-bold flex-1 text-sm', inkClass)}>
           {title}
         </Text>
         <View className="rounded-md border border-accent/35 bg-accent/10 px-1.5 py-0.5">
@@ -101,7 +101,7 @@ export function PointCard18({
         {/* Space Grotesk SemiBold — matches the app's own wordmark/heading
             font instead of introducing an unrelated serif; the unit stays in
             mono for a technical, label-like contrast beside it. */}
-        <Text numberOfLines={1} style={{ color: statusColour }} className="font-wordmark text-[34px] leading-none">
+        <Text numberOfLines={1} style={{ color: statusColour }} className="font-wordmark text-[30px] leading-none">
           {value}
         </Text>
         <Text numberOfLines={1} style={{ color: statusColour }} className="font-mono text-sm">
