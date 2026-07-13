@@ -44,17 +44,6 @@ const ZOOM_STEP = 0.1;
 // itself rather than the padded box around it.
 const RAV_PADDING = 32;
 
-function ModeTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  const { isDark } = useAppTheme();
-  return (
-    <Pressable onPress={onPress} className={cn('rounded-full px-3 py-1.5', active && (isDark ? 'bg-ink' : 'bg-ink-inverse'))}>
-      <Text className={cn('font-body-medium text-xs', active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 function ActualSubTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -136,14 +125,11 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
-  const [mode, setMode] = useState<WorkspaceMode>(() => (canConfigure ? 'design' : 'actual'));
+  const mode: WorkspaceMode = canConfigure ? 'design' : 'actual';
   useEffect(() => {
     onModeChange?.(mode);
     return () => onModeChange?.('design');
   }, [mode, onModeChange]);
-  useEffect(() => {
-    setMode(canConfigure ? 'design' : 'actual');
-  }, [canConfigure]);
   const [actualTab, setActualTab] = useState<ActualTab>('machine');
   const [rightTab, setRightTab] = useState<RightTab>('components');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(machine.components[0]?.id ?? null);
@@ -297,18 +283,8 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
         </View>
       ) : (
         <>
-          <View className="gap-3 px-4 pt-4 md:flex-row md:items-center md:justify-between md:px-6 md:pt-5">
+          <View className="gap-3 px-4 pt-4 md:flex-row md:items-center md:px-6 md:pt-5">
             {backButton}
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ alignItems: 'center' }}
-              className={cn('max-w-full rounded-full border p-1', lineClass)}
-              style={{ flexGrow: 0, flexShrink: 1, marginLeft: 'auto' }}
-            >
-              <ModeTab label="Design" active={mode === 'design'} onPress={() => setMode('design')} />
-              <ModeTab label="Actual View" active={false} onPress={() => setMode('actual')} />
-            </ScrollView>
           </View>
 
           <View className="flex-row items-center justify-between px-4 pt-3 md:px-6">{nameBlock}</View>

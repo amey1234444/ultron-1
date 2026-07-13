@@ -12,6 +12,10 @@ const STATUS_COLOUR: Record<TrailStatus, string> = {
   offline: '#737373',
 };
 
+export const POINT_CARD_WIDTH = 248;
+export const POINT_CARD_HEIGHT = 128;
+const POINT_CARD_FOOTER_HEIGHT = 14;
+
 export type PointCard18Props = {
   tag: string; // Example: V1, T1, T2
   channel?: string; // Example: V1, T1
@@ -61,7 +65,8 @@ export function PointCard18({
     <View
       className={cn('overflow-hidden rounded-2xl border', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
       style={{
-        width: 248,
+        width: POINT_CARD_WIDTH,
+        height: POINT_CARD_HEIGHT,
         paddingVertical: 14,
         paddingHorizontal: 16,
         gap: 10,
@@ -104,19 +109,15 @@ export function PointCard18({
         </Text>
       </View>
 
-      {/* Left-aligned so it never collides with the status dot, which stays
-          pinned to the bottom-right corner regardless of card height. The
-          marginTop clears the big value text's rendered glyph box, which —
-          with a large custom web font at line-height:1 — extends past its own
-          layout row and otherwise intercepts clicks meant for this link.
-          Inline style, not a NativeWind className: margin/z-index utilities
-          here have repeatedly lost to React Native Web's own generated atomic
-          classes on specificity, so inline style is the reliable option. */}
-      {interactive && onUnlink && !hideUnlink && (
-        <Pressable onPress={onUnlink} hitSlop={6} style={{ marginTop: 8, alignSelf: 'flex-start' }}>
-          <Text className={cn('font-body text-[10px] underline', mutedClass)}>Unlink</Text>
-        </Pressable>
-      )}
+      {/* Actual View hides the action, but this fixed footer keeps every card's
+          measured size identical to Design mode for trail anchoring. */}
+      <View style={{ height: POINT_CARD_FOOTER_HEIGHT, justifyContent: 'flex-end', alignItems: 'flex-start' }}>
+        {interactive && onUnlink && !hideUnlink && (
+          <Pressable onPress={onUnlink} hitSlop={6}>
+            <Text className={cn('font-body text-[10px] underline', mutedClass)}>Unlink</Text>
+          </Pressable>
+        )}
+      </View>
 
       {/* Status dot — inset from the corner rather than flush against it. */}
       <View

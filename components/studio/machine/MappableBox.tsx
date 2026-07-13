@@ -6,15 +6,13 @@ import { cn } from '../../../lib/cn';
 import type { ChannelRef } from '../../../lib/rack';
 import type { TrailStatus } from './AdjustableTrail';
 import { LIVE_RANGE_FOR_LETTER, useLiveValue } from './liveValue';
-import { PointCard18 } from './PointCard18';
+import { PointCard18, POINT_CARD_HEIGHT, POINT_CARD_WIDTH } from './PointCard18';
 
 export type Point = { x: number; y: number };
 
-export const MAPPABLE_BOX_WIDTH = 168;
-// Approximate rendered card height (varies slightly with linked/unlinked content) —
-// used only for "drop a trail endpoint anywhere on the box" hit-testing.
-export const MAPPABLE_BOX_HEIGHT = 130;
-const WIDTH = MAPPABLE_BOX_WIDTH;
+const UNLINKED_BOX_WIDTH = 168;
+export const MAPPABLE_BOX_WIDTH = POINT_CARD_WIDTH;
+export const MAPPABLE_BOX_HEIGHT = POINT_CARD_HEIGHT;
 
 function statusFor(channel: ChannelRef, value: number): TrailStatus {
   if (channel.alarmCritical !== undefined && value >= channel.alarmCritical) return 'critical';
@@ -51,9 +49,8 @@ export type MappableBoxProps = {
   onPickChannel: (channel: ChannelRef | null) => void;
   onDelete: () => void;
   onLiveValueChange?: (value: number) => void;
-  // Reports the card's actual rendered size — the linked and unlinked layouts
-  // differ in height, so callers doing hit-testing/anchoring against this box's
-  // boundary should use the real, current size rather than a guess.
+  // Reports the actual rendered size so callers doing hit-testing/anchoring can
+  // use the current boundary after a point is linked, unlinked, or expanded.
   onSizeChange?: (size: { width: number; height: number }) => void;
 };
 
@@ -87,6 +84,7 @@ export function MappableBox({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel);
+  const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
 
   useEffect(() => {
     if (channel) onLiveValueChange?.(liveValue);
@@ -96,6 +94,8 @@ export function MappableBox({
   pointRef.current = { x, y };
   const boundsRef = useRef({ canvasWidth, canvasHeight });
   boundsRef.current = { canvasWidth, canvasHeight };
+  const renderedWidthRef = useRef(renderedWidth);
+  renderedWidthRef.current = renderedWidth;
   // Gesture dx/dy arrive in screen pixels; box coordinates live in stage units
   // under a scale transform, so deltas must be divided by the current stage scale.
   const scaleRef = useRef(stageScale);
@@ -119,7 +119,7 @@ export function MappableBox({
         const { canvasWidth: cw, canvasHeight: ch } = boundsRef.current;
         const s = scaleRef.current || 1;
         onDragRef.current({
-          x: clamp(dragOrigin.current.x + gesture.dx / s, 8, Math.max(8, cw - WIDTH - 24)),
+          x: clamp(dragOrigin.current.x + gesture.dx / s, 8, Math.max(8, cw - renderedWidthRef.current - 24)),
           y: clamp(dragOrigin.current.y + gesture.dy / s, 24, Math.max(24, ch - 24)),
         });
       },
@@ -189,7 +189,7 @@ export function MappableBox({
       <View
         onLayout={(e) => onSizeChange?.({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
         className={cn('overflow-hidden rounded-xl border border-dashed', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
-        style={{ position: 'absolute', left: x + 12, top: y - 30, width: WIDTH }}
+        style={{ position: 'absolute', left: x + 12, top: y - 30, width: UNLINKED_BOX_WIDTH }}
       >
         <View
           {...panResponder.panHandlers}

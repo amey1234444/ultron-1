@@ -88,10 +88,9 @@ function pointInRect(point: Point, rect: Rect) {
   return point.x >= rect.x && point.x <= rect.x + rect.width && point.y >= rect.y && point.y <= rect.y + rect.height;
 }
 
-// Hit area covering the box's connector dot plus its actual rendered card — not
-// just a fixed guess, since linking/unlinking a channel changes the card's real
-// height. `size` should be the card's measured (onLayout) dimensions when known;
-// falls back to the nominal size before the first measurement arrives.
+// Hit area covering the box's connector dot plus its actual rendered card.
+// `size` should be the measured dimensions when known; before that, fall back
+// to the shared card dimensions so linked cards behave the same in both modes.
 function boxHitRect(box: { x: number; y: number }, size: { width: number; height: number } = { width: MAPPABLE_BOX_WIDTH, height: MAPPABLE_BOX_HEIGHT }): Rect {
   const cardLeft = box.x + 12;
   const cardTop = box.y - 30;
@@ -331,9 +330,9 @@ export function TrailBoard({
     );
   }, [machineRect]);
 
-  // A box moved, OR its rendered boundary changed (linking/unlinking a channel
-  // changes the card's height) — pull every box-anchored endpoint along with it,
-  // from its remembered relative spot on that box's *current* rect.
+  // A box moved, OR its rendered boundary changed — pull every box-anchored
+  // endpoint along with it, from its remembered relative spot on that box's
+  // *current* rect.
   useEffect(() => {
     setTrails((prev) =>
       prev.map((t) => {
