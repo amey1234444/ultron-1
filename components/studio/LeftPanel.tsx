@@ -188,7 +188,12 @@ export function LeftPanel({
       </View>
 
       {collapsed ? (
-        <View className={cn('w-0 border-r', lineClass)} />
+        <Pressable
+          onPress={() => onCollapsedChange(false)}
+          className={cn('w-3 border-r', lineClass)}
+          accessibilityRole="button"
+          accessibilityLabel="Open sidebar"
+        />
       ) : (
         <View
           className={cn('w-64 border-r', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}

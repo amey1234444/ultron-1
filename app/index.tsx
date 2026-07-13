@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
@@ -76,10 +76,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       setLeftCollapsed(isNarrow);
     }
   }, [isNarrow]);
-  // A machine's Actual View is a full-screen dashboard preview — the hierarchy
-  // sidebar hides entirely while it's active, reported up by MachineWorkspace.
+  // In machine Actual View the hierarchy stays available for navigation, but
+  // the workspace can fold it away with one click.
   const [machineWorkspaceMode, setMachineWorkspaceMode] = useState<'design' | 'actual'>('design');
-  const hideSidebar = selected.kind === 'machine' && machineWorkspaceMode === 'actual';
+  const workspaceCollapsesSidebar = selected.kind === 'machine' && machineWorkspaceMode === 'actual';
 
   const [projects, setProjects] = useState<ProjectNode[]>(SEED.projects);
   const [folders, setFolders] = useState<FolderNode[]>(SEED.folders);
@@ -333,31 +333,35 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       />
 
       <View className="flex-1 flex-row">
-        {!hideSidebar && (
-          <>
-            <LeftPanel
-              collapsed={leftCollapsed}
-              onCollapsedChange={setLeftCollapsed}
-              selected={selected}
-              onSelect={setSelected}
-              projects={projects}
-              folders={folders}
-              machines={machines}
-              onOpenMenu={canEditDeleteSchema ? (x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine }) : undefined}
-              onCreateProject={canEditDeleteSchema ? () => setCreateProjectVisible(true) : undefined}
-              canConfigure={canEditDeleteSchema}
-              footer={sidebarFooter}
-            />
+        <LeftPanel
+          collapsed={leftCollapsed}
+          onCollapsedChange={setLeftCollapsed}
+          selected={selected}
+          onSelect={setSelected}
+          projects={projects}
+          folders={folders}
+          machines={machines}
+          onOpenMenu={canEditDeleteSchema ? (x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine }) : undefined}
+          onCreateProject={canEditDeleteSchema ? () => setCreateProjectVisible(true) : undefined}
+          canConfigure={canEditDeleteSchema}
+          footer={sidebarFooter}
+        />
 
-            <PanelToggle
-              collapsed={leftCollapsed}
-              onPress={() => setLeftCollapsed((v) => !v)}
-              left={leftCollapsed ? 8 : LEFT_PANEL_WIDTH - 12}
-            />
-          </>
-        )}
+        <PanelToggle
+          collapsed={leftCollapsed}
+          onPress={() => setLeftCollapsed((v) => !v)}
+          left={leftCollapsed ? 8 : LEFT_PANEL_WIDTH - 12}
+        />
 
-        <View className="flex-1">
+        <View className="relative flex-1">
+          {workspaceCollapsesSidebar && !leftCollapsed && (
+            <Pressable
+              onPress={() => setLeftCollapsed(true)}
+              className="absolute inset-0 z-20"
+              accessibilityRole="button"
+              accessibilityLabel="Collapse sidebar"
+            />
+          )}
           {selected.kind === 'machine' && selectedMachine ? (
             <MachineWorkspace
               key={selectedMachine.id}
