@@ -5,19 +5,12 @@
 // Use the Supabase pooler DATABASE_URL in production. SSL is enabled
 // automatically for non-local hosts.
 
-type QueryResultRow = Record<string, unknown>;
-type QueryResult<T extends QueryResultRow = QueryResultRow> = { rows: T[]; rowCount: number | null };
-type PoolClient = {
-  query<T extends QueryResultRow = QueryResultRow>(text: string, params?: never[]): Promise<QueryResult<T>>;
-  release(): void;
-};
-type PgPool = {
-  query<T extends QueryResultRow = QueryResultRow>(text: string, params?: never[]): Promise<QueryResult<T>>;
-  connect(): Promise<PoolClient>;
-};
+import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
+
+import { ApiError } from './errors';
 
 const globalRef = globalThis as unknown as {
-  __ultronPgPool?: PgPool;
+  __ultronPgPool?: Pool;
   __ultronPgReady?: Promise<void>;
 };
 
@@ -31,43 +24,66 @@ function needsSsl(url: string): boolean {
   return true;
 }
 
-function loadPgPool(): new (config: { connectionString: string; max: number; ssl?: { rejectUnauthorized: boolean } }) => PgPool {
-  try {
-    // Keep local/no-DB builds from failing when the optional Postgres package is
-    // absent. If DATABASE_URL is configured, this still requires the `pg`
-    // dependency and fails loudly with a useful message.
-    const nodeRequire = eval('require') as NodeRequire;
-    return (nodeRequire('pg') as { Pool: new (config: { connectionString: string; max: number; ssl?: { rejectUnauthorized: boolean } }) => PgPool }).Pool;
-  } catch {
-    throw new Error('DATABASE_URL is set, but the pg package is not installed. Run npm install before starting the server.');
-  }
-}
-
-export function pool(): PgPool {
+export function pool(): Pool {
   if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not set.');
+    throw new ApiError(503, 'DATABASE_URL is not set.');
   }
   if (!globalRef.__ultronPgPool) {
     const connectionString = process.env.DATABASE_URL;
-    const Pool = loadPgPool();
     globalRef.__ultronPgPool = new Pool({
       connectionString,
       max: 5,
+      connectionTimeoutMillis: 8000,
       ssl: needsSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
     });
   }
   return globalRef.__ultronPgPool;
 }
 
+// Map low-level pg/socket failures to a 503 with an actionable (but
+// credential-free) message instead of an opaque 500.
+function classifyDbError(err: unknown): ApiError | null {
+  const e = err as { code?: string; message?: string } | null;
+  if (!e || typeof e !== 'object') return null;
+  const code = e.code ?? '';
+  if (code === 'ENETUNREACH' || code === 'ECONNREFUSED' || code === 'ETIMEDOUT' || code === 'EHOSTUNREACH') {
+    return new ApiError(
+      503,
+      `Database unreachable (${code}). If using Supabase from a serverless host, use the pooler connection string (aws-0-<region>.pooler.supabase.com:6543).`,
+    );
+  }
+  if (code === 'ENOTFOUND') {
+    return new ApiError(503, 'Database host not found (ENOTFOUND). Check the DATABASE_URL hostname.');
+  }
+  if (code === '28P01' || /password authentication failed|SASL/i.test(e.message ?? '')) {
+    return new ApiError(503, 'Database authentication failed. Check the DATABASE_URL username/password.');
+  }
+  if (/timeout exceeded when trying to connect/i.test(e.message ?? '')) {
+    return new ApiError(503, 'Database connection timed out. Check that the database is up and reachable.');
+  }
+  return null;
+}
+
 export async function query<T extends QueryResultRow = QueryResultRow>(
   text: string,
   params?: unknown[],
 ): Promise<QueryResult<T>> {
-  return pool().query<T>(text, params as never[]);
+  try {
+    return await pool().query<T>(text, params);
+  } catch (err) {
+    console.error('db query failed', (err as { code?: string })?.code, (err as Error)?.message);
+    throw classifyDbError(err) ?? err;
+  }
 }
 
 export async function withClient<T>(fn: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool().connect();
+  let client: PoolClient;
+  try {
+    client = await pool().connect();
+  } catch (err) {
+    console.error('db connect failed', (err as { code?: string })?.code, (err as Error)?.message);
+    throw classifyDbError(err) ?? err;
+  }
   try {
     return await fn(client);
   } finally {

@@ -34,6 +34,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return res.status(200).json({ user: toPublic(user) });
   } catch (err) {
     if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+    console.error('login error', err);
     return res.status(500).json({ error: 'Internal server error.' });
   }
 }

@@ -46,6 +46,9 @@ const nextConfig = {
   // Allow importing the shared RN component tree that lives at the repo root
   // (components/, lib/, hooks/) from src/pages.
   experimental: { externalDir: true },
+  // Keep pg out of the webpack bundle and ensure it is traced into the
+  // serverless function output.
+  serverExternalPackages: ['pg'],
   transpilePackages: [
     'react-native',
     'react-native-web',

@@ -11,6 +11,9 @@ import {
   type UserStatus,
 } from '../lib/roles';
 import { ensureSchema, isDbEnabled, query } from './db';
+import { ApiError } from './errors';
+
+export { ApiError };
 
 export type StoredUser = PublicUser & { passwordHash: string };
 
@@ -354,10 +357,4 @@ export async function deleteUser(userId: string): Promise<void> {
   await query('DELETE FROM users WHERE id = $1', [userId]);
 }
 
-export class ApiError extends Error {
-  status: number;
-  constructor(status: number, message: string) {
-    super(message);
-    this.status = status;
-  }
-}
+
