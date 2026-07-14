@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isDbEnabled, query } from './db';
 import { clientIp, deviceFingerprint } from './request';
-import { getRateLimits, type RateRule } from './settings';
+import { DEFAULT_RATE_LIMITS, getRateLimits, type RateRule } from './settings';
 import { ApiError } from './users';
 
 export type RateBucket = 'signup' | 'login' | 'api';
@@ -76,10 +76,10 @@ async function dbRecord(key: string, windowSec: number): Promise<void> {
 // rejected request doesn't consume quota. Fails open on unexpected storage
 // errors (never lock legitimate users out because the backend hiccuped).
 export async function checkRateLimit(req: NextApiRequest, bucket: RateBucket): Promise<boolean> {
-  const rules = await getRateLimits();
-  const checks = checksFor(req, bucket, rules[bucket]);
   const now = Date.now();
   try {
+    const rules = await getRateLimits();
+    const checks = checksFor(req, bucket, rules[bucket]);
     if (isDbEnabled()) {
       for (const c of checks) {
         if ((await dbCount(c.key, c.rule.windowSec)) >= c.rule.max) return false;
@@ -106,7 +106,7 @@ export async function enforceRateLimit(
 ): Promise<void> {
   const allowed = await checkRateLimit(req, bucket);
   if (!allowed) {
-    const rules = await getRateLimits();
+    const rules = await getRateLimits().catch(() => DEFAULT_RATE_LIMITS);
     res.setHeader('Retry-After', String(rules[bucket].windowSec));
     throw new ApiError(429, 'Too many requests. Please slow down and try again later.');
   }
