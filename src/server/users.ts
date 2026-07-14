@@ -14,10 +14,8 @@ import { ensureSchema, isDbEnabled, query } from './db';
 
 export type StoredUser = PublicUser & { passwordHash: string };
 
-// Storage is pluggable: a durable Postgres backend when DATABASE_URL is set,
-// otherwise an in-memory store seeded once per server instance (fine for local
-// dev / CI, resets on cold starts). Both expose the same async API so callers
-// never care which is active.
+// Production uses durable Supabase/PostgreSQL storage. Local dev / CI without a
+// DATABASE_URL may use the in-memory seed store; production fails closed.
 type Store = { users: StoredUser[] };
 
 const globalRef = globalThis as unknown as { __ultronUserStore?: Store; __ultronSeeded?: boolean };
@@ -101,6 +99,9 @@ function normalizePermissions(permissions: unknown, role: Role): UserPermission[
 // Ensure the DB schema exists and seed accounts are present. Idempotent.
 async function ready(): Promise<void> {
   if (!isDbEnabled()) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ApiError(503, 'Supabase DATABASE_URL is required.');
+    }
     memStore();
     return;
   }

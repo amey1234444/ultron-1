@@ -38,15 +38,17 @@ Three role levels, ranked `super_admin > admin > user`:
 | `admin`       | Access the studio + view the user directory.                        |
 | `super_admin` | Everything, **plus add / edit / remove any user** at `/admin/users`.|
 
-Sessions are JWT cookies (`httpOnly`). Every `/api/users*` mutation is enforced
-server-side (super admin only), not just hidden in the UI.
+Sessions use opaque random `httpOnly` cookies. Only a SHA-256 token hash is
+stored in Supabase PostgreSQL (`auth_sessions`), so login sessions survive
+deploys/restarts and can be revoked server-side. Every `/api/users*` mutation is
+enforced server-side (super admin only), not just hidden in the UI.
 
 ### Account approval (new signups are gated)
 
 Self-service signups no longer grant access. A new account is created with
 status **`pending`** and receives **no session** — a super admin must approve it
 at `/admin/users` before the user can sign in. Login, `/api/auth/me`, and every
-session check reject any account whose status is not `active`, so a valid JWT
+session check reject any account whose status is not `active`, so a valid token
 alone is not enough. Self-signup always forces the lowest (`user`) role; roles
 can never be self-elevated. Accounts have three statuses:
 
@@ -124,8 +126,8 @@ against **two windows that must both pass**:
   `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy`,
   `Cross-Origin-Opener-Policy: same-origin`, and `Strict-Transport-Security`
   (production). `X-Powered-By` is disabled.
-- **Passwords** hashed with **bcrypt**; sessions are signed JWTs and rejected
-  unless the account is still `active` (a valid token alone is never enough).
+- **Passwords** are hashed with **bcrypt**; sessions are opaque, database-backed
+  tokens and are rejected unless the account is still `active`.
 
 ### Seed accounts
 
@@ -137,26 +139,33 @@ Created on first server start (passwords overridable via env — set these in Ve
 | `admin`      | admin         | `ADMIN_PASSWORD`        | `admin123`       |
 | `user`       | user          | `USER_PASSWORD`         | `user123`        |
 
-Set `AUTH_SECRET` in production to a strong random value (JWT signing key).
+Set `AUTH_SECRET` in production to a strong random value for CAPTCHA signing.
 
-### Database (PostgreSQL)
+### Database (Supabase PostgreSQL)
 
-Users, tunable rate-limit settings, and rate-limit events are persisted in
-**PostgreSQL** when a `DATABASE_URL` is set. The schema is created and seeded
-automatically on first use — no manual migration step. If `DATABASE_URL` is
-**not** set, the app transparently falls back to an in-memory store (handy for
-local dev), which resets on restart.
+Production requires a Supabase PostgreSQL `DATABASE_URL`. The database stores:
 
-```bash
-# Local Postgres example
-DATABASE_URL=postgres://user:pass@localhost:5432/ultron
-```
+- users and durable login sessions;
+- projects, nested folders, machines, components, devices, and rack cards;
+- machine canvas box/trail coordinates and card/channel mappings;
+- app settings, collaboration revision counters, and rate-limit events.
 
-**Free hosted Postgres** (recommended for Vercel): create a free database on
-[Neon](https://neon.tech) or [Supabase](https://supabase.com), copy the
-connection string into the Vercel project's `DATABASE_URL` env var. Managed TLS
-connections work out of the box (`PGSSLMODE=require` is honored). See
-`.env.example` for all supported variables.
+The idempotent migration is checked in at
+`supabase/migrations/20260714000000_durable_studio.sql`. The server also creates
+missing tables on first use. A fresh database receives the demo workspace once;
+`studio_meta.seeded` prevents later deploys from reseeding or deleting existing
+data.
+
+The client loads this shared workspace after authentication and polls lightweight
+revision counters. Hierarchy edits and saved canvas layouts therefore become
+visible to other authenticated users. Design/configure and actual/non-configure
+views consume the same per-machine layout, including fixed-stage coordinates and
+the number/configuration of rack cards.
+
+Create a project at [Supabase](https://supabase.com), then copy **Project
+Settings → Database → Connection string → URI** into Vercel's `DATABASE_URL`
+environment variable. Use the transaction pooler URI for serverless deployments
+and keep `sslmode=require`. See `.env.example` for the expected format.
 
 ## Deployment (Vercel)
 
@@ -167,4 +176,5 @@ The workflow needs these **GitHub repository secrets** (already configured for t
 - `VERCEL_ORG_ID`
 - `VERCEL_PROJECT_ID`
 
-Set the app env vars (`AUTH_SECRET`, `*_PASSWORD`) in the Vercel project settings.
+Set `DATABASE_URL`, `AUTH_SECRET`, and `*_PASSWORD` in the Vercel project
+settings. Do not point production at an ephemeral/local database.
