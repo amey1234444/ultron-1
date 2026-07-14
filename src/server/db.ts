@@ -24,6 +24,24 @@ function needsSsl(url: string): boolean {
   return true;
 }
 
+// pg >= 8.16 treats `sslmode=require` in the connection string as verify-full,
+// which rejects Supabase's self-signed certificate chain even when an explicit
+// `ssl` option is passed. Strip ssl params from the URL and control SSL solely
+// through the `ssl` pool option.
+function stripSslParams(url: string): string {
+  try {
+    const u = new URL(url);
+    u.searchParams.delete('sslmode');
+    u.searchParams.delete('ssl');
+    u.searchParams.delete('sslcert');
+    u.searchParams.delete('sslkey');
+    u.searchParams.delete('sslrootcert');
+    return u.toString();
+  } catch {
+    return url;
+  }
+}
+
 export function pool(): Pool {
   if (!process.env.DATABASE_URL) {
     throw new ApiError(503, 'DATABASE_URL is not set.');
@@ -31,7 +49,7 @@ export function pool(): Pool {
   if (!globalRef.__ultronPgPool) {
     const connectionString = process.env.DATABASE_URL;
     globalRef.__ultronPgPool = new Pool({
-      connectionString,
+      connectionString: stripSslParams(connectionString),
       max: 5,
       connectionTimeoutMillis: 8000,
       ssl: needsSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
@@ -57,6 +75,14 @@ function classifyDbError(err: unknown): ApiError | null {
   }
   if (code === '28P01' || /password authentication failed|SASL/i.test(e.message ?? '')) {
     return new ApiError(503, 'Database authentication failed. Check the DATABASE_URL username/password.');
+  }
+  if (
+    code === 'SELF_SIGNED_CERT_IN_CHAIN' ||
+    code === 'DEPTH_ZERO_SELF_SIGNED_CERT' ||
+    code === 'UNABLE_TO_VERIFY_LEAF_SIGNATURE' ||
+    /certificate/i.test(e.message ?? '')
+  ) {
+    return new ApiError(503, 'Database TLS certificate rejected. Remove sslmode from DATABASE_URL or use a trusted certificate.');
   }
   if (/timeout exceeded when trying to connect/i.test(e.message ?? '')) {
     return new ApiError(503, 'Database connection timed out. Check that the database is up and reachable.');
