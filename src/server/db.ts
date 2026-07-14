@@ -272,6 +272,21 @@ async function migrate(): Promise<void> {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_machine_canvas_cards (
+      id          TEXT NOT NULL,
+      machine_id  TEXT NOT NULL,
+      center_x    DOUBLE PRECISION NOT NULL DEFAULT 0,
+      center_y    DOUBLE PRECISION NOT NULL DEFAULT 0,
+      label       TEXT NOT NULL DEFAULT '',
+      channel_id  TEXT,
+      data        JSONB NOT NULL DEFAULT '{}'::jsonb,
+      sort_order  INT NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (machine_id, id)
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS studio_machine_canvas_cards_machine ON studio_machine_canvas_cards (machine_id, sort_order);`);
 
   // Singleton bookkeeping row: monotonic revisions clients poll to detect other
   // users' changes, plus a one-time seed guard so a fresh database is populated

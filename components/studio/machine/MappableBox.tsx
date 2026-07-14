@@ -10,7 +10,7 @@ import { PointCard18, POINT_CARD_HEIGHT, POINT_CARD_WIDTH } from './PointCard18'
 
 export type Point = { x: number; y: number };
 
-const UNLINKED_BOX_WIDTH = 168;
+export const UNLINKED_BOX_WIDTH = 168;
 export const MAPPABLE_BOX_WIDTH = POINT_CARD_WIDTH;
 export const MAPPABLE_BOX_HEIGHT = POINT_CARD_HEIGHT;
 

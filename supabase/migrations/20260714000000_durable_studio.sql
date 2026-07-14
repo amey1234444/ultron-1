@@ -113,6 +113,55 @@ CREATE TABLE IF NOT EXISTS studio_machine_layouts (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Normalized canvas card index for each machine layout. The full layout remains
+-- in studio_machine_layouts for trail geometry/backwards compatibility; this
+-- table makes card add/delete/move state queryable and stores the card's visual
+-- center in the fixed 1600x900 stage coordinate system.
+CREATE TABLE IF NOT EXISTS studio_machine_canvas_cards (
+  id         TEXT NOT NULL,
+  machine_id TEXT NOT NULL,
+  center_x   DOUBLE PRECISION NOT NULL DEFAULT 0,
+  center_y   DOUBLE PRECISION NOT NULL DEFAULT 0,
+  label      TEXT NOT NULL DEFAULT '',
+  channel_id TEXT,
+  data       JSONB NOT NULL DEFAULT '{}'::jsonb,
+  sort_order INT NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (machine_id, id)
+);
+CREATE INDEX IF NOT EXISTS studio_machine_canvas_cards_machine ON studio_machine_canvas_cards (machine_id, sort_order);
+
+INSERT INTO studio_machine_canvas_cards (id, machine_id, center_x, center_y, label, channel_id, data, sort_order)
+SELECT
+  box.value->>'id',
+  l.machine_id,
+  COALESCE(
+    CASE WHEN box.value->>'centerX' ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (box.value->>'centerX')::double precision END,
+    CASE WHEN box.value->>'x' ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (box.value->>'x')::double precision END,
+    0
+  ),
+  COALESCE(
+    CASE WHEN box.value->>'centerY' ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (box.value->>'centerY')::double precision END,
+    CASE WHEN box.value->>'y' ~ '^-?[0-9]+(\.[0-9]+)?$' THEN (box.value->>'y')::double precision END,
+    0
+  ),
+  COALESCE(box.value->>'label', ''),
+  NULLIF(box.value->>'channelId', ''),
+  box.value,
+  box.ordinality::int - 1
+FROM studio_machine_layouts l
+CROSS JOIN LATERAL jsonb_array_elements(l.boxes) WITH ORDINALITY AS box(value, ordinality)
+WHERE box.value ? 'id'
+ON CONFLICT (machine_id, id) DO UPDATE SET
+  machine_id = EXCLUDED.machine_id,
+  center_x = EXCLUDED.center_x,
+  center_y = EXCLUDED.center_y,
+  label = EXCLUDED.label,
+  channel_id = EXCLUDED.channel_id,
+  data = EXCLUDED.data,
+  sort_order = EXCLUDED.sort_order,
+  updated_at = now();
+
 CREATE TABLE IF NOT EXISTS studio_meta (
   id              INT PRIMARY KEY DEFAULT 1,
   hier_revision   BIGINT NOT NULL DEFAULT 0,

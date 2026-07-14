@@ -16,6 +16,7 @@ import { createSeedData } from '../../lib/seedData';
 import { ensureSchema, isDbEnabled, query, withClient } from './db';
 
 export type Layout = { trails: unknown[]; boxes: unknown[] };
+type CanvasCardBox = Record<string, unknown>;
 
 export type Workspace = {
   projects: ProjectNode[];
@@ -40,6 +41,10 @@ const globalRef = globalThis as unknown as { __ultronStudioSeeded?: boolean };
 
 function makeId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+}
+
+function numericValue(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
 // Ensure schema exists and the workspace is seeded with demo data exactly once
@@ -163,6 +168,12 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
      WHERE NOT EXISTS (SELECT 1 FROM studio_machines m WHERE m.id = l.machine_id)`,
     [],
   );
+  await q(
+    client,
+    `DELETE FROM studio_machine_canvas_cards c
+     WHERE NOT EXISTS (SELECT 1 FROM studio_machines m WHERE m.id = c.machine_id)`,
+    [],
+  );
 }
 
 // --- row mapping -----------------------------------------------------------
@@ -270,13 +281,46 @@ export async function saveMachineLayout(machineId: string, layout: Layout): Prom
   return withClient(async (client) => {
     await client.query('BEGIN');
     try {
+      const trails = Array.isArray(layout.trails) ? layout.trails : [];
+      const boxes = Array.isArray(layout.boxes) ? layout.boxes : [];
       await q(
         client,
         `INSERT INTO studio_machine_layouts (machine_id, trails, boxes, updated_at)
          VALUES ($1, $2::jsonb, $3::jsonb, now())
          ON CONFLICT (machine_id) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes, updated_at = now()`,
-        [machineId, JSON.stringify(layout.trails ?? []), JSON.stringify(layout.boxes ?? [])],
+        [machineId, JSON.stringify(trails), JSON.stringify(boxes)],
       );
+      await q(client, 'DELETE FROM studio_machine_canvas_cards WHERE machine_id = $1', [machineId]);
+      let sortOrder = 0;
+      for (const box of boxes) {
+        const b = box && typeof box === 'object' && !Array.isArray(box) ? (box as CanvasCardBox) : null;
+        const id = typeof b?.id === 'string' ? b.id.trim() : '';
+        if (!b || !id) continue;
+        await q(
+          client,
+          `INSERT INTO studio_machine_canvas_cards
+             (machine_id, id, center_x, center_y, label, channel_id, data, sort_order, updated_at)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, now())
+           ON CONFLICT (machine_id, id) DO UPDATE SET
+             center_x = EXCLUDED.center_x,
+             center_y = EXCLUDED.center_y,
+             label = EXCLUDED.label,
+             channel_id = EXCLUDED.channel_id,
+             data = EXCLUDED.data,
+             sort_order = EXCLUDED.sort_order,
+             updated_at = now()`,
+          [
+            machineId,
+            id,
+            numericValue(b.centerX, numericValue(b.x, 0)),
+            numericValue(b.centerY, numericValue(b.y, 0)),
+            typeof b.label === 'string' ? b.label : '',
+            typeof b.channelId === 'string' && b.channelId.trim() ? b.channelId : null,
+            JSON.stringify(b),
+            sortOrder++,
+          ],
+        );
+      }
       const cur = await client.query<{ layout_revision: string }>('SELECT layout_revision FROM studio_meta WHERE id = 1 FOR UPDATE');
       const next = Number(cur.rows[0]?.layout_revision ?? 0) + 1;
       await client.query('UPDATE studio_meta SET layout_revision = $1, updated_at = now() WHERE id = 1', [String(next)] as never[]);

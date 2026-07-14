@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -7,7 +7,7 @@ import type { DeviceNode } from '../../../lib/devices';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
-import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH } from './MappableBox';
+import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { createRavDefaultLayout, hasDefaultLayout } from './ravDefaultLayout';
 
 export type Anchor = { rx: number; ry: number };
@@ -45,6 +45,8 @@ export type Box = {
   id: string;
   x: number;
   y: number;
+  centerX?: number;
+  centerY?: number;
   label: string;
   channelId?: string;
 };
@@ -85,6 +87,8 @@ export function trailBoardStorageKey(machineId: string) {
   return `ultron.trailboard.v3.${machineId}`;
 }
 
+const AUTO_SAVE_DEBOUNCE_MS = 700;
+
 function makeId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
@@ -104,6 +108,35 @@ function boxHitRect(box: { x: number; y: number }, size: { width: number; height
   const right = Math.max(box.x + 10, cardLeft + size.width + 10);
   const bottom = cardTop + size.height + 10;
   return { x: left, y: top, width: right - left, height: bottom - top };
+}
+
+function boxVisualRect(
+  box: Box,
+  channels: ChannelRef[],
+  size?: { width: number; height: number },
+): Rect {
+  const linked = !!box.channelId && channels.some((c) => c.id === box.channelId);
+  const width = size?.width ?? (linked ? MAPPABLE_BOX_WIDTH : UNLINKED_BOX_WIDTH);
+  const height = size?.height ?? MAPPABLE_BOX_HEIGHT;
+  return {
+    x: box.x + (linked ? 14 : 12),
+    y: box.y + (linked ? -38 : -30),
+    width,
+    height,
+  };
+}
+
+function withBoxCenter(
+  box: Box,
+  channels: ChannelRef[],
+  size?: { width: number; height: number },
+): Box {
+  const rect = boxVisualRect(box, channels, size);
+  return {
+    ...box,
+    centerX: Math.round((rect.x + rect.width / 2) * 100) / 100,
+    centerY: Math.round((rect.y + rect.height / 2) * 100) / 100,
+  };
 }
 
 const STATUS_RANK: Record<TrailStatus, number> = { offline: -1, normal: 0, warning: 1, critical: 2 };
@@ -151,6 +184,70 @@ export function TrailBoard({
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
+  const channelsRef = useRef(channels);
+  const trailsRef = useRef(trails);
+  const boxesRef = useRef(boxes);
+  const boxSizesRef = useRef(boxSizes);
+  const readOnlyRef = useRef(readOnly);
+  const onSaveLayoutRef = useRef(onSaveLayout);
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingLayout = useRef<SavedLayout | null>(null);
+
+  channelsRef.current = channels;
+  trailsRef.current = trails;
+  boxesRef.current = boxes;
+  boxSizesRef.current = boxSizes;
+  readOnlyRef.current = readOnly;
+  onSaveLayoutRef.current = onSaveLayout;
+
+  const layoutWithCenters = useCallback((nextTrails: Trail[], nextBoxes: Box[]): SavedLayout => {
+    return {
+      trails: nextTrails,
+      boxes: nextBoxes.map((box) => withBoxCenter(box, channelsRef.current, boxSizesRef.current[box.id])),
+    };
+  }, []);
+
+  const persistLayout = useCallback(
+    (nextTrails: Trail[], nextBoxes: Box[], options: { immediate?: boolean } = {}) => {
+      if (readOnlyRef.current) return;
+      const layout = layoutWithCenters(nextTrails, nextBoxes);
+      saveLocal<SavedLayout>(storageKey, layout);
+      pendingLayout.current = layout;
+
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      const send = () => {
+        const queued = pendingLayout.current;
+        pendingLayout.current = null;
+        onSaveLayoutRef.current?.(machineId, queued ?? layout);
+      };
+      if (options.immediate) {
+        send();
+      } else {
+        autoSaveTimer.current = setTimeout(send, AUTO_SAVE_DEBOUNCE_MS);
+      }
+    },
+    [layoutWithCenters, machineId, storageKey],
+  );
+
+  const replaceTrails = useCallback(
+    (next: Trail[] | ((current: Trail[]) => Trail[]), shouldPersist = true) => {
+      const nextTrails = typeof next === 'function' ? next(trailsRef.current) : next;
+      trailsRef.current = nextTrails;
+      setTrails(nextTrails);
+      if (shouldPersist) persistLayout(nextTrails, boxesRef.current);
+    },
+    [persistLayout],
+  );
+
+  const replaceBoxes = useCallback(
+    (next: Box[] | ((current: Box[]) => Box[]), shouldPersist = true) => {
+      const nextBoxes = typeof next === 'function' ? next(boxesRef.current) : next;
+      boxesRef.current = nextBoxes;
+      setBoxes(nextBoxes);
+      if (shouldPersist) persistLayout(trailsRef.current, nextBoxes);
+    },
+    [persistLayout],
+  );
 
   // A polling refresh may deliver a layout saved by another authenticated user
   // while this machine is open. Apply that new object to both design and actual
@@ -158,6 +255,9 @@ export function TrailBoard({
   useEffect(() => {
     if (!initialLayout || initialLayout === appliedRemoteLayout.current) return;
     appliedRemoteLayout.current = initialLayout;
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+    trailsRef.current = initialLayout.trails;
+    boxesRef.current = initialLayout.boxes;
     setTrails(initialLayout.trails);
     setBoxes(initialLayout.boxes);
     setSelectedId(null);
@@ -168,17 +268,18 @@ export function TrailBoard({
     // zoom) — endpoints and bends land exactly on the artwork as rendered
     // right now, not where it would sit at 100%.
     const layout = createRavDefaultLayout(channels, machineRect);
+    trailsRef.current = layout.trails;
+    boxesRef.current = layout.boxes;
     setTrails(layout.trails);
     setBoxes(layout.boxes);
+    persistLayout(layout.trails, layout.boxes);
     setSelectedId(null);
   };
 
   const saveConfig = () => {
-    const layout: SavedLayout = { trails, boxes };
     // Persist to the shared server layout (visible to other users) and keep a
     // local copy so offline / native still renders the last saved state.
-    onSaveLayout?.(machineId, layout);
-    saveLocal<SavedLayout>(storageKey, layout);
+    persistLayout(trailsRef.current, boxesRef.current, { immediate: true });
     setJustSaved(true);
     if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
     savedFlashTimer.current = setTimeout(() => setJustSaved(false), 1600);
@@ -187,8 +288,13 @@ export function TrailBoard({
   useEffect(() => {
     return () => {
       if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
+      if (pendingLayout.current) {
+        onSaveLayoutRef.current?.(machineId, pendingLayout.current);
+        pendingLayout.current = null;
+      }
     };
-  }, []);
+  }, [machineId]);
 
   // Entering Actual View drops any active selection so no editing chrome
   // (highlight ring, bend toolbar) leaks into the clean monitor rendering.
@@ -203,7 +309,7 @@ export function TrailBoard({
     const stagger = (n % 6) * 26;
     const id = makeId('trail');
 
-    setTrails((prev) => [
+    replaceTrails((prev) => [
       ...prev,
       {
         id,
@@ -222,15 +328,15 @@ export function TrailBoard({
     const baseY = boardSize.height > 0 ? boardSize.height / 2 : 200;
     const stagger = (n % 5) * 30;
 
-    setBoxes((prev) => [...prev, { id: makeId('box'), x: baseX - 220, y: baseY - 120 + stagger, label: '' }]);
+    replaceBoxes((prev) => [...prev, { id: makeId('box'), x: baseX - 220, y: baseY - 120 + stagger, label: '' }]);
   };
 
   const updateTrailPoints = (id: string, points: Point[]) => {
-    setTrails((prev) => prev.map((t) => (t.id === id ? { ...t, points } : t)));
+    replaceTrails((prev) => prev.map((t) => (t.id === id ? { ...t, points } : t)));
   };
 
   const removeTrail = (id: string) => {
-    setTrails((prev) => prev.filter((t) => t.id !== id));
+    replaceTrails((prev) => prev.filter((t) => t.id !== id));
     setSelectedId((current) => (current === id ? null : current));
   };
 
@@ -241,7 +347,7 @@ export function TrailBoard({
     const boxIdKey = which === 'start' ? 'startBoxId' : 'endBoxId';
     const boxAnchorKey = which === 'start' ? 'startBoxAnchor' : 'endBoxAnchor';
     const machineAnchorKey = which === 'start' ? 'startMachineAnchor' : 'endMachineAnchor';
-    setTrails((prev) =>
+    replaceTrails((prev) =>
       prev.map((t) => (t.id === trailId ? { ...t, [boxIdKey]: undefined, [boxAnchorKey]: undefined, [machineAnchorKey]: undefined } : t)),
     );
   };
@@ -260,7 +366,7 @@ export function TrailBoard({
     const hit = candidateBoxes[0] ?? null;
     const hitMachine = !hit && machineRect && pointInRect(point, machineRect) ? machineRect : null;
 
-    setTrails((prev) =>
+    replaceTrails((prev) =>
       prev.map((t) => {
         if (t.id !== trailId) return t;
         const index = which === 'start' ? 0 : t.points.length - 1;
@@ -285,28 +391,31 @@ export function TrailBoard({
   };
 
   const updateBoxPosition = (id: string, point: Point) => {
-    setBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, ...point } : b)));
+    replaceBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, ...point } : b)));
   };
 
   const updateBoxLabel = (id: string, label: string) => {
-    setBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, label } : b)));
+    replaceBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, label } : b)));
   };
 
   const pickBoxChannel = (id: string, channel: ChannelRef | null) => {
-    setBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, channelId: channel?.id } : b)));
+    replaceBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, channelId: channel?.id } : b)));
   };
 
   const removeBox = (id: string) => {
-    setBoxes((prev) => prev.filter((b) => b.id !== id));
-    setTrails((prev) =>
-      prev.map((t) => ({
+    const nextBoxes = boxesRef.current.filter((b) => b.id !== id);
+    const nextTrails = trailsRef.current.map((t) => ({
         ...t,
         startBoxId: t.startBoxId === id ? undefined : t.startBoxId,
         startBoxAnchor: t.startBoxId === id ? undefined : t.startBoxAnchor,
         endBoxId: t.endBoxId === id ? undefined : t.endBoxId,
         endBoxAnchor: t.endBoxId === id ? undefined : t.endBoxAnchor,
-      })),
-    );
+      }));
+    boxesRef.current = nextBoxes;
+    trailsRef.current = nextTrails;
+    setBoxes(nextBoxes);
+    setTrails(nextTrails);
+    persistLayout(nextTrails, nextBoxes);
     setBoxLiveValues((prev) => {
       const { [id]: _removed, ...rest } = prev;
       return rest;
@@ -314,7 +423,7 @@ export function TrailBoard({
   };
 
   const addBendToSelected = () => {
-    setTrails((prev) =>
+    replaceTrails((prev) =>
       prev.map((t) => {
         if (t.id !== selectedId || t.points.length < 2) return t;
         const insertIndex = t.points.length - 1;
@@ -327,7 +436,7 @@ export function TrailBoard({
   };
 
   const removeBendFromSelected = () => {
-    setTrails((prev) =>
+    replaceTrails((prev) =>
       prev.map((t) => (t.id === selectedId && t.points.length > 2 ? { ...t, points: t.points.filter((_, i) => i !== t.points.length - 2) } : t)),
     );
   };
@@ -336,8 +445,8 @@ export function TrailBoard({
   // along with it, from its remembered relative position.
   useEffect(() => {
     if (!machineRect) return;
-    setTrails((prev) =>
-      prev.map((t) => {
+    setTrails((prev) => {
+      const next = prev.map((t) => {
         if (!t.startMachineAnchor && !t.endMachineAnchor) return t;
         const nextPoints = t.points.map((p, i) => {
           if (t.startMachineAnchor && i === 0) {
@@ -349,16 +458,18 @@ export function TrailBoard({
           return p;
         });
         return { ...t, points: rerouteBend(t, nextPoints) };
-      }),
-    );
+      });
+      trailsRef.current = next;
+      return next;
+    });
   }, [machineRect]);
 
   // A box moved, OR its rendered boundary changed — pull every box-anchored
   // endpoint along with it, from its remembered relative spot on that box's
   // *current* rect.
   useEffect(() => {
-    setTrails((prev) =>
-      prev.map((t) => {
+    setTrails((prev) => {
+      const next = prev.map((t) => {
         if (!t.startBoxAnchor && !t.endBoxAnchor) return t;
         const nextPoints = t.points.map((p, i) => {
           if (t.startBoxAnchor && i === 0) {
@@ -376,8 +487,10 @@ export function TrailBoard({
           return p;
         });
         return { ...t, points: rerouteBend(t, nextPoints) };
-      }),
-    );
+      });
+      trailsRef.current = next;
+      return next;
+    });
   }, [boxes, boxSizes]);
 
   // Wherever a trail is actually attached to this box right now — falls back to
