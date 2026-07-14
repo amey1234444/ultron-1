@@ -26,6 +26,11 @@ type MachineWorkspaceProps = {
   machine: MachineNode;
   devices: DeviceNode[];
   cards: CardNode[];
+  // Shared canvas layout for this machine (Supabase-backed). Both the design
+  // and actual views read it so they stay in sync across users; null falls back
+  // to localStorage / the template default.
+  layout?: SavedLayout | null;
+  onSaveLayout?: (machineId: string, layout: SavedLayout) => void;
   onBack: () => void;
   canConfigure?: boolean;
   // Actual View is meant to be a full-screen "deployed dashboard" preview — the
@@ -118,7 +123,16 @@ function ComponentRow({ component, selected, onPress }: { component: MachineComp
   );
 }
 
-export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange, canConfigure = false }: MachineWorkspaceProps) {
+export function MachineWorkspace({
+  machine,
+  devices,
+  cards,
+  layout,
+  onSaveLayout,
+  onBack,
+  onModeChange,
+  canConfigure = false,
+}: MachineWorkspaceProps) {
   const { isDark } = useAppTheme();
   const { width } = useWindowDimensions();
   const isNarrow = width > 0 && width < 900;
@@ -164,7 +178,9 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
   const [savedBoxes, setSavedBoxes] = useState<Box[]>([]);
   useEffect(() => {
     if (!isActual || actualTab === 'machine') return;
-    const saved = loadLocal<SavedLayout>(trailBoardStorageKey(machine.id));
+    // Prefer the shared server layout; fall back to any local copy, then the
+    // template default so dashboards render live demo data out of the box.
+    const saved = layout ?? loadLocal<SavedLayout>(trailBoardStorageKey(machine.id));
     if (saved?.boxes && saved.boxes.length > 0) {
       setSavedBoxes(saved.boxes);
       return;
@@ -173,7 +189,7 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
     // one) so the Actual View dashboards render live demo data out of the box
     // instead of an empty "nothing mapped" state.
     setSavedBoxes(hasDefaultLayout(machine.template) ? createRavDefaultLayout(allChannels).boxes : []);
-  }, [isActual, actualTab, machine.id, machine.template, allChannels]);
+  }, [isActual, actualTab, machine.id, machine.template, allChannels, layout]);
 
   const mappedChannels = useMemo<MappedChannel[]>(
     () =>
@@ -337,6 +353,8 @@ export function MachineWorkspace({ machine, devices, cards, onBack, onModeChange
                   machineRect={machineRect}
                   machineId={machine.id}
                   machineTemplate={machine.template}
+                  initialLayout={layout ?? null}
+                  onSaveLayout={onSaveLayout}
                   stageStyle={stageStyle}
                   stageScale={stageScale}
                   readOnly={readOnlyCanvas}

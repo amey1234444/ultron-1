@@ -1,10 +1,9 @@
-// Thin Postgres access layer. The whole app degrades gracefully to an in-memory
-// store when DATABASE_URL is not configured (local `npm run dev` without a DB,
-// CI builds, etc.), so `isDbEnabled()` is the single switch every store checks.
+// Thin Supabase/PostgreSQL access layer. Local development and CI builds can run
+// without DATABASE_URL, but production auth and shared studio persistence fail
+// closed when it is absent.
 //
-// For durable, tamper-resistant persistence in production set DATABASE_URL to a
-// managed Postgres (a free Neon / Vercel Postgres instance works well). SSL is
-// enabled automatically for non-local hosts.
+// Use the Supabase pooler DATABASE_URL in production. SSL is enabled
+// automatically for non-local hosts.
 
 type QueryResultRow = Record<string, unknown>;
 type QueryResult<T extends QueryResultRow = QueryResultRow> = { rows: T[]; rowCount: number | null };
@@ -106,6 +105,21 @@ async function migrate(): Promise<void> {
     );
   `);
 
+  // Opaque, database-backed login sessions. Only a SHA-256 hash of the
+  // browser token is stored; sessions therefore survive deploys/restarts without
+  // depending on an instance-local JWT secret.
+  await query(`
+    CREATE TABLE IF NOT EXISTS auth_sessions (
+      token_hash   TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at   TIMESTAMPTZ NOT NULL,
+      revoked_at   TIMESTAMPTZ
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions (user_id, expires_at);`);
+
   // App-wide settings (single row) — currently holds super-admin-tunable rate
   // limits stored as JSON.
   await query(`
@@ -130,4 +144,105 @@ async function migrate(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS rate_events_lookup ON rate_events (bucket, key, ts);`);
   // Primary lookup path is by key + time window (see rateLimit.ts).
   await query(`CREATE INDEX IF NOT EXISTS rate_events_key_ts ON rate_events (key, ts);`);
+
+  // --- Studio workspace (asset hierarchy + canvas layouts) -----------------
+  // The whole hierarchy shown in the left rail is durable and shared across all
+  // authenticated users, so an edit by one user is visible to everyone. Deep,
+  // template-shaped payloads (a machine's components/points, a card's channel
+  // config, a canvas layout's trails/boxes with their coordinates) are stored as
+  // JSONB alongside the normalized parent rows.
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_projects (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL DEFAULT '',
+      code        TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      sort_order  INT  NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_folders (
+      id          TEXT PRIMARY KEY,
+      project_id  TEXT NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+      parent_id   TEXT REFERENCES studio_folders(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL DEFAULT '',
+      type        TEXT NOT NULL DEFAULT 'Custom Folder',
+      code        TEXT NOT NULL DEFAULT '',
+      description TEXT NOT NULL DEFAULT '',
+      sort_order  INT  NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS studio_folders_project ON studio_folders (project_id);`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_machines (
+      id          TEXT PRIMARY KEY,
+      project_id  TEXT NOT NULL REFERENCES studio_projects(id) ON DELETE CASCADE,
+      folder_id   TEXT NOT NULL REFERENCES studio_folders(id) ON DELETE CASCADE,
+      name        TEXT NOT NULL DEFAULT '',
+      template    TEXT NOT NULL DEFAULT 'Custom Machine',
+      components  JSONB NOT NULL DEFAULT '[]'::jsonb,
+      sort_order  INT  NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS studio_machines_folder ON studio_machines (folder_id);`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_devices (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL DEFAULT '',
+      type        TEXT NOT NULL DEFAULT 'Rack',
+      model       TEXT NOT NULL DEFAULT '',
+      ip          TEXT NOT NULL DEFAULT '',
+      port        TEXT NOT NULL DEFAULT '',
+      protocol    TEXT NOT NULL DEFAULT 'Modbus TCP',
+      description TEXT NOT NULL DEFAULT '',
+      status      TEXT NOT NULL DEFAULT 'Not Connected',
+      project_id  TEXT REFERENCES studio_projects(id) ON DELETE SET NULL,
+      archived    BOOLEAN NOT NULL DEFAULT false,
+      sort_order  INT  NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_cards (
+      id          TEXT PRIMARY KEY,
+      device_id   TEXT NOT NULL REFERENCES studio_devices(id) ON DELETE CASCADE,
+      slot        INT  NOT NULL DEFAULT 0,
+      type        TEXT NOT NULL DEFAULT '',
+      enabled     BOOLEAN NOT NULL DEFAULT true,
+      config      JSONB NOT NULL DEFAULT '{}'::jsonb,
+      sort_order  INT  NOT NULL DEFAULT 0,
+      updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS studio_cards_device ON studio_cards (device_id);`);
+
+  // Canvas layout per machine: box coordinates + card mappings + trail geometry
+  // in fixed 1600x900 stage units. Consumed identically by the configure/design
+  // view and the non-configure/actual view so both stay in sync.
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_machine_layouts (
+      machine_id TEXT PRIMARY KEY,
+      trails     JSONB NOT NULL DEFAULT '[]'::jsonb,
+      boxes      JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+
+  // Singleton bookkeeping row: monotonic revisions clients poll to detect other
+  // users' changes, plus a one-time seed guard so a fresh database is populated
+  // with demo data exactly once (and never re-seeded / reset on later deploys).
+  await query(`
+    CREATE TABLE IF NOT EXISTS studio_meta (
+      id             INT PRIMARY KEY DEFAULT 1,
+      hier_revision  BIGINT NOT NULL DEFAULT 0,
+      layout_revision BIGINT NOT NULL DEFAULT 0,
+      seeded         BOOLEAN NOT NULL DEFAULT false,
+      updated_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+      CONSTRAINT studio_meta_singleton CHECK (id = 1)
+    );
+  `);
+  await query(`INSERT INTO studio_meta (id) VALUES (1) ON CONFLICT (id) DO NOTHING;`);
 }

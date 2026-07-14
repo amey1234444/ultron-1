@@ -24,6 +24,7 @@ import { RenameDialog } from '../components/studio/RenameDialog';
 import { RackDetail } from '../components/studio/rack/RackDetail';
 import { TopBar } from '../components/studio/TopBar';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useStudioStore } from '../hooks/useStudioStore';
 import { cn } from '../lib/cn';
 import type { DeviceNode } from '../lib/devices';
 import {
@@ -38,7 +39,6 @@ import {
 import { componentsForTemplate, type MachineNode } from '../lib/machines';
 import { PERMISSIONS } from '../lib/permissions';
 import type { CardConfig, CardNode, CardType } from '../lib/rack';
-import { createSeedData } from '../lib/seedData';
 import { USER_PERMISSIONS, userHasPermission, type PublicUser } from '../src/lib/roles';
 
 const LEFT_PANEL_WIDTH = 256;
@@ -46,8 +46,6 @@ const LEFT_PANEL_WIDTH = 256;
 function makeId() {
   return Math.random().toString(36).slice(2, 10);
 }
-
-const SEED = createSeedData(makeId);
 
 export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: ReactNode; currentUser?: PublicUser | null } = {}) {
   const { isDark } = useAppTheme();
@@ -81,11 +79,23 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const [machineWorkspaceMode, setMachineWorkspaceMode] = useState<'design' | 'actual'>('design');
   const workspaceCollapsesSidebar = selected.kind === 'machine' && machineWorkspaceMode === 'actual';
 
-  const [projects, setProjects] = useState<ProjectNode[]>(SEED.projects);
-  const [folders, setFolders] = useState<FolderNode[]>(SEED.folders);
-  const [devices, setDevices] = useState<DeviceNode[]>(SEED.devices);
-  const [cards, setCards] = useState<CardNode[]>(SEED.cards);
-  const [machines, setMachines] = useState<MachineNode[]>(SEED.machines);
+  // Shared, durable workspace (Supabase-backed on web): hierarchy + canvas
+  // layouts loaded from the server, persisted on edit, and polled so changes by
+  // other authenticated users appear here too.
+  const {
+    projects,
+    folders,
+    devices,
+    cards,
+    machines,
+    setProjects,
+    setFolders,
+    setDevices,
+    setCards,
+    setMachines,
+    getLayout,
+    saveLayout,
+  } = useStudioStore();
 
   const [createProjectVisible, setCreateProjectVisible] = useState(false);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
@@ -197,6 +207,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id));
       setFolders((prev) => prev.filter((f) => f.projectId !== deleteTarget.id));
       setMachines((prev) => prev.filter((m) => m.projectId !== deleteTarget.id));
+      setDevices((prev) => prev.map((d) => (d.projectId === deleteTarget.id ? { ...d, projectId: null } : d)));
       if (selected.kind === 'project' && selected.id === deleteTarget.id) setSelected({ kind: 'none' });
       if (selected.kind === 'folder' && folders.find((f) => f.id === selected.id)?.projectId === deleteTarget.id) {
         setSelected({ kind: 'none' });
@@ -364,6 +375,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               machine={selectedMachine}
               devices={devices}
               cards={cards}
+              layout={getLayout(selectedMachine.id)}
+              onSaveLayout={saveLayout}
               onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
               onModeChange={setMachineWorkspaceMode}
               canConfigure={canEditDeleteSchema}

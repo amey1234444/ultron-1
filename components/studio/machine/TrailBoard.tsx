@@ -69,6 +69,11 @@ type TrailBoardProps = {
   // no dragging/editing. Live values and status colours keep updating.
   readOnly?: boolean;
   hideUnlink?: boolean;
+  // Shared layout for this machine loaded from the server (Supabase). When
+  // provided it seeds the board; "Save Config" persists back through
+  // onSaveLayout so the change is visible to every other user.
+  initialLayout?: SavedLayout | null;
+  onSaveLayout?: (machineId: string, layout: SavedLayout) => void;
 };
 
 export type SavedLayout = { trails: Trail[]; boxes: Box[] };
@@ -116,6 +121,8 @@ export function TrailBoard({
   stageScale,
   readOnly = false,
   hideUnlink = false,
+  initialLayout = null,
+  onSaveLayout,
 }: TrailBoardProps) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -128,13 +135,14 @@ export function TrailBoard({
   // the template generates fresh random ids each call.
   const initialLayoutRef = useRef<SavedLayout | null>(null);
   if (initialLayoutRef.current === null) {
-    const saved = loadLocal<SavedLayout>(storageKey);
+    const saved = initialLayout ?? loadLocal<SavedLayout>(storageKey);
     initialLayoutRef.current =
       saved ?? (hasDefaultLayout(machineTemplate) ? createRavDefaultLayout(listChannels(devices, cards)) : { trails: [], boxes: [] });
   }
 
   const [trails, setTrails] = useState<Trail[]>(initialLayoutRef.current.trails);
   const [boxes, setBoxes] = useState<Box[]>(initialLayoutRef.current.boxes);
+  const appliedRemoteLayout = useRef<SavedLayout | null>(initialLayout);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [boardSize, setBoardSize] = useState({ width: 0, height: 0 });
   const [boxLiveValues, setBoxLiveValues] = useState<Record<string, number>>({});
@@ -143,6 +151,17 @@ export function TrailBoard({
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
+
+  // A polling refresh may deliver a layout saved by another authenticated user
+  // while this machine is open. Apply that new object to both design and actual
+  // canvases so their geometry stays consistent without requiring navigation.
+  useEffect(() => {
+    if (!initialLayout || initialLayout === appliedRemoteLayout.current) return;
+    appliedRemoteLayout.current = initialLayout;
+    setTrails(initialLayout.trails);
+    setBoxes(initialLayout.boxes);
+    setSelectedId(null);
+  }, [initialLayout]);
 
   const applyTemplateLayout = () => {
     // Generate against the machine's *current* rect (it shrinks/grows with
@@ -155,7 +174,11 @@ export function TrailBoard({
   };
 
   const saveConfig = () => {
-    saveLocal<SavedLayout>(storageKey, { trails, boxes });
+    const layout: SavedLayout = { trails, boxes };
+    // Persist to the shared server layout (visible to other users) and keep a
+    // local copy so offline / native still renders the last saved state.
+    onSaveLayout?.(machineId, layout);
+    saveLocal<SavedLayout>(storageKey, layout);
     setJustSaved(true);
     if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
     savedFlashTimer.current = setTimeout(() => setJustSaved(false), 1600);
