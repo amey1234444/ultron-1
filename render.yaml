@@ -1,23 +1,34 @@
-# Render Blueprint — deploys the MQTT ingest background worker.
+# Render config — MQTT ingest deployed as a FREE web service (Blueprints and
+# Background Workers require a card; a free-plan Web Service does not).
+# index.js opens an HTTP health endpoint on $PORT (services/mqtt-ingest/health.js)
+# so it qualifies as a web service, and the keep-alive workflow
+# (.github/workflows/keepalive-mqtt-ingest.yml) pings it every 10 minutes so
+# the free instance never spins down.
 #
-# The worker lives in services/mqtt-ingest/ but reads files from the repo root
-# (contracts/json-schema/, supabase/migrations/), so the service builds from
-# the repo root and cd's into the folder for install/start.
+# The worker reads files from the repo root (contracts/json-schema/,
+# supabase/migrations/), so it builds from the repo root and cd's in.
 #
-# One-time setup on https://dashboard.render.com:
-#   New + → Blueprint → connect this repo → Render reads this file.
-# Then fill in the sync:false env vars on the service and add the service's
-# Deploy Hook URL as the RENDER_DEPLOY_HOOK_MQTT_INGEST GitHub secret so
-# .github/workflows/deploy-mqtt-ingest.yml can trigger deploys.
+# One-time manual setup on https://dashboard.render.com (no card needed):
+#   New + → Web Service → connect this repo →
+#     Instance type: Free
+#     Branch:        1783405085-nextjs-vercel-auth
+#     Root directory: (leave empty = repo root)
+#     Build command:  cd services/mqtt-ingest && npm install
+#     Start command:  cd services/mqtt-ingest && node index.js
+#     Env vars:       see below (PORT is injected by Render automatically)
+#   Then add two GitHub repo secrets:
+#     RENDER_DEPLOY_HOOK_MQTT_INGEST  (Settings → Deploy Hook URL)
+#     MQTT_INGEST_URL                 (the service's https://...onrender.com URL)
 services:
-  - type: worker
+  - type: web
     name: ultron-mqtt-ingest
     runtime: node
-    plan: starter
+    plan: free
     branch: 1783405085-nextjs-vercel-auth
     # Deploys are driven by the GitHub Actions workflow (deploy hook), which
     # covers main/master/dev/*/feature/* pushes too.
     autoDeploy: false
+    healthCheckPath: /healthz
     buildCommand: cd services/mqtt-ingest && npm install
     startCommand: cd services/mqtt-ingest && node index.js
     envVars:

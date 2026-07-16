@@ -11,25 +11,33 @@ contract, `contracts/json-schema/`) → topic/payload identity validation →
 gateway/rack/IP binding → `message_id` dedup (QoS 1) → handler → DB →
 optional WebSocket broadcast.
 
-## Deploying on Render
+## Deploying on Render (free plan, no card)
 
-The repo-root `render.yaml` blueprint defines this worker (builds from the
-repo root so `contracts/` and `supabase/migrations/` are available, then
-`cd services/mqtt-ingest` for install/start):
+Render Blueprints and Background Workers require payment details, so the
+service deploys as a **free Web Service** instead: when `PORT` is set (Render
+injects it), `index.js` serves a health endpoint on `/healthz` via
+`health.js`, and a scheduled GitHub Action pings it every 10 minutes so the
+free instance never spins down.
 
-1. Render dashboard → New + → **Blueprint** → connect this repo. Render
-   creates the `ultron-mqtt-ingest` background worker from `render.yaml`.
-2. On the service, fill in the `sync: false` env vars: `MQTT_URL`,
-   `MQTT_USERNAME`, `MQTT_PASSWORD`, `DATABASE_URL`.
-3. Copy the service's **Deploy Hook** URL (Settings → Deploy Hook) and add it
-   as the `RENDER_DEPLOY_HOOK_MQTT_INGEST` GitHub repository secret.
+1. Render dashboard → New + → **Web Service** → connect this repo:
+   - Instance type: **Free**; Branch: `1783405085-nextjs-vercel-auth`;
+     Root directory: empty (repo root — the worker reads `contracts/` and
+     `supabase/migrations/` via `../../`)
+   - Build: `cd services/mqtt-ingest && npm install`
+   - Start: `cd services/mqtt-ingest && node index.js`
+2. Set env vars: `MQTT_URL`, `MQTT_USERNAME`, `MQTT_PASSWORD`,
+   `DATABASE_URL`, plus `MQTT_CLIENT_ID=ultron-backend-ingress-01`,
+   `MQTT_REJECT_UNAUTHORIZED=1`, `STALE_AFTER_S=15`.
+3. Add two GitHub repository secrets:
+   - `RENDER_DEPLOY_HOOK_MQTT_INGEST` — the service's Deploy Hook URL
+     (Settings → Deploy Hook), used by `deploy-mqtt-ingest.yml` to redeploy on
+     every push to `main`, `master`, `dev/*`, `feature/*`, or
+     `1783405085-nextjs-vercel-auth`.
+   - `MQTT_INGEST_URL` — the service URL (`https://...onrender.com`), used by
+     `keepalive-mqtt-ingest.yml` for the 10-minute keep-alive ping.
 
-`.github/workflows/deploy-mqtt-ingest.yml` then triggers a Render deploy on
-every push to `main`, `master`, `dev/*`, `feature/*`, or
-`1783405085-nextjs-vercel-auth` that touches the worker, contracts, or
-migrations. Render builds the single branch configured on the service
-(`1783405085-nextjs-vercel-auth` per the blueprint); switch it in the Render
-dashboard if another branch should be deployed.
+Render builds the single branch configured on the service; switch it in the
+Render dashboard if another branch should be deployed.
 
 ## Run
 
