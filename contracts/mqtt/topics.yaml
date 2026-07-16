@@ -1,0 +1,126 @@
+# Ultron MQTT v1 topic tree.
+# Identity lives in {gateway_id}/{rack_id} path segments + the payload envelope.
+# Never put the gateway IP in a topic — it belongs in the payload (gateway_ip).
+version: 1
+prefix: ultron/v1
+
+topics:
+  gateway_status:
+    topic: ultron/v1/gateways/{gateway_id}/status
+    direction: gateway_to_backend
+    schema: ultron.gateway.status
+    qos: 1
+    retained: true
+    last_will: true
+
+  rack_inventory:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/inventory
+    direction: gateway_to_backend
+    schema: ultron.rack.inventory
+    qos: 1
+    retained: true
+
+  rack_health:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/health
+    direction: gateway_to_backend
+    schema: ultron.rack.health
+    qos: 1
+    retained: true
+
+  slot_identity:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/slots/{slot_id}/identity
+    direction: gateway_to_backend
+    schema: ultron.slot.identity
+    qos: 1
+    retained: true
+
+  slot_capabilities:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/slots/{slot_id}/capabilities
+    direction: gateway_to_backend
+    schema: ultron.slot.capabilities
+    qos: 1
+    retained: true
+
+  slot_configuration:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/slots/{slot_id}/configuration
+    direction: gateway_to_backend
+    schema: ultron.slot.configuration
+    qos: 1
+    retained: true
+
+  slot_health:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/slots/{slot_id}/health
+    direction: gateway_to_backend
+    schema: ultron.slot.health
+    qos: 1
+    retained: true
+
+  telemetry:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/telemetry
+    direction: gateway_to_backend
+    schema: ultron.measurement.batch
+    qos: 1
+    retained: false
+
+  alarm_event:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/events/alarm
+    direction: gateway_to_backend
+    schema: ultron.event.alarm
+    qos: 1
+    retained: false
+
+  fault_event:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/events/fault
+    direction: gateway_to_backend
+    schema: ultron.event.fault
+    qos: 1
+    retained: false
+
+  system_event:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/events/system
+    direction: gateway_to_backend
+    schema: ultron.event.system
+    qos: 1
+    retained: false
+
+  command_request:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/commands/request
+    direction: backend_to_gateway
+    schema: ultron.command.request
+    qos: 1
+    retained: false
+
+  command_response:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/commands/response
+    direction: gateway_to_backend
+    schema: ultron.command.response
+    qos: 1
+    retained: false
+
+  diagnostics_response:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/diagnostics/response
+    direction: gateway_to_backend
+    schema: ultron.diagnostics.response
+    qos: 1
+    retained: false
+
+  update_status:
+    topic: ultron/v1/gateways/{gateway_id}/racks/{rack_id}/updates/status
+    direction: gateway_to_backend
+    schema: ultron.update.status
+    qos: 1
+    retained: false
+
+acl:
+  gateway:
+    client_id: ultron-gw-{gateway_id}
+    publish:
+      - ultron/v1/gateways/{gateway_id}/#
+    subscribe:
+      - ultron/v1/gateways/{gateway_id}/racks/+/commands/request
+  backend:
+    client_id: ultron-backend-ingress-01
+    publish:
+      - ultron/v1/gateways/+/racks/+/commands/request
+    subscribe:
+      - ultron/v1/gateways/#

@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.rack.inventory/1.1",
+  "title": "Ultron rack inventory v1.1",
+  "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
+  "properties": {
+    "schema": { "const": "ultron.rack.inventory" },
+    "payload": {
+      "type": "object",
+      "required": ["snapshot_revision", "slots"],
+      "properties": {
+        "snapshot_revision": { "type": "integer", "minimum": 0 },
+        "slots": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["slot_id", "presence"],
+            "properties": {
+              "slot_id": { "type": "integer", "minimum": 1, "maximum": 14 },
+              "presence": { "type": "string", "enum": ["PRESENT", "EMPTY"] },
+              "online_state": { "type": "string", "enum": ["ONLINE", "OFFLINE", "UNKNOWN"] },
+              "card_type": {
+                "type": "string",
+                "enum": ["VIBRATION", "PROCESS", "SPEED", "COMMUNICATION_CONTROLLER"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.command.response/1.1",
+  "title": "Ultron command response v1.1 (Gateway -> Backend)",
+  "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
+  "properties": {
+    "schema": { "const": "ultron.command.response" },
+    "payload": {
+      "type": "object",
+      "required": ["request_id", "status"],
+      "properties": {
+        "request_id": { "type": "string", "format": "uuid" },
+        "status": { "type": "string", "enum": ["ACCEPTED", "COMPLETED", "FAILED", "REJECTED"] },
+        "result": { "type": "object" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

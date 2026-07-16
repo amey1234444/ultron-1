@@ -1,0 +1,25 @@
+{
+  "schema": "ultron.event.alarm",
+  "schema_version": "1.1",
+  "message_id": "9f2b1c44-8a1d-4c8e-9a51-2f0f53a50abc",
+  "gateway_id": "GW-001",
+  "gateway_boot_id": "b0a61c39-91af-4ac3-8b10-a7f4319eae57",
+  "gateway_ip": "192.168.50.10",
+  "rack_id": 1,
+  "gateway_sequence": 231,
+  "created_at": "2026-07-16T10:02:00.000000Z",
+  "created_at_us": "1784196120000000",
+  "replayed": false,
+  "payload": {
+    "alarm_id": "ALM-TEMP-S01C1",
+    "slot_id": 1,
+    "channel_id": 1,
+    "severity": "WARNING",
+    "state": "ACTIVE",
+    "measurement_type": "TEMPERATURE",
+    "value": 91.2,
+    "threshold": 90.0,
+    "unit": "degC",
+    "message": "Temperature above warning threshold"
+  }
+}

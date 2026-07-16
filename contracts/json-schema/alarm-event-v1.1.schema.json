@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.event.alarm/1.1",
+  "title": "Ultron alarm event v1.1",
+  "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
+  "properties": {
+    "schema": { "const": "ultron.event.alarm" },
+    "payload": {
+      "type": "object",
+      "required": ["alarm_id", "severity", "state"],
+      "properties": {
+        "alarm_id": { "type": "string" },
+        "slot_id": { "type": "integer" },
+        "channel_id": { "type": "integer" },
+        "severity": { "type": "string", "enum": ["WARNING", "CRITICAL"] },
+        "state": { "type": "string", "enum": ["ACTIVE", "CLEARED"] },
+        "measurement_type": { "type": "string" },
+        "value": { "type": "number" },
+        "threshold": { "type": "number" },
+        "unit": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

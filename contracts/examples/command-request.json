@@ -1,0 +1,10 @@
+{
+  "schema": "ultron.command.request",
+  "schema_version": "1.1",
+  "request_id": "c1a2b3d4-0000-4111-8222-333344445555",
+  "gateway_id": "GW-001",
+  "rack_id": 1,
+  "command": "PING",
+  "args": {},
+  "created_at": "2026-07-16T10:05:00.000000Z"
+}

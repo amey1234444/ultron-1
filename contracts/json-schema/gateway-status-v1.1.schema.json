@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.gateway.status/1.1",
+  "title": "Ultron gateway status v1.1",
+  "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
+  "properties": {
+    "schema": { "const": "ultron.gateway.status" },
+    "payload": {
+      "type": "object",
+      "required": ["state"],
+      "properties": {
+        "state": { "type": "string", "enum": ["ONLINE", "OFFLINE", "DEGRADED"] },
+        "mqtt_state": { "type": "string", "enum": ["CONNECTED", "DISCONNECTED"] },
+        "uptime_s": { "type": "number", "minimum": 0 },
+        "network": {
+          "type": "object",
+          "properties": {
+            "primary_interface": { "type": "string" },
+            "primary_ip": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

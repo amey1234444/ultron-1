@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.event.system/1.1",
+  "title": "Ultron system event v1.1",
+  "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
+  "properties": {
+    "schema": { "const": "ultron.event.system" },
+    "payload": {
+      "type": "object",
+      "required": ["event_type"],
+      "properties": {
+        "event_type": { "type": "string" },
+        "detail": { "type": "object" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "schema": "ultron.gateway.status",
+  "schema_version": "1.1",
+  "message_id": "5189718c-585c-46ea-b3b8-6dfb190e7a8e",
+  "gateway_id": "GW-001",
+  "gateway_boot_id": "7d9933be-744c-49f5-a017-20523b477e7c",
+  "gateway_ip": "192.168.50.10",
+  "rack_id": 1,
+  "gateway_sequence": 1,
+  "created_at": "2026-07-16T10:00:00.000000Z",
+  "created_at_us": "1784196000000000",
+  "replayed": false,
+  "payload": {
+    "state": "ONLINE",
+    "mqtt_state": "CONNECTED",
+    "uptime_s": 1,
+    "network": {
+      "primary_interface": "eth0",
+      "primary_ip": "192.168.50.10"
+    }
+  }
+}
