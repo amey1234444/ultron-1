@@ -10,6 +10,7 @@ import mqtt from 'mqtt';
 import { WebSocketServer } from 'ws';
 
 import { ensureSchema } from './db.js';
+import { startHealthServer } from './health.js';
 import {
   bind,
   claimMessage,
@@ -123,6 +124,16 @@ async function main() {
   await ensureSchema();
   console.log('[db] schema ready');
 
+  let mqttConnected = false;
+  const startedAt = Date.now();
+  if (process.env.PORT) {
+    startHealthServer(Number(process.env.PORT), () => ({
+      service: 'ultron-mqtt-ingest',
+      mqttConnected,
+      uptimeS: Math.round((Date.now() - startedAt) / 1000),
+    }));
+  }
+
   const client = mqtt.connect(MQTT_URL, {
     clientId: CLIENT_ID,
     protocolVersion: 5,
@@ -134,6 +145,7 @@ async function main() {
   });
 
   client.on('connect', () => {
+    mqttConnected = true;
     console.log(`[mqtt] connected to ${MQTT_URL} as ${CLIENT_ID}`);
     client.subscribe(SUBSCRIPTION, { qos: 1 }, (err) => {
       if (err) console.error('[mqtt] subscribe failed', err);
@@ -143,6 +155,10 @@ async function main() {
 
   client.on('message', (topic, buf) => {
     onMessage(topic, buf).catch((err) => console.error(`[pipeline] ${topic}:`, err.message));
+  });
+
+  client.on('close', () => {
+    mqttConnected = false;
   });
 
   client.on('error', (err) => console.error('[mqtt] error', err.message));

@@ -1,0 +1,32 @@
+name: Keep mqtt-ingest awake
+
+# Render free web services spin down after ~15 minutes without inbound HTTP
+# traffic. This pings the ingest service's health endpoint every 10 minutes so
+# the MQTT subscriber stays connected.
+#
+# Required GitHub Repository Secret:
+# - MQTT_INGEST_URL: the Render service URL (e.g. https://ultron-mqtt-ingest.onrender.com)
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping health endpoint
+        env:
+          URL: ${{ secrets.MQTT_INGEST_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "::error::MQTT_INGEST_URL secret is not set. Add the Render service URL as a repository secret."
+            exit 1
+          fi
+          # Retry: a spun-down free instance takes ~30-60s to cold start.
+          curl --silent --show-error --fail --retry 5 --retry-delay 15 --retry-all-errors "$URL/healthz" || {
+            echo "::warning::Health ping failed (service may be unhealthy or MQTT disconnected)."
+            exit 0
+          }
+          echo "Service is awake."
