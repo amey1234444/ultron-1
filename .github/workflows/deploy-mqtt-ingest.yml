@@ -1,0 +1,58 @@
+name: Deploy mqtt-ingest to Render
+
+# Triggers a Render deploy of the ultron-mqtt-ingest background worker on
+# every push to the branches below, but only when files the worker uses
+# actually changed.
+#
+# Required GitHub Repository Secret:
+# - RENDER_DEPLOY_HOOK_MQTT_INGEST: the service's Deploy Hook URL
+#   (Render dashboard → ultron-mqtt-ingest → Settings → Deploy Hook)
+#
+# Note: a Render service builds from the single branch configured on it
+# (render.yaml pins 1783405085-nextjs-vercel-auth). Pushes to the other
+# branches below re-trigger a deploy of that configured branch; to deploy a
+# different branch, change the service's branch in the Render dashboard.
+
+on:
+  push:
+    branches:
+      - main
+      - master
+      - 1783405085-nextjs-vercel-auth
+      - dev/*
+      - feature/*
+    paths:
+      - services/mqtt-ingest/**
+      - contracts/**
+      - supabase/migrations/**
+      - render.yaml
+      - .github/workflows/deploy-mqtt-ingest.yml
+
+concurrency:
+  group: render-mqtt-ingest-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sanity-check worker syntax
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - run: |
+          cd services/mqtt-ingest
+          npm install
+          for f in index.js db.js handlers.js topics.js validate.js; do node --check "$f"; done
+
+      - name: Trigger Render deploy
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK_MQTT_INGEST }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "::error::RENDER_DEPLOY_HOOK_MQTT_INGEST secret is not set. Add the Render deploy hook URL as a repository secret."
+            exit 1
+          fi
+          curl --fail --silent --show-error -X POST "$DEPLOY_HOOK"
+          echo "Render deploy triggered."
