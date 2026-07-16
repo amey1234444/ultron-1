@@ -1,0 +1,37 @@
+# Render Blueprint — deploys the MQTT ingest background worker.
+#
+# The worker lives in services/mqtt-ingest/ but reads files from the repo root
+# (contracts/json-schema/, supabase/migrations/), so the service builds from
+# the repo root and cd's into the folder for install/start.
+#
+# One-time setup on https://dashboard.render.com:
+#   New + → Blueprint → connect this repo → Render reads this file.
+# Then fill in the sync:false env vars on the service and add the service's
+# Deploy Hook URL as the RENDER_DEPLOY_HOOK_MQTT_INGEST GitHub secret so
+# .github/workflows/deploy-mqtt-ingest.yml can trigger deploys.
+services:
+  - type: worker
+    name: ultron-mqtt-ingest
+    runtime: node
+    plan: starter
+    branch: 1783405085-nextjs-vercel-auth
+    # Deploys are driven by the GitHub Actions workflow (deploy hook), which
+    # covers main/master/dev/*/feature/* pushes too.
+    autoDeploy: false
+    buildCommand: cd services/mqtt-ingest && npm install
+    startCommand: cd services/mqtt-ingest && node index.js
+    envVars:
+      - key: MQTT_URL
+        sync: false # e.g. mqtts://your-emqx-host:8883
+      - key: MQTT_USERNAME
+        sync: false
+      - key: MQTT_PASSWORD
+        sync: false
+      - key: MQTT_CLIENT_ID
+        value: ultron-backend-ingress-01
+      - key: MQTT_REJECT_UNAUTHORIZED
+        value: "1"
+      - key: DATABASE_URL
+        sync: false # Supabase Postgres connection string
+      - key: STALE_AFTER_S
+        value: "15"

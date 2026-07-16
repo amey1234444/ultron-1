@@ -11,6 +11,26 @@ contract, `contracts/json-schema/`) → topic/payload identity validation →
 gateway/rack/IP binding → `message_id` dedup (QoS 1) → handler → DB →
 optional WebSocket broadcast.
 
+## Deploying on Render
+
+The repo-root `render.yaml` blueprint defines this worker (builds from the
+repo root so `contracts/` and `supabase/migrations/` are available, then
+`cd services/mqtt-ingest` for install/start):
+
+1. Render dashboard → New + → **Blueprint** → connect this repo. Render
+   creates the `ultron-mqtt-ingest` background worker from `render.yaml`.
+2. On the service, fill in the `sync: false` env vars: `MQTT_URL`,
+   `MQTT_USERNAME`, `MQTT_PASSWORD`, `DATABASE_URL`.
+3. Copy the service's **Deploy Hook** URL (Settings → Deploy Hook) and add it
+   as the `RENDER_DEPLOY_HOOK_MQTT_INGEST` GitHub repository secret.
+
+`.github/workflows/deploy-mqtt-ingest.yml` then triggers a Render deploy on
+every push to `main`, `master`, `dev/*`, `feature/*`, or
+`1783405085-nextjs-vercel-auth` that touches the worker, contracts, or
+migrations. Render builds the single branch configured on the service
+(`1783405085-nextjs-vercel-auth` per the blueprint); switch it in the Render
+dashboard if another branch should be deployed.
+
 ## Run
 
 ```bash
