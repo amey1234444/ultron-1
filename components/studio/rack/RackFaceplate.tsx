@@ -3,12 +3,16 @@ import type { LayoutChangeEvent } from 'react-native';
 import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import type { DeviceNode } from '../../../lib/devices';
+import type { LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import { TOTAL_SLOTS } from '../../../lib/rack';
 import { SlotCard } from './SlotCard';
 
 type RackFaceplateProps = {
+  device: DeviceNode;
   cards: CardNode[];
+  live?: LiveState;
   editable?: boolean;
   onPressEmpty: (slot: number, x: number, y: number) => void;
   onPressCard: (card: CardNode, x: number, y: number) => void;
@@ -91,7 +95,9 @@ function RackVent({ isDark }: { isDark: boolean }) {
 }
 
 export function RackFaceplate({
+  device,
   cards,
+  live,
   editable = true,
   onPressEmpty,
   onPressCard,
@@ -220,6 +226,8 @@ export function RackFaceplate({
                     <SlotCard
                       slot={slot}
                       card={card}
+                      device={device}
+                      live={live}
                       width={cardWidth}
                       editable={editable}
                       onPressEmpty={(x, y) =>

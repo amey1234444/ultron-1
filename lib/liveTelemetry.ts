@@ -4,6 +4,7 @@
 // gateway_id + rack_id on the backend; the IP is the binding field here).
 
 import type { DeviceNode } from './devices';
+import type { CardNode } from './rack';
 
 export type LiveGateway = {
   gatewayId: string;
@@ -42,6 +43,20 @@ export type LiveState = {
 
 export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [], measurements: [] };
 
+export type ChannelLiveStatus = 'active' | 'stale' | 'idle';
+
+const ACTIVE_MEASUREMENT_MAX_AGE_MS = 15_000;
+
+function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number | undefined {
+  const gateway = gatewayForDevice(device, live);
+  if (!gateway) return undefined;
+  const match = device.name.trim().match(/(\d+)$/);
+  if (!match) return undefined;
+  const rackId = Number(match[1]);
+  if (!Number.isInteger(rackId)) return undefined;
+  return live.racks.some((r) => r.gatewayId === gateway.gatewayId && r.rackId === rackId) ? rackId : undefined;
+}
+
 export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGateway | undefined {
   const ip = device.ip.trim();
   if (!ip) return undefined;
@@ -70,6 +85,49 @@ export function measurementsForDevice(device: DeviceNode, live: LiveState): Live
   const gateway = gatewayForDevice(device, live);
   if (!gateway) return [];
   return live.measurements.filter((m) => m.gatewayId === gateway.gatewayId);
+}
+
+export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] {
+  const gateway = gatewayForDevice(device, live);
+  if (!gateway) return [];
+  const configuredRackId = configuredRackIdForDevice(device, live);
+  if (configuredRackId !== undefined) return [configuredRackId];
+  const ids = live.racks.filter((r) => r.gatewayId === gateway.gatewayId).map((r) => r.rackId);
+  if (ids.length > 0) return ids;
+  return Array.from(new Set(live.measurements.filter((m) => m.gatewayId === gateway.gatewayId).map((m) => m.rackId)));
+}
+
+function latestMeasurementForChannel(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): LiveMeasurement | undefined {
+  const gateway = gatewayForDevice(device, live);
+  if (!gateway) return undefined;
+  const rackIds = rackIdsForDevice(device, live);
+  const candidates = live.measurements.filter(
+    (m) =>
+      m.gatewayId === gateway.gatewayId &&
+      m.slotId === card.slot &&
+      m.channelId === channelId &&
+      (rackIds.length === 0 || rackIds.includes(m.rackId)),
+  );
+  return candidates.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+}
+
+export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): ChannelLiveStatus {
+  if (!card.enabled) return 'idle';
+  const gateway = gatewayForDevice(device, live);
+  if (!gateway) return 'idle';
+  if (gateway.status !== 'ONLINE') return 'stale';
+
+  if ('controllerName' in card.config) {
+    const slot = live.slots.find((s) => s.gatewayId === gateway.gatewayId && s.slotId === card.slot);
+    if (!slot) return 'idle';
+    return slot.onlineState === 'ONLINE' || slot.presence === 'PRESENT' ? 'active' : 'stale';
+  }
+
+  const measurement = latestMeasurementForChannel(device, card, channelId, live);
+  if (!measurement) return 'idle';
+  const ageMs = Date.now() - Date.parse(measurement.updatedAt);
+  if (measurement.quality && measurement.quality !== 'GOOD') return 'stale';
+  return ageMs <= ACTIVE_MEASUREMENT_MAX_AGE_MS ? 'active' : 'stale';
 }
 
 export function lastSeenLabel(gateway: LiveGateway | undefined): string {

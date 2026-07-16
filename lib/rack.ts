@@ -172,6 +172,10 @@ export type ChannelRef = {
   alarmCritical?: number;
 };
 
+type ListChannelOptions = {
+  channelIsAvailable?: (rack: DeviceNode, card: CardNode, channelNumber: number) => boolean;
+};
+
 function parsedThreshold(value: string | undefined): number | undefined {
   if (!value) return undefined;
   const n = Number(value);
@@ -200,7 +204,7 @@ function letterAndUnitForCard(card: CardNode): { letter: ChannelRef['letter']; u
 // Flattens every acquisition-card channel across all racks into a pickable list —
 // used wherever something (e.g. a machine's mapping trail) needs to reference a
 // physical rack channel, independent of that rack's own detail screen.
-export function listChannels(devices: DeviceNode[], cards: CardNode[]): ChannelRef[] {
+export function listChannels(devices: DeviceNode[], cards: CardNode[], options: ListChannelOptions = {}): ChannelRef[] {
   const racks = devices.filter((d) => d.type === 'Rack' && !d.archived);
   const letterCounts: Record<string, number> = {};
 
@@ -213,14 +217,16 @@ export function listChannels(devices: DeviceNode[], cards: CardNode[]): ChannelR
       const alarmWarning = 'alarmWarning' in card.config ? parsedThreshold(card.config.alarmWarning) : undefined;
       const alarmCritical = 'alarmCritical' in card.config ? parsedThreshold(card.config.alarmCritical) : undefined;
 
-      return names.map((name, index) => {
+      return names.flatMap((name, index) => {
+        const channelNumber = index + 1;
+        if (options.channelIsAvailable && !options.channelIsAvailable(rack, card, channelNumber)) return [];
         letterCounts[letter] = (letterCounts[letter] ?? 0) + 1;
         return {
-          id: `${rack.id}.S${String(card.slot).padStart(2, '0')}.CH${index + 1}`,
+          id: `${rack.id}.S${String(card.slot).padStart(2, '0')}.CH${channelNumber}`,
           rackId: rack.id,
           slot: card.slot,
           deviceName: rack.name,
-          label: name.trim() || `${card.type} CH${index + 1}`,
+          label: name.trim() || `${card.type} CH${channelNumber}`,
           code: `${letter}${letterCounts[letter]}`,
           unit,
           letter,

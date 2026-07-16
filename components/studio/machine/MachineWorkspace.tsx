@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-na
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
+import { channelLiveStatus, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal } from '../../../lib/localPersist';
 import type { MachineComponent, MachineNode } from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
@@ -26,6 +27,7 @@ type MachineWorkspaceProps = {
   machine: MachineNode;
   devices: DeviceNode[];
   cards: CardNode[];
+  live?: LiveState;
   // Shared canvas layout for this machine (Supabase-backed). Both the design
   // and actual views read it so they stay in sync across users; null falls back
   // to localStorage / the template default.
@@ -127,6 +129,7 @@ export function MachineWorkspace({
   machine,
   devices,
   cards,
+  live,
   layout,
   onSaveLayout,
   onBack,
@@ -174,6 +177,15 @@ export function MachineWorkspace({
   // unsaved edits. The "Machine" tab reads live in-memory state directly via
   // TrailBoard(readOnly) instead, so it's excluded here.
   const allChannels = useMemo(() => listChannels(devices, cards), [devices, cards]);
+  const activeChannels = useMemo(
+    () =>
+      live
+        ? listChannels(devices, cards, {
+            channelIsAvailable: (rack, card, channelNumber) => channelLiveStatus(rack, card, channelNumber, live) === 'active',
+          })
+        : [],
+    [devices, cards, live],
+  );
 
   const [savedBoxes, setSavedBoxes] = useState<Box[]>([]);
   useEffect(() => {
@@ -188,8 +200,8 @@ export function MachineWorkspace({
     // No saved config yet: fall back to the template's default wiring (RAV ships
     // one) so the Actual View dashboards render live demo data out of the box
     // instead of an empty "nothing mapped" state.
-    setSavedBoxes(hasDefaultLayout(machine.template) ? createRavDefaultLayout(allChannels).boxes : []);
-  }, [isActual, actualTab, machine.id, machine.template, allChannels, layout]);
+    setSavedBoxes(hasDefaultLayout(machine.template) ? createRavDefaultLayout(activeChannels).boxes : []);
+  }, [isActual, actualTab, machine.id, machine.template, allChannels, activeChannels, layout]);
 
   const mappedChannels = useMemo<MappedChannel[]>(
     () =>
@@ -350,6 +362,7 @@ export function MachineWorkspace({
                 <TrailBoard
                   devices={devices}
                   cards={cards}
+                  live={live}
                   machineRect={machineRect}
                   machineId={machine.id}
                   machineTemplate={machine.template}

@@ -383,6 +383,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               machine={selectedMachine}
               devices={devices}
               cards={cards}
+              live={liveState}
               layout={getLayout(selectedMachine.id)}
               onSaveLayout={saveLayout}
               onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
@@ -393,6 +394,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
             <RackDetail
               device={selectedDevice}
               cards={cards.filter((c) => c.deviceId === selectedDevice.id)}
+              live={liveState}
               canEditDeleteSchema={canEditDeleteSchema}
               onBack={() => setSelected({ kind: 'devices' })}
               onInstallCard={(slot, type, config, enabled) => handleInstallCard(selectedDevice.id, slot, type, config, enabled)}

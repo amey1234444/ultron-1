@@ -36,6 +36,7 @@ export type MappableBoxProps = {
   connectorPoint: Point;
   channel: ChannelRef | null;
   channels: ChannelRef[];
+  pickableChannels?: ChannelRef[];
   canvasWidth: number;
   canvasHeight: number;
   // Current stage scale — converts screen-pixel gesture deltas to stage units.
@@ -65,6 +66,7 @@ export function MappableBox({
   connectorPoint,
   channel,
   channels,
+  pickableChannels,
   canvasWidth,
   canvasHeight,
   stageScale = 1,
@@ -85,6 +87,7 @@ export function MappableBox({
   const [pickerOpen, setPickerOpen] = useState(false);
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel);
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
+  const pickerChannels = pickableChannels ?? channels;
 
   useEffect(() => {
     if (channel) onLiveValueChange?.(liveValue);
@@ -225,10 +228,10 @@ export function MappableBox({
 
         {pickerOpen && !channel && !readOnly && (
           <View className={cn('max-h-40 border-t', lineClass)}>
-            {channels.length === 0 ? (
-              <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No rack channels yet.</Text>
+            {pickerChannels.length === 0 ? (
+              <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No active rack channels yet.</Text>
             ) : (
-              channels.map((c) => (
+              pickerChannels.map((c) => (
                 <Pressable
                   key={c.id}
                   onPress={() => {

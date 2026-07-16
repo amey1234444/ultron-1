@@ -16,11 +16,15 @@ import Svg, {
 } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import type { DeviceNode } from '../../../lib/devices';
+import { channelLiveStatus, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode, CardType } from '../../../lib/rack';
 
 type SlotCardProps = {
   slot: number;
   card: CardNode | null;
+  device?: DeviceNode;
+  live?: LiveState;
   width: number;
   editable?: boolean;
   onPressEmpty: (x: number, y: number) => void;
@@ -31,7 +35,7 @@ type SlotCardProps = {
 // channel per card, not per-point status, so these exist purely to drive
 // the physical-module rendering below.
 type VisualKind = 'vibration' | 'process' | 'speed-keyphasor' | 'communication';
-type PointStatus = 'ok' | 'inactive';
+type PointStatus = 'ok' | 'stale' | 'inactive';
 
 type CardVisualConfig = {
   title: string;
@@ -103,6 +107,7 @@ const CARD_CONFIG: Record<VisualKind, CardVisualConfig> = {
 
 const STATUS_COLOURS: Record<PointStatus, string> = {
   ok: '#16A34A',
+  stale: '#DC2626',
   inactive: '#A1A1AA',
 };
 
@@ -125,6 +130,23 @@ function pointLabelsFor(card: CardNode): string[] {
   }
   if ('controllerName' in card.config) return ['DATA'];
   return [card.type];
+}
+
+function visualStatusFor(status: ReturnType<typeof channelLiveStatus>): PointStatus {
+  if (status === 'active') return 'ok';
+  if (status === 'stale') return 'stale';
+  return 'inactive';
+}
+
+function pointStatusesFor(card: CardNode, device: DeviceNode | undefined, live: LiveState | undefined, count: number): PointStatus[] {
+  if (!device || !live) return Array.from({ length: count }, () => 'inactive');
+  return Array.from({ length: count }, (_, index) => visualStatusFor(channelLiveStatus(device, card, index + 1, live)));
+}
+
+function aggregateStatus(statuses: PointStatus[]): PointStatus {
+  if (statuses.some((status) => status === 'ok')) return 'ok';
+  if (statuses.some((status) => status === 'stale')) return 'stale';
+  return 'inactive';
 }
 
 function getPressCoordinates(event: GestureResponderEvent) {
@@ -325,6 +347,8 @@ function EmptySlotCard({
 function InstalledSlotCard({
   slot,
   card,
+  device,
+  live,
   isDark,
   width,
   height,
@@ -334,6 +358,8 @@ function InstalledSlotCard({
 }: {
   slot: number;
   card: CardNode;
+  device?: DeviceNode;
+  live?: LiveState;
   isDark: boolean;
   width: number;
   height: number;
@@ -343,8 +369,9 @@ function InstalledSlotCard({
 }) {
   const kind = useMemo(() => kindFor(card.type), [card.type]);
   const config = CARD_CONFIG[kind];
-  const status: PointStatus = card.enabled ? 'ok' : 'inactive';
   const pointLabels = useMemo(() => pointLabelsFor(card), [card]);
+  const pointStatuses = useMemo(() => pointStatusesFor(card, device, live, pointLabels.length), [card, device, live, pointLabels.length]);
+  const status = aggregateStatus(pointStatuses);
   const s = width / BASE_WIDTH;
   const ref = useRef<View>(null);
 
@@ -408,14 +435,14 @@ function InstalledSlotCard({
           <View style={{ width: '72%', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', marginBottom: 7 * s }}>
             <StatusLed status={status} size={LED_SIZE * s} />
             <Text numberOfLines={1} style={{ marginLeft: 6 * s, color: textColour, fontSize: 7.2 * s, fontWeight: '800', letterSpacing: 0.35 }}>
-              {status === 'ok' ? 'OK' : 'OFF'}
+              {status === 'ok' ? 'OK' : status === 'stale' ? 'MISS' : 'OFF'}
             </Text>
           </View>
 
           <View style={{ width: '72%', gap: 6 * s }}>
             {pointLabels.map((label, index) => (
               <View key={index} style={{ flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center' }}>
-                <StatusLed status={status} size={LED_SIZE * s} />
+                <StatusLed status={pointStatuses[index] ?? 'inactive'} size={LED_SIZE * s} />
                 <Text numberOfLines={1} style={{ marginLeft: 6 * s, color: textColour, fontSize: 7 * s, fontWeight: '600', letterSpacing: 0.15 }}>
                   {label}
                 </Text>
@@ -433,7 +460,7 @@ function InstalledSlotCard({
   );
 }
 
-export function SlotCard({ slot, card, width, editable = true, onPressEmpty, onPressCard }: SlotCardProps) {
+export function SlotCard({ slot, card, device, live, width, editable = true, onPressEmpty, onPressCard }: SlotCardProps) {
   const { isDark } = useAppTheme();
   const height = width * (BASE_HEIGHT / BASE_WIDTH);
 
@@ -457,6 +484,8 @@ export function SlotCard({ slot, card, width, editable = true, onPressEmpty, onP
     <InstalledSlotCard
       slot={slot}
       card={card}
+      device={device}
+      live={live}
       isDark={isDark}
       width={width}
       height={height}

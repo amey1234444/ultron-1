@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { DeviceNode } from '../../../lib/devices';
+import type { LiveState } from '../../../lib/liveTelemetry';
 import { cn } from '../../../lib/cn';
 import { emptyConfigFor, isCardConfigured, type CardConfig, type CardNode, type CardType } from '../../../lib/rack';
 import { ConfirmDialog } from '../ConfirmDialog';
@@ -20,6 +21,7 @@ type CardPageView = 'overview' | 'config';
 type RackDetailProps = {
   device: DeviceNode;
   cards: CardNode[];
+  live?: LiveState;
   onBack: () => void;
   onInstallCard: (slot: number, type: CardType, config: CardConfig, enabled: boolean) => void;
   onUpdateCard: (cardId: string, config: CardConfig, enabled: boolean) => void;
@@ -41,7 +43,7 @@ function ModeTab({ label, active, onPress }: { label: string; active: boolean; o
   );
 }
 
-export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
+export function RackDetail({ device, cards, live, onBack, onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<ViewMode>('visual');
   const [installMenu, setInstallMenu] = useState<InstallCardMenuState | null>(null);
@@ -107,7 +109,9 @@ export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard,
       <View className="flex-1">
         {mode === 'visual' && (
           <RackFaceplate
+            device={device}
             cards={cards}
+            live={live}
             editable={canEditDeleteSchema}
             onPressEmpty={(slot, x, y) => {
               if (canEditDeleteSchema) setInstallMenu({ slot, x, y });
@@ -118,7 +122,7 @@ export function RackDetail({ device, cards, onBack, onInstallCard, onUpdateCard,
           />
         )}
         {mode === 'cards' && <CardListView cards={cards} onOpenMenu={canEditDeleteSchema ? (card, x, y) => setCardMenu({ card, x, y }) : undefined} />}
-        {mode === 'channels' && <ChannelListView cards={cards} />}
+        {mode === 'channels' && <ChannelListView device={device} cards={cards} live={live} />}
       </View>
 
       <InstallCardMenu

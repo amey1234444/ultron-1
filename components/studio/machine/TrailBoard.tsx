@@ -4,6 +4,7 @@ import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-nat
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
+import { channelLiveStatus, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
@@ -56,6 +57,7 @@ type Rect = { x: number; y: number; width: number; height: number };
 type TrailBoardProps = {
   devices: DeviceNode[];
   cards: CardNode[];
+  live?: LiveState;
   machineRect: Rect | null;
   machineId: string;
   // Machines whose template ships a default layout (currently the Rotary
@@ -147,6 +149,7 @@ function worseStatus(a: TrailStatus, b: TrailStatus): TrailStatus {
 export function TrailBoard({
   devices,
   cards,
+  live,
   machineRect,
   machineId,
   machineTemplate,
@@ -162,6 +165,11 @@ export function TrailBoard({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   const storageKey = trailBoardStorageKey(machineId);
+  const onlyActiveChannels = useCallback(
+    (rack: DeviceNode, card: CardNode, channelNumber: number) => !!live && channelLiveStatus(rack, card, channelNumber, live) === 'active',
+    [live],
+  );
+  const templateChannels = live ? listChannels(devices, cards, { channelIsAvailable: onlyActiveChannels }) : [];
 
   // A saved layout always wins; otherwise a template that ships a default
   // layout (RAV) starts pre-wired instead of blank. Computed exactly once —
@@ -170,7 +178,7 @@ export function TrailBoard({
   if (initialLayoutRef.current === null) {
     const saved = initialLayout ?? loadLocal<SavedLayout>(storageKey);
     initialLayoutRef.current =
-      saved ?? (hasDefaultLayout(machineTemplate) ? createRavDefaultLayout(listChannels(devices, cards)) : { trails: [], boxes: [] });
+      saved ?? (hasDefaultLayout(machineTemplate) ? createRavDefaultLayout(templateChannels) : { trails: [], boxes: [] });
   }
 
   const [trails, setTrails] = useState<Trail[]>(initialLayoutRef.current.trails);
@@ -184,6 +192,7 @@ export function TrailBoard({
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
+  const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: onlyActiveChannels }), [devices, cards, onlyActiveChannels]);
   const channelsRef = useRef(channels);
   const trailsRef = useRef(trails);
   const boxesRef = useRef(boxes);
@@ -267,7 +276,7 @@ export function TrailBoard({
     // Generate against the machine's *current* rect (it shrinks/grows with
     // zoom) — endpoints and bends land exactly on the artwork as rendered
     // right now, not where it would sit at 100%.
-    const layout = createRavDefaultLayout(channels, machineRect);
+    const layout = createRavDefaultLayout(pickableChannels, machineRect);
     trailsRef.current = layout.trails;
     boxesRef.current = layout.boxes;
     setTrails(layout.trails);
@@ -599,6 +608,7 @@ export function TrailBoard({
             connectorPoint={boxConnectorPoint(box)}
             channel={channels.find((c) => c.id === box.channelId) ?? null}
             channels={channels}
+            pickableChannels={pickableChannels}
             canvasWidth={boardSize.width}
             canvasHeight={boardSize.height}
             stageScale={stageScale}
