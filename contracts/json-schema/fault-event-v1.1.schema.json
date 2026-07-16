@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.event.fault/1.1",
+  "title": "Ultron fault event v1.1",
+  "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
+  "properties": {
+    "schema": { "const": "ultron.event.fault" },
+    "payload": {
+      "type": "object",
+      "required": ["fault_id", "component", "state"],
+      "properties": {
+        "fault_id": { "type": "string" },
+        "component": { "type": "string" },
+        "slot_id": { "type": "integer" },
+        "state": { "type": "string", "enum": ["ACTIVE", "CLEARED"] },
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

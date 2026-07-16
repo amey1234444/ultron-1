@@ -1,8 +1,9 @@
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { totalChannelsFor, type DeviceNode } from '../../lib/devices';
+import { gatewayForDevice, lastSeenLabel, measurementsForDevice, type LiveState } from '../../lib/liveTelemetry';
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   const { isDark } = useAppTheme();
@@ -16,13 +17,15 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   );
 }
 
-export function DeviceDetail({ device, onBack }: { device: DeviceNode; onBack: () => void }) {
+export function DeviceDetail({ device, live, onBack }: { device: DeviceNode; live?: LiveState; onBack: () => void }) {
   const { isDark } = useAppTheme();
   const total = totalChannelsFor(device.type);
   const mapped = 0; // real mapping arrives with channel mapping (spec §9)
+  const gateway = live ? gatewayForDevice(device, live) : undefined;
+  const measurements = live ? measurementsForDevice(device, live) : [];
 
   return (
-    <View className="flex-1">
+    <ScrollView className="flex-1">
       <Pressable onPress={onBack} className="px-6 pt-5">
         <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>‹ Devices</Text>
       </Pressable>
@@ -38,7 +41,8 @@ export function DeviceDetail({ device, onBack }: { device: DeviceNode; onBack: (
         <Row label="Port" value={device.port} mono />
         <Row label="Protocol" value={device.protocol} />
         <Row label="Status" value={device.status} />
-        <Row label="Last Communication" value={device.status === 'Online' ? 'Just now' : '—'} />
+        {gateway && <Row label="Gateway ID" value={gateway.gatewayId} mono />}
+        <Row label="Last Communication" value={gateway ? lastSeenLabel(gateway) : device.status === 'Online' ? 'Just now' : '—'} />
         {device.type === 'Rack' && <Row label="Sensor Mapping" value={`${mapped} / ${total}`} mono />}
       </View>
 
@@ -49,7 +53,25 @@ export function DeviceDetail({ device, onBack }: { device: DeviceNode; onBack: (
           <MiniStat label="Available Channels" value={total - mapped} />
         </View>
       )}
-    </View>
+
+      {measurements.length > 0 && (
+        <View className="px-6 pb-6 pt-5">
+          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            Live Measurements
+          </Text>
+          <View className={cn('mt-2 rounded-xl border', isDark ? 'border-line-dark' : 'border-line-light')}>
+            {measurements.map((m) => (
+              <Row
+                key={`${m.slotId}.${m.channelId}.${m.measurementType}`}
+                label={`Slot ${m.slotId} · CH${m.channelId} · ${m.measurementType}`}
+                value={`${m.value.toFixed(2)} ${m.unit}`}
+                mono
+              />
+            ))}
+          </View>
+        </View>
+      )}
+    </ScrollView>
   );
 }
 

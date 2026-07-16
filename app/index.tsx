@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -24,9 +24,11 @@ import { RenameDialog } from '../components/studio/RenameDialog';
 import { RackDetail } from '../components/studio/rack/RackDetail';
 import { TopBar } from '../components/studio/TopBar';
 import { useAppTheme } from '../hooks/useAppTheme';
+import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { cn } from '../lib/cn';
 import type { DeviceNode } from '../lib/devices';
+import { applyLiveStatus } from '../lib/liveTelemetry';
 import {
   duplicateFolderSubtree,
   duplicateProject,
@@ -85,7 +87,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const {
     projects,
     folders,
-    devices,
+    devices: storedDevices,
     cards,
     machines,
     setProjects,
@@ -96,6 +98,12 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     getLayout,
     saveLayout,
   } = useStudioStore();
+
+  // Real gateway/rack connectivity from the MQTT ingestion pipeline overlays
+  // the stored device statuses, so the devices strip shows Online the moment a
+  // bound gateway starts publishing.
+  const liveState = useLiveTelemetry();
+  const devices = useMemo(() => applyLiveStatus(storedDevices, liveState), [storedDevices, liveState]);
 
   const [createProjectVisible, setCreateProjectVisible] = useState(false);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
@@ -392,7 +400,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onRemoveCard={handleRemoveCard}
             />
           ) : selected.kind === 'device' && selectedDevice ? (
-            <DeviceDetail device={selectedDevice} onBack={() => setSelected({ kind: 'devices' })} />
+            <DeviceDetail device={selectedDevice} live={liveState} onBack={() => setSelected({ kind: 'devices' })} />
           ) : selected.kind === 'devices' ? (
             devices.length === 0 ? (
               <EmptyState title="DEVICES" description="No devices added.">

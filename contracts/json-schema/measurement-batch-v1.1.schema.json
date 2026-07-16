@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.measurement.batch/1.1",
+  "title": "Ultron measurement batch v1.1",
+  "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
+  "properties": {
+    "schema": { "const": "ultron.measurement.batch" },
+    "payload": {
+      "type": "object",
+      "required": ["batch_sequence", "record_count", "records"],
+      "properties": {
+        "batch_sequence": { "type": "integer", "minimum": 0 },
+        "record_count": { "type": "integer", "minimum": 0 },
+        "records": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "slot_id",
+              "channel_id",
+              "measurement_type",
+              "value",
+              "unit",
+              "quality",
+              "source_timestamp_us",
+              "source_sequence"
+            ],
+            "properties": {
+              "slot_id": { "type": "integer", "minimum": 1, "maximum": 14 },
+              "channel_id": { "type": "integer", "minimum": 1 },
+              "point_id": { "type": "integer" },
+              "card_type": {
+                "type": "string",
+                "enum": ["VIBRATION", "PROCESS", "SPEED", "COMMUNICATION_CONTROLLER"]
+              },
+              "measurement_type": { "type": "string" },
+              "value": { "type": "number" },
+              "unit": { "type": "string" },
+              "quality": { "type": "string", "enum": ["GOOD", "BAD", "UNCERTAIN"] },
+              "freshness": { "type": "string", "enum": ["FRESH", "STALE"] },
+              "source_timestamp_us": { "type": "string", "pattern": "^[0-9]+$" },
+              "source_sequence": { "type": "integer", "minimum": 0 },
+              "configuration_revision": { "type": "integer" },
+              "calibration_revision": { "type": "integer" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

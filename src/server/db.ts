@@ -302,4 +302,135 @@ async function migrate(): Promise<void> {
     );
   `);
   await query(`INSERT INTO studio_meta (id) VALUES (1) ON CONFLICT (id) DO NOTHING;`);
+
+  // --- MQTT ingestion (gateways / racks / telemetry) ------------------------
+  // Written by the long-running MQTT ingest service (services/mqtt-ingest);
+  // read here by the /api/live endpoints. Created in both places so either
+  // process can cold-start first. Mirrors
+  // supabase/migrations/20260716000000_mqtt_telemetry.sql.
+  await query(`
+    CREATE TABLE IF NOT EXISTS gateways (
+      id              BIGSERIAL PRIMARY KEY,
+      gateway_id      TEXT NOT NULL UNIQUE,
+      current_ip      TEXT NOT NULL DEFAULT '',
+      gateway_boot_id TEXT NOT NULL DEFAULT '',
+      mqtt_client_id  TEXT NOT NULL DEFAULT '',
+      status          TEXT NOT NULL DEFAULT 'UNKNOWN',
+      last_seen_at    TIMESTAMPTZ,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS gateway_ip_history (
+      id            BIGSERIAL PRIMARY KEY,
+      gateway_id    TEXT NOT NULL,
+      ip_address    TEXT NOT NULL,
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+      approved      BOOLEAN NOT NULL DEFAULT false,
+      UNIQUE (gateway_id, ip_address)
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS racks (
+      id            BIGSERIAL PRIMARY KEY,
+      gateway_id    TEXT NOT NULL,
+      rack_id       INT NOT NULL,
+      site_id       TEXT,
+      plant_id      TEXT,
+      friendly_name TEXT NOT NULL DEFAULT '',
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (gateway_id, rack_id)
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS mqtt_messages (
+      message_id     TEXT PRIMARY KEY,
+      topic          TEXT NOT NULL,
+      schema         TEXT NOT NULL,
+      schema_version TEXT NOT NULL,
+      gateway_id     TEXT NOT NULL,
+      gateway_ip     TEXT NOT NULL,
+      rack_id        INT,
+      received_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+      payload_hash   TEXT NOT NULL DEFAULT ''
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS mqtt_messages_gateway ON mqtt_messages (gateway_id, received_at);`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS rack_inventory_slots (
+      gateway_id        TEXT NOT NULL,
+      rack_id           INT NOT NULL,
+      slot_id           INT NOT NULL,
+      presence          TEXT NOT NULL DEFAULT 'EMPTY',
+      online_state      TEXT NOT NULL DEFAULT 'UNKNOWN',
+      card_type         TEXT,
+      snapshot_revision BIGINT NOT NULL DEFAULT 0,
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (gateway_id, rack_id, slot_id)
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS measurement_latest (
+      gateway_id          TEXT NOT NULL,
+      rack_id             INT NOT NULL,
+      slot_id             INT NOT NULL,
+      channel_id          INT NOT NULL,
+      measurement_type    TEXT NOT NULL,
+      value               DOUBLE PRECISION NOT NULL,
+      unit                TEXT NOT NULL DEFAULT '',
+      quality             TEXT NOT NULL DEFAULT 'GOOD',
+      source_sequence     BIGINT NOT NULL DEFAULT 0,
+      source_timestamp_us BIGINT NOT NULL DEFAULT 0,
+      updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (gateway_id, rack_id, slot_id, channel_id, measurement_type)
+    );
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS measurement_history (
+      id                  BIGSERIAL PRIMARY KEY,
+      gateway_id          TEXT NOT NULL,
+      rack_id             INT NOT NULL,
+      slot_id             INT NOT NULL,
+      channel_id          INT NOT NULL,
+      measurement_type    TEXT NOT NULL,
+      value               DOUBLE PRECISION NOT NULL,
+      unit                TEXT NOT NULL DEFAULT '',
+      quality             TEXT NOT NULL DEFAULT 'GOOD',
+      source_sequence     BIGINT NOT NULL DEFAULT 0,
+      source_timestamp_us BIGINT NOT NULL DEFAULT 0,
+      received_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us)
+    );
+  `);
+  await query(`
+    CREATE INDEX IF NOT EXISTS measurement_history_point
+      ON measurement_history (gateway_id, rack_id, slot_id, channel_id, source_timestamp_us);
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS gateway_events (
+      id          BIGSERIAL PRIMARY KEY,
+      message_id  TEXT NOT NULL,
+      gateway_id  TEXT NOT NULL,
+      rack_id     INT NOT NULL,
+      event_kind  TEXT NOT NULL,
+      payload     JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS gateway_events_rack ON gateway_events (gateway_id, rack_id, created_at);`);
+  await query(`
+    CREATE TABLE IF NOT EXISTS mqtt_quarantine (
+      id          BIGSERIAL PRIMARY KEY,
+      topic       TEXT NOT NULL,
+      reason      TEXT NOT NULL,
+      gateway_id  TEXT,
+      gateway_ip  TEXT,
+      rack_id     INT,
+      raw_payload JSONB,
+      received_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
 }

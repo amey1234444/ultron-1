@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ultron.command.request/1.1",
+  "title": "Ultron command request v1.1 (Backend -> Gateway)",
+  "type": "object",
+  "required": ["schema", "schema_version", "request_id", "gateway_id", "rack_id", "command", "created_at"],
+  "properties": {
+    "schema": { "const": "ultron.command.request" },
+    "schema_version": { "const": "1.1" },
+    "request_id": { "type": "string", "format": "uuid" },
+    "gateway_id": { "type": "string" },
+    "rack_id": { "type": "integer" },
+    "command": { "type": "string" },
+    "args": { "type": "object" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

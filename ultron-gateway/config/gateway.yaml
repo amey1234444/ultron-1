@@ -1,0 +1,15 @@
+# Reference configuration. Environment variables take precedence (see
+# .env.example); this documents the full configuration surface for the
+# Raspberry Pi deployment (/etc/ultron-gateway/gateway.env).
+gateway:
+  gateway_id: GW-001
+  rack_id: 1
+  gateway_ip: 192.168.50.10       # or primary_interface: eth0
+mqtt:
+  host: your-emqx-host
+  port: 8883
+  tls: true
+  client_id: ultron-gw-GW-001     # derived: ultron-gw-{gateway_id}
+telemetry:
+  interval_s: 0.5
+state_dir: /var/lib/ultron-gateway

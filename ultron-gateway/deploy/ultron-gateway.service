@@ -1,0 +1,16 @@
+[Unit]
+Description=Ultron Gateway (CC/RCC -> MQTT)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=ultron-gateway
+EnvironmentFile=/etc/ultron-gateway/gateway.env
+WorkingDirectory=/opt/ultron-gateway
+ExecStart=/opt/ultron-gateway/venv/bin/python -m ultron_gateway.main
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
