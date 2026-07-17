@@ -355,9 +355,11 @@ async function migrate(): Promise<void> {
       gateway_ip     TEXT NOT NULL,
       rack_id        INT,
       received_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-      payload_hash   TEXT NOT NULL DEFAULT ''
+      payload_hash   TEXT NOT NULL DEFAULT '',
+      source_event   JSONB
     );
   `);
+  await query(`ALTER TABLE mqtt_messages ADD COLUMN IF NOT EXISTS source_event JSONB;`);
   await query(`CREATE INDEX IF NOT EXISTS mqtt_messages_gateway ON mqtt_messages (gateway_id, received_at);`);
   await query(`
     CREATE TABLE IF NOT EXISTS rack_inventory_slots (

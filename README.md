@@ -167,6 +167,24 @@ Settings → Database → Connection string → URI** into Vercel's `DATABASE_UR
 environment variable. Use the transaction pooler URI for serverless deployments
 and keep `sslmode=require`. See `.env.example` for the expected format.
 
+### MQTT ingestion in the Vercel app
+
+Production MQTT ingestion is handled by the Next.js app through
+`POST /api/mqtt/ingest`. Configure EMQX with an HTTP Action/Webhook that forwards
+`ultron/v1/gateways/#` messages to:
+
+```text
+https://YOUR-VERCEL-DOMAIN/api/mqtt/ingest
+```
+
+Set `MQTT_INGEST_SECRET` in Vercel and send it as the
+`x-ultron-ingest-secret` header from EMQX. This replaces the standalone
+`services/mqtt-ingest` worker for Vercel deployments; do not run both long-term.
+The full EMQX webhook event is stored in `mqtt_messages.source_event`, while the
+gateway payload is normalized into the live telemetry tables. See
+`docs/vercel-mqtt-ingest.md` for the EMQX rule/action body and validation
+queries.
+
 ## Deployment (Vercel)
 
 Pushing to `main`/`master` auto-deploys via `.github/workflows/deploy-vercel.yml`.

@@ -26,5 +26,12 @@ class Sequence:
             tmp = self._path + ".tmp"
             with open(tmp, "w", encoding="utf-8") as f:
                 f.write(str(self._value))
-            os.replace(tmp, self._path)
+            try:
+                os.replace(tmp, self._path)
+            except PermissionError:
+                # Some Windows/AV setups briefly lock the target and reject the
+                # atomic replace. The sequence is best-effort persistence, so a
+                # direct rewrite is preferable to stopping telemetry.
+                with open(self._path, "w", encoding="utf-8") as f:
+                    f.write(str(self._value))
             return self._value

@@ -10,6 +10,9 @@ name: Deploy to Vercel
 # - AUTH_SECRET
 # - CAPTCHA_SECRET
 # - DATABASE_URL
+# - MQTT_INGEST_SECRET
+# - CRON_SECRET (optional)
+# - MQTT_STALE_AFTER_S (optional)
 # - SUPER_ADMIN_PASSWORD
 # - ADMIN_PASSWORD
 # - USER_PASSWORD
@@ -39,6 +42,9 @@ jobs:
       AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
       CAPTCHA_SECRET: ${{ secrets.CAPTCHA_SECRET }}
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      MQTT_INGEST_SECRET: ${{ secrets.MQTT_INGEST_SECRET }}
+      CRON_SECRET: ${{ secrets.CRON_SECRET }}
+      MQTT_STALE_AFTER_S: ${{ secrets.MQTT_STALE_AFTER_S }}
       SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
@@ -87,6 +93,7 @@ jobs:
 
           check_secret "AUTH_SECRET" "$AUTH_SECRET"
           check_secret "DATABASE_URL" "$DATABASE_URL"
+          check_secret "MQTT_INGEST_SECRET" "$MQTT_INGEST_SECRET"
           check_secret "SUPER_ADMIN_PASSWORD" "$SUPER_ADMIN_PASSWORD"
           check_secret "ADMIN_PASSWORD" "$ADMIN_PASSWORD"
           check_secret "USER_PASSWORD" "$USER_PASSWORD"
@@ -102,6 +109,18 @@ jobs:
             echo "CAPTCHA_SECRET is configured"
           else
             echo "CAPTCHA_SECRET is not configured; application fallback to AUTH_SECRET remains unchanged"
+          fi
+
+          if [ -n "$CRON_SECRET" ]; then
+            echo "CRON_SECRET is configured"
+          else
+            echo "CRON_SECRET is not configured; MQTT_INGEST_SECRET can secure manual stale-gateway maintenance"
+          fi
+
+          if [ -n "$MQTT_STALE_AFTER_S" ]; then
+            echo "MQTT_STALE_AFTER_S is configured"
+          else
+            echo "MQTT_STALE_AFTER_S is not configured; application default is 15 seconds"
           fi
 
       # Synchronize GitHub Repository Secrets into the
@@ -129,6 +148,7 @@ jobs:
 
           sync_secret "AUTH_SECRET" "$AUTH_SECRET"
           sync_secret "DATABASE_URL" "$DATABASE_URL"
+          sync_secret "MQTT_INGEST_SECRET" "$MQTT_INGEST_SECRET"
           sync_secret "SUPER_ADMIN_PASSWORD" "$SUPER_ADMIN_PASSWORD"
           sync_secret "ADMIN_PASSWORD" "$ADMIN_PASSWORD"
           sync_secret "USER_PASSWORD" "$USER_PASSWORD"
@@ -137,6 +157,14 @@ jobs:
           # Only create/update CAPTCHA_SECRET when a value was actually provided.
           if [ -n "$CAPTCHA_SECRET" ]; then
             sync_secret "CAPTCHA_SECRET" "$CAPTCHA_SECRET"
+          fi
+
+          if [ -n "$CRON_SECRET" ]; then
+            sync_secret "CRON_SECRET" "$CRON_SECRET"
+          fi
+
+          if [ -n "$MQTT_STALE_AFTER_S" ]; then
+            sync_secret "MQTT_STALE_AFTER_S" "$MQTT_STALE_AFTER_S"
           fi
 
       # Pull again so the local Vercel build environment contains

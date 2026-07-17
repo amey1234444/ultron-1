@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import { EMPTY_LIVE_STATE, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
 
-const POLL_INTERVAL_MS = 2000;
+const POLL_INTERVAL_MS = 1000;
 
 // Polls the backend's live MQTT state (gateways / racks / latest measurements)
 // so the UI reflects real gateway connectivity in near-real time. Web-only:

@@ -48,8 +48,10 @@ CREATE TABLE IF NOT EXISTS mqtt_messages (
   gateway_ip     TEXT NOT NULL,
   rack_id        INT,
   received_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  payload_hash   TEXT NOT NULL DEFAULT ''
+  payload_hash   TEXT NOT NULL DEFAULT '',
+  source_event   JSONB
 );
+ALTER TABLE mqtt_messages ADD COLUMN IF NOT EXISTS source_event JSONB;
 CREATE INDEX IF NOT EXISTS mqtt_messages_gateway ON mqtt_messages (gateway_id, received_at);
 
 -- Latest retained inventory snapshot per rack slot.
