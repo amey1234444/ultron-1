@@ -269,57 +269,52 @@ async function handleInventory(msg: MqttEnvelope): Promise<void> {
 }
 
 async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
-  let stored = 0;
   const records = Array.isArray(msg.payload.records) ? msg.payload.records : [];
-  for (const item of records) {
-    const r = item as Record<string, unknown>;
-    const hist = await query(
-      `INSERT INTO measurement_history
-         (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
-       ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
-      [
-        msg.gateway_id,
-        msg.rack_id,
-        r.slot_id,
-        r.channel_id,
-        r.measurement_type,
-        r.value,
-        r.unit ?? '',
-        r.quality ?? 'GOOD',
-        r.source_sequence,
-        r.source_timestamp_us,
-      ],
-    );
-    if (hist.rowCount === 1) stored += 1;
+  if (records.length === 0) return 0;
 
-    await query(
-      `INSERT INTO measurement_latest
-         (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
-       ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type) DO UPDATE SET
-         value = EXCLUDED.value,
-         unit = EXCLUDED.unit,
-         quality = EXCLUDED.quality,
-         source_sequence = EXCLUDED.source_sequence,
-         source_timestamp_us = EXCLUDED.source_timestamp_us,
-         updated_at = now()
-       WHERE measurement_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
-      [
-        msg.gateway_id,
-        msg.rack_id,
-        r.slot_id,
-        r.channel_id,
-        r.measurement_type,
-        r.value,
-        r.unit ?? '',
-        r.quality ?? 'GOOD',
-        r.source_sequence,
-        r.source_timestamp_us,
-      ],
+  const params: unknown[] = [];
+  const values = records.map((item, index) => {
+    const r = item as Record<string, unknown>;
+    params.push(
+      msg.gateway_id,
+      msg.rack_id,
+      r.slot_id,
+      r.channel_id,
+      r.measurement_type,
+      r.value,
+      r.unit ?? '',
+      r.quality ?? 'GOOD',
+      r.source_sequence,
+      r.source_timestamp_us,
     );
-  }
-  return stored;
+    const start = index * 10;
+    return `($${start + 1},$${start + 2},$${start + 3},$${start + 4},$${start + 5},$${start + 6},$${start + 7},$${start + 8},$${start + 9},$${start + 10})`;
+  });
+
+  const hist = await query(
+    `INSERT INTO measurement_history
+       (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us)
+     VALUES ${values.join(',')}
+     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
+    params,
+  );
+
+  await query(
+    `INSERT INTO measurement_latest
+       (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us, updated_at)
+     VALUES ${values.map((value) => `${value.slice(0, -1)}, now())`).join(',')}
+     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type) DO UPDATE SET
+       value = EXCLUDED.value,
+       unit = EXCLUDED.unit,
+       quality = EXCLUDED.quality,
+       source_sequence = EXCLUDED.source_sequence,
+       source_timestamp_us = EXCLUDED.source_timestamp_us,
+       updated_at = now()
+     WHERE measurement_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
+    params,
+  );
+
+  return hist.rowCount ?? 0;
 }
 
 async function handleEvent(msg: MqttEnvelope, kind: TopicKind): Promise<void> {
