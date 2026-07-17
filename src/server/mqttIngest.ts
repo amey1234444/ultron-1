@@ -43,6 +43,8 @@ type IngestResult = {
   stored?: number;
   bindingStatus?: string;
   bindingEvent?: string;
+  quarantined?: boolean;
+  reason?: string;
 };
 
 type NormalizedWebhookMessage = {
@@ -349,36 +351,41 @@ export async function ingestMqttMessage(topic: string, rawMessage: unknown, sour
   const parsed = parseTopic(topic);
   if (!parsed) {
     await quarantine(topic, 'unknown topic', null);
-    throw new Error('unknown topic');
+    return { kind: 'system', fresh: false, quarantined: true, reason: 'unknown topic' };
   }
   if (parsed.kind === 'command_request') return { kind: parsed.kind, fresh: false };
 
   const envelopeErrors = validateEnvelope(rawMessage);
   if (envelopeErrors.length > 0) {
-    await quarantine(topic, `envelope: ${envelopeErrors.join('; ')}`, rawMessage as Partial<MqttEnvelope>);
-    throw new Error(`envelope: ${envelopeErrors.join('; ')}`);
+    const reason = `envelope: ${envelopeErrors.join('; ')}`;
+    await quarantine(topic, reason, rawMessage as Partial<MqttEnvelope>);
+    return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
 
   const msg = rawMessage as MqttEnvelope;
   const expectedSchema = SCHEMA_FOR_KIND[parsed.kind];
   if (expectedSchema && msg.schema !== expectedSchema) {
-    await quarantine(topic, `schema ${msg.schema} does not match topic kind ${parsed.kind}`, msg);
-    throw new Error('schema/topic mismatch');
+    const reason = `schema ${msg.schema} does not match topic kind ${parsed.kind}`;
+    await quarantine(topic, reason, msg);
+    return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
 
   const payloadErrors = validatePayload(msg.schema, msg.payload);
   if (payloadErrors.length > 0) {
-    await quarantine(topic, `payload: ${payloadErrors.join('; ')}`, msg);
-    throw new Error(`payload: ${payloadErrors.join('; ')}`);
+    const reason = `payload: ${payloadErrors.join('; ')}`;
+    await quarantine(topic, reason, msg);
+    return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
 
   if (parsed.gatewayId !== msg.gateway_id) {
-    await quarantine(topic, 'topic/payload gateway_id mismatch', msg);
-    throw new Error('topic/payload gateway_id mismatch');
+    const reason = 'topic/payload gateway_id mismatch';
+    await quarantine(topic, reason, msg);
+    return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
   if (parsed.rackId !== null && parsed.rackId !== msg.rack_id) {
-    await quarantine(topic, 'topic/payload rack_id mismatch', msg);
-    throw new Error('topic/payload rack_id mismatch');
+    const reason = 'topic/payload rack_id mismatch';
+    await quarantine(topic, reason, msg);
+    return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
 
   const binding = await bind(msg);

@@ -42,13 +42,13 @@ SELECT
   username,
   peerhost,
   qos,
-  flags,
-  headers,
-  pub_props,
+  json_encode(flags) as flags_json,
+  json_encode(headers) as headers_json,
+  json_encode(pub_props) as pub_props_json,
   timestamp,
   publish_received_at,
   node,
-  client_attrs
+  json_encode(client_attrs) as client_attrs_json
 FROM
   "ultron/v1/gateways/#"
 ```
@@ -85,13 +85,13 @@ Body:
   "username": "${username}",
   "peerhost": "${peerhost}",
   "qos": ${qos},
-  "flags": ${flags},
-  "headers": ${headers},
-  "pub_props": ${pub_props},
+  "flags": ${flags_json},
+  "headers": ${headers_json},
+  "pub_props": ${pub_props_json},
   "timestamp": ${timestamp},
   "publish_received_at": ${publish_received_at},
   "node": "${node}",
-  "client_attrs": ${client_attrs}
+  "client_attrs": ${client_attrs_json}
 }
 ```
 
