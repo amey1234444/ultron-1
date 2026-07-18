@@ -165,11 +165,15 @@ export function TrailBoard({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   const storageKey = trailBoardStorageKey(machineId);
-  const onlyActiveChannels = useCallback(
-    (rack: DeviceNode, card: CardNode, channelNumber: number) => !!live && channelLiveStatus(rack, card, channelNumber, live) === 'active',
+  const pickableChannelFilter = useCallback(
+    (rack: DeviceNode, card: CardNode, channelNumber: number) => {
+      if (!card.enabled) return false;
+      if (!live || (live.gateways.length === 0 && live.racks.length === 0 && live.slots.length === 0 && live.measurements.length === 0)) return true;
+      return channelLiveStatus(rack, card, channelNumber, live) === 'active';
+    },
     [live],
   );
-  const templateChannels = live ? listChannels(devices, cards, { channelIsAvailable: onlyActiveChannels }) : [];
+  const templateChannels = listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter });
 
   // A saved layout always wins; otherwise a template that ships a default
   // layout (RAV) starts pre-wired instead of blank. Computed exactly once —
@@ -192,7 +196,7 @@ export function TrailBoard({
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
-  const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: onlyActiveChannels }), [devices, cards, onlyActiveChannels]);
+  const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter }), [devices, cards, pickableChannelFilter]);
   const channelsRef = useRef(channels);
   const trailsRef = useRef(trails);
   const boxesRef = useRef(boxes);

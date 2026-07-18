@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { PanResponder, Pressable, Text, TextInput, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
@@ -10,7 +10,7 @@ import { PointCard18, POINT_CARD_HEIGHT, POINT_CARD_WIDTH } from './PointCard18'
 
 export type Point = { x: number; y: number };
 
-export const UNLINKED_BOX_WIDTH = 168;
+export const UNLINKED_BOX_WIDTH = 236;
 export const MAPPABLE_BOX_WIDTH = POINT_CARD_WIDTH;
 export const MAPPABLE_BOX_HEIGHT = POINT_CARD_HEIGHT;
 
@@ -22,6 +22,16 @@ function statusFor(channel: ChannelRef, value: number): TrailStatus {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+function channelLocation(channel: ChannelRef) {
+  const match = channel.id.match(/\.CH(\d+)$/);
+  const channelNumber = match?.[1] ?? '?';
+  return `S${String(channel.slot).padStart(2, '0')}.CH${channelNumber}`;
+}
+
+function searchableChannelText(channel: ChannelRef) {
+  return [channel.deviceName, channel.label, channel.code, channelLocation(channel), channel.unit].join(' ').toLowerCase();
 }
 
 export type MappableBoxProps = {
@@ -85,13 +95,23 @@ export function MappableBox({
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [channelSearch, setChannelSearch] = useState('');
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel);
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;
+  const filteredPickerChannels = useMemo(() => {
+    const query = channelSearch.trim().toLowerCase();
+    if (!query) return pickerChannels;
+    return pickerChannels.filter((c) => searchableChannelText(c).includes(query));
+  }, [channelSearch, pickerChannels]);
 
   useEffect(() => {
     if (channel) onLiveValueChange?.(liveValue);
   }, [channel, liveValue, onLiveValueChange]);
+
+  useEffect(() => {
+    if (!pickerOpen || channel) setChannelSearch('');
+  }, [channel, pickerOpen]);
 
   const pointRef = useRef({ x, y });
   pointRef.current = { x, y };
@@ -227,27 +247,51 @@ export function MappableBox({
         )}
 
         {pickerOpen && !channel && !readOnly && (
-          <View className={cn('max-h-40 border-t', lineClass)}>
+          <View className={cn('border-t', lineClass)}>
             {pickerChannels.length === 0 ? (
               <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No active rack channels yet.</Text>
             ) : (
-              pickerChannels.map((c) => (
-                <Pressable
-                  key={c.id}
-                  onPress={() => {
-                    onPickChannel(c);
-                    setPickerOpen(false);
-                  }}
-                  className={cn('border-b px-2.5 py-1.5', lineClass)}
-                >
-                  <Text numberOfLines={1} className={cn('font-body-medium text-xs', inkClass)}>
-                    {c.deviceName}
+              <>
+                <View className={cn('border-b px-2.5 py-1.5', lineClass)}>
+                  <TextInput
+                    value={channelSearch}
+                    onChangeText={setChannelSearch}
+                    placeholder="Search active channels"
+                    placeholderTextColor={isDark ? '#8A8A8A' : '#6B6B6B'}
+                    className={cn('font-body text-xs', inkClass)}
+                  />
+                  <Text className={cn('mt-1 font-body text-[10px]', mutedClass)}>
+                    {filteredPickerChannels.length} of {pickerChannels.length} active channels
                   </Text>
-                  <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
-                    {c.label}
-                  </Text>
-                </Pressable>
-              ))
+                </View>
+
+                {filteredPickerChannels.length === 0 ? (
+                  <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No channels match this search.</Text>
+                ) : (
+                  <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
+                    {filteredPickerChannels.map((c) => (
+                      <Pressable
+                        key={c.id}
+                        onPress={() => {
+                          onPickChannel(c);
+                          setPickerOpen(false);
+                        }}
+                        className={cn('border-b px-2.5 py-1.5', lineClass)}
+                      >
+                        <View className="flex-row items-center gap-2">
+                          <Text className="font-body-bold text-[11px] text-accent">{c.code}</Text>
+                          <Text numberOfLines={1} style={{ minWidth: 0 }} className={cn('font-body-medium flex-1 text-xs', inkClass)}>
+                            {c.deviceName}
+                          </Text>
+                        </View>
+                        <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
+                          {channelLocation(c)} - {c.label}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                )}
+              </>
             )}
           </View>
         )}
