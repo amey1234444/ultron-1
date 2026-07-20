@@ -46,6 +46,7 @@ export type MappableBoxProps = {
   connectorPoint: Point;
   channel: ChannelRef | null;
   dataLive?: boolean;
+  liveReading?: { value: number; unit?: string };
   channels: ChannelRef[];
   pickableChannels?: ChannelRef[];
   canvasWidth: number;
@@ -77,6 +78,7 @@ export function MappableBox({
   connectorPoint,
   channel,
   dataLive = true,
+  liveReading,
   channels,
   pickableChannels,
   canvasWidth,
@@ -99,6 +101,7 @@ export function MappableBox({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel && dataLive);
+  const displayValue = liveReading?.value ?? liveValue;
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;
   const filteredPickerChannels = useMemo(() => {
@@ -108,8 +111,8 @@ export function MappableBox({
   }, [channelSearch, pickerChannels]);
 
   useEffect(() => {
-    if (channel && dataLive) onLiveValueChange?.(liveValue);
-  }, [channel, dataLive, liveValue, onLiveValueChange]);
+    if (channel && dataLive) onLiveValueChange?.(displayValue);
+  }, [channel, dataLive, displayValue, onLiveValueChange]);
 
   useEffect(() => {
     if (!pickerOpen || channel) setChannelSearch('');
@@ -154,7 +157,8 @@ export function MappableBox({
   const connectorColour = attached ? '#3FB950' : '#C9A15C';
 
   if (channel) {
-    const status = dataLive ? statusFor(channel, liveValue) : 'offline';
+    const decimals = LIVE_RANGE_FOR_LETTER[channel.letter].decimals;
+    const status = dataLive ? statusFor(channel, displayValue) : 'offline';
     return (
       <>
         <View
@@ -180,8 +184,8 @@ export function MappableBox({
             tag={channel.code}
             channel={channel.code}
             title={channel.label}
-            value={dataLive ? liveValue.toFixed(LIVE_RANGE_FOR_LETTER[channel.letter].decimals) : '--'}
-            unit={dataLive ? channel.unit : ''}
+            value={dataLive ? displayValue.toFixed(decimals) : '--'}
+            unit={dataLive ? liveReading?.unit ?? channel.unit : ''}
             status={status}
             interactive={!readOnly}
             dragHandlers={panResponder.panHandlers}

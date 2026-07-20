@@ -113,7 +113,7 @@ export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] 
   return Array.from(new Set(live.measurements.filter((m) => m.gatewayId === gateway.gatewayId).map((m) => m.rackId)));
 }
 
-function latestMeasurementForChannel(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): LiveMeasurement | undefined {
+export function latestMeasurementForChannel(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): LiveMeasurement | undefined {
   const gateway = gatewayForDevice(device, live);
   if (!gateway) return undefined;
   const rackIds = rackIdsForDevice(device, live);

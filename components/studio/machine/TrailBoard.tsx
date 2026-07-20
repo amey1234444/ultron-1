@@ -4,7 +4,7 @@ import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-nat
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
-import { channelLiveStatus, type LiveState } from '../../../lib/liveTelemetry';
+import { channelLiveStatus, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
@@ -209,6 +209,16 @@ export function TrailBoard({
       const card = cards.find((c) => c.deviceId === channel.rackId && c.slot === channel.slot);
       if (!rack || !card) return false;
       return channelLiveStatus(rack, card, channelNumberFor(channel), live) === 'active';
+    },
+    [cards, devices, live],
+  );
+  const liveReadingFor = useCallback(
+    (channel: ChannelRef | null): LiveMeasurement | undefined => {
+      if (!channel || !live) return undefined;
+      const rack = devices.find((device) => device.id === channel.rackId);
+      const card = cards.find((c) => c.deviceId === channel.rackId && c.slot === channel.slot);
+      if (!rack || !card) return undefined;
+      return latestMeasurementForChannel(rack, card, channelNumberFor(channel), live);
     },
     [cards, devices, live],
   );
@@ -629,6 +639,7 @@ export function TrailBoard({
               connectorPoint={boxConnectorPoint(box)}
               channel={channel}
               dataLive={isChannelLive(channel)}
+              liveReading={liveReadingFor(channel)}
               channels={channels}
               pickableChannels={pickableChannels}
               canvasWidth={boardSize.width}

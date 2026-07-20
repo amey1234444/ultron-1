@@ -192,9 +192,13 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
        FROM studio_devices
        WHERE type = 'Gateway'
          AND archived = false
-         AND (ip = $1 OR ip = regexp_replace($1, '\\.[^.]+$', ''))
+         AND (
+           real_gateway_id = $2
+           OR ip = $1
+           OR ip = regexp_replace($1, '\\.[^.]+$', '')
+         )
        LIMIT 1`,
-      [msg.gateway_ip],
+      [msg.gateway_ip, msg.gateway_id],
     );
     if (commissioned.rowCount === 0) {
       status = 'QUARANTINED';

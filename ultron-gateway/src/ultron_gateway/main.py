@@ -29,15 +29,16 @@ def main() -> None:
     sequence = Sequence(config.state_dir)
     envelope = EnvelopeBuilder(config.gateway_id, boot_id, gateway_ip, sequence)
 
-    will = envelope.build("ultron.gateway.status", config.rack_id, {"state": "OFFLINE"})
+    will = envelope.build("ultron.gateway.status", config.primary_rack_id, {"state": "OFFLINE"})
     client = MqttClient(config, topics.status(config.gateway_id), will)
 
     spool = Spool(config.state_dir)
     publisher = Publisher(envelope, client, spool)
-    consumer = CommandConsumer(publisher, config.rack_id)
+    consumer = CommandConsumer(publisher, set(config.rack_ids))
     client.subscribe_commands(topics.command_request_filter(config.gateway_id), consumer.handle)
 
-    print(f"[gateway] {config.gateway_id} rack {config.rack_id} ip {gateway_ip} -> {config.mqtt_host}:{config.mqtt_port}")
+    rack_label = ",".join(str(rack_id) for rack_id in config.rack_ids)
+    print(f"[gateway] {config.gateway_id} racks {rack_label} ip {gateway_ip} -> {config.mqtt_host}:{config.mqtt_port}")
     client.connect()
     started = time.monotonic()
 
@@ -49,10 +50,11 @@ def main() -> None:
             "network": {"primary_interface": config.primary_interface or "configured", "primary_ip": gateway_ip},
         }
 
-    publisher.status(config.rack_id, status_payload())
+    publisher.status(config.primary_rack_id, status_payload())
 
-    source = Simulator(config.rack_id)  # Raspberry Pi swaps in CcRccClient here
-    publisher.inventory(config.rack_id, source.rack.inventory_payload())
+    sources = {rack_id: Simulator(rack_id) for rack_id in config.rack_ids}  # Raspberry Pi swaps in CcRccClient here
+    for rack_id, source in sources.items():
+        publisher.inventory(rack_id, source.rack.inventory_payload())
 
     running = True
 
@@ -67,14 +69,16 @@ def main() -> None:
     last_status = time.monotonic()
     while running:
         batch_sequence += 1
-        publisher.telemetry(config.rack_id, batch_sequence, [m.to_record() for m in source.sample()])
+        for rack_id, source in sources.items():
+            publisher.telemetry(rack_id, batch_sequence, [m.to_record() for m in source.sample()])
         publisher.replay_spool()
         if time.monotonic() - last_status >= 5:
-            publisher.status(config.rack_id, status_payload())
+            publisher.status(config.primary_rack_id, status_payload())
             last_status = time.monotonic()
         time.sleep(config.telemetry_interval_s)
 
-    publisher.status(config.rack_id, {**status_payload(), "state": "OFFLINE"})
+    publisher.status(config.primary_rack_id, {**status_payload(), "state": "OFFLINE"})
+    spool.close()
     client.disconnect()
 
 

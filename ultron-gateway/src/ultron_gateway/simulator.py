@@ -15,18 +15,18 @@ from .rack_model import Measurement, RackModel, Slot
 # - every TEMPERATURE channel is clamped between 7 and 8 degC
 # - mixed vibration/speed/pressure channels keep the rack view realistic
 _CARDS = {
-    1: ("PROCESS", 4, "TEMPERATURE", "degC", (7.0, 8.0))
-    # 2: ("VIBRATION", 2, "VELOCITY_RMS", "mm/s", (1.2, 5.5)),
-    # 3: ("SPEED", 2, "SPEED", "rpm", (1440.0, 1480.0)),
-    # 4: ("PROCESS", 4, "PRESSURE", "bar", (1.5, 6.2)),
-    # 5: ("PROCESS", 4, "TEMPERATURE", "degC", (7.0, 8.0)),
-    # 6: ("VIBRATION", 2, "VELOCITY_RMS", "mm/s", (1.0, 4.8)),
-    # 7: ("SPEED", 2, "SPEED", "rpm", (960.0, 1020.0)),
-    # 8: ("PROCESS", 4, "TEMPERATURE", "degC", (7.0, 8.0)),
-    # 9: ("PROCESS", 4, "PRESSURE", "bar", (2.0, 5.5)),
-    # 10: ("VIBRATION", 2, "VELOCITY_RMS", "mm/s", (0.8, 4.2)),
-    # 11: ("SPEED", 2, "SPEED", "rpm", (720.0, 780.0)),
-    # 12: ("PROCESS", 4, "TEMPERATURE", "degC", (7.0, 8.0)),
+    1: ("VIBRATION", 2, "VELOCITY_RMS", "mm/s", (1.2, 5.5)),
+    2: ("PROCESS", 4, "TEMPERATURE", "degC", (35.0, 78.0)),
+    3: ("SPEED", 2, "SPEED", "rpm", (1440.0, 1480.0)),
+    4: ("PROCESS", 4, "PRESSURE", "bar", (1.5, 6.2)),
+    5: ("PROCESS", 4, "TEMPERATURE", "degC", (35.0, 78.0)),
+    6: ("VIBRATION", 2, "VELOCITY_RMS", "mm/s", (1.0, 4.8)),
+    7: ("SPEED", 2, "SPEED", "rpm", (960.0, 1020.0)),
+    8: ("PROCESS", 4, "TEMPERATURE", "degC", (35.0, 78.0)),
+    9: ("PROCESS", 4, "PRESSURE", "bar", (2.0, 5.5)),
+    10: ("VIBRATION", 2, "VELOCITY_RMS", "mm/s", (0.8, 4.2)),
+    11: ("SPEED", 2, "SPEED", "rpm", (720.0, 780.0)),
+    12: ("PROCESS", 4, "TEMPERATURE", "degC", (35.0, 78.0)),
 }
 
 

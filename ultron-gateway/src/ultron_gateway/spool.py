@@ -47,3 +47,13 @@ class Spool:
     def __len__(self) -> int:
         with self._lock:
             return int(self._db.execute("SELECT COUNT(*) FROM spool").fetchone()[0])
+
+    def close(self) -> None:
+        with self._lock:
+            self._db.close()
+
+    def __enter__(self) -> "Spool":
+        return self
+
+    def __exit__(self, _exc_type, _exc, _tb) -> None:  # noqa: ANN001
+        self.close()

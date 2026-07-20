@@ -20,3 +20,10 @@ def test_startup_fails_without_ip_configuration(monkeypatch):
 def test_client_id_derives_from_gateway_id(monkeypatch):
     monkeypatch.setenv("GATEWAY_ID", "GW-007")
     assert Config().mqtt_client_id == "ultron-gw-GW-007"
+
+
+def test_rack_ids_parse_csv(monkeypatch):
+    monkeypatch.setenv("RACK_IDS", "1,2,3,4")
+    cfg = Config()
+    assert cfg.rack_ids == (1, 2, 3, 4)
+    assert cfg.primary_rack_id == 1
