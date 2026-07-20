@@ -3,7 +3,7 @@
 // current_ip and that gateway is ONLINE (permanent identity stays
 // gateway_id + rack_id on the backend; the IP is the binding field here).
 
-import type { DeviceNode } from './devices';
+import { ipPrefixFor, type DeviceNode } from './devices';
 import type { CardNode } from './rack';
 
 export type LiveGateway = {
@@ -60,6 +60,13 @@ function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number 
 export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGateway | undefined {
   const ip = device.ip.trim();
   if (!ip) return undefined;
+  const prefix = ipPrefixFor(ip);
+  if (device.type === 'Gateway' && prefix) {
+    return live.gateways.find((g) => g.currentIp === ip || ipPrefixFor(g.currentIp) === prefix);
+  }
+  if (device.type === 'Rack' && prefix) {
+    return live.gateways.find((g) => ipPrefixFor(g.currentIp) === prefix);
+  }
   return live.gateways.find((g) => g.currentIp === ip);
 }
 

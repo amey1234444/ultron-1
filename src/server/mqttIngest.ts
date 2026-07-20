@@ -187,7 +187,15 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
   let status = 'ONLINE';
   let event = 'BOUND';
   if (existing.rowCount === 0) {
-    const commissioned = await query(`SELECT 1 FROM studio_devices WHERE ip = $1 AND archived = false LIMIT 1`, [msg.gateway_ip]);
+    const commissioned = await query(
+      `SELECT 1
+       FROM studio_devices
+       WHERE type = 'Gateway'
+         AND archived = false
+         AND (ip = $1 OR ip = regexp_replace($1, '\\.[^.]+$', ''))
+       LIMIT 1`,
+      [msg.gateway_ip],
+    );
     if (commissioned.rowCount === 0) {
       status = 'QUARANTINED';
       event = 'UNCLAIMED';

@@ -24,6 +24,9 @@ type LeftPanelProps = {
   onOpenMenu?: (x: number, y: number, target: ContextMenuTarget, canAddMachine: boolean) => void;
   onCreateProject?: () => void;
   canConfigure?: boolean;
+  showRealModeToggle?: boolean;
+  realMode?: boolean;
+  onRealModeChange?: (enabled: boolean) => void;
   // Optional block pinned to the bottom of the sidebar (e.g. the web account
   // strip). Expo never passes it, so the shared tree stays untouched there.
   footer?: ReactNode;
@@ -121,6 +124,9 @@ export function LeftPanel({
   onOpenMenu,
   onCreateProject,
   canConfigure = false,
+  showRealModeToggle = false,
+  realMode = false,
+  onRealModeChange,
   footer,
 }: LeftPanelProps) {
   const { isDark } = useAppTheme();
@@ -314,8 +320,31 @@ export function LeftPanel({
           )}
           </ScrollView>
 
-          {footer ? (
-            <View className={cn('border-t', isDark ? 'border-line-dark' : 'border-line-light')}>{footer}</View>
+          {showRealModeToggle || footer ? (
+            <View className={cn('border-t', isDark ? 'border-line-dark' : 'border-line-light')}>
+              {showRealModeToggle ? (
+                <View className="px-3 py-3">
+                  <Pressable
+                    onPress={() => onRealModeChange?.(!realMode)}
+                    className={cn(
+                      'flex-row items-center justify-between rounded-lg border px-3 py-2',
+                      isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel',
+                    )}
+                  >
+                    <View>
+                      <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Real</Text>
+                      <Text className={cn('font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                        {realMode ? 'Connected devices' : 'Demo data'}
+                      </Text>
+                    </View>
+                    <View className={cn('h-5 w-9 rounded-full p-0.5', realMode ? 'bg-status-success' : isDark ? 'bg-line-dark' : 'bg-line-light')}>
+                      <View className={cn('h-4 w-4 rounded-full bg-white', realMode && 'self-end')} />
+                    </View>
+                  </Pressable>
+                </View>
+              ) : null}
+              {footer}
+            </View>
           ) : null}
         </View>
       )}

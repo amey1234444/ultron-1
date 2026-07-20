@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Text, useWindowDimensions, View } from 'react-native';
+import { Platform, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
@@ -14,6 +14,7 @@ import { DeviceDetail } from '../components/studio/DeviceDetail';
 import { DeviceMenu, type DeviceMenuState } from '../components/studio/DeviceMenu';
 import { DevicesTable } from '../components/studio/DevicesTable';
 import { EmptyState } from '../components/studio/EmptyState';
+import { GatewayDetail } from '../components/studio/GatewayDetail';
 import { HierarchyContents } from '../components/studio/HierarchyContents';
 import { LeftPanel } from '../components/studio/LeftPanel';
 import { AddMachineDialog, type NewMachine } from '../components/studio/machine/AddMachineDialog';
@@ -27,8 +28,8 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { cn } from '../lib/cn';
-import type { DeviceNode } from '../lib/devices';
-import { applyLiveStatus } from '../lib/liveTelemetry';
+import { composeIp, hostOctetFor, ipPrefixFor, racksForGateway, type DeviceNode } from '../lib/devices';
+import { applyLiveStatus, isDeviceLive } from '../lib/liveTelemetry';
 import {
   duplicateFolderSubtree,
   duplicateProject,
@@ -55,11 +56,24 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     ? userHasPermission(currentUser, USER_PERMISSIONS.SCHEMA_EDIT_DELETE)
     : true;
   const [configureMode, setConfigureMode] = useState(false);
+  const [realMode, setRealMode] = useState(false);
   const canEditDeleteSchema = hasConfigureAccess && configureMode;
 
   useEffect(() => {
     if (!hasConfigureAccess && configureMode) setConfigureMode(false);
   }, [hasConfigureAccess, configureMode]);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    setRealMode(window.localStorage.getItem('ultron.realMode') === '1');
+  }, []);
+
+  const handleRealModeChange = (enabled: boolean) => {
+    setRealMode(enabled);
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.localStorage.setItem('ultron.realMode', enabled ? '1' : '0');
+    }
+  };
 
   // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
   // workspace stays usable; users can still toggle it back open via PanelToggle.
@@ -103,7 +117,55 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // the stored device statuses, so the devices strip shows Online the moment a
   // bound gateway starts publishing.
   const liveState = useLiveTelemetry();
-  const devices = useMemo(() => applyLiveStatus(storedDevices, liveState), [storedDevices, liveState]);
+  const liveDevices = useMemo(() => applyLiveStatus(storedDevices, liveState), [storedDevices, liveState]);
+  const devices = useMemo(
+    () => (realMode ? liveDevices.filter((device) => !device.archived && isDeviceLive(device, liveState)) : storedDevices),
+    [liveDevices, liveState, realMode, storedDevices],
+  );
+  const visibleDeviceIds = useMemo(() => new Set(devices.map((device) => device.id)), [devices]);
+  const visibleCards = useMemo(
+    () => (realMode ? cards.filter((card) => visibleDeviceIds.has(card.deviceId)) : cards),
+    [cards, realMode, visibleDeviceIds],
+  );
+  const gateways = useMemo(() => devices.filter((device) => device.type === 'Gateway' && !device.archived), [devices]);
+  const configuredGateways = useMemo(() => storedDevices.filter((device) => device.type === 'Gateway' && !device.archived), [storedDevices]);
+
+  useEffect(() => {
+    if (storedDevices.some((device) => device.type === 'Gateway')) return;
+    const racks = storedDevices.filter((device) => device.type === 'Rack' && ipPrefixFor(device.ip));
+    if (racks.length === 0) return;
+    setDevices((prev) => {
+      if (prev.some((device) => device.type === 'Gateway')) return prev;
+      const byPrefix = new Map<string, DeviceNode[]>();
+      for (const rack of racks) {
+        const prefix = ipPrefixFor(rack.ip);
+        if (!prefix) continue;
+        byPrefix.set(prefix, [...(byPrefix.get(prefix) ?? []), rack]);
+      }
+      const generatedGateways: DeviceNode[] = Array.from(byPrefix.entries()).map(([prefix, group]) => ({
+        id: `gateway-${prefix.replace(/\./g, '-')}`,
+        name: `Gateway-${prefix.replace(/\./g, '-')}`,
+        type: 'Gateway' as const,
+        model: 'GW-100',
+        ip: prefix,
+        port: '503',
+        protocol: group[0]?.protocol ?? 'Modbus TCP',
+        description: 'Auto-created gateway for existing racks',
+        status: group.some((rack) => rack.status === 'Online') ? 'Online' as const : 'Not Connected' as const,
+        projectId: group[0]?.projectId ?? null,
+        archived: false,
+      }));
+      const gatewayIdByPrefix = new Map(generatedGateways.map((gateway) => [gateway.ip, gateway.id]));
+      return [
+        ...generatedGateways,
+        ...prev.map((device) => {
+          if (device.type !== 'Rack') return device;
+          const gatewayId = gatewayIdByPrefix.get(ipPrefixFor(device.ip));
+          return gatewayId ? { ...device, gatewayId } : device;
+        }),
+      ];
+    });
+  }, [setDevices, storedDevices]);
 
   const [createProjectVisible, setCreateProjectVisible] = useState(false);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
@@ -115,6 +177,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const [deleteTarget, setDeleteTarget] = useState<ContextMenuTarget | null>(null);
 
   const [addDeviceVisible, setAddDeviceVisible] = useState(false);
+  const [addDeviceGatewayId, setAddDeviceGatewayId] = useState<string | null>(null);
   const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
   const [deviceMenu, setDeviceMenu] = useState<DeviceMenuState | null>(null);
   const [assignDeviceId, setAssignDeviceId] = useState<string | null>(null);
@@ -241,12 +304,25 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   const handleSaveDevice = (device: NewDevice) => {
     if (editingDeviceId) {
-      setDevices((prev) => prev.map((d) => (d.id === editingDeviceId ? { ...d, ...device } : d)));
+      setDevices((prev) => {
+        const previous = prev.find((d) => d.id === editingDeviceId);
+        const nextGatewayPrefix = device.type === 'Gateway' ? ipPrefixFor(device.ip) : '';
+        return prev.map((d) => {
+          if (d.id === editingDeviceId) return { ...d, ...device };
+          if (previous?.type === 'Gateway' && nextGatewayPrefix && d.type === 'Rack' && d.gatewayId === editingDeviceId) {
+            const host = hostOctetFor(d.ip);
+            return host ? { ...d, ip: composeIp(nextGatewayPrefix, host) } : d;
+          }
+          return d;
+        });
+      });
       setEditingDeviceId(null);
     } else {
-      setDevices((prev) => [...prev, { id: makeId(), projectId: null, archived: false, ...device }]);
+      const gateway = device.gatewayId ? storedDevices.find((d) => d.id === device.gatewayId && d.type === 'Gateway') : undefined;
+      setDevices((prev) => [...prev, { id: makeId(), projectId: gateway?.projectId ?? null, archived: false, ...device }]);
     }
     setAddDeviceVisible(false);
+    setAddDeviceGatewayId(null);
   };
 
   const handleTestConnectionFromMenu = (device: DeviceNode) => {
@@ -265,12 +341,18 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   const handleArchiveDevice = (device: DeviceNode) => {
-    setDevices((prev) => prev.map((d) => (d.id === device.id ? { ...d, archived: true } : d)));
+    setDevices((prev) => {
+      const childIds = device.type === 'Gateway' ? new Set(racksForGateway(device, prev).map((rack) => rack.id)) : new Set<string>();
+      return prev.map((d) => (d.id === device.id || childIds.has(d.id) ? { ...d, archived: true } : d));
+    });
   };
 
   const handleDeleteDevice = () => {
     if (!deleteDeviceId) return;
-    setDevices((prev) => prev.filter((d) => d.id !== deleteDeviceId));
+    const deleted = storedDevices.find((d) => d.id === deleteDeviceId);
+    const removedIds = new Set([deleteDeviceId, ...(deleted?.type === 'Gateway' ? racksForGateway(deleted, storedDevices).map((rack) => rack.id) : [])]);
+    setDevices((prev) => prev.filter((d) => !removedIds.has(d.id)));
+    setCards((prev) => prev.filter((card) => !removedIds.has(card.deviceId)));
     if (selected.kind === 'device' && selected.id === deleteDeviceId) setSelected({ kind: 'devices' });
     setDeleteDeviceId(null);
   };
@@ -306,8 +388,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const selectedFolder = selected.kind === 'folder' ? folders.find((f) => f.id === selected.id) : undefined;
   const selectedDevice = selected.kind === 'device' ? devices.find((d) => d.id === selected.id) : undefined;
   const selectedMachine = selected.kind === 'machine' ? machines.find((m) => m.id === selected.id) : undefined;
-  const editingDevice = editingDeviceId ? devices.find((d) => d.id === editingDeviceId) : null;
-  const deleteDeviceInfo = deleteDeviceId ? devices.find((d) => d.id === deleteDeviceId) : null;
+  const editingDevice = editingDeviceId ? (storedDevices.find((d) => d.id === editingDeviceId) ?? devices.find((d) => d.id === editingDeviceId)) : null;
+  const deleteDeviceInfo = deleteDeviceId ? (storedDevices.find((d) => d.id === deleteDeviceId) ?? devices.find((d) => d.id === deleteDeviceId)) : null;
   const topBarProjectName = selectedProject?.name ?? (selectedFolder ? projects.find((p) => p.id === selectedFolder.projectId)?.name : undefined);
 
   const renameCurrentName =
@@ -365,6 +447,9 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onOpenMenu={canEditDeleteSchema ? (x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine }) : undefined}
               onCreateProject={canEditDeleteSchema ? () => setCreateProjectVisible(true) : undefined}
               canConfigure={canEditDeleteSchema}
+              showRealModeToggle={currentUser?.role === 'super_admin'}
+              realMode={realMode}
+              onRealModeChange={handleRealModeChange}
               footer={sidebarFooter}
             />
 
@@ -382,7 +467,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               key={selectedMachine.id}
               machine={selectedMachine}
               devices={devices}
-              cards={cards}
+              cards={visibleCards}
               live={liveState}
               layout={getLayout(selectedMachine.id)}
               onSaveLayout={saveLayout}
@@ -390,10 +475,27 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onModeChange={setMachineWorkspaceMode}
               canConfigure={canEditDeleteSchema}
             />
+          ) : selected.kind === 'device' && selectedDevice && selectedDevice.type === 'Gateway' ? (
+            <GatewayDetail
+              gateway={selectedDevice}
+              devices={devices}
+              projects={projects}
+              canConfigure={canEditDeleteSchema}
+              onBack={() => setSelected({ kind: 'devices' })}
+              onAddRack={() => {
+                setAddDeviceGatewayId(selectedDevice.id);
+                setAddDeviceVisible(true);
+              }}
+              onOpenRack={(id) => setSelected({ kind: 'device', id })}
+              onOpenMenu={canEditDeleteSchema ? (x, y, deviceId) => {
+                const device = devices.find((d) => d.id === deviceId);
+                if (device) setDeviceMenu({ x, y, device });
+              } : undefined}
+            />
           ) : selected.kind === 'device' && selectedDevice && selectedDevice.type === 'Rack' ? (
             <RackDetail
               device={selectedDevice}
-              cards={cards.filter((c) => c.deviceId === selectedDevice.id)}
+              cards={visibleCards.filter((c) => c.deviceId === selectedDevice.id)}
               live={liveState}
               canEditDeleteSchema={canEditDeleteSchema}
               onBack={() => setSelected({ kind: 'devices' })}
@@ -404,9 +506,18 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           ) : selected.kind === 'device' && selectedDevice ? (
             <DeviceDetail device={selectedDevice} live={liveState} onBack={() => setSelected({ kind: 'devices' })} />
           ) : selected.kind === 'devices' ? (
-            devices.length === 0 ? (
+            gateways.length === 0 ? (
               <EmptyState title="DEVICES" description="No devices added.">
-                {canEditDeleteSchema && <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />}
+                {canEditDeleteSchema && (
+                  <ActionButton
+                    label="Add Device"
+                    permission={PERMISSIONS.DEVICE_CREATE}
+                    onPress={() => {
+                      setAddDeviceGatewayId(null);
+                      setAddDeviceVisible(true);
+                    }}
+                  />
+                )}
               </EmptyState>
             ) : (
               <View className="flex-1">
@@ -414,10 +525,20 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
                     Hierarchy/Devices toggle then sits right over this corner. */}
                 <View className="flex-row items-center justify-between px-6 pt-5" style={leftCollapsed ? { paddingTop: 56 } : undefined}>
                   <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>Devices</Text>
-                  {canEditDeleteSchema && <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => setAddDeviceVisible(true)} />}
+                  {canEditDeleteSchema && (
+                    <ActionButton
+                      label="Add Device"
+                      permission={PERMISSIONS.DEVICE_CREATE}
+                      onPress={() => {
+                        setAddDeviceGatewayId(null);
+                        setAddDeviceVisible(true);
+                      }}
+                    />
+                  )}
                 </View>
                 <DevicesTable
-                  devices={devices}
+                  devices={gateways}
+                  allDevices={devices}
                   projects={projects}
                   onOpenDevice={(id) => setSelected({ kind: 'device', id })}
                   onOpenMenu={canEditDeleteSchema ? (x, y, deviceId) => {
@@ -550,8 +671,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       <AddDeviceDialog
         visible={addDeviceVisible || editingDeviceId !== null}
         editingDevice={editingDevice}
+        gateways={configuredGateways}
+        initialGatewayId={addDeviceGatewayId}
         onCancel={() => {
           setAddDeviceVisible(false);
+          setAddDeviceGatewayId(null);
           setEditingDeviceId(null);
         }}
         onCreate={handleSaveDevice}

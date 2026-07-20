@@ -17,6 +17,7 @@ export type DeviceNode = {
   description: string;
   status: ConnectionStatus;
   projectId: string | null;
+  gatewayId?: string | null;
   archived: boolean;
 };
 
@@ -36,7 +37,7 @@ export function mappedChannelsFor(_device: DeviceNode): number {
 }
 
 export function lastCommunicationLabel(device: DeviceNode): string {
-  return device.status === 'Online' ? 'Just now' : '—';
+  return device.status === 'Online' ? 'Just now' : '-';
 }
 
 // Ribbon/edge-indicator semantics: healthy stays neutral (no color to celebrate,
@@ -52,6 +53,62 @@ export function isValidIp(ip: string): boolean {
   const octets = ip.trim().split('.');
   if (octets.length !== 4) return false;
   return octets.every((o) => /^\d{1,3}$/.test(o) && Number(o) >= 0 && Number(o) <= 255);
+}
+
+export function isValidIpPrefix(prefix: string): boolean {
+  const octets = prefix.trim().split('.');
+  if (octets.length !== 3) return false;
+  return octets.every((o) => /^\d{1,3}$/.test(o) && Number(o) >= 0 && Number(o) <= 255);
+}
+
+export function isValidHostOctet(value: string): boolean {
+  if (!/^\d{1,3}$/.test(value.trim())) return false;
+  const n = Number(value);
+  return n >= 1 && n <= 254;
+}
+
+export function ipPrefixFor(ip: string): string {
+  const trimmed = ip.trim();
+  if (isValidIpPrefix(trimmed)) return trimmed;
+  const octets = trimmed.split('.');
+  if (octets.length === 4 && isValidIp(trimmed)) return octets.slice(0, 3).join('.');
+  return '';
+}
+
+export function hostOctetFor(ip: string): string {
+  const trimmed = ip.trim();
+  return isValidIp(trimmed) ? trimmed.split('.')[3] : '';
+}
+
+export function composeIp(prefix: string, hostOctet: string): string {
+  return isValidIpPrefix(prefix) && isValidHostOctet(hostOctet) ? `${prefix.trim()}.${hostOctet.trim()}` : '';
+}
+
+export function displayIpFor(device: DeviceNode): string {
+  if (device.type === 'Gateway') {
+    return ipPrefixFor(device.ip) || device.ip.trim();
+  }
+  return device.ip.trim();
+}
+
+export function racksForGateway(gateway: DeviceNode, devices: DeviceNode[]): DeviceNode[] {
+  const prefix = ipPrefixFor(gateway.ip);
+  return devices.filter((device) => {
+    if (device.type !== 'Rack' || device.archived) return false;
+    if (device.gatewayId && device.gatewayId === gateway.id) return true;
+    return !!prefix && ipPrefixFor(device.ip) === prefix;
+  });
+}
+
+export function gatewayForRack(rack: DeviceNode, devices: DeviceNode[]): DeviceNode | undefined {
+  if (rack.type !== 'Rack') return undefined;
+  if (rack.gatewayId) {
+    const configured = devices.find((device) => device.id === rack.gatewayId && device.type === 'Gateway' && !device.archived);
+    if (configured) return configured;
+  }
+  const prefix = ipPrefixFor(rack.ip);
+  if (!prefix) return undefined;
+  return devices.find((device) => device.type === 'Gateway' && !device.archived && ipPrefixFor(device.ip) === prefix);
 }
 
 export function isValidPort(port: string): boolean {

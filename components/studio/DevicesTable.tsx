@@ -4,12 +4,21 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
-import { healthFor, lastCommunicationLabel, mappedChannelsFor, totalChannelsFor, type DeviceNode } from '../../lib/devices';
+import {
+  displayIpFor,
+  healthFor,
+  lastCommunicationLabel,
+  mappedChannelsFor,
+  racksForGateway,
+  totalChannelsFor,
+  type DeviceNode,
+} from '../../lib/devices';
 import type { ProjectNode } from '../../lib/hierarchy';
 import { RibbonEdge } from './RibbonEdge';
 
 type DevicesTableProps = {
   devices: DeviceNode[];
+  allDevices?: DeviceNode[];
   projects: ProjectNode[];
   onOpenDevice: (id: string) => void;
   onOpenMenu?: (x: number, y: number, deviceId: string) => void;
@@ -93,11 +102,13 @@ function StatusPill({ online }: { online: boolean }) {
 
 function DeviceRow({
   device,
+  allDevices,
   projectName,
   onOpenDevice,
   onOpenMenu,
 }: {
   device: DeviceNode;
+  allDevices: DeviceNode[];
   projectName: string;
   onOpenDevice: (id: string) => void;
   onOpenMenu?: (x: number, y: number, deviceId: string) => void;
@@ -107,8 +118,10 @@ function DeviceRow({
   const borderClass = isDark ? 'border-line-dark' : 'border-line-light';
   const total = totalChannelsFor(device.type);
   const mapped = mappedChannelsFor(device);
-  const hasIp = device.ip.trim().length > 0;
+  const shownIp = displayIpFor(device);
+  const hasIp = shownIp.length > 0;
   const health = healthFor(device);
+  const gatewayRackCount = device.type === 'Gateway' ? racksForGateway(device, allDevices).length : 0;
 
   return (
     <Pressable
@@ -140,10 +153,10 @@ function DeviceRow({
         numberOfLines={1}
         className={cn('font-mono text-xs', hasIp ? (isDark ? 'text-ink-muted' : 'text-ink-inverse-muted') : 'italic text-status-warning')}
       >
-        {hasIp ? device.ip : 'not set'}
+        {hasIp ? shownIp : 'not set'}
       </Text>
       <Text style={{ flex: FLEX.port, paddingRight: 8, textAlign: 'right' }} className={cn('font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        {device.port || '—'}
+        {device.port || '-'}
       </Text>
       <View style={{ flex: FLEX.status }}>
         <StatusPill online={device.status === 'Online'} />
@@ -159,7 +172,7 @@ function DeviceRow({
         {lastCommunicationLabel(device)}
       </Text>
       <Text style={{ flex: FLEX.mapping }} className={cn('font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        {total > 0 ? `${mapped} / ${total}` : '—'}
+        {device.type === 'Gateway' ? `${gatewayRackCount} rack${gatewayRackCount === 1 ? '' : 's'}` : total > 0 ? `${mapped} / ${total}` : '-'}
       </Text>
       {onOpenMenu ? (
         <Pressable
@@ -179,7 +192,7 @@ function DeviceRow({
   );
 }
 
-export function DevicesTable({ devices, projects, onOpenDevice, onOpenMenu }: DevicesTableProps) {
+export function DevicesTable({ devices, allDevices = devices, projects, onOpenDevice, onOpenMenu }: DevicesTableProps) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null);
@@ -222,6 +235,7 @@ export function DevicesTable({ devices, projects, onOpenDevice, onOpenMenu }: De
               <DeviceRow
                 key={d.id}
                 device={d}
+                allDevices={allDevices}
                 projectName={d.projectId ? (projectNameById.get(d.projectId) ?? 'Unassigned') : 'Unassigned'}
                 onOpenDevice={onOpenDevice}
                 onOpenMenu={onOpenMenu}

@@ -1,15 +1,21 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import {
   DEVICE_TYPES,
   PROTOCOLS,
+  composeIp,
   defaultModelFor,
+  gatewayForRack,
+  hostOctetFor,
   isValidIp,
+  isValidHostOctet,
+  isValidIpPrefix,
   isValidPort,
+  ipPrefixFor,
   type ConnectionStatus,
   type DeviceNode,
   type DeviceType,
@@ -29,11 +35,14 @@ export type NewDevice = {
   protocol: Protocol;
   description: string;
   status: ConnectionStatus;
+  gatewayId?: string | null;
 };
 
 type AddDeviceDialogProps = {
   visible: boolean;
   editingDevice?: DeviceNode | null;
+  gateways?: DeviceNode[];
+  initialGatewayId?: string | null;
   onCancel: () => void;
   onCreate: (device: NewDevice) => void;
 };
@@ -102,37 +111,59 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
   );
 }
 
-export function AddDeviceDialog({ visible, editingDevice, onCancel, onCreate }: AddDeviceDialogProps) {
+export function AddDeviceDialog({ visible, editingDevice, gateways = [], initialGatewayId = null, onCancel, onCreate }: AddDeviceDialogProps) {
   const { isDark } = useAppTheme();
   const [type, setType] = useState<DeviceType | null>(null);
   const [name, setName] = useState('');
   const [ip, setIp] = useState('');
+  const [hostOctet, setHostOctet] = useState('');
   const [port, setPort] = useState('');
   const [protocol, setProtocol] = useState<Protocol | null>(null);
   const [description, setDescription] = useState('');
+  const [gatewayId, setGatewayId] = useState<string | null>(initialGatewayId);
   const [testState, setTestState] = useState<'idle' | 'testing' | 'online' | 'failed'>('idle');
 
   useEffect(() => {
     if (visible) {
-      setType(editingDevice?.type ?? null);
+      const nextType = initialGatewayId ? 'Rack' : (editingDevice?.type ?? null);
+      const inferredGateway = editingDevice?.type === 'Rack' ? gatewayForRack(editingDevice, gateways) : undefined;
+      const nextGatewayId = editingDevice?.gatewayId ?? inferredGateway?.id ?? initialGatewayId ?? null;
+      setType(nextType);
       setName(editingDevice?.name ?? '');
-      setIp(editingDevice?.ip ?? '');
+      setGatewayId(nextGatewayId);
+      setIp(editingDevice?.type === 'Gateway' ? ipPrefixFor(editingDevice.ip) : (editingDevice?.ip ?? ''));
+      setHostOctet(editingDevice?.type === 'Rack' ? hostOctetFor(editingDevice.ip) : '');
       setPort(editingDevice?.port ?? '');
       setProtocol(editingDevice?.protocol ?? null);
       setDescription(editingDevice?.description ?? '');
       setTestState('idle');
     }
-  }, [visible, editingDevice]);
+  }, [visible, editingDevice, gateways, initialGatewayId]);
 
-  const ipError = ip.trim().length > 0 && !isValidIp(ip) ? 'Enter a valid IPv4 address, e.g. 192.168.1.10' : undefined;
+  const selectedGateway = type === 'Rack' && gatewayId ? gateways.find((gateway) => gateway.id === gatewayId) : undefined;
+  const selectedGatewayPrefix = selectedGateway ? ipPrefixFor(selectedGateway.ip) : '';
+  const effectiveIp = type === 'Gateway' ? ip.trim() : selectedGatewayPrefix ? composeIp(selectedGatewayPrefix, hostOctet) : ip.trim();
+  const ipError =
+    type === 'Gateway'
+      ? ip.trim().length > 0 && !isValidIpPrefix(ip)
+        ? 'Enter the first three IPv4 sections, e.g. 192.168.10'
+        : undefined
+      : selectedGatewayPrefix
+        ? hostOctet.trim().length > 0 && !isValidHostOctet(hostOctet)
+          ? 'Enter the fourth IP section from 1 to 254'
+          : undefined
+        : ip.trim().length > 0 && !isValidIp(ip)
+          ? 'Select a gateway or enter a valid full IPv4 address'
+          : undefined;
   const portError = port.trim().length > 0 && !isValidPort(port) ? 'Enter a port number between 1 and 65535' : undefined;
 
   const canSave =
     type !== null &&
     name.trim().length > 0 &&
-    isValidIp(ip) &&
+    (type === 'Gateway' ? isValidIpPrefix(ip) : selectedGatewayPrefix ? isValidIp(effectiveIp) : isValidIp(ip)) &&
     isValidPort(port) &&
     protocol !== null;
+  const canTestConnection = (type === 'Gateway' ? isValidIpPrefix(ip) : isValidIp(effectiveIp)) && isValidPort(port);
 
   const handleTestConnection = () => {
     setTestState('testing');
@@ -149,11 +180,12 @@ export function AddDeviceDialog({ visible, editingDevice, onCancel, onCreate }: 
       name: name.trim(),
       type,
       model: defaultModelFor(type),
-      ip: ip.trim(),
+      ip: effectiveIp,
       port: port.trim(),
       protocol,
       description: description.trim(),
       status,
+      gatewayId: type === 'Rack' ? (gatewayId ?? null) : null,
     });
   };
 
@@ -169,7 +201,7 @@ export function AddDeviceDialog({ visible, editingDevice, onCancel, onCreate }: 
             label="Test Connection"
             variant="secondary"
             onPress={handleTestConnection}
-            disabled={!isValidIp(ip) || !isValidPort(port) || testState === 'testing'}
+            disabled={!canTestConnection || testState === 'testing'}
           />
           <ActionButton
             label={editingDevice ? 'Save' : 'Add Device'}
@@ -181,13 +213,60 @@ export function AddDeviceDialog({ visible, editingDevice, onCancel, onCreate }: 
       }
     >
       <View className="flex-row gap-2">
-        {DEVICE_TYPES.map((t) => (
-          <TypeCard key={t} type={t} selected={type === t} onPress={() => setType(t)} />
+        {(initialGatewayId ? (['Rack'] as DeviceType[]) : DEVICE_TYPES).map((t) => (
+          <TypeCard
+            key={t}
+            type={t}
+            selected={type === t}
+            onPress={() => {
+              setType(t);
+              if (t === 'Gateway') setGatewayId(null);
+              if (t === 'Rack' && !gatewayId && gateways.length === 1) setGatewayId(gateways[0].id);
+            }}
+          />
         ))}
       </View>
 
       <FormField label="Device Name" required value={name} onChangeText={setName} placeholder="e.g. Gateway-01" />
-      <FormField label="IP Address" required value={ip} onChangeText={setIp} placeholder="e.g. 192.168.1.10" error={ipError} />
+      {type === 'Rack' && gateways.length > 0 && (
+        <View className="gap-1.5">
+          <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Gateway *</Text>
+          <View className="flex-row flex-wrap gap-2">
+            {gateways.map((gateway) => (
+              <Chip key={gateway.id} label={`${gateway.name} (${ipPrefixFor(gateway.ip) || 'no prefix'})`} selected={gatewayId === gateway.id} onPress={() => setGatewayId(gateway.id)} />
+            ))}
+          </View>
+        </View>
+      )}
+      {type === 'Gateway' ? (
+        <FormField label="Gateway IP Prefix" required value={ip} onChangeText={setIp} placeholder="e.g. 192.168.10" error={ipError} />
+      ) : selectedGatewayPrefix ? (
+        <View className="gap-1.5">
+          <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Rack IP Address *</Text>
+          <View className="flex-row items-center gap-2">
+            <View className={cn('h-10 justify-center rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}>
+              <Text className={cn('font-mono text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{selectedGatewayPrefix}.</Text>
+            </View>
+            <TextInput
+              value={hostOctet}
+              onChangeText={setHostOctet}
+              placeholder="11"
+              placeholderTextColor={isDark ? '#6B6B6B' : '#8A8A8A'}
+              className={cn(
+                'h-10 flex-1 rounded-lg border px-3 py-2 font-mono text-sm',
+                ipError ? 'border-status-critical' : isDark ? 'border-line-dark' : 'border-line-light',
+                isDark ? 'bg-surface-dark text-ink' : 'bg-surface-light text-ink-inverse',
+              )}
+            />
+          </View>
+          {ipError && <Text className="font-body text-xs text-status-critical">{ipError}</Text>}
+          <Text className={cn('font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            {isValidIp(effectiveIp) ? effectiveIp : `${selectedGatewayPrefix}.x`}
+          </Text>
+        </View>
+      ) : (
+        <FormField label="IP Address" required value={ip} onChangeText={setIp} placeholder="e.g. 192.168.10.11" error={ipError} />
+      )}
       <FormField label="Port" required value={port} onChangeText={setPort} placeholder="e.g. 502" error={portError} />
 
       <View className="gap-1.5">

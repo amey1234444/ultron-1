@@ -45,6 +45,32 @@ export function createSeedData(makeId: () => string): {
 
   const devices: DeviceNode[] = [
     {
+      id: 'seed-gateway-north',
+      name: 'Gateway-North',
+      type: 'Gateway',
+      model: 'GW-100',
+      ip: '192.168.10',
+      port: '503',
+      protocol: 'Modbus TCP',
+      description: 'Seeded demo gateway',
+      status: 'Online',
+      projectId: plantNorth.id,
+      archived: false,
+    },
+    {
+      id: 'seed-gateway-south',
+      name: 'Gateway-South',
+      type: 'Gateway',
+      model: 'GW-100',
+      ip: '192.168.20',
+      port: '503',
+      protocol: 'Modbus TCP',
+      description: 'Seeded demo gateway',
+      status: 'Online',
+      projectId: plantSouth.id,
+      archived: false,
+    },
+    {
       id: 'seed-rack-north-1',
       name: 'Rack-North-1',
       type: 'Rack',
@@ -55,6 +81,7 @@ export function createSeedData(makeId: () => string): {
       description: 'Seeded demo rack',
       status: 'Online',
       projectId: plantNorth.id,
+      gatewayId: 'seed-gateway-north',
       archived: false,
     },
     {
@@ -68,6 +95,7 @@ export function createSeedData(makeId: () => string): {
       description: 'Seeded demo rack',
       status: 'Online',
       projectId: plantNorth.id,
+      gatewayId: 'seed-gateway-north',
       archived: false,
     },
     {
@@ -81,6 +109,7 @@ export function createSeedData(makeId: () => string): {
       description: 'Seeded demo rack',
       status: 'Online',
       projectId: plantSouth.id,
+      gatewayId: 'seed-gateway-south',
       archived: false,
     },
     {
@@ -94,6 +123,7 @@ export function createSeedData(makeId: () => string): {
       description: 'Seeded demo rack',
       status: 'Online',
       projectId: plantSouth.id,
+      gatewayId: 'seed-gateway-south',
       archived: false,
     },
   ];
