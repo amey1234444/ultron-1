@@ -178,6 +178,27 @@ async function quarantine(topic: string, reason: string, msg: Partial<MqttEnvelo
   );
 }
 
+// A gateway is commissioned when a matching, non-archived studio Gateway device
+// exists — matched by its real gateway id, its exact IP, or its IP prefix.
+// Commissioning can be configured either before or after the gateway first
+// appears, so this is re-evaluated on every bind (not just on first sight).
+async function isCommissioned(gatewayId: string, gatewayIp: string): Promise<boolean> {
+  const res = await query(
+    `SELECT 1
+     FROM studio_devices
+     WHERE type = 'Gateway'
+       AND archived = false
+       AND (
+         real_gateway_id = $2
+         OR ip = $1
+         OR ip = regexp_replace($1, '\\.[^.]+$', '')
+       )
+     LIMIT 1`,
+    [gatewayIp, gatewayId],
+  );
+  return (res.rowCount ?? 0) > 0;
+}
+
 async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string }> {
   const existing = await query<{ gateway_id: string; current_ip: string; status: string }>(
     `SELECT gateway_id, current_ip, status FROM gateways WHERE gateway_id = $1`,
@@ -187,20 +208,7 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
   let status = 'ONLINE';
   let event = 'BOUND';
   if (existing.rowCount === 0) {
-    const commissioned = await query(
-      `SELECT 1
-       FROM studio_devices
-       WHERE type = 'Gateway'
-         AND archived = false
-         AND (
-           real_gateway_id = $2
-           OR ip = $1
-           OR ip = regexp_replace($1, '\\.[^.]+$', '')
-         )
-       LIMIT 1`,
-      [msg.gateway_ip, msg.gateway_id],
-    );
-    if (commissioned.rowCount === 0) {
+    if (!(await isCommissioned(msg.gateway_id, msg.gateway_ip))) {
       status = 'QUARANTINED';
       event = 'UNCLAIMED';
     }
@@ -212,8 +220,21 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
     );
   } else {
     const current = existing.rows[0];
-    status = current.status === 'QUARANTINED' ? 'QUARANTINED' : 'ONLINE';
-    if (current.current_ip && current.current_ip !== msg.gateway_ip) event = 'IP_CHANGED';
+    if (current.status === 'QUARANTINED') {
+      // Re-check commissioning: a quarantined gateway is promoted to ONLINE once
+      // a matching studio device is configured, so operators can claim a gateway
+      // that connected before it was commissioned without restarting it.
+      if (await isCommissioned(msg.gateway_id, msg.gateway_ip)) {
+        status = 'ONLINE';
+        event = 'COMMISSIONED';
+      } else {
+        status = 'QUARANTINED';
+        event = 'UNCLAIMED';
+      }
+    } else {
+      status = 'ONLINE';
+      event = current.current_ip && current.current_ip !== msg.gateway_ip ? 'IP_CHANGED' : 'BOUND';
+    }
     await query(
       `UPDATE gateways SET current_ip = $2, gateway_boot_id = $3, status = $4, last_seen_at = now(), updated_at = now()
        WHERE gateway_id = $1`,
@@ -225,7 +246,7 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
     `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
      VALUES ($1,$2,$3)
      ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [msg.gateway_id, msg.gateway_ip, event === 'BOUND'],
+    [msg.gateway_id, msg.gateway_ip, event === 'BOUND' || event === 'COMMISSIONED'],
   );
 
   await query(

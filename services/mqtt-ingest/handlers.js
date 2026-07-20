@@ -23,11 +23,27 @@ export async function quarantine(topic, reason, msg) {
   );
 }
 
-// Gateway/Rack/IP binding (Phase E). Permanent identity = gateway_id + rack_id;
-// gateway_ip is the mandatory verification field. A known gateway whose IP
-// changed keeps its identity but the new IP is recorded unapproved; an unknown
-// gateway_id is registered as QUARANTINED (never silently trusted just because
-// the IP matches).
+// A gateway is commissioned when a matching, non-archived studio Gateway device
+// exists — matched by its real gateway id, its exact IP, or its IP prefix.
+// Re-evaluated on every bind so commissioning can happen before or after the
+// gateway first appears.
+async function isCommissioned(gatewayId, gatewayIp) {
+  const res = await query(
+    `SELECT 1
+     FROM studio_devices
+     WHERE type = 'Gateway'
+       AND archived = false
+       AND (
+         real_gateway_id = $2
+         OR ip = $1
+         OR ip = regexp_replace($1, '\\.[^.]+$', '')
+       )
+     LIMIT 1`,
+    [gatewayIp, gatewayId],
+  );
+  return res.rowCount > 0;
+}
+
 export async function bind(msg) {
   const { gateway_id, gateway_ip, gateway_boot_id, rack_id } = msg;
 
@@ -36,13 +52,7 @@ export async function bind(msg) {
   let status = 'ONLINE';
   let event = 'BOUND';
   if (existing.rowCount === 0) {
-    // Commissioning bootstrap: only auto-claim when a studio device is already
-    // configured with this exact IP; otherwise quarantine until approved.
-    const commissioned = await query(
-      `SELECT 1 FROM studio_devices WHERE ip = $1 AND archived = false LIMIT 1`,
-      [gateway_ip],
-    );
-    if (commissioned.rowCount === 0) {
+    if (!(await isCommissioned(gateway_id, gateway_ip))) {
       status = 'QUARANTINED';
       event = 'UNCLAIMED';
     }
@@ -52,8 +62,24 @@ export async function bind(msg) {
        ON CONFLICT (gateway_id) DO UPDATE SET last_seen_at = now()`,
       [gateway_id, gateway_ip, gateway_boot_id, `ultron-gw-${gateway_id}`, status],
     );
+  } else if (existing.rows[0].status === 'QUARANTINED') {
+    // Promote a previously quarantined gateway once a matching studio device is
+    // configured, so a gateway that connected before commissioning is claimed
+    // without needing a restart.
+    if (await isCommissioned(gateway_id, gateway_ip)) {
+      status = 'ONLINE';
+      event = 'COMMISSIONED';
+    } else {
+      status = 'QUARANTINED';
+      event = 'UNCLAIMED';
+    }
+    await query(
+      `UPDATE gateways SET current_ip = $2, gateway_boot_id = $3, status = $4, last_seen_at = now(), updated_at = now()
+       WHERE gateway_id = $1`,
+      [gateway_id, gateway_ip, gateway_boot_id, status],
+    );
   } else {
-    status = existing.rows[0].status === 'QUARANTINED' ? 'QUARANTINED' : 'ONLINE';
+    status = 'ONLINE';
     if (existing.rows[0].current_ip && existing.rows[0].current_ip !== gateway_ip) event = 'IP_CHANGED';
     await query(
       `UPDATE gateways SET current_ip = $2, gateway_boot_id = $3, status = $4, last_seen_at = now(), updated_at = now()
@@ -66,7 +92,7 @@ export async function bind(msg) {
     `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
      VALUES ($1,$2,$3)
      ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [gateway_id, gateway_ip, event === 'BOUND'],
+    [gateway_id, gateway_ip, event === 'BOUND' || event === 'COMMISSIONED'],
   );
 
   if (Number.isInteger(rack_id)) {
