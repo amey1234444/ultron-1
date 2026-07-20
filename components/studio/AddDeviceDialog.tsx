@@ -36,6 +36,8 @@ export type NewDevice = {
   description: string;
   status: ConnectionStatus;
   gatewayId?: string | null;
+  realGatewayId?: string | null;
+  realRackId?: number | null;
 };
 
 type AddDeviceDialogProps = {
@@ -186,6 +188,8 @@ export function AddDeviceDialog({ visible, editingDevice, gateways = [], initial
       description: description.trim(),
       status,
       gatewayId: type === 'Rack' ? (gatewayId ?? null) : null,
+      realGatewayId: editingDevice?.realGatewayId ?? null,
+      realRackId: editingDevice?.realRackId ?? null,
     });
   };
 
@@ -268,6 +272,22 @@ export function AddDeviceDialog({ visible, editingDevice, gateways = [], initial
         <FormField label="IP Address" required value={ip} onChangeText={setIp} placeholder="e.g. 192.168.10.11" error={ipError} />
       )}
       <FormField label="Port" required value={port} onChangeText={setPort} placeholder="e.g. 502" error={portError} />
+
+      {editingDevice && (
+        <View className="gap-1.5">
+          <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Script IDs</Text>
+          <View className={cn('rounded-lg border px-3 py-2', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}>
+            <Text className={cn('font-mono text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              gateway_id: {editingDevice.realGatewayId || 'generated on save'}
+            </Text>
+            {editingDevice.type === 'Rack' && (
+              <Text className={cn('mt-1 font-mono text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>
+                rack_id: {editingDevice.realRackId ?? 'generated on save'}
+              </Text>
+            )}
+          </View>
+        </View>
+      )}
 
       <View className="gap-1.5">
         <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Protocol *</Text>

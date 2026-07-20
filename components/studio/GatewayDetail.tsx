@@ -84,6 +84,7 @@ export function GatewayDetail({ gateway, devices, projects, canConfigure, onBack
       {mode === 'details' ? (
         <View className={cn('mx-6 mt-4 rounded-xl border', isDark ? 'border-line-dark' : 'border-line-light')}>
           <InfoRow label="Device" value={gateway.name} />
+          <InfoRow label="Gateway Script ID" value={gateway.realGatewayId || '-'} mono />
           <InfoRow label="Model" value={gateway.model} mono />
           <InfoRow label="IP Prefix" value={displayIpFor(gateway)} mono />
           <InfoRow label="Port" value={gateway.port || '-'} mono />

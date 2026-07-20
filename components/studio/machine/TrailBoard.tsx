@@ -141,6 +141,11 @@ function withBoxCenter(
   };
 }
 
+function channelNumberFor(channel: ChannelRef): number {
+  const match = channel.id.match(/\.CH(\d+)$/);
+  return match ? Number(match[1]) : 1;
+}
+
 const STATUS_RANK: Record<TrailStatus, number> = { offline: -1, normal: 0, warning: 1, critical: 2 };
 function worseStatus(a: TrailStatus, b: TrailStatus): TrailStatus {
   return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
@@ -197,6 +202,16 @@ export function TrailBoard({
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
   const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter }), [devices, cards, pickableChannelFilter]);
+  const isChannelLive = useCallback(
+    (channel: ChannelRef | null) => {
+      if (!channel || !live) return true;
+      const rack = devices.find((device) => device.id === channel.rackId);
+      const card = cards.find((c) => c.deviceId === channel.rackId && c.slot === channel.slot);
+      if (!rack || !card) return false;
+      return channelLiveStatus(rack, card, channelNumberFor(channel), live) === 'active';
+    },
+    [cards, devices, live],
+  );
   const channelsRef = useRef(channels);
   const trailsRef = useRef(trails);
   const boxesRef = useRef(boxes);
@@ -602,32 +617,36 @@ export function TrailBoard({
           />
         ))}
 
-        {boxes.map((box) => (
-          <MappableBox
-            key={box.id}
-            x={box.x}
-            y={box.y}
-            label={box.label}
-            attached={trails.some((t) => t.startBoxId === box.id || t.endBoxId === box.id)}
-            connectorPoint={boxConnectorPoint(box)}
-            channel={channels.find((c) => c.id === box.channelId) ?? null}
-            channels={channels}
-            pickableChannels={pickableChannels}
-            canvasWidth={boardSize.width}
-            canvasHeight={boardSize.height}
-            stageScale={stageScale}
-            readOnly={readOnly}
-            hideUnlink={hideUnlink}
-            onDrag={(point) => updateBoxPosition(box.id, point)}
-            onLabelChange={(label) => updateBoxLabel(box.id, label)}
-            onPickChannel={(channel) => pickBoxChannel(box.id, channel)}
-            onDelete={() => removeBox(box.id)}
-            onLiveValueChange={(value) => setBoxLiveValues((prev) => (prev[box.id] === value ? prev : { ...prev, [box.id]: value }))}
-            onSizeChange={(size) =>
-              setBoxSizes((prev) => (prev[box.id]?.width === size.width && prev[box.id]?.height === size.height ? prev : { ...prev, [box.id]: size }))
-            }
-          />
-        ))}
+        {boxes.map((box) => {
+          const channel = channels.find((c) => c.id === box.channelId) ?? null;
+          return (
+            <MappableBox
+              key={box.id}
+              x={box.x}
+              y={box.y}
+              label={box.label}
+              attached={trails.some((t) => t.startBoxId === box.id || t.endBoxId === box.id)}
+              connectorPoint={boxConnectorPoint(box)}
+              channel={channel}
+              dataLive={isChannelLive(channel)}
+              channels={channels}
+              pickableChannels={pickableChannels}
+              canvasWidth={boardSize.width}
+              canvasHeight={boardSize.height}
+              stageScale={stageScale}
+              readOnly={readOnly}
+              hideUnlink={hideUnlink}
+              onDrag={(point) => updateBoxPosition(box.id, point)}
+              onLabelChange={(label) => updateBoxLabel(box.id, label)}
+              onPickChannel={(channel) => pickBoxChannel(box.id, channel)}
+              onDelete={() => removeBox(box.id)}
+              onLiveValueChange={(value) => setBoxLiveValues((prev) => (prev[box.id] === value ? prev : { ...prev, [box.id]: value }))}
+              onSizeChange={(size) =>
+                setBoxSizes((prev) => (prev[box.id]?.width === size.width && prev[box.id]?.height === size.height ? prev : { ...prev, [box.id]: size }))
+              }
+            />
+          );
+        })}
       </View>
     </>
   );

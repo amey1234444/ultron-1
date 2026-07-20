@@ -50,16 +50,18 @@ const ACTIVE_MEASUREMENT_MAX_AGE_MS = 15_000;
 function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number | undefined {
   const gateway = gatewayForDevice(device, live);
   if (!gateway) return undefined;
-  const match = device.name.trim().match(/(\d+)$/);
-  if (!match) return undefined;
-  const rackId = Number(match[1]);
+  const rackId = device.realRackId;
   if (!Number.isInteger(rackId)) return undefined;
-  return live.racks.some((r) => r.gatewayId === gateway.gatewayId && r.rackId === rackId) ? rackId : undefined;
+  return live.racks.some((r) => r.gatewayId === gateway.gatewayId && r.rackId === rackId) ? rackId as number : undefined;
 }
 
 export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGateway | undefined {
   const ip = device.ip.trim();
   if (!ip) return undefined;
+  if (device.realGatewayId) {
+    const byId = live.gateways.find((g) => g.gatewayId === device.realGatewayId);
+    if (byId) return byId;
+  }
   const prefix = ipPrefixFor(ip);
   if (device.type === 'Gateway' && prefix) {
     return live.gateways.find((g) => g.currentIp === ip || ipPrefixFor(g.currentIp) === prefix);
@@ -72,6 +74,10 @@ export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGatew
 
 export function isDeviceLive(device: DeviceNode, live: LiveState): boolean {
   const gateway = gatewayForDevice(device, live);
+  if (device.type === 'Rack') {
+    const rackId = configuredRackIdForDevice(device, live);
+    if (rackId === undefined) return false;
+  }
   return gateway?.status === 'ONLINE';
 }
 
@@ -82,7 +88,10 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
   if (live.gateways.length === 0) return devices;
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
-    if (!gateway) return device;
+    if (!gateway) return { ...device, status: 'Not Connected' };
+    if (device.type === 'Rack' && configuredRackIdForDevice(device, live) === undefined) {
+      return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
+    }
     const status = gateway.status === 'ONLINE' ? 'Online' : 'Not Connected';
     return device.status === status ? device : { ...device, status };
   });

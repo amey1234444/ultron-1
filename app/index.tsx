@@ -28,7 +28,7 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { cn } from '../lib/cn';
-import { composeIp, hostOctetFor, ipPrefixFor, racksForGateway, type DeviceNode } from '../lib/devices';
+import { composeIp, defaultRealGatewayId, hostOctetFor, ipPrefixFor, nextRealRackId, racksForGateway, type DeviceNode } from '../lib/devices';
 import { applyLiveStatus } from '../lib/liveTelemetry';
 import {
   duplicateFolderSubtree,
@@ -122,7 +122,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // bound gateway starts publishing.
   const liveState = useLiveTelemetry();
   const configuredGateways = useMemo(() => storedDevices.filter((device) => device.type === 'Gateway' && !device.archived), [storedDevices]);
-  const demoDevices = useMemo(() => {
+  const demoDevices = useMemo<DeviceNode[]>(() => {
     const merged = new Map<string, DeviceNode>();
     for (const device of storedDevices) merged.set(device.id, device);
 
@@ -144,9 +144,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           model: existing?.model ?? rack.model,
           ip: composeIp(prefix, hostOctets[index] ?? String(11 + index)) || rack.ip,
           gatewayId: firstGateway.id,
+          realGatewayId: firstGateway.realGatewayId ?? defaultRealGatewayId(firstGateway.id),
           projectId: firstGateway.projectId ?? existing?.projectId ?? rack.projectId,
           archived: false,
-          status: realMode ? (existing?.status ?? rack.status) : 'Online',
+          status: realMode ? (existing?.status ?? rack.status) : 'Online' as const,
+          realRackId: existing?.realRackId ?? rack.realRackId ?? index + 1,
         });
       });
 
@@ -158,10 +160,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     for (const card of cards) merged.set(card.id, card);
     return Array.from(merged.values());
   }, [cards]);
-  const devices = useMemo(
+  const devices = useMemo<DeviceNode[]>(
     () => {
-      if (!realMode) return demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Online' }));
-      return applyLiveStatus(demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' })), liveState);
+      if (!realMode) return demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Online' as const }));
+      return applyLiveStatus(demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' as const })), liveState);
     },
     [demoDevices, liveState, realMode],
   );
@@ -171,6 +173,29 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     [demoCards, visibleDeviceIds],
   );
   const gateways = useMemo(() => devices.filter((device) => device.type === 'Gateway' && !device.archived), [devices]);
+
+  useEffect(() => {
+    if (storedDevices.length === 0) return;
+    if (!storedDevices.some((device) => (device.type === 'Gateway' && !device.realGatewayId) || (device.type === 'Rack' && !device.realRackId))) return;
+    setDevices((prev) => {
+      let changed = false;
+      const next = prev.map((device) => {
+        if (device.type === 'Gateway' && !device.realGatewayId) {
+          changed = true;
+          return { ...device, realGatewayId: defaultRealGatewayId(device.id) };
+        }
+        return device;
+      });
+      const assigned = [...next];
+      for (let index = 0; index < assigned.length; index += 1) {
+        const device = assigned[index];
+        if (device.type !== 'Rack' || device.realRackId) continue;
+        changed = true;
+        assigned[index] = { ...device, realRackId: nextRealRackId(device.gatewayId, assigned) };
+      }
+      return changed ? assigned : prev;
+    });
+  }, [setDevices, storedDevices]);
 
   useEffect(() => {
     if (storedDevices.some((device) => device.type === 'Gateway')) return;
@@ -349,8 +374,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       setDevices((prev) => {
         const previous = prev.find((d) => d.id === editingDeviceId);
         const nextGatewayPrefix = device.type === 'Gateway' ? ipPrefixFor(device.ip) : '';
+        const savedDevice: NewDevice = {
+          ...device,
+          realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? previous?.realGatewayId ?? defaultRealGatewayId(editingDeviceId)) : (device.realGatewayId ?? previous?.realGatewayId ?? null),
+          realRackId: device.type === 'Rack' ? (device.realRackId ?? previous?.realRackId ?? nextRealRackId(device.gatewayId, prev)) : null,
+        };
         const updated = prev.map((d) => {
-          if (d.id === editingDeviceId) return { ...d, ...device };
+          if (d.id === editingDeviceId) return { ...d, ...savedDevice };
           if (previous?.type === 'Gateway' && nextGatewayPrefix && d.type === 'Rack' && d.gatewayId === editingDeviceId) {
             const host = hostOctetFor(d.ip);
             return host ? { ...d, ip: composeIp(nextGatewayPrefix, host) } : d;
@@ -358,12 +388,23 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           return d;
         });
         if (previous) return updated;
-        return [...updated, { id: editingDeviceId, projectId: device.gatewayId ? (prev.find((d) => d.id === device.gatewayId)?.projectId ?? null) : null, archived: false, ...device }];
+        return [...updated, { id: editingDeviceId, projectId: device.gatewayId ? (prev.find((d) => d.id === device.gatewayId)?.projectId ?? null) : null, archived: false, ...savedDevice }];
       });
       setEditingDeviceId(null);
     } else {
       const gateway = device.gatewayId ? storedDevices.find((d) => d.id === device.gatewayId && d.type === 'Gateway') : undefined;
-      setDevices((prev) => [...prev, { id: makeId(), projectId: gateway?.projectId ?? null, archived: false, ...device }]);
+      const id = makeId();
+      setDevices((prev) => [
+        ...prev,
+        {
+          id,
+          projectId: gateway?.projectId ?? null,
+          archived: false,
+          ...device,
+          realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? defaultRealGatewayId(id)) : (gateway?.realGatewayId ?? null),
+          realRackId: device.type === 'Rack' ? (device.realRackId ?? nextRealRackId(device.gatewayId, prev)) : null,
+        },
+      ]);
     }
     setAddDeviceVisible(false);
     setAddDeviceGatewayId(null);

@@ -243,12 +243,16 @@ async function migrate(): Promise<void> {
       status      TEXT NOT NULL DEFAULT 'Not Connected',
       project_id  TEXT REFERENCES studio_projects(id) ON DELETE SET NULL,
       gateway_id  TEXT REFERENCES studio_devices(id) ON DELETE SET NULL,
+      real_gateway_id TEXT,
+      real_rack_id INT,
       archived    BOOLEAN NOT NULL DEFAULT false,
       sort_order  INT  NOT NULL DEFAULT 0,
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
   await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS gateway_id TEXT REFERENCES studio_devices(id) ON DELETE SET NULL;`);
+  await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS real_gateway_id TEXT;`);
+  await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS real_rack_id INT;`);
   await query(`
     CREATE TABLE IF NOT EXISTS studio_cards (
       id          TEXT PRIMARY KEY,

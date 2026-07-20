@@ -55,6 +55,7 @@ export function createSeedData(makeId: () => string): {
       description: 'Seeded demo gateway',
       status: 'Online',
       projectId: plantNorth.id,
+      realGatewayId: 'ultron-gw-demo-01',
       archived: false,
     },
     {
@@ -69,6 +70,7 @@ export function createSeedData(makeId: () => string): {
       status: 'Online',
       projectId: plantNorth.id,
       gatewayId: 'seed-gateway-north',
+      realRackId: 1,
       archived: false,
     },
     {
@@ -83,6 +85,7 @@ export function createSeedData(makeId: () => string): {
       status: 'Online',
       projectId: plantNorth.id,
       gatewayId: 'seed-gateway-north',
+      realRackId: 2,
       archived: false,
     },
     {
@@ -97,6 +100,7 @@ export function createSeedData(makeId: () => string): {
       status: 'Online',
       projectId: plantSouth.id,
       gatewayId: 'seed-gateway-north',
+      realRackId: 3,
       archived: false,
     },
     {
@@ -111,6 +115,7 @@ export function createSeedData(makeId: () => string): {
       status: 'Online',
       projectId: plantSouth.id,
       gatewayId: 'seed-gateway-north',
+      realRackId: 4,
       archived: false,
     },
   ];

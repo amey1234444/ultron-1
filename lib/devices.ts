@@ -18,6 +18,8 @@ export type DeviceNode = {
   status: ConnectionStatus;
   projectId: string | null;
   gatewayId?: string | null;
+  realGatewayId?: string | null;
+  realRackId?: number | null;
   archived: boolean;
 };
 
@@ -82,6 +84,22 @@ export function hostOctetFor(ip: string): string {
 
 export function composeIp(prefix: string, hostOctet: string): string {
   return isValidIpPrefix(prefix) && isValidHostOctet(hostOctet) ? `${prefix.trim()}.${hostOctet.trim()}` : '';
+}
+
+export function defaultRealGatewayId(id: string): string {
+  const cleaned = id.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return `gw-${cleaned || Math.random().toString(36).slice(2, 8)}`;
+}
+
+export function nextRealRackId(gatewayId: string | null | undefined, devices: DeviceNode[]): number {
+  const used = new Set(
+    devices
+      .filter((device) => device.type === 'Rack' && device.gatewayId === gatewayId && typeof device.realRackId === 'number')
+      .map((device) => device.realRackId as number),
+  );
+  let id = 1;
+  while (used.has(id)) id += 1;
+  return id;
 }
 
 export function displayIpFor(device: DeviceNode): string {

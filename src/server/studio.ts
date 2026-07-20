@@ -145,8 +145,8 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
   for (const d of data.devices) {
     await q(
       client,
-      `INSERT INTO studio_devices (id, name, type, model, ip, port, protocol, description, status, project_id, gateway_id, archived, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+      `INSERT INTO studio_devices (id, name, type, model, ip, port, protocol, description, status, project_id, gateway_id, real_gateway_id, real_rack_id, archived, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
       [
         d.id,
         d.name ?? '',
@@ -159,6 +159,8 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
         d.status,
         d.projectId,
         null,
+        d.realGatewayId ?? null,
+        d.type === 'Rack' ? (d.realRackId ?? null) : null,
         !!d.archived,
         order++,
       ],
@@ -205,7 +207,7 @@ type FolderRow = { id: string; project_id: string; parent_id: string | null; nam
 type MachineRow = { id: string; project_id: string; folder_id: string; name: string; template: string; components: unknown };
 type DeviceRow = {
   id: string; name: string; type: string; model: string; ip: string; port: string; protocol: string;
-  description: string; status: string; project_id: string | null; gateway_id: string | null; archived: boolean;
+  description: string; status: string; project_id: string | null; gateway_id: string | null; real_gateway_id: string | null; real_rack_id: number | null; archived: boolean;
 };
 type CardRow = { id: string; device_id: string; slot: number; type: string; enabled: boolean; config: unknown };
 type LayoutRow = { machine_id: string; trails: unknown; boxes: unknown };
@@ -246,7 +248,8 @@ export async function getWorkspace(): Promise<Workspace | null> {
     devices: devices.rows.map((r) => ({
       id: r.id, name: r.name, type: r.type as DeviceNode['type'], model: r.model, ip: r.ip, port: r.port,
       protocol: r.protocol as DeviceNode['protocol'], description: r.description,
-      status: r.status as DeviceNode['status'], projectId: r.project_id, gatewayId: r.gateway_id, archived: r.archived,
+      status: r.status as DeviceNode['status'], projectId: r.project_id, gatewayId: r.gateway_id,
+      realGatewayId: r.real_gateway_id, realRackId: r.real_rack_id, archived: r.archived,
     })),
     cards: cards.rows.map((r) => ({
       id: r.id, deviceId: r.device_id, slot: r.slot, type: r.type as CardNode['type'],

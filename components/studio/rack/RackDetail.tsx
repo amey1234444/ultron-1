@@ -92,7 +92,12 @@ export function RackDetail({ device, cards, live, onBack, onInstallCard, onUpdat
       </Pressable>
 
       <View className="flex-row items-center justify-between px-6 pt-3">
-        <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{device.name}</Text>
+        <View>
+          <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{device.name}</Text>
+          <Text className={cn('mt-1 font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            rack_id: {device.realRackId ?? '-'}
+          </Text>
+        </View>
         <View className={cn('flex-row rounded-full border p-1', isDark ? 'border-line-dark' : 'border-line-light')}>
           <ModeTab label="Visual Rack View" active={mode === 'visual'} onPress={() => setMode('visual')} />
           <ModeTab label="Card List View" active={mode === 'cards'} onPress={() => setMode('cards')} />

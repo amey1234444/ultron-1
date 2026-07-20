@@ -45,6 +45,7 @@ export type MappableBoxProps = {
   // connection point rather than a stale default.
   connectorPoint: Point;
   channel: ChannelRef | null;
+  dataLive?: boolean;
   channels: ChannelRef[];
   pickableChannels?: ChannelRef[];
   canvasWidth: number;
@@ -75,6 +76,7 @@ export function MappableBox({
   attached,
   connectorPoint,
   channel,
+  dataLive = true,
   channels,
   pickableChannels,
   canvasWidth,
@@ -96,7 +98,7 @@ export function MappableBox({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
-  const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel);
+  const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel && dataLive);
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;
   const filteredPickerChannels = useMemo(() => {
@@ -106,8 +108,8 @@ export function MappableBox({
   }, [channelSearch, pickerChannels]);
 
   useEffect(() => {
-    if (channel) onLiveValueChange?.(liveValue);
-  }, [channel, liveValue, onLiveValueChange]);
+    if (channel && dataLive) onLiveValueChange?.(liveValue);
+  }, [channel, dataLive, liveValue, onLiveValueChange]);
 
   useEffect(() => {
     if (!pickerOpen || channel) setChannelSearch('');
@@ -152,7 +154,7 @@ export function MappableBox({
   const connectorColour = attached ? '#3FB950' : '#C9A15C';
 
   if (channel) {
-    const status = statusFor(channel, liveValue);
+    const status = dataLive ? statusFor(channel, liveValue) : 'offline';
     return (
       <>
         <View
@@ -178,8 +180,8 @@ export function MappableBox({
             tag={channel.code}
             channel={channel.code}
             title={channel.label}
-            value={liveValue.toFixed(LIVE_RANGE_FOR_LETTER[channel.letter].decimals)}
-            unit={channel.unit}
+            value={dataLive ? liveValue.toFixed(LIVE_RANGE_FOR_LETTER[channel.letter].decimals) : '--'}
+            unit={dataLive ? channel.unit : ''}
             status={status}
             interactive={!readOnly}
             dragHandlers={panResponder.panHandlers}

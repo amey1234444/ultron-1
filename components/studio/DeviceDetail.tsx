@@ -36,6 +36,8 @@ export function DeviceDetail({ device, live, onBack }: { device: DeviceNode; liv
 
       <View className={cn('mx-6 mt-4 rounded-xl border', isDark ? 'border-line-dark' : 'border-line-light')}>
         <Row label="Device" value={device.name} />
+        {device.realGatewayId && <Row label="Gateway Script ID" value={device.realGatewayId} mono />}
+        {device.type === 'Rack' && <Row label="Rack Script ID" value={device.realRackId !== undefined && device.realRackId !== null ? String(device.realRackId) : '-'} mono />}
         <Row label="Model" value={device.model} mono />
         <Row label="IP Address" value={device.ip} mono />
         <Row label="Port" value={device.port} mono />
