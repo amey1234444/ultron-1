@@ -183,8 +183,8 @@ export function MachineWorkspace({
         ? listChannels(devices, cards, {
             channelIsAvailable: (rack, card, channelNumber) => channelLiveStatus(rack, card, channelNumber, live) === 'active',
           })
-        : [],
-    [devices, cards, live],
+        : allChannels,
+    [allChannels, devices, cards, live],
   );
 
   const [savedBoxes, setSavedBoxes] = useState<Box[]>([]);

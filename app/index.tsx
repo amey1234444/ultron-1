@@ -29,7 +29,7 @@ import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { cn } from '../lib/cn';
 import { composeIp, hostOctetFor, ipPrefixFor, racksForGateway, type DeviceNode } from '../lib/devices';
-import { applyLiveStatus, isDeviceLive } from '../lib/liveTelemetry';
+import { applyLiveStatus } from '../lib/liveTelemetry';
 import {
   duplicateFolderSubtree,
   duplicateProject,
@@ -42,9 +42,13 @@ import {
 import { componentsForTemplate, type MachineNode } from '../lib/machines';
 import { PERMISSIONS } from '../lib/permissions';
 import type { CardConfig, CardNode, CardType } from '../lib/rack';
+import { createSeedData } from '../lib/seedData';
 import { USER_PERMISSIONS, userHasPermission, type PublicUser } from '../src/lib/roles';
 
 const LEFT_PANEL_WIDTH = 256;
+
+let demoId = 0;
+const DEMO_SEED = createSeedData(() => `demo-${demoId++}`);
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10);
@@ -117,18 +121,56 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // the stored device statuses, so the devices strip shows Online the moment a
   // bound gateway starts publishing.
   const liveState = useLiveTelemetry();
-  const liveDevices = useMemo(() => applyLiveStatus(storedDevices, liveState), [storedDevices, liveState]);
+  const configuredGateways = useMemo(() => storedDevices.filter((device) => device.type === 'Gateway' && !device.archived), [storedDevices]);
+  const demoDevices = useMemo(() => {
+    const merged = new Map<string, DeviceNode>();
+    for (const device of storedDevices) merged.set(device.id, device);
+
+    const seedGateway = DEMO_SEED.devices.find((device) => device.type === 'Gateway');
+    const firstGateway = configuredGateways[0] ?? seedGateway;
+    if (!firstGateway) return storedDevices;
+    if (!merged.has(firstGateway.id)) merged.set(firstGateway.id, firstGateway);
+
+    const prefix = ipPrefixFor(firstGateway.ip) || '192.168.10';
+    const hostOctets = ['11', '12', '13', '14'];
+    DEMO_SEED.devices
+      .filter((device) => device.type === 'Rack')
+      .forEach((rack, index) => {
+        const existing = merged.get(rack.id);
+        merged.set(rack.id, {
+          ...rack,
+          ...existing,
+          type: 'Rack',
+          model: existing?.model ?? rack.model,
+          ip: composeIp(prefix, hostOctets[index] ?? String(11 + index)) || rack.ip,
+          gatewayId: firstGateway.id,
+          projectId: firstGateway.projectId ?? existing?.projectId ?? rack.projectId,
+          archived: false,
+          status: realMode ? (existing?.status ?? rack.status) : 'Online',
+        });
+      });
+
+    return Array.from(merged.values());
+  }, [configuredGateways, realMode, storedDevices]);
+  const demoCards = useMemo(() => {
+    const merged = new Map<string, CardNode>();
+    for (const card of DEMO_SEED.cards) merged.set(card.id, card);
+    for (const card of cards) merged.set(card.id, card);
+    return Array.from(merged.values());
+  }, [cards]);
   const devices = useMemo(
-    () => (realMode ? liveDevices.filter((device) => !device.archived && isDeviceLive(device, liveState)) : storedDevices),
-    [liveDevices, liveState, realMode, storedDevices],
+    () => {
+      if (!realMode) return demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Online' }));
+      return applyLiveStatus(demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' })), liveState);
+    },
+    [demoDevices, liveState, realMode],
   );
   const visibleDeviceIds = useMemo(() => new Set(devices.map((device) => device.id)), [devices]);
   const visibleCards = useMemo(
-    () => (realMode ? cards.filter((card) => visibleDeviceIds.has(card.deviceId)) : cards),
-    [cards, realMode, visibleDeviceIds],
+    () => demoCards.filter((card) => visibleDeviceIds.has(card.deviceId)),
+    [demoCards, visibleDeviceIds],
   );
   const gateways = useMemo(() => devices.filter((device) => device.type === 'Gateway' && !device.archived), [devices]);
-  const configuredGateways = useMemo(() => storedDevices.filter((device) => device.type === 'Gateway' && !device.archived), [storedDevices]);
 
   useEffect(() => {
     if (storedDevices.some((device) => device.type === 'Gateway')) return;
@@ -307,7 +349,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       setDevices((prev) => {
         const previous = prev.find((d) => d.id === editingDeviceId);
         const nextGatewayPrefix = device.type === 'Gateway' ? ipPrefixFor(device.ip) : '';
-        return prev.map((d) => {
+        const updated = prev.map((d) => {
           if (d.id === editingDeviceId) return { ...d, ...device };
           if (previous?.type === 'Gateway' && nextGatewayPrefix && d.type === 'Rack' && d.gatewayId === editingDeviceId) {
             const host = hostOctetFor(d.ip);
@@ -315,6 +357,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           }
           return d;
         });
+        if (previous) return updated;
+        return [...updated, { id: editingDeviceId, projectId: device.gatewayId ? (prev.find((d) => d.id === device.gatewayId)?.projectId ?? null) : null, archived: false, ...device }];
       });
       setEditingDeviceId(null);
     } else {
@@ -444,7 +488,12 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               projects={projects}
               folders={folders}
               machines={machines}
+              devices={devices}
               onOpenMenu={canEditDeleteSchema ? (x, y, target, canAddMachine) => setMenu({ x, y, target, canAddMachine }) : undefined}
+              onOpenDeviceMenu={canEditDeleteSchema ? (x, y, deviceId) => {
+                const device = devices.find((d) => d.id === deviceId);
+                if (device) setDeviceMenu({ x, y, device });
+              } : undefined}
               onCreateProject={canEditDeleteSchema ? () => setCreateProjectVisible(true) : undefined}
               canConfigure={canEditDeleteSchema}
               showRealModeToggle={currentUser?.role === 'super_admin'}
@@ -468,7 +517,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               machine={selectedMachine}
               devices={devices}
               cards={visibleCards}
-              live={liveState}
+              live={realMode ? liveState : undefined}
               layout={getLayout(selectedMachine.id)}
               onSaveLayout={saveLayout}
               onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
@@ -496,7 +545,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
             <RackDetail
               device={selectedDevice}
               cards={visibleCards.filter((c) => c.deviceId === selectedDevice.id)}
-              live={liveState}
+              live={realMode ? liveState : undefined}
               canEditDeleteSchema={canEditDeleteSchema}
               onBack={() => setSelected({ kind: 'devices' })}
               onInstallCard={(slot, type, config, enabled) => handleInstallCard(selectedDevice.id, slot, type, config, enabled)}
@@ -504,7 +553,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onRemoveCard={handleRemoveCard}
             />
           ) : selected.kind === 'device' && selectedDevice ? (
-            <DeviceDetail device={selectedDevice} live={liveState} onBack={() => setSelected({ kind: 'devices' })} />
+            <DeviceDetail device={selectedDevice} live={realMode ? liveState : undefined} onBack={() => setSelected({ kind: 'devices' })} />
           ) : selected.kind === 'devices' ? (
             gateways.length === 0 ? (
               <EmptyState title="DEVICES" description="No devices added.">

@@ -3,6 +3,7 @@ import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
+import { displayIpFor, racksForGateway, type DeviceNode } from '../../lib/devices';
 import type { FolderNode, ProjectNode, SelectedNode } from '../../lib/hierarchy';
 import type { MachineNode } from '../../lib/machines';
 import { PERMISSIONS } from '../../lib/permissions';
@@ -21,7 +22,9 @@ type LeftPanelProps = {
   projects: ProjectNode[];
   folders: FolderNode[];
   machines: MachineNode[];
+  devices?: DeviceNode[];
   onOpenMenu?: (x: number, y: number, target: ContextMenuTarget, canAddMachine: boolean) => void;
+  onOpenDeviceMenu?: (x: number, y: number, deviceId: string) => void;
   onCreateProject?: () => void;
   canConfigure?: boolean;
   showRealModeToggle?: boolean;
@@ -113,6 +116,59 @@ function FolderBranch({
   );
 }
 
+function DeviceBranch({
+  gateway,
+  devices,
+  selected,
+  onSelect,
+  onOpenDeviceMenu,
+  canConfigure,
+  collapsedIds,
+  onToggleExpand,
+}: {
+  gateway: DeviceNode;
+  devices: DeviceNode[];
+  selected: SelectedNode;
+  onSelect: (node: SelectedNode) => void;
+  onOpenDeviceMenu?: (x: number, y: number, deviceId: string) => void;
+  canConfigure: boolean;
+  collapsedIds: Set<string>;
+  onToggleExpand: (id: string) => void;
+}) {
+  const racks = racksForGateway(gateway, devices);
+  const expanded = !collapsedIds.has(gateway.id);
+
+  return (
+    <>
+      <TreeNode
+        label={gateway.name}
+        depth={0}
+        kind="leaf"
+        hasChildren={racks.length > 0}
+        expanded={expanded}
+        onToggleExpand={() => onToggleExpand(gateway.id)}
+        selected={selected.kind === 'device' && selected.id === gateway.id}
+        onPress={() => onSelect({ kind: 'device', id: gateway.id })}
+        onOpenMenu={canConfigure && onOpenDeviceMenu ? (x, y) => onOpenDeviceMenu(x, y, gateway.id) : undefined}
+        testID={`tree-node:device:${gateway.id}`}
+      />
+      {expanded &&
+        racks.map((rack) => (
+          <TreeNode
+            key={rack.id}
+            label={rack.name}
+            depth={1}
+            kind="leaf"
+            selected={selected.kind === 'device' && selected.id === rack.id}
+            onPress={() => onSelect({ kind: 'device', id: rack.id })}
+            onOpenMenu={canConfigure && onOpenDeviceMenu ? (x, y) => onOpenDeviceMenu(x, y, rack.id) : undefined}
+            testID={`tree-node:device:${rack.id}`}
+          />
+        ))}
+    </>
+  );
+}
+
 export function LeftPanel({
   collapsed,
   onCollapsedChange,
@@ -121,7 +177,9 @@ export function LeftPanel({
   projects,
   folders,
   machines,
+  devices = [],
   onOpenMenu,
+  onOpenDeviceMenu,
   onCreateProject,
   canConfigure = false,
   showRealModeToggle = false,
@@ -138,7 +196,12 @@ export function LeftPanel({
   const matchedProjects = searching ? projects.filter((p) => p.name.toLowerCase().includes(q)) : [];
   const matchedFolders = searching ? folders.filter((f) => f.name.toLowerCase().includes(q)) : [];
   const matchedMachines = searching ? machines.filter((m) => m.name.toLowerCase().includes(q)) : [];
+  const matchedDevices = searching
+    ? devices.filter((d) => [d.name, d.type, displayIpFor(d), d.model].join(' ').toLowerCase().includes(q))
+    : [];
   const matchCount = matchedProjects.length + matchedFolders.length + matchedMachines.length;
+  const deviceMatchCount = matchedDevices.length;
+  const gateways = devices.filter((d) => d.type === 'Gateway' && !d.archived);
 
   const toggleExpand = (id: string) => {
     setCollapsedIds((prev) => {
@@ -159,7 +222,7 @@ export function LeftPanel({
   };
   const goDevices = () => {
     onSelect({ kind: 'devices' });
-    onCollapsedChange(true);
+    onCollapsedChange(false);
   };
 
   return (
@@ -318,27 +381,82 @@ export function LeftPanel({
               )}
             </View>
           )}
+          {activeTab === 'devices' && (
+            <View className="mb-5">
+              <View className="mb-3 px-3">
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder="Search devices..."
+                  placeholderTextColor={isDark ? '#5A5A5A' : '#9A9A9A'}
+                  className={cn(
+                    'rounded-lg border px-3 py-2 font-body text-[13px]',
+                    isDark ? 'border-line-dark bg-surface-darkpanel text-ink' : 'border-line-light bg-surface-lightpanel text-ink-inverse',
+                  )}
+                />
+              </View>
+
+              {searching ? (
+                deviceMatchCount === 0 ? (
+                  <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                    No matches for "{query.trim()}"
+                  </Text>
+                ) : (
+                  matchedDevices.map((device) => (
+                    <TreeNode
+                      key={`s-d-${device.id}`}
+                      label={device.name}
+                      depth={0}
+                      kind="leaf"
+                      selected={selected.kind === 'device' && selected.id === device.id}
+                      onPress={() => onSelect({ kind: 'device', id: device.id })}
+                      onOpenMenu={canConfigure && onOpenDeviceMenu ? (x, y) => onOpenDeviceMenu(x, y, device.id) : undefined}
+                      testID={`tree-node:device:${device.id}`}
+                    />
+                  ))
+                )
+              ) : gateways.length === 0 ? (
+                <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                  No gateway yet
+                </Text>
+              ) : (
+                gateways.map((gateway) => (
+                  <DeviceBranch
+                    key={gateway.id}
+                    gateway={gateway}
+                    devices={devices}
+                    selected={selected}
+                    onSelect={onSelect}
+                    onOpenDeviceMenu={onOpenDeviceMenu}
+                    canConfigure={canConfigure}
+                    collapsedIds={collapsedIds}
+                    onToggleExpand={toggleExpand}
+                  />
+                ))
+              )}
+            </View>
+          )}
           </ScrollView>
 
           {showRealModeToggle || footer ? (
             <View className={cn('border-t', isDark ? 'border-line-dark' : 'border-line-light')}>
               {showRealModeToggle ? (
-                <View className="px-3 py-3">
+                <View className="px-3 py-1.5">
                   <Pressable
                     onPress={() => onRealModeChange?.(!realMode)}
                     className={cn(
-                      'flex-row items-center justify-between rounded-lg border px-3 py-2',
+                      'flex-row items-center justify-between rounded-lg border px-2 py-1.5',
                       isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel',
                     )}
                   >
                     <View>
-                      <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Real</Text>
-                      <Text className={cn('font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                      <Text className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Real</Text>
+                      <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
                         {realMode ? 'Connected devices' : 'Demo data'}
                       </Text>
                     </View>
-                    <View className={cn('h-5 w-9 rounded-full p-0.5', realMode ? 'bg-status-success' : isDark ? 'bg-line-dark' : 'bg-line-light')}>
-                      <View className={cn('h-4 w-4 rounded-full bg-white', realMode && 'self-end')} />
+                    <View className={cn('h-4 w-7 rounded-full p-0.5', realMode ? 'bg-status-success' : isDark ? 'bg-line-dark' : 'bg-line-light')}>
+                      <View className={cn('h-3 w-3 rounded-full bg-white', realMode && 'self-end')} />
                     </View>
                   </Pressable>
                 </View>
