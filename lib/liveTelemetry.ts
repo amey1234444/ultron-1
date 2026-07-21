@@ -138,9 +138,9 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
   const duplicateIpIds = duplicateConfiguredIpDeviceIds(devices, live);
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
-    const liveIp = device.type === 'Gateway' && gateway?.currentIp ? gateway.currentIp : device.ip;
+    const liveIp = device.type === 'Gateway' && gateway?.currentIp && gateway.status !== 'QUARANTINED' ? gateway.currentIp : device.ip;
     if (duplicateIpIds.has(device.id)) {
-      return device.status === 'Not Connected' && device.ip === liveIp ? device : { ...device, ip: liveIp, status: 'Not Connected' };
+      return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
     }
     if (!gateway) return { ...device, status: 'Not Connected' };
     const rack = device.type === 'Rack' ? configuredRackForDevice(device, live) : undefined;

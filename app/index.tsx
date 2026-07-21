@@ -255,6 +255,35 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     [demoCards, visibleDeviceIds],
   );
   const gateways = useMemo(() => devices.filter((device) => device.type === 'Gateway' && !device.archived), [devices]);
+  const configuredIpConflict = (ip: string, exceptDeviceId?: string | null) => {
+    const normalizedIp = ip.trim();
+    if (!normalizedIp) return undefined;
+    return storedDevices.find(
+      (d) =>
+        !d.archived &&
+        (d.type === 'Gateway' || d.type === 'Rack') &&
+        d.id !== exceptDeviceId &&
+        d.ip.trim() === normalizedIp,
+    );
+  };
+  const findDuplicateIpInDevices = (candidateDevices: DeviceNode[]) => {
+    const byIp = new Map<string, DeviceNode>();
+    for (const device of candidateDevices) {
+      if (device.archived || (device.type !== 'Gateway' && device.type !== 'Rack')) continue;
+      const ip = device.ip.trim();
+      if (!ip) continue;
+      const existing = byIp.get(ip);
+      if (existing && existing.id !== device.id) return { ip, device: existing };
+      byIp.set(ip, device);
+    }
+    return null;
+  };
+  const showIpConflictNotice = (notice: { ip: string; conflictDeviceName?: string; conflictDeviceType?: string }) => {
+    if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
+    if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
+    setIpChangeNotice(null);
+    setIpConflictNotice(notice);
+  };
 
   useEffect(() => {
     if (!realMode) return;
@@ -267,25 +296,32 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       const key = `${liveGateway.gatewayId}:${oldIp}->${newIp}`;
       if (seenIpChanges.current.has(key)) continue;
       seenIpChanges.current.add(key);
+      const conflict = configuredIpConflict(newIp, storedGateway.id);
+      if (conflict) {
+        showIpConflictNotice({
+          ip: newIp,
+          conflictDeviceName: currentUser?.role === 'super_admin' ? conflict.name : undefined,
+          conflictDeviceType: currentUser?.role === 'super_admin' ? conflict.type : undefined,
+        });
+        break;
+      }
       setIpChangeNotice({ gatewayName: storedGateway.name, oldIp, newIp });
       if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
       ipNoticeTimer.current = setTimeout(() => setIpChangeNotice(null), 6000);
       break;
     }
-  }, [configuredGateways, liveState.gateways, realMode]);
+  }, [configuredGateways, currentUser?.role, liveState.gateways, realMode, storedDevices]);
 
   useEffect(() => {
     if (!realMode) return;
     const alert = liveState.alerts.find((item) => item.type === 'IP_CONFLICT' && !seenIpConflictAlerts.current.has(item.id));
     if (!alert) return;
     seenIpConflictAlerts.current.add(alert.id);
-    setIpConflictNotice({
+    showIpConflictNotice({
       ip: alert.gatewayIp,
       conflictDeviceName: currentUser?.role === 'super_admin' ? alert.conflictDeviceName : undefined,
       conflictDeviceType: currentUser?.role === 'super_admin' ? alert.conflictDeviceType : undefined,
     });
-    if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
-    ipConflictNoticeTimer.current = setTimeout(() => setIpConflictNotice(null), 8000);
   }, [currentUser?.role, liveState.alerts, realMode]);
 
   useEffect(() => () => {
@@ -489,80 +525,71 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   const handleSaveDevice = (device: NewDevice) => {
-    const duplicateIpDevice = storedDevices.find(
-      (d) =>
-        !d.archived &&
-        (d.type === 'Gateway' || d.type === 'Rack') &&
-        d.id !== editingDeviceId &&
-        d.ip.trim() === device.ip.trim(),
-    );
-    if (duplicateIpDevice) {
-      setIpConflictNotice({
-        ip: device.ip.trim(),
-        conflictDeviceName: currentUser?.role === 'super_admin' ? duplicateIpDevice.name : undefined,
-        conflictDeviceType: currentUser?.role === 'super_admin' ? duplicateIpDevice.type : undefined,
-      });
-      if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
-      ipConflictNoticeTimer.current = setTimeout(() => setIpConflictNotice(null), 8000);
-      return;
-    }
-
     if (editingDeviceId) {
-      setDevices((prev) => {
-        const previous = prev.find((d) => d.id === editingDeviceId);
-        const nextGatewayPrefix = device.type === 'Gateway' ? ipPrefixFor(device.ip) : '';
-        const savedDevice: NewDevice = {
-          ...device,
-          realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? previous?.realGatewayId ?? defaultRealGatewayId(editingDeviceId)) : (device.realGatewayId ?? previous?.realGatewayId ?? null),
-          realRackId: device.type === 'Rack' ? (device.realRackId ?? previous?.realRackId ?? nextRealRackId(device.gatewayId, prev)) : null,
-        };
-        const updated = prev.map((d) => {
-          if (d.id === editingDeviceId) return { ...d, ...savedDevice };
-          if (previous?.type === 'Gateway' && nextGatewayPrefix && d.type === 'Rack' && d.gatewayId === editingDeviceId) {
-            const host = hostOctetFor(d.ip);
-            return host ? { ...d, ip: composeIp(nextGatewayPrefix, host) } : d;
-          }
-          return d;
-        });
-        if (previous) return updated;
-        return [...updated, { id: editingDeviceId, projectId: device.gatewayId ? (prev.find((d) => d.id === device.gatewayId)?.projectId ?? null) : null, archived: false, ...savedDevice }];
+      const previous = storedDevices.find((d) => d.id === editingDeviceId);
+      const nextGatewayPrefix = device.type === 'Gateway' ? ipPrefixFor(device.ip) : '';
+      const savedDevice: NewDevice = {
+        ...device,
+        realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? previous?.realGatewayId ?? defaultRealGatewayId(editingDeviceId)) : (device.realGatewayId ?? previous?.realGatewayId ?? null),
+        realRackId: device.type === 'Rack' ? (device.realRackId ?? previous?.realRackId ?? nextRealRackId(device.gatewayId, storedDevices)) : null,
+      };
+      const updated = storedDevices.map((d) => {
+        if (d.id === editingDeviceId) return { ...d, ...savedDevice };
+        if (previous?.type === 'Gateway' && nextGatewayPrefix && d.type === 'Rack' && d.gatewayId === editingDeviceId) {
+          const host = hostOctetFor(d.ip);
+          return host ? { ...d, ip: composeIp(nextGatewayPrefix, host) } : d;
+        }
+        return d;
       });
+      const candidate: DeviceNode[] = previous
+        ? updated
+        : [...updated, { id: editingDeviceId, projectId: device.gatewayId ? (storedDevices.find((d) => d.id === device.gatewayId)?.projectId ?? null) : null, archived: false, ...savedDevice }];
+      const duplicate = findDuplicateIpInDevices(candidate);
+      if (duplicate) {
+        showIpConflictNotice({
+          ip: duplicate.ip,
+          conflictDeviceName: currentUser?.role === 'super_admin' ? duplicate.device.name : undefined,
+          conflictDeviceType: currentUser?.role === 'super_admin' ? duplicate.device.type : undefined,
+        });
+        return;
+      }
+      setDevices(candidate);
       setEditingDeviceId(null);
     } else {
       const gateway = device.gatewayId ? storedDevices.find((d) => d.id === device.gatewayId && d.type === 'Gateway') : undefined;
       const id = makeId();
-      setDevices((prev) => [
-        ...prev,
-        {
-          id,
-          projectId: gateway?.projectId ?? null,
-          archived: false,
-          ...device,
-          realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? defaultRealGatewayId(id)) : (gateway?.realGatewayId ?? null),
-          realRackId: device.type === 'Rack' ? (device.realRackId ?? nextRealRackId(device.gatewayId, prev)) : null,
-        },
-      ]);
+      const newDevice: DeviceNode = {
+        id,
+        projectId: gateway?.projectId ?? null,
+        archived: false,
+        ...device,
+        realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? defaultRealGatewayId(id)) : (gateway?.realGatewayId ?? null),
+        realRackId: device.type === 'Rack' ? (device.realRackId ?? nextRealRackId(device.gatewayId, storedDevices)) : null,
+      };
+      const candidate: DeviceNode[] = [...storedDevices, newDevice];
+      const duplicate = findDuplicateIpInDevices(candidate);
+      if (duplicate) {
+        showIpConflictNotice({
+          ip: duplicate.ip,
+          conflictDeviceName: currentUser?.role === 'super_admin' ? duplicate.device.name : undefined,
+          conflictDeviceType: currentUser?.role === 'super_admin' ? duplicate.device.type : undefined,
+        });
+        return;
+      }
+      setDevices(candidate);
     }
     setAddDeviceVisible(false);
     setAddDeviceGatewayId(null);
   };
 
   const handleTestConnectionFromMenu = (device: DeviceNode) => {
-    const duplicateIpDevice = storedDevices.find(
-      (d) =>
-        !d.archived &&
-        (d.type === 'Gateway' || d.type === 'Rack') &&
-        d.id !== device.id &&
-        d.ip.trim() === device.ip.trim(),
-    );
+    const duplicateIpDevice = configuredIpConflict(device.ip, device.id);
     if (duplicateIpDevice) {
-      setIpConflictNotice({
+      showIpConflictNotice({
         ip: device.ip.trim(),
         conflictDeviceName: currentUser?.role === 'super_admin' ? duplicateIpDevice.name : undefined,
         conflictDeviceType: currentUser?.role === 'super_admin' ? duplicateIpDevice.type : undefined,
       });
-      if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
-      ipConflictNoticeTimer.current = setTimeout(() => setIpConflictNotice(null), 8000);
       return;
     }
     // Same simulated test as the Add/Edit dialog, applied in place.
@@ -688,18 +715,25 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
       {ipConflictNotice && (
         <View
-          className={cn(
-            'absolute right-4 top-16 z-50 max-w-[400px] rounded-lg border px-4 py-3 shadow-lg',
-            isDark ? 'border-status-critical/50 bg-surface-darkpanel' : 'border-status-critical/60 bg-surface-lightpanel',
-          )}
-          style={ipChangeNotice ? { top: 136 } : undefined}
+          className="absolute inset-0 z-50 items-center justify-center px-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.28)' }}
         >
-          <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>IP already configured</Text>
-          <Text className={cn('mt-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            {ipConflictNotice.conflictDeviceName
-              ? `${ipConflictNotice.ip} is already configured on ${ipConflictNotice.conflictDeviceName} (${ipConflictNotice.conflictDeviceType ?? 'Device'}).`
-              : `${ipConflictNotice.ip} is already configured.`}
-          </Text>
+          <View
+            className={cn(
+              'w-full max-w-[420px] rounded-xl border px-5 py-4 shadow-xl',
+              isDark ? 'border-status-critical/50 bg-surface-darkpanel' : 'border-status-critical/60 bg-surface-lightpanel',
+            )}
+          >
+            <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>IP address already exists</Text>
+            <Text className={cn('mt-2 font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+              {ipConflictNotice.conflictDeviceName
+                ? `${ipConflictNotice.ip} is already configured on ${ipConflictNotice.conflictDeviceName} (${ipConflictNotice.conflictDeviceType ?? 'Device'}). This IP cannot be used for another gateway or rack.`
+                : `${ipConflictNotice.ip} is already configured and cannot be used for another gateway or rack.`}
+            </Text>
+            <View className="mt-4 items-end">
+              <ActionButton label="OK" onPress={() => setIpConflictNotice(null)} />
+            </View>
+          </View>
         </View>
       )}
 
