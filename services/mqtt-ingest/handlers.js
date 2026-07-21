@@ -51,7 +51,7 @@ async function findConfiguredIpConflict(gatewayDeviceId, gatewayIp) {
   return device.rows[0] ?? null;
 }
 
-async function rejectConfiguredIpConflict(gatewayId, gatewayIp) {
+async function rejectConfiguredIpConflict(gatewayId, gatewayIp, gatewayDeviceId) {
   await query(
     `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
      VALUES ($1,$2,false)
@@ -64,6 +64,27 @@ async function rejectConfiguredIpConflict(gatewayId, gatewayIp) {
      WHERE gateway_id = $1`,
     [gatewayId],
   );
+  await query(`DELETE FROM measurement_latest WHERE gateway_id = $1`, [gatewayId]);
+  await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1`, [gatewayId]);
+  await query(`DELETE FROM racks WHERE gateway_id = $1`, [gatewayId]);
+  const cleared = await query(
+    `UPDATE studio_devices
+     SET ip = '', updated_at = now()
+     WHERE id = $1
+       AND ip = $2
+       AND EXISTS (
+         SELECT 1
+         FROM studio_devices conflict
+         WHERE conflict.archived = false
+           AND conflict.type IN ('Gateway', 'Rack')
+           AND conflict.ip = $2
+           AND conflict.id <> $1
+       )`,
+    [gatewayDeviceId, gatewayIp],
+  );
+  if ((cleared.rowCount ?? 0) > 0) {
+    await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
+  }
   return {
     status: 'QUARANTINED',
     event: 'IP_CONFLICT',
@@ -112,7 +133,7 @@ export async function bind(msg) {
 
     const gatewayIpChanged = studioGateway.ip !== gateway_ip;
     const ipConflict = await findConfiguredIpConflict(studioGateway.id, gateway_ip);
-    if (ipConflict) return rejectConfiguredIpConflict(gateway_id, gateway_ip);
+    if (ipConflict) return rejectConfiguredIpConflict(gateway_id, gateway_ip, studioGateway.id);
 
     event = gatewayIpChanged ? 'IP_CHANGED' : 'BOUND';
     if (event === 'IP_CHANGED') await updateStudioGatewayIp(studioGateway.id, gateway_ip);
@@ -136,7 +157,7 @@ export async function bind(msg) {
 
     const gatewayIpChanged = studioGateway.ip !== gateway_ip;
     const ipConflict = await findConfiguredIpConflict(studioGateway.id, gateway_ip);
-    if (ipConflict) return rejectConfiguredIpConflict(gateway_id, gateway_ip);
+    if (ipConflict) return rejectConfiguredIpConflict(gateway_id, gateway_ip, studioGateway.id);
 
     if (current.status === 'QUARANTINED') {
       status = 'ONLINE';

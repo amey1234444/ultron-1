@@ -153,6 +153,10 @@ function isConflicted(device: DeviceNode, scope: { ips: Set<string>; gatewayIds:
   return !!ip && scope.ips.has(ip);
 }
 
+function gatewayCanShowData(gateway: LiveGateway | undefined): gateway is LiveGateway {
+  return !!gateway && gateway.status === 'ONLINE';
+}
+
 // Overlays real connectivity onto the stored devices: a device whose IP is
 // bound to an ONLINE gateway reads Online; one bound to an OFFLINE gateway
 // reads Not Connected; devices with no binding keep their stored status.
@@ -160,8 +164,8 @@ function isConflicted(device: DeviceNode, scope: { ips: Set<string>; gatewayIds:
 export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceNode[] {
   const scope = conflictScope(live);
   const hasConflicts = scope.ips.size > 0 || scope.gatewayIds.size > 0;
-  if (live.gateways.length === 0 && !hasConflicts) return devices;
   const duplicateIpIds = duplicateConfiguredIpDeviceIds(devices, live);
+  if (live.gateways.length === 0 && !hasConflicts && duplicateIpIds.size === 0) return devices;
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
     const liveIp = device.type === 'Gateway' && gateway?.currentIp && gateway.status !== 'QUARANTINED' ? gateway.currentIp : device.ip;
@@ -169,7 +173,8 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
       return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
     }
     if (duplicateIpIds.has(device.id)) {
-      return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
+      const displayIp = device.type === 'Gateway' ? '' : device.ip;
+      return device.status === 'Not Connected' && device.ip === displayIp ? device : { ...device, ip: displayIp, status: 'Not Connected' };
     }
     if (!gateway) return { ...device, status: 'Not Connected' };
     const rack = device.type === 'Rack' ? configuredRackForDevice(device, live) : undefined;
@@ -183,7 +188,7 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
 
 export function measurementsForDevice(device: DeviceNode, live: LiveState): LiveMeasurement[] {
   const gateway = gatewayForDevice(device, live);
-  if (!gateway) return [];
+  if (!gatewayCanShowData(gateway)) return [];
   return live.measurements.filter((m) => m.gatewayId === gateway.gatewayId);
 }
 
@@ -192,6 +197,7 @@ export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { 
   if (device.type !== 'Rack') return { active: 0, total };
   if (device.status !== 'Online') return { active: 0, total };
   const gateway = gatewayForDevice(device, live);
+  if (!gatewayCanShowData(gateway)) return { active: 0, total };
   const rack = configuredRackForDevice(device, live);
   if (!gateway || !rack || rack.status !== 'ONLINE') return { active: 0, total };
   const now = Date.now();
@@ -207,7 +213,7 @@ export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { 
 
 export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] {
   const gateway = gatewayForDevice(device, live);
-  if (!gateway) return [];
+  if (!gatewayCanShowData(gateway)) return [];
   const configuredRackId = configuredRackIdForDevice(device, live);
   if (configuredRackId !== undefined) return [configuredRackId];
   const ids = live.racks.filter((r) => r.gatewayId === gateway.gatewayId).map((r) => r.rackId);
@@ -217,7 +223,7 @@ export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] 
 
 export function latestMeasurementForChannel(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): LiveMeasurement | undefined {
   const gateway = gatewayForDevice(device, live);
-  if (!gateway) return undefined;
+  if (!gatewayCanShowData(gateway)) return undefined;
   const rackIds = rackIdsForDevice(device, live);
   const candidates = live.measurements.filter(
     (m) =>
@@ -232,8 +238,7 @@ export function latestMeasurementForChannel(device: DeviceNode, card: CardNode, 
 export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): ChannelLiveStatus {
   if (!card.enabled) return 'idle';
   const gateway = gatewayForDevice(device, live);
-  if (!gateway) return 'idle';
-  if (gateway.status !== 'ONLINE') return 'stale';
+  if (!gatewayCanShowData(gateway)) return 'stale';
 
   if ('controllerName' in card.config) {
     const slot = live.slots.find((s) => s.gatewayId === gateway.gatewayId && s.slotId === card.slot);

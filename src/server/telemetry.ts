@@ -83,6 +83,7 @@ type AlertRow = {
   conflict_device_name: string;
   conflict_device_type: string;
 };
+type BlockedBindingRow = Omit<AlertRow, 'id' | 'received_at'>;
 
 // A gateway that hasn't reported for this long reads as offline even if the
 // retained OFFLINE will was missed (matches the ingest service's backstop).
@@ -91,7 +92,7 @@ const STALE_AFTER_S = 15;
 export async function getLiveState(options: { includeConflictDeviceDetails?: boolean } = {}): Promise<LiveState> {
   await ensureSchema();
 
-  const [gateways, racks, slots, measurements, alerts] = await Promise.all([
+  const [gateways, racks, slots, measurements, alerts, blockedBindings] = await Promise.all([
     query<GatewayRow>(
       `SELECT gateway_id, current_ip, status, last_seen_at,
               (last_seen_at IS NULL OR last_seen_at < now() - make_interval(secs => $1)) AS stale
@@ -139,22 +140,56 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
        LIMIT 10`,
       [STALE_AFTER_S * 4],
     ),
+    query<BlockedBindingRow>(
+      `SELECT DISTINCT g.gateway_id,
+              g.current_ip AS gateway_ip,
+              gateway.name AS gateway_name,
+              conflict.id AS conflict_device_id,
+              conflict.name AS conflict_device_name,
+              conflict.type AS conflict_device_type
+       FROM gateways g
+       JOIN studio_devices gateway
+         ON gateway.type = 'Gateway'
+        AND gateway.archived = false
+        AND gateway.real_gateway_id = g.gateway_id
+       JOIN studio_devices conflict
+         ON conflict.archived = false
+        AND conflict.type IN ('Gateway', 'Rack')
+        AND conflict.ip = g.current_ip
+        AND conflict.id <> gateway.id
+       WHERE g.current_ip <> ''`,
+    ),
+  ]);
+
+  const alertKey = (gatewayId: string, gatewayIp: string) => `${gatewayId}:${gatewayIp}`;
+  const alertKeys = new Set(alerts.rows.map((a: AlertRow) => alertKey(a.gateway_id, a.gateway_ip)));
+  const syntheticAlerts: AlertRow[] = blockedBindings.rows
+    .filter((binding: BlockedBindingRow) => !alertKeys.has(alertKey(binding.gateway_id, binding.gateway_ip)))
+    .map((binding: BlockedBindingRow, index: number) => ({
+      id: -(index + 1),
+      received_at: new Date(),
+      ...binding,
+    }));
+  const allAlerts = [...alerts.rows, ...syntheticAlerts];
+  const blockedGatewayIds = new Set<string>([
+    ...gateways.rows.filter((g: GatewayRow) => g.status === 'QUARANTINED').map((g: GatewayRow) => g.gateway_id),
+    ...allAlerts.map((a: AlertRow) => a.gateway_id),
   ]);
 
   return {
     gateways: gateways.rows.map((g: GatewayRow) => ({
       gatewayId: g.gateway_id,
       currentIp: g.current_ip,
-      status: g.status === 'ONLINE' && g.stale ? 'OFFLINE' : g.status,
+      status: blockedGatewayIds.has(g.gateway_id) ? 'QUARANTINED' : g.status === 'ONLINE' && g.stale ? 'OFFLINE' : g.status,
       lastSeenAt: g.last_seen_at ? g.last_seen_at.toISOString() : null,
     })),
-    racks: racks.rows.map((r: RackRow) => ({
+    racks: racks.rows.filter((r: RackRow) => !blockedGatewayIds.has(r.gateway_id)).map((r: RackRow) => ({
       gatewayId: r.gateway_id,
       rackId: r.rack_id,
       status: r.stale ? 'OFFLINE' : 'ONLINE',
       lastSeenAt: r.last_seen_at ? r.last_seen_at.toISOString() : null,
     })),
-    slots: slots.rows.map((s: SlotRow) => ({
+    slots: slots.rows.filter((s: SlotRow) => !blockedGatewayIds.has(s.gateway_id)).map((s: SlotRow) => ({
       gatewayId: s.gateway_id,
       rackId: s.rack_id,
       slotId: s.slot_id,
@@ -162,7 +197,7 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
       onlineState: s.online_state,
       cardType: s.card_type,
     })),
-    measurements: measurements.rows.map((m: MeasurementRow) => ({
+    measurements: measurements.rows.filter((m: MeasurementRow) => !blockedGatewayIds.has(m.gateway_id)).map((m: MeasurementRow) => ({
       gatewayId: m.gateway_id,
       rackId: m.rack_id,
       slotId: m.slot_id,
@@ -173,7 +208,7 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
       quality: m.quality,
       updatedAt: m.updated_at.toISOString(),
     })),
-    alerts: alerts.rows.map((a: AlertRow) => ({
+    alerts: allAlerts.map((a: AlertRow) => ({
       id: Number(a.id),
       type: 'IP_CONFLICT',
       gatewayId: a.gateway_id,
