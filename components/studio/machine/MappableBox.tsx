@@ -3,6 +3,7 @@ import { PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'reac
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
+import { gatewayForRack, racksForGateway, type DeviceNode } from '../../../lib/devices';
 import type { ChannelRef } from '../../../lib/rack';
 import type { TrailStatus } from './AdjustableTrail';
 import { LIVE_RANGE_FOR_LETTER, useLiveValue } from './liveValue';
@@ -49,6 +50,7 @@ export type MappableBoxProps = {
   liveReading?: { value: number; unit?: string };
   channels: ChannelRef[];
   pickableChannels?: ChannelRef[];
+  devices?: DeviceNode[];
   canvasWidth: number;
   canvasHeight: number;
   // Current stage scale — converts screen-pixel gesture deltas to stage units.
@@ -81,6 +83,7 @@ export function MappableBox({
   liveReading,
   channels,
   pickableChannels,
+  devices = [],
   canvasWidth,
   canvasHeight,
   stageScale = 1,
@@ -100,15 +103,34 @@ export function MappableBox({
 
   const [pickerOpen, setPickerOpen] = useState(false);
   const [channelSearch, setChannelSearch] = useState('');
+  const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
+  const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel && dataLive);
   const displayValue = liveReading?.value ?? liveValue;
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;
+  const pickerGateways = useMemo(
+    () => devices.filter((device) => device.type === 'Gateway' && !device.archived),
+    [devices],
+  );
+  const selectedGateway = useMemo(
+    () => pickerGateways.find((gateway) => gateway.id === selectedGatewayId) ?? null,
+    [pickerGateways, selectedGatewayId],
+  );
+  const selectedGatewayRacks = useMemo(() => (selectedGateway ? racksForGateway(selectedGateway, devices) : []), [devices, selectedGateway]);
+  const selectedRack = useMemo(
+    () => selectedGatewayRacks.find((rack) => rack.id === selectedRackId) ?? null,
+    [selectedGatewayRacks, selectedRackId],
+  );
+  const pickerChannelsForRack = useMemo(
+    () => (selectedRack ? pickerChannels.filter((c) => c.rackId === selectedRack.id) : pickerChannels),
+    [pickerChannels, selectedRack],
+  );
   const filteredPickerChannels = useMemo(() => {
     const query = channelSearch.trim().toLowerCase();
-    if (!query) return pickerChannels;
-    return pickerChannels.filter((c) => searchableChannelText(c).includes(query));
-  }, [channelSearch, pickerChannels]);
+    if (!query) return pickerChannelsForRack;
+    return pickerChannelsForRack.filter((c) => searchableChannelText(c).includes(query));
+  }, [channelSearch, pickerChannelsForRack]);
 
   useEffect(() => {
     if (channel && dataLive) onLiveValueChange?.(displayValue);
@@ -117,6 +139,24 @@ export function MappableBox({
   useEffect(() => {
     if (!pickerOpen || channel) setChannelSearch('');
   }, [channel, pickerOpen]);
+
+  useEffect(() => {
+    if (!pickerOpen) {
+      setSelectedGatewayId(null);
+      setSelectedRackId(null);
+      return;
+    }
+    if (selectedGatewayId && !pickerGateways.some((gateway) => gateway.id === selectedGatewayId)) {
+      setSelectedGatewayId(null);
+      setSelectedRackId(null);
+    }
+  }, [pickerGateways, pickerOpen, selectedGatewayId]);
+
+  useEffect(() => {
+    if (selectedRackId && !selectedGatewayRacks.some((rack) => rack.id === selectedRackId)) {
+      setSelectedRackId(null);
+    }
+  }, [selectedGatewayRacks, selectedRackId]);
 
   const pointRef = useRef({ x, y });
   pointRef.current = { x, y };
@@ -256,9 +296,90 @@ export function MappableBox({
           <View className={cn('border-t', lineClass)}>
             {pickerChannels.length === 0 ? (
               <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No active rack channels yet.</Text>
+            ) : devices.length > 0 && !selectedGateway ? (
+              <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
+                <Text className={cn('px-2.5 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                  Gateways
+                </Text>
+                {pickerGateways.map((gateway) => {
+                  const racks = racksForGateway(gateway, devices);
+                  const activeCount = pickerChannels.filter((c) => {
+                    const rack = devices.find((d) => d.id === c.rackId);
+                    return rack && gatewayForRack(rack, devices)?.id === gateway.id;
+                  }).length;
+                  return (
+                    <Pressable
+                      key={gateway.id}
+                      onPress={() => {
+                        setSelectedGatewayId(gateway.id);
+                        setSelectedRackId(null);
+                      }}
+                      className={cn('border-b px-2.5 py-1.5', lineClass)}
+                    >
+                      <View className="flex-row items-center gap-2">
+                        <Text numberOfLines={1} style={{ minWidth: 0 }} className={cn('font-body-medium flex-1 text-xs', inkClass)}>
+                          {gateway.name}
+                        </Text>
+                        <Text className={cn('font-body-medium text-[10px]', gateway.status === 'Online' ? 'text-status-success' : mutedClass)}>
+                          {gateway.status === 'Online' ? 'active' : 'offline'}
+                        </Text>
+                      </View>
+                      <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
+                        {gateway.ip || 'no ip'} - {racks.length} racks - {activeCount} active channels
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            ) : devices.length > 0 && selectedGateway && !selectedRack ? (
+              <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
+                <Pressable
+                  onPress={() => {
+                    setSelectedGatewayId(null);
+                    setSelectedRackId(null);
+                  }}
+                  className={cn('border-b px-2.5 py-1.5', lineClass)}
+                >
+                  <Text className={cn('font-body-medium text-[11px]', mutedClass)}>Back to gateways</Text>
+                </Pressable>
+                <Text className={cn('px-2.5 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                  {selectedGateway.name} racks
+                </Text>
+                {selectedGatewayRacks.length === 0 ? (
+                  <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No racks under this gateway.</Text>
+                ) : (
+                  selectedGatewayRacks.map((rack) => {
+                    const activeCount = pickerChannels.filter((c) => c.rackId === rack.id).length;
+                    return (
+                      <Pressable
+                        key={rack.id}
+                        onPress={() => setSelectedRackId(rack.id)}
+                        className={cn('border-b px-2.5 py-1.5', lineClass)}
+                      >
+                        <View className="flex-row items-center gap-2">
+                          <Text numberOfLines={1} style={{ minWidth: 0 }} className={cn('font-body-medium flex-1 text-xs', inkClass)}>
+                            {rack.name}
+                          </Text>
+                          <Text className={cn('font-body-medium text-[10px]', rack.status === 'Online' ? 'text-status-success' : mutedClass)}>
+                            {rack.status === 'Online' ? 'active' : 'offline'}
+                          </Text>
+                        </View>
+                        <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
+                          {rack.ip || 'no ip'} - {activeCount} active channels
+                        </Text>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </ScrollView>
             ) : (
               <>
                 <View className={cn('border-b px-2.5 py-1.5', lineClass)}>
+                  {devices.length > 0 && selectedGateway && selectedRack && (
+                    <Pressable onPress={() => setSelectedRackId(null)} className="pb-1">
+                      <Text className={cn('font-body-medium text-[11px]', mutedClass)}>Back to racks</Text>
+                    </Pressable>
+                  )}
                   <TextInput
                     value={channelSearch}
                     onChangeText={setChannelSearch}
@@ -267,12 +388,14 @@ export function MappableBox({
                     className={cn('font-body text-xs', inkClass)}
                   />
                   <Text className={cn('mt-1 font-body text-[10px]', mutedClass)}>
-                    {filteredPickerChannels.length} of {pickerChannels.length} active channels
+                    {filteredPickerChannels.length} of {pickerChannelsForRack.length} active channels
                   </Text>
                 </View>
 
                 {filteredPickerChannels.length === 0 ? (
-                  <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No channels match this search.</Text>
+                  <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>
+                    {pickerChannelsForRack.length === 0 ? 'No active channels for this rack.' : 'No channels match this search.'}
+                  </Text>
                 ) : (
                   <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
                     {filteredPickerChannels.map((c) => (

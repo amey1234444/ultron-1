@@ -642,6 +642,7 @@ export function TrailBoard({
               liveReading={liveReadingFor(channel)}
               channels={channels}
               pickableChannels={pickableChannels}
+              devices={devices}
               canvasWidth={boardSize.width}
               canvasHeight={boardSize.height}
               stageScale={stageScale}

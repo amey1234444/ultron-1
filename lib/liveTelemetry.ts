@@ -3,7 +3,7 @@
 // gateway. The displayed IP follows the gateway's current_ip so an accepted
 // gateway IP change is visible immediately.
 
-import { ipPrefixFor, type DeviceNode } from './devices';
+import { ipPrefixFor, totalChannelsFor, type DeviceNode } from './devices';
 import type { CardNode } from './rack';
 
 export type LiveGateway = {
@@ -128,6 +128,23 @@ export function measurementsForDevice(device: DeviceNode, live: LiveState): Live
   const gateway = gatewayForDevice(device, live);
   if (!gateway) return [];
   return live.measurements.filter((m) => m.gatewayId === gateway.gatewayId);
+}
+
+export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { active: number; total: number } {
+  const total = totalChannelsFor(device.type);
+  if (device.type !== 'Rack') return { active: 0, total };
+  const gateway = gatewayForDevice(device, live);
+  const rack = configuredRackForDevice(device, live);
+  if (!gateway || !rack || rack.status !== 'ONLINE') return { active: 0, total };
+  const now = Date.now();
+  const activeKeys = new Set<string>();
+  for (const measurement of live.measurements) {
+    if (measurement.gatewayId !== gateway.gatewayId || measurement.rackId !== rack.rackId) continue;
+    if (measurement.quality && measurement.quality !== 'GOOD') continue;
+    if (now - Date.parse(measurement.updatedAt) > ACTIVE_MEASUREMENT_MAX_AGE_MS) continue;
+    activeKeys.add(`${measurement.slotId}.${measurement.channelId}`);
+  }
+  return { active: activeKeys.size, total };
 }
 
 export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] {

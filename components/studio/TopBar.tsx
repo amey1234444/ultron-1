@@ -6,7 +6,7 @@ import { ThemeToggle } from '../ThemeToggle';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { LOGO_DARK, LOGO_LIGHT } from '../../lib/brandLogos';
 import { cn } from '../../lib/cn';
-import type { DeviceNode } from '../../lib/devices';
+import { racksForGateway, type DeviceNode } from '../../lib/devices';
 
 const LOGO_ASPECT = 284 / 77;
 const LOGO_HEIGHT = 24;
@@ -14,7 +14,6 @@ const LOGO_HEIGHT = 24;
 type TopBarProps = {
   projectName?: string | null;
   alarmCount?: number;
-  // Devices power the "Connections" dropdown (active/inactive IPs + machine ids).
   devices?: DeviceNode[];
   canConfigure?: boolean;
   configureMode?: boolean;
@@ -25,7 +24,6 @@ function formatClock(d: Date): string {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-// Ticking wall-clock, refreshed every 15s.
 function LiveClock({ muted, ink }: { muted: string; ink: string }) {
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
@@ -44,30 +42,30 @@ function Divider({ color }: { color: string }) {
   return <View style={{ width: 1, height: 18, backgroundColor: color }} />;
 }
 
-// Dropdown listing every device grouped by connection state: active IPs get a
-// green dot, inactive ones a grey dot, each paired with its machine/device id —
-// so an operator can see at a glance which gateways/racks are reachable.
-function ConnectionsMenu({
-  devices,
-  compact,
-}: {
-  devices: DeviceNode[];
-  compact: boolean;
-}) {
+function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact: boolean }) {
   const { isDark } = useAppTheme();
   const [open, setOpen] = useState(false);
+  const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
 
-  const { active, inactive } = useMemo(() => {
-    const real = devices.filter((d) => !d.archived);
-    return {
-      active: real.filter((d) => d.status === 'Online'),
-      inactive: real.filter((d) => d.status !== 'Online'),
-    };
-  }, [devices]);
-  const total = active.length + inactive.length;
+  const realDevices = useMemo(() => devices.filter((d) => !d.archived), [devices]);
+  const active = useMemo(() => realDevices.filter((d) => d.status === 'Online'), [realDevices]);
+  const gateways = useMemo(() => realDevices.filter((d) => d.type === 'Gateway'), [realDevices]);
+  const total = realDevices.length;
+  const selectedGateway = useMemo(
+    () => gateways.find((gateway) => gateway.id === selectedGatewayId) ?? gateways[0] ?? null,
+    [gateways, selectedGatewayId],
+  );
+  const selectedRacks = useMemo(() => (selectedGateway ? racksForGateway(selectedGateway, devices) : []), [devices, selectedGateway]);
+
+  useEffect(() => {
+    if (!selectedGatewayId && gateways[0]) setSelectedGatewayId(gateways[0].id);
+    if (selectedGatewayId && !gateways.some((gateway) => gateway.id === selectedGatewayId)) {
+      setSelectedGatewayId(gateways[0]?.id ?? null);
+    }
+  }, [gateways, selectedGatewayId]);
 
   const panelStyle = {
     backgroundColor: isDark ? 'rgba(16,16,16,0.96)' : 'rgba(255,255,255,0.98)',
@@ -75,10 +73,13 @@ function ConnectionsMenu({
     WebkitBackdropFilter: 'blur(18px) saturate(160%)',
   } as unknown as ViewStyle;
 
-  const Row = ({ device }: { device: DeviceNode }) => {
+  const Row = ({ device, selected = false, onPress }: { device: DeviceNode; selected?: boolean; onPress?: () => void }) => {
     const isOnline = device.status === 'Online';
     return (
-      <View className="flex-row items-center gap-2.5 px-3 py-2">
+      <Pressable
+        onPress={onPress}
+        className={cn('flex-row items-center gap-2.5 px-3 py-2', selected && (isDark ? 'bg-ink/10' : 'bg-ink-inverse/10'))}
+      >
         <View
           style={{
             width: 8,
@@ -92,13 +93,13 @@ function ConnectionsMenu({
             {device.name}
           </Text>
           <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
-            {device.ip || 'no ip'} · {device.type}
+            {device.ip || 'no ip'} - {device.type}
           </Text>
         </View>
         <Text className={cn('font-body-medium text-[10px]', isOnline ? 'text-status-success' : mutedClass)}>
-          {isOnline ? 'active' : 'idle'}
+          {isOnline ? 'active' : 'offline'}
         </Text>
-      </View>
+      </Pressable>
     );
   };
 
@@ -114,18 +115,19 @@ function ConnectionsMenu({
           <Text className={mutedClass}>/{total}</Text>
         </Text>
         {!compact && <Text className={cn('font-body-medium text-[11px]', mutedClass)}>IPs</Text>}
-        <Text className={cn('text-[9px]', mutedClass)}>▾</Text>
+        <Text className={cn('text-[9px]', mutedClass)}>v</Text>
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <Pressable className="flex-1" onPress={() => setOpen(false)}>
-          <View
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
             className={cn('absolute overflow-hidden rounded-2xl border', lineClass)}
             style={[
               {
                 top: 54,
                 right: 12,
-                width: 288,
+                width: compact ? 420 : 560,
                 maxHeight: 380,
                 shadowColor: '#000',
                 shadowOpacity: isDark ? 0.5 : 0.18,
@@ -146,30 +148,38 @@ function ConnectionsMenu({
             {total === 0 ? (
               <Text className={cn('px-3 py-4 font-body text-xs italic', mutedClass)}>No devices added yet.</Text>
             ) : (
-              <ScrollView style={{ maxHeight: 320 }}>
-                {active.length > 0 && (
-                  <View className={cn('border-b', lineClass)}>
-                    <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider text-status-success')}>
-                      Active · {active.length}
-                    </Text>
-                    {active.map((d) => (
-                      <Row key={d.id} device={d} />
+              <View className="flex-row">
+                <View className={cn('border-r', lineClass)} style={{ width: compact ? 190 : 240 }}>
+                  <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                    Gateways - {gateways.length}
+                  </Text>
+                  <ScrollView style={{ maxHeight: 320 }}>
+                    {gateways.map((gateway) => (
+                      <Row
+                        key={gateway.id}
+                        device={gateway}
+                        selected={selectedGateway?.id === gateway.id}
+                        onPress={() => setSelectedGatewayId(gateway.id)}
+                      />
                     ))}
-                  </View>
-                )}
-                {inactive.length > 0 && (
-                  <View>
-                    <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
-                      Inactive · {inactive.length}
-                    </Text>
-                    {inactive.map((d) => (
-                      <Row key={d.id} device={d} />
-                    ))}
-                  </View>
-                )}
-              </ScrollView>
+                  </ScrollView>
+                </View>
+
+                <View className="flex-1">
+                  <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                    {selectedGateway ? `${selectedGateway.name} racks` : 'Racks'} - {selectedRacks.filter((rack) => rack.status === 'Online').length}/{selectedRacks.length} active
+                  </Text>
+                  <ScrollView style={{ maxHeight: 320 }}>
+                    {selectedRacks.length === 0 ? (
+                      <Text className={cn('px-3 py-4 font-body text-xs italic', mutedClass)}>No racks under this gateway.</Text>
+                    ) : (
+                      selectedRacks.map((rack) => <Row key={rack.id} device={rack} />)
+                    )}
+                  </ScrollView>
+                </View>
+              </View>
             )}
-          </View>
+          </Pressable>
         </Pressable>
       </Modal>
     </>
@@ -186,8 +196,6 @@ export function TopBar({
 }: TopBarProps) {
   const { isDark } = useAppTheme();
   const { width } = useWindowDimensions();
-  // Progressive disclosure: drop the least-essential chrome first as the header
-  // narrows, so it never overflows on tablet/phone widths.
   const isNarrow = width > 0 && width < 640;
   const isMid = width > 0 && width < 900;
 
@@ -212,7 +220,6 @@ export function TopBar({
       className="relative z-10 flex-row flex-wrap items-center justify-between gap-y-2 px-4 py-2"
       style={glassStyle}
     >
-      {/* Left: brand + location breadcrumb */}
       <View className="flex-row items-center gap-3">
         <Image
           source={isDark ? LOGO_DARK : LOGO_LIGHT}
@@ -229,7 +236,6 @@ export function TopBar({
         )}
       </View>
 
-      {/* Right: connections + alarms + clock + theme toggle */}
       <View className="flex-row flex-wrap items-center justify-end gap-3">
         {canConfigure && (
           <>
@@ -240,9 +246,7 @@ export function TopBar({
               className={cn(
                 'flex-row items-center gap-2 rounded-full border px-2.5 py-1',
                 configureMode
-                  ? isDark
-                    ? 'border-accent bg-accent/15'
-                    : 'border-accent bg-accent/15'
+                  ? 'border-accent bg-accent/15'
                   : isDark
                     ? 'border-line-dark'
                     : 'border-line-light',

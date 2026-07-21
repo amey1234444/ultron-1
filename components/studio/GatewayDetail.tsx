@@ -5,6 +5,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { displayIpFor, lastCommunicationLabel, racksForGateway, type DeviceNode } from '../../lib/devices';
 import type { ProjectNode } from '../../lib/hierarchy';
+import type { LiveState } from '../../lib/liveTelemetry';
 import { PERMISSIONS } from '../../lib/permissions';
 import { ActionButton } from './ActionButton';
 import { BackButton } from './BackButton';
@@ -14,6 +15,7 @@ type GatewayDetailProps = {
   gateway: DeviceNode;
   devices: DeviceNode[];
   projects: ProjectNode[];
+  live?: LiveState;
   canConfigure: boolean;
   onBack: () => void;
   onAddRack: () => void;
@@ -54,7 +56,7 @@ function InfoRow({ label, value, mono }: { label: string; value: string; mono?: 
   );
 }
 
-export function GatewayDetail({ gateway, devices, projects, canConfigure, onBack, onAddRack, onOpenRack, onOpenMenu }: GatewayDetailProps) {
+export function GatewayDetail({ gateway, devices, projects, live, canConfigure, onBack, onAddRack, onOpenRack, onOpenMenu }: GatewayDetailProps) {
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<'racks' | 'details'>('racks');
   const racks = racksForGateway(gateway, devices);
@@ -97,7 +99,7 @@ export function GatewayDetail({ gateway, devices, projects, canConfigure, onBack
           <Text className={cn('font-body text-sm italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>No racks connected to this gateway.</Text>
         </View>
       ) : (
-        <DevicesTable devices={racks} allDevices={devices} projects={projects} onOpenDevice={onOpenRack} onOpenMenu={onOpenMenu} />
+        <DevicesTable devices={racks} allDevices={devices} projects={projects} live={live} onOpenDevice={onOpenRack} onOpenMenu={onOpenMenu} />
       )}
     </View>
   );

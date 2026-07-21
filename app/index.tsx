@@ -710,6 +710,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               gateway={selectedDevice}
               devices={devices}
               projects={projects}
+              live={realMode ? liveState : undefined}
               canConfigure={canEditDeleteSchema}
               onBack={() => setSelected({ kind: 'devices' })}
               onAddRack={() => {
@@ -774,6 +775,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
                   devices={gateways}
                   allDevices={devices}
                   projects={projects}
+                  live={realMode ? liveState : undefined}
                   onOpenDevice={(id) => setSelected({ kind: 'device', id })}
                   onOpenMenu={canEditDeleteSchema ? (x, y, deviceId) => {
                     const device = devices.find((d) => d.id === deviceId);

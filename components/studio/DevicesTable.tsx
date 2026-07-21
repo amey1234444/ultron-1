@@ -8,18 +8,19 @@ import {
   displayIpFor,
   healthFor,
   lastCommunicationLabel,
-  mappedChannelsFor,
   racksForGateway,
   totalChannelsFor,
   type DeviceNode,
 } from '../../lib/devices';
 import type { ProjectNode } from '../../lib/hierarchy';
+import { activeChannelsForDevice, type LiveState } from '../../lib/liveTelemetry';
 import { RibbonEdge } from './RibbonEdge';
 
 type DevicesTableProps = {
   devices: DeviceNode[];
   allDevices?: DeviceNode[];
   projects: ProjectNode[];
+  live?: LiveState;
   onOpenDevice: (id: string) => void;
   onOpenMenu?: (x: number, y: number, deviceId: string) => void;
 };
@@ -104,12 +105,14 @@ function DeviceRow({
   device,
   allDevices,
   projectName,
+  live,
   onOpenDevice,
   onOpenMenu,
 }: {
   device: DeviceNode;
   allDevices: DeviceNode[];
   projectName: string;
+  live?: LiveState;
   onOpenDevice: (id: string) => void;
   onOpenMenu?: (x: number, y: number, deviceId: string) => void;
 }) {
@@ -117,7 +120,7 @@ function DeviceRow({
   const [hovered, setHovered] = useState(false);
   const borderClass = isDark ? 'border-line-dark' : 'border-line-light';
   const total = totalChannelsFor(device.type);
-  const mapped = mappedChannelsFor(device);
+  const activeChannels = live ? activeChannelsForDevice(device, live) : { active: 0, total };
   const shownIp = displayIpFor(device);
   const hasIp = shownIp.length > 0;
   const health = healthFor(device);
@@ -172,7 +175,7 @@ function DeviceRow({
         {lastCommunicationLabel(device)}
       </Text>
       <Text style={{ flex: FLEX.mapping }} className={cn('font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        {device.type === 'Gateway' ? `${gatewayRackCount} rack${gatewayRackCount === 1 ? '' : 's'}` : total > 0 ? `${mapped} / ${total}` : '-'}
+        {device.type === 'Gateway' ? `${gatewayRackCount} rack${gatewayRackCount === 1 ? '' : 's'}` : total > 0 ? `${activeChannels.active} / ${activeChannels.total}` : '-'}
       </Text>
       {onOpenMenu ? (
         <Pressable
@@ -192,7 +195,7 @@ function DeviceRow({
   );
 }
 
-export function DevicesTable({ devices, allDevices = devices, projects, onOpenDevice, onOpenMenu }: DevicesTableProps) {
+export function DevicesTable({ devices, allDevices = devices, projects, live, onOpenDevice, onOpenMenu }: DevicesTableProps) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' } | null>(null);
@@ -226,7 +229,7 @@ export function DevicesTable({ devices, allDevices = devices, projects, onOpenDe
             <HeaderCell label="Status" flex={FLEX.status} sortKey="status" activeSort={sort} onSort={toggleSort} />
             <HeaderCell label="Project" flex={FLEX.project} />
             <HeaderCell label="Last Comm." flex={FLEX.lastComm} />
-            <HeaderCell label="Mapping" flex={FLEX.mapping} />
+            <HeaderCell label="Active Ch." flex={FLEX.mapping} />
             {onOpenMenu ? <View style={{ width: MENU_WIDTH }} /> : null}
           </View>
 
@@ -237,6 +240,7 @@ export function DevicesTable({ devices, allDevices = devices, projects, onOpenDe
                 device={d}
                 allDevices={allDevices}
                 projectName={d.projectId ? (projectNameById.get(d.projectId) ?? 'Unassigned') : 'Unassigned'}
+                live={live}
                 onOpenDevice={onOpenDevice}
                 onOpenMenu={onOpenMenu}
               />
