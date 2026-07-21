@@ -107,6 +107,30 @@ function duplicateConfiguredIpDeviceIds(devices: DeviceNode[], live: LiveState):
   return duplicates;
 }
 
+function unconfiguredGatewayScope(devices: DeviceNode[]): { deviceIds: Set<string>; realGatewayIds: Set<string> } {
+  const deviceIds = new Set<string>();
+  const realGatewayIds = new Set<string>();
+  for (const device of devices) {
+    if (device.archived || device.type !== 'Gateway') continue;
+    if (device.ip.trim()) continue;
+    deviceIds.add(device.id);
+    if (device.realGatewayId) realGatewayIds.add(device.realGatewayId);
+  }
+  return { deviceIds, realGatewayIds };
+}
+
+function isUnderUnconfiguredGateway(
+  device: DeviceNode,
+  scope: { deviceIds: Set<string>; realGatewayIds: Set<string> },
+): boolean {
+  if (device.type === 'Gateway') {
+    return scope.deviceIds.has(device.id) || (!!device.realGatewayId && scope.realGatewayIds.has(device.realGatewayId));
+  }
+  if (device.type !== 'Rack') return false;
+  if (device.gatewayId && scope.deviceIds.has(device.gatewayId)) return true;
+  return !!device.realGatewayId && scope.realGatewayIds.has(device.realGatewayId);
+}
+
 export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGateway | undefined {
   const ip = device.ip.trim();
   if (!ip) return undefined;
@@ -165,10 +189,16 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
   const scope = conflictScope(live);
   const hasConflicts = scope.ips.size > 0 || scope.gatewayIds.size > 0;
   const duplicateIpIds = duplicateConfiguredIpDeviceIds(devices, live);
-  if (live.gateways.length === 0 && !hasConflicts && duplicateIpIds.size === 0) return devices;
+  const unconfiguredScope = unconfiguredGatewayScope(devices);
+  const hasUnconfiguredGateways = unconfiguredScope.deviceIds.size > 0 || unconfiguredScope.realGatewayIds.size > 0;
+  if (live.gateways.length === 0 && !hasConflicts && duplicateIpIds.size === 0 && !hasUnconfiguredGateways) return devices;
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
     const liveIp = device.type === 'Gateway' && gateway?.currentIp && gateway.status !== 'QUARANTINED' ? gateway.currentIp : device.ip;
+    if (isUnderUnconfiguredGateway(device, unconfiguredScope)) {
+      const displayIp = device.type === 'Gateway' ? '' : device.ip;
+      return device.status === 'Not Connected' && device.ip === displayIp ? device : { ...device, ip: displayIp, status: 'Not Connected' };
+    }
     if (device.type === 'Gateway' && !device.ip.trim()) {
       return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
     }
@@ -193,6 +223,7 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
 }
 
 export function measurementsForDevice(device: DeviceNode, live: LiveState): LiveMeasurement[] {
+  if (device.type === 'Rack' && device.status !== 'Online') return [];
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return [];
   return live.measurements.filter((m) => m.gatewayId === gateway.gatewayId);
@@ -228,6 +259,7 @@ export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] 
 }
 
 export function latestMeasurementForChannel(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): LiveMeasurement | undefined {
+  if (device.status !== 'Online') return undefined;
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return undefined;
   const rackIds = rackIdsForDevice(device, live);
@@ -243,6 +275,7 @@ export function latestMeasurementForChannel(device: DeviceNode, card: CardNode, 
 
 export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): ChannelLiveStatus {
   if (!card.enabled) return 'idle';
+  if (device.status !== 'Online') return 'stale';
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return 'stale';
 
