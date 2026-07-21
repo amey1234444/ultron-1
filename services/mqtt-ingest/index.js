@@ -82,12 +82,8 @@ async function onMessage(topic, buf) {
     console.warn(`[quarantine] unknown gateway ${msg.gateway_id} @ ${msg.gateway_ip} — awaiting commissioning`);
   } else if (binding.event === 'IP_CONFLICT') {
     console.warn(`[quarantine] ${msg.gateway_id} configured gateway_ip ${msg.gateway_ip} is already assigned to another device`);
-  } else if (binding.event === 'UNCONFIGURED') {
-    console.warn(`[quarantine] ${msg.gateway_id} has no gateway IP configured in Studio — configure it before it can publish`);
-  } else if (binding.event === 'IP_MISMATCH') {
-    console.warn(`[quarantine] ${msg.gateway_id} reported ${msg.gateway_ip} which does not match its configured Studio IP`);
-  } else if (binding.event === 'COMMISSIONED') {
-    console.log(`COMMISSIONED: ${msg.gateway_id} Rack ${msg.rack_id} ${msg.gateway_ip}`);
+  } else if (binding.event === 'IP_CHANGED') {
+    console.warn(`[binding] ${msg.gateway_id} IP changed to commissioned address ${msg.gateway_ip}`);
   } else {
     console.log(`BOUND: ${msg.gateway_id} Rack ${msg.rack_id} ${msg.gateway_ip}`);
   }

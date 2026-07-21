@@ -1,9 +1,10 @@
 // Live gateway/rack state from the MQTT ingestion pipeline (/api/live/state).
-// A studio device is "live" only when its permanent Script ID maps to a
-// commissioned (ONLINE) gateway — one whose reported IP matches the IP
-// configured for it in Studio. A gateway that has not had its IP configured,
-// reports a different IP than configured, or whose IP collides with another
-// device is quarantined by the ingest layer and never reads as connected here.
+// A studio device is "live" when its permanent Script ID maps to a bound
+// gateway. The displayed IP follows the gateway's current_ip so an accepted
+// gateway IP change is visible immediately. A gateway that reports an IP that
+// is already configured on another gateway/rack is an invalid request: the
+// ingest layer quarantines it and raises an IP_CONFLICT alert, and neither the
+// offending gateway nor the device that owns the IP ever reads as connected.
 
 import { ipPrefixFor, totalChannelsFor, type DeviceNode } from './devices';
 import type { CardNode } from './rack';
@@ -132,15 +133,41 @@ export function isDeviceLive(device: DeviceNode, live: LiveState): boolean {
   return gateway?.status === 'ONLINE';
 }
 
+function conflictScope(live: LiveState): { ips: Set<string>; gatewayIds: Set<string> } {
+  const ips = new Set<string>();
+  const gatewayIds = new Set<string>();
+  for (const alert of live.alerts) {
+    if (alert.type !== 'IP_CONFLICT') continue;
+    const ip = alert.gatewayIp.trim();
+    if (ip) ips.add(ip);
+    if (alert.gatewayId) gatewayIds.add(alert.gatewayId);
+  }
+  return { ips, gatewayIds };
+}
+
+// The offending gateway (matched by its script id) and every device that owns
+// the contested IP are invalid while the conflict stands — force Not Connected.
+function isConflicted(device: DeviceNode, scope: { ips: Set<string>; gatewayIds: Set<string> }): boolean {
+  if (device.type === 'Gateway' && device.realGatewayId && scope.gatewayIds.has(device.realGatewayId)) return true;
+  const ip = device.ip.trim();
+  return !!ip && scope.ips.has(ip);
+}
+
 // Overlays real connectivity onto the stored devices: a device whose IP is
 // bound to an ONLINE gateway reads Online; one bound to an OFFLINE gateway
 // reads Not Connected; devices with no binding keep their stored status.
+// Devices involved in an IP_CONFLICT are forced to Not Connected.
 export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceNode[] {
-  if (live.gateways.length === 0) return devices;
+  const scope = conflictScope(live);
+  const hasConflicts = scope.ips.size > 0 || scope.gatewayIds.size > 0;
+  if (live.gateways.length === 0 && !hasConflicts) return devices;
   const duplicateIpIds = duplicateConfiguredIpDeviceIds(devices, live);
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
     const liveIp = device.type === 'Gateway' && gateway?.currentIp && gateway.status !== 'QUARANTINED' ? gateway.currentIp : device.ip;
+    if ((device.type === 'Gateway' || device.type === 'Rack') && isConflicted(device, scope)) {
+      return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
+    }
     if (duplicateIpIds.has(device.id)) {
       return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
     }
