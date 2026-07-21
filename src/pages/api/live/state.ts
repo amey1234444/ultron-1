@@ -16,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ error: 'Method not allowed.' });
     }
     await enforceRateLimit(req, res, 'api');
-    if (!isDbEnabled()) return res.status(200).json({ persisted: false, gateways: [], racks: [], slots: [], measurements: [] });
+    if (!isDbEnabled()) return res.status(200).json({ persisted: false, gateways: [], racks: [], slots: [], measurements: [], alerts: [] });
     const state = await getLiveState();
     return res.status(200).json({ persisted: true, ...state });
   } catch {

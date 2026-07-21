@@ -1,7 +1,7 @@
 // Live gateway/rack state from the MQTT ingestion pipeline (/api/live/state).
-// A studio device is "live" when its configured IP matches a bound gateway's
-// current_ip and that gateway is ONLINE (permanent identity stays
-// gateway_id + rack_id on the backend; the IP is the binding field here).
+// A studio device is "live" when its permanent Script ID maps to a bound
+// gateway. The displayed IP follows the gateway's current_ip so an accepted
+// gateway IP change is visible immediately.
 
 import { ipPrefixFor, type DeviceNode } from './devices';
 import type { CardNode } from './rack';
@@ -34,25 +34,50 @@ export type LiveSlot = {
   cardType: string | null;
 };
 
-export type LiveState = {
-  gateways: LiveGateway[];
-  racks: { gatewayId: string; rackId: number }[];
-  slots: LiveSlot[];
-  measurements: LiveMeasurement[];
+export type LiveRack = {
+  gatewayId: string;
+  rackId: number;
+  status: string;
+  lastSeenAt: string | null;
 };
 
-export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [], measurements: [] };
+export type LiveAlert = {
+  id: number;
+  type: 'RACK_IP_CONFLICT';
+  gatewayId: string;
+  gatewayIp: string;
+  gatewayName: string;
+  rackDeviceId: string;
+  rackName: string;
+  rackId: number | null;
+  createdAt: string;
+  message: string;
+};
+
+export type LiveState = {
+  gateways: LiveGateway[];
+  racks: LiveRack[];
+  slots: LiveSlot[];
+  measurements: LiveMeasurement[];
+  alerts: LiveAlert[];
+};
+
+export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [], measurements: [], alerts: [] };
 
 export type ChannelLiveStatus = 'active' | 'stale' | 'idle';
 
 const ACTIVE_MEASUREMENT_MAX_AGE_MS = 15_000;
 
-function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number | undefined {
+function configuredRackForDevice(device: DeviceNode, live: LiveState): LiveRack | undefined {
   const gateway = gatewayForDevice(device, live);
   if (!gateway) return undefined;
   const rackId = device.realRackId;
   if (!Number.isInteger(rackId)) return undefined;
-  return live.racks.some((r) => r.gatewayId === gateway.gatewayId && r.rackId === rackId) ? rackId as number : undefined;
+  return live.racks.find((r) => r.gatewayId === gateway.gatewayId && r.rackId === rackId);
+}
+
+function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number | undefined {
+  return configuredRackForDevice(device, live)?.rackId;
 }
 
 export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGateway | undefined {
@@ -75,8 +100,8 @@ export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGatew
 export function isDeviceLive(device: DeviceNode, live: LiveState): boolean {
   const gateway = gatewayForDevice(device, live);
   if (device.type === 'Rack') {
-    const rackId = configuredRackIdForDevice(device, live);
-    if (rackId === undefined) return false;
+    const rack = configuredRackForDevice(device, live);
+    if (!rack || rack.status !== 'ONLINE') return false;
   }
   return gateway?.status === 'ONLINE';
 }
@@ -88,12 +113,14 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
   if (live.gateways.length === 0) return devices;
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
+    const liveIp = device.type === 'Gateway' && gateway?.currentIp ? gateway.currentIp : device.ip;
     if (!gateway) return { ...device, status: 'Not Connected' };
-    if (device.type === 'Rack' && configuredRackIdForDevice(device, live) === undefined) {
-      return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
+    const rack = device.type === 'Rack' ? configuredRackForDevice(device, live) : undefined;
+    if (device.type === 'Rack' && (!rack || rack.status !== 'ONLINE')) {
+      return device.status === 'Not Connected' && device.ip === liveIp ? device : { ...device, ip: liveIp, status: 'Not Connected' };
     }
     const status = gateway.status === 'ONLINE' ? 'Online' : 'Not Connected';
-    return device.status === status ? device : { ...device, status };
+    return device.status === status && device.ip === liveIp ? device : { ...device, ip: liveIp, status };
   });
 }
 

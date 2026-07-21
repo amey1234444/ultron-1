@@ -13,6 +13,8 @@ export type LiveGateway = {
 export type LiveRack = {
   gatewayId: string;
   rackId: number;
+  status: string;
+  lastSeenAt: string | null;
 };
 
 export type LiveSlot = {
@@ -36,11 +38,25 @@ export type LiveMeasurement = {
   updatedAt: string;
 };
 
+export type LiveAlert = {
+  id: number;
+  type: 'RACK_IP_CONFLICT';
+  gatewayId: string;
+  gatewayIp: string;
+  gatewayName: string;
+  rackDeviceId: string;
+  rackName: string;
+  rackId: number | null;
+  createdAt: string;
+  message: string;
+};
+
 export type LiveState = {
   gateways: LiveGateway[];
   racks: LiveRack[];
   slots: LiveSlot[];
   measurements: LiveMeasurement[];
+  alerts: LiveAlert[];
 };
 
 // A gateway that hasn't reported for this long reads as offline even if the
@@ -50,14 +66,24 @@ const STALE_AFTER_S = 15;
 export async function getLiveState(): Promise<LiveState> {
   await ensureSchema();
 
-  const [gateways, racks, slots, measurements] = await Promise.all([
+  const [gateways, racks, slots, measurements, alerts] = await Promise.all([
     query<{ gateway_id: string; current_ip: string; status: string; last_seen_at: Date | null; stale: boolean }>(
       `SELECT gateway_id, current_ip, status, last_seen_at,
               (last_seen_at IS NULL OR last_seen_at < now() - make_interval(secs => $1)) AS stale
        FROM gateways ORDER BY gateway_id`,
       [STALE_AFTER_S],
     ),
-    query<{ gateway_id: string; rack_id: number }>(`SELECT gateway_id, rack_id FROM racks ORDER BY gateway_id, rack_id`),
+    query<{ gateway_id: string; rack_id: number; last_seen_at: Date | null; stale: boolean }>(
+      `SELECT r.gateway_id, r.rack_id, MAX(m.updated_at) AS last_seen_at,
+              (MAX(m.updated_at) IS NULL OR MAX(m.updated_at) < now() - make_interval(secs => $1)) AS stale
+       FROM racks r
+       LEFT JOIN measurement_latest m
+         ON m.gateway_id = r.gateway_id
+        AND m.rack_id = r.rack_id
+       GROUP BY r.gateway_id, r.rack_id
+       ORDER BY r.gateway_id, r.rack_id`,
+      [STALE_AFTER_S],
+    ),
     query<{ gateway_id: string; rack_id: number; slot_id: number; presence: string; online_state: string; card_type: string | null }>(
       `SELECT gateway_id, rack_id, slot_id, presence, online_state, card_type
        FROM rack_inventory_slots ORDER BY gateway_id, rack_id, slot_id`,
@@ -76,6 +102,37 @@ export async function getLiveState(): Promise<LiveState> {
       `SELECT gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, updated_at
        FROM measurement_latest ORDER BY gateway_id, rack_id, slot_id, channel_id`,
     ),
+    query<{
+      id: string;
+      gateway_id: string;
+      gateway_ip: string;
+      received_at: Date;
+      gateway_name: string;
+      rack_device_id: string;
+      rack_name: string;
+      real_rack_id: number | null;
+    }>(
+      `SELECT q.id, q.gateway_id, q.gateway_ip, q.received_at,
+              gateway.name AS gateway_name,
+              rack.id AS rack_device_id,
+              rack.name AS rack_name,
+              rack.real_rack_id
+       FROM mqtt_quarantine q
+       JOIN studio_devices gateway
+         ON gateway.type = 'Gateway'
+        AND gateway.archived = false
+        AND gateway.real_gateway_id = q.gateway_id
+       JOIN studio_devices rack
+         ON rack.type = 'Rack'
+        AND rack.archived = false
+        AND rack.gateway_id = gateway.id
+        AND rack.ip = q.gateway_ip
+       WHERE q.reason = 'gateway_ip matches configured rack ip'
+         AND q.received_at > now() - make_interval(secs => $1)
+       ORDER BY q.received_at DESC
+       LIMIT 10`,
+      [STALE_AFTER_S * 4],
+    ),
   ]);
 
   return {
@@ -85,7 +142,12 @@ export async function getLiveState(): Promise<LiveState> {
       status: g.status === 'ONLINE' && g.stale ? 'OFFLINE' : g.status,
       lastSeenAt: g.last_seen_at ? g.last_seen_at.toISOString() : null,
     })),
-    racks: racks.rows.map((r) => ({ gatewayId: r.gateway_id, rackId: r.rack_id })),
+    racks: racks.rows.map((r) => ({
+      gatewayId: r.gateway_id,
+      rackId: r.rack_id,
+      status: r.stale ? 'OFFLINE' : 'ONLINE',
+      lastSeenAt: r.last_seen_at ? r.last_seen_at.toISOString() : null,
+    })),
     slots: slots.rows.map((s) => ({
       gatewayId: s.gateway_id,
       rackId: s.rack_id,
@@ -104,6 +166,18 @@ export async function getLiveState(): Promise<LiveState> {
       unit: m.unit,
       quality: m.quality,
       updatedAt: m.updated_at.toISOString(),
+    })),
+    alerts: alerts.rows.map((a) => ({
+      id: Number(a.id),
+      type: 'RACK_IP_CONFLICT',
+      gatewayId: a.gateway_id,
+      gatewayIp: a.gateway_ip,
+      gatewayName: a.gateway_name,
+      rackDeviceId: a.rack_device_id,
+      rackName: a.rack_name,
+      rackId: a.real_rack_id,
+      createdAt: a.received_at.toISOString(),
+      message: `Configured gateway IP ${a.gateway_ip} is assigned to rack ${a.rack_name}. Connect using the gateway IP instead.`,
     })),
   };
 }

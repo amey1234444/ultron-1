@@ -47,6 +47,12 @@ type IngestResult = {
   reason?: string;
 };
 
+type BindResult = {
+  status: string;
+  event: string;
+  reason?: string;
+};
+
 type NormalizedWebhookMessage = {
   topic: string | null;
   message: unknown;
@@ -178,33 +184,88 @@ async function quarantine(topic: string, reason: string, msg: Partial<MqttEnvelo
   );
 }
 
-async function isCommissioned(gatewayId: string, gatewayIp: string): Promise<boolean> {
-  const commissioned = await query(
-    `SELECT 1
+async function findStudioGateway(gatewayId: string): Promise<{ id: string; ip: string } | null> {
+  const gateway = await query<{ id: string; ip: string }>(
+    `SELECT id, ip
      FROM studio_devices
      WHERE type = 'Gateway'
        AND archived = false
-       AND real_gateway_id = $2
-       AND ip = $1
+       AND real_gateway_id = $1
      LIMIT 1`,
-    [gatewayIp, gatewayId],
+    [gatewayId],
   );
-  return (commissioned.rowCount ?? 0) > 0;
+  return gateway.rows[0] ?? null;
 }
 
-async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string }> {
+async function findRackIpConflict(gatewayDeviceId: string, gatewayIp: string): Promise<{ id: string; name: string; real_rack_id: number | null } | null> {
+  const rack = await query<{ id: string; name: string; real_rack_id: number | null }>(
+    `SELECT id, name, real_rack_id
+     FROM studio_devices
+     WHERE type = 'Rack'
+       AND archived = false
+       AND gateway_id = $1
+       AND ip = $2
+     LIMIT 1`,
+    [gatewayDeviceId, gatewayIp],
+  );
+  return rack.rows[0] ?? null;
+}
+
+async function updateStudioGatewayIp(deviceId: string, gatewayIp: string): Promise<void> {
+  const updated = await query(
+    `UPDATE studio_devices
+     SET ip = $2, updated_at = now()
+     WHERE id = $1 AND ip <> $2`,
+    [deviceId, gatewayIp],
+  );
+  if ((updated.rowCount ?? 0) > 0) {
+    await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
+  }
+}
+
+async function bind(msg: MqttEnvelope): Promise<BindResult> {
   const existing = await query<{ gateway_id: string; current_ip: string; status: string }>(
     `SELECT gateway_id, current_ip, status FROM gateways WHERE gateway_id = $1`,
     [msg.gateway_id],
   );
 
+  const studioGateway = await findStudioGateway(msg.gateway_id);
   let status = 'ONLINE';
   let event = 'BOUND';
+  if (!studioGateway) {
+    status = 'QUARANTINED';
+    event = 'UNCLAIMED';
+  }
+
   if (existing.rowCount === 0) {
-    if (!(await isCommissioned(msg.gateway_id, msg.gateway_ip))) {
-      status = 'QUARANTINED';
-      event = 'UNCLAIMED';
+    if (!studioGateway) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [msg.gateway_id, msg.gateway_ip],
+      );
+      return { status, event };
     }
+
+    const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
+    const rackConflict = gatewayIpChanged ? await findRackIpConflict(studioGateway.id, msg.gateway_ip) : null;
+    if (rackConflict) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [msg.gateway_id, msg.gateway_ip],
+      );
+      return {
+        status: 'QUARANTINED',
+        event: 'RACK_IP_CONFLICT',
+        reason: 'gateway_ip matches configured rack ip',
+      };
+    }
+
+    event = gatewayIpChanged ? 'IP_CHANGED' : 'BOUND';
+    if (event === 'IP_CHANGED') await updateStudioGatewayIp(studioGateway.id, msg.gateway_ip);
     await query(
       `INSERT INTO gateways (gateway_id, current_ip, gateway_boot_id, mqtt_client_id, status, last_seen_at)
        VALUES ($1,$2,$3,$4,$5, now())
@@ -213,18 +274,40 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
     );
   } else {
     const current = existing.rows[0];
+    if (!studioGateway) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [msg.gateway_id, msg.gateway_ip],
+      );
+      return { status, event };
+    }
+
+    const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
+    const rackConflict = gatewayIpChanged ? await findRackIpConflict(studioGateway.id, msg.gateway_ip) : null;
+    if (rackConflict) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [msg.gateway_id, msg.gateway_ip],
+      );
+      return {
+        status: 'QUARANTINED',
+        event: 'RACK_IP_CONFLICT',
+        reason: 'gateway_ip matches configured rack ip',
+      };
+    }
+
     if (current.status === 'QUARANTINED') {
-      if (await isCommissioned(msg.gateway_id, msg.gateway_ip)) {
-        status = 'ONLINE';
-        event = 'COMMISSIONED';
-      } else {
-        status = 'QUARANTINED';
-        event = 'UNCLAIMED';
-      }
+      status = 'ONLINE';
+      event = gatewayIpChanged ? 'IP_CHANGED' : 'COMMISSIONED';
     } else {
       status = 'ONLINE';
       event = current.current_ip && current.current_ip !== msg.gateway_ip ? 'IP_CHANGED' : 'BOUND';
     }
+    if (gatewayIpChanged) await updateStudioGatewayIp(studioGateway.id, msg.gateway_ip);
     await query(
       `UPDATE gateways SET current_ip = $2, gateway_boot_id = $3, status = $4, last_seen_at = now(), updated_at = now()
        WHERE gateway_id = $1`,
@@ -236,7 +319,7 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
     `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
      VALUES ($1,$2,$3)
      ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [msg.gateway_id, msg.gateway_ip, event === 'BOUND' || event === 'COMMISSIONED'],
+    [msg.gateway_id, msg.gateway_ip, true],
   );
 
   await query(
@@ -409,6 +492,9 @@ export async function ingestMqttMessage(topic: string, rawMessage: unknown, sour
   const binding = await bind(msg);
   const fresh = await claimMessage(msg, topic, sourceEvent);
   if (!fresh || binding.status === 'QUARANTINED') {
+    if (fresh && binding.status === 'QUARANTINED') {
+      await quarantine(topic, binding.reason ?? 'gateway not commissioned', msg);
+    }
     return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
   }
 

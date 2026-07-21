@@ -193,6 +193,12 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // the stored device statuses, so the devices strip shows Online the moment a
   // bound gateway starts publishing.
   const liveState = useLiveTelemetry();
+  const [ipChangeNotice, setIpChangeNotice] = useState<{ gatewayName: string; oldIp: string; newIp: string } | null>(null);
+  const [rackIpNotice, setRackIpNotice] = useState<{ rackName: string; gatewayName: string; ip: string } | null>(null);
+  const seenIpChanges = useRef<Set<string>>(new Set());
+  const seenRackIpAlerts = useRef<Set<number>>(new Set());
+  const ipNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rackIpNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const configuredGateways = useMemo(() => storedDevices.filter((device) => device.type === 'Gateway' && !device.archived), [storedDevices]);
   const demoDevices = useMemo<DeviceNode[]>(() => {
     const merged = new Map<string, DeviceNode>();
@@ -245,6 +251,39 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     [demoCards, visibleDeviceIds],
   );
   const gateways = useMemo(() => devices.filter((device) => device.type === 'Gateway' && !device.archived), [devices]);
+
+  useEffect(() => {
+    if (!realMode) return;
+    for (const liveGateway of liveState.gateways) {
+      const storedGateway = configuredGateways.find((device) => device.realGatewayId === liveGateway.gatewayId);
+      if (!storedGateway) continue;
+      const oldIp = storedGateway.ip.trim();
+      const newIp = liveGateway.currentIp.trim();
+      if (!oldIp || !newIp || oldIp === newIp) continue;
+      const key = `${liveGateway.gatewayId}:${oldIp}->${newIp}`;
+      if (seenIpChanges.current.has(key)) continue;
+      seenIpChanges.current.add(key);
+      setIpChangeNotice({ gatewayName: storedGateway.name, oldIp, newIp });
+      if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
+      ipNoticeTimer.current = setTimeout(() => setIpChangeNotice(null), 6000);
+      break;
+    }
+  }, [configuredGateways, liveState.gateways, realMode]);
+
+  useEffect(() => {
+    if (!realMode) return;
+    const alert = liveState.alerts.find((item) => item.type === 'RACK_IP_CONFLICT' && !seenRackIpAlerts.current.has(item.id));
+    if (!alert) return;
+    seenRackIpAlerts.current.add(alert.id);
+    setRackIpNotice({ rackName: alert.rackName, gatewayName: alert.gatewayName, ip: alert.gatewayIp });
+    if (rackIpNoticeTimer.current) clearTimeout(rackIpNoticeTimer.current);
+    rackIpNoticeTimer.current = setTimeout(() => setRackIpNotice(null), 8000);
+  }, [liveState.alerts, realMode]);
+
+  useEffect(() => () => {
+    if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
+    if (rackIpNoticeTimer.current) clearTimeout(rackIpNoticeTimer.current);
+  }, []);
 
   useEffect(() => {
     if (storedDevices.length === 0) return;
@@ -589,6 +628,35 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         configureMode={configureMode}
         onConfigureModeChange={setConfigureMode}
       />
+
+      {ipChangeNotice && (
+        <View
+          className={cn(
+            'absolute right-4 top-16 z-50 max-w-[360px] rounded-lg border px-4 py-3 shadow-lg',
+            isDark ? 'border-status-warning/50 bg-surface-darkpanel' : 'border-status-warning/60 bg-surface-lightpanel',
+          )}
+        >
+          <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Gateway IP updated</Text>
+          <Text className={cn('mt-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            {ipChangeNotice.gatewayName}: {ipChangeNotice.oldIp} to {ipChangeNotice.newIp}
+          </Text>
+        </View>
+      )}
+
+      {rackIpNotice && (
+        <View
+          className={cn(
+            'absolute right-4 top-16 z-50 max-w-[400px] rounded-lg border px-4 py-3 shadow-lg',
+            isDark ? 'border-status-critical/50 bg-surface-darkpanel' : 'border-status-critical/60 bg-surface-lightpanel',
+          )}
+          style={ipChangeNotice ? { top: 136 } : undefined}
+        >
+          <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Rack IP used as gateway IP</Text>
+          <Text className={cn('mt-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            {rackIpNotice.rackName} is configured with {rackIpNotice.ip}. Set {rackIpNotice.gatewayName} to the real gateway IP.
+          </Text>
+        </View>
+      )}
 
       <View className="flex-1 flex-row">
         {!workspaceCollapsesSidebar && (

@@ -23,39 +23,90 @@ export async function quarantine(topic, reason, msg) {
   );
 }
 
-async function isCommissioned(gatewayId, gatewayIp) {
-  const commissioned = await query(
-    `SELECT 1
+async function findStudioGateway(gatewayId) {
+  const gateway = await query(
+    `SELECT id, ip
      FROM studio_devices
      WHERE type = 'Gateway'
        AND archived = false
-       AND real_gateway_id = $2
-       AND ip = $1
+       AND real_gateway_id = $1
      LIMIT 1`,
-    [gatewayIp, gatewayId],
+    [gatewayId],
   );
-  return commissioned.rowCount > 0;
+  return gateway.rows[0] ?? null;
 }
 
-// Gateway/Rack/IP binding (Phase E). Permanent identity = gateway_id + rack_id;
-// gateway_ip is the mandatory verification field. A known gateway whose IP
-// changed keeps its identity but the new IP is recorded unapproved; an unknown
-// gateway_id is registered as QUARANTINED (never silently trusted just because
-// the IP matches).
+async function findRackIpConflict(gatewayDeviceId, gatewayIp) {
+  const rack = await query(
+    `SELECT id, name, real_rack_id
+     FROM studio_devices
+     WHERE type = 'Rack'
+       AND archived = false
+       AND gateway_id = $1
+       AND ip = $2
+     LIMIT 1`,
+    [gatewayDeviceId, gatewayIp],
+  );
+  return rack.rows[0] ?? null;
+}
+
+async function updateStudioGatewayIp(deviceId, gatewayIp) {
+  const updated = await query(
+    `UPDATE studio_devices
+     SET ip = $2, updated_at = now()
+     WHERE id = $1 AND ip <> $2`,
+    [deviceId, gatewayIp],
+  );
+  if (updated.rowCount > 0) {
+    await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
+  }
+}
+
+// Gateway/Rack/IP binding (Phase E). Permanent identity = gateway_id + rack_id.
+// A known Studio gateway_id may move to a new IP; unknown gateway IDs are
+// quarantined before live gateway, rack, inventory, telemetry, or event state.
 export async function bind(msg) {
   const { gateway_id, gateway_ip, gateway_boot_id, rack_id } = msg;
 
   const existing = await query(`SELECT gateway_id, current_ip, status FROM gateways WHERE gateway_id = $1`, [gateway_id]);
 
+  const studioGateway = await findStudioGateway(gateway_id);
   let status = 'ONLINE';
   let event = 'BOUND';
+  if (!studioGateway) {
+    status = 'QUARANTINED';
+    event = 'UNCLAIMED';
+  }
+
   if (existing.rowCount === 0) {
-    // Commissioning bootstrap: only auto-claim when the studio Gateway has the
-    // same script ID and exact full gateway IP. Rack IPs/prefixes do not claim.
-    if (!(await isCommissioned(gateway_id, gateway_ip))) {
-      status = 'QUARANTINED';
-      event = 'UNCLAIMED';
+    if (!studioGateway) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [gateway_id, gateway_ip],
+      );
+      return { status, event };
     }
+
+    const gatewayIpChanged = studioGateway.ip !== gateway_ip;
+    const rackConflict = gatewayIpChanged ? await findRackIpConflict(studioGateway.id, gateway_ip) : null;
+    if (rackConflict) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [gateway_id, gateway_ip],
+      );
+      return {
+        status: 'QUARANTINED',
+        event: 'RACK_IP_CONFLICT',
+        reason: 'gateway_ip matches configured rack ip',
+      };
+    }
+
+    event = gatewayIpChanged ? 'IP_CHANGED' : 'BOUND';
+    if (event === 'IP_CHANGED') await updateStudioGatewayIp(studioGateway.id, gateway_ip);
     await query(
       `INSERT INTO gateways (gateway_id, current_ip, gateway_boot_id, mqtt_client_id, status, last_seen_at)
        VALUES ($1,$2,$3,$4,$5, now())
@@ -64,18 +115,40 @@ export async function bind(msg) {
     );
   } else {
     const current = existing.rows[0];
+    if (!studioGateway) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [gateway_id, gateway_ip],
+      );
+      return { status, event };
+    }
+
+    const gatewayIpChanged = studioGateway.ip !== gateway_ip;
+    const rackConflict = gatewayIpChanged ? await findRackIpConflict(studioGateway.id, gateway_ip) : null;
+    if (rackConflict) {
+      await query(
+        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+         VALUES ($1,$2,false)
+         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+        [gateway_id, gateway_ip],
+      );
+      return {
+        status: 'QUARANTINED',
+        event: 'RACK_IP_CONFLICT',
+        reason: 'gateway_ip matches configured rack ip',
+      };
+    }
+
     if (current.status === 'QUARANTINED') {
-      if (await isCommissioned(gateway_id, gateway_ip)) {
-        status = 'ONLINE';
-        event = 'COMMISSIONED';
-      } else {
-        status = 'QUARANTINED';
-        event = 'UNCLAIMED';
-      }
+      status = 'ONLINE';
+      event = gatewayIpChanged ? 'IP_CHANGED' : 'COMMISSIONED';
     } else {
       status = 'ONLINE';
       event = current.current_ip && current.current_ip !== gateway_ip ? 'IP_CHANGED' : 'BOUND';
     }
+    if (gatewayIpChanged) await updateStudioGatewayIp(studioGateway.id, gateway_ip);
     await query(
       `UPDATE gateways SET current_ip = $2, gateway_boot_id = $3, status = $4, last_seen_at = now(), updated_at = now()
        WHERE gateway_id = $1`,
@@ -87,7 +160,7 @@ export async function bind(msg) {
     `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
      VALUES ($1,$2,$3)
      ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [gateway_id, gateway_ip, event === 'BOUND' || event === 'COMMISSIONED'],
+    [gateway_id, gateway_ip, true],
   );
 
   if (Number.isInteger(rack_id)) {

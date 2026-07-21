@@ -80,8 +80,10 @@ async function onMessage(topic, buf) {
   const binding = await bind(msg);
   if (binding.event === 'UNCLAIMED') {
     console.warn(`[quarantine] unknown gateway ${msg.gateway_id} @ ${msg.gateway_ip} — awaiting commissioning`);
+  } else if (binding.event === 'RACK_IP_CONFLICT') {
+    console.warn(`[quarantine] ${msg.gateway_id} configured gateway_ip ${msg.gateway_ip} is a child rack IP`);
   } else if (binding.event === 'IP_CHANGED') {
-    console.warn(`[binding] ${msg.gateway_id} IP changed to ${msg.gateway_ip} (recorded, pending approval)`);
+    console.warn(`[binding] ${msg.gateway_id} IP changed to commissioned address ${msg.gateway_ip}`);
   } else {
     console.log(`BOUND: ${msg.gateway_id} Rack ${msg.rack_id} ${msg.gateway_ip}`);
   }
@@ -89,7 +91,10 @@ async function onMessage(topic, buf) {
   const fresh = await claimMessage(msg, topic);
   if (!fresh) return; // QoS 1 duplicate — already ingested
 
-  if (binding.status === 'QUARANTINED') return; // stored envelope only; no state until commissioned
+  if (binding.status === 'QUARANTINED') {
+    await quarantine(topic, binding.reason ?? 'gateway not commissioned', msg);
+    return; // stored envelope only; no state until commissioned
+  }
 
   switch (parsed.kind) {
     case 'status':

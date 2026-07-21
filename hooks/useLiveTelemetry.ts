@@ -29,6 +29,7 @@ export function useLiveTelemetry(): LiveState {
               racks: json.racks ?? [],
               slots: json.slots ?? [],
               measurements: json.measurements ?? [],
+              alerts: json.alerts ?? [],
             });
           }
         }
