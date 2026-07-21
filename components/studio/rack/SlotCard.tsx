@@ -139,9 +139,10 @@ function visualStatusFor(status: ReturnType<typeof channelLiveStatus>): PointSta
 }
 
 function pointStatusesFor(card: CardNode, device: DeviceNode | undefined, live: LiveState | undefined, count: number): PointStatus[] {
+  if (!card.enabled) return Array.from({ length: count }, () => 'inactive');
   if (!device) return Array.from({ length: count }, () => 'inactive');
   if (device.status !== 'Online') return Array.from({ length: count }, () => 'stale');
-  if (!live) return Array.from({ length: count }, () => (card.enabled ? 'ok' : 'inactive'));
+  if (!live) return Array.from({ length: count }, () => 'stale');
   return Array.from({ length: count }, (_, index) => visualStatusFor(channelLiveStatus(device, card, index + 1, live)));
 }
 

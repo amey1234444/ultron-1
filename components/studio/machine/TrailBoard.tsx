@@ -3,7 +3,7 @@ import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-nat
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import type { DeviceNode } from '../../../lib/devices';
+import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
 import { channelLiveStatus, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
@@ -170,13 +170,16 @@ export function TrailBoard({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   const storageKey = trailBoardStorageKey(machineId);
+  const effectiveRack = useCallback((rack: DeviceNode) => deviceWithGatewayConnectionState(rack, devices), [devices]);
   const pickableChannelFilter = useCallback(
     (rack: DeviceNode, card: CardNode, channelNumber: number) => {
+      const rackState = effectiveRack(rack);
+      if (rackState.status !== 'Online') return false;
       if (!card.enabled) return false;
       if (!live || (live.gateways.length === 0 && live.racks.length === 0 && live.slots.length === 0 && live.measurements.length === 0)) return true;
-      return channelLiveStatus(rack, card, channelNumber, live) === 'active';
+      return channelLiveStatus(rackState, card, channelNumber, live) === 'active';
     },
-    [live],
+    [effectiveRack, live],
   );
   const templateChannels = listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter });
 
@@ -204,13 +207,16 @@ export function TrailBoard({
   const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter }), [devices, cards, pickableChannelFilter]);
   const isChannelLive = useCallback(
     (channel: ChannelRef | null) => {
-      if (!channel || !live) return true;
+      if (!channel) return true;
       const rack = devices.find((device) => device.id === channel.rackId);
       const card = cards.find((c) => c.deviceId === channel.rackId && c.slot === channel.slot);
       if (!rack || !card) return false;
-      return channelLiveStatus(rack, card, channelNumberFor(channel), live) === 'active';
+      const rackState = effectiveRack(rack);
+      if (rackState.status !== 'Online') return false;
+      if (!live) return true;
+      return channelLiveStatus(rackState, card, channelNumberFor(channel), live) === 'active';
     },
-    [cards, devices, live],
+    [cards, devices, effectiveRack, live],
   );
   const liveReadingFor = useCallback(
     (channel: ChannelRef | null): LiveMeasurement | undefined => {
@@ -218,9 +224,11 @@ export function TrailBoard({
       const rack = devices.find((device) => device.id === channel.rackId);
       const card = cards.find((c) => c.deviceId === channel.rackId && c.slot === channel.slot);
       if (!rack || !card) return undefined;
-      return latestMeasurementForChannel(rack, card, channelNumberFor(channel), live);
+      const rackState = effectiveRack(rack);
+      if (rackState.status !== 'Online') return undefined;
+      return latestMeasurementForChannel(rackState, card, channelNumberFor(channel), live);
     },
-    [cards, devices, live],
+    [cards, devices, effectiveRack, live],
   );
   const channelsRef = useRef(channels);
   const trailsRef = useRef(trails);

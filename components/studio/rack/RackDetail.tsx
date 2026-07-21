@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
-import type { DeviceNode } from '../../../lib/devices';
+import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import { cn } from '../../../lib/cn';
 import { emptyConfigFor, isCardConfigured, type CardConfig, type CardNode, type CardType } from '../../../lib/rack';
@@ -21,6 +21,7 @@ type CardPageView = 'overview' | 'config';
 
 type RackDetailProps = {
   device: DeviceNode;
+  devices?: DeviceNode[];
   cards: CardNode[];
   live?: LiveState;
   onBack: () => void;
@@ -45,7 +46,7 @@ function ModeTab({ label, active, onPress }: { label: string; active: boolean; o
   );
 }
 
-export function RackDetail({ device, cards, live, onBack, backLabel = 'Back', onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
+export function RackDetail({ device, devices = [device], cards, live, onBack, backLabel = 'Back', onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<ViewMode>('visual');
   const [installMenu, setInstallMenu] = useState<InstallCardMenuState | null>(null);
@@ -54,6 +55,7 @@ export function RackDetail({ device, cards, live, onBack, backLabel = 'Back', on
   const [removeTarget, setRemoveTarget] = useState<CardNode | null>(null);
   const [stubNote, setStubNote] = useState<string | null>(null);
 
+  const effectiveDevice = deviceWithGatewayConnectionState(device, devices);
   const pageCard = cardPage ? cards.find((c) => c.id === cardPage.cardId) ?? null : null;
 
   if (cardPage && pageCard) {
@@ -95,9 +97,9 @@ export function RackDetail({ device, cards, live, onBack, backLabel = 'Back', on
 
       <View className="flex-row items-center justify-between px-6 pt-3">
         <View>
-          <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{device.name}</Text>
+          <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{effectiveDevice.name}</Text>
           <Text className={cn('mt-1 font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            rack_id: {device.realRackId ?? '-'}
+            rack_id: {effectiveDevice.realRackId ?? '-'}
           </Text>
         </View>
         <View className={cn('flex-row rounded-full border p-1', isDark ? 'border-line-dark' : 'border-line-light')}>
@@ -116,7 +118,7 @@ export function RackDetail({ device, cards, live, onBack, backLabel = 'Back', on
       <View className="flex-1">
         {mode === 'visual' && (
           <RackFaceplate
-            device={device}
+            device={effectiveDevice}
             cards={cards}
             live={live}
             editable={canEditDeleteSchema}
@@ -129,7 +131,7 @@ export function RackDetail({ device, cards, live, onBack, backLabel = 'Back', on
           />
         )}
         {mode === 'cards' && <CardListView cards={cards} onOpenMenu={canEditDeleteSchema ? (card, x, y) => setCardMenu({ card, x, y }) : undefined} />}
-        {mode === 'channels' && <ChannelListView device={device} cards={cards} live={live} />}
+        {mode === 'channels' && <ChannelListView device={effectiveDevice} cards={cards} live={live} />}
       </View>
 
       <InstallCardMenu

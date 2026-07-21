@@ -806,6 +806,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           ) : selected.kind === 'device' && selectedDevice && selectedDevice.type === 'Rack' ? (
             <RackDetail
               device={selectedDevice}
+              devices={devices}
               cards={visibleCards.filter((c) => c.deviceId === selectedDevice.id)}
               live={realMode ? liveState : undefined}
               canEditDeleteSchema={canEditDeleteSchema}
