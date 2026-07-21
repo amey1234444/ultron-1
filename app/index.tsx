@@ -28,7 +28,7 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { cn } from '../lib/cn';
-import { composeIp, defaultRealGatewayId, hostOctetFor, ipPrefixFor, nextRealRackId, racksForGateway, type DeviceNode } from '../lib/devices';
+import { composeIp, defaultRealGatewayId, deviceWithGatewayConnectionState, hostOctetFor, ipPrefixFor, nextRealRackId, racksForGateway, type DeviceNode } from '../lib/devices';
 import { applyLiveStatus } from '../lib/liveTelemetry';
 import {
   duplicateFolderSubtree,
@@ -652,7 +652,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   const selectedProject = selected.kind === 'project' ? projects.find((p) => p.id === selected.id) : undefined;
   const selectedFolder = selected.kind === 'folder' ? folders.find((f) => f.id === selected.id) : undefined;
-  const selectedDevice = selected.kind === 'device' ? devices.find((d) => d.id === selected.id) : undefined;
+  const selectedDeviceRaw = selected.kind === 'device' ? devices.find((d) => d.id === selected.id) : undefined;
+  const selectedDevice = selectedDeviceRaw ? deviceWithGatewayConnectionState(selectedDeviceRaw, devices) : undefined;
   const selectedMachine = selected.kind === 'machine' ? machines.find((m) => m.id === selected.id) : undefined;
   const editingDevice = editingDeviceId ? (storedDevices.find((d) => d.id === editingDeviceId) ?? devices.find((d) => d.id === editingDeviceId)) : null;
   const deleteDeviceInfo = deleteDeviceId ? (storedDevices.find((d) => d.id === deleteDeviceId) ?? devices.find((d) => d.id === deleteDeviceId)) : null;

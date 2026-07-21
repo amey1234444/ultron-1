@@ -117,6 +117,22 @@ export function racksForGateway(gateway: DeviceNode, devices: DeviceNode[]): Dev
   return racks.map((rack) => (rack.status === 'Not Connected' ? rack : { ...rack, status: 'Not Connected' }));
 }
 
+export function isBlockedByUnconfiguredGateway(device: DeviceNode, devices: DeviceNode[]): boolean {
+  if (device.archived) return false;
+  if (device.type === 'Gateway') return !device.ip.trim();
+  if (device.type !== 'Rack') return false;
+  const gateway =
+    (device.gatewayId ? devices.find((d) => d.id === device.gatewayId && d.type === 'Gateway' && !d.archived) : undefined) ??
+    (device.realGatewayId ? devices.find((d) => d.realGatewayId === device.realGatewayId && d.type === 'Gateway' && !d.archived) : undefined);
+  return !!gateway && !gateway.ip.trim();
+}
+
+export function deviceWithGatewayConnectionState(device: DeviceNode, devices: DeviceNode[]): DeviceNode {
+  return isBlockedByUnconfiguredGateway(device, devices) && device.status !== 'Not Connected'
+    ? { ...device, status: 'Not Connected' }
+    : device;
+}
+
 export function gatewayForRack(rack: DeviceNode, devices: DeviceNode[]): DeviceNode | undefined {
   if (rack.type !== 'Rack') return undefined;
   if (rack.gatewayId) {

@@ -73,7 +73,7 @@ export function ChannelListView({ device, cards, live }: ChannelListViewProps) {
       </View>
 
       {rows.map(({ id, card, channelId, label }) => {
-        const status = live ? channelLiveStatus(device, card, channelId, live) : 'idle';
+        const status = device.status !== 'Online' ? 'stale' : live ? channelLiveStatus(device, card, channelId, live) : 'idle';
         return (
           <View
             key={id}
