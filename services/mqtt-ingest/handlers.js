@@ -92,6 +92,29 @@ async function rejectConfiguredIpConflict(gatewayId, gatewayIp, gatewayDeviceId)
   };
 }
 
+async function rejectMissingConfiguredIp(gatewayId, gatewayIp) {
+  await query(
+    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+     VALUES ($1,$2,false)
+     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+    [gatewayId, gatewayIp],
+  );
+  await query(
+    `UPDATE gateways
+     SET status = 'QUARANTINED', updated_at = now()
+     WHERE gateway_id = $1`,
+    [gatewayId],
+  );
+  await query(`DELETE FROM measurement_latest WHERE gateway_id = $1`, [gatewayId]);
+  await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1`, [gatewayId]);
+  await query(`DELETE FROM racks WHERE gateway_id = $1`, [gatewayId]);
+  return {
+    status: 'QUARANTINED',
+    event: 'IP_NOT_CONFIGURED',
+    reason: 'gateway_ip not configured',
+  };
+}
+
 async function updateStudioGatewayIp(deviceId, gatewayIp) {
   const updated = await query(
     `UPDATE studio_devices
@@ -131,6 +154,8 @@ export async function bind(msg) {
       return { status, event };
     }
 
+    if (!studioGateway.ip.trim()) return rejectMissingConfiguredIp(gateway_id, gateway_ip);
+
     const gatewayIpChanged = studioGateway.ip !== gateway_ip;
     const ipConflict = await findConfiguredIpConflict(studioGateway.id, gateway_ip);
     if (ipConflict) return rejectConfiguredIpConflict(gateway_id, gateway_ip, studioGateway.id);
@@ -154,6 +179,8 @@ export async function bind(msg) {
       );
       return { status, event };
     }
+
+    if (!studioGateway.ip.trim()) return rejectMissingConfiguredIp(gateway_id, gateway_ip);
 
     const gatewayIpChanged = studioGateway.ip !== gateway_ip;
     const ipConflict = await findConfiguredIpConflict(studioGateway.id, gateway_ip);

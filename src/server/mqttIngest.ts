@@ -256,6 +256,29 @@ async function rejectConfiguredIpConflict(gatewayId: string, gatewayIp: string, 
   };
 }
 
+async function rejectMissingConfiguredIp(gatewayId: string, gatewayIp: string): Promise<BindResult> {
+  await query(
+    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+     VALUES ($1,$2,false)
+     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+    [gatewayId, gatewayIp],
+  );
+  await query(
+    `UPDATE gateways
+     SET status = 'QUARANTINED', updated_at = now()
+     WHERE gateway_id = $1`,
+    [gatewayId],
+  );
+  await query(`DELETE FROM measurement_latest WHERE gateway_id = $1`, [gatewayId]);
+  await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1`, [gatewayId]);
+  await query(`DELETE FROM racks WHERE gateway_id = $1`, [gatewayId]);
+  return {
+    status: 'QUARANTINED',
+    event: 'IP_NOT_CONFIGURED',
+    reason: 'gateway_ip not configured',
+  };
+}
+
 async function updateStudioGatewayIp(deviceId: string, gatewayIp: string): Promise<void> {
   const updated = await query(
     `UPDATE studio_devices
@@ -293,6 +316,8 @@ async function bind(msg: MqttEnvelope): Promise<BindResult> {
       return { status, event };
     }
 
+    if (!studioGateway.ip.trim()) return rejectMissingConfiguredIp(msg.gateway_id, msg.gateway_ip);
+
     const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
     const ipConflict = await findConfiguredIpConflict(studioGateway.id, msg.gateway_ip);
     if (ipConflict) return rejectConfiguredIpConflict(msg.gateway_id, msg.gateway_ip, studioGateway.id);
@@ -316,6 +341,8 @@ async function bind(msg: MqttEnvelope): Promise<BindResult> {
       );
       return { status, event };
     }
+
+    if (!studioGateway.ip.trim()) return rejectMissingConfiguredIp(msg.gateway_id, msg.gateway_ip);
 
     const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
     const ipConflict = await findConfiguredIpConflict(studioGateway.id, msg.gateway_ip);

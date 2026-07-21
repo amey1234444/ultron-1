@@ -73,7 +73,7 @@ const ACTIVE_MEASUREMENT_MAX_AGE_MS = 15_000;
 
 function configuredRackForDevice(device: DeviceNode, live: LiveState): LiveRack | undefined {
   const gateway = gatewayForDevice(device, live);
-  if (!gateway) return undefined;
+  if (!gatewayCanShowData(gateway)) return undefined;
   const rackId = device.realRackId;
   if (!Number.isInteger(rackId)) return undefined;
   return live.racks.find((r) => r.gatewayId === gateway.gatewayId && r.rackId === rackId);
@@ -154,7 +154,7 @@ function isConflicted(device: DeviceNode, scope: { ips: Set<string>; gatewayIds:
 }
 
 function gatewayCanShowData(gateway: LiveGateway | undefined): gateway is LiveGateway {
-  return !!gateway && gateway.status === 'ONLINE';
+  return !!gateway && gateway.status === 'ONLINE' && !!gateway.currentIp.trim();
 }
 
 // Overlays real connectivity onto the stored devices: a device whose IP is
@@ -169,6 +169,9 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
     const liveIp = device.type === 'Gateway' && gateway?.currentIp && gateway.status !== 'QUARANTINED' ? gateway.currentIp : device.ip;
+    if (device.type === 'Gateway' && !device.ip.trim()) {
+      return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
+    }
     if ((device.type === 'Gateway' || device.type === 'Rack') && isConflicted(device, scope)) {
       return device.status === 'Not Connected' ? device : { ...device, status: 'Not Connected' };
     }
@@ -177,6 +180,9 @@ export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceN
       return device.status === 'Not Connected' && device.ip === displayIp ? device : { ...device, ip: displayIp, status: 'Not Connected' };
     }
     if (!gateway) return { ...device, status: 'Not Connected' };
+    if (gateway.status !== 'ONLINE' || !gateway.currentIp.trim()) {
+      return device.status === 'Not Connected' && device.ip === liveIp ? device : { ...device, ip: liveIp, status: 'Not Connected' };
+    }
     const rack = device.type === 'Rack' ? configuredRackForDevice(device, live) : undefined;
     if (device.type === 'Rack' && (!rack || rack.status !== 'ONLINE')) {
       return device.status === 'Not Connected' && device.ip === liveIp ? device : { ...device, ip: liveIp, status: 'Not Connected' };

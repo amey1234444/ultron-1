@@ -80,6 +80,8 @@ async function onMessage(topic, buf) {
   const binding = await bind(msg);
   if (binding.event === 'UNCLAIMED') {
     console.warn(`[quarantine] unknown gateway ${msg.gateway_id} @ ${msg.gateway_ip} — awaiting commissioning`);
+  } else if (binding.event === 'IP_NOT_CONFIGURED') {
+    console.warn(`[quarantine] ${msg.gateway_id} has no configured gateway IP; ignoring ${msg.gateway_ip}`);
   } else if (binding.event === 'IP_CONFLICT') {
     console.warn(`[quarantine] ${msg.gateway_id} configured gateway_ip ${msg.gateway_ip} is already assigned to another device`);
   } else if (binding.event === 'IP_CHANGED') {

@@ -84,6 +84,7 @@ type AlertRow = {
   conflict_device_type: string;
 };
 type BlockedBindingRow = Omit<AlertRow, 'id' | 'received_at'>;
+type UnconfiguredGatewayRow = { gateway_id: string };
 
 // A gateway that hasn't reported for this long reads as offline even if the
 // retained OFFLINE will was missed (matches the ingest service's backstop).
@@ -92,7 +93,7 @@ const STALE_AFTER_S = 15;
 export async function getLiveState(options: { includeConflictDeviceDetails?: boolean } = {}): Promise<LiveState> {
   await ensureSchema();
 
-  const [gateways, racks, slots, measurements, alerts, blockedBindings] = await Promise.all([
+  const [gateways, racks, slots, measurements, alerts, blockedBindings, unconfiguredGateways] = await Promise.all([
     query<GatewayRow>(
       `SELECT gateway_id, current_ip, status, last_seen_at,
               (last_seen_at IS NULL OR last_seen_at < now() - make_interval(secs => $1)) AS stale
@@ -159,6 +160,14 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
         AND conflict.id <> gateway.id
        WHERE g.current_ip <> ''`,
     ),
+    query<UnconfiguredGatewayRow>(
+      `SELECT real_gateway_id AS gateway_id
+       FROM studio_devices
+       WHERE type = 'Gateway'
+         AND archived = false
+         AND real_gateway_id IS NOT NULL
+         AND btrim(ip) = ''`,
+    ),
   ]);
 
   const alertKey = (gatewayId: string, gatewayIp: string) => `${gatewayId}:${gatewayIp}`;
@@ -173,6 +182,7 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
   const allAlerts = [...alerts.rows, ...syntheticAlerts];
   const blockedGatewayIds = new Set<string>([
     ...gateways.rows.filter((g: GatewayRow) => g.status === 'QUARANTINED').map((g: GatewayRow) => g.gateway_id),
+    ...unconfiguredGateways.rows.map((g: UnconfiguredGatewayRow) => g.gateway_id),
     ...allAlerts.map((a: AlertRow) => a.gateway_id),
   ]);
 
