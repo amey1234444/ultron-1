@@ -235,91 +235,82 @@ async function rejectConfiguredIpConflict(gatewayId: string, gatewayIp: string):
   };
 }
 
-async function updateStudioGatewayIp(deviceId: string, gatewayIp: string): Promise<void> {
-  const updated = await query(
-    `UPDATE studio_devices
-     SET ip = $2, updated_at = now()
-     WHERE id = $1 AND ip <> $2`,
-    [deviceId, gatewayIp],
+async function markGatewayQuarantined(gatewayId: string): Promise<void> {
+  await query(
+    `UPDATE gateways SET status = 'QUARANTINED', updated_at = now() WHERE gateway_id = $1`,
+    [gatewayId],
   );
-  if ((updated.rowCount ?? 0) > 0) {
-    await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
-  }
 }
 
+async function recordUnapprovedIp(gatewayId: string, gatewayIp: string): Promise<void> {
+  await query(
+    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+     VALUES ($1,$2,false)
+     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+    [gatewayId, gatewayIp],
+  );
+}
+
+// Commissioning gate (handover §10/§12). A gateway only goes ONLINE — and only
+// then does any of its state (status/inventory/telemetry) reach the read model
+// — once ALL of the following hold:
+//   1. a Studio Gateway device carries this gateway script id (claimed);
+//   2. that device has an operational IP configured in Studio;
+//   3. the configured IP is not already assigned to another gateway/rack;
+//   4. the IP the gateway actually reports matches the configured IP.
+// Setting GATEWAY_IP in the gateway's env is therefore not sufficient on its
+// own: the same address must be configured in Studio first, and it is never
+// silently adopted from the env.
 async function bind(msg: MqttEnvelope): Promise<BindResult> {
   const existing = await query<{ gateway_id: string; current_ip: string; status: string }>(
     `SELECT gateway_id, current_ip, status FROM gateways WHERE gateway_id = $1`,
     [msg.gateway_id],
   );
+  const wasKnown = (existing.rowCount ?? 0) > 0;
 
   const studioGateway = await findStudioGateway(msg.gateway_id);
-  let status = 'ONLINE';
-  let event = 'BOUND';
   if (!studioGateway) {
-    status = 'QUARANTINED';
-    event = 'UNCLAIMED';
+    await recordUnapprovedIp(msg.gateway_id, msg.gateway_ip);
+    if (wasKnown) await markGatewayQuarantined(msg.gateway_id);
+    return { status: 'QUARANTINED', event: 'UNCLAIMED' };
   }
 
-  if (existing.rowCount === 0) {
-    if (!studioGateway) {
-      await query(
-        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-         VALUES ($1,$2,false)
-         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-        [msg.gateway_id, msg.gateway_ip],
-      );
-      return { status, event };
-    }
-
-    const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
-    const ipConflict = await findConfiguredIpConflict(studioGateway.id, msg.gateway_ip);
-    if (ipConflict) return rejectConfiguredIpConflict(msg.gateway_id, msg.gateway_ip);
-
-    event = gatewayIpChanged ? 'IP_CHANGED' : 'BOUND';
-    if (event === 'IP_CHANGED') await updateStudioGatewayIp(studioGateway.id, msg.gateway_ip);
-    await query(
-      `INSERT INTO gateways (gateway_id, current_ip, gateway_boot_id, mqtt_client_id, status, last_seen_at)
-       VALUES ($1,$2,$3,$4,$5, now())
-       ON CONFLICT (gateway_id) DO UPDATE SET last_seen_at = now()`,
-      [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, `ultron-gw-${msg.gateway_id}`, status],
-    );
-  } else {
-    const current = existing.rows[0];
-    if (!studioGateway) {
-      await query(
-        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-         VALUES ($1,$2,false)
-         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-        [msg.gateway_id, msg.gateway_ip],
-      );
-      return { status, event };
-    }
-
-    const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
-    const ipConflict = await findConfiguredIpConflict(studioGateway.id, msg.gateway_ip);
-    if (ipConflict) return rejectConfiguredIpConflict(msg.gateway_id, msg.gateway_ip);
-
-    if (current.status === 'QUARANTINED') {
-      status = 'ONLINE';
-      event = gatewayIpChanged ? 'IP_CHANGED' : 'COMMISSIONED';
-    } else {
-      status = 'ONLINE';
-      event = current.current_ip && current.current_ip !== msg.gateway_ip ? 'IP_CHANGED' : 'BOUND';
-    }
-    if (gatewayIpChanged) await updateStudioGatewayIp(studioGateway.id, msg.gateway_ip);
-    await query(
-      `UPDATE gateways SET current_ip = $2, gateway_boot_id = $3, status = $4, last_seen_at = now(), updated_at = now()
-       WHERE gateway_id = $1`,
-      [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, status],
-    );
+  const configuredIp = (studioGateway.ip ?? '').trim();
+  if (!configuredIp) {
+    await recordUnapprovedIp(msg.gateway_id, msg.gateway_ip);
+    if (wasKnown) await markGatewayQuarantined(msg.gateway_id);
+    return { status: 'QUARANTINED', event: 'UNCONFIGURED', reason: 'gateway_ip not configured in studio' };
   }
+
+  const ipConflict = await findConfiguredIpConflict(studioGateway.id, msg.gateway_ip);
+  if (ipConflict) return rejectConfiguredIpConflict(msg.gateway_id, msg.gateway_ip);
+
+  if (msg.gateway_ip !== configuredIp) {
+    await recordUnapprovedIp(msg.gateway_id, msg.gateway_ip);
+    if (wasKnown) await markGatewayQuarantined(msg.gateway_id);
+    return { status: 'QUARANTINED', event: 'IP_MISMATCH', reason: 'gateway_ip does not match configured ip' };
+  }
+
+  const status = 'ONLINE';
+  const event = wasKnown && existing.rows[0].status === 'QUARANTINED' ? 'COMMISSIONED' : 'BOUND';
+
+  await query(
+    `INSERT INTO gateways (gateway_id, current_ip, gateway_boot_id, mqtt_client_id, status, last_seen_at)
+     VALUES ($1,$2,$3,$4,$5, now())
+     ON CONFLICT (gateway_id) DO UPDATE SET
+       current_ip = EXCLUDED.current_ip,
+       gateway_boot_id = EXCLUDED.gateway_boot_id,
+       status = EXCLUDED.status,
+       last_seen_at = now(),
+       updated_at = now()`,
+    [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, `ultron-gw-${msg.gateway_id}`, status],
+  );
 
   await query(
     `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-     VALUES ($1,$2,$3)
-     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [msg.gateway_id, msg.gateway_ip, true],
+     VALUES ($1,$2,true)
+     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now(), approved = true`,
+    [msg.gateway_id, msg.gateway_ip],
   );
 
   await query(

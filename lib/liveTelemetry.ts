@@ -1,7 +1,9 @@
 // Live gateway/rack state from the MQTT ingestion pipeline (/api/live/state).
-// A studio device is "live" when its permanent Script ID maps to a bound
-// gateway. The displayed IP follows the gateway's current_ip so an accepted
-// gateway IP change is visible immediately.
+// A studio device is "live" only when its permanent Script ID maps to a
+// commissioned (ONLINE) gateway — one whose reported IP matches the IP
+// configured for it in Studio. A gateway that has not had its IP configured,
+// reports a different IP than configured, or whose IP collides with another
+// device is quarantined by the ingest layer and never reads as connected here.
 
 import { ipPrefixFor, totalChannelsFor, type DeviceNode } from './devices';
 import type { CardNode } from './rack';
