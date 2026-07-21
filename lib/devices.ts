@@ -108,11 +108,13 @@ export function displayIpFor(device: DeviceNode): string {
 
 export function racksForGateway(gateway: DeviceNode, devices: DeviceNode[]): DeviceNode[] {
   const prefix = ipPrefixFor(gateway.ip);
-  return devices.filter((device) => {
+  const racks = devices.filter((device) => {
     if (device.type !== 'Rack' || device.archived) return false;
     if (device.gatewayId && device.gatewayId === gateway.id) return true;
     return !!prefix && ipPrefixFor(device.ip) === prefix;
   });
+  if (gateway.ip.trim()) return racks;
+  return racks.map((rack) => (rack.status === 'Not Connected' ? rack : { ...rack, status: 'Not Connected' }));
 }
 
 export function gatewayForRack(rack: DeviceNode, devices: DeviceNode[]): DeviceNode | undefined {
