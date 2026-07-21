@@ -80,6 +80,30 @@ function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number 
   return configuredRackForDevice(device, live)?.rackId;
 }
 
+function reportedGatewayIpForDevice(device: DeviceNode, live: LiveState): string {
+  if (device.type === 'Gateway' && device.realGatewayId) {
+    return live.gateways.find((g) => g.gatewayId === device.realGatewayId)?.currentIp.trim() || device.ip.trim();
+  }
+  return device.ip.trim();
+}
+
+function duplicateConfiguredIpDeviceIds(devices: DeviceNode[], live: LiveState): Set<string> {
+  const byIp = new Map<string, string[]>();
+  for (const device of devices) {
+    if (device.archived || (device.type !== 'Gateway' && device.type !== 'Rack')) continue;
+    const ip = reportedGatewayIpForDevice(device, live);
+    if (!ip) continue;
+    byIp.set(ip, [...(byIp.get(ip) ?? []), device.id]);
+  }
+
+  const duplicates = new Set<string>();
+  for (const ids of byIp.values()) {
+    if (ids.length < 2) continue;
+    ids.forEach((id) => duplicates.add(id));
+  }
+  return duplicates;
+}
+
 export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGateway | undefined {
   const ip = device.ip.trim();
   if (!ip) return undefined;
@@ -111,9 +135,13 @@ export function isDeviceLive(device: DeviceNode, live: LiveState): boolean {
 // reads Not Connected; devices with no binding keep their stored status.
 export function applyLiveStatus(devices: DeviceNode[], live: LiveState): DeviceNode[] {
   if (live.gateways.length === 0) return devices;
+  const duplicateIpIds = duplicateConfiguredIpDeviceIds(devices, live);
   return devices.map((device) => {
     const gateway = gatewayForDevice(device, live);
     const liveIp = device.type === 'Gateway' && gateway?.currentIp ? gateway.currentIp : device.ip;
+    if (duplicateIpIds.has(device.id)) {
+      return device.status === 'Not Connected' && device.ip === liveIp ? device : { ...device, ip: liveIp, status: 'Not Connected' };
+    }
     if (!gateway) return { ...device, status: 'Not Connected' };
     const rack = device.type === 'Rack' ? configuredRackForDevice(device, live) : undefined;
     if (device.type === 'Rack' && (!rack || rack.status !== 'ONLINE')) {
@@ -133,6 +161,7 @@ export function measurementsForDevice(device: DeviceNode, live: LiveState): Live
 export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { active: number; total: number } {
   const total = totalChannelsFor(device.type);
   if (device.type !== 'Rack') return { active: 0, total };
+  if (device.status !== 'Online') return { active: 0, total };
   const gateway = gatewayForDevice(device, live);
   const rack = configuredRackForDevice(device, live);
   if (!gateway || !rack || rack.status !== 'ONLINE') return { active: 0, total };
@@ -144,7 +173,7 @@ export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { 
     if (now - Date.parse(measurement.updatedAt) > ACTIVE_MEASUREMENT_MAX_AGE_MS) continue;
     activeKeys.add(`${measurement.slotId}.${measurement.channelId}`);
   }
-  return { active: activeKeys.size, total };
+  return { active: Math.min(activeKeys.size, total), total };
 }
 
 export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] {

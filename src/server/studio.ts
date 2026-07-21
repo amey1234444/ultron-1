@@ -14,6 +14,7 @@ import type { MachineNode } from '../../lib/machines';
 import type { CardNode } from '../../lib/rack';
 import { createSeedData } from '../../lib/seedData';
 import { ensureSchema, isDbEnabled, query, withClient } from './db';
+import { ApiError } from './errors';
 
 export type Layout = { trails: unknown[]; boxes: unknown[] };
 type CanvasCardBox = Record<string, unknown>;
@@ -93,6 +94,20 @@ async function q<T extends Record<string, unknown> = Record<string, unknown>>(
   params: unknown[],
 ): Promise<{ rows: T[]; rowCount: number | null }> {
   return client.query<T>(text, params as never[]);
+}
+
+function assertUniqueConfiguredIps(data: HierarchyInput): void {
+  const byIp = new Map<string, DeviceNode>();
+  for (const device of data.devices) {
+    if (device.archived || (device.type !== 'Gateway' && device.type !== 'Rack')) continue;
+    const ip = device.ip.trim();
+    if (!ip) continue;
+    const existing = byIp.get(ip);
+    if (existing && existing.id !== device.id) {
+      throw new ApiError(409, 'IP is already configured.');
+    }
+    byIp.set(ip, device);
+  }
 }
 
 // Delete every hierarchy row and re-insert from the given snapshot. Callers wrap
@@ -235,23 +250,23 @@ export async function getWorkspace(): Promise<Workspace | null> {
   }
 
   return {
-    projects: projects.rows.map((r) => ({ id: r.id, name: r.name, code: r.code, description: r.description })),
-    folders: folders.rows.map((r) => ({
+    projects: projects.rows.map((r: ProjectRow) => ({ id: r.id, name: r.name, code: r.code, description: r.description })),
+    folders: folders.rows.map((r: FolderRow) => ({
       id: r.id, projectId: r.project_id, parentId: r.parent_id,
       name: r.name, type: r.type as FolderNode['type'], code: r.code, description: r.description,
     })),
-    machines: machines.rows.map((r) => ({
+    machines: machines.rows.map((r: MachineRow) => ({
       id: r.id, projectId: r.project_id, folderId: r.folder_id, name: r.name,
       template: r.template as MachineNode['template'],
       components: (Array.isArray(r.components) ? r.components : []) as MachineNode['components'],
     })),
-    devices: devices.rows.map((r) => ({
+    devices: devices.rows.map((r: DeviceRow) => ({
       id: r.id, name: r.name, type: r.type as DeviceNode['type'], model: r.model, ip: r.ip, port: r.port,
       protocol: r.protocol as DeviceNode['protocol'], description: r.description,
       status: r.status as DeviceNode['status'], projectId: r.project_id, gatewayId: r.gateway_id,
       realGatewayId: r.real_gateway_id, realRackId: r.real_rack_id, archived: r.archived,
     })),
-    cards: cards.rows.map((r) => ({
+    cards: cards.rows.map((r: CardRow) => ({
       id: r.id, deviceId: r.device_id, slot: r.slot, type: r.type as CardNode['type'],
       enabled: r.enabled, config: (r.config ?? {}) as CardNode['config'],
     })),
@@ -276,6 +291,7 @@ export async function getRevisions(): Promise<{ hierRevision: number; layoutRevi
 // revision. Optimistic concurrency: if baseRevision is provided and no longer
 // matches, the write is rejected so the client can refetch and retry.
 export async function replaceHierarchy(data: HierarchyInput, baseRevision?: number): Promise<{ hierRevision: number } | { conflict: true; hierRevision: number }> {
+  assertUniqueConfiguredIps(data);
   await ready();
   return withClient(async (client) => {
     await client.query('BEGIN');

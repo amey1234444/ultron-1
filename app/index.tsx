@@ -489,6 +489,24 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   const handleSaveDevice = (device: NewDevice) => {
+    const duplicateIpDevice = storedDevices.find(
+      (d) =>
+        !d.archived &&
+        (d.type === 'Gateway' || d.type === 'Rack') &&
+        d.id !== editingDeviceId &&
+        d.ip.trim() === device.ip.trim(),
+    );
+    if (duplicateIpDevice) {
+      setIpConflictNotice({
+        ip: device.ip.trim(),
+        conflictDeviceName: currentUser?.role === 'super_admin' ? duplicateIpDevice.name : undefined,
+        conflictDeviceType: currentUser?.role === 'super_admin' ? duplicateIpDevice.type : undefined,
+      });
+      if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
+      ipConflictNoticeTimer.current = setTimeout(() => setIpConflictNotice(null), 8000);
+      return;
+    }
+
     if (editingDeviceId) {
       setDevices((prev) => {
         const previous = prev.find((d) => d.id === editingDeviceId);
@@ -530,6 +548,23 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   const handleTestConnectionFromMenu = (device: DeviceNode) => {
+    const duplicateIpDevice = storedDevices.find(
+      (d) =>
+        !d.archived &&
+        (d.type === 'Gateway' || d.type === 'Rack') &&
+        d.id !== device.id &&
+        d.ip.trim() === device.ip.trim(),
+    );
+    if (duplicateIpDevice) {
+      setIpConflictNotice({
+        ip: device.ip.trim(),
+        conflictDeviceName: currentUser?.role === 'super_admin' ? duplicateIpDevice.name : undefined,
+        conflictDeviceType: currentUser?.role === 'super_admin' ? duplicateIpDevice.type : undefined,
+      });
+      if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
+      ipConflictNoticeTimer.current = setTimeout(() => setIpConflictNotice(null), 8000);
+      return;
+    }
     // Same simulated test as the Add/Edit dialog, applied in place.
     setDevices((prev) => prev.map((d) => (d.id === device.id ? { ...d, status: Math.random() > 0.3 ? 'Online' : 'Not Connected' } : d)));
   };
