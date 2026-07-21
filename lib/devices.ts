@@ -103,9 +103,6 @@ export function nextRealRackId(gatewayId: string | null | undefined, devices: De
 }
 
 export function displayIpFor(device: DeviceNode): string {
-  if (device.type === 'Gateway') {
-    return ipPrefixFor(device.ip) || device.ip.trim();
-  }
   return device.ip.trim();
 }
 

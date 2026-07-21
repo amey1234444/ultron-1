@@ -7,6 +7,7 @@ import { displayIpFor, lastCommunicationLabel, racksForGateway, type DeviceNode 
 import type { ProjectNode } from '../../lib/hierarchy';
 import { PERMISSIONS } from '../../lib/permissions';
 import { ActionButton } from './ActionButton';
+import { BackButton } from './BackButton';
 import { DevicesTable } from './DevicesTable';
 
 type GatewayDetailProps = {
@@ -61,9 +62,7 @@ export function GatewayDetail({ gateway, devices, projects, canConfigure, onBack
   return (
     <View className="flex-1">
       <View className="px-6 pt-5">
-        <Pressable onPress={onBack}>
-          <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{'< Devices'}</Text>
-        </Pressable>
+        <BackButton label="Back to Devices" onPress={onBack} />
         <View className="mt-3 flex-row items-center justify-between gap-4">
           <View>
             <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{gateway.name}</Text>
@@ -86,7 +85,7 @@ export function GatewayDetail({ gateway, devices, projects, canConfigure, onBack
           <InfoRow label="Device" value={gateway.name} />
           <InfoRow label="Gateway Script ID" value={gateway.realGatewayId || '-'} mono />
           <InfoRow label="Model" value={gateway.model} mono />
-          <InfoRow label="IP Prefix" value={displayIpFor(gateway)} mono />
+          <InfoRow label="Gateway IP" value={displayIpFor(gateway)} mono />
           <InfoRow label="Port" value={gateway.port || '-'} mono />
           <InfoRow label="Protocol" value={gateway.protocol} />
           <InfoRow label="Status" value={gateway.status} />

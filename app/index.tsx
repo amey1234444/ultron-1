@@ -54,6 +54,42 @@ function makeId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+const HISTORY_STATE_KEY = 'ultronSelected';
+
+function selectedToHash(selected: SelectedNode): string {
+  switch (selected.kind) {
+    case 'none':
+      return '#home';
+    case 'devices':
+      return '#devices';
+    case 'project':
+    case 'folder':
+    case 'machine':
+    case 'device':
+      return `#${selected.kind}=${encodeURIComponent(selected.id)}`;
+  }
+}
+
+function selectedFromHash(hash: string): SelectedNode {
+  const normalized = hash.startsWith('#') ? hash.slice(1) : hash;
+  if (!normalized || normalized === 'home') return { kind: 'none' };
+  if (normalized === 'devices') return { kind: 'devices' };
+  const [kind, encodedId = ''] = normalized.split('=');
+  const id = decodeURIComponent(encodedId);
+  if (!id) return { kind: 'none' };
+  if (kind === 'project' || kind === 'folder' || kind === 'machine' || kind === 'device') return { kind, id };
+  return { kind: 'none' };
+}
+
+function initialSelected(): SelectedNode {
+  if (Platform.OS !== 'web' || typeof window === 'undefined') return { kind: 'none' };
+  return selectedFromHash(window.location.hash);
+}
+
+function sameSelected(a: SelectedNode, b: SelectedNode): boolean {
+  return a.kind === b.kind && ('id' in a ? a.id : '') === ('id' in b ? b.id : '');
+}
+
 export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: ReactNode; currentUser?: PublicUser | null } = {}) {
   const { isDark } = useAppTheme();
   const hasConfigureAccess = currentUser
@@ -84,8 +120,44 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const { width } = useWindowDimensions();
   const isNarrow = width > 0 && width < 768;
 
-  const [selected, setSelected] = useState<SelectedNode>({ kind: 'none' });
+  const [selected, setSelected] = useState<SelectedNode>(initialSelected);
+  const skipNextHistoryPush = useRef(false);
   const [leftCollapsed, setLeftCollapsed] = useState(isNarrow);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+
+    const applyLocationSelection = () => {
+      const next = selectedFromHash(window.location.hash);
+      setSelected((current) => {
+        if (sameSelected(current, next)) return current;
+        skipNextHistoryPush.current = true;
+        return next;
+      });
+    };
+
+    if (!window.history.state?.[HISTORY_STATE_KEY]) {
+      window.history.replaceState({ ...(window.history.state ?? {}), [HISTORY_STATE_KEY]: true }, '', selectedToHash(selected));
+    }
+
+    window.addEventListener('popstate', applyLocationSelection);
+    window.addEventListener('hashchange', applyLocationSelection);
+    return () => {
+      window.removeEventListener('popstate', applyLocationSelection);
+      window.removeEventListener('hashchange', applyLocationSelection);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
+    const hash = selectedToHash(selected);
+    if (skipNextHistoryPush.current) {
+      skipNextHistoryPush.current = false;
+      return;
+    }
+    if (window.location.hash === hash) return;
+    window.history.pushState({ ...(window.history.state ?? {}), [HISTORY_STATE_KEY]: true }, '', hash);
+  }, [selected]);
 
   const prevNarrow = useRef<boolean | null>(null);
   useEffect(() => {
@@ -214,7 +286,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         name: `Gateway-${prefix.replace(/\./g, '-')}`,
         type: 'Gateway' as const,
         model: 'GW-100',
-        ip: prefix,
+        ip: composeIp(prefix, '10') || `${prefix}.10`,
         port: '503',
         protocol: group[0]?.protocol ?? 'Modbus TCP',
         description: 'Auto-created gateway for existing racks',
@@ -222,7 +294,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         projectId: group[0]?.projectId ?? null,
         archived: false,
       }));
-      const gatewayIdByPrefix = new Map(generatedGateways.map((gateway) => [gateway.ip, gateway.id]));
+      const gatewayIdByPrefix = new Map(generatedGateways.map((gateway) => [ipPrefixFor(gateway.ip), gateway.id]));
       return [
         ...generatedGateways,
         ...prev.map((device) => {
@@ -588,7 +660,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               cards={visibleCards.filter((c) => c.deviceId === selectedDevice.id)}
               live={realMode ? liveState : undefined}
               canEditDeleteSchema={canEditDeleteSchema}
-              onBack={() => setSelected({ kind: 'devices' })}
+              backLabel={selectedDevice.gatewayId ? 'Back to Gateway' : 'Back to Devices'}
+              onBack={() => {
+                const gateway = selectedDevice.gatewayId ? devices.find((device) => device.id === selectedDevice.gatewayId && device.type === 'Gateway') : undefined;
+                setSelected(gateway ? { kind: 'device', id: gateway.id } : { kind: 'devices' });
+              }}
               onInstallCard={(slot, type, config, enabled) => handleInstallCard(selectedDevice.id, slot, type, config, enabled)}
               onUpdateCard={handleUpdateCard}
               onRemoveCard={handleRemoveCard}

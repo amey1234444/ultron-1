@@ -184,11 +184,8 @@ async function isCommissioned(gatewayId: string, gatewayIp: string): Promise<boo
      FROM studio_devices
      WHERE type = 'Gateway'
        AND archived = false
-       AND (
-         real_gateway_id = $2
-         OR ip = $1
-         OR ip = regexp_replace($1, '\\.[^.]+$', '')
-       )
+       AND real_gateway_id = $2
+       AND ip = $1
      LIMIT 1`,
     [gatewayIp, gatewayId],
   );

@@ -13,7 +13,6 @@ import {
   hostOctetFor,
   isValidIp,
   isValidHostOctet,
-  isValidIpPrefix,
   isValidPort,
   ipPrefixFor,
   type ConnectionStatus,
@@ -133,7 +132,7 @@ export function AddDeviceDialog({ visible, editingDevice, gateways = [], initial
       setType(nextType);
       setName(editingDevice?.name ?? '');
       setGatewayId(nextGatewayId);
-      setIp(editingDevice?.type === 'Gateway' ? ipPrefixFor(editingDevice.ip) : (editingDevice?.ip ?? ''));
+      setIp(editingDevice?.ip ?? '');
       setHostOctet(editingDevice?.type === 'Rack' ? hostOctetFor(editingDevice.ip) : '');
       setPort(editingDevice?.port ?? '');
       setProtocol(editingDevice?.protocol ?? null);
@@ -147,8 +146,8 @@ export function AddDeviceDialog({ visible, editingDevice, gateways = [], initial
   const effectiveIp = type === 'Gateway' ? ip.trim() : selectedGatewayPrefix ? composeIp(selectedGatewayPrefix, hostOctet) : ip.trim();
   const ipError =
     type === 'Gateway'
-      ? ip.trim().length > 0 && !isValidIpPrefix(ip)
-        ? 'Enter the first three IPv4 sections, e.g. 192.168.10'
+      ? ip.trim().length > 0 && !isValidIp(ip)
+        ? 'Enter the gateway full IPv4 address, e.g. 192.168.10.10'
         : undefined
       : selectedGatewayPrefix
         ? hostOctet.trim().length > 0 && !isValidHostOctet(hostOctet)
@@ -162,10 +161,10 @@ export function AddDeviceDialog({ visible, editingDevice, gateways = [], initial
   const canSave =
     type !== null &&
     name.trim().length > 0 &&
-    (type === 'Gateway' ? isValidIpPrefix(ip) : selectedGatewayPrefix ? isValidIp(effectiveIp) : isValidIp(ip)) &&
+    (type === 'Gateway' ? isValidIp(ip) : selectedGatewayPrefix ? isValidIp(effectiveIp) : isValidIp(ip)) &&
     isValidPort(port) &&
     protocol !== null;
-  const canTestConnection = (type === 'Gateway' ? isValidIpPrefix(ip) : isValidIp(effectiveIp)) && isValidPort(port);
+  const canTestConnection = (type === 'Gateway' ? isValidIp(ip) : isValidIp(effectiveIp)) && isValidPort(port);
 
   const handleTestConnection = () => {
     setTestState('testing');
@@ -237,13 +236,13 @@ export function AddDeviceDialog({ visible, editingDevice, gateways = [], initial
           <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Gateway *</Text>
           <View className="flex-row flex-wrap gap-2">
             {gateways.map((gateway) => (
-              <Chip key={gateway.id} label={`${gateway.name} (${ipPrefixFor(gateway.ip) || 'no prefix'})`} selected={gatewayId === gateway.id} onPress={() => setGatewayId(gateway.id)} />
+              <Chip key={gateway.id} label={`${gateway.name} (${gateway.ip || 'no IP'})`} selected={gatewayId === gateway.id} onPress={() => setGatewayId(gateway.id)} />
             ))}
           </View>
         </View>
       )}
       {type === 'Gateway' ? (
-        <FormField label="Gateway IP Prefix" required value={ip} onChangeText={setIp} placeholder="e.g. 192.168.10" error={ipError} />
+        <FormField label="Gateway IP Address" required value={ip} onChangeText={setIp} placeholder="e.g. 192.168.10.10" error={ipError} />
       ) : selectedGatewayPrefix ? (
         <View className="gap-1.5">
           <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Rack IP Address *</Text>

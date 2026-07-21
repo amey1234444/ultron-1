@@ -6,6 +6,7 @@ import type { DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import { cn } from '../../../lib/cn';
 import { emptyConfigFor, isCardConfigured, type CardConfig, type CardNode, type CardType } from '../../../lib/rack';
+import { BackButton } from '../BackButton';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { CardActionsMenu, type CardActionsMenuState } from './CardActionsMenu';
 import { CardConfigPage } from './CardConfigPage';
@@ -23,6 +24,7 @@ type RackDetailProps = {
   cards: CardNode[];
   live?: LiveState;
   onBack: () => void;
+  backLabel?: string;
   onInstallCard: (slot: number, type: CardType, config: CardConfig, enabled: boolean) => void;
   onUpdateCard: (cardId: string, config: CardConfig, enabled: boolean) => void;
   onRemoveCard: (cardId: string) => void;
@@ -43,7 +45,7 @@ function ModeTab({ label, active, onPress }: { label: string; active: boolean; o
   );
 }
 
-export function RackDetail({ device, cards, live, onBack, onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
+export function RackDetail({ device, cards, live, onBack, backLabel = 'Back', onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<ViewMode>('visual');
   const [installMenu, setInstallMenu] = useState<InstallCardMenuState | null>(null);
@@ -87,9 +89,9 @@ export function RackDetail({ device, cards, live, onBack, onInstallCard, onUpdat
 
   return (
     <View className="flex-1">
-      <Pressable onPress={onBack} className="px-6 pt-5">
-        <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>‹ Devices</Text>
-      </Pressable>
+      <View className="px-6 pt-5">
+        <BackButton label={backLabel} onPress={onBack} />
+      </View>
 
       <View className="flex-row items-center justify-between px-6 pt-3">
         <View>

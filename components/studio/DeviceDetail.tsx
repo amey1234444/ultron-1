@@ -1,9 +1,10 @@
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { totalChannelsFor, type DeviceNode } from '../../lib/devices';
 import { gatewayForDevice, lastSeenLabel, measurementsForDevice, type LiveState } from '../../lib/liveTelemetry';
+import { BackButton } from './BackButton';
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   const { isDark } = useAppTheme();
@@ -26,9 +27,9 @@ export function DeviceDetail({ device, live, onBack }: { device: DeviceNode; liv
 
   return (
     <ScrollView className="flex-1">
-      <Pressable onPress={onBack} className="px-6 pt-5">
-        <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>‹ Devices</Text>
-      </Pressable>
+      <View className="px-6 pt-5">
+        <BackButton label="Back to Devices" onPress={onBack} />
+      </View>
 
       <View className="px-6 pt-3">
         <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{device.name}</Text>

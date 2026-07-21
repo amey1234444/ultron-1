@@ -29,11 +29,8 @@ async function isCommissioned(gatewayId, gatewayIp) {
      FROM studio_devices
      WHERE type = 'Gateway'
        AND archived = false
-       AND (
-         real_gateway_id = $2
-         OR ip = $1
-         OR ip = regexp_replace($1, '\\.[^.]+$', '')
-       )
+       AND real_gateway_id = $2
+       AND ip = $1
      LIMIT 1`,
     [gatewayIp, gatewayId],
   );
@@ -53,8 +50,8 @@ export async function bind(msg) {
   let status = 'ONLINE';
   let event = 'BOUND';
   if (existing.rowCount === 0) {
-    // Commissioning bootstrap: only auto-claim when a studio Gateway is already
-    // configured with this script ID, exact IP, or IP prefix.
+    // Commissioning bootstrap: only auto-claim when the studio Gateway has the
+    // same script ID and exact full gateway IP. Rack IPs/prefixes do not claim.
     if (!(await isCommissioned(gateway_id, gateway_ip))) {
       status = 'QUARANTINED';
       event = 'UNCLAIMED';

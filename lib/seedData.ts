@@ -49,7 +49,7 @@ export function createSeedData(makeId: () => string): {
       name: 'Gateway-North',
       type: 'Gateway',
       model: 'GW-100',
-      ip: '192.168.10',
+      ip: '192.168.10.10',
       port: '503',
       protocol: 'Modbus TCP',
       description: 'Seeded demo gateway',
