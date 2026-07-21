@@ -29,9 +29,9 @@ Requires Node 20+. The service creates its own tables (idempotent) from
 - `gateway_ip` is mandatory verification metadata. When a known Studio
   `real_gateway_id` reports a new IP, the service updates the Studio Gateway IP,
   records it in `gateway_ip_history`, and continues processing the message.
-- If that reported gateway IP is already configured on one of the gateway's
-  child racks, the message is quarantined as a rack IP conflict instead of
-  updating the gateway IP.
+- If that reported gateway IP is already configured on any other active Studio
+  rack or gateway, the message is quarantined as an IP conflict before live
+  gateway, rack, inventory, telemetry, or event state can update.
 - Unknown `gateway_id`s are quarantined and do not update live gateway, rack,
   inventory, telemetry, or event state.
 - Topic identity must match the payload envelope or the message is rejected.

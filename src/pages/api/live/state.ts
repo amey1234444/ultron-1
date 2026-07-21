@@ -17,7 +17,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     await enforceRateLimit(req, res, 'api');
     if (!isDbEnabled()) return res.status(200).json({ persisted: false, gateways: [], racks: [], slots: [], measurements: [], alerts: [] });
-    const state = await getLiveState();
+    const state = await getLiveState({ includeConflictDeviceDetails: user.role === 'super_admin' });
     return res.status(200).json({ persisted: true, ...state });
   } catch {
     return res.status(500).json({ error: 'Internal server error.' });

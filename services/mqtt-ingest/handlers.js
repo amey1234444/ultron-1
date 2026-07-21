@@ -36,18 +36,39 @@ async function findStudioGateway(gatewayId) {
   return gateway.rows[0] ?? null;
 }
 
-async function findRackIpConflict(gatewayDeviceId, gatewayIp) {
-  const rack = await query(
-    `SELECT id, name, real_rack_id
+async function findConfiguredIpConflict(gatewayDeviceId, gatewayIp) {
+  const device = await query(
+    `SELECT id, name, type, real_gateway_id, real_rack_id
      FROM studio_devices
-     WHERE type = 'Rack'
-       AND archived = false
-       AND gateway_id = $1
-       AND ip = $2
+     WHERE archived = false
+       AND type IN ('Gateway', 'Rack')
+       AND ip = $1
+       AND id <> $2
+     ORDER BY CASE type WHEN 'Gateway' THEN 0 ELSE 1 END, name
      LIMIT 1`,
-    [gatewayDeviceId, gatewayIp],
+    [gatewayIp, gatewayDeviceId],
   );
-  return rack.rows[0] ?? null;
+  return device.rows[0] ?? null;
+}
+
+async function rejectConfiguredIpConflict(gatewayId, gatewayIp) {
+  await query(
+    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+     VALUES ($1,$2,false)
+     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
+    [gatewayId, gatewayIp],
+  );
+  await query(
+    `UPDATE gateways
+     SET status = 'QUARANTINED', updated_at = now()
+     WHERE gateway_id = $1`,
+    [gatewayId],
+  );
+  return {
+    status: 'QUARANTINED',
+    event: 'IP_CONFLICT',
+    reason: 'gateway_ip already configured',
+  };
 }
 
 async function updateStudioGatewayIp(deviceId, gatewayIp) {
@@ -90,20 +111,8 @@ export async function bind(msg) {
     }
 
     const gatewayIpChanged = studioGateway.ip !== gateway_ip;
-    const rackConflict = gatewayIpChanged ? await findRackIpConflict(studioGateway.id, gateway_ip) : null;
-    if (rackConflict) {
-      await query(
-        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-         VALUES ($1,$2,false)
-         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-        [gateway_id, gateway_ip],
-      );
-      return {
-        status: 'QUARANTINED',
-        event: 'RACK_IP_CONFLICT',
-        reason: 'gateway_ip matches configured rack ip',
-      };
-    }
+    const ipConflict = await findConfiguredIpConflict(studioGateway.id, gateway_ip);
+    if (ipConflict) return rejectConfiguredIpConflict(gateway_id, gateway_ip);
 
     event = gatewayIpChanged ? 'IP_CHANGED' : 'BOUND';
     if (event === 'IP_CHANGED') await updateStudioGatewayIp(studioGateway.id, gateway_ip);
@@ -126,20 +135,8 @@ export async function bind(msg) {
     }
 
     const gatewayIpChanged = studioGateway.ip !== gateway_ip;
-    const rackConflict = gatewayIpChanged ? await findRackIpConflict(studioGateway.id, gateway_ip) : null;
-    if (rackConflict) {
-      await query(
-        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-         VALUES ($1,$2,false)
-         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-        [gateway_id, gateway_ip],
-      );
-      return {
-        status: 'QUARANTINED',
-        event: 'RACK_IP_CONFLICT',
-        reason: 'gateway_ip matches configured rack ip',
-      };
-    }
+    const ipConflict = await findConfiguredIpConflict(studioGateway.id, gateway_ip);
+    if (ipConflict) return rejectConfiguredIpConflict(gateway_id, gateway_ip);
 
     if (current.status === 'QUARANTINED') {
       status = 'ONLINE';

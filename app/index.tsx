@@ -194,11 +194,15 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // bound gateway starts publishing.
   const liveState = useLiveTelemetry();
   const [ipChangeNotice, setIpChangeNotice] = useState<{ gatewayName: string; oldIp: string; newIp: string } | null>(null);
-  const [rackIpNotice, setRackIpNotice] = useState<{ rackName: string; gatewayName: string; ip: string } | null>(null);
+  const [ipConflictNotice, setIpConflictNotice] = useState<{
+    ip: string;
+    conflictDeviceName?: string;
+    conflictDeviceType?: string;
+  } | null>(null);
   const seenIpChanges = useRef<Set<string>>(new Set());
-  const seenRackIpAlerts = useRef<Set<number>>(new Set());
+  const seenIpConflictAlerts = useRef<Set<number>>(new Set());
   const ipNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const rackIpNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const ipConflictNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const configuredGateways = useMemo(() => storedDevices.filter((device) => device.type === 'Gateway' && !device.archived), [storedDevices]);
   const demoDevices = useMemo<DeviceNode[]>(() => {
     const merged = new Map<string, DeviceNode>();
@@ -272,17 +276,21 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   useEffect(() => {
     if (!realMode) return;
-    const alert = liveState.alerts.find((item) => item.type === 'RACK_IP_CONFLICT' && !seenRackIpAlerts.current.has(item.id));
+    const alert = liveState.alerts.find((item) => item.type === 'IP_CONFLICT' && !seenIpConflictAlerts.current.has(item.id));
     if (!alert) return;
-    seenRackIpAlerts.current.add(alert.id);
-    setRackIpNotice({ rackName: alert.rackName, gatewayName: alert.gatewayName, ip: alert.gatewayIp });
-    if (rackIpNoticeTimer.current) clearTimeout(rackIpNoticeTimer.current);
-    rackIpNoticeTimer.current = setTimeout(() => setRackIpNotice(null), 8000);
-  }, [liveState.alerts, realMode]);
+    seenIpConflictAlerts.current.add(alert.id);
+    setIpConflictNotice({
+      ip: alert.gatewayIp,
+      conflictDeviceName: currentUser?.role === 'super_admin' ? alert.conflictDeviceName : undefined,
+      conflictDeviceType: currentUser?.role === 'super_admin' ? alert.conflictDeviceType : undefined,
+    });
+    if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
+    ipConflictNoticeTimer.current = setTimeout(() => setIpConflictNotice(null), 8000);
+  }, [currentUser?.role, liveState.alerts, realMode]);
 
   useEffect(() => () => {
     if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
-    if (rackIpNoticeTimer.current) clearTimeout(rackIpNoticeTimer.current);
+    if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
   }, []);
 
   useEffect(() => {
@@ -643,7 +651,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         </View>
       )}
 
-      {rackIpNotice && (
+      {ipConflictNotice && (
         <View
           className={cn(
             'absolute right-4 top-16 z-50 max-w-[400px] rounded-lg border px-4 py-3 shadow-lg',
@@ -651,9 +659,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           )}
           style={ipChangeNotice ? { top: 136 } : undefined}
         >
-          <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Rack IP used as gateway IP</Text>
+          <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>IP already configured</Text>
           <Text className={cn('mt-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            {rackIpNotice.rackName} is configured with {rackIpNotice.ip}. Set {rackIpNotice.gatewayName} to the real gateway IP.
+            {ipConflictNotice.conflictDeviceName
+              ? `${ipConflictNotice.ip} is already configured on ${ipConflictNotice.conflictDeviceName} (${ipConflictNotice.conflictDeviceType ?? 'Device'}).`
+              : `${ipConflictNotice.ip} is already configured.`}
           </Text>
         </View>
       )}

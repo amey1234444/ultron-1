@@ -43,13 +43,13 @@ export type LiveRack = {
 
 export type LiveAlert = {
   id: number;
-  type: 'RACK_IP_CONFLICT';
+  type: 'IP_CONFLICT';
   gatewayId: string;
   gatewayIp: string;
   gatewayName: string;
-  rackDeviceId: string;
-  rackName: string;
-  rackId: number | null;
+  conflictDeviceId?: string;
+  conflictDeviceName?: string;
+  conflictDeviceType?: string;
   createdAt: string;
   message: string;
 };
