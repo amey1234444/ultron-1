@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { verifyCaptcha } from '../../../server/captcha';
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
-import { ApiError, createUser, findByUsername } from '../../../server/users';
+import { createUser, findByUsername } from '../../../server/users';
 
 // Public self-service sign-up. New accounts:
 //  - always get the lowest ('user') role regardless of any client-supplied value,
@@ -50,8 +51,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       message: 'Account created. A super admin must approve it before you can sign in.',
     });
   } catch (err) {
-    if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
-    console.error('signup error', err);
-    return res.status(500).json({ error: 'Internal server error.' });
+    return sendApiError(res, err, 'api/auth/signup');
   }
 }

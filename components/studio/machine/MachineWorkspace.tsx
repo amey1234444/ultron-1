@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-na
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
-import { channelLiveStatus, type LiveState } from '../../../lib/liveTelemetry';
+import type { LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal } from '../../../lib/localPersist';
 import type { MachineComponent, MachineNode } from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
@@ -15,7 +15,6 @@ import { ComponentTypeIcon } from './machineIcons';
 import { MachineCanvas } from './MachineCanvas';
 import { computePointCode, PointCard } from './PointCard';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
-import { createRavDefaultLayout, hasDefaultLayout } from './ravDefaultLayout';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { StageGrid, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
@@ -177,31 +176,19 @@ export function MachineWorkspace({
   // unsaved edits. The "Machine" tab reads live in-memory state directly via
   // TrailBoard(readOnly) instead, so it's excluded here.
   const allChannels = useMemo(() => listChannels(devices, cards), [devices, cards]);
-  const activeChannels = useMemo(
-    () =>
-      live
-        ? listChannels(devices, cards, {
-            channelIsAvailable: (rack, card, channelNumber) => channelLiveStatus(rack, card, channelNumber, live) === 'active',
-          })
-        : allChannels,
-    [allChannels, devices, cards, live],
-  );
-
   const [savedBoxes, setSavedBoxes] = useState<Box[]>([]);
   useEffect(() => {
     if (!isActual || actualTab === 'machine') return;
-    // Prefer the shared server layout; fall back to any local copy, then the
-    // template default so dashboards render live demo data out of the box.
+    // Prefer the shared server layout; fall back to any local copy. A newly
+    // created RAV should show the machine artwork without mapping cards/trails
+    // until a user explicitly saves a canvas configuration.
     const saved = layout ?? loadLocal<SavedLayout>(trailBoardStorageKey(machine.id));
     if (saved?.boxes && saved.boxes.length > 0) {
       setSavedBoxes(saved.boxes);
       return;
     }
-    // No saved config yet: fall back to the template's default wiring (RAV ships
-    // one) so the Actual View dashboards render live demo data out of the box
-    // instead of an empty "nothing mapped" state.
-    setSavedBoxes(hasDefaultLayout(machine.template) ? createRavDefaultLayout(activeChannels).boxes : []);
-  }, [isActual, actualTab, machine.id, machine.template, allChannels, activeChannels, layout]);
+    setSavedBoxes([]);
+  }, [isActual, actualTab, machine.id, layout]);
 
   const mappedChannels = useMemo<MappedChannel[]>(
     () =>

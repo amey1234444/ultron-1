@@ -6,7 +6,7 @@ import { ThemeToggle } from '../ThemeToggle';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { LOGO_DARK, LOGO_LIGHT } from '../../lib/brandLogos';
 import { cn } from '../../lib/cn';
-import { racksForGateway, type DeviceNode } from '../../lib/devices';
+import { deviceWithGatewayConnectionState, racksForGateway, type DeviceNode } from '../../lib/devices';
 
 const LOGO_ASPECT = 284 / 77;
 const LOGO_HEIGHT = 24;
@@ -44,26 +44,29 @@ function Divider({ color }: { color: string }) {
 
 function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact: boolean }) {
   const { isDark } = useAppTheme();
+  const { width, height } = useWindowDimensions();
   const [open, setOpen] = useState(false);
   const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
 
-  const realDevices = useMemo(() => devices.filter((d) => !d.archived), [devices]);
+  const realDevices = useMemo(
+    () => devices.filter((d) => !d.archived).map((device) => deviceWithGatewayConnectionState(device, devices)),
+    [devices],
+  );
   const active = useMemo(() => realDevices.filter((d) => d.status === 'Online'), [realDevices]);
   const gateways = useMemo(() => realDevices.filter((d) => d.type === 'Gateway'), [realDevices]);
   const total = realDevices.length;
-  const selectedGateway = useMemo(
-    () => gateways.find((gateway) => gateway.id === selectedGatewayId) ?? gateways[0] ?? null,
-    [gateways, selectedGatewayId],
-  );
-  const selectedRacks = useMemo(() => (selectedGateway ? racksForGateway(selectedGateway, devices) : []), [devices, selectedGateway]);
+  const selectedGateway = useMemo(() => gateways.find((gateway) => gateway.id === selectedGatewayId) ?? null, [gateways, selectedGatewayId]);
+  const selectedRacks = useMemo(() => (selectedGateway ? racksForGateway(selectedGateway, realDevices) : []), [realDevices, selectedGateway]);
+  const menuWidth = Math.max(260, Math.min((width || 560) - 24, compact ? 420 : 520));
+  const panelMaxHeight = Math.max(220, Math.min(460, (height || 560) - 72));
+  const listMaxHeight = Math.max(160, panelMaxHeight - 58);
 
   useEffect(() => {
-    if (!selectedGatewayId && gateways[0]) setSelectedGatewayId(gateways[0].id);
     if (selectedGatewayId && !gateways.some((gateway) => gateway.id === selectedGatewayId)) {
-      setSelectedGatewayId(gateways[0]?.id ?? null);
+      setSelectedGatewayId(null);
     }
   }, [gateways, selectedGatewayId]);
 
@@ -73,12 +76,25 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
     WebkitBackdropFilter: 'blur(18px) saturate(160%)',
   } as unknown as ViewStyle;
 
-  const Row = ({ device, selected = false, onPress }: { device: DeviceNode; selected?: boolean; onPress?: () => void }) => {
+  const Row = ({
+    device,
+    selected = false,
+    onPress,
+    onHoverIn,
+    detail,
+  }: {
+    device: DeviceNode;
+    selected?: boolean;
+    onPress?: () => void;
+    onHoverIn?: () => void;
+    detail?: string;
+  }) => {
     const isOnline = device.status === 'Online';
     return (
       <Pressable
         onPress={onPress}
-        className={cn('flex-row items-center gap-2.5 px-3 py-2', selected && (isDark ? 'bg-ink/10' : 'bg-ink-inverse/10'))}
+        onHoverIn={onHoverIn}
+        className={cn('flex-row items-center gap-2.5 px-3 py-2.5', selected && (isDark ? 'bg-ink/10' : 'bg-ink-inverse/10'))}
       >
         <View
           style={{
@@ -93,7 +109,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
             {device.name}
           </Text>
           <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
-            {device.ip || 'no ip'} - {device.type}
+            {device.ip || 'not set'} - {detail ?? device.type}
           </Text>
         </View>
         <Text className={cn('font-body-medium text-[10px]', isOnline ? 'text-status-success' : mutedClass)}>
@@ -109,7 +125,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
         onPress={() => setOpen(true)}
         className={cn('flex-row items-center gap-1.5 rounded-full border px-2.5 py-1', lineClass)}
       >
-        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: '#3FB950' }} />
+        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active.length > 0 ? '#3FB950' : isDark ? '#5A5A5A' : '#B4B4B4' }} />
         <Text className={cn('font-body-medium text-[11px]', inkClass)}>
           {active.length}
           <Text className={mutedClass}>/{total}</Text>
@@ -127,8 +143,8 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
               {
                 top: 54,
                 right: 12,
-                width: compact ? 420 : 560,
-                maxHeight: 380,
+                width: menuWidth,
+                maxHeight: panelMaxHeight,
                 shadowColor: '#000',
                 shadowOpacity: isDark ? 0.5 : 0.18,
                 shadowRadius: 24,
@@ -148,36 +164,43 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
             {total === 0 ? (
               <Text className={cn('px-3 py-4 font-body text-xs italic', mutedClass)}>No devices added yet.</Text>
             ) : (
-              <View className="flex-row">
-                <View className={cn('border-r', lineClass)} style={{ width: compact ? 190 : 240 }}>
-                  <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
-                    Gateways - {gateways.length}
-                  </Text>
-                  <ScrollView style={{ maxHeight: 320 }}>
-                    {gateways.map((gateway) => (
-                      <Row
-                        key={gateway.id}
-                        device={gateway}
-                        selected={selectedGateway?.id === gateway.id}
-                        onPress={() => setSelectedGatewayId(gateway.id)}
-                      />
-                    ))}
-                  </ScrollView>
-                </View>
-
-                <View className="flex-1">
-                  <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
-                    {selectedGateway ? `${selectedGateway.name} racks` : 'Racks'} - {selectedRacks.filter((rack) => rack.status === 'Online').length}/{selectedRacks.length} active
-                  </Text>
-                  <ScrollView style={{ maxHeight: 320 }}>
-                    {selectedRacks.length === 0 ? (
-                      <Text className={cn('px-3 py-4 font-body text-xs italic', mutedClass)}>No racks under this gateway.</Text>
-                    ) : (
-                      selectedRacks.map((rack) => <Row key={rack.id} device={rack} />)
-                    )}
-                  </ScrollView>
-                </View>
-              </View>
+              <ScrollView style={{ maxHeight: listMaxHeight }}>
+                <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                  Gateways - {gateways.length}
+                </Text>
+                {gateways.length === 0 ? (
+                  <Text className={cn('px-3 py-4 font-body text-xs italic', mutedClass)}>No gateways added yet.</Text>
+                ) : (
+                  gateways.map((gateway) => {
+                    const gatewayRacks = racksForGateway(gateway, realDevices);
+                    const onlineRackCount = gatewayRacks.filter((rack) => rack.status === 'Online').length;
+                    const expanded = selectedGateway?.id === gateway.id;
+                    return (
+                      <View key={gateway.id}>
+                        <Row
+                          device={gateway}
+                          selected={expanded}
+                          detail={`${onlineRackCount}/${gatewayRacks.length} racks active`}
+                          onHoverIn={() => setSelectedGatewayId(gateway.id)}
+                          onPress={() => setSelectedGatewayId((current) => (current === gateway.id ? null : gateway.id))}
+                        />
+                        {expanded && (
+                          <View className={cn('mx-3 mb-2 ml-8 rounded-lg border', lineClass)}>
+                            <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                              Racks - {selectedRacks.filter((rack) => rack.status === 'Online').length}/{selectedRacks.length} active
+                            </Text>
+                            {selectedRacks.length === 0 ? (
+                              <Text className={cn('px-3 py-3 font-body text-xs italic', mutedClass)}>No racks under this gateway.</Text>
+                            ) : (
+                              selectedRacks.map((rack) => <Row key={rack.id} device={rack} />)
+                            )}
+                          </View>
+                        )}
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
             )}
           </Pressable>
         </Pressable>

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { USER_PERMISSIONS, userHasPermission } from '../../../lib/roles';
 import { isDbEnabled } from '../../../server/db';
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
@@ -29,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     const result = await saveMachineLayout(body.machineId, body.layout);
     return res.status(200).json({ layoutRevision: result.layoutRevision });
-  } catch {
-    return res.status(500).json({ error: 'Internal server error.' });
+  } catch (err) {
+    return sendApiError(res, err, 'api/studio/layout');
   }
 }

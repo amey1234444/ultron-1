@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isDbEnabled } from '../../../server/db';
+import { sendApiError } from '../../../server/errors';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
 import { getRevisions } from '../../../server/studio';
@@ -15,7 +16,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!isDbEnabled()) return res.status(200).json({ persisted: false });
     const revisions = await getRevisions();
     return res.status(200).json({ persisted: true, ...revisions });
-  } catch {
-    return res.status(500).json({ error: 'Internal server error.' });
+  } catch (err) {
+    return sendApiError(res, err, 'api/studio/revisions');
   }
 }

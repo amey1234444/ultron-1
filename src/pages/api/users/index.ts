@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isUserStatus } from '../../../lib/roles';
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { requireUser } from '../../../server/session';
-import { ApiError, createUser, listUsers } from '../../../server/users';
+import { createUser, listUsers } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -37,11 +38,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed.' });
   } catch (err) {
-    return handleError(res, err);
+    return sendApiError(res, err, 'api/users');
   }
-}
-
-function handleError(res: NextApiResponse, err: unknown) {
-  if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
-  return res.status(500).json({ error: 'Internal server error.' });
 }

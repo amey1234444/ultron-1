@@ -1,10 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isUserStatus } from '../../../lib/roles';
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { requireUser } from '../../../server/session';
-import { ApiError, deleteUser, updateUser } from '../../../server/users';
+import { deleteUser, updateUser } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const { id } = req.query;
@@ -38,7 +39,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', 'PATCH, DELETE');
     return res.status(405).json({ error: 'Method not allowed.' });
   } catch (err) {
-    if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
-    return res.status(500).json({ error: 'Internal server error.' });
+    return sendApiError(res, err, 'api/users/[id]');
   }
 }

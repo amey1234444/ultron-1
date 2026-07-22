@@ -1,9 +1,10 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { issueSession } from '../../../server/session';
-import { ApiError, recordLogin, toPublic, verifyCredentials } from '../../../server/users';
+import { recordLogin, toPublic, verifyCredentials } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -33,8 +34,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await issueSession(res, user);
     return res.status(200).json({ user: toPublic(user) });
   } catch (err) {
-    if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
-    console.error('login error', err);
-    return res.status(500).json({ error: 'Internal server error.' });
+    return sendApiError(res, err, 'api/auth/login');
   }
 }

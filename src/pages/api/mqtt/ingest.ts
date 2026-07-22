@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { sendApiError } from '../../../server/errors';
 import { ingestMqttMessage, normalizeWebhookMessage } from '../../../server/mqttIngest';
 
 export const config = {
@@ -40,7 +41,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await ingestMqttMessage(topic, message, sourceEvent);
     return res.status(200).json({ ok: true, ...result });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error.';
-    return res.status(500).json({ error: message });
+    return sendApiError(res, err, 'api/mqtt/ingest');
   }
 }

@@ -181,16 +181,12 @@ export function TrailBoard({
     },
     [effectiveRack, live],
   );
-  const templateChannels = listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter });
-
-  // A saved layout always wins; otherwise a template that ships a default
-  // layout (RAV) starts pre-wired instead of blank. Computed exactly once —
-  // the template generates fresh random ids each call.
+  // A saved layout wins; otherwise the canvas starts as only the machine
+  // artwork. Template wiring is still available from the toolbar when needed.
   const initialLayoutRef = useRef<SavedLayout | null>(null);
   if (initialLayoutRef.current === null) {
     const saved = initialLayout ?? loadLocal<SavedLayout>(storageKey);
-    initialLayoutRef.current =
-      saved ?? (hasDefaultLayout(machineTemplate) ? createRavDefaultLayout(templateChannels) : { trails: [], boxes: [] });
+    initialLayoutRef.current = saved ?? { trails: [], boxes: [] };
   }
 
   const [trails, setTrails] = useState<Trail[]>(initialLayoutRef.current.trails);

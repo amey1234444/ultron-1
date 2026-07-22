@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isDbEnabled } from '../../../server/db';
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
@@ -29,7 +30,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const points = await getMeasurementHistory(gatewayId, rackId, slotId, channelId, limit);
     return res.status(200).json({ persisted: true, points });
-  } catch {
-    return res.status(500).json({ error: 'Internal server error.' });
+  } catch (err) {
+    return sendApiError(res, err, 'api/live/history');
   }
 }

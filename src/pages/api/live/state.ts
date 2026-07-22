@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isDbEnabled } from '../../../server/db';
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
@@ -19,7 +20,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!isDbEnabled()) return res.status(200).json({ persisted: false, gateways: [], racks: [], slots: [], measurements: [], alerts: [] });
     const state = await getLiveState({ includeConflictDeviceDetails: user.role === 'super_admin' });
     return res.status(200).json({ persisted: true, ...state });
-  } catch {
-    return res.status(500).json({ error: 'Internal server error.' });
+  } catch (err) {
+    return sendApiError(res, err, 'api/live/state');
   }
 }

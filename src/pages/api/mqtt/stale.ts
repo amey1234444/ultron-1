@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { sendApiError } from '../../../server/errors';
 import { markStaleGateways } from '../../../server/mqttIngest';
 
 const DEFAULT_STALE_AFTER_S = 15;
@@ -35,7 +36,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await markStaleGateways(staleAfterS);
     return res.status(200).json({ ok: true, staleAfterS });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Internal server error.';
-    return res.status(500).json({ error: message });
+    return sendApiError(res, err, 'api/mqtt/stale');
   }
 }

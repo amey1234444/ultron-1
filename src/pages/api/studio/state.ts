@@ -2,7 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { USER_PERMISSIONS, userHasPermission } from '../../../lib/roles';
 import { isDbEnabled } from '../../../server/db';
-import { ApiError } from '../../../server/errors';
+import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
@@ -43,7 +43,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', 'GET, PUT');
     return res.status(405).json({ error: 'Method not allowed.' });
   } catch (err) {
-    if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
-    return res.status(500).json({ error: 'Internal server error.' });
+    return sendApiError(res, err, 'api/studio/state');
   }
 }

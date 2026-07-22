@@ -1,8 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { sendApiError } from '../../../server/errors';
 import { guardRequest } from '../../../server/security';
 import { clearSession } from '../../../server/session';
-import { ApiError } from '../../../server/users';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -14,7 +14,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     await clearSession(req, res);
     return res.status(200).json({ ok: true });
   } catch (err) {
-    if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
-    return res.status(500).json({ error: 'Internal server error.' });
+    return sendApiError(res, err, 'api/auth/logout');
   }
 }

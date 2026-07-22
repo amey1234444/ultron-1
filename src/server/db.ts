@@ -7,7 +7,7 @@
 
 import { Pool, type PoolClient, type QueryResult, type QueryResultRow } from 'pg';
 
-import { ApiError } from './errors';
+import { ApiError, logServerError } from './errors';
 
 const globalRef = globalThis as unknown as {
   __ultronPgPool?: Pool;
@@ -97,7 +97,7 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
   try {
     return await pool().query<T>(text, params);
   } catch (err) {
-    console.error('db query failed', (err as { code?: string })?.code, (err as Error)?.message);
+    logServerError('db query failed', err);
     throw classifyDbError(err) ?? err;
   }
 }
@@ -107,7 +107,7 @@ export async function withClient<T>(fn: (client: PoolClient) => Promise<T>): Pro
   try {
     client = await pool().connect();
   } catch (err) {
-    console.error('db connect failed', (err as { code?: string })?.code, (err as Error)?.message);
+    logServerError('db connect failed', err);
     throw classifyDbError(err) ?? err;
   }
   try {
