@@ -90,6 +90,23 @@ function sameSelected(a: SelectedNode, b: SelectedNode): boolean {
   return a.kind === b.kind && ('id' in a ? a.id : '') === ('id' in b ? b.id : '');
 }
 
+function rackGatewayGroupKey(rack: DeviceNode, devices: DeviceNode[]): string {
+  if (rack.gatewayId) return `gateway:${rack.gatewayId}`;
+  if (rack.realGatewayId) return `real:${rack.realGatewayId}`;
+  const prefix = ipPrefixFor(rack.ip);
+  if (prefix) {
+    const gateway = devices.find((device) => device.type === 'Gateway' && !device.archived && ipPrefixFor(device.ip) === prefix);
+    if (gateway) return `gateway:${gateway.id}`;
+    return `prefix:${prefix}`;
+  }
+  return 'gateway:unassigned';
+}
+
+function rackSortValue(rack: DeviceNode): string {
+  const rackId = typeof rack.realRackId === 'number' && Number.isInteger(rack.realRackId) ? String(rack.realRackId).padStart(6, '0') : '999999';
+  return `${rackId}|${rack.name.toLowerCase()}|${rack.id}`;
+}
+
 export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: ReactNode; currentUser?: PublicUser | null } = {}) {
   const { isDark } = useAppTheme();
   const hasConfigureAccess = currentUser
@@ -331,24 +348,53 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   useEffect(() => {
     if (storedDevices.length === 0) return;
-    if (!storedDevices.some((device) => (device.type === 'Gateway' && !device.realGatewayId) || (device.type === 'Rack' && !device.realRackId))) return;
+    const needsGatewayIds = storedDevices.some((device) => device.type === 'Gateway' && !device.realGatewayId);
+    const racksByGateway = new Map<string, DeviceNode[]>();
+    for (const device of storedDevices) {
+      if (device.type !== 'Rack' || device.archived) continue;
+      const key = rackGatewayGroupKey(device, storedDevices);
+      racksByGateway.set(key, [...(racksByGateway.get(key) ?? []), device]);
+    }
+    const needsRackRepair = Array.from(racksByGateway.values()).some((racks) => {
+      const ids = racks.map((rack) => rack.realRackId).filter((id): id is number => typeof id === 'number' && Number.isInteger(id));
+      if (ids.length !== racks.length) return true;
+      const unique = new Set(ids);
+      if (unique.size !== ids.length) return true;
+      for (let id = 1; id <= racks.length; id += 1) {
+        if (!unique.has(id)) return true;
+      }
+      return false;
+    });
+    if (!needsGatewayIds && !needsRackRepair) return;
+
     setDevices((prev) => {
       let changed = false;
-      const next = prev.map((device) => {
+      let next = prev.map((device) => {
         if (device.type === 'Gateway' && !device.realGatewayId) {
           changed = true;
           return { ...device, realGatewayId: defaultRealGatewayId(device.id) };
         }
         return device;
       });
-      const assigned = [...next];
-      for (let index = 0; index < assigned.length; index += 1) {
-        const device = assigned[index];
-        if (device.type !== 'Rack' || device.realRackId) continue;
-        changed = true;
-        assigned[index] = { ...device, realRackId: nextRealRackId(device.gatewayId, assigned) };
+      const currentRacksByGateway = new Map<string, DeviceNode[]>();
+      for (const device of next) {
+        if (device.type !== 'Rack' || device.archived) continue;
+        const key = rackGatewayGroupKey(device, next);
+        currentRacksByGateway.set(key, [...(currentRacksByGateway.get(key) ?? []), device]);
       }
-      return changed ? assigned : prev;
+      const nextRackIdByDeviceId = new Map<string, number>();
+      for (const racks of currentRacksByGateway.values()) {
+        [...racks].sort((a, b) => rackSortValue(a).localeCompare(rackSortValue(b))).forEach((rack, index) => {
+          nextRackIdByDeviceId.set(rack.id, index + 1);
+        });
+      }
+      next = next.map((device) => {
+        const nextRackId = nextRackIdByDeviceId.get(device.id);
+        if (!nextRackId || device.realRackId === nextRackId) return device;
+        changed = true;
+        return { ...device, realRackId: nextRackId };
+      });
+      return changed ? next : prev;
     });
   }, [setDevices, storedDevices]);
 
