@@ -69,7 +69,7 @@ export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [],
 
 export type ChannelLiveStatus = 'active' | 'stale' | 'idle';
 
-const ACTIVE_MEASUREMENT_MAX_AGE_MS = 15_000;
+const ACTIVE_MEASUREMENT_MAX_AGE_MS = 1_000;
 type LiveIndex = {
   gatewayById: Map<string, LiveGateway>;
   gatewayByIp: Map<string, LiveGateway>;
@@ -91,6 +91,10 @@ function pairKey(a: string, b: number): string {
 
 function pointKey(gatewayId: string, rackId: number, slotId: number, channelId: number): string {
   return `${gatewayId}|${rackId}|${slotId}|${channelId}`;
+}
+
+function slotKey(gatewayId: string, rackId: number, slotId: number): string {
+  return `${gatewayId}|${rackId}|${slotId}`;
 }
 
 function pushMap<K, V>(map: Map<K, V[]>, key: K, value: V) {
@@ -136,7 +140,7 @@ function liveIndex(live: LiveState): LiveIndex {
   }
 
   for (const slot of live.slots) {
-    index.slotByGatewaySlot.set(`${slot.gatewayId}|${slot.slotId}`, slot);
+    index.slotByGatewaySlot.set(slotKey(slot.gatewayId, slot.rackId, slot.slotId), slot);
   }
 
   for (const measurement of live.measurements) {
@@ -378,7 +382,9 @@ export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId:
   if (!gatewayCanShowData(gateway)) return 'stale';
 
   if ('controllerName' in card.config) {
-    const slot = liveIndex(live).slotByGatewaySlot.get(`${gateway.gatewayId}|${card.slot}`);
+    const rack = configuredRackForDevice(device, live);
+    if (!rack || rack.status !== 'ONLINE') return 'stale';
+    const slot = liveIndex(live).slotByGatewaySlot.get(slotKey(gateway.gatewayId, rack.rackId, card.slot));
     if (!slot) return 'idle';
     return slot.onlineState === 'ONLINE' || slot.presence === 'PRESENT' ? 'active' : 'stale';
   }

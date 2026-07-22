@@ -4,7 +4,7 @@ import { Platform } from 'react-native';
 import { EMPTY_LIVE_STATE, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
 
-const VISIBLE_POLL_INTERVAL_MS = 500;
+const VISIBLE_POLL_INTERVAL_MS = 300;
 const HIDDEN_POLL_INTERVAL_MS = 5000;
 const REQUEST_TIMEOUT_MS = 4000;
 

@@ -86,9 +86,10 @@ type AlertRow = {
 type BlockedBindingRow = Omit<AlertRow, 'id' | 'received_at'>;
 type UnconfiguredGatewayRow = { gateway_id: string };
 
-// A gateway that hasn't reported for this long reads as offline even if the
-// retained OFFLINE will was missed (matches the ingest service's backstop).
-const STALE_AFTER_S = 15;
+// Gateway status is still useful for process/MQTT health, but rack/gateway
+// connectivity in the live UI must follow fresh channel data for IoT accuracy.
+const GATEWAY_STATUS_STALE_AFTER_S = 6;
+const LIVE_DATA_STALE_AFTER_S = 2;
 
 export async function getLiveState(options: { includeConflictDeviceDetails?: boolean } = {}): Promise<LiveState> {
   await ensureSchema();
@@ -98,18 +99,23 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
       `SELECT gateway_id, current_ip, status, last_seen_at,
               (last_seen_at IS NULL OR last_seen_at < now() - make_interval(secs => $1)) AS stale
        FROM gateways ORDER BY gateway_id`,
-      [STALE_AFTER_S],
+      [GATEWAY_STATUS_STALE_AFTER_S],
     ),
     query<RackRow>(
-      `SELECT r.gateway_id, r.rack_id, MAX(m.updated_at) AS last_seen_at,
-              (MAX(m.updated_at) IS NULL OR MAX(m.updated_at) < now() - make_interval(secs => $1)) AS stale
+      `SELECT r.gateway_id, r.rack_id, latest.last_seen_at,
+              (latest.last_seen_at IS NULL OR latest.last_seen_at < now() - make_interval(secs => $1)) AS stale
        FROM racks r
-       LEFT JOIN measurement_latest m
-         ON m.gateway_id = r.gateway_id
-        AND m.rack_id = r.rack_id
-       GROUP BY r.gateway_id, r.rack_id
+       LEFT JOIN LATERAL (
+         SELECT m.updated_at AS last_seen_at
+         FROM measurement_latest m
+         WHERE m.gateway_id = r.gateway_id
+           AND m.rack_id = r.rack_id
+           AND m.quality = 'GOOD'
+         ORDER BY m.updated_at DESC
+         LIMIT 1
+       ) latest ON true
        ORDER BY r.gateway_id, r.rack_id`,
-      [STALE_AFTER_S],
+      [LIVE_DATA_STALE_AFTER_S],
     ),
     query<SlotRow>(
       `SELECT gateway_id, rack_id, slot_id, presence, online_state, card_type
@@ -117,7 +123,10 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
     ),
     query<MeasurementRow>(
       `SELECT gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, updated_at
-       FROM measurement_latest ORDER BY gateway_id, rack_id, slot_id, channel_id`,
+       FROM measurement_latest
+       WHERE updated_at >= now() - make_interval(secs => $1)
+       ORDER BY gateway_id, rack_id, slot_id, channel_id`,
+      [LIVE_DATA_STALE_AFTER_S],
     ),
     query<AlertRow>(
       `SELECT q.id, q.gateway_id, q.gateway_ip, q.received_at,
@@ -139,7 +148,7 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
          AND q.received_at > now() - make_interval(secs => $1)
        ORDER BY q.received_at DESC
        LIMIT 10`,
-      [STALE_AFTER_S * 4],
+      [GATEWAY_STATUS_STALE_AFTER_S * 4],
     ),
     query<BlockedBindingRow>(
       `SELECT DISTINCT g.gateway_id,
@@ -185,12 +194,20 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
     ...unconfiguredGateways.rows.map((g: UnconfiguredGatewayRow) => g.gateway_id),
     ...allAlerts.map((a: AlertRow) => a.gateway_id),
   ]);
+  const liveRackGatewayIds = new Set(
+    racks.rows.filter((r: RackRow) => !blockedGatewayIds.has(r.gateway_id) && !r.stale).map((r: RackRow) => r.gateway_id),
+  );
 
   return {
     gateways: gateways.rows.map((g: GatewayRow) => ({
       gatewayId: g.gateway_id,
       currentIp: g.current_ip,
-      status: blockedGatewayIds.has(g.gateway_id) ? 'QUARANTINED' : g.status === 'ONLINE' && g.stale ? 'OFFLINE' : g.status,
+      status:
+        blockedGatewayIds.has(g.gateway_id)
+          ? 'QUARANTINED'
+          : g.status === 'OFFLINE' || g.stale || !liveRackGatewayIds.has(g.gateway_id)
+            ? 'OFFLINE'
+            : g.status,
       lastSeenAt: g.last_seen_at ? g.last_seen_at.toISOString() : null,
     })),
     racks: racks.rows.filter((r: RackRow) => !blockedGatewayIds.has(r.gateway_id)).map((r: RackRow) => ({
