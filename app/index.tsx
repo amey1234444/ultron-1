@@ -249,7 +249,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     for (const device of storedDevices) merged.set(device.id, device);
 
     const seedGateway = DEMO_SEED.devices.find((device) => device.type === 'Gateway');
-    const firstGateway = configuredGateways[0] ?? seedGateway;
+    const firstGateway = configuredGateways[0] ?? (seedGateway && merged.has(seedGateway.id) ? seedGateway : undefined);
     if (!firstGateway) return storedDevices;
     if (!merged.has(firstGateway.id)) merged.set(firstGateway.id, firstGateway);
 
@@ -259,6 +259,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       .filter((device) => device.type === 'Rack')
       .forEach((rack, index) => {
         const existing = merged.get(rack.id);
+        if (!existing) return;
         merged.set(rack.id, {
           ...rack,
           ...existing,
@@ -687,8 +688,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   const handleDeleteDevice = () => {
     if (!deleteDeviceId) return;
-    const deleted = storedDevices.find((d) => d.id === deleteDeviceId);
-    const removedIds = new Set([deleteDeviceId, ...(deleted?.type === 'Gateway' ? racksForGateway(deleted, storedDevices).map((rack) => rack.id) : [])]);
+    const deleted = devices.find((d) => d.id === deleteDeviceId);
+    const removedIds = new Set([deleteDeviceId, ...(deleted?.type === 'Gateway' ? racksForGateway(deleted, devices).map((rack) => rack.id) : [])]);
     setDevices((prev) => prev.filter((d) => !removedIds.has(d.id)));
     setCards((prev) => prev.filter((card) => !removedIds.has(card.deviceId)));
     if (selected.kind === 'device' && selected.id === deleteDeviceId) setSelected({ kind: 'devices' });
