@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ActionButton } from '../components/studio/ActionButton';
@@ -50,8 +50,21 @@ export default function Home() {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
+  // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
+  // workspace stays usable; users can still toggle it back open via PanelToggle.
+  const { width } = useWindowDimensions();
+  const isNarrow = width > 0 && width < 768;
+
   const [selected, setSelected] = useState<SelectedNode>({ kind: 'none' });
-  const [leftCollapsed, setLeftCollapsed] = useState(false);
+  const [leftCollapsed, setLeftCollapsed] = useState(isNarrow);
+
+  const prevNarrow = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (prevNarrow.current !== isNarrow) {
+      prevNarrow.current = isNarrow;
+      setLeftCollapsed(isNarrow);
+    }
+  }, [isNarrow]);
   // A machine's Actual View is a full-screen dashboard preview — the hierarchy
   // sidebar hides entirely while it's active, reported up by MachineWorkspace.
   const [machineWorkspaceMode, setMachineWorkspaceMode] = useState<'design' | 'mapping' | 'live' | 'actual'>('design');

@@ -39,3 +39,10 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+.vercel
+.env
+.env.*
+!.env.example
+.next/
+next-env.d.ts
+/build
