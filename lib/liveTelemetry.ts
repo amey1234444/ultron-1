@@ -70,13 +70,103 @@ export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [],
 export type ChannelLiveStatus = 'active' | 'stale' | 'idle';
 
 const ACTIVE_MEASUREMENT_MAX_AGE_MS = 15_000;
+type LiveIndex = {
+  gatewayById: Map<string, LiveGateway>;
+  gatewayByIp: Map<string, LiveGateway>;
+  gatewayByPrefix: Map<string, LiveGateway>;
+  rackByGatewayRack: Map<string, LiveRack>;
+  rackIdsByGateway: Map<string, number[]>;
+  measurementRackIdsByGateway: Map<string, number[]>;
+  slotByGatewaySlot: Map<string, LiveSlot>;
+  measurementsByGateway: Map<string, LiveMeasurement[]>;
+  measurementsByGatewayRack: Map<string, LiveMeasurement[]>;
+  latestMeasurementByPoint: Map<string, LiveMeasurement>;
+};
+
+const liveIndexCache = new WeakMap<LiveState, LiveIndex>();
+
+function pairKey(a: string, b: number): string {
+  return `${a}|${b}`;
+}
+
+function pointKey(gatewayId: string, rackId: number, slotId: number, channelId: number): string {
+  return `${gatewayId}|${rackId}|${slotId}|${channelId}`;
+}
+
+function pushMap<K, V>(map: Map<K, V[]>, key: K, value: V) {
+  const current = map.get(key);
+  if (current) current.push(value);
+  else map.set(key, [value]);
+}
+
+function firstSet<K, V>(map: Map<K, V>, key: K, value: V) {
+  if (!map.has(key)) map.set(key, value);
+}
+
+function liveIndex(live: LiveState): LiveIndex {
+  const cached = liveIndexCache.get(live);
+  if (cached) return cached;
+
+  const index: LiveIndex = {
+    gatewayById: new Map(),
+    gatewayByIp: new Map(),
+    gatewayByPrefix: new Map(),
+    rackByGatewayRack: new Map(),
+    rackIdsByGateway: new Map(),
+    measurementRackIdsByGateway: new Map(),
+    slotByGatewaySlot: new Map(),
+    measurementsByGateway: new Map(),
+    measurementsByGatewayRack: new Map(),
+    latestMeasurementByPoint: new Map(),
+  };
+
+  for (const gateway of live.gateways) {
+    index.gatewayById.set(gateway.gatewayId, gateway);
+    const ip = gateway.currentIp.trim();
+    if (ip) {
+      firstSet(index.gatewayByIp, ip, gateway);
+      const prefix = ipPrefixFor(ip);
+      if (prefix) firstSet(index.gatewayByPrefix, prefix, gateway);
+    }
+  }
+
+  for (const rack of live.racks) {
+    index.rackByGatewayRack.set(pairKey(rack.gatewayId, rack.rackId), rack);
+    pushMap(index.rackIdsByGateway, rack.gatewayId, rack.rackId);
+  }
+
+  for (const slot of live.slots) {
+    index.slotByGatewaySlot.set(`${slot.gatewayId}|${slot.slotId}`, slot);
+  }
+
+  for (const measurement of live.measurements) {
+    pushMap(index.measurementsByGateway, measurement.gatewayId, measurement);
+    pushMap(index.measurementsByGatewayRack, pairKey(measurement.gatewayId, measurement.rackId), measurement);
+    pushMap(index.measurementRackIdsByGateway, measurement.gatewayId, measurement.rackId);
+    const key = pointKey(measurement.gatewayId, measurement.rackId, measurement.slotId, measurement.channelId);
+    const current = index.latestMeasurementByPoint.get(key);
+    if (!current || Date.parse(measurement.updatedAt) > Date.parse(current.updatedAt)) {
+      index.latestMeasurementByPoint.set(key, measurement);
+    }
+  }
+
+  for (const [gatewayId, ids] of index.rackIdsByGateway) {
+    index.rackIdsByGateway.set(gatewayId, Array.from(new Set(ids)));
+  }
+  for (const [gatewayId, ids] of index.measurementRackIdsByGateway) {
+    index.measurementRackIdsByGateway.set(gatewayId, Array.from(new Set(ids)));
+  }
+
+  liveIndexCache.set(live, index);
+  return index;
+}
 
 function configuredRackForDevice(device: DeviceNode, live: LiveState): LiveRack | undefined {
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return undefined;
   const rackId = device.realRackId;
-  if (!Number.isInteger(rackId)) return undefined;
-  return live.racks.find((r) => r.gatewayId === gateway.gatewayId && r.rackId === rackId);
+  if (typeof rackId !== 'number' || !Number.isInteger(rackId)) return undefined;
+  return liveIndex(live).rackByGatewayRack.get(pairKey(gateway.gatewayId, rackId));
 }
 
 function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number | undefined {
@@ -85,7 +175,7 @@ function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number 
 
 function reportedGatewayIpForDevice(device: DeviceNode, live: LiveState): string {
   if (device.type === 'Gateway' && device.realGatewayId) {
-    return live.gateways.find((g) => g.gatewayId === device.realGatewayId)?.currentIp.trim() || device.ip.trim();
+    return liveIndex(live).gatewayById.get(device.realGatewayId)?.currentIp.trim() || device.ip.trim();
   }
   return device.ip.trim();
 }
@@ -134,18 +224,19 @@ function isUnderUnconfiguredGateway(
 export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGateway | undefined {
   const ip = device.ip.trim();
   if (!ip) return undefined;
+  const index = liveIndex(live);
   if (device.realGatewayId) {
-    const byId = live.gateways.find((g) => g.gatewayId === device.realGatewayId);
+    const byId = index.gatewayById.get(device.realGatewayId);
     if (byId) return byId;
   }
   const prefix = ipPrefixFor(ip);
   if (device.type === 'Gateway' && prefix) {
-    return live.gateways.find((g) => g.currentIp === ip || ipPrefixFor(g.currentIp) === prefix);
+    return index.gatewayByIp.get(ip) ?? index.gatewayByPrefix.get(prefix);
   }
   if (device.type === 'Rack' && prefix) {
-    return live.gateways.find((g) => ipPrefixFor(g.currentIp) === prefix);
+    return index.gatewayByPrefix.get(prefix);
   }
-  return live.gateways.find((g) => g.currentIp === ip);
+  return index.gatewayByIp.get(ip);
 }
 
 export function isDeviceLive(device: DeviceNode, live: LiveState): boolean {
@@ -226,7 +317,7 @@ export function measurementsForDevice(device: DeviceNode, live: LiveState): Live
   if (device.type === 'Rack' && device.status !== 'Online') return [];
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return [];
-  return live.measurements.filter((m) => m.gatewayId === gateway.gatewayId);
+  return liveIndex(live).measurementsByGateway.get(gateway.gatewayId) ?? [];
 }
 
 export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { active: number; total: number } {
@@ -239,8 +330,7 @@ export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { 
   if (!gateway || !rack || rack.status !== 'ONLINE') return { active: 0, total };
   const now = Date.now();
   const activeKeys = new Set<string>();
-  for (const measurement of live.measurements) {
-    if (measurement.gatewayId !== gateway.gatewayId || measurement.rackId !== rack.rackId) continue;
+  for (const measurement of liveIndex(live).measurementsByGatewayRack.get(pairKey(gateway.gatewayId, rack.rackId)) ?? []) {
     if (measurement.quality && measurement.quality !== 'GOOD') continue;
     if (now - Date.parse(measurement.updatedAt) > ACTIVE_MEASUREMENT_MAX_AGE_MS) continue;
     activeKeys.add(`${measurement.slotId}.${measurement.channelId}`);
@@ -253,9 +343,10 @@ export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] 
   if (!gatewayCanShowData(gateway)) return [];
   const configuredRackId = configuredRackIdForDevice(device, live);
   if (configuredRackId !== undefined) return [configuredRackId];
-  const ids = live.racks.filter((r) => r.gatewayId === gateway.gatewayId).map((r) => r.rackId);
+  const index = liveIndex(live);
+  const ids = index.rackIdsByGateway.get(gateway.gatewayId) ?? [];
   if (ids.length > 0) return ids;
-  return Array.from(new Set(live.measurements.filter((m) => m.gatewayId === gateway.gatewayId).map((m) => m.rackId)));
+  return index.measurementRackIdsByGateway.get(gateway.gatewayId) ?? [];
 }
 
 export function latestMeasurementForChannel(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): LiveMeasurement | undefined {
@@ -263,14 +354,21 @@ export function latestMeasurementForChannel(device: DeviceNode, card: CardNode, 
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return undefined;
   const rackIds = rackIdsForDevice(device, live);
-  const candidates = live.measurements.filter(
-    (m) =>
-      m.gatewayId === gateway.gatewayId &&
-      m.slotId === card.slot &&
-      m.channelId === channelId &&
-      (rackIds.length === 0 || rackIds.includes(m.rackId)),
-  );
-  return candidates.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))[0];
+  const index = liveIndex(live);
+  if (rackIds.length > 0) {
+    let latest: LiveMeasurement | undefined;
+    for (const rackId of rackIds) {
+      const candidate = index.latestMeasurementByPoint.get(pointKey(gateway.gatewayId, rackId, card.slot, channelId));
+      if (candidate && (!latest || Date.parse(candidate.updatedAt) > Date.parse(latest.updatedAt))) latest = candidate;
+    }
+    return latest;
+  }
+  let latest: LiveMeasurement | undefined;
+  for (const measurement of index.measurementsByGateway.get(gateway.gatewayId) ?? []) {
+    if (measurement.slotId !== card.slot || measurement.channelId !== channelId) continue;
+    if (!latest || Date.parse(measurement.updatedAt) > Date.parse(latest.updatedAt)) latest = measurement;
+  }
+  return latest;
 }
 
 export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId: number, live: LiveState): ChannelLiveStatus {
@@ -280,7 +378,7 @@ export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId:
   if (!gatewayCanShowData(gateway)) return 'stale';
 
   if ('controllerName' in card.config) {
-    const slot = live.slots.find((s) => s.gatewayId === gateway.gatewayId && s.slotId === card.slot);
+    const slot = liveIndex(live).slotByGatewaySlot.get(`${gateway.gatewayId}|${card.slot}`);
     if (!slot) return 'idle';
     return slot.onlineState === 'ONLINE' || slot.presence === 'PRESENT' ? 'active' : 'stale';
   }

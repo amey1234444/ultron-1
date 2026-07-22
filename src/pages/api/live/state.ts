@@ -10,6 +10,7 @@ import { getLiveState } from '../../../server/telemetry';
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (guardRequest(req, res)) return;
+    res.setHeader('Cache-Control', 'no-store, max-age=0');
     const user = await getSessionUser(req);
     if (!user) return res.status(401).json({ error: 'Not authenticated.' });
     if (req.method !== 'GET') {

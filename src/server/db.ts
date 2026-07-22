@@ -253,6 +253,8 @@ async function migrate(): Promise<void> {
   await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS gateway_id TEXT REFERENCES studio_devices(id) ON DELETE SET NULL;`);
   await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS real_gateway_id TEXT;`);
   await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS real_rack_id INT;`);
+  await query(`CREATE INDEX IF NOT EXISTS studio_devices_live_gateway ON studio_devices (type, archived, real_gateway_id);`);
+  await query(`CREATE INDEX IF NOT EXISTS studio_devices_live_ip ON studio_devices (type, archived, ip);`);
   await query(`
     CREATE TABLE IF NOT EXISTS studio_cards (
       id          TEXT PRIMARY KEY,
@@ -351,6 +353,7 @@ async function migrate(): Promise<void> {
       UNIQUE (gateway_id, rack_id)
     );
   `);
+  await query(`CREATE INDEX IF NOT EXISTS racks_live_gateway_rack ON racks (gateway_id, rack_id);`);
   await query(`
     CREATE TABLE IF NOT EXISTS mqtt_messages (
       message_id     TEXT PRIMARY KEY,
@@ -380,6 +383,7 @@ async function migrate(): Promise<void> {
       PRIMARY KEY (gateway_id, rack_id, slot_id)
     );
   `);
+  await query(`CREATE INDEX IF NOT EXISTS rack_inventory_slots_live ON rack_inventory_slots (gateway_id, rack_id, slot_id);`);
   await query(`
     CREATE TABLE IF NOT EXISTS measurement_latest (
       gateway_id          TEXT NOT NULL,
@@ -396,6 +400,8 @@ async function migrate(): Promise<void> {
       PRIMARY KEY (gateway_id, rack_id, slot_id, channel_id, measurement_type)
     );
   `);
+  await query(`CREATE INDEX IF NOT EXISTS measurement_latest_live_rack ON measurement_latest (gateway_id, rack_id, updated_at DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS measurement_latest_live_channel ON measurement_latest (gateway_id, rack_id, slot_id, channel_id, updated_at DESC);`);
   await query(`
     CREATE TABLE IF NOT EXISTS measurement_history (
       id                  BIGSERIAL PRIMARY KEY,
@@ -441,4 +447,5 @@ async function migrate(): Promise<void> {
       received_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  await query(`CREATE INDEX IF NOT EXISTS mqtt_quarantine_live_conflict ON mqtt_quarantine (reason, received_at DESC, gateway_id, gateway_ip);`);
 }
