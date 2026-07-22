@@ -60,9 +60,9 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
   const total = realDevices.length;
   const selectedGateway = useMemo(() => gateways.find((gateway) => gateway.id === selectedGatewayId) ?? null, [gateways, selectedGatewayId]);
   const selectedRacks = useMemo(() => (selectedGateway ? racksForGateway(selectedGateway, realDevices) : []), [realDevices, selectedGateway]);
-  const menuWidth = Math.max(260, Math.min((width || 560) - 24, compact ? 420 : 520));
-  const panelMaxHeight = Math.max(220, Math.min(460, (height || 560) - 72));
-  const listMaxHeight = Math.max(160, panelMaxHeight - 58);
+  const menuWidth = Math.max(250, Math.min((width || 360) - 24, compact ? 300 : 340));
+  const panelMaxHeight = Math.max(190, Math.min(340, (height || 460) - 72));
+  const listMaxHeight = Math.max(132, panelMaxHeight - 48);
 
   useEffect(() => {
     if (selectedGatewayId && !gateways.some((gateway) => gateway.id === selectedGatewayId)) {
@@ -71,9 +71,9 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
   }, [gateways, selectedGatewayId]);
 
   const panelStyle = {
-    backgroundColor: isDark ? 'rgba(16,16,16,0.96)' : 'rgba(255,255,255,0.98)',
-    backdropFilter: 'blur(18px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(18px) saturate(160%)',
+    backgroundColor: isDark ? 'rgba(16,16,16,0.97)' : 'rgba(255,255,255,0.98)',
+    backdropFilter: 'blur(14px) saturate(150%)',
+    WebkitBackdropFilter: 'blur(14px) saturate(150%)',
   } as unknown as ViewStyle;
 
   const Row = ({
@@ -94,18 +94,18 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
       <Pressable
         onPress={onPress}
         onHoverIn={onHoverIn}
-        className={cn('flex-row items-center gap-2.5 px-3 py-2.5', selected && (isDark ? 'bg-ink/10' : 'bg-ink-inverse/10'))}
+        className={cn('flex-row items-center gap-2 px-3 py-1.5', selected && (isDark ? 'bg-ink/10' : 'bg-ink-inverse/10'))}
       >
         <View
           style={{
-            width: 8,
-            height: 8,
+            width: 7,
+            height: 7,
             borderRadius: 4,
             backgroundColor: isOnline ? '#3FB950' : isDark ? '#5A5A5A' : '#B4B4B4',
           }}
         />
         <View className="flex-1">
-          <Text numberOfLines={1} className={cn('font-body-medium text-xs', inkClass)}>
+          <Text numberOfLines={1} className={cn('font-body-medium text-[11px]', inkClass)}>
             {device.name}
           </Text>
           <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
@@ -138,7 +138,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
         <Pressable className="flex-1" onPress={() => setOpen(false)}>
           <Pressable
             onPress={(e) => e.stopPropagation()}
-            className={cn('absolute overflow-hidden rounded-2xl border', lineClass)}
+            className={cn('absolute overflow-hidden rounded-xl border', lineClass)}
             style={[
               {
                 top: 54,
@@ -146,16 +146,16 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
                 width: menuWidth,
                 maxHeight: panelMaxHeight,
                 shadowColor: '#000',
-                shadowOpacity: isDark ? 0.5 : 0.18,
-                shadowRadius: 24,
-                shadowOffset: { width: 0, height: 12 },
-                elevation: 12,
+                shadowOpacity: isDark ? 0.42 : 0.14,
+                shadowRadius: 16,
+                shadowOffset: { width: 0, height: 8 },
+                elevation: 8,
               },
               panelStyle,
             ]}
           >
-            <View className={cn('flex-row items-center justify-between border-b px-3 py-2.5', lineClass)}>
-              <Text className={cn('font-body-bold text-xs uppercase tracking-wider', inkClass)}>Connections</Text>
+            <View className={cn('flex-row items-center justify-between border-b px-3 py-2', lineClass)}>
+              <Text className={cn('font-body-bold text-[11px] uppercase tracking-wider', inkClass)}>Connections</Text>
               <Text className={cn('font-body-medium text-[11px]', mutedClass)}>
                 {active.length} of {total} active
               </Text>
@@ -165,7 +165,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
               <Text className={cn('px-3 py-4 font-body text-xs italic', mutedClass)}>No devices added yet.</Text>
             ) : (
               <ScrollView style={{ maxHeight: listMaxHeight }}>
-                <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                <Text className={cn('px-3 pb-0.5 pt-1.5 font-body-medium text-[9px] uppercase tracking-wider', mutedClass)}>
                   Gateways - {gateways.length}
                 </Text>
                 {gateways.length === 0 ? (
@@ -185,12 +185,14 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
                           onPress={() => setSelectedGatewayId((current) => (current === gateway.id ? null : gateway.id))}
                         />
                         {expanded && (
-                          <View className={cn('mx-3 mb-2 ml-8 rounded-lg border', lineClass)}>
-                            <Text className={cn('px-3 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                          <View
+                            className={cn('mb-1 ml-6 mr-2 border-l pl-2', isDark ? 'border-line-dark' : 'border-line-light')}
+                          >
+                            <Text className={cn('pb-0.5 pt-1 font-body-medium text-[9px] uppercase tracking-wider', mutedClass)}>
                               Racks - {selectedRacks.filter((rack) => rack.status === 'Online').length}/{selectedRacks.length} active
                             </Text>
                             {selectedRacks.length === 0 ? (
-                              <Text className={cn('px-3 py-3 font-body text-xs italic', mutedClass)}>No racks under this gateway.</Text>
+                              <Text className={cn('py-2 font-body text-[11px] italic', mutedClass)}>No racks under this gateway.</Text>
                             ) : (
                               selectedRacks.map((rack) => <Row key={rack.id} device={rack} />)
                             )}

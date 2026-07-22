@@ -543,7 +543,7 @@ export async function ingestMqttMessage(topic: string, rawMessage: unknown, sour
     if (fresh && binding.status === 'QUARANTINED') {
       await quarantine(topic, binding.reason ?? 'gateway not commissioned', msg);
     }
-    return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
+    return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event, reason: binding.reason };
   }
 
   switch (parsed.kind) {
