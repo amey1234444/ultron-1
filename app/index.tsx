@@ -28,7 +28,7 @@ import { useAppTheme } from '../hooks/useAppTheme';
 import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
 import { useStudioStore } from '../hooks/useStudioStore';
 import { cn } from '../lib/cn';
-import { composeIp, defaultRealGatewayId, deviceWithGatewayConnectionState, hostOctetFor, ipPrefixFor, nextRealRackId, racksForGateway, type DeviceNode } from '../lib/devices';
+import { composeIp, defaultRealGatewayId, deviceWithGatewayConnectionState, hostOctetFor, ipPrefixFor, racksForGateway, type DeviceNode } from '../lib/devices';
 import { applyLiveStatus } from '../lib/liveTelemetry';
 import {
   duplicateFolderSubtree,
@@ -105,6 +105,29 @@ function rackGatewayGroupKey(rack: DeviceNode, devices: DeviceNode[]): string {
 function rackSortValue(rack: DeviceNode): string {
   const rackId = typeof rack.realRackId === 'number' && Number.isInteger(rack.realRackId) ? String(rack.realRackId).padStart(6, '0') : '999999';
   return `${rackId}|${rack.name.toLowerCase()}|${rack.id}`;
+}
+
+function nextRackIdForGateway(
+  gatewayId: string | null | undefined,
+  devices: DeviceNode[],
+  exceptDeviceId?: string | null,
+  preferredRackId?: number | null,
+): number {
+  const gateway = gatewayId ? devices.find((device) => device.id === gatewayId && device.type === 'Gateway' && !device.archived) : undefined;
+  const racks = gateway
+    ? racksForGateway(gateway, devices)
+    : devices.filter((device) => device.type === 'Rack' && !device.archived && device.gatewayId === gatewayId);
+  const used = new Set(
+    racks
+      .filter((rack) => rack.id !== exceptDeviceId && typeof rack.realRackId === 'number' && Number.isInteger(rack.realRackId))
+      .map((rack) => rack.realRackId as number),
+  );
+  if (typeof preferredRackId === 'number' && Number.isInteger(preferredRackId) && preferredRackId > 0 && !used.has(preferredRackId)) {
+    return preferredRackId;
+  }
+  let id = 1;
+  while (used.has(id)) id += 1;
+  return id;
 }
 
 export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: ReactNode; currentUser?: PublicUser | null } = {}) {
@@ -577,7 +600,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       const savedDevice: NewDevice = {
         ...device,
         realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? previous?.realGatewayId ?? defaultRealGatewayId(editingDeviceId)) : (device.realGatewayId ?? previous?.realGatewayId ?? null),
-        realRackId: device.type === 'Rack' ? (device.realRackId ?? previous?.realRackId ?? nextRealRackId(device.gatewayId, storedDevices)) : null,
+        realRackId:
+          device.type === 'Rack'
+            ? nextRackIdForGateway(device.gatewayId, devices, editingDeviceId, device.realRackId ?? previous?.realRackId ?? null)
+            : null,
       };
       const updated = storedDevices.map((d) => {
         if (d.id === editingDeviceId) return { ...d, ...savedDevice };
@@ -610,7 +636,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         archived: false,
         ...device,
         realGatewayId: device.type === 'Gateway' ? (device.realGatewayId ?? defaultRealGatewayId(id)) : (gateway?.realGatewayId ?? null),
-        realRackId: device.type === 'Rack' ? (device.realRackId ?? nextRealRackId(device.gatewayId, storedDevices)) : null,
+        realRackId: device.type === 'Rack' ? nextRackIdForGateway(device.gatewayId, devices, null, device.realRackId ?? null) : null,
       };
       const candidate: DeviceNode[] = [...storedDevices, newDevice];
       const duplicate = findDuplicateIpInDevices(candidate);
