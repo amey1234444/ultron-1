@@ -4,15 +4,24 @@ import type { PublicUser } from '../../../lib/roles';
 import { verifyCaptcha } from '../../../server/captcha';
 import { ApiError, sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
+import {
+  addRejectedEmail,
+  checkEmailReputation,
+  findRejectedEmail,
+} from '../../../server/emailReputation';
 import { clientIp, deviceFingerprint } from '../../../server/request';
 import { guardRequest } from '../../../server/security';
 import { recordSecurityAlert } from '../../../server/securityAlerts';
-import { createUser, findByEmail, findByUsername } from '../../../server/users';
+import { createUser, findByEmail, findByUsername, type UserReputation } from '../../../server/users';
 
 // Non-revealing response for any state that would confirm whether an
 // identifier is already taken (username or email). Prevents account
 // enumeration while still failing the request.
 const GENERIC_CONFLICT = 'Registration could not be completed. Please check your details and try again.';
+
+// Shown when an email is barred by the reputation gate (either a cached prior
+// rejection or a fresh not-acceptable verdict). Deliberately non-specific.
+const REPUTATION_REJECTED = 'This email address is not eligible for registration.';
 
 // Public self-service sign-up. New accounts:
 //  - always get the lowest ('user') role regardless of any client-supplied value,
@@ -55,6 +64,39 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(409).json({ error: GENERIC_CONFLICT });
     }
 
+    // Email reputation gate. Runs only after the email is confirmed unique.
+    //  1. If it's in the rejected-reputation cache and NOT overridden, reject
+    //     immediately WITHOUT calling the paid API (cost + latency saving).
+    //  2. An overridden cache entry means a super admin cleared it: skip the API
+    //     and let signup proceed, carrying the stored response for the record.
+    //  3. Otherwise call the API; a not-acceptable verdict rejects the signup and
+    //     is cached; acceptable / unknown (provider unavailable) proceeds.
+    let reputation: UserReputation | undefined;
+    const cached = await findRejectedEmail(email);
+    if (cached && !cached.overridden) {
+      return res.status(403).json({ error: REPUTATION_REJECTED });
+    }
+    if (cached && cached.overridden) {
+      reputation = {
+        status: 'overridden',
+        score: null,
+        checkedAt: new Date().toISOString(),
+        data: cached.data,
+      };
+    } else {
+      const result = await checkEmailReputation(email);
+      if (result.status === 'not_acceptable') {
+        await addRejectedEmail(email, result.reasons, result.data);
+        return res.status(403).json({ error: REPUTATION_REJECTED });
+      }
+      reputation = {
+        status: result.status,
+        score: result.score,
+        checkedAt: result.checkedAt,
+        data: result.data,
+      };
+    }
+
     // createUser re-validates and enforces uniqueness atomically (incl. the
     // concurrent-request race), so it remains the authoritative gate.
     let user: PublicUser;
@@ -66,6 +108,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         role: 'user',
         password,
         status: 'pending',
+        reputation,
       });
     } catch (err) {
       // Collapse the atomic-uniqueness 409 into the same non-revealing message.
