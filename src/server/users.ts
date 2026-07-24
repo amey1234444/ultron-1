@@ -17,6 +17,35 @@ export { ApiError };
 
 export type StoredUser = PublicUser & { passwordHash: string };
 
+// Pragmatic email shape check: exactly one @, non-empty local/domain parts, and
+// a dotted domain. Deliberately permissive — the goal is to reject obvious junk,
+// not to fully validate deliverability.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_EMAIL_LENGTH = 254;
+
+// Canonical key used for case-insensitive uniqueness (mirrors username_lc).
+function emailKey(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function assertValidEmail(email: string): void {
+  if (!email) throw new ApiError(400, 'Email is required.');
+  if (email.length > MAX_EMAIL_LENGTH || !EMAIL_RE.test(email)) {
+    throw new ApiError(400, 'Enter a valid email address.');
+  }
+}
+
+// A Postgres unique-constraint violation. Guards the narrow race where two
+// concurrent requests pass the pre-check and both attempt to insert.
+function uniqueViolationMessage(err: unknown): string | null {
+  const e = err as { code?: string; constraint?: string } | null;
+  if (!e || typeof e !== 'object' || e.code !== '23505') return null;
+  const constraint = e.constraint ?? '';
+  if (constraint.includes('email')) return 'An account with this email already exists.';
+  if (constraint.includes('username')) return 'Username already exists.';
+  return 'An account with these details already exists.';
+}
+
 // Production uses durable Supabase/PostgreSQL storage. Local dev / CI without a
 // DATABASE_URL may use the in-memory seed store; production fails closed.
 type Store = { users: StoredUser[] };
@@ -126,6 +155,7 @@ type UserRow = {
   username: string;
   name: string;
   email: string;
+  email_lc: string;
   role: string;
   status: string;
   permissions: unknown;
@@ -159,14 +189,15 @@ function rowToStored(r: UserRow): StoredUser {
 
 async function insertRow(u: StoredUser): Promise<void> {
   await query(
-    `INSERT INTO users (id, username, username_lc, name, email, role, status, permissions, password_hash, created_at, last_login_at, last_seen_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12)`,
+    `INSERT INTO users (id, username, username_lc, name, email, email_lc, role, status, permissions, password_hash, created_at, last_login_at, last_seen_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13)`,
     [
       u.id,
       u.username,
       u.username.toLowerCase(),
       u.name,
       u.email,
+      emailKey(u.email),
       u.role,
       u.status,
       JSON.stringify(u.permissions),
@@ -199,6 +230,15 @@ export async function findByUsername(username: string): Promise<StoredUser | und
   const key = username.trim().toLowerCase();
   if (!isDbEnabled()) return memStore().users.find((u) => u.username.toLowerCase() === key);
   const res = await query<UserRow>('SELECT * FROM users WHERE username_lc = $1', [key]);
+  return res.rows[0] ? rowToStored(res.rows[0]) : undefined;
+}
+
+export async function findByEmail(email: string): Promise<StoredUser | undefined> {
+  await ready();
+  const key = emailKey(email);
+  if (!key) return undefined;
+  if (!isDbEnabled()) return memStore().users.find((u) => emailKey(u.email) === key);
+  const res = await query<UserRow>('SELECT * FROM users WHERE email_lc = $1', [key]);
   return res.rows[0] ? rowToStored(res.rows[0]) : undefined;
 }
 
@@ -255,14 +295,17 @@ export async function createUser(input: CreateUserInput): Promise<PublicUser> {
     throw new ApiError(400, 'Password must be at least 8 characters.');
   }
   if (!isRole(input.role)) throw new ApiError(400, 'Invalid role.');
+  const email = input.email.trim();
+  assertValidEmail(email);
   if (await findByUsername(username)) throw new ApiError(409, 'Username already exists.');
+  if (await findByEmail(email)) throw new ApiError(409, 'An account with this email already exists.');
 
   const now = new Date().toISOString();
   const user: StoredUser = {
     id: id(),
     username,
     name: input.name.trim() || username,
-    email: input.email.trim(),
+    email,
     role: input.role,
     status: input.status ?? 'pending',
     permissions: normalizePermissions(input.permissions, input.role),
@@ -272,10 +315,16 @@ export async function createUser(input: CreateUserInput): Promise<PublicUser> {
     passwordHash: await bcrypt.hash(input.password, 10),
   };
 
-  if (!isDbEnabled()) {
-    memStore().users.push(user);
-  } else {
-    await insertRow(user);
+  try {
+    if (!isDbEnabled()) {
+      memStore().users.push(user);
+    } else {
+      await insertRow(user);
+    }
+  } catch (err) {
+    const message = uniqueViolationMessage(err);
+    if (message) throw new ApiError(409, message);
+    throw err;
   }
   return toPublic(user);
 }
@@ -306,7 +355,17 @@ export async function updateUser(userId: string, patch: UpdateUserInput): Promis
   if (!user) throw new ApiError(404, 'User not found.');
 
   if (patch.name !== undefined) user.name = patch.name.trim() || user.name;
-  if (patch.email !== undefined) user.email = patch.email.trim();
+  if (patch.email !== undefined) {
+    const email = patch.email.trim();
+    if (email) {
+      assertValidEmail(email);
+      const existing = await findByEmail(email);
+      if (existing && existing.id !== user.id) {
+        throw new ApiError(409, 'An account with this email already exists.');
+      }
+    }
+    user.email = email;
+  }
   if (patch.role !== undefined) {
     if (!isRole(patch.role)) throw new ApiError(400, 'Invalid role.');
     if (user.role === 'super_admin' && patch.role !== 'super_admin') {
@@ -333,10 +392,25 @@ export async function updateUser(userId: string, patch: UpdateUserInput): Promis
   if (!isDbEnabled()) {
     // memStore held a reference; nothing else to persist.
   } else {
-    await query(
-      `UPDATE users SET name = $2, email = $3, role = $4, status = $5, permissions = $6::jsonb, password_hash = $7 WHERE id = $1`,
-      [user.id, user.name, user.email, user.role, user.status, JSON.stringify(user.permissions), user.passwordHash],
-    );
+    try {
+      await query(
+        `UPDATE users SET name = $2, email = $3, email_lc = $4, role = $5, status = $6, permissions = $7::jsonb, password_hash = $8 WHERE id = $1`,
+        [
+          user.id,
+          user.name,
+          user.email,
+          emailKey(user.email),
+          user.role,
+          user.status,
+          JSON.stringify(user.permissions),
+          user.passwordHash,
+        ],
+      );
+    } catch (err) {
+      const message = uniqueViolationMessage(err);
+      if (message) throw new ApiError(409, message);
+      throw err;
+    }
   }
   return toPublic(user);
 }
