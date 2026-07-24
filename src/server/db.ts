@@ -129,6 +129,19 @@ export async function ensureSchema(): Promise<void> {
   return globalRef.__ultronPgReady;
 }
 
+// Create the case-insensitive unique index guarding email addresses. If a
+// database predates this constraint and already holds duplicate emails (e.g.
+// created while the vulnerability was live), the index build fails; we log and
+// continue rather than wedging every cold start, since the application-level
+// check still blocks new duplicates. Operators can dedupe and re-run migrate().
+async function ensureEmailUniqueIndex(): Promise<void> {
+  try {
+    await query(`CREATE UNIQUE INDEX IF NOT EXISTS users_email_lc_unique ON users (email_lc) WHERE email_lc <> '';`);
+  } catch (err) {
+    logServerError('db users_email_lc_unique index (pre-existing duplicate emails?)', err);
+  }
+}
+
 async function migrate(): Promise<void> {
   await query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -137,6 +150,7 @@ async function migrate(): Promise<void> {
       username_lc   TEXT NOT NULL UNIQUE,
       name          TEXT NOT NULL DEFAULT '',
       email         TEXT NOT NULL DEFAULT '',
+      email_lc      TEXT NOT NULL DEFAULT '',
       role          TEXT NOT NULL DEFAULT 'user',
       status        TEXT NOT NULL DEFAULT 'pending',
       permissions   JSONB NOT NULL DEFAULT '[]'::jsonb,
@@ -146,6 +160,14 @@ async function migrate(): Promise<void> {
       last_seen_at  TIMESTAMPTZ
     );
   `);
+
+  // Enforce one account per email address at the database level (defence in
+  // depth behind the application check). The lowercased column makes uniqueness
+  // case-insensitive; the partial index skips blank emails so historical rows
+  // without an address don't collide with each other.
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS email_lc TEXT NOT NULL DEFAULT '';`);
+  await query(`UPDATE users SET email_lc = lower(btrim(email)) WHERE email_lc IS DISTINCT FROM lower(btrim(email));`);
+  await ensureEmailUniqueIndex();
 
   // Opaque, database-backed login sessions. Only a SHA-256 hash of the
   // browser token is stored; sessions therefore survive deploys/restarts without

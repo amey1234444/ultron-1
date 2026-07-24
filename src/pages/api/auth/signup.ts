@@ -4,7 +4,7 @@ import { verifyCaptcha } from '../../../server/captcha';
 import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
-import { createUser, findByUsername } from '../../../server/users';
+import { createUser, findByEmail, findByUsername } from '../../../server/users';
 
 // Public self-service sign-up. New accounts:
 //  - always get the lowest ('user') role regardless of any client-supplied value,
@@ -25,8 +25,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       string,
       string
     >;
-    if (!username || !password) {
-      return res.status(400).json({ error: 'Username and password are required.' });
+    if (!username || !password || !email) {
+      return res.status(400).json({ error: 'Username, email, and password are required.' });
     }
     if (!verifyCaptcha(captchaToken, captchaAnswer)) {
       return res.status(400).json({ error: 'CAPTCHA verification failed. Please try again.' });
@@ -34,11 +34,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (await findByUsername(username)) {
       return res.status(409).json({ error: 'Username already exists.' });
     }
+    if (await findByEmail(email)) {
+      return res.status(409).json({ error: 'An account with this email already exists.' });
+    }
 
+    // createUser re-validates and enforces uniqueness atomically (incl. the
+    // concurrent-request race), so it remains the authoritative gate.
     const user = await createUser({
       username,
       name: name || username,
-      email: email || '',
+      email,
       role: 'user',
       password,
       status: 'pending',
