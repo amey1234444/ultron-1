@@ -80,40 +80,99 @@ export function evaluateReputation(raw: unknown): { acceptable: boolean; score: 
   return { acceptable: reasons.length === 0, score, reasons };
 }
 
-// Call the Abstract API. Returns the parsed JSON on success, or null on any
-// failure (missing key, network error, timeout, non-2xx) so callers fail open.
-async function callReputationApi(email: string): Promise<unknown | null> {
+// Outcome of a single Abstract API call. On failure we keep a structured,
+// key-free diagnostic so the reason is persisted on the user record and shown
+// to super admins instead of a silent, empty "unchecked".
+type ApiOutcome =
+  | { ok: true; data: unknown }
+  | { ok: false; detail: string; diagnostic: Record<string, unknown> };
+
+// Pull Abstract's `{ error: { message, code } }` body (returned on 4xx/5xx and,
+// defensively, sometimes alongside a 200) into a short, safe summary. Never
+// includes the request URL or API key.
+function abstractErrorInfo(body: unknown): { code: string | null; message: string | null } {
+  const e = (body as { error?: { code?: unknown; message?: unknown } } | null)?.error;
+  if (!e || typeof e !== 'object') return { code: null, message: null };
+  return {
+    code: typeof e.code === 'string' ? e.code : null,
+    message: typeof e.message === 'string' ? e.message : null,
+  };
+}
+
+// Call the Abstract API. Returns the parsed JSON on success, or a STRUCTURED
+// failure (missing key, network error, timeout, non-2xx, error body) so callers
+// can fail open WHILE recording exactly why the check did not complete.
+async function callReputationApi(email: string): Promise<ApiOutcome> {
   const key = apiKey();
-  if (!key) return null;
+  if (!key) {
+    return {
+      ok: false,
+      detail: 'Reputation API key is not configured.',
+      diagnostic: {
+        reason: 'missing_api_key',
+        hint: 'Set ABSTRACT_EMAIL_REPUTATION_API_KEY in the deployment environment and redeploy.',
+      },
+    };
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const url = `${API_URL}?api_key=${encodeURIComponent(key)}&email=${encodeURIComponent(email)}`;
     const res = await fetch(url, { method: 'GET', signal: controller.signal });
+    const body = (await res.json().catch(() => null)) as unknown;
     if (!res.ok) {
-      logServerError('emailReputation api non-2xx', new Error(`status ${res.status}`));
-      return null;
+      const { code, message } = abstractErrorInfo(body);
+      logServerError('emailReputation api non-2xx', new Error(`status ${res.status} ${code ?? ''}`.trim()));
+      return {
+        ok: false,
+        detail: message ?? `Reputation service returned HTTP ${res.status}.`,
+        diagnostic: { reason: 'http_error', httpStatus: res.status, code, message },
+      };
     }
-    return (await res.json()) as unknown;
+    // Some error conditions arrive as HTTP 200 with an `error` body — treat as
+    // a failure so we never mistake an error payload for a real verdict.
+    const { code, message } = abstractErrorInfo(body);
+    if (code || message) {
+      return {
+        ok: false,
+        detail: message ?? 'Reputation service returned an error.',
+        diagnostic: { reason: 'api_error', code, message },
+      };
+    }
+    return { ok: true, data: body };
   } catch (err) {
+    const timedOut = err instanceof Error && err.name === 'AbortError';
     logServerError('emailReputation api call', err);
-    return null;
+    return {
+      ok: false,
+      detail: timedOut ? 'Reputation service timed out.' : 'Reputation service is unreachable.',
+      diagnostic: { reason: timedOut ? 'timeout' : 'network_error' },
+    };
   } finally {
     clearTimeout(timer);
   }
 }
 
 // Run a full reputation check for an email that is NOT already in the rejected
-// table. Fails open to status 'unknown' when the API can't be reached.
+// table. Fails open to status 'unknown' when the API can't be reached — but now
+// persists a structured diagnostic (the reason) in `data` so the check is never
+// a silent, empty "unchecked" with "No stored API response" in the super-admin
+// view.
 export async function checkEmailReputation(email: string): Promise<ReputationResult> {
   const checkedAt = new Date().toISOString();
-  const raw = await callReputationApi(email);
-  if (raw === null) {
-    return { status: 'unknown', score: null, reasons: ['Reputation service unavailable.'], checkedAt, data: null };
+  const outcome = await callReputationApi(email);
+  if (!outcome.ok) {
+    return {
+      status: 'unknown',
+      score: null,
+      reasons: [outcome.detail],
+      checkedAt,
+      data: { unavailable: true, ...outcome.diagnostic, detail: outcome.detail, checkedAt },
+    };
   }
-  const { acceptable, score, reasons } = evaluateReputation(raw);
-  return { status: acceptable ? 'acceptable' : 'not_acceptable', score, reasons, checkedAt, data: raw };
+  const { acceptable, score, reasons } = evaluateReputation(outcome.data);
+  return { status: acceptable ? 'acceptable' : 'not_acceptable', score, reasons, checkedAt, data: outcome.data };
 }
 
 // --- rejected-email reputation store ---------------------------------------

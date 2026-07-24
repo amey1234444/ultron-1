@@ -975,6 +975,16 @@ function UsersScreenInner() {
                       {u.reputationScore !== null ? ` · score ${u.reputationScore}` : ''}
                       {u.reputationCheckedAt ? ` · checked ${timeAgo(u.reputationCheckedAt, now)}` : ''}
                     </Text>
+                    {(() => {
+                      const rep = repDetail[u.id] as { data?: unknown } | undefined;
+                      const d = rep?.data as { unavailable?: boolean; detail?: string } | null | undefined;
+                      if (!d || typeof d !== 'object' || !d.unavailable) return null;
+                      return (
+                        <Text className="mt-1 font-body text-[11px] text-status-warning">
+                          Validation did not complete{d.detail ? `: ${d.detail}` : '.'}
+                        </Text>
+                      );
+                    })()}
                     <ScrollView horizontal className="mt-2 max-h-64 rounded-lg border border-line-dark bg-surface-dark">
                       <Text className="p-3 font-mono text-[11px] text-ink-muted">
                         {(() => {
