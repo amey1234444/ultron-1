@@ -1,16 +1,9 @@
 import { useRouter } from 'next/router';
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../lib/apiClient';
-import { AUTH_FONT_BODY, AuthButton, AuthField, AuthShell } from './AuthShell';
-
-function svgToDataUri(svg: string): string {
-  // Base64 keeps the data URI robust regardless of the glyphs/quotes inside.
-  const encoded = typeof window === 'undefined' ? Buffer.from(svg).toString('base64') : window.btoa(svg);
-  return `data:image/svg+xml;base64,${encoded}`;
-}
+import { AUTH_FONT_BODY, AuthButton, AuthField, AuthShell, CaptchaField, useCaptcha } from './AuthShell';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -19,10 +12,7 @@ export default function SignupScreen() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [captchaAnswer, setCaptchaAnswer] = useState('');
-  const [captchaToken, setCaptchaToken] = useState('');
-  const [captchaSvg, setCaptchaSvg] = useState('');
-  const [captchaLoading, setCaptchaLoading] = useState(true);
+  const captcha = useCaptcha();
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -34,27 +24,6 @@ export default function SignupScreen() {
     }
   }, [loading, user, router]);
 
-  const loadCaptcha = useCallback(async () => {
-    setCaptchaLoading(true);
-    setCaptchaAnswer('');
-    try {
-      const res = await apiFetch('/api/captcha');
-      const data = await res.json();
-      if (res.ok) {
-        setCaptchaToken(data.token as string);
-        setCaptchaSvg(data.svg as string);
-      }
-    } catch {
-      /* leave captcha blank; submit will fail with a clear message */
-    } finally {
-      setCaptchaLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void loadCaptcha();
-  }, [loadCaptcha]);
-
   const onSubmit = async () => {
     setError(null);
     if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
@@ -65,7 +34,7 @@ export default function SignupScreen() {
       setError('Password must be at least 8 characters.');
       return;
     }
-    if (!captchaAnswer.trim()) {
+    if (!captcha.answer.trim()) {
       setError('Please solve the CAPTCHA.');
       return;
     }
@@ -76,13 +45,13 @@ export default function SignupScreen() {
         name: name.trim(),
         email: email.trim(),
         password,
-        captchaToken,
-        captchaAnswer: captchaAnswer.trim(),
+        captchaToken: captcha.token,
+        captchaAnswer: captcha.answer.trim(),
       });
       setDone(result.message);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Sign up failed.');
-      void loadCaptcha(); // rotate the challenge after any failure
+      void captcha.reload(); // rotate the challenge after any failure
     } finally {
       setSubmitting(false);
     }
@@ -121,47 +90,17 @@ export default function SignupScreen() {
         placeholder="min 8 chars"
       />
 
-      <View className="mt-3 gap-1">
-        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-[11px] uppercase tracking-wider text-ink-muted">
-          CAPTCHA
-        </Text>
-        <View className="flex-row flex-wrap items-center gap-3">
-          <View className="h-[60px] w-[180px] max-w-full items-center justify-center overflow-hidden rounded-xl border border-line-dark bg-surface-dark">
-            {captchaLoading ? (
-              <ActivityIndicator color="#C9A15C" />
-            ) : captchaSvg ? (
-              <Image source={{ uri: svgToDataUri(captchaSvg) }} style={{ width: 180, height: 60 }} resizeMode="contain" />
-            ) : (
-              <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
-                Unavailable
-              </Text>
-            )}
-          </View>
-          <Pressable onPress={loadCaptcha} accessibilityLabel="Refresh CAPTCHA" className="rounded-lg border border-line-dark px-3 py-2">
-            <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-accent">
-              ↻ New
-            </Text>
-          </Pressable>
-        </View>
-      </View>
-      <AuthField
-        label="Type the characters above"
-        value={captchaAnswer}
-        onChangeText={setCaptchaAnswer}
-        autoCapitalize="characters"
-        placeholder="e.g. AB3KP"
-        onSubmitEditing={onSubmit}
-      />
+      <CaptchaField captcha={captcha} onSubmitEditing={onSubmit} />
 
       {error ? (
-        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="mt-4 text-sm text-status-critical">
+        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="mt-3 text-sm text-status-critical">
           {error}
         </Text>
       ) : null}
 
       <AuthButton label="Create Account" submitting={submitting} onPress={onSubmit} />
 
-      <View className="mt-4 flex-row items-center gap-1">
+      <View className="mt-3 flex-row items-center gap-1">
         <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
           Already have an account?
         </Text>

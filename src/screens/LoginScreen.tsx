@@ -3,13 +3,14 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { AUTH_FONT_BODY, AuthButton, AuthField, AuthShell } from './AuthShell';
+import { AUTH_FONT_BODY, AuthButton, AuthField, AuthShell, CaptchaField, useCaptcha } from './AuthShell';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { user, loading, login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const captcha = useCaptcha();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -22,13 +23,18 @@ export default function LoginScreen() {
 
   const onSubmit = async () => {
     setError(null);
+    if (!captcha.answer.trim()) {
+      setError('Please solve the CAPTCHA.');
+      return;
+    }
     setSubmitting(true);
     try {
-      await login(username.trim(), password);
+      await login(username.trim(), password, captcha.token, captcha.answer.trim());
       const next = typeof router.query.next === 'string' ? router.query.next : '/';
       await router.replace(next);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed.');
+      void captcha.reload(); // rotate the challenge after any failure
     } finally {
       setSubmitting(false);
     }
@@ -52,6 +58,8 @@ export default function LoginScreen() {
         placeholder="••••••••"
         onSubmitEditing={onSubmit}
       />
+
+      <CaptchaField captcha={captcha} onSubmitEditing={onSubmit} />
 
       {error ? (
         <Text style={{ fontFamily: AUTH_FONT_BODY }} className="mt-4 text-sm text-status-critical">
