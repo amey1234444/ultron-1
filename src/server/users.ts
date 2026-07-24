@@ -465,6 +465,30 @@ export async function deleteUser(userId: string): Promise<void> {
   await query('DELETE FROM users WHERE id = $1', [userId]);
 }
 
+// Stamp a reputation verdict onto every account that shares an email. Called by
+// the reputation queue worker once the (rate-limited) Abstract API call for that
+// email completes, so the Manage Users row reflects the real verdict.
+export async function applyReputationByEmail(email: string, rep: UserReputation): Promise<void> {
+  const key = emailKey(email);
+  if (!key) return;
+  if (!isDbEnabled()) {
+    for (const u of memStore().users) {
+      if (emailKey(u.email) === key) {
+        u.reputationStatus = rep.status;
+        u.reputationScore = rep.score;
+        u.reputationCheckedAt = rep.checkedAt;
+        u.reputationData = rep.data ?? null;
+      }
+    }
+    return;
+  }
+  await query(
+    `UPDATE users SET reputation_status = $2, reputation_score = $3, reputation_checked_at = $4, reputation_data = $5::jsonb
+     WHERE email_lc = $1`,
+    [key, rep.status, rep.score, rep.checkedAt, JSON.stringify(rep.data ?? null)],
+  );
+}
+
 // Full reputation record (including the complete raw API response) for a single
 // user. Restricted to super admins at the route layer — the raw response can
 // contain breach / risk data that must not reach ordinary callers.

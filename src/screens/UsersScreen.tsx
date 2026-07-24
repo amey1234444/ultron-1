@@ -64,6 +64,14 @@ function AccountStatusBadge({ status }: { status: UserStatus }) {
   );
 }
 
+// Abstract email_quality.score must be ABOVE this to be considered trustable.
+// Keep in sync with MIN_QUALITY_SCORE in server/emailReputation.ts.
+const TRUST_MIN_SCORE = 0.85;
+
+function isTrustable(status: ReputationStatus, score: number | null): boolean {
+  return status === 'acceptable' && score !== null && score > TRUST_MIN_SCORE;
+}
+
 const REPUTATION_BADGE: Record<ReputationStatus, { label: string; tone: string }> = {
   acceptable: { label: '✅ Acceptable', tone: 'border-status-success/50 text-status-success' },
   overridden: { label: '✅ Overridden', tone: 'border-status-success/50 text-status-success' },
@@ -71,8 +79,20 @@ const REPUTATION_BADGE: Record<ReputationStatus, { label: string; tone: string }
   unknown: { label: '— Unchecked', tone: 'border-line-dark text-ink-muted' },
 };
 
-function ReputationBadge({ status }: { status: ReputationStatus }) {
-  const m = REPUTATION_BADGE[status] ?? REPUTATION_BADGE.unknown;
+function reputationBadge(
+  status: ReputationStatus,
+  score: number | null,
+): { label: string; tone: string } {
+  if (status === 'acceptable') {
+    return isTrustable(status, score)
+      ? { label: `✅ Valid & trusted (${score})`, tone: 'border-status-success/50 text-status-success' }
+      : { label: `⚠️ Low score (${score ?? 'n/a'})`, tone: 'border-status-warning/60 text-status-warning' };
+  }
+  return REPUTATION_BADGE[status] ?? REPUTATION_BADGE.unknown;
+}
+
+function ReputationBadge({ status, score = null }: { status: ReputationStatus; score?: number | null }) {
+  const m = reputationBadge(status, score);
   return (
     <View className={`rounded-full border px-2 py-0.5 ${m.tone.split(' ')[0]}`}>
       <Text className={`font-body-medium text-[11px] ${m.tone.split(' ')[1]}`}>{m.label}</Text>
@@ -353,20 +373,26 @@ function SecurityAlertsPanel({
   );
 }
 
-// --- rejected email reputation panel ---------------------------------------
+// --- email reputation panel ------------------------------------------------
 
-type RejectedEmail = {
+type ReputationEntry = {
   id: string;
   email: string;
+  status: ReputationStatus;
+  allowed: boolean;
+  trustable: boolean;
+  score: number | null;
   reasons: string[];
   detail: string;
   overridden: boolean;
+  checkedAt: string | null;
   createdAt: string;
+  updatedAt: string;
   data: unknown | null;
 };
 
-function RejectedEmailsPanel({
-  rejected,
+function ReputationPanel({
+  records,
   loading,
   busy,
   now,
@@ -375,7 +401,7 @@ function RejectedEmailsPanel({
   onDelete,
   onClose,
 }: {
-  rejected: RejectedEmail[];
+  records: ReputationEntry[];
   loading: boolean;
   busy: boolean;
   now: number;
@@ -389,9 +415,11 @@ function RejectedEmailsPanel({
     <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
       <View className="flex-row flex-wrap items-start justify-between gap-2">
         <View className="min-w-[180px] flex-1">
-          <Text className="font-body-bold text-sm text-ink">Rejected Emails (Reputation ❌)</Text>
+          <Text className="font-body-bold text-sm text-ink">Email Reputation (all records)</Text>
           <Text className="mt-1 font-body text-xs text-ink-muted">
-            Emails barred by the reputation check. Approve to override (re-enable signup), or Delete to remove the record.
+            Every Abstract API result — approved, rejected, unknown and overridden — with the full stored response. An
+            email is &quot;valid &amp; trusted&quot; only when its quality score is above {TRUST_MIN_SCORE}. Approve to
+            override a rejection (re-enable signup), or Delete to remove a record.
           </Text>
         </View>
         <View className="flex-row flex-wrap gap-2">
@@ -408,24 +436,16 @@ function RejectedEmailsPanel({
         <View className="items-center py-6">
           <ActivityIndicator color="#F5F5F5" />
         </View>
-      ) : rejected.length === 0 ? (
-        <Text className="mt-4 font-body text-sm text-ink-muted">No rejected emails.</Text>
+      ) : records.length === 0 ? (
+        <Text className="mt-4 font-body text-sm text-ink-muted">No reputation records yet.</Text>
       ) : (
         <View className="mt-3">
-          {rejected.map((r, i) => (
+          {records.map((r, i) => (
             <View key={r.id} className={`gap-1 py-3 ${i > 0 ? 'border-t border-line-dark' : ''}`}>
               <View className="flex-row flex-wrap items-center gap-2">
                 <Text className="font-body-bold text-sm text-ink">{r.email}</Text>
-                {r.overridden ? (
-                  <View className="rounded-full border border-status-success/50 px-2 py-0.5">
-                    <Text className="font-body-medium text-[11px] text-status-success">Overridden</Text>
-                  </View>
-                ) : (
-                  <View className="rounded-full border border-status-critical/60 px-2 py-0.5">
-                    <Text className="font-body-medium text-[11px] text-status-critical">Not acceptable</Text>
-                  </View>
-                )}
-                <Text className="font-body text-[11px] text-ink-muted">{timeAgo(r.createdAt, now)}</Text>
+                <ReputationBadge status={r.status} score={r.score} />
+                <Text className="font-body text-[11px] text-ink-muted">{timeAgo(r.checkedAt ?? r.updatedAt, now)}</Text>
               </View>
               {r.detail ? <Text className="font-body text-xs text-ink-muted">{r.detail}</Text> : null}
               <View className="mt-1 flex-row flex-wrap gap-2">
@@ -435,7 +455,7 @@ function RejectedEmailsPanel({
                 >
                   <Text className="font-body-medium text-xs text-ink">{expanded === r.id ? 'Hide details' : 'View details'}</Text>
                 </Pressable>
-                {!r.overridden ? (
+                {r.status === 'not_acceptable' ? (
                   <Pressable
                     onPress={busy ? undefined : () => onOverride(r.id)}
                     className={`rounded-lg border border-status-success px-3 py-1.5 ${busy ? 'opacity-50' : ''}`}
@@ -485,11 +505,13 @@ function UsersScreenInner() {
   const [alertsBusy, setAlertsBusy] = useState(false);
   const [showAlarms, setShowAlarms] = useState(false);
 
-  const [rejected, setRejected] = useState<RejectedEmail[]>([]);
-  const [rejectedActive, setRejectedActive] = useState(0);
+  const [repRecords, setRepRecords] = useState<ReputationEntry[]>([]);
+  const [repBarred, setRepBarred] = useState(0);
   const [rejectedLoading, setRejectedLoading] = useState(true);
   const [rejectedBusy, setRejectedBusy] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
+  // Users with an in-flight manual reputation re-check (keyed by user id).
+  const [recheckBusy, setRecheckBusy] = useState<Record<string, boolean>>({});
 
   // Full reputation detail for a single user, fetched on demand (super-admin
   // endpoint) and shown inline. Keyed by user id.
@@ -544,9 +566,9 @@ function UsersScreenInner() {
     try {
       const res = await apiFetch('/api/reputation/rejected');
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to load rejected emails.');
-      setRejected(data.rejected as RejectedEmail[]);
-      setRejectedActive(Number(data.active) || 0);
+      if (!res.ok) throw new Error(data.error || 'Failed to load reputation records.');
+      setRepRecords(data.records as ReputationEntry[]);
+      setRepBarred(Number(data.barred) || 0);
     } catch {
       /* non-critical */
     } finally {
@@ -561,8 +583,8 @@ function UsersScreenInner() {
         const res = await apiFetch('/api/reputation/rejected', { method: 'POST', body: JSON.stringify({ id }) });
         const data = await res.json();
         if (res.ok) {
-          setRejected(data.rejected as RejectedEmail[]);
-          setRejectedActive(Number(data.active) || 0);
+          setRepRecords(data.records as ReputationEntry[]);
+          setRepBarred(Number(data.barred) || 0);
         }
       } finally {
         setRejectedBusy(false);
@@ -578,14 +600,39 @@ function UsersScreenInner() {
         const res = await apiFetch('/api/reputation/rejected', { method: 'DELETE', body: JSON.stringify({ id }) });
         const data = await res.json();
         if (res.ok) {
-          setRejected(data.rejected as RejectedEmail[]);
-          setRejectedActive(Number(data.active) || 0);
+          setRepRecords(data.records as ReputationEntry[]);
+          setRepBarred(Number(data.barred) || 0);
         }
       } finally {
         setRejectedBusy(false);
       }
     },
     [],
+  );
+
+  // Manual super-admin re-check: enqueue this user's email and drain the
+  // rate-limited queue, then refresh the directory + records with the verdict.
+  const recheckReputation = useCallback(
+    async (userId: string) => {
+      setRecheckBusy((prev) => ({ ...prev, [userId]: true }));
+      try {
+        const res = await apiFetch('/api/reputation/recheck', {
+          method: 'POST',
+          body: JSON.stringify({ userId }),
+        });
+        const data = await res.json();
+        if (res.ok && data.reputation) {
+          setRepDetail((prev) => ({ ...prev, [userId]: data.reputation }));
+        }
+      } catch {
+        /* leave state; the job stays queued and can be retried */
+      } finally {
+        setRecheckBusy((prev) => ({ ...prev, [userId]: false }));
+        void load(true);
+        void loadRejected(true);
+      }
+    },
+    [load, loadRejected],
   );
 
   const toggleReputation = useCallback(
@@ -758,15 +805,15 @@ function UsersScreenInner() {
               void loadRejected();
             }}
             className={`flex-row items-center gap-2 rounded-lg border px-3 py-1.5 ${
-              rejectedActive > 0 ? 'border-status-critical bg-status-critical/10' : 'border-line-dark'
+              repBarred > 0 ? 'border-status-critical bg-status-critical/10' : 'border-line-dark'
             }`}
           >
-            <Text className={`font-body-medium text-xs ${rejectedActive > 0 ? 'text-status-critical' : 'text-ink'}`}>
-              Rejected Emails
+            <Text className={`font-body-medium text-xs ${repBarred > 0 ? 'text-status-critical' : 'text-ink'}`}>
+              Email Reputation
             </Text>
-            {rejectedActive > 0 ? (
+            {repBarred > 0 ? (
               <View className="min-w-[18px] items-center rounded-full bg-status-critical px-1.5 py-0.5">
-                <Text className="font-body-bold text-[10px] text-ink-inverse">{rejectedActive > 99 ? '99+' : rejectedActive}</Text>
+                <Text className="font-body-bold text-[10px] text-ink-inverse">{repBarred > 99 ? '99+' : repBarred}</Text>
               </View>
             ) : null}
           </Pressable>
@@ -791,8 +838,8 @@ function UsersScreenInner() {
         ) : null}
 
         {showRejected ? (
-          <RejectedEmailsPanel
-            rejected={rejected}
+          <ReputationPanel
+            records={repRecords}
             loading={rejectedLoading}
             busy={rejectedBusy}
             now={now}
@@ -905,7 +952,7 @@ function UsersScreenInner() {
                         <Text className="font-body-medium text-[11px] uppercase tracking-wide text-accent">{ROLE_LABEL[u.role]}</Text>
                       </View>
                       <AccountStatusBadge status={u.status} />
-                      <ReputationBadge status={u.reputationStatus} />
+                      <ReputationBadge status={u.reputationStatus} score={u.reputationScore} />
                       {me?.id === u.id ? <Text className="font-body text-[11px] text-ink-muted">(you)</Text> : null}
                       {userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE) ? (
                         <View className="rounded-full border border-line-dark px-2 py-0.5">
@@ -956,6 +1003,16 @@ function UsersScreenInner() {
                         {repOpen === u.id ? 'Hide reputation' : 'Reputation'}
                       </Text>
                     </Pressable>
+                    {u.email && (u.reputationStatus === 'unknown' || recheckBusy[u.id]) ? (
+                      <Pressable
+                        onPress={recheckBusy[u.id] ? undefined : () => void recheckReputation(u.id)}
+                        className={`rounded-lg border border-accent px-3 py-1.5 ${recheckBusy[u.id] ? 'opacity-60' : ''}`}
+                      >
+                        <Text className="font-body-medium text-xs text-accent">
+                          {recheckBusy[u.id] ? 'Validating…' : 'Re-check'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
                     <Pressable onPress={() => startEdit(u)} className="rounded-lg border border-line-dark px-3 py-1.5">
                       <Text className="font-body-medium text-xs text-ink">Edit</Text>
                     </Pressable>
@@ -971,9 +1028,14 @@ function UsersScreenInner() {
                 {repOpen === u.id ? (
                   <View className="px-4 pb-3">
                     <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">
-                      Reputation: {REPUTATION_BADGE[u.reputationStatus]?.label ?? u.reputationStatus}
+                      Reputation: {reputationBadge(u.reputationStatus, u.reputationScore).label}
                       {u.reputationScore !== null ? ` · score ${u.reputationScore}` : ''}
                       {u.reputationCheckedAt ? ` · checked ${timeAgo(u.reputationCheckedAt, now)}` : ''}
+                      {u.reputationStatus === 'acceptable'
+                        ? isTrustable(u.reputationStatus, u.reputationScore)
+                          ? ` · trusted (> ${TRUST_MIN_SCORE})`
+                          : ` · not trusted (≤ ${TRUST_MIN_SCORE})`
+                        : ''}
                     </Text>
                     {(() => {
                       const rep = repDetail[u.id] as { data?: unknown } | undefined;
