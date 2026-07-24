@@ -209,6 +209,24 @@ async function migrate(): Promise<void> {
   // Primary lookup path is by key + time window (see rateLimit.ts).
   await query(`CREATE INDEX IF NOT EXISTS rate_events_key_ts ON rate_events (key, ts);`);
 
+  // Security alarms shown to super admins (repeated duplicate-email signups,
+  // rate-limit / signup-limit breaches). See server/securityAlerts.ts.
+  await query(`
+    CREATE TABLE IF NOT EXISTS security_alerts (
+      id              BIGSERIAL PRIMARY KEY,
+      kind            TEXT NOT NULL,
+      email           TEXT NOT NULL DEFAULT '',
+      ip              TEXT NOT NULL DEFAULT '',
+      device          TEXT NOT NULL DEFAULT '',
+      bucket          TEXT NOT NULL DEFAULT '',
+      detail          TEXT NOT NULL DEFAULT '',
+      acknowledged_at TIMESTAMPTZ,
+      created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS security_alerts_recent ON security_alerts (created_at DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS security_alerts_dedup ON security_alerts (kind, email, ip, bucket, created_at);`);
+
   // --- Studio workspace (asset hierarchy + canvas layouts) -----------------
   // The whole hierarchy shown in the left rail is durable and shared across all
   // authenticated users, so an edit by one user is visible to everyone. Deep,
