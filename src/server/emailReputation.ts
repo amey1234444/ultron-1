@@ -32,8 +32,10 @@ export type ReputationResult = {
 
 const API_URL = 'https://emailreputation.abstractapi.com/v1/';
 const API_TIMEOUT_MS = 8000;
-// Reject anything below this Abstract "email_quality.score" (0.01–0.99).
-const MIN_QUALITY_SCORE = 0.3;
+// An email is considered valid / trustable only when Abstract's
+// "email_quality.score" is ABOVE this threshold; anything at or below it is
+// rejected. Scores range 0.01–0.99.
+export const MIN_QUALITY_SCORE = 0.85;
 
 function apiKey(): string {
   return process.env.ABSTRACT_EMAIL_REPUTATION_API_KEY || process.env.ABSTRACT_API_KEY || '';
@@ -75,70 +77,228 @@ export function evaluateReputation(raw: unknown): { acceptable: boolean; score: 
   if (quality.is_username_suspicious === true) reasons.push('Username looks auto-generated / suspicious.');
   if (addressRisk === 'high') reasons.push('High address risk.');
   if (domainRisk === 'high') reasons.push('High domain risk.');
-  if (score !== null && score < MIN_QUALITY_SCORE) reasons.push(`Low quality score (${score}).`);
+  if (score !== null && score <= MIN_QUALITY_SCORE) {
+    reasons.push(`Low quality score (${score}); must be above ${MIN_QUALITY_SCORE} to be trusted.`);
+  }
 
   return { acceptable: reasons.length === 0, score, reasons };
 }
 
-// Call the Abstract API. Returns the parsed JSON on success, or null on any
-// failure (missing key, network error, timeout, non-2xx) so callers fail open.
-async function callReputationApi(email: string): Promise<unknown | null> {
+// Outcome of a single Abstract API call. On failure we keep a structured,
+// key-free diagnostic so the reason is persisted on the user record and shown
+// to super admins instead of a silent, empty "unchecked".
+type ApiOutcome =
+  | { ok: true; data: unknown }
+  | { ok: false; detail: string; diagnostic: Record<string, unknown> };
+
+// Pull Abstract's `{ error: { message, code } }` body (returned on 4xx/5xx and,
+// defensively, sometimes alongside a 200) into a short, safe summary. Never
+// includes the request URL or API key.
+function abstractErrorInfo(body: unknown): { code: string | null; message: string | null } {
+  const e = (body as { error?: { code?: unknown; message?: unknown } } | null)?.error;
+  if (!e || typeof e !== 'object') return { code: null, message: null };
+  return {
+    code: typeof e.code === 'string' ? e.code : null,
+    message: typeof e.message === 'string' ? e.message : null,
+  };
+}
+
+// Call the Abstract API. Returns the parsed JSON on success, or a STRUCTURED
+// failure (missing key, network error, timeout, non-2xx, error body) so callers
+// can fail open WHILE recording exactly why the check did not complete.
+async function callReputationApi(email: string): Promise<ApiOutcome> {
   const key = apiKey();
-  if (!key) return null;
+  if (!key) {
+    return {
+      ok: false,
+      detail: 'Reputation API key is not configured.',
+      diagnostic: {
+        reason: 'missing_api_key',
+        hint: 'Set ABSTRACT_EMAIL_REPUTATION_API_KEY in the deployment environment and redeploy.',
+      },
+    };
+  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
   try {
     const url = `${API_URL}?api_key=${encodeURIComponent(key)}&email=${encodeURIComponent(email)}`;
     const res = await fetch(url, { method: 'GET', signal: controller.signal });
+    const body = (await res.json().catch(() => null)) as unknown;
     if (!res.ok) {
-      logServerError('emailReputation api non-2xx', new Error(`status ${res.status}`));
-      return null;
+      const { code, message } = abstractErrorInfo(body);
+      logServerError('emailReputation api non-2xx', new Error(`status ${res.status} ${code ?? ''}`.trim()));
+      return {
+        ok: false,
+        detail: message ?? `Reputation service returned HTTP ${res.status}.`,
+        diagnostic: { reason: 'http_error', httpStatus: res.status, code, message },
+      };
     }
-    return (await res.json()) as unknown;
+    // Some error conditions arrive as HTTP 200 with an `error` body — treat as
+    // a failure so we never mistake an error payload for a real verdict.
+    const { code, message } = abstractErrorInfo(body);
+    if (code || message) {
+      return {
+        ok: false,
+        detail: message ?? 'Reputation service returned an error.',
+        diagnostic: { reason: 'api_error', code, message },
+      };
+    }
+    return { ok: true, data: body };
   } catch (err) {
+    const timedOut = err instanceof Error && err.name === 'AbortError';
     logServerError('emailReputation api call', err);
-    return null;
+    return {
+      ok: false,
+      detail: timedOut ? 'Reputation service timed out.' : 'Reputation service is unreachable.',
+      diagnostic: { reason: timedOut ? 'timeout' : 'network_error' },
+    };
   } finally {
     clearTimeout(timer);
   }
 }
 
 // Run a full reputation check for an email that is NOT already in the rejected
-// table. Fails open to status 'unknown' when the API can't be reached.
+// table. Fails open to status 'unknown' when the API can't be reached — but now
+// persists a structured diagnostic (the reason) in `data` so the check is never
+// a silent, empty "unchecked" with "No stored API response" in the super-admin
+// view.
 export async function checkEmailReputation(email: string): Promise<ReputationResult> {
   const checkedAt = new Date().toISOString();
-  const raw = await callReputationApi(email);
-  if (raw === null) {
-    return { status: 'unknown', score: null, reasons: ['Reputation service unavailable.'], checkedAt, data: null };
+  const outcome = await callReputationApi(email);
+  if (!outcome.ok) {
+    return {
+      status: 'unknown',
+      score: null,
+      reasons: [outcome.detail],
+      checkedAt,
+      data: { unavailable: true, ...outcome.diagnostic, detail: outcome.detail, checkedAt },
+    };
   }
-  const { acceptable, score, reasons } = evaluateReputation(raw);
-  return { status: acceptable ? 'acceptable' : 'not_acceptable', score, reasons, checkedAt, data: raw };
+  const { acceptable, score, reasons } = evaluateReputation(outcome.data);
+  return { status: acceptable ? 'acceptable' : 'not_acceptable', score, reasons, checkedAt, data: outcome.data };
 }
 
-// --- rejected-email reputation store ---------------------------------------
+// --- unified reputation store ----------------------------------------------
+//
+// A single table (`email_reputation`) holds the LATEST verdict + the full
+// Abstract API response for every email we have ever checked — acceptable,
+// not_acceptable, unknown (provider unavailable) and manually overridden alike.
+// It supersedes the old rejected-only table; the rejected-email helpers below
+// are now thin filtered views over this unified table.
 
-export type RejectedEmail = {
+// Signup is allowed for every verdict except an active (non-overridden)
+// rejection. `unknown` fails open (availability first).
+export function isAllowed(status: ReputationStatus): boolean {
+  return status !== 'not_acceptable';
+}
+
+// An email is "trustable" only when it was explicitly accepted with a quality
+// score above the threshold (see MIN_QUALITY_SCORE).
+export function isTrustable(status: ReputationStatus, score: number | null): boolean {
+  return status === 'acceptable' && score !== null && score > MIN_QUALITY_SCORE;
+}
+
+export type ReputationRecord = {
   id: string;
   email: string;
+  status: ReputationStatus;
+  allowed: boolean;
+  trustable: boolean;
+  score: number | null;
   reasons: string[];
   detail: string;
   overridden: boolean;
+  checkedAt: string | null;
   createdAt: string;
+  updatedAt: string;
   data: unknown | null;
 };
 
-type MemRejected = RejectedEmail & { emailLc: string };
-const globalRef = globalThis as unknown as { __ultronRejectedEmails?: MemRejected[] };
-function mem(): MemRejected[] {
-  if (!globalRef.__ultronRejectedEmails) globalRef.__ultronRejectedEmails = [];
-  return globalRef.__ultronRejectedEmails;
+type MemReputation = ReputationRecord & { emailLc: string };
+const globalRef = globalThis as unknown as { __ultronReputation?: MemReputation[] };
+function mem(): MemReputation[] {
+  if (!globalRef.__ultronReputation) globalRef.__ultronReputation = [];
+  return globalRef.__ultronReputation;
 }
 
-// Look up a rejected entry by email. Returns undefined if none. An entry whose
-// `overridden` is true means a super admin manually cleared the reputation
-// decision, so signup should be allowed to proceed (without re-calling the API).
-export async function findRejectedEmail(email: string): Promise<RejectedEmail | undefined> {
+// Upsert (keyed case-insensitively on email) the latest verdict + full API
+// response. Called by the queue worker after every Abstract API call.
+export async function recordReputation(email: string, result: ReputationResult): Promise<void> {
+  const emailLc = normalizeEmail(email);
+  if (!emailLc) return;
+  const allowed = isAllowed(result.status);
+  const detail = result.reasons.join(' ');
+  try {
+    if (!isDbEnabled()) {
+      const store = mem();
+      const nowIso = new Date().toISOString();
+      const existing = store.find((r) => r.emailLc === emailLc);
+      if (existing) {
+        existing.email = email.trim();
+        existing.status = result.status;
+        existing.allowed = allowed;
+        existing.trustable = isTrustable(result.status, result.score);
+        existing.score = result.score;
+        existing.reasons = result.reasons;
+        existing.detail = detail;
+        existing.checkedAt = result.checkedAt;
+        existing.data = result.data ?? null;
+        existing.updatedAt = nowIso;
+        existing.overridden = result.status === 'overridden';
+      } else {
+        store.unshift({
+          id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          email: email.trim(),
+          emailLc,
+          status: result.status,
+          allowed,
+          trustable: isTrustable(result.status, result.score),
+          score: result.score,
+          reasons: result.reasons,
+          detail,
+          overridden: result.status === 'overridden',
+          checkedAt: result.checkedAt,
+          createdAt: nowIso,
+          updatedAt: nowIso,
+          data: result.data ?? null,
+        });
+      }
+      return;
+    }
+    await query(
+      `INSERT INTO email_reputation (email, email_lc, status, allowed, score, reasons, detail, checked_at, response)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9::jsonb)
+       ON CONFLICT (email_lc) DO UPDATE SET
+         email = EXCLUDED.email,
+         status = EXCLUDED.status,
+         allowed = EXCLUDED.allowed,
+         score = EXCLUDED.score,
+         reasons = EXCLUDED.reasons,
+         detail = EXCLUDED.detail,
+         checked_at = EXCLUDED.checked_at,
+         response = EXCLUDED.response,
+         overridden_at = CASE WHEN EXCLUDED.status = 'overridden' THEN now() ELSE NULL END,
+         updated_at = now()`,
+      [
+        email.trim(),
+        emailLc,
+        result.status,
+        allowed,
+        result.score,
+        JSON.stringify(result.reasons),
+        detail,
+        result.checkedAt,
+        JSON.stringify(result.data ?? null),
+      ],
+    );
+  } catch (err) {
+    logServerError('recordReputation', err);
+  }
+}
+
+// Latest stored verdict for an email, or undefined if never checked.
+export async function findReputation(email: string): Promise<ReputationRecord | undefined> {
   const key = normalizeEmail(email);
   if (!key) return undefined;
   if (!isDbEnabled()) {
@@ -147,109 +307,100 @@ export async function findRejectedEmail(email: string): Promise<RejectedEmail | 
     const { emailLc: _emailLc, ...rest } = found;
     return rest;
   }
-  const res = await query<RejectedRow>('SELECT * FROM rejected_email_reputation WHERE email_lc = $1', [key]);
-  return res.rows[0] ? rowToRejected(res.rows[0]) : undefined;
+  const res = await query<ReputationRow>('SELECT * FROM email_reputation WHERE email_lc = $1', [key]);
+  return res.rows[0] ? rowToRecord(res.rows[0]) : undefined;
 }
 
-// Persist a not-acceptable email + the full API response. Idempotent on email:
-// a repeat rejection refreshes the stored response/reasons.
-export async function addRejectedEmail(email: string, reasons: string[], data: unknown): Promise<void> {
-  const emailLc = normalizeEmail(email);
-  const detail = reasons.join(' ');
-  try {
-    if (!isDbEnabled()) {
-      const store = mem();
-      const existing = store.find((r) => r.emailLc === emailLc);
-      if (existing) {
-        existing.reasons = reasons;
-        existing.detail = detail;
-        existing.data = data ?? null;
-        return;
-      }
-      const now = Date.now();
-      store.unshift({
-        id: `${now}-${Math.random().toString(36).slice(2, 8)}`,
-        email: email.trim(),
-        emailLc,
-        reasons,
-        detail,
-        overridden: false,
-        createdAt: new Date(now).toISOString(),
-        data: data ?? null,
-      });
-      return;
-    }
-    await query(
-      `INSERT INTO rejected_email_reputation (email, email_lc, reasons, detail, response)
-       VALUES ($1, $2, $3::jsonb, $4, $5::jsonb)
-       ON CONFLICT (email_lc) DO UPDATE
-         SET reasons = EXCLUDED.reasons, detail = EXCLUDED.detail, response = EXCLUDED.response`,
-      [email.trim(), emailLc, JSON.stringify(reasons), detail, JSON.stringify(data ?? null)],
-    );
-  } catch (err) {
-    logServerError('addRejectedEmail', err);
-  }
-}
-
-export async function listRejectedEmails(limit = 200): Promise<{ rejected: RejectedEmail[]; active: number }> {
-  const cap = Math.min(Math.max(1, Math.floor(limit)), 500);
+// Every stored record (acceptable + not_acceptable + unknown + overridden),
+// most-recently-updated first, plus the count of active (barred) rejections.
+export async function listReputationRecords(
+  limit = 500,
+): Promise<{ records: ReputationRecord[]; barred: number }> {
+  const cap = Math.min(Math.max(1, Math.floor(limit)), 1000);
   if (!isDbEnabled()) {
     const store = mem();
     return {
-      rejected: store.slice(0, cap).map(({ emailLc: _emailLc, ...r }) => r),
-      active: store.filter((r) => !r.overridden).length,
+      records: store.slice(0, cap).map(({ emailLc: _emailLc, ...r }) => r),
+      barred: store.filter((r) => r.status === 'not_acceptable').length,
     };
   }
-  const res = await query<RejectedRow>('SELECT * FROM rejected_email_reputation ORDER BY created_at DESC LIMIT $1', [cap]);
+  const res = await query<ReputationRow>('SELECT * FROM email_reputation ORDER BY updated_at DESC LIMIT $1', [cap]);
   const countRes = await query<{ n: string }>(
-    'SELECT COUNT(*)::text AS n FROM rejected_email_reputation WHERE overridden_at IS NULL',
+    "SELECT COUNT(*)::text AS n FROM email_reputation WHERE status = 'not_acceptable'",
   );
-  return { rejected: res.rows.map(rowToRejected), active: Number(countRes.rows[0]?.n ?? '0') };
+  return { records: res.rows.map(rowToRecord), barred: Number(countRes.rows[0]?.n ?? '0') };
 }
 
-// Manual super-admin override: mark the reputation decision as cleared so the
-// email becomes eligible to register again (signup will skip the API for it).
-export async function overrideRejectedEmail(id: string): Promise<void> {
+// Manual super-admin override: clear a rejection so the email may register
+// again (signup will reuse this record and skip the API).
+export async function overrideReputation(id: string): Promise<void> {
   if (!isDbEnabled()) {
     const found = mem().find((r) => r.id === id);
-    if (found) found.overridden = true;
+    if (found) {
+      found.status = 'overridden';
+      found.allowed = true;
+      found.trustable = false;
+      found.overridden = true;
+      found.updatedAt = new Date().toISOString();
+    }
     return;
   }
-  await query('UPDATE rejected_email_reputation SET overridden_at = now() WHERE id = $1', [id]);
+  await query(
+    "UPDATE email_reputation SET status = 'overridden', allowed = true, overridden_at = now(), updated_at = now() WHERE id = $1",
+    [id],
+  );
 }
 
-export async function deleteRejectedEmail(id: string): Promise<void> {
+export async function deleteReputation(id: string): Promise<void> {
   if (!isDbEnabled()) {
     const store = mem();
     const idx = store.findIndex((r) => r.id === id);
     if (idx !== -1) store.splice(idx, 1);
     return;
   }
-  await query('DELETE FROM rejected_email_reputation WHERE id = $1', [id]);
+  await query('DELETE FROM email_reputation WHERE id = $1', [id]);
 }
 
-type RejectedRow = {
+type ReputationRow = {
   id: string;
   email: string;
+  status: string;
+  allowed: boolean;
+  score: number | string | null;
   reasons: unknown;
   detail: string;
   response: unknown;
+  checked_at: Date | string | null;
   overridden_at: Date | string | null;
   created_at: Date | string;
+  updated_at: Date | string;
 };
 
 function iso(v: Date | string): string {
   return v instanceof Date ? v.toISOString() : new Date(v).toISOString();
 }
 
-function rowToRejected(r: RejectedRow): RejectedEmail {
+function isoOrNull(v: Date | string | null): string | null {
+  return v === null ? null : iso(v);
+}
+
+function rowToRecord(r: ReputationRow): ReputationRecord {
+  const status: ReputationStatus =
+    r.status === 'acceptable' || r.status === 'not_acceptable' || r.status === 'overridden' ? r.status : 'unknown';
+  const score = r.score === null || r.score === undefined ? null : Number(r.score);
   return {
     id: String(r.id),
     email: r.email,
+    status,
+    allowed: r.allowed,
+    trustable: isTrustable(status, score),
+    score,
     reasons: Array.isArray(r.reasons) ? (r.reasons as string[]) : [],
     detail: r.detail,
     overridden: r.overridden_at !== null,
+    checkedAt: isoOrNull(r.checked_at),
     createdAt: iso(r.created_at),
+    updatedAt: iso(r.updated_at),
     data: r.response ?? null,
   };
 }

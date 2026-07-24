@@ -13,6 +13,7 @@ name: Deploy to Vercel
 # - MQTT_INGEST_SECRET
 # - CRON_SECRET (optional)
 # - MQTT_STALE_AFTER_S (optional)
+# - ABSTRACT_EMAIL_REPUTATION_API_KEY (optional; signup email-reputation gate)
 # - SUPER_ADMIN_PASSWORD
 # - ADMIN_PASSWORD
 # - USER_PASSWORD
@@ -45,6 +46,7 @@ jobs:
       MQTT_INGEST_SECRET: ${{ secrets.MQTT_INGEST_SECRET }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       MQTT_STALE_AFTER_S: ${{ secrets.MQTT_STALE_AFTER_S }}
+      ABSTRACT_EMAIL_REPUTATION_API_KEY: ${{ secrets.ABSTRACT_EMAIL_REPUTATION_API_KEY }}
       SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
@@ -123,6 +125,15 @@ jobs:
             echo "MQTT_STALE_AFTER_S is not configured; application default is 15 seconds"
           fi
 
+          # ABSTRACT_EMAIL_REPUTATION_API_KEY is optional: the signup email
+          # reputation gate fails OPEN when it is absent (accounts are still
+          # created, with reputation status 'unknown').
+          if [ -n "$ABSTRACT_EMAIL_REPUTATION_API_KEY" ]; then
+            echo "ABSTRACT_EMAIL_REPUTATION_API_KEY is configured"
+          else
+            echo "ABSTRACT_EMAIL_REPUTATION_API_KEY is not configured; signup email-reputation check fails open (status 'unknown')"
+          fi
+
       # Synchronize GitHub Repository Secrets into the
       # Vercel Production environment.
       #
@@ -165,6 +176,10 @@ jobs:
 
           if [ -n "$MQTT_STALE_AFTER_S" ]; then
             sync_secret "MQTT_STALE_AFTER_S" "$MQTT_STALE_AFTER_S"
+          fi
+
+          if [ -n "$ABSTRACT_EMAIL_REPUTATION_API_KEY" ]; then
+            sync_secret "ABSTRACT_EMAIL_REPUTATION_API_KEY" "$ABSTRACT_EMAIL_REPUTATION_API_KEY"
           fi
 
       # Pull again so the local Vercel build environment contains

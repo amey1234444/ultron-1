@@ -5,11 +5,8 @@ import type { PublicUser } from '../../../lib/roles';
 import { verifyCaptcha } from '../../../server/captcha';
 import { ApiError, sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
-import {
-  addRejectedEmail,
-  checkEmailReputation,
-  findRejectedEmail,
-} from '../../../server/emailReputation';
+import { findReputation } from '../../../server/emailReputation';
+import { drainReputationQueue, enqueueReputationCheck } from '../../../server/reputationQueue';
 import { clientIp, deviceFingerprint } from '../../../server/request';
 import { guardRequest } from '../../../server/security';
 import { recordSecurityAlert } from '../../../server/securityAlerts';
@@ -78,37 +75,23 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
 
     // Email reputation gate. Runs only after the email is confirmed unique.
-    //  1. If it's in the rejected-reputation cache and NOT overridden, reject
-    //     immediately WITHOUT calling the paid API (cost + latency saving).
-    //  2. An overridden cache entry means a super admin cleared it: skip the API
-    //     and let signup proceed, carrying the stored response for the record.
-    //  3. Otherwise call the API; a not-acceptable verdict rejects the signup and
-    //     is cached; acceptable / unknown (provider unavailable) proceeds.
-    let reputation: UserReputation | undefined;
-    const cached = await findRejectedEmail(email);
-    if (cached && !cached.overridden) {
+    // Abstract's free tier allows only 1 request/second, so we NEVER call it
+    // inline here. Instead:
+    //  1. If a stored verdict says not_acceptable (and it wasn't overridden by a
+    //     super admin), reject immediately WITHOUT any API call.
+    //  2. Any other stored verdict (acceptable / overridden / unknown) is reused
+    //     as-is for the new account record.
+    //  3. If the email was never checked, fail OPEN (create as 'unknown') and
+    //     enqueue a rate-limited check; the queue worker fills in the real
+    //     verdict shortly after, and a super admin can also re-check manually.
+    const existing = await findReputation(email);
+    if (existing && existing.status === 'not_acceptable') {
       return res.status(403).json({ error: REPUTATION_REJECTED });
     }
-    if (cached && cached.overridden) {
-      reputation = {
-        status: 'overridden',
-        score: null,
-        checkedAt: new Date().toISOString(),
-        data: cached.data,
-      };
-    } else {
-      const result = await checkEmailReputation(email);
-      if (result.status === 'not_acceptable') {
-        await addRejectedEmail(email, result.reasons, result.data);
-        return res.status(403).json({ error: REPUTATION_REJECTED });
-      }
-      reputation = {
-        status: result.status,
-        score: result.score,
-        checkedAt: result.checkedAt,
-        data: result.data,
-      };
-    }
+    const reputation: UserReputation = existing
+      ? { status: existing.status, score: existing.score, checkedAt: existing.checkedAt, data: existing.data }
+      : { status: 'unknown', score: null, checkedAt: null, data: { queued: true } };
+    const needsCheck = !existing || existing.status === 'unknown';
 
     // createUser re-validates and enforces uniqueness atomically (incl. the
     // concurrent-request race), so it remains the authoritative gate.
@@ -129,6 +112,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         return res.status(409).json({ error: GENERIC_CONFLICT });
       }
       throw err;
+    }
+
+    // Queue a rate-limited reputation check for never-seen emails, then make a
+    // best-effort attempt to drain it now. The single-flight advisory lock means
+    // concurrent signups don't pile up: only one drains, the rest return fast and
+    // leave their job pending for the next drain / a manual re-check.
+    if (needsCheck) {
+      await enqueueReputationCheck(email, 'signup');
+      try {
+        await drainReputationQueue({ maxJobs: 3, maxMs: 4000 });
+      } catch {
+        // Never let queue processing fail the signup — the job stays pending.
+      }
     }
 
     // Intentionally NO session is issued — the account is inactive until approved.
