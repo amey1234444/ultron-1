@@ -2,10 +2,12 @@ import bcrypt from 'bcryptjs';
 
 import {
   isRole,
+  isReputationStatus,
   isUserPermission,
   isUserStatus,
   USER_PERMISSIONS,
   type PublicUser,
+  type ReputationStatus,
   type Role,
   type UserPermission,
   type UserStatus,
@@ -15,7 +17,18 @@ import { ApiError } from './errors';
 
 export { ApiError };
 
-export type StoredUser = PublicUser & { passwordHash: string };
+// `reputationData` holds the complete raw reputation API response for the
+// super-admin detail view. It is intentionally NOT part of PublicUser, so
+// toPublic() strips it alongside the password hash.
+export type StoredUser = PublicUser & { passwordHash: string; reputationData: unknown | null };
+
+// Reputation metadata attached to a user at creation time.
+export type UserReputation = {
+  status: ReputationStatus;
+  score: number | null;
+  checkedAt: string | null;
+  data: unknown | null;
+};
 
 // Pragmatic email shape check: exactly one @, non-empty local/domain parts, and
 // a dotted domain. Deliberately permissive — the goal is to reject obvious junk,
@@ -99,6 +112,10 @@ function buildSeedUser(s: Seed): StoredUser {
     createdAt: now,
     lastLoginAt: null,
     lastSeenAt: null,
+    reputationStatus: 'unknown',
+    reputationScore: null,
+    reputationCheckedAt: null,
+    reputationData: null,
     passwordHash: bcrypt.hashSync(s.password, 10),
   };
 }
@@ -115,7 +132,7 @@ function memStore(): Store {
 // -- shared helpers ---------------------------------------------------------
 
 export function toPublic(u: StoredUser): PublicUser {
-  const { passwordHash: _passwordHash, ...pub } = u;
+  const { passwordHash: _passwordHash, reputationData: _reputationData, ...pub } = u;
   return {
     ...pub,
     permissions: normalizePermissions(pub.permissions, pub.role),
@@ -163,6 +180,10 @@ type UserRow = {
   created_at: Date | string;
   last_login_at: Date | string | null;
   last_seen_at: Date | string | null;
+  reputation_status: string | null;
+  reputation_score: number | string | null;
+  reputation_checked_at: Date | string | null;
+  reputation_data: unknown | null;
 };
 
 function iso(v: Date | string | null): string | null {
@@ -183,14 +204,18 @@ function rowToStored(r: UserRow): StoredUser {
     createdAt: iso(r.created_at) ?? new Date().toISOString(),
     lastLoginAt: iso(r.last_login_at),
     lastSeenAt: iso(r.last_seen_at),
+    reputationStatus: isReputationStatus(r.reputation_status) ? r.reputation_status : 'unknown',
+    reputationScore: r.reputation_score === null || r.reputation_score === undefined ? null : Number(r.reputation_score),
+    reputationCheckedAt: iso(r.reputation_checked_at),
+    reputationData: r.reputation_data ?? null,
     passwordHash: r.password_hash,
   };
 }
 
 async function insertRow(u: StoredUser): Promise<void> {
   await query(
-    `INSERT INTO users (id, username, username_lc, name, email, email_lc, role, status, permissions, password_hash, created_at, last_login_at, last_seen_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13)`,
+    `INSERT INTO users (id, username, username_lc, name, email, email_lc, role, status, permissions, password_hash, created_at, last_login_at, last_seen_at, reputation_status, reputation_score, reputation_checked_at, reputation_data)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb)`,
     [
       u.id,
       u.username,
@@ -205,6 +230,10 @@ async function insertRow(u: StoredUser): Promise<void> {
       u.createdAt,
       u.lastLoginAt,
       u.lastSeenAt,
+      u.reputationStatus,
+      u.reputationScore,
+      u.reputationCheckedAt,
+      JSON.stringify(u.reputationData ?? null),
     ],
   );
 }
@@ -282,6 +311,7 @@ export type CreateUserInput = {
   password: string;
   permissions?: UserPermission[];
   status?: UserStatus;
+  reputation?: UserReputation;
 };
 
 export async function createUser(input: CreateUserInput): Promise<PublicUser> {
@@ -312,6 +342,10 @@ export async function createUser(input: CreateUserInput): Promise<PublicUser> {
     createdAt: now,
     lastLoginAt: null,
     lastSeenAt: null,
+    reputationStatus: input.reputation?.status ?? 'unknown',
+    reputationScore: input.reputation?.score ?? null,
+    reputationCheckedAt: input.reputation?.checkedAt ?? null,
+    reputationData: input.reputation?.data ?? null,
     passwordHash: await bcrypt.hash(input.password, 10),
   };
 
@@ -429,6 +463,20 @@ export async function deleteUser(userId: string): Promise<void> {
     return;
   }
   await query('DELETE FROM users WHERE id = $1', [userId]);
+}
+
+// Full reputation record (including the complete raw API response) for a single
+// user. Restricted to super admins at the route layer — the raw response can
+// contain breach / risk data that must not reach ordinary callers.
+export async function getUserReputation(userId: string): Promise<UserReputation | null> {
+  const user = await findById(userId);
+  if (!user) return null;
+  return {
+    status: user.reputationStatus,
+    score: user.reputationScore,
+    checkedAt: user.reputationCheckedAt,
+    data: user.reputationData ?? null,
+  };
 }
 
 

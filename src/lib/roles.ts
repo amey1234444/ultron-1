@@ -69,7 +69,24 @@ export type PublicUser = {
   // "online" status and last-seen times in User Management.
   lastLoginAt: string | null;
   lastSeenAt: string | null;
+  // Email reputation verdict from the signup-time check (Abstract Email
+  // Reputation API). The full API response is NOT included here — it is fetched
+  // separately through a super-admin-only endpoint — so this stays safe for the
+  // general (any-authenticated-user) directory read.
+  reputationStatus: ReputationStatus;
+  reputationScore: number | null;
+  reputationCheckedAt: string | null;
 };
+
+// Verdict of the signup-time email reputation check. `unknown` covers accounts
+// created before the feature and signups where the provider was unavailable
+// (fail-open); `overridden` is a manual super-admin approval of a rejected email.
+export const REPUTATION_STATUSES = ['acceptable', 'not_acceptable', 'unknown', 'overridden'] as const;
+export type ReputationStatus = (typeof REPUTATION_STATUSES)[number];
+
+export function isReputationStatus(value: unknown): value is ReputationStatus {
+  return typeof value === 'string' && (REPUTATION_STATUSES as readonly string[]).includes(value);
+}
 
 export function userHasPermission(user: Pick<PublicUser, 'role' | 'permissions'> | null | undefined, permission: UserPermission): boolean {
   if (!user) return false;

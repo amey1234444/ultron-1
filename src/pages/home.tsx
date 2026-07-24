@@ -204,14 +204,21 @@ export default function HomePage() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          padding: scrolled ? '11px clamp(20px, 6vw, 72px)' : '20px clamp(20px, 6vw, 72px)',
-          backdropFilter: scrolled ? 'blur(18px) saturate(160%)' : 'blur(0px)',
-          WebkitBackdropFilter: scrolled ? 'blur(18px) saturate(160%)' : 'blur(0px)',
+          padding: scrolled ? '11px clamp(20px, 6vw, 72px)' : '18px clamp(20px, 6vw, 72px)',
+          // Glassy from the very top: a lighter, more transparent frosted panel at
+          // rest that condenses into a denser frosted bar once you scroll.
+          backdropFilter: scrolled ? 'blur(22px) saturate(180%)' : 'blur(14px) saturate(150%)',
+          WebkitBackdropFilter: scrolled ? 'blur(22px) saturate(180%)' : 'blur(14px) saturate(150%)',
           background: scrolled
-            ? 'linear-gradient(180deg, rgba(18,18,18,0.72), rgba(10,10,10,0.48))'
-            : 'transparent',
-          borderBottom: `1px solid ${scrolled ? 'rgba(255,255,255,0.08)' : 'transparent'}`,
-          boxShadow: scrolled ? '0 1px 0 rgba(255,255,255,0.05) inset, 0 8px 30px rgba(0,0,0,0.28)' : 'none',
+            ? 'linear-gradient(180deg, rgba(20,20,20,0.78), rgba(10,10,10,0.52))'
+            : 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 55%, rgba(201,161,92,0.06))',
+          borderBottom: `1px solid ${scrolled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.10)'}`,
+          // A bright hairline top highlight + soft glow gives the glass a glossy,
+          // reflective sheen even at rest (when the near-black hero sits behind it);
+          // the drop shadow deepens on scroll to lift the bar off the page.
+          boxShadow: scrolled
+            ? '0 1px 0 rgba(255,255,255,0.08) inset, 0 8px 30px rgba(0,0,0,0.32)'
+            : '0 1px 0 rgba(255,255,255,0.14) inset, 0 -1px 0 rgba(201,161,92,0.10) inset, 0 6px 24px rgba(0,0,0,0.18)',
           transition:
             'padding 0.35s cubic-bezier(0.22,1,0.36,1), background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease',
         }}

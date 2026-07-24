@@ -13,6 +13,7 @@ import {
   USER_PERMISSIONS,
   userHasPermission,
   type PublicUser,
+  type ReputationStatus,
   type Role,
   type UserStatus,
 } from '../lib/roles';
@@ -59,6 +60,22 @@ function AccountStatusBadge({ status }: { status: UserStatus }) {
       <Text className={`font-body-medium text-[11px] uppercase tracking-wide ${tone.split(' ')[1]}`}>
         {STATUS_LABEL[status]}
       </Text>
+    </View>
+  );
+}
+
+const REPUTATION_BADGE: Record<ReputationStatus, { label: string; tone: string }> = {
+  acceptable: { label: '✅ Acceptable', tone: 'border-status-success/50 text-status-success' },
+  overridden: { label: '✅ Overridden', tone: 'border-status-success/50 text-status-success' },
+  not_acceptable: { label: '❌ Not acceptable', tone: 'border-status-critical/60 text-status-critical' },
+  unknown: { label: '— Unchecked', tone: 'border-line-dark text-ink-muted' },
+};
+
+function ReputationBadge({ status }: { status: ReputationStatus }) {
+  const m = REPUTATION_BADGE[status] ?? REPUTATION_BADGE.unknown;
+  return (
+    <View className={`rounded-full border px-2 py-0.5 ${m.tone.split(' ')[0]}`}>
+      <Text className={`font-body-medium text-[11px] ${m.tone.split(' ')[1]}`}>{m.label}</Text>
     </View>
   );
 }
@@ -336,6 +353,118 @@ function SecurityAlertsPanel({
   );
 }
 
+// --- rejected email reputation panel ---------------------------------------
+
+type RejectedEmail = {
+  id: string;
+  email: string;
+  reasons: string[];
+  detail: string;
+  overridden: boolean;
+  createdAt: string;
+  data: unknown | null;
+};
+
+function RejectedEmailsPanel({
+  rejected,
+  loading,
+  busy,
+  now,
+  onRefresh,
+  onOverride,
+  onDelete,
+  onClose,
+}: {
+  rejected: RejectedEmail[];
+  loading: boolean;
+  busy: boolean;
+  now: number;
+  onRefresh: () => void;
+  onOverride: (id: string) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+}) {
+  const [expanded, setExpanded] = useState<string | null>(null);
+  return (
+    <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
+      <View className="flex-row flex-wrap items-start justify-between gap-2">
+        <View className="min-w-[180px] flex-1">
+          <Text className="font-body-bold text-sm text-ink">Rejected Emails (Reputation ❌)</Text>
+          <Text className="mt-1 font-body text-xs text-ink-muted">
+            Emails barred by the reputation check. Approve to override (re-enable signup), or Delete to remove the record.
+          </Text>
+        </View>
+        <View className="flex-row flex-wrap gap-2">
+          <Pressable onPress={onRefresh} className="rounded-lg border border-line-dark px-3 py-1.5">
+            <Text className="font-body-medium text-xs text-ink">Refresh</Text>
+          </Pressable>
+          <Pressable onPress={onClose} className="rounded-lg border border-line-dark px-3 py-1.5">
+            <Text className="font-body-medium text-xs text-ink">Close</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {loading ? (
+        <View className="items-center py-6">
+          <ActivityIndicator color="#F5F5F5" />
+        </View>
+      ) : rejected.length === 0 ? (
+        <Text className="mt-4 font-body text-sm text-ink-muted">No rejected emails.</Text>
+      ) : (
+        <View className="mt-3">
+          {rejected.map((r, i) => (
+            <View key={r.id} className={`gap-1 py-3 ${i > 0 ? 'border-t border-line-dark' : ''}`}>
+              <View className="flex-row flex-wrap items-center gap-2">
+                <Text className="font-body-bold text-sm text-ink">{r.email}</Text>
+                {r.overridden ? (
+                  <View className="rounded-full border border-status-success/50 px-2 py-0.5">
+                    <Text className="font-body-medium text-[11px] text-status-success">Overridden</Text>
+                  </View>
+                ) : (
+                  <View className="rounded-full border border-status-critical/60 px-2 py-0.5">
+                    <Text className="font-body-medium text-[11px] text-status-critical">Not acceptable</Text>
+                  </View>
+                )}
+                <Text className="font-body text-[11px] text-ink-muted">{timeAgo(r.createdAt, now)}</Text>
+              </View>
+              {r.detail ? <Text className="font-body text-xs text-ink-muted">{r.detail}</Text> : null}
+              <View className="mt-1 flex-row flex-wrap gap-2">
+                <Pressable
+                  onPress={() => setExpanded((e) => (e === r.id ? null : r.id))}
+                  className="rounded-lg border border-line-dark px-3 py-1.5"
+                >
+                  <Text className="font-body-medium text-xs text-ink">{expanded === r.id ? 'Hide details' : 'View details'}</Text>
+                </Pressable>
+                {!r.overridden ? (
+                  <Pressable
+                    onPress={busy ? undefined : () => onOverride(r.id)}
+                    className={`rounded-lg border border-status-success px-3 py-1.5 ${busy ? 'opacity-50' : ''}`}
+                  >
+                    <Text className="font-body-medium text-xs text-status-success">Approve (override)</Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  onPress={busy ? undefined : () => onDelete(r.id)}
+                  className={`rounded-lg border border-status-critical px-3 py-1.5 ${busy ? 'opacity-50' : ''}`}
+                >
+                  <Text className="font-body-medium text-xs text-status-critical">Delete</Text>
+                </Pressable>
+              </View>
+              {expanded === r.id ? (
+                <ScrollView horizontal className="mt-2 max-h-64 rounded-lg border border-line-dark bg-surface-dark">
+                  <Text className="p-3 font-mono text-[11px] text-ink-muted">
+                    {r.data ? JSON.stringify(r.data, null, 2) : 'No stored API response.'}
+                  </Text>
+                </ScrollView>
+              ) : null}
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // --- main screen -----------------------------------------------------------
 
 function UsersScreenInner() {
@@ -355,6 +484,17 @@ function UsersScreenInner() {
   const [alertsLoading, setAlertsLoading] = useState(true);
   const [alertsBusy, setAlertsBusy] = useState(false);
   const [showAlarms, setShowAlarms] = useState(false);
+
+  const [rejected, setRejected] = useState<RejectedEmail[]>([]);
+  const [rejectedActive, setRejectedActive] = useState(0);
+  const [rejectedLoading, setRejectedLoading] = useState(true);
+  const [rejectedBusy, setRejectedBusy] = useState(false);
+  const [showRejected, setShowRejected] = useState(false);
+
+  // Full reputation detail for a single user, fetched on demand (super-admin
+  // endpoint) and shown inline. Keyed by user id.
+  const [repDetail, setRepDetail] = useState<Record<string, unknown>>({});
+  const [repOpen, setRepOpen] = useState<string | null>(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -399,10 +539,80 @@ function UsersScreenInner() {
     }
   }, []);
 
+  const loadRejected = useCallback(async (silent = false) => {
+    if (!silent) setRejectedLoading(true);
+    try {
+      const res = await apiFetch('/api/reputation/rejected');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load rejected emails.');
+      setRejected(data.rejected as RejectedEmail[]);
+      setRejectedActive(Number(data.active) || 0);
+    } catch {
+      /* non-critical */
+    } finally {
+      if (!silent) setRejectedLoading(false);
+    }
+  }, []);
+
+  const overrideRejected = useCallback(
+    async (id: string) => {
+      setRejectedBusy(true);
+      try {
+        const res = await apiFetch('/api/reputation/rejected', { method: 'POST', body: JSON.stringify({ id }) });
+        const data = await res.json();
+        if (res.ok) {
+          setRejected(data.rejected as RejectedEmail[]);
+          setRejectedActive(Number(data.active) || 0);
+        }
+      } finally {
+        setRejectedBusy(false);
+      }
+    },
+    [],
+  );
+
+  const deleteRejected = useCallback(
+    async (id: string) => {
+      setRejectedBusy(true);
+      try {
+        const res = await apiFetch('/api/reputation/rejected', { method: 'DELETE', body: JSON.stringify({ id }) });
+        const data = await res.json();
+        if (res.ok) {
+          setRejected(data.rejected as RejectedEmail[]);
+          setRejectedActive(Number(data.active) || 0);
+        }
+      } finally {
+        setRejectedBusy(false);
+      }
+    },
+    [],
+  );
+
+  const toggleReputation = useCallback(
+    async (userId: string) => {
+      if (repOpen === userId) {
+        setRepOpen(null);
+        return;
+      }
+      setRepOpen(userId);
+      if (!(userId in repDetail)) {
+        try {
+          const res = await apiFetch(`/api/reputation/user?id=${encodeURIComponent(userId)}`);
+          const data = await res.json();
+          if (res.ok) setRepDetail((prev) => ({ ...prev, [userId]: data.reputation }));
+        } catch {
+          /* leave undefined; UI shows unavailable */
+        }
+      }
+    },
+    [repOpen, repDetail],
+  );
+
   useEffect(() => {
     void load();
     void loadAlerts();
-  }, [load, loadAlerts]);
+    void loadRejected();
+  }, [load, loadAlerts, loadRejected]);
 
   // Keep statuses live: re-fetch the directory and advance the clock so
   // online/last-seen labels stay accurate without a manual refresh.
@@ -410,13 +620,14 @@ function UsersScreenInner() {
     const poll = setInterval(() => {
       void load(true);
       void loadAlerts(true);
+      void loadRejected(true);
     }, 30_000);
     const tick = setInterval(() => setNow(Date.now()), 15_000);
     return () => {
       clearInterval(poll);
       clearInterval(tick);
     };
-  }, [load, loadAlerts]);
+  }, [load, loadAlerts, loadRejected]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -541,6 +752,24 @@ function UsersScreenInner() {
               </View>
             ) : null}
           </Pressable>
+          <Pressable
+            onPress={() => {
+              setShowRejected((s) => !s);
+              void loadRejected();
+            }}
+            className={`flex-row items-center gap-2 rounded-lg border px-3 py-1.5 ${
+              rejectedActive > 0 ? 'border-status-critical bg-status-critical/10' : 'border-line-dark'
+            }`}
+          >
+            <Text className={`font-body-medium text-xs ${rejectedActive > 0 ? 'text-status-critical' : 'text-ink'}`}>
+              Rejected Emails
+            </Text>
+            {rejectedActive > 0 ? (
+              <View className="min-w-[18px] items-center rounded-full bg-status-critical px-1.5 py-0.5">
+                <Text className="font-body-bold text-[10px] text-ink-inverse">{rejectedActive > 99 ? '99+' : rejectedActive}</Text>
+              </View>
+            ) : null}
+          </Pressable>
           <Pressable onPress={() => router.push('/')} className="rounded-lg border border-line-dark px-3 py-1.5">
             <Text className="font-body-medium text-xs text-ink">Back to Studio</Text>
           </Pressable>
@@ -558,6 +787,19 @@ function UsersScreenInner() {
             onRefresh={() => void loadAlerts()}
             onAcknowledge={() => void acknowledgeAlerts()}
             onClose={() => setShowAlarms(false)}
+          />
+        ) : null}
+
+        {showRejected ? (
+          <RejectedEmailsPanel
+            rejected={rejected}
+            loading={rejectedLoading}
+            busy={rejectedBusy}
+            now={now}
+            onRefresh={() => void loadRejected()}
+            onOverride={(id) => void overrideRejected(id)}
+            onDelete={(id) => void deleteRejected(id)}
+            onClose={() => setShowRejected(false)}
           />
         ) : null}
 
@@ -654,69 +896,96 @@ function UsersScreenInner() {
             </View>
           ) : (
             sorted.map((u, i) => (
-              <View
-                key={u.id}
-                className={`flex-row flex-wrap items-center justify-between gap-3 px-4 py-3 ${i > 0 ? 'border-t border-line-dark' : ''}`}
-              >
-                <View className="min-w-[160px] flex-1">
-                  <View className="flex-row flex-wrap items-center gap-2">
-                    <Text className="font-body-bold text-sm text-ink">{u.name}</Text>
-                    <View className="rounded-full bg-accent-soft px-2 py-0.5">
-                      <Text className="font-body-medium text-[11px] uppercase tracking-wide text-accent">{ROLE_LABEL[u.role]}</Text>
-                    </View>
-                    <AccountStatusBadge status={u.status} />
-                    {me?.id === u.id ? <Text className="font-body text-[11px] text-ink-muted">(you)</Text> : null}
-                    {userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE) ? (
-                      <View className="rounded-full border border-line-dark px-2 py-0.5">
-                        <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Schema Access</Text>
+              <View key={u.id} className={i > 0 ? 'border-t border-line-dark' : ''}>
+                <View className="flex-row flex-wrap items-center justify-between gap-3 px-4 py-3">
+                  <View className="min-w-[160px] flex-1">
+                    <View className="flex-row flex-wrap items-center gap-2">
+                      <Text className="font-body-bold text-sm text-ink">{u.name}</Text>
+                      <View className="rounded-full bg-accent-soft px-2 py-0.5">
+                        <Text className="font-body-medium text-[11px] uppercase tracking-wide text-accent">{ROLE_LABEL[u.role]}</Text>
                       </View>
-                    ) : null}
+                      <AccountStatusBadge status={u.status} />
+                      <ReputationBadge status={u.reputationStatus} />
+                      {me?.id === u.id ? <Text className="font-body text-[11px] text-ink-muted">(you)</Text> : null}
+                      {userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE) ? (
+                        <View className="rounded-full border border-line-dark px-2 py-0.5">
+                          <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Schema Access</Text>
+                        </View>
+                      ) : null}
+                    </View>
+                    <Text className="mt-0.5 font-body text-xs text-ink-muted">
+                      @{u.username}
+                      {u.email ? ` · ${u.email}` : ''}
+                    </Text>
+                    <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
+                      <StatusPill user={u} now={now} />
+                      <Text className="font-body text-[11px] text-ink-muted">Last login: {timeAgo(u.lastLoginAt, now)}</Text>
+                    </View>
                   </View>
-                  <Text className="mt-0.5 font-body text-xs text-ink-muted">
-                    @{u.username}
-                    {u.email ? ` · ${u.email}` : ''}
-                  </Text>
-                  <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
-                    <StatusPill user={u} now={now} />
-                    <Text className="font-body text-[11px] text-ink-muted">Last login: {timeAgo(u.lastLoginAt, now)}</Text>
+
+                  <View className="flex-row flex-wrap gap-2">
+                    {u.status === 'pending' ? (
+                      <Pressable
+                        onPress={busy ? undefined : () => setStatus(u, 'active')}
+                        className="rounded-lg border border-status-success px-3 py-1.5"
+                      >
+                        <Text className="font-body-medium text-xs text-status-success">Approve</Text>
+                      </Pressable>
+                    ) : null}
+                    {u.status === 'active' && me?.id !== u.id ? (
+                      <Pressable
+                        onPress={busy ? undefined : () => setStatus(u, 'disabled')}
+                        className="rounded-lg border border-status-warning px-3 py-1.5"
+                      >
+                        <Text className="font-body-medium text-xs text-status-warning">Suspend</Text>
+                      </Pressable>
+                    ) : null}
+                    {u.status === 'disabled' ? (
+                      <Pressable
+                        onPress={busy ? undefined : () => setStatus(u, 'active')}
+                        className="rounded-lg border border-status-success px-3 py-1.5"
+                      >
+                        <Text className="font-body-medium text-xs text-status-success">Reactivate</Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable
+                      onPress={() => void toggleReputation(u.id)}
+                      className="rounded-lg border border-line-dark px-3 py-1.5"
+                    >
+                      <Text className="font-body-medium text-xs text-ink">
+                        {repOpen === u.id ? 'Hide reputation' : 'Reputation'}
+                      </Text>
+                    </Pressable>
+                    <Pressable onPress={() => startEdit(u)} className="rounded-lg border border-line-dark px-3 py-1.5">
+                      <Text className="font-body-medium text-xs text-ink">Edit</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={busy || me?.id === u.id ? undefined : () => remove(u)}
+                      className={`rounded-lg border border-status-critical px-3 py-1.5 ${me?.id === u.id ? 'opacity-40' : ''}`}
+                    >
+                      <Text className="font-body-medium text-xs text-status-critical">Delete</Text>
+                    </Pressable>
                   </View>
                 </View>
 
-                <View className="flex-row flex-wrap gap-2">
-                  {u.status === 'pending' ? (
-                    <Pressable
-                      onPress={busy ? undefined : () => setStatus(u, 'active')}
-                      className="rounded-lg border border-status-success px-3 py-1.5"
-                    >
-                      <Text className="font-body-medium text-xs text-status-success">Approve</Text>
-                    </Pressable>
-                  ) : null}
-                  {u.status === 'active' && me?.id !== u.id ? (
-                    <Pressable
-                      onPress={busy ? undefined : () => setStatus(u, 'disabled')}
-                      className="rounded-lg border border-status-warning px-3 py-1.5"
-                    >
-                      <Text className="font-body-medium text-xs text-status-warning">Suspend</Text>
-                    </Pressable>
-                  ) : null}
-                  {u.status === 'disabled' ? (
-                    <Pressable
-                      onPress={busy ? undefined : () => setStatus(u, 'active')}
-                      className="rounded-lg border border-status-success px-3 py-1.5"
-                    >
-                      <Text className="font-body-medium text-xs text-status-success">Reactivate</Text>
-                    </Pressable>
-                  ) : null}
-                  <Pressable onPress={() => startEdit(u)} className="rounded-lg border border-line-dark px-3 py-1.5">
-                    <Text className="font-body-medium text-xs text-ink">Edit</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={busy || me?.id === u.id ? undefined : () => remove(u)}
-                    className={`rounded-lg border border-status-critical px-3 py-1.5 ${me?.id === u.id ? 'opacity-40' : ''}`}
-                  >
-                    <Text className="font-body-medium text-xs text-status-critical">Delete</Text>
-                  </Pressable>
-                </View>
+                {repOpen === u.id ? (
+                  <View className="px-4 pb-3">
+                    <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">
+                      Reputation: {REPUTATION_BADGE[u.reputationStatus]?.label ?? u.reputationStatus}
+                      {u.reputationScore !== null ? ` · score ${u.reputationScore}` : ''}
+                      {u.reputationCheckedAt ? ` · checked ${timeAgo(u.reputationCheckedAt, now)}` : ''}
+                    </Text>
+                    <ScrollView horizontal className="mt-2 max-h-64 rounded-lg border border-line-dark bg-surface-dark">
+                      <Text className="p-3 font-mono text-[11px] text-ink-muted">
+                        {(() => {
+                          const rep = repDetail[u.id] as { data?: unknown } | undefined;
+                          if (!(u.id in repDetail)) return 'Loading…';
+                          return rep?.data ? JSON.stringify(rep.data, null, 2) : 'No stored API response for this user.';
+                        })()}
+                      </Text>
+                    </ScrollView>
+                  </View>
+                ) : null}
               </View>
             ))
           )}

@@ -227,6 +227,31 @@ async function migrate(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS security_alerts_recent ON security_alerts (created_at DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS security_alerts_dedup ON security_alerts (kind, email, ip, bucket, created_at);`);
 
+  // Email reputation gate (Abstract Email Reputation API). Accepted signups
+  // carry their reputation verdict + full API response on the users row so the
+  // super admin can review it. See server/emailReputation.ts.
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reputation_status TEXT NOT NULL DEFAULT 'unknown';`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reputation_score DOUBLE PRECISION;`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reputation_checked_at TIMESTAMPTZ;`);
+  await query(`ALTER TABLE users ADD COLUMN IF NOT EXISTS reputation_data JSONB;`);
+
+  // Emails whose reputation was judged not-acceptable. Checked BEFORE calling the
+  // paid API on future signups (a hit short-circuits and rejects without a call).
+  // `overridden_at` records a manual super-admin override that re-enables signup.
+  await query(`
+    CREATE TABLE IF NOT EXISTS rejected_email_reputation (
+      id            BIGSERIAL PRIMARY KEY,
+      email         TEXT NOT NULL DEFAULT '',
+      email_lc      TEXT NOT NULL UNIQUE,
+      reasons       JSONB NOT NULL DEFAULT '[]'::jsonb,
+      detail        TEXT NOT NULL DEFAULT '',
+      response      JSONB,
+      overridden_at TIMESTAMPTZ,
+      created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS rejected_email_reputation_recent ON rejected_email_reputation (created_at DESC);`);
+
   // --- Studio workspace (asset hierarchy + canvas layouts) -----------------
   // The whole hierarchy shown in the left rail is durable and shared across all
   // authenticated users, so an edit by one user is visible to everyone. Deep,
