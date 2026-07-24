@@ -4,6 +4,12 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
+        {/* Defense-in-depth anti-clickjacking guard (runs before render). The
+            primary protection is the X-Frame-Options / CSP frame-ancestors
+            headers in next.config.js; this same-origin script is a fallback that
+            keeps the app from rendering inside a frame even if those headers are
+            ever stripped by an intermediary or a mis-serving host. */}
+        <script src="/anti-clickjack.js" />
         {/* Landing-page typography: sharp display plus premium UI faces, loaded
             from Google Fonts for the web pages. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />

@@ -237,6 +237,105 @@ function RateLimitsPanel() {
   );
 }
 
+// --- security alarms panel -------------------------------------------------
+
+type SecurityAlertKind = 'duplicate_email' | 'rate_limit';
+type SecurityAlert = {
+  id: string;
+  kind: SecurityAlertKind;
+  email: string;
+  ip: string;
+  device: string;
+  bucket: string;
+  detail: string;
+  acknowledged: boolean;
+  createdAt: string;
+};
+
+function alertTitle(a: SecurityAlert): string {
+  if (a.kind === 'duplicate_email') return 'Repeated signup with an existing email';
+  if (a.bucket === 'signup') return 'Signup attempts exceeded the limit';
+  if (a.bucket === 'login') return 'Login rate limit exceeded';
+  return 'API rate limit exceeded';
+}
+
+function SecurityAlertsPanel({
+  alerts,
+  unacknowledged,
+  loading,
+  busy,
+  now,
+  onRefresh,
+  onAcknowledge,
+  onClose,
+}: {
+  alerts: SecurityAlert[];
+  unacknowledged: number;
+  loading: boolean;
+  busy: boolean;
+  now: number;
+  onRefresh: () => void;
+  onAcknowledge: () => void;
+  onClose: () => void;
+}) {
+  return (
+    <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
+      <View className="flex-row flex-wrap items-start justify-between gap-2">
+        <View className="min-w-[180px] flex-1">
+          <Text className="font-body-bold text-sm text-ink">User Alarms</Text>
+          <Text className="mt-1 font-body text-xs text-ink-muted">
+            Repeated duplicate-email signups and rate-limit / signup-limit breaches.
+          </Text>
+        </View>
+        <View className="flex-row flex-wrap gap-2">
+          <Pressable onPress={onRefresh} className="rounded-lg border border-line-dark px-3 py-1.5">
+            <Text className="font-body-medium text-xs text-ink">Refresh</Text>
+          </Pressable>
+          <Pressable
+            onPress={busy || unacknowledged === 0 ? undefined : onAcknowledge}
+            className={`rounded-lg border border-line-dark px-3 py-1.5 ${busy || unacknowledged === 0 ? 'opacity-40' : ''}`}
+          >
+            <Text className="font-body-medium text-xs text-ink">Mark all read</Text>
+          </Pressable>
+          <Pressable onPress={onClose} className="rounded-lg border border-line-dark px-3 py-1.5">
+            <Text className="font-body-medium text-xs text-ink">Close</Text>
+          </Pressable>
+        </View>
+      </View>
+
+      {loading ? (
+        <View className="items-center py-6">
+          <ActivityIndicator color="#F5F5F5" />
+        </View>
+      ) : alerts.length === 0 ? (
+        <Text className="mt-4 font-body text-sm text-ink-muted">No security alarms. All clear.</Text>
+      ) : (
+        <View className="mt-3">
+          {alerts.map((a, i) => (
+            <View key={a.id} className={`gap-1 py-3 ${i > 0 ? 'border-t border-line-dark' : ''}`}>
+              <View className="flex-row flex-wrap items-center gap-2">
+                {!a.acknowledged ? <View className="h-2 w-2 rounded-full bg-status-critical" /> : null}
+                <Text className="font-body-bold text-sm text-ink">{alertTitle(a)}</Text>
+                <View className="rounded-full border border-line-dark px-2 py-0.5">
+                  <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">
+                    {a.kind === 'duplicate_email' ? 'Duplicate email' : 'Rate limit'}
+                  </Text>
+                </View>
+              </View>
+              {a.detail ? <Text className="font-body text-xs text-ink-muted">{a.detail}</Text> : null}
+              <View className="flex-row flex-wrap gap-3">
+                {a.email ? <Text className="font-body text-[11px] text-ink-muted">Email: {a.email}</Text> : null}
+                {a.ip ? <Text className="font-body text-[11px] text-ink-muted">IP: {a.ip}</Text> : null}
+                <Text className="font-body text-[11px] text-ink-muted">{timeAgo(a.createdAt, now)}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
 // --- main screen -----------------------------------------------------------
 
 function UsersScreenInner() {
@@ -250,6 +349,12 @@ function UsersScreenInner() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [now, setNow] = useState(() => Date.now());
+
+  const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
+  const [alertsUnack, setAlertsUnack] = useState(0);
+  const [alertsLoading, setAlertsLoading] = useState(true);
+  const [alertsBusy, setAlertsBusy] = useState(false);
+  const [showAlarms, setShowAlarms] = useState(false);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -265,20 +370,53 @@ function UsersScreenInner() {
     }
   }, []);
 
+  const loadAlerts = useCallback(async (silent = false) => {
+    if (!silent) setAlertsLoading(true);
+    try {
+      const res = await apiFetch('/api/security/alerts');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load alarms.');
+      setAlerts(data.alerts as SecurityAlert[]);
+      setAlertsUnack(Number(data.unacknowledged) || 0);
+    } catch {
+      /* non-critical: leave the last-known alarms in place */
+    } finally {
+      if (!silent) setAlertsLoading(false);
+    }
+  }, []);
+
+  const acknowledgeAlerts = useCallback(async () => {
+    setAlertsBusy(true);
+    try {
+      const res = await apiFetch('/api/security/alerts', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        setAlerts(data.alerts as SecurityAlert[]);
+        setAlertsUnack(Number(data.unacknowledged) || 0);
+      }
+    } finally {
+      setAlertsBusy(false);
+    }
+  }, []);
+
   useEffect(() => {
     void load();
-  }, [load]);
+    void loadAlerts();
+  }, [load, loadAlerts]);
 
   // Keep statuses live: re-fetch the directory and advance the clock so
   // online/last-seen labels stay accurate without a manual refresh.
   useEffect(() => {
-    const poll = setInterval(() => void load(true), 30_000);
+    const poll = setInterval(() => {
+      void load(true);
+      void loadAlerts(true);
+    }, 30_000);
     const tick = setInterval(() => setNow(Date.now()), 15_000);
     return () => {
       clearInterval(poll);
       clearInterval(tick);
     };
-  }, [load]);
+  }, [load, loadAlerts]);
 
   const resetForm = () => {
     setEditingId(null);
@@ -382,14 +520,47 @@ function UsersScreenInner() {
 
   return (
     <View className="flex-1 bg-surface-dark">
-      <View className="flex-row items-center justify-between border-b border-line-dark px-4 py-3">
+      <View className="flex-row flex-wrap items-center justify-between gap-2 border-b border-line-dark px-4 py-3">
         <Text className="font-heading-medium text-lg text-ink">User Management</Text>
-        <Pressable onPress={() => router.push('/')} className="rounded-lg border border-line-dark px-3 py-1.5">
-          <Text className="font-body-medium text-xs text-ink">Back to Studio</Text>
-        </Pressable>
+        <View className="flex-row flex-wrap items-center gap-2">
+          <Pressable
+            onPress={() => {
+              setShowAlarms((s) => !s);
+              void loadAlerts();
+            }}
+            className={`flex-row items-center gap-2 rounded-lg border px-3 py-1.5 ${
+              alertsUnack > 0 ? 'border-status-critical bg-status-critical/10' : 'border-line-dark'
+            }`}
+          >
+            <Text className={`font-body-medium text-xs ${alertsUnack > 0 ? 'text-status-critical' : 'text-ink'}`}>
+              User Alarms
+            </Text>
+            {alertsUnack > 0 ? (
+              <View className="min-w-[18px] items-center rounded-full bg-status-critical px-1.5 py-0.5">
+                <Text className="font-body-bold text-[10px] text-ink-inverse">{alertsUnack > 99 ? '99+' : alertsUnack}</Text>
+              </View>
+            ) : null}
+          </Pressable>
+          <Pressable onPress={() => router.push('/')} className="rounded-lg border border-line-dark px-3 py-1.5">
+            <Text className="font-body-medium text-xs text-ink">Back to Studio</Text>
+          </Pressable>
+        </View>
       </View>
 
       <ScrollView contentContainerClassName="p-4 gap-6" className="flex-1">
+        {showAlarms ? (
+          <SecurityAlertsPanel
+            alerts={alerts}
+            unacknowledged={alertsUnack}
+            loading={alertsLoading}
+            busy={alertsBusy}
+            now={now}
+            onRefresh={() => void loadAlerts()}
+            onAcknowledge={() => void acknowledgeAlerts()}
+            onClose={() => setShowAlarms(false)}
+          />
+        ) : null}
+
         {pendingCount > 0 ? (
           <View className="rounded-xl border border-status-warning/50 bg-status-warning/10 px-4 py-3">
             <Text className="font-body-medium text-sm text-status-warning">

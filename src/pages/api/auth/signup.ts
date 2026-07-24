@@ -1,10 +1,18 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import type { PublicUser } from '../../../lib/roles';
 import { verifyCaptcha } from '../../../server/captcha';
-import { sendApiError } from '../../../server/errors';
+import { ApiError, sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
+import { clientIp, deviceFingerprint } from '../../../server/request';
 import { guardRequest } from '../../../server/security';
+import { recordSecurityAlert } from '../../../server/securityAlerts';
 import { createUser, findByEmail, findByUsername } from '../../../server/users';
+
+// Non-revealing response for any state that would confirm whether an
+// identifier is already taken (username or email). Prevents account
+// enumeration while still failing the request.
+const GENERIC_CONFLICT = 'Registration could not be completed. Please check your details and try again.';
 
 // Public self-service sign-up. New accounts:
 //  - always get the lowest ('user') role regardless of any client-supplied value,
@@ -32,22 +40,40 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(400).json({ error: 'CAPTCHA verification failed. Please try again.' });
     }
     if (await findByUsername(username)) {
-      return res.status(409).json({ error: 'Username already exists.' });
+      return res.status(409).json({ error: GENERIC_CONFLICT });
     }
     if (await findByEmail(email)) {
-      return res.status(409).json({ error: 'An account with this email already exists.' });
+      // Repeated attempts to register an already-known email are a signal of
+      // account probing / mass-signup abuse — surface it to super admins.
+      await recordSecurityAlert({
+        kind: 'duplicate_email',
+        email,
+        ip: clientIp(req),
+        device: deviceFingerprint(req),
+        detail: 'Signup attempted with an email that is already registered.',
+      });
+      return res.status(409).json({ error: GENERIC_CONFLICT });
     }
 
     // createUser re-validates and enforces uniqueness atomically (incl. the
     // concurrent-request race), so it remains the authoritative gate.
-    const user = await createUser({
-      username,
-      name: name || username,
-      email,
-      role: 'user',
-      password,
-      status: 'pending',
-    });
+    let user: PublicUser;
+    try {
+      user = await createUser({
+        username,
+        name: name || username,
+        email,
+        role: 'user',
+        password,
+        status: 'pending',
+      });
+    } catch (err) {
+      // Collapse the atomic-uniqueness 409 into the same non-revealing message.
+      if (err instanceof ApiError && err.status === 409) {
+        return res.status(409).json({ error: GENERIC_CONFLICT });
+      }
+      throw err;
+    }
 
     // Intentionally NO session is issued — the account is inactive until approved.
     return res.status(201).json({

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 
 import { isDbEnabled, query } from './db';
 import { clientIp, deviceFingerprint } from './request';
+import { recordSecurityAlert } from './securityAlerts';
 import { DEFAULT_RATE_LIMITS, getRateLimits, type RateRule } from './settings';
 import { ApiError } from './users';
 
@@ -108,6 +109,16 @@ export async function enforceRateLimit(
   if (!allowed) {
     const rules = await getRateLimits().catch(() => DEFAULT_RATE_LIMITS);
     res.setHeader('Retry-After', String(rules[bucket].windowSec));
+    await recordSecurityAlert({
+      kind: 'rate_limit',
+      ip: clientIp(req),
+      device: deviceFingerprint(req),
+      bucket,
+      detail:
+        bucket === 'signup'
+          ? 'Signup attempts exceeded the configured limit.'
+          : `Rate limit exceeded on the ${bucket} endpoint.`,
+    });
     throw new ApiError(429, 'Too many requests. Please slow down and try again later.');
   }
 }
