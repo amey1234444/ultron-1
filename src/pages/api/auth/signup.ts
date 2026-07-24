@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 import type { PublicUser } from '../../../lib/roles';
@@ -12,7 +13,11 @@ import { createUser, findByEmail, findByUsername } from '../../../server/users';
 // Non-revealing response for any state that would confirm whether an
 // identifier is already taken (username or email). Prevents account
 // enumeration while still failing the request.
-const GENERIC_CONFLICT = 'Registration could not be completed. Please check your details and try again.';
+const GENERIC_CONFLICT = 'Unable to create account. Please verify the provided information.';
+
+// Matches the cost factor used by createUser (server/users.ts) so the
+// conflict path spends the same time as the account-creation path.
+const BCRYPT_ROUNDS = 10;
 
 // Public self-service sign-up. New accounts:
 //  - always get the lowest ('user') role regardless of any client-supplied value,
@@ -39,19 +44,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!verifyCaptcha(captchaToken, captchaAnswer)) {
       return res.status(400).json({ error: 'CAPTCHA verification failed. Please try again.' });
     }
-    if (await findByUsername(username)) {
-      return res.status(409).json({ error: GENERIC_CONFLICT });
-    }
-    if (await findByEmail(email)) {
-      // Repeated attempts to register an already-known email are a signal of
-      // account probing / mass-signup abuse — surface it to super admins.
-      await recordSecurityAlert({
-        kind: 'duplicate_email',
-        email,
-        ip: clientIp(req),
-        device: deviceFingerprint(req),
-        detail: 'Signup attempted with an email that is already registered.',
-      });
+    // Always run BOTH lookups (never short-circuit) so the amount of DB work is
+    // identical whether or not the username exists — no timing side-channel.
+    const usernameExists = Boolean(await findByUsername(username));
+    const emailExists = Boolean(await findByEmail(email));
+    if (usernameExists || emailExists) {
+      if (emailExists) {
+        // Repeated attempts to register an already-known email are a signal of
+        // account probing / mass-signup abuse — surface it to super admins.
+        await recordSecurityAlert({
+          kind: 'duplicate_email',
+          email,
+          ip: clientIp(req),
+          device: deviceFingerprint(req),
+          detail: 'Signup attempted with an email that is already registered.',
+        });
+      }
+      // Spend the same bcrypt cost the account-creation path would, so
+      // "already exists" and "created" responses take comparable time. Combined
+      // with the identical status (409 handled below vs 201) and message, this
+      // removes username/email enumeration via timing.
+      await bcrypt.hash(password, BCRYPT_ROUNDS);
       return res.status(409).json({ error: GENERIC_CONFLICT });
     }
 
