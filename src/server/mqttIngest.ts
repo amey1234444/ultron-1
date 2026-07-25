@@ -119,6 +119,26 @@ function validateEnvelope(msg: unknown): string[] {
   return errors;
 }
 
+// Optional per-channel detail (sensor, thresholds, alarm state) reported by
+// real controllers; absent from simulator batches.
+function validateChannelDetail(record: Record<string, unknown>): string[] {
+  const errors: string[] = [];
+  for (const key of ['alert_threshold', 'danger_threshold'] as const) {
+    const value = record[key];
+    if (value !== undefined && value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
+      errors.push(`record.${key} invalid`);
+    }
+  }
+  for (const key of ['alert_state', 'danger_state'] as const) {
+    const value = record[key];
+    if (value !== undefined && value !== 'ACTIVE' && value !== 'INACTIVE') errors.push(`record.${key} invalid`);
+  }
+  if (record.freshness !== undefined && record.freshness !== 'FRESH' && record.freshness !== 'STALE') {
+    errors.push('record.freshness invalid');
+  }
+  return errors;
+}
+
 function validatePayload(schema: string, payload: Record<string, unknown>): string[] {
   const errors: string[] = [];
   switch (schema) {
@@ -152,6 +172,7 @@ function validatePayload(schema: string, payload: Record<string, unknown>): stri
           if (typeof record.value !== 'number' || !Number.isFinite(record.value)) errors.push('record.value invalid');
           if (typeof record.source_timestamp_us !== 'string' || !/^\d+$/.test(record.source_timestamp_us)) errors.push('record.source_timestamp_us invalid');
           if (!Number.isInteger(record.source_sequence)) errors.push('record.source_sequence invalid');
+          errors.push(...validateChannelDetail(record));
         }
       }
       break;
@@ -422,32 +443,65 @@ async function handleInventory(msg: MqttEnvelope): Promise<void> {
   await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1 AND rack_id = $2 AND snapshot_revision < $3`, [msg.gateway_id, msg.rack_id, revision]);
 }
 
+// Value columns shared by measurement_history and measurement_latest. The
+// trailing fields are the per-channel detail a real controller reports next to
+// the value (sensor, card type, thresholds, alarm state); the simulator omits
+// them and they stay null.
+const MEASUREMENT_COLUMNS =
+  'gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us,' +
+  ' card_type, sensor, freshness, channel_status, alert_threshold, danger_threshold, alert_state, danger_state';
+const MEASUREMENT_COLUMN_COUNT = 18;
+
+function text(value: unknown): string | null {
+  return typeof value === 'string' && value ? value : null;
+}
+
+function numeric(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function alarmState(value: unknown): string {
+  return value === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE';
+}
+
+function measurementParams(msg: MqttEnvelope, r: Record<string, unknown>): unknown[] {
+  return [
+    msg.gateway_id,
+    msg.rack_id,
+    r.slot_id,
+    r.channel_id,
+    r.measurement_type,
+    r.value,
+    r.unit ?? '',
+    r.quality ?? 'GOOD',
+    r.source_sequence,
+    r.source_timestamp_us,
+    text(r.card_type),
+    text(r.sensor),
+    r.freshness === 'STALE' ? 'STALE' : 'FRESH',
+    text(r.channel_status),
+    numeric(r.alert_threshold),
+    numeric(r.danger_threshold),
+    alarmState(r.alert_state),
+    alarmState(r.danger_state),
+  ];
+}
+
 async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
   const records = Array.isArray(msg.payload.records) ? msg.payload.records : [];
   if (records.length === 0) return 0;
 
   const params: unknown[] = [];
   const values = records.map((item, index) => {
-    const r = item as Record<string, unknown>;
-    params.push(
-      msg.gateway_id,
-      msg.rack_id,
-      r.slot_id,
-      r.channel_id,
-      r.measurement_type,
-      r.value,
-      r.unit ?? '',
-      r.quality ?? 'GOOD',
-      r.source_sequence,
-      r.source_timestamp_us,
-    );
-    const start = index * 10;
-    return `($${start + 1},$${start + 2},$${start + 3},$${start + 4},$${start + 5},$${start + 6},$${start + 7},$${start + 8},$${start + 9},$${start + 10})`;
+    params.push(...measurementParams(msg, item as Record<string, unknown>));
+    const start = index * MEASUREMENT_COLUMN_COUNT;
+    const placeholders = Array.from({ length: MEASUREMENT_COLUMN_COUNT }, (_, offset) => `$${start + offset + 1}`);
+    return `(${placeholders.join(',')})`;
   });
 
   const hist = await query(
     `INSERT INTO measurement_history
-       (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us)
+       (${MEASUREMENT_COLUMNS})
      VALUES ${values.join(',')}
      ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
     params,
@@ -455,7 +509,7 @@ async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
 
   await query(
     `INSERT INTO measurement_latest
-       (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us, updated_at)
+       (${MEASUREMENT_COLUMNS}, updated_at)
      VALUES ${values.map((value) => `${value.slice(0, -1)}, now())`).join(',')}
      ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type) DO UPDATE SET
        value = EXCLUDED.value,
@@ -463,6 +517,14 @@ async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
        quality = EXCLUDED.quality,
        source_sequence = EXCLUDED.source_sequence,
        source_timestamp_us = EXCLUDED.source_timestamp_us,
+       card_type = EXCLUDED.card_type,
+       sensor = EXCLUDED.sensor,
+       freshness = EXCLUDED.freshness,
+       channel_status = EXCLUDED.channel_status,
+       alert_threshold = EXCLUDED.alert_threshold,
+       danger_threshold = EXCLUDED.danger_threshold,
+       alert_state = EXCLUDED.alert_state,
+       danger_state = EXCLUDED.danger_state,
        updated_at = now()
      WHERE measurement_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
     params,

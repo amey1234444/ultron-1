@@ -253,33 +253,78 @@ export async function handleInventory(msg) {
   );
 }
 
+// Value columns shared by measurement_history and measurement_latest. The
+// trailing fields are the per-channel detail a real controller reports next to
+// the value (sensor, card type, thresholds, alarm state); the simulator omits
+// them and they stay null.
+const MEASUREMENT_COLUMNS =
+  'gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us,' +
+  ' card_type, sensor, freshness, channel_status, alert_threshold, danger_threshold, alert_state, danger_state';
+const MEASUREMENT_PLACEHOLDERS = '$1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18';
+
+const text = (value) => (typeof value === 'string' && value ? value : null);
+const numeric = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
+const alarmState = (value) => (value === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE');
+
+function measurementParams(msg, r) {
+  return [
+    msg.gateway_id,
+    msg.rack_id,
+    r.slot_id,
+    r.channel_id,
+    r.measurement_type,
+    r.value,
+    r.unit ?? '',
+    r.quality ?? 'GOOD',
+    r.source_sequence,
+    r.source_timestamp_us,
+    text(r.card_type),
+    text(r.sensor),
+    r.freshness === 'STALE' ? 'STALE' : 'FRESH',
+    text(r.channel_status),
+    numeric(r.alert_threshold),
+    numeric(r.danger_threshold),
+    alarmState(r.alert_state),
+    alarmState(r.danger_state),
+  ];
+}
+
 export async function handleTelemetry(msg) {
   let stored = 0;
   for (const r of msg.payload.records) {
+    const params = measurementParams(msg, r);
     // Record-level dedup by source identity + sequence + source timestamp;
     // history time is the gateway's source timestamp, not backend arrival.
     const hist = await query(
       `INSERT INTO measurement_history
-         (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+         (${MEASUREMENT_COLUMNS})
+       VALUES (${MEASUREMENT_PLACEHOLDERS})
        ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
-      [msg.gateway_id, msg.rack_id, r.slot_id, r.channel_id, r.measurement_type, r.value, r.unit ?? '', r.quality ?? 'GOOD', r.source_sequence, r.source_timestamp_us],
+      params,
     );
     if (hist.rowCount === 1) stored += 1;
 
     await query(
       `INSERT INTO measurement_latest
-         (gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+         (${MEASUREMENT_COLUMNS}, updated_at)
+       VALUES (${MEASUREMENT_PLACEHOLDERS}, now())
        ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type) DO UPDATE SET
          value = EXCLUDED.value,
          unit = EXCLUDED.unit,
          quality = EXCLUDED.quality,
          source_sequence = EXCLUDED.source_sequence,
          source_timestamp_us = EXCLUDED.source_timestamp_us,
+         card_type = EXCLUDED.card_type,
+         sensor = EXCLUDED.sensor,
+         freshness = EXCLUDED.freshness,
+         channel_status = EXCLUDED.channel_status,
+         alert_threshold = EXCLUDED.alert_threshold,
+         danger_threshold = EXCLUDED.danger_threshold,
+         alert_state = EXCLUDED.alert_state,
+         danger_state = EXCLUDED.danger_state,
          updated_at = now()
        WHERE measurement_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
-      [msg.gateway_id, msg.rack_id, r.slot_id, r.channel_id, r.measurement_type, r.value, r.unit ?? '', r.quality ?? 'GOOD', r.source_sequence, r.source_timestamp_us],
+      params,
     );
   }
   return stored;

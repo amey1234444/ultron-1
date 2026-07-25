@@ -41,7 +41,13 @@
               "source_timestamp_us": { "type": "string", "pattern": "^[0-9]+$" },
               "source_sequence": { "type": "integer", "minimum": 0 },
               "configuration_revision": { "type": "integer" },
-              "calibration_revision": { "type": "integer" }
+              "calibration_revision": { "type": "integer" },
+              "sensor": { "type": "string" },
+              "channel_status": { "type": "string" },
+              "alert_threshold": { "type": "number" },
+              "danger_threshold": { "type": "number" },
+              "alert_state": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+              "danger_state": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] }
             }
           }
         }

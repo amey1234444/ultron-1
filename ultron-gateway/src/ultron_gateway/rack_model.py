@@ -32,9 +32,17 @@ class Measurement:
     source_sequence: int
     configuration_revision: int = 1
     calibration_revision: int = 1
+    # Optional per-channel detail a real controller reports alongside the value
+    # (the simulator leaves these unset, so the record stays as it was).
+    sensor: str | None = None
+    channel_status: str | None = None
+    alert_threshold: float | None = None
+    danger_threshold: float | None = None
+    alert_state: str | None = None
+    danger_state: str | None = None
 
     def to_record(self) -> dict[str, Any]:
-        return {
+        record: dict[str, Any] = {
             "slot_id": self.slot_id,
             "channel_id": self.channel_id,
             "point_id": self.point_id,
@@ -49,6 +57,16 @@ class Measurement:
             "configuration_revision": self.configuration_revision,
             "calibration_revision": self.calibration_revision,
         }
+        optional = {
+            "sensor": self.sensor,
+            "channel_status": self.channel_status,
+            "alert_threshold": self.alert_threshold,
+            "danger_threshold": self.danger_threshold,
+            "alert_state": self.alert_state,
+            "danger_state": self.danger_state,
+        }
+        record.update({key: value for key, value in optional.items() if value is not None})
+        return record
 
 
 @dataclass

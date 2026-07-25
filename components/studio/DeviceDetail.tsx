@@ -3,8 +3,18 @@ import { ScrollView, Text, View } from 'react-native';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { totalChannelsFor, type DeviceNode } from '../../lib/devices';
-import { gatewayForDevice, lastSeenLabel, measurementsForDevice, type LiveState } from '../../lib/liveTelemetry';
+import {
+  activeChannelsForDevice,
+  channelAlarmLevel,
+  formatMeasurement,
+  gatewayForDevice,
+  lastSeenLabel,
+  measurementsForDevice,
+  type LiveState,
+} from '../../lib/liveTelemetry';
 import { BackButton } from './BackButton';
+
+const ALARM_SUFFIX = { normal: '', alert: '  ALERT', danger: '  DANGER' } as const;
 
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   const { isDark } = useAppTheme();
@@ -20,10 +30,11 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 
 export function DeviceDetail({ device, live, onBack }: { device: DeviceNode; live?: LiveState; onBack: () => void }) {
   const { isDark } = useAppTheme();
-  const total = totalChannelsFor(device.type);
-  const mapped = 0; // real mapping arrives with channel mapping (spec §9)
   const gateway = live ? gatewayForDevice(device, live) : undefined;
   const measurements = live ? measurementsForDevice(device, live) : [];
+  // Channels the rack is actually reporting on right now, not a configuration count.
+  const { active: mapped, total } = live ? activeChannelsForDevice(device, live) : { active: 0, total: totalChannelsFor(device.type) };
+  const alarms = measurements.filter((m) => channelAlarmLevel(m) !== 'normal').length;
 
   return (
     <ScrollView className="flex-1">
@@ -52,8 +63,8 @@ export function DeviceDetail({ device, live, onBack }: { device: DeviceNode; liv
       {device.type === 'Rack' && (
         <View className="flex-row gap-3 px-6 pt-3">
           <MiniStat label="Connected Points" value={mapped} />
-          <MiniStat label="Disconnected Points" value={0} />
-          <MiniStat label="Available Channels" value={total - mapped} />
+          <MiniStat label="Points In Alarm" value={alarms} />
+          <MiniStat label="Available Channels" value={Math.max(total - mapped, 0)} />
         </View>
       )}
 
@@ -66,8 +77,8 @@ export function DeviceDetail({ device, live, onBack }: { device: DeviceNode; liv
             {measurements.map((m) => (
               <Row
                 key={`${m.slotId}.${m.channelId}.${m.measurementType}`}
-                label={`Slot ${m.slotId} · CH${m.channelId} · ${m.measurementType}`}
-                value={`${m.value.toFixed(2)} ${m.unit}`}
+                label={`Slot ${m.slotId} · CH${m.channelId} · ${m.sensor ?? m.measurementType}`}
+                value={`${formatMeasurement(m)}${ALARM_SUFFIX[channelAlarmLevel(m)]}`}
                 mono
               />
             ))}

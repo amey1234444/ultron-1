@@ -523,6 +523,14 @@ async function migrate(): Promise<void> {
       quality             TEXT NOT NULL DEFAULT 'GOOD',
       source_sequence     BIGINT NOT NULL DEFAULT 0,
       source_timestamp_us BIGINT NOT NULL DEFAULT 0,
+      card_type           TEXT,
+      sensor              TEXT,
+      freshness           TEXT NOT NULL DEFAULT 'FRESH',
+      channel_status      TEXT,
+      alert_threshold     DOUBLE PRECISION,
+      danger_threshold    DOUBLE PRECISION,
+      alert_state         TEXT NOT NULL DEFAULT 'INACTIVE',
+      danger_state        TEXT NOT NULL DEFAULT 'INACTIVE',
       updated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
       PRIMARY KEY (gateway_id, rack_id, slot_id, channel_id, measurement_type)
     );
@@ -542,10 +550,31 @@ async function migrate(): Promise<void> {
       quality             TEXT NOT NULL DEFAULT 'GOOD',
       source_sequence     BIGINT NOT NULL DEFAULT 0,
       source_timestamp_us BIGINT NOT NULL DEFAULT 0,
+      card_type           TEXT,
+      sensor              TEXT,
+      freshness           TEXT NOT NULL DEFAULT 'FRESH',
+      channel_status      TEXT,
+      alert_threshold     DOUBLE PRECISION,
+      danger_threshold    DOUBLE PRECISION,
+      alert_state         TEXT NOT NULL DEFAULT 'INACTIVE',
+      danger_state        TEXT NOT NULL DEFAULT 'INACTIVE',
       received_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
       UNIQUE (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us)
     );
   `);
+  // Per-channel detail a real controller reports next to the value (the CC v3
+  // frame carries sensor, card type, thresholds and alarm state); older
+  // deployments created these tables before the columns existed.
+  for (const table of ['measurement_latest', 'measurement_history']) {
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS card_type TEXT;`);
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS sensor TEXT;`);
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS freshness TEXT NOT NULL DEFAULT 'FRESH';`);
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS channel_status TEXT;`);
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS alert_threshold DOUBLE PRECISION;`);
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS danger_threshold DOUBLE PRECISION;`);
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS alert_state TEXT NOT NULL DEFAULT 'INACTIVE';`);
+    await query(`ALTER TABLE ${table} ADD COLUMN IF NOT EXISTS danger_state TEXT NOT NULL DEFAULT 'INACTIVE';`);
+  }
   await query(`
     CREATE INDEX IF NOT EXISTS measurement_history_point
       ON measurement_history (gateway_id, rack_id, slot_id, channel_id, source_timestamp_us);

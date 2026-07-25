@@ -3,7 +3,15 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
-import { channelLiveStatus, type ChannelLiveStatus, type LiveState } from '../../../lib/liveTelemetry';
+import {
+  channelAlarmLevel,
+  channelLiveStatus,
+  formatMeasurement,
+  latestMeasurementForChannel,
+  type ChannelAlarmLevel,
+  type ChannelLiveStatus,
+  type LiveState,
+} from '../../../lib/liveTelemetry';
 import { channelCountForCardType, type CardNode } from '../../../lib/rack';
 
 type ChannelListViewProps = {
@@ -25,16 +33,26 @@ const STATUS_META: Record<ChannelLiveStatus, { label: string; colour: string }> 
   idle: { label: 'No data', colour: '#A1A1AA' },
 };
 
-function StatusCell({ status }: { status: ChannelLiveStatus }) {
-  const meta = STATUS_META[status];
+const ALARM_META: Record<ChannelAlarmLevel, { label: string; colour: string }> = {
+  normal: { label: 'Normal', colour: '#16A34A' },
+  alert: { label: 'Alert', colour: '#D97706' },
+  danger: { label: 'Danger', colour: '#DC2626' },
+};
+
+function Dot({ label, colour }: { label: string; colour: string }) {
   return (
     <View style={{ flex: 1 }} className="flex-row items-center gap-2">
-      <View style={{ width: 9, height: 9, borderRadius: 999, backgroundColor: meta.colour }} />
-      <Text className="font-body text-sm" style={{ color: meta.colour }}>
-        {meta.label}
+      <View style={{ width: 9, height: 9, borderRadius: 999, backgroundColor: colour }} />
+      <Text className="font-body text-sm" style={{ color: colour }}>
+        {label}
       </Text>
     </View>
   );
+}
+
+function StatusCell({ status }: { status: ChannelLiveStatus }) {
+  const meta = STATUS_META[status];
+  return <Dot label={meta.label} colour={meta.colour} />;
 }
 
 export function ChannelListView({ device, cards, live }: ChannelListViewProps) {
@@ -65,7 +83,7 @@ export function ChannelListView({ device, cards, live }: ChannelListViewProps) {
   return (
     <View className="flex-1 px-6 py-5">
       <View className={cn('mb-3 flex-row items-center gap-3 border-b px-4 pb-3', lineClass)}>
-        {['Channel', 'Sensor', 'Status', 'Mapped Point'].map((h) => (
+        {['Channel', 'Sensor', 'Status', 'Live Value', 'Alarm'].map((h) => (
           <Text key={h} style={{ flex: 1 }} className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>
             {h}
           </Text>
@@ -74,6 +92,8 @@ export function ChannelListView({ device, cards, live }: ChannelListViewProps) {
 
       {rows.map(({ id, card, channelId, label }) => {
         const status = device.status !== 'Online' ? 'stale' : live ? channelLiveStatus(device, card, channelId, live) : 'idle';
+        const measurement = live && status === 'active' ? latestMeasurementForChannel(device, card, channelId, live) : undefined;
+        const alarm = ALARM_META[channelAlarmLevel(measurement)];
         return (
           <View
             key={id}
@@ -83,12 +103,13 @@ export function ChannelListView({ device, cards, live }: ChannelListViewProps) {
               {id}
             </Text>
             <Text style={{ flex: 1 }} numberOfLines={1} className={cn('font-body text-sm', mutedClass)}>
-              {label}
+              {measurement?.sensor ? `${label} (${measurement.sensor})` : label}
             </Text>
             <StatusCell status={status} />
-            <Text style={{ flex: 1 }} className={cn('font-body text-sm', mutedClass)}>
-              -
+            <Text style={{ flex: 1 }} className={cn('font-mono text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              {formatMeasurement(measurement)}
             </Text>
+            {measurement ? <Dot label={alarm.label} colour={alarm.colour} /> : <Text style={{ flex: 1 }} className={cn('font-body text-sm', mutedClass)}>-</Text>}
           </View>
         );
       })}
