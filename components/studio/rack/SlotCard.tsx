@@ -17,7 +17,7 @@ import Svg, {
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { DeviceNode } from '../../../lib/devices';
-import { channelLiveStatus, type LiveState } from '../../../lib/liveTelemetry';
+import { channelAlarmLevel, channelLiveStatus, latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode, CardType } from '../../../lib/rack';
 
 type SlotCardProps = {
@@ -35,7 +35,7 @@ type SlotCardProps = {
 // channel per card, not per-point status, so these exist purely to drive
 // the physical-module rendering below.
 type VisualKind = 'vibration' | 'process' | 'speed-keyphasor' | 'communication';
-type PointStatus = 'ok' | 'stale' | 'inactive';
+type PointStatus = 'ok' | 'alert' | 'danger' | 'stale' | 'inactive';
 
 type CardVisualConfig = {
   title: string;
@@ -107,8 +107,18 @@ const CARD_CONFIG: Record<VisualKind, CardVisualConfig> = {
 
 const STATUS_COLOURS: Record<PointStatus, string> = {
   ok: '#16A34A',
+  alert: '#D97706',
+  danger: '#DC2626',
   stale: '#DC2626',
   inactive: '#A1A1AA',
+};
+
+const STATUS_LABELS: Record<PointStatus, string> = {
+  ok: 'OK',
+  alert: 'WARN',
+  danger: 'ALARM',
+  stale: 'MISS',
+  inactive: 'OFF',
 };
 
 function kindFor(type: CardType): VisualKind {
@@ -132,10 +142,12 @@ function pointLabelsFor(card: CardNode): string[] {
   return [card.type];
 }
 
-function visualStatusFor(status: ReturnType<typeof channelLiveStatus>): PointStatus {
-  if (status === 'active') return 'ok';
+function visualStatusFor(card: CardNode, device: DeviceNode, channelId: number, live: LiveState): PointStatus {
+  const status = channelLiveStatus(device, card, channelId, live);
   if (status === 'stale') return 'stale';
-  return 'inactive';
+  if (status !== 'active') return 'inactive';
+  const level = channelAlarmLevel(latestMeasurementForChannel(device, card, channelId, live));
+  return level === 'danger' ? 'danger' : level === 'alert' ? 'alert' : 'ok';
 }
 
 function pointStatusesFor(card: CardNode, device: DeviceNode | undefined, live: LiveState | undefined, count: number): PointStatus[] {
@@ -143,12 +155,13 @@ function pointStatusesFor(card: CardNode, device: DeviceNode | undefined, live: 
   if (!device) return Array.from({ length: count }, () => 'inactive');
   if (device.status !== 'Online') return Array.from({ length: count }, () => 'stale');
   if (!live) return Array.from({ length: count }, () => 'stale');
-  return Array.from({ length: count }, (_, index) => visualStatusFor(channelLiveStatus(device, card, index + 1, live)));
+  return Array.from({ length: count }, (_, index) => visualStatusFor(card, device, index + 1, live));
 }
 
 function aggregateStatus(statuses: PointStatus[]): PointStatus {
-  if (statuses.some((status) => status === 'ok')) return 'ok';
-  if (statuses.some((status) => status === 'stale')) return 'stale';
+  for (const level of ['danger', 'alert', 'ok', 'stale'] as const) {
+    if (statuses.some((status) => status === level)) return level;
+  }
   return 'inactive';
 }
 
@@ -438,7 +451,7 @@ function InstalledSlotCard({
           <View style={{ width: '72%', flexDirection: 'row', flexWrap: 'nowrap', alignItems: 'center', marginBottom: 7 * s }}>
             <StatusLed status={status} size={LED_SIZE * s} />
             <Text numberOfLines={1} style={{ marginLeft: 6 * s, color: textColour, fontSize: 7.2 * s, fontWeight: '800', letterSpacing: 0.35 }}>
-              {status === 'ok' ? 'OK' : status === 'stale' ? 'MISS' : 'OFF'}
+              {STATUS_LABELS[status]}
             </Text>
           </View>
 

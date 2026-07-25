@@ -26,6 +26,16 @@ export type LiveMeasurement = {
   unit: string;
   quality: string;
   updatedAt: string;
+  // Present when the controller reports channel detail (CC v3); the simulator
+  // leaves these null/defaulted.
+  cardType?: string | null;
+  sensor?: string | null;
+  freshness?: string;
+  channelStatus?: string | null;
+  alertThreshold?: number | null;
+  dangerThreshold?: number | null;
+  alertState?: string;
+  dangerState?: string;
 };
 
 export type LiveSlot = {
@@ -69,7 +79,9 @@ export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [],
 
 export type ChannelLiveStatus = 'active' | 'stale' | 'idle';
 
-const ACTIVE_MEASUREMENT_MAX_AGE_MS = 1_000;
+// A channel counts as live until roughly two publish intervals have passed: a
+// 1 Hz controller (CC v3) must not flicker to "missing data" between frames.
+const ACTIVE_MEASUREMENT_MAX_AGE_MS = 5_000;
 type LiveIndex = {
   gatewayById: Map<string, LiveGateway>;
   gatewayByIp: Map<string, LiveGateway>;
@@ -394,6 +406,25 @@ export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId:
   const ageMs = Date.now() - Date.parse(measurement.updatedAt);
   if (measurement.quality && measurement.quality !== 'GOOD') return 'stale';
   return ageMs <= ACTIVE_MEASUREMENT_MAX_AGE_MS ? 'active' : 'stale';
+}
+
+export type ChannelAlarmLevel = 'normal' | 'alert' | 'danger';
+
+// Threshold state as reported by the controller; a channel over its danger
+// threshold outranks one that is only in alert.
+export function channelAlarmLevel(measurement: LiveMeasurement | undefined): ChannelAlarmLevel {
+  if (!measurement) return 'normal';
+  if (measurement.dangerState === 'ACTIVE') return 'danger';
+  if (measurement.alertState === 'ACTIVE') return 'alert';
+  return 'normal';
+}
+
+export function formatMeasurement(measurement: LiveMeasurement | undefined): string {
+  if (!measurement) return '—';
+  const magnitude = Math.abs(measurement.value);
+  const decimals = magnitude >= 100 ? 1 : magnitude >= 1 ? 2 : 3;
+  const value = Number.isInteger(measurement.value) ? String(measurement.value) : measurement.value.toFixed(decimals);
+  return measurement.unit ? `${value} ${measurement.unit}` : value;
 }
 
 export function lastSeenLabel(gateway: LiveGateway | undefined): string {

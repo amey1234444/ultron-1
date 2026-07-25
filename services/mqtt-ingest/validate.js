@@ -22,6 +22,22 @@ export function validateEnvelope(msg) {
   return errors;
 }
 
+// Optional per-channel detail (sensor, thresholds, alarm state) reported by
+// real controllers; absent from simulator batches.
+function validateChannelDetail(r) {
+  const errors = [];
+  for (const key of ['alert_threshold', 'danger_threshold']) {
+    if (r[key] !== undefined && r[key] !== null && (typeof r[key] !== 'number' || !Number.isFinite(r[key]))) {
+      errors.push(`record.${key} invalid`);
+    }
+  }
+  for (const key of ['alert_state', 'danger_state']) {
+    if (r[key] !== undefined && !['ACTIVE', 'INACTIVE'].includes(r[key])) errors.push(`record.${key} invalid`);
+  }
+  if (r.freshness !== undefined && !['FRESH', 'STALE'].includes(r.freshness)) errors.push('record.freshness invalid');
+  return errors;
+}
+
 export function validatePayload(schema, payload) {
   const errors = [];
   switch (schema) {
@@ -52,6 +68,7 @@ export function validatePayload(schema, payload) {
           if (typeof r.value !== 'number' || !Number.isFinite(r.value)) errors.push('record.value invalid');
           if (typeof r.source_timestamp_us !== 'string' || !/^\d+$/.test(r.source_timestamp_us)) errors.push('record.source_timestamp_us invalid');
           if (!Number.isInteger(r.source_sequence)) errors.push('record.source_sequence invalid');
+          errors.push(...validateChannelDetail(r));
         }
       }
       break;

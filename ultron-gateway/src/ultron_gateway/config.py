@@ -43,6 +43,36 @@ def _rack_ids_from_env() -> tuple[int, ...]:
     return (int(os.environ.get("RACK_ID", "1")),)
 
 
+def _rack_number_map_from_env() -> dict[str, int]:
+    """`RACK_NUMBER_MAP=CC_Card_UID1=1,CC_Card_UID2=2` — v3 names racks, the
+    contract numbers them."""
+    mapping: dict[str, int] = {}
+    for part in os.environ.get("RACK_NUMBER_MAP", "").split(","):
+        name, _, value = part.partition("=")
+        name = name.strip()
+        if not name or not value.strip().isdigit():
+            continue
+        mapping[name] = int(value.strip())
+        mapping[name.lower()] = int(value.strip())
+    return mapping
+
+
+def _channel_slot_map_from_env() -> dict[int, tuple[int, int]]:
+    """`CHANNEL_SLOT_MAP=1=1.1,2=1.2` — override the default one card per v3
+    channel when several channels share a physical card."""
+    mapping: dict[int, tuple[int, int]] = {}
+    for part in os.environ.get("CHANNEL_SLOT_MAP", "").split(","):
+        channel, _, target = part.partition("=")
+        slot, _, sub_channel = target.partition(".")
+        if not channel.strip().isdigit() or not slot.strip().isdigit():
+            continue
+        mapping[int(channel.strip())] = (
+            int(slot.strip()),
+            int(sub_channel.strip()) if sub_channel.strip().isdigit() else 1,
+        )
+    return mapping
+
+
 @dataclass(frozen=True)
 class Config:
     gateway_id: str = field(default_factory=lambda: os.environ.get("GATEWAY_ID", "ultron-gw-demo-01"))
@@ -64,6 +94,22 @@ class Config:
     telemetry_interval_s: float = field(
         default_factory=lambda: float(os.environ.get("TELEMETRY_INTERVAL_S", "0.5"))
     )
+
+    # Data source: the simulator (Colab/dev) or Ultron Gateway v3 CC telemetry
+    # (Raspberry Pi). v3 writes latest_telemetry.json and can stream frames over
+    # TCP; CC_V3_TCP_HOST/PORT selects the stream, otherwise the file is polled.
+    data_source: str = field(default_factory=lambda: os.environ.get("DATA_SOURCE", "simulator").strip().lower())
+    cc_v3_path: str = field(
+        default_factory=lambda: os.environ.get("CC_V3_TELEMETRY_PATH", "/home/mtb/Desktop/UltronGateway/latest_telemetry.json")
+    )
+    cc_v3_tcp_host: str | None = field(default_factory=lambda: os.environ.get("CC_V3_TCP_HOST") or None)
+    cc_v3_tcp_port: int | None = field(
+        default_factory=lambda: int(os.environ["CC_V3_TCP_PORT"]) if os.environ.get("CC_V3_TCP_PORT") else None
+    )
+    cc_stale_after_s: float = field(default_factory=lambda: float(os.environ.get("CC_STALE_AFTER_S", "5")))
+    controller_slot_id: int = field(default_factory=lambda: int(os.environ.get("CC_CONTROLLER_SLOT", "13")))
+    rack_number_map: dict[str, int] = field(default_factory=_rack_number_map_from_env)
+    channel_slot_map: dict[int, tuple[int, int]] = field(default_factory=_channel_slot_map_from_env)
 
     @property
     def primary_rack_id(self) -> int:

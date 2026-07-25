@@ -36,6 +36,14 @@ export type LiveMeasurement = {
   unit: string;
   quality: string;
   updatedAt: string;
+  cardType: string | null;
+  sensor: string | null;
+  freshness: string;
+  channelStatus: string | null;
+  alertThreshold: number | null;
+  dangerThreshold: number | null;
+  alertState: string;
+  dangerState: string;
 };
 
 export type LiveAlert = {
@@ -72,6 +80,14 @@ type MeasurementRow = {
   unit: string;
   quality: string;
   updated_at: Date;
+  card_type: string | null;
+  sensor: string | null;
+  freshness: string | null;
+  channel_status: string | null;
+  alert_threshold: number | null;
+  danger_threshold: number | null;
+  alert_state: string | null;
+  danger_state: string | null;
 };
 type AlertRow = {
   id: number;
@@ -89,7 +105,10 @@ type UnconfiguredGatewayRow = { gateway_id: string };
 // Gateway status is still useful for process/MQTT health, but rack/gateway
 // connectivity in the live UI must follow fresh channel data for IoT accuracy.
 const GATEWAY_STATUS_STALE_AFTER_S = 6;
-const LIVE_DATA_STALE_AFTER_S = 2;
+// Wide enough for controllers that publish a frame every second or two (CC v3)
+// without hiding a genuinely dead link; LIVE_DATA_STALE_AFTER_S tunes it per
+// deployment.
+const LIVE_DATA_STALE_AFTER_S = Number(process.env.LIVE_DATA_STALE_AFTER_S ?? 6) || 6;
 
 export async function getLiveState(options: { includeConflictDeviceDetails?: boolean } = {}): Promise<LiveState> {
   await ensureSchema();
@@ -122,7 +141,8 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
        FROM rack_inventory_slots ORDER BY gateway_id, rack_id, slot_id`,
     ),
     query<MeasurementRow>(
-      `SELECT gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, updated_at
+      `SELECT gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, updated_at,
+              card_type, sensor, freshness, channel_status, alert_threshold, danger_threshold, alert_state, danger_state
        FROM measurement_latest
        WHERE updated_at >= now() - make_interval(secs => $1)
        ORDER BY gateway_id, rack_id, slot_id, channel_id`,
@@ -234,6 +254,14 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
       unit: m.unit,
       quality: m.quality,
       updatedAt: m.updated_at.toISOString(),
+      cardType: m.card_type,
+      sensor: m.sensor,
+      freshness: m.freshness ?? 'FRESH',
+      channelStatus: m.channel_status,
+      alertThreshold: m.alert_threshold,
+      dangerThreshold: m.danger_threshold,
+      alertState: m.alert_state ?? 'INACTIVE',
+      dangerState: m.danger_state ?? 'INACTIVE',
     })),
     alerts: allAlerts.map((a: AlertRow) => ({
       id: Number(a.id),

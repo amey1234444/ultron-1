@@ -21,7 +21,7 @@
     "schema": { "type": "string", "pattern": "^ultron\\.[a-z]+(\\.[a-z]+)+$" },
     "schema_version": { "type": "string", "const": "1.1" },
     "message_id": { "type": "string", "format": "uuid" },
-    "gateway_id": { "type": "string", "pattern": "^GW-[A-Za-z0-9-]+$" },
+    "gateway_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
     "gateway_boot_id": { "type": "string", "format": "uuid" },
     "gateway_ip": {
       "type": "string",
