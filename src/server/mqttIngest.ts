@@ -74,6 +74,8 @@ const SCHEMA_FOR_KIND: Partial<Record<TopicKind, string>> = {
   command_response: 'ultron.command.response',
 };
 
+const CC_V3_SCHEMA = 'ultron.gateway.normalized_telemetry';
+
 function parseTopic(topic: string): ParsedTopic | null {
   const status = RE_STATUS.exec(topic);
   if (status) return { gatewayId: status[1], rackId: null, kind: 'status' };
@@ -117,6 +119,209 @@ function validateEnvelope(msg: unknown): string[] {
   if (typeof m.replayed !== 'boolean') errors.push('replayed must be boolean');
   if (!m.payload || typeof m.payload !== 'object') errors.push('payload missing');
   return errors;
+}
+
+function objectValue(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
+}
+
+function stringValue(value: unknown): string | null {
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function integerValue(value: unknown): number | null {
+  return Number.isInteger(value) ? value as number : null;
+}
+
+function finiteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && value.trim()) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return null;
+}
+
+function parseIsoUs(value: unknown): string {
+  const text = stringValue(value);
+  const ms = text ? Date.parse(text) : NaN;
+  return String((Number.isNaN(ms) ? Date.now() : ms) * 1000);
+}
+
+function hashUuid(input: string): string {
+  const hex = createHash('sha256').update(input).digest('hex').slice(0, 32);
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function rackIdFromRackNumber(value: unknown, fallback: number): number {
+  const rackNumber = stringValue(value);
+  if (!rackNumber) return fallback;
+  const match = /(\d+)(?!.*\d)/.exec(rackNumber);
+  return match ? Number(match[1]) : fallback;
+}
+
+function channelValue(channel: Record<string, unknown>): number | null {
+  const formatted = finiteNumber(channel.value_formatted);
+  if (formatted !== null) return formatted;
+  const raw = finiteNumber(channel.value_raw);
+  if (raw === null) return null;
+  const decimals = integerValue(channel.decimal_places);
+  return decimals && decimals > 0 ? raw / 10 ** decimals : raw;
+}
+
+function thresholdValue(channel: Record<string, unknown>, prefix: string): number | null {
+  const formatted = finiteNumber(channel[`${prefix}_value_formatted`]);
+  if (formatted !== null) return formatted;
+  const raw = finiteNumber(channel[`${prefix}_value_raw`]);
+  if (raw === null) return null;
+  const decimals = integerValue(channel.decimal_places);
+  return decimals && decimals > 0 ? raw / 10 ** decimals : raw;
+}
+
+function canonicalCardType(cardType: string): string {
+  const key = cardType.trim().toLowerCase();
+  if (key === 'vibration') return 'VIBRATION';
+  if (key === 'speed') return 'SPEED';
+  if (key === 'communication_controller') return 'COMMUNICATION_CONTROLLER';
+  return 'PROCESS';
+}
+
+function measurementTypeFor(cardType: string, sensor: string, unit: string): string {
+  const key = cardType.trim().toLowerCase();
+  const sensorKey = sensor.trim().toLowerCase();
+  const known: Record<string, string> = {
+    vibration: 'VELOCITY_RMS',
+    speed: 'SPEED',
+    rtd: 'TEMPERATURE',
+    thermocouple: 'TEMPERATURE',
+    temperature: 'TEMPERATURE',
+    pressure: 'PRESSURE',
+    current: 'CURRENT',
+    voltage: 'VOLTAGE',
+    proximity: 'PROXIMITY_STATE',
+    digital_input: 'DIGITAL_STATE',
+    analog_input: 'ANALOG_INPUT',
+  };
+  return known[key] ?? known[sensorKey] ?? (key ? key.toUpperCase() : (unit || 'VALUE').toUpperCase());
+}
+
+function parseChannelSlotMap(): Map<number, [number, number]> {
+  const map = new Map<number, [number, number]>();
+  for (const part of (process.env.CHANNEL_SLOT_MAP ?? '').split(',')) {
+    const [channel, target] = part.split('=');
+    const [slot, subChannel] = (target ?? '').split('.');
+    const channelNo = Number(channel?.trim());
+    const slotNo = Number(slot?.trim());
+    const subChannelNo = Number(subChannel?.trim() || '1');
+    if (Number.isInteger(channelNo) && Number.isInteger(slotNo) && Number.isInteger(subChannelNo)) {
+      map.set(channelNo, [slotNo, subChannelNo]);
+    }
+  }
+  return map;
+}
+
+function slotForChannel(channelNumber: number): [number, number] {
+  return parseChannelSlotMap().get(channelNumber) ?? [channelNumber, 1];
+}
+
+function firstIp(...values: unknown[]): string | null {
+  for (const value of values) {
+    const text = stringValue(value);
+    if (text && IP_RE.test(text)) return text;
+  }
+  return null;
+}
+
+function normalizeCcV3SnapshotMessage(
+  rawMessage: unknown,
+  parsed: ParsedTopic,
+  sourceEvent?: Record<string, unknown> | null,
+): MqttEnvelope | null {
+  if (parsed.kind !== 'telemetry' || parsed.rackId === null) return null;
+  const raw = objectValue(rawMessage);
+  if (!raw) return null;
+  const channels = Array.isArray(raw.channels) ? raw.channels : null;
+  if (!channels || !(raw.schema === CC_V3_SCHEMA || raw.rack_number !== undefined)) return null;
+
+  const link = objectValue(raw.cc_gateway_communication) ?? {};
+  const source = objectValue(raw.source) ?? {};
+  const gatewayIp = firstIp(
+    sourceEvent?.peerhost,
+    raw.gateway_ip,
+    source.ip,
+    link.connected_client_ip,
+    link.expected_cc_card_ip,
+  );
+  if (!gatewayIp) return null;
+
+  const rackId = parsed.rackId ?? rackIdFromRackNumber(raw.rack_number, 1);
+  const receivedAt = stringValue(raw.received_at) ?? stringValue(raw.snapshot_updated_at) ?? stringValue(link.last_message_at) ?? new Date().toISOString();
+  const sourceTimestampUs = parseIsoUs(receivedAt);
+  const daqSequence = integerValue(raw.daq_sequence);
+  const messageSequence = integerValue(raw.message_sequence);
+  const sourceSequence = daqSequence ?? messageSequence ?? 0;
+  const daqValid = raw.daq_valid === 1 && String(raw.daq_state ?? 'valid') === 'valid';
+  const age = finiteNumber(link.telemetry_age_seconds);
+  const staleAfter = finiteNumber(link.stale_after_seconds) ?? 5;
+  const telemetryFresh = raw.telemetry_available !== false && (age === null || age <= staleAfter);
+  const snapshotHash = createHash('sha256').update(JSON.stringify(raw)).digest('hex');
+  const deliveryId = stringValue(sourceEvent?.id) ?? stringValue(sourceEvent?.publish_received_at) ?? stringValue(sourceEvent?.timestamp) ?? String(Date.now());
+
+  const records = channels.flatMap((item) => {
+    const channel = objectValue(item);
+    if (!channel) return [];
+    const channelNumber = integerValue(channel.channel);
+    if (!channelNumber) return [];
+    const value = channelValue(channel);
+    if (value === null) return [];
+
+    const [slotId, channelId] = slotForChannel(channelNumber);
+    const rawCardType = stringValue(channel.card_type) ?? '';
+    const sensor = stringValue(channel.sensor) ?? '';
+    const unit = stringValue(channel.unit) ?? '';
+    const channelStatus = (stringValue(channel.channel_status) ?? 'ok').toLowerCase();
+    const alertActive = channel.alert_status_code === 1 || String(channel.alert_status ?? '').toLowerCase() === 'active';
+    const dangerActive = channel.danger_status_code === 1 || String(channel.danger_status ?? '').toLowerCase() === 'active';
+
+    return [{
+      slot_id: slotId,
+      channel_id: channelId,
+      point_id: slotId * 100_000 + channelId * 100 + 1,
+      card_type: canonicalCardType(rawCardType),
+      measurement_type: measurementTypeFor(rawCardType, sensor, unit),
+      value,
+      unit,
+      quality: channelStatus && channelStatus !== 'ok' ? 'BAD' : daqValid ? 'GOOD' : 'UNCERTAIN',
+      freshness: telemetryFresh ? 'FRESH' : 'STALE',
+      source_timestamp_us: sourceTimestampUs,
+      source_sequence: sourceSequence,
+      sensor: sensor || undefined,
+      channel_status: channelStatus || undefined,
+      alert_threshold: thresholdValue(channel, 'alert') ?? undefined,
+      danger_threshold: thresholdValue(channel, 'danger') ?? undefined,
+      alert_state: alertActive ? 'ACTIVE' : 'INACTIVE',
+      danger_state: dangerActive ? 'ACTIVE' : 'INACTIVE',
+    }];
+  });
+
+  return {
+    schema: 'ultron.measurement.batch',
+    schema_version: '1.1',
+    message_id: hashUuid(`cc-v3|${parsed.gatewayId}|${rackId}|${sourceSequence}|${sourceTimestampUs}|${snapshotHash}|${deliveryId}`),
+    gateway_id: parsed.gatewayId,
+    gateway_boot_id: hashUuid(`cc-v3-boot|${parsed.gatewayId}|${stringValue(objectValue(raw.connection)?.connected_at) ?? ''}`),
+    gateway_ip: gatewayIp,
+    rack_id: rackId,
+    gateway_sequence: messageSequence ?? sourceSequence,
+    created_at: new Date(Number(sourceTimestampUs) / 1000).toISOString(),
+    replayed: raw.replayed === true,
+    payload: {
+      batch_sequence: messageSequence ?? sourceSequence,
+      record_count: records.length,
+      records,
+      source_format: CC_V3_SCHEMA,
+    },
+  };
 }
 
 // Optional per-channel detail (sensor, thresholds, alarm state) reported by
@@ -566,14 +771,20 @@ export async function ingestMqttMessage(topic: string, rawMessage: unknown, sour
   }
   if (parsed.kind === 'command_request') return { kind: parsed.kind, fresh: false };
 
-  const envelopeErrors = validateEnvelope(rawMessage);
+  const normalizedRawMessage = normalizeCcV3SnapshotMessage(rawMessage, parsed, sourceEvent);
+  const messageForIngest = normalizedRawMessage ?? rawMessage;
+  const sourceForClaim = normalizedRawMessage
+    ? { ...(sourceEvent ?? {}), raw_payload_format: CC_V3_SCHEMA, raw_payload: rawMessage }
+    : sourceEvent;
+
+  const envelopeErrors = validateEnvelope(messageForIngest);
   if (envelopeErrors.length > 0) {
     const reason = `envelope: ${envelopeErrors.join('; ')}`;
-    await quarantine(topic, reason, rawMessage as Partial<MqttEnvelope>);
+    await quarantine(topic, reason, messageForIngest as Partial<MqttEnvelope>);
     return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
 
-  const msg = rawMessage as MqttEnvelope;
+  const msg = messageForIngest as MqttEnvelope;
   const expectedSchema = SCHEMA_FOR_KIND[parsed.kind];
   if (expectedSchema && msg.schema !== expectedSchema) {
     const reason = `schema ${msg.schema} does not match topic kind ${parsed.kind}`;
@@ -600,7 +811,7 @@ export async function ingestMqttMessage(topic: string, rawMessage: unknown, sour
   }
 
   const binding = await bind(msg);
-  const fresh = await claimMessage(msg, topic, sourceEvent);
+  const fresh = await claimMessage(msg, topic, sourceForClaim);
   if (!fresh || binding.status === 'QUARANTINED') {
     if (fresh && binding.status === 'QUARANTINED') {
       await quarantine(topic, binding.reason ?? 'gateway not commissioned', msg);

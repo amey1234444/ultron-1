@@ -14,7 +14,7 @@ import signal
 import time
 from typing import Callable
 
-from .cc_source import CcV3Feed, build_reader
+from .cc_source import CcV3Feed, build_looping_fixture_reader, build_reader
 from .cc_v3 import CcSnapshot
 from .command_consumer import CommandConsumer
 from .config import Config
@@ -57,7 +57,12 @@ def run_simulator(config: Config, publisher: Publisher, is_running: Callable[[],
 def run_cc_v3(config: Config, publisher: Publisher, is_running: Callable[[], bool], status: Callable[[str], None]) -> None:
     """Republish v3 CC frames: retained inventory on layout changes, telemetry
     per frame, edge-triggered alarms, and link health as the gateway state."""
-    reader = build_reader(config.cc_v3_path, config.cc_v3_tcp_host, config.cc_v3_tcp_port)
+    use_test_loop = config.data_source in {"cc_v3_test_loop", "cc-v3-test-loop", "cc_test_loop", "test_loop"}
+    reader = (
+        build_looping_fixture_reader(config.cc_v3_test_fixture_path)
+        if use_test_loop
+        else build_reader(config.cc_v3_path, config.cc_v3_tcp_host, config.cc_v3_tcp_port)
+    )
     feed = CcV3Feed(
         reader,
         rack_number_map=config.rack_number_map,
@@ -65,7 +70,11 @@ def run_cc_v3(config: Config, publisher: Publisher, is_running: Callable[[], boo
         fallback_rack_id=config.primary_rack_id,
         controller_slot_id=config.controller_slot_id,
     )
-    source_label = f"{config.cc_v3_tcp_host}:{config.cc_v3_tcp_port}" if config.cc_v3_tcp_host and config.cc_v3_tcp_port else config.cc_v3_path
+    source_label = (
+        f"looping fixture {config.cc_v3_test_fixture_path}"
+        if use_test_loop
+        else f"{config.cc_v3_tcp_host}:{config.cc_v3_tcp_port}" if config.cc_v3_tcp_host and config.cc_v3_tcp_port else config.cc_v3_path
+    )
     print(f"[cc-v3] reading CC telemetry from {source_label}")
 
     batch_sequence = 0
@@ -83,7 +92,10 @@ def run_cc_v3(config: Config, publisher: Publisher, is_running: Callable[[], boo
                     print(f"[cc-v3] rack {snapshot.rack_number} -> rack_id {snapshot.rack_id}: inventory revision {inventory['snapshot_revision']}")
 
                 batch_sequence += 1
-                publisher.telemetry(snapshot.rack_id, batch_sequence, [m.to_record() for m in snapshot.measurements])
+                if config.mqtt_payload_format in {"cc_v3_raw", "cc-v3-raw", "raw"}:
+                    publisher.raw_telemetry(snapshot.rack_id, snapshot.raw_frame)
+                else:
+                    publisher.telemetry(snapshot.rack_id, batch_sequence, [m.to_record() for m in snapshot.measurements])
                 for alarm in feed.alarm_transitions(snapshot):
                     publisher.event(snapshot.rack_id, "alarm", alarm.to_payload())
                 last_frame_at = time.monotonic()
@@ -140,7 +152,7 @@ def main() -> None:
 
     _install_signal_handlers(stop)
 
-    run = run_cc_v3 if config.data_source in {"cc_v3", "cc-v3", "cc"} else run_simulator
+    run = run_cc_v3 if config.data_source in {"cc_v3", "cc-v3", "cc", "cc_v3_test_loop", "cc-v3-test-loop", "cc_test_loop", "test_loop"} else run_simulator
     run(config, publisher, lambda: running, publish_status)
 
     publish_status("OFFLINE")

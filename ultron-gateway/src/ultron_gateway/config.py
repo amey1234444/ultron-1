@@ -102,6 +102,9 @@ class Config:
     cc_v3_path: str = field(
         default_factory=lambda: os.environ.get("CC_V3_TELEMETRY_PATH", "/home/mtb/Desktop/UltronGateway/latest_telemetry.json")
     )
+    cc_v3_test_fixture_path: str = field(
+        default_factory=lambda: os.environ.get("CC_V3_TEST_FIXTURE_PATH", "tests/fixtures/cc_v3_telemetry.json")
+    )
     cc_v3_tcp_host: str | None = field(default_factory=lambda: os.environ.get("CC_V3_TCP_HOST") or None)
     cc_v3_tcp_port: int | None = field(
         default_factory=lambda: int(os.environ["CC_V3_TCP_PORT"]) if os.environ.get("CC_V3_TCP_PORT") else None
@@ -110,6 +113,9 @@ class Config:
     controller_slot_id: int = field(default_factory=lambda: int(os.environ.get("CC_CONTROLLER_SLOT", "13")))
     rack_number_map: dict[str, int] = field(default_factory=_rack_number_map_from_env)
     channel_slot_map: dict[int, tuple[int, int]] = field(default_factory=_channel_slot_map_from_env)
+    # cc_v3_raw publishes the exact normalized frame v3 writes/streams on the
+    # rack telemetry topic. canonical keeps the older measurement-batch envelope.
+    mqtt_payload_format: str = field(default_factory=lambda: os.environ.get("MQTT_PAYLOAD_FORMAT", "cc_v3_raw").strip().lower())
 
     @property
     def primary_rack_id(self) -> int:

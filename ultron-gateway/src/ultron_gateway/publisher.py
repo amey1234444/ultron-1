@@ -5,6 +5,7 @@ telemetry/events not.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from .envelope import EnvelopeBuilder
@@ -22,6 +23,13 @@ class Publisher:
 
     def _send(self, topic: str, message: dict[str, Any], retain: bool) -> None:
         validate_envelope(message)
+        print(f"[mqtt-publish] topic={topic} retain={retain} payload={json.dumps(message, separators=(',', ':'), sort_keys=True)}", flush=True)
+        if self._client.connected and self._client.publish(topic, message, retain=retain):
+            return
+        self._spool.push(topic, message, retain=retain)
+
+    def _send_raw(self, topic: str, message: dict[str, Any], retain: bool) -> None:
+        print(f"[mqtt-publish] topic={topic} retain={retain} payload={json.dumps(message, separators=(',', ':'), sort_keys=True)}", flush=True)
         if self._client.connected and self._client.publish(topic, message, retain=retain):
             return
         self._spool.push(topic, message, retain=retain)
@@ -43,6 +51,9 @@ class Publisher:
         payload = {"batch_sequence": batch_sequence, "record_count": len(records), "records": records}
         message = self._envelope.build("ultron.measurement.batch", rack_id, payload)
         self._send(topics.telemetry(self._envelope.gateway_id, rack_id), message, retain=False)
+
+    def raw_telemetry(self, rack_id: int, payload: dict[str, Any]) -> None:
+        self._send_raw(topics.telemetry(self._envelope.gateway_id, rack_id), payload, retain=False)
 
     def event(self, rack_id: int, kind: str, payload: dict[str, Any]) -> None:
         message = self._envelope.build(f"ultron.event.{kind}", rack_id, payload)

@@ -105,6 +105,7 @@ class CcSnapshot:
     daq_valid: bool
     message_sequence: int
     received_at_us: int
+    raw_frame: dict[str, Any]
 
 
 def parse_iso_us(value: Any) -> int | None:
@@ -333,4 +334,5 @@ def normalize(
         daq_valid=daq_valid,
         message_sequence=message_sequence if isinstance(message_sequence, int) else 0,
         received_at_us=received_at_us,
+        raw_frame=snapshot,
     )

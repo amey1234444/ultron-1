@@ -53,6 +53,27 @@ class FileSnapshotReader:
         return None
 
 
+class LoopingFixtureSnapshotReader:
+    """Returns the same tested CC v3 fixture on every poll."""
+
+    def __init__(self, path: str) -> None:
+        fixture_path = Path(path)
+        if not fixture_path.is_absolute():
+            candidates = [
+                Path.cwd() / fixture_path,
+                Path(__file__).resolve().parents[2] / fixture_path,
+            ]
+            fixture_path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
+        self._path = fixture_path
+        self._frame = json.loads(self._path.read_text(encoding="utf-8"))
+
+    def read(self) -> dict[str, Any] | None:
+        return json.loads(json.dumps(self._frame))
+
+    def close(self) -> None:
+        return None
+
+
 class TcpSnapshotReader:
     """Client for a v3 stream of newline-delimited JSON frames."""
 
@@ -181,3 +202,7 @@ def build_reader(path: str, tcp_host: str | None, tcp_port: int | None) -> Snaps
     if tcp_host and tcp_port:
         return TcpSnapshotReader(tcp_host, tcp_port)
     return FileSnapshotReader(path)
+
+
+def build_looping_fixture_reader(path: str) -> SnapshotReader:
+    return LoopingFixtureSnapshotReader(path)

@@ -47,6 +47,15 @@ uses simulated UI data.
 
 ## CC v3 telemetry (`DATA_SOURCE=cc_v3`)
 
+Set `MQTT_PAYLOAD_FORMAT=cc_v3_raw` to publish the exact normalized CC v3 JSON
+frame on the rack telemetry topic. This is the default. Set
+`MQTT_PAYLOAD_FORMAT=canonical` to publish the older `ultron.measurement.batch`
+envelope instead.
+
+For dashboard smoke tests, set `DATA_SOURCE=cc_v3_test_loop`. The gateway will
+publish `CC_V3_TEST_FIXTURE_PATH` repeatedly, using the checked-in tested fixture
+by default.
+
 Ultron Gateway v3 normalizes each CC/DAQ frame and rewrites
 `latest_telemetry.json` (or streams newline-delimited frames over TCP —
 `CC_V3_TCP_HOST`/`CC_V3_TCP_PORT`). `cc_v3.py` translates a frame into the
