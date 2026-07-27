@@ -76,6 +76,14 @@ function studioCardConfig(type, slot) {
   };
 }
 
+const CONTROLLER_SLOT = 13;
+const CONTROLLER_SLOT_PAYLOAD = {
+  slot_number: CONTROLLER_SLOT,
+  card_type: 'Communication Controller',
+  sensor: 'Rack Communication',
+  unit: '',
+};
+
 function createdAtUs(msg) {
   return /^\d+$/.test(String(msg.created_at_us ?? '')) ? msg.created_at_us : '0';
 }
@@ -256,7 +264,11 @@ async function ensureStudioRackAndSlots(msg, slots = []) {
   if (!deviceId) return;
 
   let cardsChanged = 0;
-  for (const slot of slots) {
+  const studioSlots = [...slots];
+  if (!studioSlots.some((slot) => Number(slot?.slot_number) === CONTROLLER_SLOT)) {
+    studioSlots.push(CONTROLLER_SLOT_PAYLOAD);
+  }
+  for (const slot of studioSlots) {
     if (!Number.isInteger(slot?.slot_number) || slot.slot_number < 1) continue;
     const type = studioCardType(slot);
     const cardId = stableId('auto-card', msg.gateway_id, msg.rack_id, String(slot.slot_number));
@@ -280,6 +292,57 @@ async function ensureStudioRackAndSlots(msg, slots = []) {
   if (rackChanged > 0 || cardsChanged > 0) {
     await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
   }
+}
+
+async function upsertControllerSlot(msg, online) {
+  if (typeof msg.rack_id !== 'string') return;
+  await query(
+    `INSERT INTO rack_inventory_slots (
+       gateway_id, rack_id, slot_number, presence, online_state, card_type,
+       snapshot_revision, card_type_code, sensor_code, sensor, unit_code, unit,
+       decimal_places, slot_payload, updated_at
+     )
+     VALUES ($1,$2,$3,$4,$5,'Communication Controller',$6,NULL,NULL,'Rack Communication',NULL,'',NULL,$7,now())
+     ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
+       presence = EXCLUDED.presence,
+       online_state = EXCLUDED.online_state,
+       card_type = EXCLUDED.card_type,
+       sensor = EXCLUDED.sensor,
+       unit = EXCLUDED.unit,
+       slot_payload = rack_inventory_slots.slot_payload || EXCLUDED.slot_payload,
+       updated_at = now()`,
+    [
+      msg.gateway_id,
+      msg.rack_id,
+      CONTROLLER_SLOT,
+      online ? 'PRESENT' : 'ABSENT',
+      online ? 'ONLINE' : 'OFFLINE',
+      msg.gateway_sequence,
+      json({ ...CONTROLLER_SLOT_PAYLOAD, online }),
+    ],
+  );
+}
+
+async function refreshGatewayRackState(gatewayId) {
+  await query(
+    `UPDATE gateways g
+     SET connected_racks = counts.connected_racks,
+         stale_racks = counts.stale_racks,
+         disconnected_racks = counts.disconnected_racks,
+         status = CASE WHEN counts.connected_racks > 0 THEN 'ONLINE' ELSE 'OFFLINE' END,
+         mqtt_state = CASE WHEN counts.connected_racks > 0 THEN 'CONNECTED' ELSE 'DISCONNECTED' END,
+         updated_at = now()
+     FROM (
+       SELECT
+         count(*) FILTER (WHERE active = true AND status = 'connected' AND data_current = true)::int AS connected_racks,
+         count(*) FILTER (WHERE active = true AND status = 'connected' AND data_current = false)::int AS stale_racks,
+         count(*) FILTER (WHERE active = false OR status <> 'connected')::int AS disconnected_racks
+       FROM racks
+       WHERE gateway_id = $1
+     ) counts
+     WHERE g.gateway_id = $1`,
+    [gatewayId],
+  );
 }
 
 async function currentGatewayAllows(msg, force = false) {
@@ -455,6 +518,8 @@ export async function handleTopology(msg) {
   for (const rack of racks) {
     const rackMsg = { ...msg, rack_id: rack.rack_id, payload: rack };
     await upsertRack(rackMsg, { status: rack.status ?? 'unknown', dataCurrent: rack.data_current === true });
+    await ensureStudioRackAndSlots(rackMsg);
+    await upsertControllerSlot(rackMsg, rack.status === 'connected' && rack.data_current === true);
     activeRackIds.push(rack.rack_id);
   }
 
@@ -463,6 +528,12 @@ export async function handleTopology(msg) {
      WHERE gateway_id = $1 AND NOT (rack_id = ANY($2::text[]))`,
     [msg.gateway_id, activeRackIds],
   );
+  await query(
+    `UPDATE rack_inventory_slots SET presence = 'ABSENT', online_state = 'OFFLINE', updated_at = now()
+     WHERE gateway_id = $1 AND slot_number = $2 AND NOT (rack_id = ANY($3::text[]))`,
+    [msg.gateway_id, CONTROLLER_SLOT, activeRackIds],
+  );
+  await refreshGatewayRackState(msg.gateway_id);
 }
 
 export async function handleRackHealth(msg) {
@@ -472,6 +543,7 @@ export async function handleRackHealth(msg) {
   }
   await upsertRack(msg);
   await ensureStudioRackAndSlots(msg);
+  await upsertControllerSlot(msg, msg.payload.data_current === true);
   if (msg.payload.data_current !== true) {
     await query(
       `UPDATE rack_slot_latest SET live = false, measurement_valid = false, updated_at = now()
@@ -479,6 +551,7 @@ export async function handleRackHealth(msg) {
       [msg.gateway_id, msg.rack_id],
     );
   }
+  await refreshGatewayRackState(msg.gateway_id);
 }
 
 export async function handleInventory(msg) {
@@ -662,6 +735,8 @@ export async function handleTelemetry(msg) {
       slotParams(msg, slot),
     );
   }
+  await upsertControllerSlot(msg, msg.payload.telemetry?.data_current === true);
+  await refreshGatewayRackState(msg.gateway_id);
   return slots.length;
 }
 
@@ -684,7 +759,13 @@ export async function handleTombstone(topic, parsed) {
        WHERE gateway_id = $1 AND rack_id = $2`,
       [parsed.gatewayId, parsed.rackId],
     );
+    await query(
+      `UPDATE rack_inventory_slots SET presence = 'ABSENT', online_state = 'OFFLINE', updated_at = now()
+       WHERE gateway_id = $1 AND rack_id = $2 AND slot_number = $3`,
+      [parsed.gatewayId, parsed.rackId, CONTROLLER_SLOT],
+    );
     await query(`UPDATE rack_slot_latest SET live = false, measurement_valid = false WHERE gateway_id = $1 AND rack_id = $2`, [parsed.gatewayId, parsed.rackId]);
+    await refreshGatewayRackState(parsed.gatewayId);
   }
 }
 
@@ -693,5 +774,19 @@ export async function markStaleGateways(staleAfterS) {
     `UPDATE gateways SET status = 'OFFLINE', mqtt_state = 'DISCONNECTED', updated_at = now()
      WHERE status = 'ONLINE' AND last_seen_at < now() - make_interval(secs => $1)`,
     [staleAfterS],
+  );
+  await query(
+    `UPDATE racks SET status = 'unknown', data_current = false, updated_at = now()
+     WHERE gateway_id IN (
+       SELECT gateway_id FROM gateways
+       WHERE status = 'OFFLINE'
+     )
+       AND (status <> 'unknown' OR data_current = true)`,
+  );
+  await query(
+    `UPDATE rack_inventory_slots SET presence = 'ABSENT', online_state = 'OFFLINE', updated_at = now()
+     WHERE slot_number = $1
+       AND gateway_id IN (SELECT gateway_id FROM gateways WHERE status = 'OFFLINE')`,
+    [CONTROLLER_SLOT],
   );
 }

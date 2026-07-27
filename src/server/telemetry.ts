@@ -201,6 +201,11 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
     ...unconfiguredGateways.rows.map((g: UnconfiguredGatewayRow) => g.gateway_id),
     ...allAlerts.map((a: AlertRow) => a.gateway_id),
   ]);
+  const onlineRackGatewayIds = new Set(
+    racks.rows
+      .filter((r: RackRow) => r.active && r.status === 'connected' && r.data_current)
+      .map((r: RackRow) => r.gateway_id),
+  );
   return {
     gateways: gateways.rows.map((g: GatewayRow) => ({
       gatewayId: g.gateway_id,
@@ -210,7 +215,9 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
           ? 'QUARANTINED'
           : g.status === 'OFFLINE'
             ? 'OFFLINE'
-            : g.status,
+            : onlineRackGatewayIds.has(g.gateway_id)
+              ? g.status
+              : 'OFFLINE',
       lastSeenAt: g.last_seen_at ? g.last_seen_at.toISOString() : null,
     })),
     racks: racks.rows.filter((r: RackRow) => !blockedGatewayIds.has(r.gateway_id)).map((r: RackRow) => ({
