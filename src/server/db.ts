@@ -511,7 +511,17 @@ async function migrate(): Promise<void> {
       PRIMARY KEY (gateway_id, rack_id, slot_id)
     );
   `);
-  await query(`CREATE INDEX IF NOT EXISTS rack_inventory_slots_live ON rack_inventory_slots (gateway_id, rack_id, slot_id);`);
+  await query(`
+    DO $$
+    BEGIN
+      IF EXISTS (
+        SELECT 1 FROM information_schema.columns
+        WHERE table_name = 'rack_inventory_slots' AND column_name = 'slot_id'
+      ) THEN
+        EXECUTE 'CREATE INDEX IF NOT EXISTS rack_inventory_slots_live ON rack_inventory_slots (gateway_id, rack_id, slot_id)';
+      END IF;
+    END $$;
+  `);
   await query(`
     CREATE TABLE IF NOT EXISTS measurement_latest (
       gateway_id          TEXT NOT NULL,
@@ -667,6 +677,7 @@ async function migrate(): Promise<void> {
   await query(`ALTER TABLE rack_inventory_slots ADD COLUMN IF NOT EXISTS unit TEXT;`);
   await query(`ALTER TABLE rack_inventory_slots ADD COLUMN IF NOT EXISTS decimal_places INT;`);
   await query(`ALTER TABLE rack_inventory_slots ADD COLUMN IF NOT EXISTS slot_payload JSONB NOT NULL DEFAULT '{}'::jsonb;`);
+  await query(`CREATE INDEX IF NOT EXISTS rack_inventory_slots_live ON rack_inventory_slots (gateway_id, rack_id, slot_number);`);
 
   await query(`
     CREATE TABLE IF NOT EXISTS rack_slot_latest (
