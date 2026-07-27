@@ -82,6 +82,72 @@ function stringValue(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
+function stableId(prefix: string, ...parts: string[]): string {
+  return `${prefix}-${createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 16)}`;
+}
+
+function studioCardType(slot: Record<string, unknown>): 'Vibration Card' | 'Process Card' | 'Speed Card' | 'Communication Controller' {
+  const normalized = [slot.card_type, slot.sensor, slot.unit, slot.value_with_unit]
+    .map((value) => String(value ?? '').trim().toLowerCase())
+    .filter(Boolean)
+    .join(' ');
+  if (normalized.includes('vibration')) return 'Vibration Card';
+  if (normalized.includes('speed')) return 'Speed Card';
+  if (normalized.includes('rpm')) return 'Speed Card';
+  if (normalized.includes('communication')) return 'Communication Controller';
+  if (normalized.includes('controller')) return 'Communication Controller';
+  return 'Process Card';
+}
+
+function studioCardConfig(type: ReturnType<typeof studioCardType>, slot: Record<string, unknown>): Record<string, unknown> {
+  const unit = stringValue(slot.unit) ?? '';
+  const sensor = stringValue(slot.sensor) ?? '';
+  const label = sensor || stringValue(slot.card_type) || `Slot ${slot.slot_number}`;
+  const warning = stringValue(slot.alert_value_formatted) ?? '';
+  const critical = stringValue(slot.danger_value_formatted) ?? '';
+  if (type === 'Vibration Card') {
+    return {
+      channelNames: [label, ''],
+      sensorType: sensor,
+      sensitivity: '',
+      engineeringUnit: unit || 'mm/s',
+      measurementRangeMin: '',
+      measurementRangeMax: '',
+      samplingRate: '',
+      alarmWarning: warning,
+      alarmCritical: critical,
+    };
+  }
+  if (type === 'Speed Card') {
+    return {
+      channelNames: [label, ''],
+      inputType: 'RPM',
+      pulsesPerRevolution: '',
+      trigger: '',
+      hysteresis: '',
+      minSpeed: '',
+      maxSpeed: '',
+      alarmWarning: warning,
+      alarmCritical: critical,
+    };
+  }
+  if (type === 'Communication Controller') {
+    return { controllerName: label, ip: '', port: '', firmware: '', role: 'Primary', partnerController: '' };
+  }
+  return {
+    channelNames: [label, '', '', ''],
+    inputType: sensor.toLowerCase().includes('rtd') ? 'RTD 3-wire' : sensor.toLowerCase().includes('thermocouple') ? 'Thermocouple' : '4-20 mA',
+    engineeringMin: '',
+    engineeringMax: '',
+    unit,
+    scaling: '',
+    offset: '',
+    filter: '',
+    alarmWarning: warning,
+    alarmCritical: critical,
+  };
+}
+
 function intValue(value: unknown): number | null {
   return Number.isInteger(value) ? (value as number) : null;
 }
@@ -184,8 +250,136 @@ async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string 
        updated_at = now()`,
     [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, process.env.MQTT_BACKEND_CLIENT_ID ?? 'ultron-backend-webhook'],
   );
-  if (msg.rack_id) await upsertRack(msg, { status: 'unknown', dataCurrent: false });
+  if (msg.rack_id) await ensureRack(msg);
   return { status: 'ONLINE', event: 'BOUND' };
+}
+
+async function ensureRack(msg: MqttEnvelope): Promise<void> {
+  if (!msg.rack_id) return;
+  await query(
+    `INSERT INTO racks (
+       gateway_id, rack_id, last_gateway_boot_id, last_gateway_sequence,
+       last_source_created_at, last_source_created_at_us, active, updated_at
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,true,now())
+     ON CONFLICT (gateway_id, rack_id) DO UPDATE SET
+       active = true,
+       updated_at = now()`,
+    [msg.gateway_id, msg.rack_id, msg.gateway_boot_id, msg.gateway_sequence, dateValue(msg.created_at), createdAtUs(msg)],
+  );
+}
+
+async function ensureStudioRackAndSlots(msg: MqttEnvelope, slots: Record<string, unknown>[] = []): Promise<void> {
+  if (!msg.rack_id) return;
+  const gateway = await query<{ id: string; project_id: string | null }>(
+    `SELECT id, project_id
+     FROM studio_devices
+     WHERE type = 'Gateway'
+       AND archived = false
+       AND real_gateway_id = $1
+     ORDER BY sort_order, name
+     LIMIT 1`,
+    [msg.gateway_id],
+  );
+  const gatewayDevice = gateway.rows[0];
+  if (!gatewayDevice) return;
+
+  const connection = objectValue(msg.payload.connection) ?? {};
+  const currentIp = stringValue(connection.current_ip ?? msg.payload.current_ip) ?? '';
+  const rack = await query<{ id: string }>(
+    `SELECT id
+     FROM studio_devices
+     WHERE type = 'Rack'
+       AND archived = false
+       AND gateway_id = $4
+       AND (
+         (real_gateway_id = $1 AND real_rack_id = $2)
+         OR ($3 <> '' AND ip = $3)
+       )
+     ORDER BY
+       CASE WHEN real_gateway_id = $1 AND real_rack_id = $2 THEN 0 ELSE 1 END,
+       sort_order,
+       name
+     LIMIT 1`,
+    [msg.gateway_id, msg.rack_id, currentIp, gatewayDevice.id],
+  );
+  let deviceId = rack.rows[0]?.id;
+  let rackChanged = 0;
+  if (deviceId) {
+    const updated = await query(
+      `UPDATE studio_devices
+       SET real_gateway_id = $1,
+           real_rack_id = $2,
+           gateway_id = $3,
+           project_id = COALESCE(project_id, $4),
+           ip = CASE WHEN $5 <> '' THEN $5 ELSE ip END,
+           updated_at = now()
+       WHERE id = $6
+         AND (
+           real_gateway_id IS DISTINCT FROM $1
+           OR real_rack_id IS DISTINCT FROM $2
+           OR gateway_id IS DISTINCT FROM $3
+           OR ($5 <> '' AND ip IS DISTINCT FROM $5)
+         )`,
+      [msg.gateway_id, msg.rack_id, gatewayDevice.id, gatewayDevice.project_id, currentIp, deviceId],
+    );
+    rackChanged = updated.rowCount ?? 0;
+  } else {
+    const rackDeviceId = stableId('auto-rack', msg.gateway_id, msg.rack_id);
+    const inserted = await query(
+      `INSERT INTO studio_devices (
+         id, name, type, model, ip, port, protocol, description, status,
+         project_id, gateway_id, real_gateway_id, real_rack_id, archived, sort_order
+       )
+       VALUES ($1,$2,'Rack','RACK-12-R',$3,'','Modbus TCP',$4,'Not Connected',
+              $5,$6,$7,$8,false,
+              COALESCE((SELECT max(sort_order) + 1 FROM studio_devices), 0))`,
+      [
+        rackDeviceId,
+        msg.rack_id,
+        currentIp,
+        'Auto-discovered from Ultron MQTT live state',
+        gatewayDevice.project_id,
+        gatewayDevice.id,
+        msg.gateway_id,
+        msg.rack_id,
+      ],
+    );
+    deviceId = rackDeviceId;
+    rackChanged = inserted.rowCount ?? 0;
+  }
+  if (!deviceId) return;
+
+  let cardsChanged = 0;
+  for (const slot of slots) {
+    if (!Number.isInteger(slot.slot_number) || Number(slot.slot_number) < 1) continue;
+    const type = studioCardType(slot);
+    const card = await query(
+      `INSERT INTO studio_cards (id, device_id, slot, type, enabled, config, sort_order)
+       VALUES ($1,$2,$3,$4,true,$5::jsonb,
+              COALESCE((SELECT max(sort_order) + 1 FROM studio_cards WHERE device_id = $2), 0))
+       ON CONFLICT (device_id, slot) DO UPDATE SET
+         type = EXCLUDED.type,
+         enabled = true,
+         config = EXCLUDED.config,
+         updated_at = now()
+       WHERE studio_cards.type IS DISTINCT FROM EXCLUDED.type
+          OR studio_cards.enabled IS DISTINCT FROM true
+          OR studio_cards.config IS DISTINCT FROM EXCLUDED.config`,
+      [
+        stableId('auto-card', msg.gateway_id, msg.rack_id, String(slot.slot_number)),
+        deviceId,
+        slot.slot_number,
+        type,
+        JSON.stringify(studioCardConfig(type, slot)),
+      ],
+    );
+    cardsChanged += card.rowCount ?? 0;
+  }
+
+  if (rackChanged > 0 || cardsChanged > 0) {
+    await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
+  }
 }
 
 async function claimMessage(msg: MqttEnvelope, topic: string, sourceEvent?: Record<string, unknown> | null): Promise<boolean> {
@@ -346,16 +540,17 @@ async function handleTopology(msg: MqttEnvelope): Promise<void> {
 async function handleRackHealth(msg: MqttEnvelope): Promise<void> {
   if (!(await rackAllows(msg))) return;
   await upsertRack(msg);
+  await ensureStudioRackAndSlots(msg);
   if (msg.payload.data_current !== true) {
     await query(`UPDATE rack_slot_latest SET live = false, measurement_valid = false, updated_at = now() WHERE gateway_id = $1 AND rack_id = $2`, [msg.gateway_id, msg.rack_id]);
   }
 }
 
 async function handleInventory(msg: MqttEnvelope): Promise<void> {
-  if (!(await rackAllows(msg))) return;
-  await upsertRack(msg, { dataCurrent: false });
+  await ensureRack(msg);
   const revision = Number(msg.payload.snapshot_revision);
   const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots.map(objectValue).filter(Boolean) as Record<string, unknown>[] : [];
+  await ensureStudioRackAndSlots(msg, slots);
   for (const slot of slots) {
     await query(
       `INSERT INTO rack_inventory_slots (
@@ -407,7 +602,42 @@ async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
   if (!(await rackAllows(msg))) return 0;
   await upsertRack(msg, { status: 'connected', dataCurrent: objectValue(msg.payload.telemetry)?.data_current === true });
   const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots.map(objectValue).filter(Boolean) as Record<string, unknown>[] : [];
+  await ensureStudioRackAndSlots(msg, slots);
   for (const slot of slots) {
+    await query(
+      `INSERT INTO rack_inventory_slots (
+         gateway_id, rack_id, slot_number, presence, online_state, card_type,
+         snapshot_revision, card_type_code, sensor_code, sensor, unit_code, unit,
+         decimal_places, slot_payload, updated_at
+       )
+       VALUES ($1,$2,$3,'PRESENT','ONLINE',$4,$5,$6,$7,$8,$9,$10,$11,$12,now())
+       ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
+         presence = EXCLUDED.presence,
+         online_state = EXCLUDED.online_state,
+         card_type = COALESCE(EXCLUDED.card_type, rack_inventory_slots.card_type),
+         card_type_code = COALESCE(EXCLUDED.card_type_code, rack_inventory_slots.card_type_code),
+         sensor_code = COALESCE(EXCLUDED.sensor_code, rack_inventory_slots.sensor_code),
+         sensor = COALESCE(EXCLUDED.sensor, rack_inventory_slots.sensor),
+         unit_code = COALESCE(EXCLUDED.unit_code, rack_inventory_slots.unit_code),
+         unit = COALESCE(EXCLUDED.unit, rack_inventory_slots.unit),
+         decimal_places = COALESCE(EXCLUDED.decimal_places, rack_inventory_slots.decimal_places),
+         slot_payload = rack_inventory_slots.slot_payload || EXCLUDED.slot_payload,
+         updated_at = now()`,
+      [
+        msg.gateway_id,
+        msg.rack_id,
+        slot.slot_number,
+        stringValue(slot.card_type),
+        msg.gateway_sequence,
+        intValue(slot.card_type_code),
+        intValue(slot.sensor_code),
+        stringValue(slot.sensor),
+        intValue(slot.unit_code),
+        stringValue(slot.unit),
+        intValue(slot.decimal_places),
+        json(slot),
+      ],
+    );
     await query(
       `INSERT INTO rack_slot_latest (
          gateway_id, rack_id, slot_number, data_status, channel_status_code, channel_status,

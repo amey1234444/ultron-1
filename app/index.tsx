@@ -382,14 +382,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       racksByGateway.set(key, [...(racksByGateway.get(key) ?? []), device]);
     }
     const needsRackRepair = Array.from(racksByGateway.values()).some((racks) => {
-      const ids = racks.map((rack) => rack.realRackId).filter((id): id is number => typeof id === 'number' && Number.isInteger(id));
+      const ids = racks.map((rack) => (rack.realRackId === undefined || rack.realRackId === null ? '' : String(rack.realRackId))).filter(Boolean);
       if (ids.length !== racks.length) return true;
       const unique = new Set(ids);
-      if (unique.size !== ids.length) return true;
-      for (let id = 1; id <= racks.length; id += 1) {
-        if (!unique.has(id)) return true;
-      }
-      return false;
+      return unique.size !== ids.length;
     });
     if (!needsGatewayIds && !needsRackRepair) return;
 
@@ -408,10 +404,16 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         const key = rackGatewayGroupKey(device, next);
         currentRacksByGateway.set(key, [...(currentRacksByGateway.get(key) ?? []), device]);
       }
-      const nextRackIdByDeviceId = new Map<string, number>();
+      const nextRackIdByDeviceId = new Map<string, string>();
       for (const racks of currentRacksByGateway.values()) {
-        [...racks].sort((a, b) => rackSortValue(a).localeCompare(rackSortValue(b))).forEach((rack, index) => {
-          nextRackIdByDeviceId.set(rack.id, index + 1);
+        const used = new Set(racks.map((rack) => (rack.realRackId === undefined || rack.realRackId === null ? '' : String(rack.realRackId))).filter(Boolean));
+        let nextNumeric = 1;
+        [...racks].sort((a, b) => rackSortValue(a).localeCompare(rackSortValue(b))).forEach((rack) => {
+          if (rack.realRackId !== undefined && rack.realRackId !== null && String(rack.realRackId) !== '') return;
+          while (used.has(String(nextNumeric))) nextNumeric += 1;
+          const assigned = String(nextNumeric);
+          used.add(assigned);
+          nextRackIdByDeviceId.set(rack.id, assigned);
         });
       }
       next = next.map((device) => {
@@ -699,7 +701,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   const handleInstallCard = (deviceId: string, slot: number, type: CardType, config: CardConfig, enabled: boolean) => {
-    setCards((prev) => [...prev, { id: makeId(), deviceId, slot, type, config, enabled }]);
+    setCards((prev) => {
+      const existing = prev.find((card) => card.deviceId === deviceId && card.slot === slot);
+      if (existing) {
+        return prev.map((card) => (card.id === existing.id ? { ...card, type, config, enabled } : card)).filter((card) => card.id === existing.id || card.deviceId !== deviceId || card.slot !== slot);
+      }
+      return [...prev, { id: makeId(), deviceId, slot, type, config, enabled }];
+    });
   };
 
   const handleUpdateCard = (cardId: string, config: CardConfig, enabled: boolean) => {

@@ -396,6 +396,18 @@ async function migrate(): Promise<void> {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS studio_cards_device ON studio_cards (device_id);`);
+  await query(`
+    DELETE FROM studio_cards stale
+    USING studio_cards keep
+    WHERE stale.device_id = keep.device_id
+      AND stale.slot = keep.slot
+      AND (
+        stale.sort_order < keep.sort_order
+        OR (stale.sort_order = keep.sort_order AND stale.updated_at < keep.updated_at)
+        OR (stale.sort_order = keep.sort_order AND stale.updated_at = keep.updated_at AND stale.id < keep.id)
+      );
+  `);
+  await query(`CREATE UNIQUE INDEX IF NOT EXISTS studio_cards_device_slot_unique ON studio_cards (device_id, slot);`);
 
   // Canvas layout per machine: box coordinates + card mappings + trail geometry
   // in fixed 1600x900 stage units. Consumed identically by the configure/design

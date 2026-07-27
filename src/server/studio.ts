@@ -190,7 +190,11 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
     );
   }
   order = 0;
+  const cardBySlot = new Map<string, CardNode>();
   for (const c of data.cards) {
+    cardBySlot.set(`${c.deviceId}|${c.slot}`, c);
+  }
+  for (const c of cardBySlot.values()) {
     await q(
       client,
       `INSERT INTO studio_cards (id, device_id, slot, type, enabled, config, sort_order)

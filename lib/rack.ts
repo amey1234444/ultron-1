@@ -209,7 +209,12 @@ export function listChannels(devices: DeviceNode[], cards: CardNode[], options: 
   const letterCounts: Record<string, number> = {};
 
   return racks.flatMap((rack) => {
-    const rackCards = cards.filter((c) => c.deviceId === rack.id && channelCountForCardType(c.type) > 0).sort((a, b) => a.slot - b.slot);
+    const cardBySlot = new Map<number, CardNode>();
+    for (const card of cards) {
+      if (card.deviceId !== rack.id || channelCountForCardType(card.type) <= 0) continue;
+      cardBySlot.set(card.slot, card);
+    }
+    const rackCards = Array.from(cardBySlot.values()).sort((a, b) => a.slot - b.slot);
 
     return rackCards.flatMap((card) => {
       const names = 'channelNames' in card.config ? card.config.channelNames : [];
