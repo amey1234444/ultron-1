@@ -23,7 +23,7 @@ def test_client_id_derives_from_gateway_id(monkeypatch):
 
 
 def test_rack_ids_parse_csv(monkeypatch):
-    monkeypatch.setenv("RACK_IDS", "1,2,3,4")
+    monkeypatch.setenv("RACK_IDS", "001,Rack-A7,compressor-west")
     cfg = Config()
-    assert cfg.rack_ids == (1, 2, 3, 4)
-    assert cfg.primary_rack_id == 1
+    assert cfg.rack_ids == ("001", "Rack-A7", "compressor-west")
+    assert cfg.primary_rack_id == "001"

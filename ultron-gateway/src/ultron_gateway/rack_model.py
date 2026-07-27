@@ -11,7 +11,7 @@ from typing import Any
 
 @dataclass
 class Slot:
-    slot_id: int
+    slot_number: int
     presence: str = "EMPTY"  # PRESENT | EMPTY
     online_state: str = "UNKNOWN"  # ONLINE | OFFLINE | UNKNOWN
     card_type: str | None = None  # VIBRATION | PROCESS | SPEED | COMMUNICATION_CONTROLLER
@@ -19,7 +19,7 @@ class Slot:
 
 @dataclass
 class Measurement:
-    slot_id: int
+    slot_number: int
     channel_id: int
     point_id: int
     card_type: str
@@ -43,12 +43,16 @@ class Measurement:
 
     def to_record(self) -> dict[str, Any]:
         record: dict[str, Any] = {
-            "slot_id": self.slot_id,
+            "slot_number": self.slot_number,
             "channel_id": self.channel_id,
             "point_id": self.point_id,
             "card_type": self.card_type,
             "measurement_type": self.measurement_type,
             "value": round(self.value, 4),
+            "value_formatted": f"{self.value:.4f}".rstrip("0").rstrip("."),
+            "value_display": f"{self.value:.4f}".rstrip("0").rstrip("."),
+            "value_with_unit": f"{self.value:.4f}".rstrip("0").rstrip(".") + (f" {self.unit}" if self.unit else ""),
+            "measurement_valid": self.quality == "GOOD" and self.freshness == "FRESH",
             "unit": self.unit,
             "quality": self.quality,
             "freshness": self.freshness,
@@ -71,16 +75,18 @@ class Measurement:
 
 @dataclass
 class RackModel:
-    rack_id: int
+    rack_id: str
     snapshot_revision: int = 1
     slots: list[Slot] = field(default_factory=list)
 
     def inventory_payload(self) -> dict[str, Any]:
         return {
+            "rack_id": self.rack_id,
             "snapshot_revision": self.snapshot_revision,
+            "slot_count": len(self.slots),
             "slots": [
                 {
-                    "slot_id": s.slot_id,
+                    "slot_number": s.slot_number,
                     "presence": s.presence,
                     "online_state": s.online_state,
                     **({"card_type": s.card_type} if s.card_type else {}),

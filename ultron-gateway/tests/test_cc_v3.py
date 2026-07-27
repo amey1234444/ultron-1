@@ -14,20 +14,19 @@ def frame() -> dict:
     return json.loads(FIXTURE.read_text(encoding="utf-8"))
 
 
-def test_rack_number_maps_to_an_integer_rack_id():
-    assert rack_id_for("CC_Card_UID1", {}, 9) == 1
-    assert rack_id_for("CC_Card_UID12", {}, 9) == 12
-    assert rack_id_for("CC_Card_UID1", {"CC_Card_UID1": 4}, 9) == 4
-    assert rack_id_for("primary-cc", {}, 9) == 9  # no digits -> configured fallback
+def test_rack_number_maps_to_an_exact_string_rack_id():
+    assert rack_id_for("CC_Card_UID1", {}, "fallback") == "CC_Card_UID1"
+    assert rack_id_for("001", {}, "fallback") == "001"
+    assert rack_id_for("CC_Card_UID1", {"CC_Card_UID1": "Rack-A"}, "fallback") == "Rack-A"
 
 
 def test_every_channel_becomes_its_own_slot_with_a_canonical_card_type():
     snapshot = normalize(frame())
     assert snapshot is not None
-    assert snapshot.rack_id == 1
+    assert snapshot.rack_id == "CC_Card_UID1"
     assert len(snapshot.measurements) == 12
 
-    by_slot = {m.slot_id: m for m in snapshot.measurements}
+    by_slot = {m.slot_number: m for m in snapshot.measurements}
     assert sorted(by_slot) == list(range(1, 13))
     assert all(m.channel_id == 1 for m in snapshot.measurements)
 
@@ -48,28 +47,26 @@ def test_every_channel_becomes_its_own_slot_with_a_canonical_card_type():
 def test_channel_slot_map_can_group_channels_onto_one_card():
     snapshot = normalize(frame(), channel_slot_map={1: (1, 1), 7: (1, 2)})
     assert snapshot is not None
-    slot_one = sorted((m.channel_id, m.value) for m in snapshot.measurements if m.slot_id == 1)
+    slot_one = sorted((m.channel_id, m.value) for m in snapshot.measurements if m.slot_number == 1)
     assert slot_one == [(1, 72.57), (2, 82.42)]
 
 
-def test_inventory_covers_all_slots_including_the_communication_controller():
+def test_inventory_covers_the_slots_supplied_by_the_rack():
     snapshot = normalize(frame())
     assert snapshot is not None
-    slots = {slot["slot_id"]: slot for slot in snapshot.rack.inventory_payload()["slots"]}
-    assert len(slots) == 14
-    assert slots[1]["presence"] == "PRESENT" and slots[1]["online_state"] == "ONLINE"
-    assert slots[13]["card_type"] == "COMMUNICATION_CONTROLLER"
-    assert slots[14]["presence"] == "EMPTY"
+    slots = {slot["slot_number"]: slot for slot in snapshot.inventory_payload(1)["slots"]}
+    assert len(slots) == 12
+    assert slots[1]["card_type"] == "rtd"
 
 
 def test_alarms_follow_alert_and_danger_status():
     snapshot = normalize(frame())
     assert snapshot is not None
-    active = {(a.slot_id, a.severity) for a in snapshot.alarms if a.state == "ACTIVE"}
+    active = {(a.slot_number, a.severity) for a in snapshot.alarms if a.state == "ACTIVE"}
     assert active == {(3, "WARNING"), (3, "CRITICAL"), (7, "WARNING")}
-    critical = next(a for a in snapshot.alarms if a.slot_id == 3 and a.severity == "CRITICAL")
+    critical = next(a for a in snapshot.alarms if a.slot_number == 3 and a.severity == "CRITICAL")
     assert critical.threshold == 7.1 and critical.unit == "mm/s"
-    assert critical.to_payload()["alarm_id"] == "slot3-ch1-critical"
+    assert critical.to_payload()["alarm_id"] == "slot3-critical"
 
 
 def test_disconnected_link_and_invalid_daq_degrade_quality():
@@ -83,12 +80,12 @@ def test_disconnected_link_and_invalid_daq_degrade_quality():
     snapshot = normalize(raw)
     assert snapshot is not None
     assert snapshot.link_connected is False and snapshot.telemetry_fresh is False
-    by_slot = {m.slot_id: m for m in snapshot.measurements}
+    by_slot = {m.slot_number: m for m in snapshot.measurements}
     assert by_slot[1].quality == "BAD"  # channel fault outranks the DAQ state
     assert by_slot[2].quality == "UNCERTAIN"
     assert all(m.freshness == "STALE" for m in snapshot.measurements)
-    slots = {slot["slot_id"]: slot for slot in snapshot.rack.inventory_payload()["slots"]}
-    assert slots[13]["online_state"] == "OFFLINE"
+    slots = {slot["slot_number"]: slot for slot in snapshot.inventory_payload(1)["slots"]}
+    assert slots[1]["card_type"] == "rtd"
 
 
 def test_records_and_envelope_satisfy_the_contract():
@@ -96,14 +93,15 @@ def test_records_and_envelope_satisfy_the_contract():
     assert snapshot is not None
     record = snapshot.measurements[0].to_record()
     assert record["source_timestamp_us"].isdigit()
+    assert record["slot_number"] == 1
     assert isinstance(record["source_sequence"], int)
     assert record["alert_state"] == "INACTIVE" and record["sensor"] == "pt100"
 
     builder = EnvelopeBuilder("ultron-gw-demo-01", "7d9933be-744c-49f5-a017-20523b477e7c", "192.168.30.5", Sequence("/tmp/ultron-cc-v3-test"))
     message = builder.build(
-        "ultron.measurement.batch",
+        "ultron.rack.telemetry",
         snapshot.rack_id,
-        {"batch_sequence": 1, "record_count": len(snapshot.measurements), "records": [m.to_record() for m in snapshot.measurements]},
+        snapshot.telemetry_payload(),
     )
     validate_envelope(message)
 
@@ -142,7 +140,7 @@ def test_feed_only_emits_alarm_edges(tmp_path):
 
     first = feed.poll()
     assert first is not None
-    assert {(a.slot_id, a.severity) for a in feed.alarm_transitions(first)} == {(3, "WARNING"), (3, "CRITICAL"), (7, "WARNING")}
+    assert {(a.slot_number, a.severity) for a in feed.alarm_transitions(first)} == {(3, "WARNING"), (3, "CRITICAL"), (7, "WARNING")}
 
     steady = frame()
     steady["message_sequence"] = 2500
@@ -158,7 +156,7 @@ def test_feed_only_emits_alarm_edges(tmp_path):
     third = feed.poll()
     assert third is not None
     transitions = feed.alarm_transitions(third)
-    assert [(a.slot_id, a.severity, a.state) for a in transitions] == [(3, "CRITICAL", "CLEARED")]
+    assert [(a.slot_number, a.severity, a.state) for a in transitions] == [(3, "CRITICAL", "CLEARED")]
 
 
 def test_file_reader_skips_unchanged_and_broken_frames(tmp_path):

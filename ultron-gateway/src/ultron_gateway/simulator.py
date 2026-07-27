@@ -31,21 +31,18 @@ _CARDS = {
 
 
 class Simulator:
-    def __init__(self, rack_id: int) -> None:
+    def __init__(self, rack_id: str) -> None:
         self.rack = RackModel(rack_id=rack_id, snapshot_revision=1)
         for slot_id in range(1, 13):
             card = _CARDS.get(slot_id)
             self.rack.slots.append(
                 Slot(
-                    slot_id=slot_id,
+                    slot_number=slot_id,
                     presence="PRESENT" if card else "EMPTY",
                     online_state="ONLINE" if card else "UNKNOWN",
                     card_type=card[0] if card else None,
                 )
             )
-        self.rack.slots.append(Slot(slot_id=13, presence="PRESENT", online_state="ONLINE", card_type="COMMUNICATION_CONTROLLER"))
-        self.rack.slots.append(Slot(slot_id=14, presence="EMPTY"))
-
         self._sequence = 0
         self._values: dict[tuple[int, int], float] = {}
         for slot_id, (_, channels, _, _, band) in _CARDS.items():
@@ -66,7 +63,7 @@ class Simulator:
                 self._sequence += 1
                 records.append(
                     Measurement(
-                        slot_id=slot_id,
+                        slot_number=slot_id,
                         channel_id=channel_id,
                         point_id=slot_id * 100_000 + channel_id * 100 + 1,
                         card_type=card_type,

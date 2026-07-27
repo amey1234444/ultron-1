@@ -18,11 +18,14 @@ export type LiveGateway = {
 
 export type LiveMeasurement = {
   gatewayId: string;
-  rackId: number;
+  rackId: string;
   slotId: number;
   channelId: number;
   measurementType: string;
-  value: number;
+  value: number | null;
+  valueDisplay?: string | null;
+  valueWithUnit?: string | null;
+  measurementValid?: boolean;
   unit: string;
   quality: string;
   updatedAt: string;
@@ -40,7 +43,7 @@ export type LiveMeasurement = {
 
 export type LiveSlot = {
   gatewayId: string;
-  rackId: number;
+  rackId: string;
   slotId: number;
   presence: string;
   onlineState: string;
@@ -49,7 +52,7 @@ export type LiveSlot = {
 
 export type LiveRack = {
   gatewayId: string;
-  rackId: number;
+  rackId: string;
   status: string;
   lastSeenAt: string | null;
 };
@@ -87,8 +90,8 @@ type LiveIndex = {
   gatewayByIp: Map<string, LiveGateway>;
   gatewayByPrefix: Map<string, LiveGateway>;
   rackByGatewayRack: Map<string, LiveRack>;
-  rackIdsByGateway: Map<string, number[]>;
-  measurementRackIdsByGateway: Map<string, number[]>;
+  rackIdsByGateway: Map<string, string[]>;
+  measurementRackIdsByGateway: Map<string, string[]>;
   slotByGatewaySlot: Map<string, LiveSlot>;
   measurementsByGateway: Map<string, LiveMeasurement[]>;
   measurementsByGatewayRack: Map<string, LiveMeasurement[]>;
@@ -97,15 +100,15 @@ type LiveIndex = {
 
 const liveIndexCache = new WeakMap<LiveState, LiveIndex>();
 
-function pairKey(a: string, b: number): string {
+function pairKey(a: string, b: string): string {
   return `${a}|${b}`;
 }
 
-function pointKey(gatewayId: string, rackId: number, slotId: number, channelId: number): string {
+function pointKey(gatewayId: string, rackId: string, slotId: number, channelId: number): string {
   return `${gatewayId}|${rackId}|${slotId}|${channelId}`;
 }
 
-function slotKey(gatewayId: string, rackId: number, slotId: number): string {
+function slotKey(gatewayId: string, rackId: string, slotId: number): string {
   return `${gatewayId}|${rackId}|${slotId}`;
 }
 
@@ -181,11 +184,11 @@ function configuredRackForDevice(device: DeviceNode, live: LiveState): LiveRack 
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return undefined;
   const rackId = device.realRackId;
-  if (typeof rackId !== 'number' || !Number.isInteger(rackId)) return undefined;
-  return liveIndex(live).rackByGatewayRack.get(pairKey(gateway.gatewayId, rackId));
+  if (rackId === undefined || rackId === null || String(rackId) === '') return undefined;
+  return liveIndex(live).rackByGatewayRack.get(pairKey(gateway.gatewayId, String(rackId)));
 }
 
-function configuredRackIdForDevice(device: DeviceNode, live: LiveState): number | undefined {
+function configuredRackIdForDevice(device: DeviceNode, live: LiveState): string | undefined {
   return configuredRackForDevice(device, live)?.rackId;
 }
 
@@ -354,7 +357,7 @@ export function activeChannelsForDevice(device: DeviceNode, live: LiveState): { 
   return { active: Math.min(activeKeys.size, total), total };
 }
 
-export function rackIdsForDevice(device: DeviceNode, live: LiveState): number[] {
+export function rackIdsForDevice(device: DeviceNode, live: LiveState): string[] {
   const gateway = gatewayForDevice(device, live);
   if (!gatewayCanShowData(gateway)) return [];
   const configuredRackId = configuredRackIdForDevice(device, live);
@@ -405,6 +408,7 @@ export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId:
   if (!measurement) return 'idle';
   const ageMs = Date.now() - Date.parse(measurement.updatedAt);
   if (measurement.quality && measurement.quality !== 'GOOD') return 'stale';
+  if (measurement.measurementValid === false) return 'stale';
   return ageMs <= ACTIVE_MEASUREMENT_MAX_AGE_MS ? 'active' : 'stale';
 }
 
@@ -421,6 +425,10 @@ export function channelAlarmLevel(measurement: LiveMeasurement | undefined): Cha
 
 export function formatMeasurement(measurement: LiveMeasurement | undefined): string {
   if (!measurement) return '—';
+  if (measurement.measurementValid === false || measurement.quality !== 'GOOD') return '—';
+  if (measurement.valueWithUnit) return measurement.valueWithUnit;
+  if (measurement.valueDisplay) return measurement.unit ? `${measurement.valueDisplay} ${measurement.unit}` : measurement.valueDisplay;
+  if (measurement.value === null) return '—';
   const magnitude = Math.abs(measurement.value);
   const decimals = magnitude >= 100 ? 1 : magnitude >= 1 ? 2 : 3;
   const value = Number.isInteger(measurement.value) ? String(measurement.value) : measurement.value.toFixed(decimals);

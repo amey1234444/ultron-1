@@ -29,9 +29,19 @@ class MqttClient:
             self._client.username_pw_set(config.mqtt_username, config.mqtt_password)
         if config.mqtt_use_tls:
             if config.mqtt_ca_cert:
-                self._client.tls_set(ca_certs=config.mqtt_ca_cert, tls_version=ssl.PROTOCOL_TLS_CLIENT)
+                self._client.tls_set(
+                    ca_certs=config.mqtt_ca_cert,
+                    certfile=config.mqtt_client_cert,
+                    keyfile=config.mqtt_client_key,
+                    tls_version=ssl.PROTOCOL_TLS_CLIENT,
+                )
             else:
-                self._client.tls_set(tls_version=ssl.PROTOCOL_TLS_CLIENT)
+                self._client.tls_set(
+                    certfile=config.mqtt_client_cert,
+                    keyfile=config.mqtt_client_key,
+                    tls_version=ssl.PROTOCOL_TLS_CLIENT,
+                )
+            self._client.tls_insecure_set(False)
 
         # Retained Last Will so the backend flips this gateway OFFLINE on an
         # unexpected disconnect (handover §13).

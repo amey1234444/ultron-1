@@ -222,7 +222,7 @@ type FolderRow = { id: string; project_id: string; parent_id: string | null; nam
 type MachineRow = { id: string; project_id: string; folder_id: string; name: string; template: string; components: unknown };
 type DeviceRow = {
   id: string; name: string; type: string; model: string; ip: string; port: string; protocol: string;
-  description: string; status: string; project_id: string | null; gateway_id: string | null; real_gateway_id: string | null; real_rack_id: number | null; archived: boolean;
+  description: string; status: string; project_id: string | null; gateway_id: string | null; real_gateway_id: string | null; real_rack_id: string | null; archived: boolean;
 };
 type CardRow = { id: string; device_id: string; slot: number; type: string; enabled: boolean; config: unknown };
 type LayoutRow = { machine_id: string; trails: unknown; boxes: unknown };

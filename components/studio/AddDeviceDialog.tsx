@@ -36,7 +36,7 @@ export type NewDevice = {
   status: ConnectionStatus;
   gatewayId?: string | null;
   realGatewayId?: string | null;
-  realRackId?: number | null;
+  realRackId?: string | number | null;
 };
 
 type AddDeviceDialogProps = {

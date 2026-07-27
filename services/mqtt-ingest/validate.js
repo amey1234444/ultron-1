@@ -1,4 +1,4 @@
-// Envelope + payload validation for the v1.1 contract
+// Envelope + payload validation for the v2.0 current-state contract
 // (contracts/json-schema/*). Returns a list of problems; empty = valid.
 
 const IP_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
@@ -9,32 +9,17 @@ export function validateEnvelope(msg) {
   if (!msg || typeof msg !== 'object') return ['message is not a JSON object'];
 
   if (typeof msg.schema !== 'string' || !msg.schema.startsWith('ultron.')) errors.push('schema missing/invalid');
-  if (msg.schema_version !== '1.1') errors.push('schema_version must be "1.1"');
+  if (msg.schema_version !== '2.0') errors.push('schema_version must be "2.0"');
   if (typeof msg.message_id !== 'string' || !UUID_RE.test(msg.message_id)) errors.push('message_id must be a UUID');
   if (typeof msg.gateway_id !== 'string' || !msg.gateway_id) errors.push('gateway_id missing');
   if (typeof msg.gateway_boot_id !== 'string' || !msg.gateway_boot_id) errors.push('gateway_boot_id missing');
   if (typeof msg.gateway_ip !== 'string' || !IP_RE.test(msg.gateway_ip)) errors.push('gateway_ip missing/invalid');
-  if (!Number.isInteger(msg.rack_id)) errors.push('rack_id must be an integer');
+  if (msg.rack_id !== undefined && (typeof msg.rack_id !== 'string' || !msg.rack_id)) errors.push('rack_id must be a non-empty string');
   if (!Number.isInteger(msg.gateway_sequence)) errors.push('gateway_sequence must be an integer');
   if (typeof msg.created_at !== 'string' || Number.isNaN(Date.parse(msg.created_at))) errors.push('created_at invalid');
-  if (typeof msg.replayed !== 'boolean') errors.push('replayed must be boolean');
+  if (typeof msg.created_at_us !== 'string' || !/^\d+$/.test(msg.created_at_us)) errors.push('created_at_us must be a decimal string');
+  if (msg.replayed !== false) errors.push('replayed must be false');
   if (!msg.payload || typeof msg.payload !== 'object') errors.push('payload missing');
-  return errors;
-}
-
-// Optional per-channel detail (sensor, thresholds, alarm state) reported by
-// real controllers; absent from simulator batches.
-function validateChannelDetail(r) {
-  const errors = [];
-  for (const key of ['alert_threshold', 'danger_threshold']) {
-    if (r[key] !== undefined && r[key] !== null && (typeof r[key] !== 'number' || !Number.isFinite(r[key]))) {
-      errors.push(`record.${key} invalid`);
-    }
-  }
-  for (const key of ['alert_state', 'danger_state']) {
-    if (r[key] !== undefined && !['ACTIVE', 'INACTIVE'].includes(r[key])) errors.push(`record.${key} invalid`);
-  }
-  if (r.freshness !== undefined && !['FRESH', 'STALE'].includes(r.freshness)) errors.push('record.freshness invalid');
   return errors;
 }
 
@@ -42,33 +27,42 @@ export function validatePayload(schema, payload) {
   const errors = [];
   switch (schema) {
     case 'ultron.gateway.status':
-      if (!['ONLINE', 'OFFLINE', 'DEGRADED'].includes(payload.state)) errors.push('status.state invalid');
+      if (!['ONLINE', 'OFFLINE'].includes(payload.state)) errors.push('status.state invalid');
+      if (payload.rack_summary !== undefined && (payload.rack_summary === null || typeof payload.rack_summary !== 'object' || Array.isArray(payload.rack_summary))) {
+        errors.push('status.rack_summary invalid');
+      }
       break;
-    case 'ultron.rack.inventory':
-      if (!Number.isInteger(payload.snapshot_revision)) errors.push('inventory.snapshot_revision invalid');
-      if (!Array.isArray(payload.slots)) errors.push('inventory.slots must be an array');
+    case 'ultron.gateway.topology':
+      if (!Array.isArray(payload.racks)) errors.push('topology.racks must be an array');
       else {
-        for (const s of payload.slots) {
-          if (!Number.isInteger(s.slot_id) || s.slot_id < 1 || s.slot_id > 14) errors.push(`slot_id ${s.slot_id} out of range`);
-          if (!['PRESENT', 'EMPTY'].includes(s.presence)) errors.push('slot presence invalid');
+        for (const rack of payload.racks) {
+          if (typeof rack?.rack_id !== 'string' || !rack.rack_id) errors.push('topology.rack_id invalid');
         }
       }
       break;
-    case 'ultron.measurement.batch':
-      if (!Number.isInteger(payload.batch_sequence)) errors.push('batch_sequence invalid');
-      if (!Array.isArray(payload.records)) errors.push('records must be an array');
+    case 'ultron.rack.inventory':
+      if (!Number.isInteger(payload.snapshot_revision)) errors.push('inventory.snapshot_revision invalid');
+      if (!Number.isInteger(payload.slot_count) || payload.slot_count < 0) errors.push('inventory.slot_count invalid');
+      if (!Array.isArray(payload.slots)) errors.push('inventory.slots must be an array');
       else {
-        if (Number.isInteger(payload.record_count) && payload.record_count !== payload.records.length) {
-          errors.push('record_count does not match records length');
+        for (const s of payload.slots) {
+          if (!Number.isInteger(s.slot_number) || s.slot_number < 1) errors.push(`slot_number ${s.slot_number} invalid`);
         }
-        for (const r of payload.records) {
-          if (!Number.isInteger(r.slot_id)) errors.push('record.slot_id invalid');
-          if (!Number.isInteger(r.channel_id)) errors.push('record.channel_id invalid');
-          if (typeof r.measurement_type !== 'string' || !r.measurement_type) errors.push('record.measurement_type missing');
-          if (typeof r.value !== 'number' || !Number.isFinite(r.value)) errors.push('record.value invalid');
-          if (typeof r.source_timestamp_us !== 'string' || !/^\d+$/.test(r.source_timestamp_us)) errors.push('record.source_timestamp_us invalid');
-          if (!Number.isInteger(r.source_sequence)) errors.push('record.source_sequence invalid');
-          errors.push(...validateChannelDetail(r));
+      }
+      break;
+    case 'ultron.rack.health':
+      if (typeof payload.rack_id !== 'string' || !payload.rack_id) errors.push('health.rack_id invalid');
+      if (typeof payload.status !== 'string' || !payload.status) errors.push('health.status invalid');
+      if (typeof payload.data_current !== 'boolean') errors.push('health.data_current invalid');
+      break;
+    case 'ultron.rack.telemetry':
+      if (typeof payload.rack_id !== 'string' || !payload.rack_id) errors.push('telemetry.rack_id invalid');
+      if (!Number.isInteger(payload.slot_count) || payload.slot_count < 0) errors.push('telemetry.slot_count invalid');
+      if (!Array.isArray(payload.slots)) errors.push('telemetry.slots must be an array');
+      else {
+        for (const s of payload.slots) {
+          if (!Number.isInteger(s?.slot_number) || s.slot_number < 1) errors.push('telemetry.slot_number invalid');
+          if (s?.measurement_valid !== undefined && typeof s.measurement_valid !== 'boolean') errors.push('telemetry.measurement_valid invalid');
         }
       }
       break;
@@ -96,10 +90,10 @@ export function validatePayload(schema, payload) {
 // a telemetry topic must actually carry a measurement batch.
 export const SCHEMA_FOR_KIND = {
   status: 'ultron.gateway.status',
+  topology: 'ultron.gateway.topology',
+  rack_health: 'ultron.rack.health',
   inventory: 'ultron.rack.inventory',
-  telemetry: 'ultron.measurement.batch',
+  telemetry: 'ultron.rack.telemetry',
   alarm: 'ultron.event.alarm',
-  fault: 'ultron.event.fault',
-  system: 'ultron.event.system',
   command_response: 'ultron.command.response',
 };

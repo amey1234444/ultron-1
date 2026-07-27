@@ -35,7 +35,7 @@ function messageMeta(message: unknown) {
     schema: typeof m.schema === 'string' ? m.schema : undefined,
     gatewayId: typeof m.gateway_id === 'string' ? m.gateway_id : undefined,
     gatewayIp: typeof m.gateway_ip === 'string' ? m.gateway_ip : undefined,
-    rackId: Number.isInteger(m.rack_id) ? m.rack_id : undefined,
+    rackId: typeof m.rack_id === 'string' ? m.rack_id : undefined,
   };
 }
 

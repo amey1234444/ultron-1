@@ -19,7 +19,7 @@ export type DeviceNode = {
   projectId: string | null;
   gatewayId?: string | null;
   realGatewayId?: string | null;
-  realRackId?: number | null;
+  realRackId?: string | number | null;
   archived: boolean;
 };
 
@@ -94,8 +94,9 @@ export function defaultRealGatewayId(id: string): string {
 export function nextRealRackId(gatewayId: string | null | undefined, devices: DeviceNode[]): number {
   const used = new Set(
     devices
-      .filter((device) => device.type === 'Rack' && device.gatewayId === gatewayId && typeof device.realRackId === 'number')
-      .map((device) => device.realRackId as number),
+      .filter((device) => device.type === 'Rack' && device.gatewayId === gatewayId && device.realRackId !== undefined && device.realRackId !== null)
+      .map((device) => Number(device.realRackId))
+      .filter((id) => Number.isInteger(id)),
   );
   let id = 1;
   while (used.has(id)) id += 1;

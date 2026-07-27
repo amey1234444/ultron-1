@@ -49,15 +49,11 @@ MEASUREMENT_TYPES: dict[str, str] = {
     "analog_input": "ANALOG_INPUT",
 }
 
-TOTAL_SLOTS = 14
-ACQUISITION_SLOTS = 12
-
-
 @dataclass(frozen=True)
 class Alarm:
     """A threshold crossing derived from the v3 alert/danger status codes."""
 
-    slot_id: int
+    slot_number: int
     channel_id: int
     severity: str  # WARNING | CRITICAL
     state: str  # ACTIVE | CLEARED
@@ -68,20 +64,19 @@ class Alarm:
 
     @property
     def alarm_id(self) -> str:
-        return f"slot{self.slot_id}-ch{self.channel_id}-{self.severity.lower()}"
+        return f"slot{self.slot_number}-{self.severity.lower()}"
 
     def to_payload(self) -> dict[str, Any]:
         payload: dict[str, Any] = {
             "alarm_id": self.alarm_id,
-            "slot_id": self.slot_id,
-            "channel_id": self.channel_id,
+            "slot_number": self.slot_number,
             "severity": self.severity,
             "state": self.state,
             "measurement_type": self.measurement_type,
             "value": self.value,
             "unit": self.unit,
             "message": (
-                f"{self.measurement_type} on slot {self.slot_id} channel {self.channel_id} "
+                f"{self.measurement_type} on slot {self.slot_number} "
                 f"{'entered' if self.state == 'ACTIVE' else 'left'} {self.severity.lower()}"
             ),
         }
@@ -94,10 +89,11 @@ class Alarm:
 class CcSnapshot:
     """One v3 frame translated into everything the publisher needs."""
 
-    rack_id: int
+    rack_id: str
     rack_number: str
     rack: RackModel
     measurements: list[Measurement]
+    slot_payloads: list[dict[str, Any]]
     alarms: list[Alarm]
     link_connected: bool
     telemetry_fresh: bool
@@ -106,6 +102,84 @@ class CcSnapshot:
     message_sequence: int
     received_at_us: int
     raw_frame: dict[str, Any]
+
+    def telemetry_meta(self) -> dict[str, Any]:
+        return {
+            "data_current": self.link_connected and self.telemetry_fresh and self.daq_valid,
+            "data_status": "current" if self.link_connected and self.telemetry_fresh and self.daq_valid else "invalid",
+            "last_received_at": self.raw_frame.get("received_at"),
+            "last_message_sequence": self.raw_frame.get("message_sequence"),
+            "last_message_sequence_state": self.raw_frame.get("message_sequence_state"),
+            "last_daq_sequence": self.raw_frame.get("daq_sequence"),
+            "last_daq_sequence_state": self.raw_frame.get("daq_sequence_state"),
+            "mode": self.mode,
+            "daq_state": self.raw_frame.get("daq_state"),
+            "crc32_hex": self.raw_frame.get("crc32_hex"),
+        }
+
+    def health_payload(self) -> dict[str, Any]:
+        connection = self.raw_frame.get("connection")
+        connection = connection if isinstance(connection, dict) else {}
+        link = self.raw_frame.get("cc_gateway_communication")
+        link = link if isinstance(link, dict) else {}
+        return {
+            "rack_id": self.rack_id,
+            "status": "connected" if self.link_connected else "disconnected",
+            "data_current": self.link_connected and self.telemetry_fresh and self.daq_valid,
+            "connection": {
+                "status": link.get("status") or connection.get("state"),
+                "status_reason": link.get("status_reason"),
+                "data_current": self.link_connected and self.telemetry_fresh and self.daq_valid,
+                "current_ip": connection.get("client_ip") or link.get("connected_client_ip"),
+                "current_port": connection.get("client_port") or link.get("connected_client_port"),
+                "last_known_ip": connection.get("client_ip") or link.get("connected_client_ip") or link.get("expected_cc_card_ip"),
+                "last_known_port": connection.get("client_port") or link.get("connected_client_port"),
+                "connected_at": connection.get("connected_at"),
+                "disconnected_at": connection.get("disconnected_at") or connection.get("last_disconnected_at"),
+                "last_seen_at": connection.get("last_message_at") or link.get("last_message_at"),
+                "last_transport_activity_at": connection.get("last_transport_activity_at") or link.get("last_transport_activity_at"),
+                "last_message_at": connection.get("last_message_at") or link.get("last_message_at"),
+                "telemetry_age_seconds": link.get("telemetry_age_seconds"),
+                "stale_after_seconds": link.get("stale_after_seconds"),
+                "last_disconnect_reason": connection.get("last_disconnect_reason") or link.get("last_disconnect_reason"),
+                "last_error": connection.get("last_error") or link.get("last_error"),
+                "connection_count": connection.get("connection_count"),
+                "reconnect_count": connection.get("reconnect_count"),
+                "valid_messages": connection.get("valid_messages"),
+                "rejected_messages": connection.get("rejected_messages"),
+                "current_connection_messages": connection.get("current_connection_messages"),
+            },
+            "telemetry": self.telemetry_meta(),
+            "source_snapshot_updated_at": self.raw_frame.get("snapshot_updated_at"),
+        }
+
+    def inventory_payload(self, snapshot_revision: int) -> dict[str, Any]:
+        slots = [
+            {
+                "slot_number": slot["slot_number"],
+                **{key: slot[key] for key in ("card_type_code", "card_type", "sensor_code", "sensor", "unit_code", "unit", "decimal_places") if key in slot},
+            }
+            for slot in self.slot_payloads
+        ]
+        return {
+            "rack_id": self.rack_id,
+            "snapshot_revision": snapshot_revision,
+            "slot_count": len(slots),
+            "slots": slots,
+            "source_snapshot_updated_at": self.raw_frame.get("snapshot_updated_at"),
+        }
+
+    def telemetry_payload(self) -> dict[str, Any]:
+        return {
+            "rack_id": self.rack_id,
+            "source_schema": "ultron.gateway.multi_rack_live_state",
+            "source_version": 2,
+            "source_snapshot_updated_at": self.raw_frame.get("snapshot_updated_at"),
+            "received_at": self.raw_frame.get("received_at"),
+            "telemetry": self.telemetry_meta(),
+            "slot_count": len(self.slot_payloads),
+            "slots": self.slot_payloads,
+        }
 
 
 def parse_iso_us(value: Any) -> int | None:
@@ -119,18 +193,12 @@ def parse_iso_us(value: Any) -> int | None:
         return None
 
 
-def rack_id_for(rack_number: str, overrides: dict[str, int], fallback: int) -> int:
-    """Racks are integers end to end; v3 names them (`CC_Card_UID1`)."""
-    mapped = overrides.get(rack_number) or overrides.get(rack_number.strip().lower())
+def rack_id_for(rack_number: str, overrides: dict[str, str], fallback: str) -> str:
+    """Racks are exact strings end to end; no digit extraction or case folding."""
+    mapped = overrides.get(rack_number)
     if mapped is not None:
         return mapped
-    digits = ""
-    for char in reversed(rack_number):
-        if char.isdigit():
-            digits = char + digits
-        elif digits:
-            break
-    return int(digits) if digits else fallback
+    return rack_number if rack_number else fallback
 
 
 def card_type_for(card_type: str) -> str:
@@ -204,9 +272,9 @@ def slot_for_channel(channel_number: int, overrides: dict[int, tuple[int, int]])
 def normalize(
     snapshot: dict[str, Any],
     *,
-    rack_number_map: dict[str, int] | None = None,
+    rack_number_map: dict[str, str] | None = None,
     channel_slot_map: dict[int, tuple[int, int]] | None = None,
-    fallback_rack_id: int = 1,
+    fallback_rack_id: str = "1",
     controller_slot_id: int = 13,
 ) -> CcSnapshot | None:
     """Translate one v3 telemetry frame; returns None when it carries no rack."""
@@ -237,6 +305,7 @@ def normalize(
     rack = RackModel(rack_id=rack_id, snapshot_revision=max(1, received_at_us // 1_000_000))
     occupied: dict[int, Slot] = {}
     measurements: list[Measurement] = []
+    slot_payloads: list[dict[str, Any]] = []
     alarms: list[Alarm] = []
 
     channels: Iterable[Any] = snapshot.get("channels") or []
@@ -261,16 +330,57 @@ def normalize(
         danger_active = entry.get("danger_status_code") == 1 or str(entry.get("danger_status") or "") == "active"
         alert_threshold = _threshold(entry, "alert")
         danger_threshold = _threshold(entry, "danger")
+        measurement_valid = link_connected and telemetry_fresh and daq_valid and channel_status == "ok"
+
+        slot_payload = {
+            key: value
+            for key, value in entry.items()
+            if key
+            in {
+                "data_status",
+                "channel_status_code",
+                "channel_status",
+                "card_type_code",
+                "card_type",
+                "sensor_code",
+                "sensor",
+                "unit_code",
+                "unit",
+                "decimal_places",
+                "value_raw",
+                "value_formatted",
+                "value_with_unit",
+                "alert_value_raw",
+                "alert_value_formatted",
+                "alert_with_unit",
+                "danger_value_raw",
+                "danger_value_formatted",
+                "danger_with_unit",
+                "alert_status_code",
+                "alert_status",
+                "danger_status_code",
+                "danger_status",
+            }
+        }
+        slot_payload.update(
+            {
+                "slot_number": slot_id,
+                "data_status": "current" if measurement_valid else "invalid",
+                "measurement_valid": measurement_valid,
+                "value_display": str(entry.get("value_formatted") or value),
+            }
+        )
+        slot_payloads.append(slot_payload)
 
         occupied[slot_id] = Slot(
-            slot_id=slot_id,
+            slot_number=slot_id,
             presence="PRESENT",
             online_state="ONLINE" if channel_status == "ok" and link_connected else "OFFLINE",
             card_type=card_type,
         )
         measurements.append(
             Measurement(
-                slot_id=slot_id,
+                slot_number=slot_id,
                 channel_id=channel_id,
                 point_id=slot_id * 100_000 + channel_id * 100 + 1,
                 card_type=card_type,
@@ -296,7 +406,7 @@ def normalize(
         ):
             alarms.append(
                 Alarm(
-                    slot_id=slot_id,
+                    slot_number=slot_id,
                     channel_id=channel_id,
                     severity=severity,
                     state="ACTIVE" if active else "CLEARED",
@@ -307,20 +417,7 @@ def normalize(
                 )
             )
 
-    for slot_id in range(1, TOTAL_SLOTS + 1):
-        if slot_id in occupied:
-            rack.slots.append(occupied[slot_id])
-        elif slot_id == controller_slot_id:
-            rack.slots.append(
-                Slot(
-                    slot_id=slot_id,
-                    presence="PRESENT",
-                    online_state="ONLINE" if link_connected else "OFFLINE",
-                    card_type="COMMUNICATION_CONTROLLER",
-                )
-            )
-        else:
-            rack.slots.append(Slot(slot_id=slot_id, presence="EMPTY"))
+    rack.slots.extend(occupied[slot_id] for slot_id in sorted(occupied))
 
     return CcSnapshot(
         rack_id=rack_id,
@@ -328,6 +425,7 @@ def normalize(
         rack=rack,
         measurements=measurements,
         alarms=alarms,
+        slot_payloads=slot_payloads,
         link_connected=link_connected,
         telemetry_fresh=telemetry_fresh,
         mode=str(snapshot.get("mode") or "unknown"),

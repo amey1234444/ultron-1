@@ -10,7 +10,7 @@ from __future__ import annotations
 
 
 class CcRccClient:
-    def __init__(self, rack_id: int) -> None:
+    def __init__(self, rack_id: str) -> None:
         raise NotImplementedError(
             "CC/RCC TCP client arrives with the Raspberry Pi deployment phase; "
             "use ultron_gateway.simulator.Simulator until then"

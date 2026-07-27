@@ -2,27 +2,8 @@ import { createHash } from 'crypto';
 
 import { ensureSchema, query } from './db';
 
-type TopicKind =
-  | 'status'
-  | 'inventory'
-  | 'telemetry'
-  | 'alarm'
-  | 'fault'
-  | 'system'
-  | 'command_response'
-  | 'command_request'
-  | 'rack_health'
-  | 'diagnostics_response'
-  | 'update_status'
-  | `slot_${string}`;
-
-type ParsedTopic = {
-  gatewayId: string;
-  rackId: number | null;
-  kind: TopicKind;
-  slotId?: number;
-};
-
+type TopicKind = 'status' | 'topology' | 'rack_health' | 'inventory' | 'telemetry' | 'alarm' | 'command_response' | 'command_request';
+type ParsedTopic = { gatewayId: string; rackId: string | null; kind: TopicKind };
 type MqttEnvelope = {
   schema: string;
   schema_version: string;
@@ -30,13 +11,13 @@ type MqttEnvelope = {
   gateway_id: string;
   gateway_boot_id: string;
   gateway_ip: string;
-  rack_id: number;
+  rack_id?: string;
   gateway_sequence: number;
   created_at: string;
-  replayed: boolean;
+  created_at_us: string;
+  replayed: false;
   payload: Record<string, unknown>;
 };
-
 type IngestResult = {
   kind: TopicKind;
   fresh: boolean;
@@ -46,79 +27,51 @@ type IngestResult = {
   quarantined?: boolean;
   reason?: string;
 };
-
-type BindResult = {
-  status: string;
-  event: string;
-  reason?: string;
-};
-
 type NormalizedWebhookMessage = {
   topic: string | null;
   message: unknown;
   sourceEvent: Record<string, unknown> | null;
 };
 
-const RE_STATUS = /^ultron\/v1\/gateways\/([^/]+)\/status$/;
-const RE_RACK = /^ultron\/v1\/gateways\/([^/]+)\/racks\/(\d+)\/(.+)$/;
 const IP_RE = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 const SCHEMA_FOR_KIND: Partial<Record<TopicKind, string>> = {
   status: 'ultron.gateway.status',
+  topology: 'ultron.gateway.topology',
+  rack_health: 'ultron.rack.health',
   inventory: 'ultron.rack.inventory',
-  telemetry: 'ultron.measurement.batch',
+  telemetry: 'ultron.rack.telemetry',
   alarm: 'ultron.event.alarm',
-  fault: 'ultron.event.fault',
-  system: 'ultron.event.system',
   command_response: 'ultron.command.response',
 };
 
-const CC_V3_SCHEMA = 'ultron.gateway.normalized_telemetry';
-
-function parseTopic(topic: string): ParsedTopic | null {
-  const status = RE_STATUS.exec(topic);
-  if (status) return { gatewayId: status[1], rackId: null, kind: 'status' };
-
-  const rack = RE_RACK.exec(topic);
-  if (!rack) return null;
-  const [, gatewayId, rackIdStr, rest] = rack;
-  const rackId = Number(rackIdStr);
-
-  if (rest === 'inventory') return { gatewayId, rackId, kind: 'inventory' };
-  if (rest === 'health') return { gatewayId, rackId, kind: 'rack_health' };
-  if (rest === 'telemetry') return { gatewayId, rackId, kind: 'telemetry' };
-  if (rest === 'events/alarm') return { gatewayId, rackId, kind: 'alarm' };
-  if (rest === 'events/fault') return { gatewayId, rackId, kind: 'fault' };
-  if (rest === 'events/system') return { gatewayId, rackId, kind: 'system' };
-  if (rest === 'commands/response') return { gatewayId, rackId, kind: 'command_response' };
-  if (rest === 'commands/request') return { gatewayId, rackId, kind: 'command_request' };
-  if (rest === 'diagnostics/response') return { gatewayId, rackId, kind: 'diagnostics_response' };
-  if (rest === 'updates/status') return { gatewayId, rackId, kind: 'update_status' };
-
-  const slot = /^slots\/(\d+)\/(identity|capabilities|configuration|health)$/.exec(rest);
-  if (slot) return { gatewayId, rackId, kind: `slot_${slot[2]}`, slotId: Number(slot[1]) };
-
-  return null;
+function decodeSegment(segment: string): string | null {
+  try {
+    const decoded = decodeURIComponent(segment);
+    return decoded.length > 0 ? decoded : null;
+  } catch {
+    return null;
+  }
 }
 
-function validateEnvelope(msg: unknown): string[] {
-  const errors: string[] = [];
-  if (!msg || typeof msg !== 'object') return ['message is not a JSON object'];
-  const m = msg as Partial<MqttEnvelope>;
-
-  if (typeof m.schema !== 'string' || !m.schema.startsWith('ultron.')) errors.push('schema missing/invalid');
-  if (m.schema_version !== '1.1') errors.push('schema_version must be "1.1"');
-  if (typeof m.message_id !== 'string' || !UUID_RE.test(m.message_id)) errors.push('message_id must be a UUID');
-  if (typeof m.gateway_id !== 'string' || !m.gateway_id) errors.push('gateway_id missing');
-  if (typeof m.gateway_boot_id !== 'string' || !m.gateway_boot_id) errors.push('gateway_boot_id missing');
-  if (typeof m.gateway_ip !== 'string' || !IP_RE.test(m.gateway_ip)) errors.push('gateway_ip missing/invalid');
-  if (!Number.isInteger(m.rack_id)) errors.push('rack_id must be an integer');
-  if (!Number.isInteger(m.gateway_sequence)) errors.push('gateway_sequence must be an integer');
-  if (typeof m.created_at !== 'string' || Number.isNaN(Date.parse(m.created_at))) errors.push('created_at invalid');
-  if (typeof m.replayed !== 'boolean') errors.push('replayed must be boolean');
-  if (!m.payload || typeof m.payload !== 'object') errors.push('payload missing');
-  return errors;
+function parseTopic(topic: string): ParsedTopic | null {
+  const parts = topic.split('/');
+  if (parts.length < 5 || parts[0] !== 'ultron' || parts[1] !== 'v1' || parts[2] !== 'gateways') return null;
+  const gatewayId = decodeSegment(parts[3]);
+  if (!gatewayId) return null;
+  if (parts.length === 5 && parts[4] === 'status') return { gatewayId, rackId: null, kind: 'status' };
+  if (parts.length === 5 && parts[4] === 'topology') return { gatewayId, rackId: null, kind: 'topology' };
+  if (parts.length < 7 || parts[4] !== 'racks') return null;
+  const rackId = decodeSegment(parts[5]);
+  if (!rackId) return null;
+  const rest = parts.slice(6).join('/');
+  if (rest === 'health') return { gatewayId, rackId, kind: 'rack_health' };
+  if (rest === 'inventory') return { gatewayId, rackId, kind: 'inventory' };
+  if (rest === 'telemetry') return { gatewayId, rackId, kind: 'telemetry' };
+  if (rest === 'events/alarm') return { gatewayId, rackId, kind: 'alarm' };
+  if (rest === 'commands/response') return { gatewayId, rackId, kind: 'command_response' };
+  if (rest === 'commands/request') return { gatewayId, rackId, kind: 'command_request' };
+  return null;
 }
 
 function objectValue(value: unknown): Record<string, unknown> | null {
@@ -126,484 +79,113 @@ function objectValue(value: unknown): Record<string, unknown> | null {
 }
 
 function stringValue(value: unknown): string | null {
-  return typeof value === 'string' && value.trim() ? value.trim() : null;
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
-function integerValue(value: unknown): number | null {
-  return Number.isInteger(value) ? value as number : null;
+function intValue(value: unknown): number | null {
+  return Number.isInteger(value) ? (value as number) : null;
 }
 
-function finiteNumber(value: unknown): number | null {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value.trim()) {
-    const parsed = Number(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return null;
+function createdAtUs(msg: MqttEnvelope): string {
+  return /^\d+$/.test(msg.created_at_us) ? msg.created_at_us : '0';
 }
 
-function parseIsoUs(value: unknown): string {
-  const text = stringValue(value);
-  const ms = text ? Date.parse(text) : NaN;
-  return String((Number.isNaN(ms) ? Date.now() : ms) * 1000);
+function dateValue(value: unknown): Date | null {
+  if (typeof value !== 'string') return null;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : new Date(parsed);
 }
 
-function hashUuid(input: string): string {
-  const hex = createHash('sha256').update(input).digest('hex').slice(0, 32);
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+function json(value: unknown): string {
+  return JSON.stringify(value ?? {});
 }
 
-function rackIdFromRackNumber(value: unknown, fallback: number): number {
-  const rackNumber = stringValue(value);
-  if (!rackNumber) return fallback;
-  const match = /(\d+)(?!.*\d)/.exec(rackNumber);
-  return match ? Number(match[1]) : fallback;
-}
-
-function channelValue(channel: Record<string, unknown>): number | null {
-  const formatted = finiteNumber(channel.value_formatted);
-  if (formatted !== null) return formatted;
-  const raw = finiteNumber(channel.value_raw);
-  if (raw === null) return null;
-  const decimals = integerValue(channel.decimal_places);
-  return decimals && decimals > 0 ? raw / 10 ** decimals : raw;
-}
-
-function thresholdValue(channel: Record<string, unknown>, prefix: string): number | null {
-  const formatted = finiteNumber(channel[`${prefix}_value_formatted`]);
-  if (formatted !== null) return formatted;
-  const raw = finiteNumber(channel[`${prefix}_value_raw`]);
-  if (raw === null) return null;
-  const decimals = integerValue(channel.decimal_places);
-  return decimals && decimals > 0 ? raw / 10 ** decimals : raw;
-}
-
-function canonicalCardType(cardType: string): string {
-  const key = cardType.trim().toLowerCase();
-  if (key === 'vibration') return 'VIBRATION';
-  if (key === 'speed') return 'SPEED';
-  if (key === 'communication_controller') return 'COMMUNICATION_CONTROLLER';
-  return 'PROCESS';
-}
-
-function measurementTypeFor(cardType: string, sensor: string, unit: string): string {
-  const key = cardType.trim().toLowerCase();
-  const sensorKey = sensor.trim().toLowerCase();
-  const known: Record<string, string> = {
-    vibration: 'VELOCITY_RMS',
-    speed: 'SPEED',
-    rtd: 'TEMPERATURE',
-    thermocouple: 'TEMPERATURE',
-    temperature: 'TEMPERATURE',
-    pressure: 'PRESSURE',
-    current: 'CURRENT',
-    voltage: 'VOLTAGE',
-    proximity: 'PROXIMITY_STATE',
-    digital_input: 'DIGITAL_STATE',
-    analog_input: 'ANALOG_INPUT',
-  };
-  return known[key] ?? known[sensorKey] ?? (key ? key.toUpperCase() : (unit || 'VALUE').toUpperCase());
-}
-
-function parseChannelSlotMap(): Map<number, [number, number]> {
-  const map = new Map<number, [number, number]>();
-  for (const part of (process.env.CHANNEL_SLOT_MAP ?? '').split(',')) {
-    const [channel, target] = part.split('=');
-    const [slot, subChannel] = (target ?? '').split('.');
-    const channelNo = Number(channel?.trim());
-    const slotNo = Number(slot?.trim());
-    const subChannelNo = Number(subChannel?.trim() || '1');
-    if (Number.isInteger(channelNo) && Number.isInteger(slotNo) && Number.isInteger(subChannelNo)) {
-      map.set(channelNo, [slotNo, subChannelNo]);
-    }
-  }
-  return map;
-}
-
-function slotForChannel(channelNumber: number): [number, number] {
-  return parseChannelSlotMap().get(channelNumber) ?? [channelNumber, 1];
-}
-
-function firstIp(...values: unknown[]): string | null {
-  for (const value of values) {
-    const text = stringValue(value);
-    if (text && IP_RE.test(text)) return text;
-  }
-  return null;
-}
-
-function normalizeCcV3SnapshotMessage(
-  rawMessage: unknown,
-  parsed: ParsedTopic,
-  sourceEvent?: Record<string, unknown> | null,
-): MqttEnvelope | null {
-  if (parsed.kind !== 'telemetry' || parsed.rackId === null) return null;
-  const raw = objectValue(rawMessage);
-  if (!raw) return null;
-  const channels = Array.isArray(raw.channels) ? raw.channels : null;
-  if (!channels || !(raw.schema === CC_V3_SCHEMA || raw.rack_number !== undefined)) return null;
-
-  const link = objectValue(raw.cc_gateway_communication) ?? {};
-  const source = objectValue(raw.source) ?? {};
-  const gatewayIp = firstIp(
-    sourceEvent?.peerhost,
-    raw.gateway_ip,
-    source.ip,
-    link.connected_client_ip,
-    link.expected_cc_card_ip,
-  );
-  if (!gatewayIp) return null;
-
-  const rackId = parsed.rackId ?? rackIdFromRackNumber(raw.rack_number, 1);
-  const receivedAt = stringValue(raw.received_at) ?? stringValue(raw.snapshot_updated_at) ?? stringValue(link.last_message_at) ?? new Date().toISOString();
-  const sourceTimestampUs = parseIsoUs(receivedAt);
-  const daqSequence = integerValue(raw.daq_sequence);
-  const messageSequence = integerValue(raw.message_sequence);
-  const sourceSequence = daqSequence ?? messageSequence ?? 0;
-  const daqValid = raw.daq_valid === 1 && String(raw.daq_state ?? 'valid') === 'valid';
-  const age = finiteNumber(link.telemetry_age_seconds);
-  const staleAfter = finiteNumber(link.stale_after_seconds) ?? 5;
-  const telemetryFresh = raw.telemetry_available !== false && (age === null || age <= staleAfter);
-  const snapshotHash = createHash('sha256').update(JSON.stringify(raw)).digest('hex');
-  const deliveryId = stringValue(sourceEvent?.id) ?? stringValue(sourceEvent?.publish_received_at) ?? stringValue(sourceEvent?.timestamp) ?? String(Date.now());
-
-  const records = channels.flatMap((item) => {
-    const channel = objectValue(item);
-    if (!channel) return [];
-    const channelNumber = integerValue(channel.channel);
-    if (!channelNumber) return [];
-    const value = channelValue(channel);
-    if (value === null) return [];
-
-    const [slotId, channelId] = slotForChannel(channelNumber);
-    const rawCardType = stringValue(channel.card_type) ?? '';
-    const sensor = stringValue(channel.sensor) ?? '';
-    const unit = stringValue(channel.unit) ?? '';
-    const channelStatus = (stringValue(channel.channel_status) ?? 'ok').toLowerCase();
-    const alertActive = channel.alert_status_code === 1 || String(channel.alert_status ?? '').toLowerCase() === 'active';
-    const dangerActive = channel.danger_status_code === 1 || String(channel.danger_status ?? '').toLowerCase() === 'active';
-
-    return [{
-      slot_id: slotId,
-      channel_id: channelId,
-      point_id: slotId * 100_000 + channelId * 100 + 1,
-      card_type: canonicalCardType(rawCardType),
-      measurement_type: measurementTypeFor(rawCardType, sensor, unit),
-      value,
-      unit,
-      quality: channelStatus && channelStatus !== 'ok' ? 'BAD' : daqValid ? 'GOOD' : 'UNCERTAIN',
-      freshness: telemetryFresh ? 'FRESH' : 'STALE',
-      source_timestamp_us: sourceTimestampUs,
-      source_sequence: sourceSequence,
-      sensor: sensor || undefined,
-      channel_status: channelStatus || undefined,
-      alert_threshold: thresholdValue(channel, 'alert') ?? undefined,
-      danger_threshold: thresholdValue(channel, 'danger') ?? undefined,
-      alert_state: alertActive ? 'ACTIVE' : 'INACTIVE',
-      danger_state: dangerActive ? 'ACTIVE' : 'INACTIVE',
-    }];
-  });
-
-  return {
-    schema: 'ultron.measurement.batch',
-    schema_version: '1.1',
-    message_id: hashUuid(`cc-v3|${parsed.gatewayId}|${rackId}|${sourceSequence}|${sourceTimestampUs}|${snapshotHash}|${deliveryId}`),
-    gateway_id: parsed.gatewayId,
-    gateway_boot_id: hashUuid(`cc-v3-boot|${parsed.gatewayId}|${stringValue(objectValue(raw.connection)?.connected_at) ?? ''}`),
-    gateway_ip: gatewayIp,
-    rack_id: rackId,
-    gateway_sequence: messageSequence ?? sourceSequence,
-    created_at: new Date(Number(sourceTimestampUs) / 1000).toISOString(),
-    replayed: raw.replayed === true,
-    payload: {
-      batch_sequence: messageSequence ?? sourceSequence,
-      record_count: records.length,
-      records,
-      source_format: CC_V3_SCHEMA,
-    },
-  };
-}
-
-// Optional per-channel detail (sensor, thresholds, alarm state) reported by
-// real controllers; absent from simulator batches.
-function validateChannelDetail(record: Record<string, unknown>): string[] {
+function validateEnvelope(msg: unknown): string[] {
   const errors: string[] = [];
-  for (const key of ['alert_threshold', 'danger_threshold'] as const) {
-    const value = record[key];
-    if (value !== undefined && value !== null && (typeof value !== 'number' || !Number.isFinite(value))) {
-      errors.push(`record.${key} invalid`);
-    }
-  }
-  for (const key of ['alert_state', 'danger_state'] as const) {
-    const value = record[key];
-    if (value !== undefined && value !== 'ACTIVE' && value !== 'INACTIVE') errors.push(`record.${key} invalid`);
-  }
-  if (record.freshness !== undefined && record.freshness !== 'FRESH' && record.freshness !== 'STALE') {
-    errors.push('record.freshness invalid');
-  }
+  const m = objectValue(msg);
+  if (!m) return ['message is not a JSON object'];
+  if (typeof m.schema !== 'string' || !m.schema.startsWith('ultron.')) errors.push('schema missing/invalid');
+  if (m.schema_version !== '2.0') errors.push('schema_version must be "2.0"');
+  if (typeof m.message_id !== 'string' || !UUID_RE.test(m.message_id)) errors.push('message_id must be a UUID');
+  if (typeof m.gateway_id !== 'string' || !m.gateway_id) errors.push('gateway_id missing');
+  if (typeof m.gateway_boot_id !== 'string' || !m.gateway_boot_id) errors.push('gateway_boot_id missing');
+  if (typeof m.gateway_ip !== 'string' || !IP_RE.test(m.gateway_ip)) errors.push('gateway_ip missing/invalid');
+  if (m.rack_id !== undefined && (typeof m.rack_id !== 'string' || !m.rack_id)) errors.push('rack_id must be a non-empty string');
+  if (!Number.isInteger(m.gateway_sequence)) errors.push('gateway_sequence must be an integer');
+  if (typeof m.created_at !== 'string' || Number.isNaN(Date.parse(m.created_at))) errors.push('created_at invalid');
+  if (typeof m.created_at_us !== 'string' || !/^\d+$/.test(m.created_at_us)) errors.push('created_at_us must be a decimal string');
+  if (m.replayed !== false) errors.push('replayed must be false');
+  if (!objectValue(m.payload)) errors.push('payload missing');
   return errors;
 }
 
 function validatePayload(schema: string, payload: Record<string, unknown>): string[] {
   const errors: string[] = [];
-  switch (schema) {
-    case 'ultron.gateway.status':
-      if (!['ONLINE', 'OFFLINE', 'DEGRADED'].includes(String(payload.state))) errors.push('status.state invalid');
-      break;
-    case 'ultron.rack.inventory': {
-      if (!Number.isInteger(payload.snapshot_revision)) errors.push('inventory.snapshot_revision invalid');
-      if (!Array.isArray(payload.slots)) errors.push('inventory.slots must be an array');
-      else {
-        for (const s of payload.slots) {
-          const slot = s as { slot_id?: unknown; presence?: unknown };
-          if (!Number.isInteger(slot.slot_id) || Number(slot.slot_id) < 1 || Number(slot.slot_id) > 14) errors.push(`slot_id ${slot.slot_id} out of range`);
-          if (!['PRESENT', 'EMPTY'].includes(String(slot.presence))) errors.push('slot presence invalid');
-        }
-      }
-      break;
-    }
-    case 'ultron.measurement.batch': {
-      if (!Number.isInteger(payload.batch_sequence)) errors.push('batch_sequence invalid');
-      if (!Array.isArray(payload.records)) errors.push('records must be an array');
-      else {
-        if (Number.isInteger(payload.record_count) && payload.record_count !== payload.records.length) {
-          errors.push('record_count does not match records length');
-        }
-        for (const r of payload.records) {
-          const record = r as Record<string, unknown>;
-          if (!Number.isInteger(record.slot_id)) errors.push('record.slot_id invalid');
-          if (!Number.isInteger(record.channel_id)) errors.push('record.channel_id invalid');
-          if (typeof record.measurement_type !== 'string' || !record.measurement_type) errors.push('record.measurement_type missing');
-          if (typeof record.value !== 'number' || !Number.isFinite(record.value)) errors.push('record.value invalid');
-          if (typeof record.source_timestamp_us !== 'string' || !/^\d+$/.test(record.source_timestamp_us)) errors.push('record.source_timestamp_us invalid');
-          if (!Number.isInteger(record.source_sequence)) errors.push('record.source_sequence invalid');
-          errors.push(...validateChannelDetail(record));
-        }
-      }
-      break;
-    }
-    case 'ultron.event.alarm':
-      if (!['WARNING', 'CRITICAL'].includes(String(payload.severity))) errors.push('alarm.severity invalid');
-      if (!['ACTIVE', 'CLEARED'].includes(String(payload.state))) errors.push('alarm.state invalid');
-      break;
-    case 'ultron.event.fault':
-      if (!['ACTIVE', 'CLEARED'].includes(String(payload.state))) errors.push('fault.state invalid');
-      break;
-    case 'ultron.event.system':
-      if (typeof payload.event_type !== 'string' || !payload.event_type) errors.push('system.event_type missing');
-      break;
-    case 'ultron.command.response':
-      if (typeof payload.request_id !== 'string') errors.push('response.request_id missing');
-      if (!['ACCEPTED', 'COMPLETED', 'FAILED', 'REJECTED'].includes(String(payload.status))) errors.push('response.status invalid');
-      break;
-    default:
-      break;
+  if (schema === 'ultron.gateway.status' && !['ONLINE', 'OFFLINE'].includes(String(payload.state))) errors.push('status.state invalid');
+  if (schema === 'ultron.gateway.topology') {
+    const racks = Array.isArray(payload.racks) ? payload.racks : null;
+    if (!racks) errors.push('topology.racks must be an array');
+    else for (const rack of racks) if (!stringValue(objectValue(rack)?.rack_id)) errors.push('topology.rack_id invalid');
+  }
+  if (schema === 'ultron.rack.health') {
+    if (!stringValue(payload.rack_id)) errors.push('health.rack_id invalid');
+    if (!stringValue(payload.status)) errors.push('health.status invalid');
+    if (typeof payload.data_current !== 'boolean') errors.push('health.data_current invalid');
+  }
+  if (schema === 'ultron.rack.inventory') {
+    if (!Number.isInteger(payload.snapshot_revision)) errors.push('inventory.snapshot_revision invalid');
+    if (!Number.isInteger(payload.slot_count)) errors.push('inventory.slot_count invalid');
+    const slots = Array.isArray(payload.slots) ? payload.slots : null;
+    if (!slots) errors.push('inventory.slots must be an array');
+    else for (const slot of slots) if (!Number.isInteger(objectValue(slot)?.slot_number)) errors.push('inventory.slot_number invalid');
+  }
+  if (schema === 'ultron.rack.telemetry') {
+    if (!stringValue(payload.rack_id)) errors.push('telemetry.rack_id invalid');
+    if (!Number.isInteger(payload.slot_count)) errors.push('telemetry.slot_count invalid');
+    const slots = Array.isArray(payload.slots) ? payload.slots : null;
+    if (!slots) errors.push('telemetry.slots must be an array');
+    else for (const slot of slots) if (!Number.isInteger(objectValue(slot)?.slot_number)) errors.push('telemetry.slot_number invalid');
+  }
+  if (schema === 'ultron.event.alarm') {
+    if (!['WARNING', 'CRITICAL'].includes(String(payload.severity))) errors.push('alarm.severity invalid');
+    if (!['ACTIVE', 'CLEARED'].includes(String(payload.state))) errors.push('alarm.state invalid');
   }
   return errors;
 }
 
+async function bumpMetric(metricName: string, by = 1): Promise<void> {
+  await query(
+    `INSERT INTO mqtt_ingest_metrics (metric_name, metric_value)
+     VALUES ($1,$2)
+     ON CONFLICT (metric_name) DO UPDATE SET
+       metric_value = mqtt_ingest_metrics.metric_value + EXCLUDED.metric_value,
+       updated_at = now()`,
+    [metricName, by],
+  );
+}
+
 async function quarantine(topic: string, reason: string, msg: Partial<MqttEnvelope> | null): Promise<void> {
+  await bumpMetric('quarantine_messages');
   await query(
     `INSERT INTO mqtt_quarantine (topic, reason, gateway_id, gateway_ip, rack_id, raw_payload)
      VALUES ($1,$2,$3,$4,$5,$6)`,
-    [topic, reason, msg?.gateway_id ?? null, msg?.gateway_ip ?? null, Number.isInteger(msg?.rack_id) ? msg?.rack_id : null, msg ? JSON.stringify(msg) : null],
+    [topic, reason, msg?.gateway_id ?? null, msg?.gateway_ip ?? null, typeof msg?.rack_id === 'string' ? msg.rack_id : null, msg ? JSON.stringify(msg) : null],
   );
 }
 
-async function findStudioGateway(gatewayId: string): Promise<{ id: string; ip: string } | null> {
-  const gateway = await query<{ id: string; ip: string }>(
-    `SELECT id, ip
-     FROM studio_devices
-     WHERE type = 'Gateway'
-       AND archived = false
-       AND real_gateway_id = $1
-     LIMIT 1`,
-    [gatewayId],
-  );
-  return gateway.rows[0] ?? null;
-}
-
-async function findConfiguredIpConflict(
-  gatewayDeviceId: string,
-  gatewayIp: string,
-): Promise<{ id: string; name: string; type: string; real_gateway_id: string | null; real_rack_id: number | null } | null> {
-  const device = await query<{ id: string; name: string; type: string; real_gateway_id: string | null; real_rack_id: number | null }>(
-    `SELECT id, name, type, real_gateway_id, real_rack_id
-     FROM studio_devices
-     WHERE archived = false
-       AND type IN ('Gateway', 'Rack')
-       AND ip = $1
-       AND id <> $2
-     ORDER BY CASE type WHEN 'Gateway' THEN 0 ELSE 1 END, name
-     LIMIT 1`,
-    [gatewayIp, gatewayDeviceId],
-  );
-  return device.rows[0] ?? null;
-}
-
-async function rejectConfiguredIpConflict(gatewayId: string, gatewayIp: string, gatewayDeviceId: string): Promise<BindResult> {
+async function bind(msg: MqttEnvelope): Promise<{ status: string; event: string }> {
   await query(
-    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-     VALUES ($1,$2,false)
-     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [gatewayId, gatewayIp],
+    `INSERT INTO gateways (gateway_id, current_ip, gateway_boot_id, mqtt_client_id, status, mqtt_state, last_seen_at)
+     VALUES ($1,$2,$3,$4,'UNKNOWN','UNKNOWN', now())
+     ON CONFLICT (gateway_id) DO UPDATE SET
+       current_ip = EXCLUDED.current_ip,
+       gateway_boot_id = EXCLUDED.gateway_boot_id,
+       last_seen_at = now(),
+       updated_at = now()`,
+    [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, process.env.MQTT_BACKEND_CLIENT_ID ?? 'ultron-backend-webhook'],
   );
-  await query(
-    `UPDATE gateways
-     SET status = 'QUARANTINED', updated_at = now()
-     WHERE gateway_id = $1`,
-    [gatewayId],
-  );
-  await query(`DELETE FROM measurement_latest WHERE gateway_id = $1`, [gatewayId]);
-  await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1`, [gatewayId]);
-  await query(`DELETE FROM racks WHERE gateway_id = $1`, [gatewayId]);
-  const cleared = await query(
-    `UPDATE studio_devices
-     SET ip = '', updated_at = now()
-     WHERE id = $1
-       AND ip = $2
-       AND EXISTS (
-         SELECT 1
-         FROM studio_devices conflict
-         WHERE conflict.archived = false
-           AND conflict.type IN ('Gateway', 'Rack')
-           AND conflict.ip = $2
-           AND conflict.id <> $1
-       )`,
-    [gatewayDeviceId, gatewayIp],
-  );
-  if ((cleared.rowCount ?? 0) > 0) {
-    await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
-  }
-  return {
-    status: 'QUARANTINED',
-    event: 'IP_CONFLICT',
-    reason: 'gateway_ip already configured',
-  };
-}
-
-async function rejectMissingConfiguredIp(gatewayId: string, gatewayIp: string): Promise<BindResult> {
-  await query(
-    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-     VALUES ($1,$2,false)
-     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [gatewayId, gatewayIp],
-  );
-  await query(
-    `UPDATE gateways
-     SET status = 'QUARANTINED', updated_at = now()
-     WHERE gateway_id = $1`,
-    [gatewayId],
-  );
-  await query(`DELETE FROM measurement_latest WHERE gateway_id = $1`, [gatewayId]);
-  await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1`, [gatewayId]);
-  await query(`DELETE FROM racks WHERE gateway_id = $1`, [gatewayId]);
-  return {
-    status: 'QUARANTINED',
-    event: 'IP_NOT_CONFIGURED',
-    reason: 'gateway_ip not configured',
-  };
-}
-
-async function updateStudioGatewayIp(deviceId: string, gatewayIp: string): Promise<void> {
-  const updated = await query(
-    `UPDATE studio_devices
-     SET ip = $2, updated_at = now()
-     WHERE id = $1 AND ip <> $2`,
-    [deviceId, gatewayIp],
-  );
-  if ((updated.rowCount ?? 0) > 0) {
-    await query(`UPDATE studio_meta SET hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1`);
-  }
-}
-
-async function bind(msg: MqttEnvelope): Promise<BindResult> {
-  const existing = await query<{ gateway_id: string; current_ip: string; status: string }>(
-    `SELECT gateway_id, current_ip, status FROM gateways WHERE gateway_id = $1`,
-    [msg.gateway_id],
-  );
-
-  const studioGateway = await findStudioGateway(msg.gateway_id);
-  let status = 'ONLINE';
-  let event = 'BOUND';
-  if (!studioGateway) {
-    status = 'QUARANTINED';
-    event = 'UNCLAIMED';
-  }
-
-  if (existing.rowCount === 0) {
-    if (!studioGateway) {
-      await query(
-        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-         VALUES ($1,$2,false)
-         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-        [msg.gateway_id, msg.gateway_ip],
-      );
-      return { status, event };
-    }
-
-    if (!studioGateway.ip.trim()) return rejectMissingConfiguredIp(msg.gateway_id, msg.gateway_ip);
-
-    const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
-    const ipConflict = await findConfiguredIpConflict(studioGateway.id, msg.gateway_ip);
-    if (ipConflict) return rejectConfiguredIpConflict(msg.gateway_id, msg.gateway_ip, studioGateway.id);
-
-    event = gatewayIpChanged ? 'IP_CHANGED' : 'BOUND';
-    if (event === 'IP_CHANGED') await updateStudioGatewayIp(studioGateway.id, msg.gateway_ip);
-    await query(
-      `INSERT INTO gateways (gateway_id, current_ip, gateway_boot_id, mqtt_client_id, status, last_seen_at)
-       VALUES ($1,$2,$3,$4,$5, now())
-       ON CONFLICT (gateway_id) DO UPDATE SET last_seen_at = now()`,
-      [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, `ultron-gw-${msg.gateway_id}`, status],
-    );
-  } else {
-    const current = existing.rows[0];
-    if (!studioGateway) {
-      await query(
-        `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-         VALUES ($1,$2,false)
-         ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-        [msg.gateway_id, msg.gateway_ip],
-      );
-      return { status, event };
-    }
-
-    if (!studioGateway.ip.trim()) return rejectMissingConfiguredIp(msg.gateway_id, msg.gateway_ip);
-
-    const gatewayIpChanged = studioGateway.ip !== msg.gateway_ip;
-    const ipConflict = await findConfiguredIpConflict(studioGateway.id, msg.gateway_ip);
-    if (ipConflict) return rejectConfiguredIpConflict(msg.gateway_id, msg.gateway_ip, studioGateway.id);
-
-    if (current.status === 'QUARANTINED') {
-      status = 'ONLINE';
-      event = gatewayIpChanged ? 'IP_CHANGED' : 'COMMISSIONED';
-    } else {
-      status = 'ONLINE';
-      event = current.current_ip && current.current_ip !== msg.gateway_ip ? 'IP_CHANGED' : 'BOUND';
-    }
-    if (gatewayIpChanged) await updateStudioGatewayIp(studioGateway.id, msg.gateway_ip);
-    await query(
-      `UPDATE gateways SET current_ip = $2, gateway_boot_id = $3, status = $4, last_seen_at = now(), updated_at = now()
-       WHERE gateway_id = $1`,
-      [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, status],
-    );
-  }
-
-  await query(
-    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-     VALUES ($1,$2,$3)
-     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now()`,
-    [msg.gateway_id, msg.gateway_ip, true],
-  );
-
-  await query(
-    `INSERT INTO racks (gateway_id, rack_id)
-     VALUES ($1,$2)
-     ON CONFLICT (gateway_id, rack_id) DO UPDATE SET updated_at = now()`,
-    [msg.gateway_id, msg.rack_id],
-  );
-
-  return { status, event };
+  if (msg.rack_id) await upsertRack(msg, { status: 'unknown', dataCurrent: false });
+  return { status: 'ONLINE', event: 'BOUND' };
 }
 
 async function claimMessage(msg: MqttEnvelope, topic: string, sourceEvent?: Record<string, unknown> | null): Promise<boolean> {
@@ -612,137 +194,259 @@ async function claimMessage(msg: MqttEnvelope, topic: string, sourceEvent?: Reco
     `INSERT INTO mqtt_messages (message_id, topic, schema, schema_version, gateway_id, gateway_ip, rack_id, payload_hash, source_event)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
      ON CONFLICT (message_id) DO NOTHING`,
-    [msg.message_id, topic, msg.schema, msg.schema_version, msg.gateway_id, msg.gateway_ip, msg.rack_id, hash, sourceEvent ? JSON.stringify(sourceEvent) : null],
+    [msg.message_id, topic, msg.schema, msg.schema_version, msg.gateway_id, msg.gateway_ip, msg.rack_id ?? null, hash, sourceEvent ? JSON.stringify(sourceEvent) : null],
   );
+  if ((res.rowCount ?? 0) === 0) await bumpMetric('qos_duplicates');
   return res.rowCount === 1;
 }
 
-async function handleStatus(msg: MqttEnvelope): Promise<void> {
-  const state = msg.payload.state === 'ONLINE' ? 'ONLINE' : msg.payload.state === 'DEGRADED' ? 'DEGRADED' : 'OFFLINE';
+async function gatewayAllows(msg: MqttEnvelope, force = false): Promise<boolean> {
+  if (force) return true;
+  const res = await query<{ gateway_boot_id: string; last_gateway_sequence: string; last_source_created_at_us: string | null }>(
+    `SELECT gateway_boot_id, last_gateway_sequence, last_source_created_at_us FROM gateways WHERE gateway_id = $1`,
+    [msg.gateway_id],
+  );
+  const row = res.rows[0];
+  if (!row || (row.gateway_boot_id && row.gateway_boot_id !== msg.gateway_boot_id)) return true;
+  const incoming = BigInt(createdAtUs(msg));
+  const stored = BigInt(String(row.last_source_created_at_us ?? -1));
+  return incoming > stored || (incoming === stored && msg.gateway_sequence >= Number(row.last_gateway_sequence ?? -1));
+}
+
+async function rackAllows(msg: MqttEnvelope): Promise<boolean> {
+  const res = await query<{ last_gateway_boot_id: string; last_gateway_sequence: string; last_source_created_at_us: string | null }>(
+    `SELECT last_gateway_boot_id, last_gateway_sequence, last_source_created_at_us FROM racks WHERE gateway_id = $1 AND rack_id = $2`,
+    [msg.gateway_id, msg.rack_id],
+  );
+  const row = res.rows[0];
+  if (!row || (row.last_gateway_boot_id && row.last_gateway_boot_id !== msg.gateway_boot_id)) return true;
+  const incoming = BigInt(createdAtUs(msg));
+  const stored = BigInt(String(row.last_source_created_at_us ?? -1));
+  return incoming > stored || (incoming === stored && msg.gateway_sequence >= Number(row.last_gateway_sequence ?? -1));
+}
+
+async function upsertRack(msg: MqttEnvelope, patch: { status?: string; dataCurrent?: boolean } = {}): Promise<void> {
+  if (!msg.rack_id) return;
+  const payload = msg.payload;
+  const connection = objectValue(payload.connection) ?? {};
+  const telemetry = objectValue(payload.telemetry) ?? {};
   await query(
-    `UPDATE gateways SET status = CASE WHEN status = 'QUARANTINED' THEN status ELSE $2 END,
-       last_seen_at = now(), updated_at = now()
-     WHERE gateway_id = $1`,
-    [msg.gateway_id, state],
+    `INSERT INTO racks (
+       gateway_id, rack_id, status, data_current, current_ip, last_known_ip,
+       connection_reason, connection_payload, telemetry_payload, health_payload,
+       last_seen_at, last_message_at, last_gateway_sequence, last_gateway_boot_id,
+       last_source_created_at, last_source_created_at_us, active, updated_at
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,true,now())
+     ON CONFLICT (gateway_id, rack_id) DO UPDATE SET
+       status = EXCLUDED.status,
+       data_current = EXCLUDED.data_current,
+       current_ip = EXCLUDED.current_ip,
+       last_known_ip = EXCLUDED.last_known_ip,
+       connection_reason = EXCLUDED.connection_reason,
+       connection_payload = EXCLUDED.connection_payload,
+       telemetry_payload = EXCLUDED.telemetry_payload,
+       health_payload = EXCLUDED.health_payload,
+       last_seen_at = EXCLUDED.last_seen_at,
+       last_message_at = EXCLUDED.last_message_at,
+       last_gateway_sequence = EXCLUDED.last_gateway_sequence,
+       last_gateway_boot_id = EXCLUDED.last_gateway_boot_id,
+       last_source_created_at = EXCLUDED.last_source_created_at,
+       last_source_created_at_us = EXCLUDED.last_source_created_at_us,
+       active = true,
+       updated_at = now()`,
+    [
+      msg.gateway_id,
+      msg.rack_id,
+      patch.status ?? stringValue(payload.status) ?? stringValue(connection.status) ?? 'unknown',
+      patch.dataCurrent ?? (payload.data_current === true || telemetry.data_current === true),
+      stringValue(connection.current_ip ?? payload.current_ip),
+      stringValue(connection.last_known_ip ?? payload.last_known_ip),
+      stringValue(connection.status_reason ?? payload.status_reason),
+      json(connection),
+      json(telemetry),
+      json(payload),
+      dateValue(connection.last_seen_at ?? telemetry.last_received_at ?? payload.received_at),
+      dateValue(connection.last_message_at ?? telemetry.last_received_at ?? payload.received_at),
+      msg.gateway_sequence,
+      msg.gateway_boot_id,
+      dateValue(msg.created_at),
+      createdAtUs(msg),
+    ],
   );
 }
 
+async function handleStatus(msg: MqttEnvelope): Promise<void> {
+  if (!(await gatewayAllows(msg, msg.payload.state === 'OFFLINE'))) return;
+  const summary = objectValue(msg.payload.rack_summary) ?? {};
+  await query(
+    `UPDATE gateways SET status = $2, mqtt_state = $3, last_seen_at = now(),
+       last_gateway_sequence = $4, last_source_created_at = $5, last_source_created_at_us = $6,
+       status_payload = $7, known_racks = COALESCE($8, known_racks),
+       connected_racks = COALESCE($9, connected_racks), stale_racks = COALESCE($10, stale_racks),
+       disconnected_racks = COALESCE($11, disconnected_racks), blocked_racks = COALESCE($12, blocked_racks),
+       unidentified_connections = COALESCE($13, unidentified_connections),
+       active_tcp_connections = COALESCE($14, active_tcp_connections), updated_at = now()
+     WHERE gateway_id = $1`,
+    [
+      msg.gateway_id,
+      msg.payload.state,
+      msg.payload.mqtt_state ?? (msg.payload.state === 'ONLINE' ? 'CONNECTED' : 'DISCONNECTED'),
+      msg.gateway_sequence,
+      dateValue(msg.created_at),
+      createdAtUs(msg),
+      json(msg.payload),
+      intValue(summary.known_racks),
+      intValue(summary.connected_racks),
+      intValue(summary.stale_racks),
+      intValue(summary.disconnected_racks),
+      intValue(summary.blocked_racks),
+      intValue(summary.unidentified_connections),
+      intValue(summary.active_tcp_connections),
+    ],
+  );
+}
+
+async function handleTopology(msg: MqttEnvelope): Promise<void> {
+  if (!(await gatewayAllows(msg))) return;
+  const racks = Array.isArray(msg.payload.racks) ? msg.payload.racks.map(objectValue).filter(Boolean) as Record<string, unknown>[] : [];
+  await query(
+    `UPDATE gateways SET topology_payload = $2, known_racks = COALESCE($3, known_racks),
+       connected_racks = COALESCE($4, connected_racks), stale_racks = COALESCE($5, stale_racks),
+       disconnected_racks = COALESCE($6, disconnected_racks), blocked_racks = COALESCE($7, blocked_racks),
+       unidentified_connections = COALESCE($8, unidentified_connections),
+       active_tcp_connections = COALESCE($9, active_tcp_connections),
+       last_gateway_sequence = $10, last_source_created_at = $11, last_source_created_at_us = $12, updated_at = now()
+     WHERE gateway_id = $1`,
+    [
+      msg.gateway_id,
+      json(msg.payload),
+      intValue(msg.payload.known_racks),
+      intValue(msg.payload.connected_racks),
+      intValue(msg.payload.stale_racks),
+      intValue(msg.payload.disconnected_racks),
+      intValue(msg.payload.blocked_racks),
+      intValue(msg.payload.unidentified_connections),
+      intValue(msg.payload.active_tcp_connections),
+      msg.gateway_sequence,
+      dateValue(msg.created_at),
+      createdAtUs(msg),
+    ],
+  );
+  const activeRackIds: string[] = [];
+  for (const rack of racks) {
+    const rackId = stringValue(rack.rack_id);
+    if (!rackId) continue;
+    await upsertRack({ ...msg, rack_id: rackId, payload: rack }, { status: stringValue(rack.status) ?? 'unknown', dataCurrent: rack.data_current === true });
+    activeRackIds.push(rackId);
+  }
+  await query(`UPDATE racks SET active = false, updated_at = now() WHERE gateway_id = $1 AND NOT (rack_id = ANY($2::text[]))`, [msg.gateway_id, activeRackIds]);
+}
+
+async function handleRackHealth(msg: MqttEnvelope): Promise<void> {
+  if (!(await rackAllows(msg))) return;
+  await upsertRack(msg);
+  if (msg.payload.data_current !== true) {
+    await query(`UPDATE rack_slot_latest SET live = false, measurement_valid = false, updated_at = now() WHERE gateway_id = $1 AND rack_id = $2`, [msg.gateway_id, msg.rack_id]);
+  }
+}
+
 async function handleInventory(msg: MqttEnvelope): Promise<void> {
+  if (!(await rackAllows(msg))) return;
+  await upsertRack(msg, { dataCurrent: false });
   const revision = Number(msg.payload.snapshot_revision);
-  const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots : [];
-  for (const item of slots) {
-    const slot = item as Record<string, unknown>;
+  const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots.map(objectValue).filter(Boolean) as Record<string, unknown>[] : [];
+  for (const slot of slots) {
     await query(
-      `INSERT INTO rack_inventory_slots (gateway_id, rack_id, slot_id, presence, online_state, card_type, snapshot_revision)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT (gateway_id, rack_id, slot_id) DO UPDATE SET
-         presence = EXCLUDED.presence,
-         online_state = EXCLUDED.online_state,
-         card_type = EXCLUDED.card_type,
-         snapshot_revision = EXCLUDED.snapshot_revision,
-         updated_at = now()
+      `INSERT INTO rack_inventory_slots (
+         gateway_id, rack_id, slot_number, presence, online_state, card_type,
+         snapshot_revision, card_type_code, sensor_code, sensor, unit_code, unit,
+         decimal_places, slot_payload, updated_at
+       )
+       VALUES ($1,$2,$3,'PRESENT','UNKNOWN',$4,$5,$6,$7,$8,$9,$10,$11,$12,now())
+       ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
+         card_type = EXCLUDED.card_type, snapshot_revision = EXCLUDED.snapshot_revision,
+         card_type_code = EXCLUDED.card_type_code, sensor_code = EXCLUDED.sensor_code,
+         sensor = EXCLUDED.sensor, unit_code = EXCLUDED.unit_code, unit = EXCLUDED.unit,
+         decimal_places = EXCLUDED.decimal_places, slot_payload = EXCLUDED.slot_payload, updated_at = now()
        WHERE rack_inventory_slots.snapshot_revision <= EXCLUDED.snapshot_revision`,
-      [msg.gateway_id, msg.rack_id, slot.slot_id, slot.presence, slot.online_state ?? 'UNKNOWN', slot.card_type ?? null, revision],
+      [
+        msg.gateway_id,
+        msg.rack_id,
+        slot.slot_number,
+        stringValue(slot.card_type),
+        revision,
+        intValue(slot.card_type_code),
+        intValue(slot.sensor_code),
+        stringValue(slot.sensor),
+        intValue(slot.unit_code),
+        stringValue(slot.unit),
+        intValue(slot.decimal_places),
+        json(slot),
+      ],
     );
   }
   await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1 AND rack_id = $2 AND snapshot_revision < $3`, [msg.gateway_id, msg.rack_id, revision]);
 }
 
-// Value columns shared by measurement_history and measurement_latest. The
-// trailing fields are the per-channel detail a real controller reports next to
-// the value (sensor, card type, thresholds, alarm state); the simulator omits
-// them and they stay null.
-const MEASUREMENT_COLUMNS =
-  'gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, source_sequence, source_timestamp_us,' +
-  ' card_type, sensor, freshness, channel_status, alert_threshold, danger_threshold, alert_state, danger_state';
-const MEASUREMENT_COLUMN_COUNT = 18;
-
-function text(value: unknown): string | null {
-  return typeof value === 'string' && value ? value : null;
-}
-
-function numeric(value: unknown): number | null {
-  return typeof value === 'number' && Number.isFinite(value) ? value : null;
-}
-
-function alarmState(value: unknown): string {
-  return value === 'ACTIVE' ? 'ACTIVE' : 'INACTIVE';
-}
-
-function measurementParams(msg: MqttEnvelope, r: Record<string, unknown>): unknown[] {
+function slotParams(msg: MqttEnvelope, slot: Record<string, unknown>): unknown[] {
+  const display = String(slot.value_display ?? slot.value_formatted ?? '').trim().toLowerCase();
+  const measurementValid = slot.measurement_valid === true && String(slot.channel_status ?? 'ok').toLowerCase() === 'ok' && !['', 'invalid', 'nan', 'null', 'none'].includes(display);
+  const decimal = (value: unknown) => value === null || value === undefined ? null : String(value);
   return [
-    msg.gateway_id,
-    msg.rack_id,
-    r.slot_id,
-    r.channel_id,
-    r.measurement_type,
-    r.value,
-    r.unit ?? '',
-    r.quality ?? 'GOOD',
-    r.source_sequence,
-    r.source_timestamp_us,
-    text(r.card_type),
-    text(r.sensor),
-    r.freshness === 'STALE' ? 'STALE' : 'FRESH',
-    text(r.channel_status),
-    numeric(r.alert_threshold),
-    numeric(r.danger_threshold),
-    alarmState(r.alert_state),
-    alarmState(r.danger_state),
+    msg.gateway_id, msg.rack_id, slot.slot_number, stringValue(slot.data_status), intValue(slot.channel_status_code), stringValue(slot.channel_status),
+    intValue(slot.card_type_code), stringValue(slot.card_type), intValue(slot.sensor_code), stringValue(slot.sensor), intValue(slot.unit_code), stringValue(slot.unit),
+    intValue(slot.decimal_places), decimal(slot.value_raw), decimal(slot.value_formatted), stringValue(slot.value_with_unit), measurementValid, stringValue(slot.value_display),
+    decimal(slot.alert_value_raw), decimal(slot.alert_value_formatted), stringValue(slot.alert_with_unit), decimal(slot.danger_value_raw), decimal(slot.danger_value_formatted),
+    stringValue(slot.danger_with_unit), intValue(slot.alert_status_code), stringValue(slot.alert_status), intValue(slot.danger_status_code), stringValue(slot.danger_status),
+    createdAtUs(msg), msg.gateway_sequence, msg.gateway_boot_id, json(slot), objectValue(msg.payload.telemetry)?.data_current === true && measurementValid,
   ];
 }
 
 async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
-  const records = Array.isArray(msg.payload.records) ? msg.payload.records : [];
-  if (records.length === 0) return 0;
-
-  const params: unknown[] = [];
-  const values = records.map((item, index) => {
-    params.push(...measurementParams(msg, item as Record<string, unknown>));
-    const start = index * MEASUREMENT_COLUMN_COUNT;
-    const placeholders = Array.from({ length: MEASUREMENT_COLUMN_COUNT }, (_, offset) => `$${start + offset + 1}`);
-    return `(${placeholders.join(',')})`;
-  });
-
-  const hist = await query(
-    `INSERT INTO measurement_history
-       (${MEASUREMENT_COLUMNS})
-     VALUES ${values.join(',')}
-     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
-    params,
-  );
-
-  await query(
-    `INSERT INTO measurement_latest
-       (${MEASUREMENT_COLUMNS}, updated_at)
-     VALUES ${values.map((value) => `${value.slice(0, -1)}, now())`).join(',')}
-     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type) DO UPDATE SET
-       value = EXCLUDED.value,
-       unit = EXCLUDED.unit,
-       quality = EXCLUDED.quality,
-       source_sequence = EXCLUDED.source_sequence,
-       source_timestamp_us = EXCLUDED.source_timestamp_us,
-       card_type = EXCLUDED.card_type,
-       sensor = EXCLUDED.sensor,
-       freshness = EXCLUDED.freshness,
-       channel_status = EXCLUDED.channel_status,
-       alert_threshold = EXCLUDED.alert_threshold,
-       danger_threshold = EXCLUDED.danger_threshold,
-       alert_state = EXCLUDED.alert_state,
-       danger_state = EXCLUDED.danger_state,
-       updated_at = now()
-     WHERE measurement_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
-    params,
-  );
-
-  return hist.rowCount ?? 0;
+  if (!(await rackAllows(msg))) return 0;
+  await upsertRack(msg, { status: 'connected', dataCurrent: objectValue(msg.payload.telemetry)?.data_current === true });
+  const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots.map(objectValue).filter(Boolean) as Record<string, unknown>[] : [];
+  for (const slot of slots) {
+    await query(
+      `INSERT INTO rack_slot_latest (
+         gateway_id, rack_id, slot_number, data_status, channel_status_code, channel_status,
+         card_type_code, card_type, sensor_code, sensor, unit_code, unit, decimal_places,
+         value_raw, value_formatted, value_with_unit, measurement_valid, value_display,
+         alert_value_raw, alert_value_formatted, alert_with_unit, danger_value_raw,
+         danger_value_formatted, danger_with_unit, alert_status_code, alert_status,
+         danger_status_code, danger_status, source_timestamp_us, gateway_sequence,
+         gateway_boot_id, payload, live, updated_at
+       )
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,now())
+       ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
+         data_status = EXCLUDED.data_status, channel_status_code = EXCLUDED.channel_status_code,
+         channel_status = EXCLUDED.channel_status, card_type_code = EXCLUDED.card_type_code,
+         card_type = EXCLUDED.card_type, sensor_code = EXCLUDED.sensor_code, sensor = EXCLUDED.sensor,
+         unit_code = EXCLUDED.unit_code, unit = EXCLUDED.unit, decimal_places = EXCLUDED.decimal_places,
+         value_raw = EXCLUDED.value_raw, value_formatted = EXCLUDED.value_formatted,
+         value_with_unit = EXCLUDED.value_with_unit, measurement_valid = EXCLUDED.measurement_valid,
+         value_display = EXCLUDED.value_display, alert_value_raw = EXCLUDED.alert_value_raw,
+         alert_value_formatted = EXCLUDED.alert_value_formatted, alert_with_unit = EXCLUDED.alert_with_unit,
+         danger_value_raw = EXCLUDED.danger_value_raw, danger_value_formatted = EXCLUDED.danger_value_formatted,
+         danger_with_unit = EXCLUDED.danger_with_unit, alert_status_code = EXCLUDED.alert_status_code,
+         alert_status = EXCLUDED.alert_status, danger_status_code = EXCLUDED.danger_status_code,
+         danger_status = EXCLUDED.danger_status, source_timestamp_us = EXCLUDED.source_timestamp_us,
+         gateway_sequence = EXCLUDED.gateway_sequence, gateway_boot_id = EXCLUDED.gateway_boot_id,
+         payload = EXCLUDED.payload, live = EXCLUDED.live, updated_at = now()
+       WHERE rack_slot_latest.gateway_boot_id <> EXCLUDED.gateway_boot_id
+          OR rack_slot_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
+      slotParams(msg, slot),
+    );
+  }
+  return slots.length;
 }
 
 async function handleEvent(msg: MqttEnvelope, kind: TopicKind): Promise<void> {
   await query(
     `INSERT INTO gateway_events (message_id, gateway_id, rack_id, event_kind, payload)
      VALUES ($1,$2,$3,$4,$5)`,
-    [msg.message_id, msg.gateway_id, msg.rack_id, kind, JSON.stringify(msg.payload)],
+    [msg.message_id, msg.gateway_id, msg.rack_id ?? null, kind, JSON.stringify(msg.payload)],
   );
 }
 
@@ -763,90 +467,54 @@ export function normalizeWebhookMessage(body: unknown): NormalizedWebhookMessage
 
 export async function ingestMqttMessage(topic: string, rawMessage: unknown, sourceEvent?: Record<string, unknown> | null): Promise<IngestResult> {
   await ensureSchema();
-
   const parsed = parseTopic(topic);
   if (!parsed) {
     await quarantine(topic, 'unknown topic', null);
-    return { kind: 'system', fresh: false, quarantined: true, reason: 'unknown topic' };
+    return { kind: 'status', fresh: false, quarantined: true, reason: 'unknown topic' };
   }
   if (parsed.kind === 'command_request') return { kind: parsed.kind, fresh: false };
-
-  const normalizedRawMessage = normalizeCcV3SnapshotMessage(rawMessage, parsed, sourceEvent);
-  const messageForIngest = normalizedRawMessage ?? rawMessage;
-  const sourceForClaim = normalizedRawMessage
-    ? { ...(sourceEvent ?? {}), raw_payload_format: CC_V3_SCHEMA, raw_payload: rawMessage }
-    : sourceEvent;
-
-  const envelopeErrors = validateEnvelope(messageForIngest);
+  const envelopeErrors = validateEnvelope(rawMessage);
   if (envelopeErrors.length > 0) {
     const reason = `envelope: ${envelopeErrors.join('; ')}`;
-    await quarantine(topic, reason, messageForIngest as Partial<MqttEnvelope>);
+    await quarantine(topic, reason, rawMessage as Partial<MqttEnvelope>);
     return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
-
-  const msg = messageForIngest as MqttEnvelope;
+  const msg = rawMessage as MqttEnvelope;
   const expectedSchema = SCHEMA_FOR_KIND[parsed.kind];
   if (expectedSchema && msg.schema !== expectedSchema) {
     const reason = `schema ${msg.schema} does not match topic kind ${parsed.kind}`;
     await quarantine(topic, reason, msg);
     return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
-
   const payloadErrors = validatePayload(msg.schema, msg.payload);
   if (payloadErrors.length > 0) {
     const reason = `payload: ${payloadErrors.join('; ')}`;
     await quarantine(topic, reason, msg);
     return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
-
-  if (parsed.gatewayId !== msg.gateway_id) {
-    const reason = 'topic/payload gateway_id mismatch';
+  if (parsed.gatewayId !== msg.gateway_id || (parsed.rackId !== null && parsed.rackId !== msg.rack_id) || (parsed.rackId === null && msg.rack_id !== undefined)) {
+    const reason = 'topic/payload identity mismatch';
     await quarantine(topic, reason, msg);
     return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
-  if (parsed.rackId !== null && parsed.rackId !== msg.rack_id) {
-    const reason = 'topic/payload rack_id mismatch';
-    await quarantine(topic, reason, msg);
-    return { kind: parsed.kind, fresh: false, quarantined: true, reason };
-  }
-
   const binding = await bind(msg);
-  const fresh = await claimMessage(msg, topic, sourceForClaim);
-  if (!fresh || binding.status === 'QUARANTINED') {
-    if (fresh && binding.status === 'QUARANTINED') {
-      await quarantine(topic, binding.reason ?? 'gateway not commissioned', msg);
-    }
-    return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event, reason: binding.reason };
-  }
-
-  switch (parsed.kind) {
-    case 'status':
-      await handleStatus(msg);
-      return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
-    case 'inventory':
-      await handleInventory(msg);
-      return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
-    case 'telemetry': {
-      const stored = await handleTelemetry(msg);
-      return { kind: parsed.kind, fresh, stored, bindingStatus: binding.status, bindingEvent: binding.event };
-    }
-    case 'alarm':
-    case 'fault':
-    case 'system':
-      await handleEvent(msg, parsed.kind);
-      return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
-    default:
-      return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
-  }
+  const fresh = await claimMessage(msg, topic, sourceEvent);
+  if (!fresh) return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
+  if (parsed.kind === 'status') await handleStatus(msg);
+  if (parsed.kind === 'topology') await handleTopology(msg);
+  if (parsed.kind === 'rack_health') await handleRackHealth(msg);
+  if (parsed.kind === 'inventory') await handleInventory(msg);
+  if (parsed.kind === 'telemetry') return { kind: parsed.kind, fresh, stored: await handleTelemetry(msg), bindingStatus: binding.status, bindingEvent: binding.event };
+  if (parsed.kind === 'alarm' || parsed.kind === 'command_response') await handleEvent(msg, parsed.kind);
+  await bumpMetric(`messages_schema_${msg.schema.replaceAll('.', '_')}`);
+  await bumpMetric('messages_total');
+  return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };
 }
 
-// Last-will backstop: gateways silent past the threshold flip to OFFLINE even
-// if the retained OFFLINE will was lost. The live-state read path also computes
-// staleness, but this keeps persisted status useful for admin/database views.
 export async function markStaleGateways(staleAfterS: number): Promise<void> {
   await ensureSchema();
   await query(
-    `UPDATE gateways SET status = 'OFFLINE', updated_at = now()
+    `UPDATE gateways SET status = 'OFFLINE', mqtt_state = 'DISCONNECTED', updated_at = now()
      WHERE status = 'ONLINE' AND last_seen_at < now() - make_interval(secs => $1)`,
     [staleAfterS],
   );

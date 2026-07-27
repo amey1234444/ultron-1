@@ -1,4 +1,4 @@
-"""The single common envelope builder (v1.1).
+"""The single common envelope builder (v2.0).
 
 Every Gateway-originated message is built here so no publisher can forget a
 mandatory field — in particular gateway_ip, the network-binding amendment.
@@ -12,7 +12,7 @@ from typing import Any
 from .clock import iso_from_us, now_us
 from .sequence import Sequence
 
-SCHEMA_VERSION = "1.1"
+SCHEMA_VERSION = "2.0"
 
 
 class EnvelopeBuilder:
@@ -25,7 +25,7 @@ class EnvelopeBuilder:
     def build(
         self,
         schema: str,
-        rack_id: int,
+        rack_id: str | None,
         payload: dict[str, Any],
         source_controller: dict[str, Any] | None = None,
         replayed: bool = False,
@@ -39,13 +39,14 @@ class EnvelopeBuilder:
             "gateway_id": self.gateway_id,
             "gateway_boot_id": self.gateway_boot_id,
             "gateway_ip": self.gateway_ip,
-            "rack_id": rack_id,
             "gateway_sequence": self._sequence.next(),
             "created_at": iso_from_us(us),
             "created_at_us": str(us),
             "replayed": replayed,
             "payload": payload,
         }
+        if rack_id is not None:
+            envelope["rack_id"] = rack_id
         if source_controller is not None:
             envelope["source_controller"] = source_controller
         return envelope

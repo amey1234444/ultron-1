@@ -34,26 +34,24 @@ def _load_dotenv() -> None:
 _load_dotenv()
 
 
-def _rack_ids_from_env() -> tuple[int, ...]:
+def _rack_ids_from_env() -> tuple[str, ...]:
     raw = os.environ.get("RACK_IDS")
     if raw:
-        ids = tuple(int(part.strip()) for part in raw.split(",") if part.strip())
+        ids = tuple(part for part in raw.split(",") if part)
         if ids:
             return ids
-    return (int(os.environ.get("RACK_ID", "1")),)
+    return (os.environ.get("RACK_ID", "1"),)
 
 
-def _rack_number_map_from_env() -> dict[str, int]:
+def _rack_number_map_from_env() -> dict[str, str]:
     """`RACK_NUMBER_MAP=CC_Card_UID1=1,CC_Card_UID2=2` — v3 names racks, the
     contract numbers them."""
-    mapping: dict[str, int] = {}
+    mapping: dict[str, str] = {}
     for part in os.environ.get("RACK_NUMBER_MAP", "").split(","):
         name, _, value = part.partition("=")
-        name = name.strip()
-        if not name or not value.strip().isdigit():
+        if not name or value == "":
             continue
-        mapping[name] = int(value.strip())
-        mapping[name.lower()] = int(value.strip())
+        mapping[name] = value
     return mapping
 
 
@@ -76,8 +74,8 @@ def _channel_slot_map_from_env() -> dict[int, tuple[int, int]]:
 @dataclass(frozen=True)
 class Config:
     gateway_id: str = field(default_factory=lambda: os.environ.get("GATEWAY_ID", "ultron-gw-demo-01"))
-    rack_id: int = field(default_factory=lambda: int(os.environ.get("RACK_ID", "1")))
-    rack_ids: tuple[int, ...] = field(default_factory=_rack_ids_from_env)
+    rack_id: str = field(default_factory=lambda: os.environ.get("RACK_ID", "1"))
+    rack_ids: tuple[str, ...] = field(default_factory=_rack_ids_from_env)
     gateway_ip: str | None = field(default_factory=lambda: os.environ.get("GATEWAY_IP") or None)
     primary_interface: str | None = field(
         default_factory=lambda: os.environ.get("GATEWAY_PRIMARY_INTERFACE") or None
@@ -89,6 +87,8 @@ class Config:
     mqtt_username: str | None = field(default_factory=lambda: os.environ.get("MQTT_USERNAME") or None)
     mqtt_password: str | None = field(default_factory=lambda: os.environ.get("MQTT_PASSWORD") or None)
     mqtt_ca_cert: str | None = field(default_factory=lambda: os.environ.get("MQTT_CA_CERT") or None)
+    mqtt_client_cert: str | None = field(default_factory=lambda: os.environ.get("MQTT_CLIENT_CERT") or None)
+    mqtt_client_key: str | None = field(default_factory=lambda: os.environ.get("MQTT_CLIENT_KEY") or None)
 
     state_dir: str = field(default_factory=lambda: os.environ.get("GATEWAY_STATE_DIR", "./state"))
     telemetry_interval_s: float = field(
@@ -111,14 +111,12 @@ class Config:
     )
     cc_stale_after_s: float = field(default_factory=lambda: float(os.environ.get("CC_STALE_AFTER_S", "5")))
     controller_slot_id: int = field(default_factory=lambda: int(os.environ.get("CC_CONTROLLER_SLOT", "13")))
-    rack_number_map: dict[str, int] = field(default_factory=_rack_number_map_from_env)
+    rack_number_map: dict[str, str] = field(default_factory=_rack_number_map_from_env)
     channel_slot_map: dict[int, tuple[int, int]] = field(default_factory=_channel_slot_map_from_env)
-    # cc_v3_raw publishes the exact normalized frame v3 writes/streams on the
-    # rack telemetry topic. canonical keeps the older measurement-batch envelope.
-    mqtt_payload_format: str = field(default_factory=lambda: os.environ.get("MQTT_PAYLOAD_FORMAT", "cc_v3_raw").strip().lower())
+    mqtt_payload_format: str = field(default_factory=lambda: os.environ.get("MQTT_PAYLOAD_FORMAT", "v2").strip().lower())
 
     @property
-    def primary_rack_id(self) -> int:
+    def primary_rack_id(self) -> str:
         return self.rack_ids[0]
 
     @property

@@ -20,11 +20,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!isDbEnabled()) return res.status(200).json({ persisted: false, points: [] });
 
     const gatewayId = String(req.query.gatewayId ?? '');
-    const rackId = Number(req.query.rackId);
+    const rackId = String(req.query.rackId ?? '');
     const slotId = Number(req.query.slotId);
     const channelId = Number(req.query.channelId);
     const limit = Math.min(Math.max(Number(req.query.limit) || 120, 1), 1000);
-    if (!gatewayId || !Number.isInteger(rackId) || !Number.isInteger(slotId) || !Number.isInteger(channelId)) {
+    if (!gatewayId || !rackId || !Number.isInteger(slotId) || !Number.isInteger(channelId)) {
       return res.status(400).json({ error: 'gatewayId, rackId, slotId, and channelId are required.' });
     }
 

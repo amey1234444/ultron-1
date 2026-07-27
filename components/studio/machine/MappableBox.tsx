@@ -47,7 +47,7 @@ export type MappableBoxProps = {
   connectorPoint: Point;
   channel: ChannelRef | null;
   dataLive?: boolean;
-  liveReading?: { value: number; unit?: string };
+  liveReading?: { value: number | null; unit?: string };
   channels: ChannelRef[];
   pickableChannels?: ChannelRef[];
   devices?: DeviceNode[];
@@ -106,7 +106,7 @@ export function MappableBox({
   const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
   const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel && dataLive);
-  const displayValue = liveReading?.value ?? liveValue;
+  const displayValue = typeof liveReading?.value === 'number' ? liveReading.value : liveValue;
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;
   const pickerGateways = useMemo(

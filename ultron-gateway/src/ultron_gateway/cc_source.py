@@ -138,9 +138,9 @@ class CcV3Feed:
         self,
         reader: SnapshotReader,
         *,
-        rack_number_map: dict[str, int] | None = None,
+        rack_number_map: dict[str, str] | None = None,
         channel_slot_map: dict[int, tuple[int, int]] | None = None,
-        fallback_rack_id: int = 1,
+        fallback_rack_id: str = "1",
         controller_slot_id: int = 13,
     ) -> None:
         self._reader = reader
@@ -148,9 +148,9 @@ class CcV3Feed:
         self._channel_slot_map = channel_slot_map or {}
         self._fallback_rack_id = fallback_rack_id
         self._controller_slot_id = controller_slot_id
-        self._layouts: dict[int, str] = {}
-        self._alarms: dict[tuple[int, int, int, str], bool] = {}
-        self._revisions: dict[int, int] = {}
+        self._layouts: dict[str, str] = {}
+        self._alarms: dict[tuple[str, int, int, str], bool] = {}
+        self._revisions: dict[str, int] = {}
 
     def poll(self) -> CcSnapshot | None:
         frame = self._reader.read()
@@ -166,22 +166,20 @@ class CcV3Feed:
 
     def inventory_if_changed(self, snapshot: CcSnapshot) -> dict[str, Any] | None:
         """Retained inventory is republished only when the layout changes."""
-        payload = snapshot.rack.inventory_payload()
-        layout = json.dumps(payload["slots"], sort_keys=True)
+        layout = json.dumps(snapshot.slot_payloads, sort_keys=True)
         if self._layouts.get(snapshot.rack_id) == layout:
             return None
         self._layouts[snapshot.rack_id] = layout
         # Revisions must never go backwards: the backend drops older snapshots.
-        revision = max(payload["snapshot_revision"], self._revisions.get(snapshot.rack_id, 0) + 1)
+        revision = max(1, self._revisions.get(snapshot.rack_id, 0) + 1)
         self._revisions[snapshot.rack_id] = revision
-        payload["snapshot_revision"] = revision
-        return payload
+        return snapshot.inventory_payload(revision)
 
     def alarm_transitions(self, snapshot: CcSnapshot) -> list[Alarm]:
         """Only ACTIVE/CLEARED edges, so a steady alarm is published once."""
         transitions: list[Alarm] = []
         for alarm in snapshot.alarms:
-            key = (snapshot.rack_id, alarm.slot_id, alarm.channel_id, alarm.severity)
+            key = (snapshot.rack_id, alarm.slot_number, alarm.channel_id, alarm.severity)
             active = alarm.state == "ACTIVE"
             known = self._alarms.get(key)
             if known is None:

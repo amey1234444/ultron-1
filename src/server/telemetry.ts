@@ -12,14 +12,16 @@ export type LiveGateway = {
 
 export type LiveRack = {
   gatewayId: string;
-  rackId: number;
+  rackId: string;
   status: string;
   lastSeenAt: string | null;
+  dataCurrent: boolean;
+  connectionReason: string | null;
 };
 
 export type LiveSlot = {
   gatewayId: string;
-  rackId: number;
+  rackId: string;
   slotId: number;
   presence: string;
   onlineState: string;
@@ -28,11 +30,14 @@ export type LiveSlot = {
 
 export type LiveMeasurement = {
   gatewayId: string;
-  rackId: number;
+  rackId: string;
   slotId: number;
   channelId: number;
   measurementType: string;
-  value: number;
+  value: number | null;
+  valueDisplay: string | null;
+  valueWithUnit: string | null;
+  measurementValid: boolean;
   unit: string;
   quality: string;
   updatedAt: string;
@@ -67,25 +72,23 @@ export type LiveState = {
   alerts: LiveAlert[];
 };
 
-type GatewayRow = { gateway_id: string; current_ip: string; status: string; last_seen_at: Date | null; stale: boolean };
-type RackRow = { gateway_id: string; rack_id: number; last_seen_at: Date | null; stale: boolean };
-type SlotRow = { gateway_id: string; rack_id: number; slot_id: number; presence: string; online_state: string; card_type: string | null };
+type GatewayRow = { gateway_id: string; current_ip: string; status: string; mqtt_state: string; last_seen_at: Date | null; known_racks: number; connected_racks: number; stale_racks: number; disconnected_racks: number };
+type RackRow = { gateway_id: string; rack_id: string; status: string; data_current: boolean; connection_reason: string | null; last_seen_at: Date | null; active: boolean };
+type SlotRow = { gateway_id: string; rack_id: string; slot_number: number; presence: string; online_state: string; card_type: string | null };
 type MeasurementRow = {
   gateway_id: string;
-  rack_id: number;
-  slot_id: number;
-  channel_id: number;
-  measurement_type: string;
-  value: number;
-  unit: string;
-  quality: string;
+  rack_id: string;
+  slot_number: number;
+  value: number | null;
+  value_display: string | null;
+  value_with_unit: string | null;
+  measurement_valid: boolean;
+  unit: string | null;
   updated_at: Date;
   card_type: string | null;
   sensor: string | null;
-  freshness: string | null;
+  data_status: string | null;
   channel_status: string | null;
-  alert_threshold: number | null;
-  danger_threshold: number | null;
   alert_state: string | null;
   danger_state: string | null;
 };
@@ -102,51 +105,35 @@ type AlertRow = {
 type BlockedBindingRow = Omit<AlertRow, 'id' | 'received_at'>;
 type UnconfiguredGatewayRow = { gateway_id: string };
 
-// Gateway status is still useful for process/MQTT health, but rack/gateway
-// connectivity in the live UI must follow fresh channel data for IoT accuracy.
-const GATEWAY_STATUS_STALE_AFTER_S = 6;
-// Wide enough for controllers that publish a frame every second or two (CC v3)
-// without hiding a genuinely dead link; LIVE_DATA_STALE_AFTER_S tunes it per
-// deployment.
-const LIVE_DATA_STALE_AFTER_S = Number(process.env.LIVE_DATA_STALE_AFTER_S ?? 6) || 6;
+const GATEWAY_STATUS_STALE_AFTER_S = 15;
 
 export async function getLiveState(options: { includeConflictDeviceDetails?: boolean } = {}): Promise<LiveState> {
   await ensureSchema();
 
   const [gateways, racks, slots, measurements, alerts, blockedBindings, unconfiguredGateways] = await Promise.all([
     query<GatewayRow>(
-      `SELECT gateway_id, current_ip, status, last_seen_at,
-              (last_seen_at IS NULL OR last_seen_at < now() - make_interval(secs => $1)) AS stale
+      `SELECT gateway_id, current_ip, status, mqtt_state, last_seen_at,
+              known_racks, connected_racks, stale_racks, disconnected_racks
        FROM gateways ORDER BY gateway_id`,
-      [GATEWAY_STATUS_STALE_AFTER_S],
     ),
     query<RackRow>(
-      `SELECT r.gateway_id, r.rack_id, latest.last_seen_at,
-              (latest.last_seen_at IS NULL OR latest.last_seen_at < now() - make_interval(secs => $1)) AS stale
-       FROM racks r
-       LEFT JOIN LATERAL (
-         SELECT m.updated_at AS last_seen_at
-         FROM measurement_latest m
-         WHERE m.gateway_id = r.gateway_id
-           AND m.rack_id = r.rack_id
-           AND m.quality = 'GOOD'
-         ORDER BY m.updated_at DESC
-         LIMIT 1
-       ) latest ON true
-       ORDER BY r.gateway_id, r.rack_id`,
-      [LIVE_DATA_STALE_AFTER_S],
+      `SELECT gateway_id, rack_id, status, data_current, connection_reason, last_seen_at, active
+       FROM racks
+       WHERE active = true
+       ORDER BY gateway_id, rack_id`,
     ),
     query<SlotRow>(
-      `SELECT gateway_id, rack_id, slot_id, presence, online_state, card_type
-       FROM rack_inventory_slots ORDER BY gateway_id, rack_id, slot_id`,
+      `SELECT gateway_id, rack_id, slot_number, presence, online_state, card_type
+       FROM rack_inventory_slots ORDER BY gateway_id, rack_id, slot_number`,
     ),
     query<MeasurementRow>(
-      `SELECT gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality, updated_at,
-              card_type, sensor, freshness, channel_status, alert_threshold, danger_threshold, alert_state, danger_state
-       FROM measurement_latest
-       WHERE updated_at >= now() - make_interval(secs => $1)
-       ORDER BY gateway_id, rack_id, slot_id, channel_id`,
-      [LIVE_DATA_STALE_AFTER_S],
+      `SELECT gateway_id, rack_id, slot_number,
+              CASE WHEN value_formatted ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN value_formatted::double precision ELSE NULL END AS value,
+              value_display, value_with_unit, measurement_valid, unit, updated_at,
+              card_type, sensor, data_status, channel_status, alert_status AS alert_state, danger_status AS danger_state
+       FROM rack_slot_latest
+       WHERE live = true
+       ORDER BY gateway_id, rack_id, slot_number`,
     ),
     query<AlertRow>(
       `SELECT q.id, q.gateway_id, q.gateway_ip, q.received_at,
@@ -214,10 +201,6 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
     ...unconfiguredGateways.rows.map((g: UnconfiguredGatewayRow) => g.gateway_id),
     ...allAlerts.map((a: AlertRow) => a.gateway_id),
   ]);
-  const liveRackGatewayIds = new Set(
-    racks.rows.filter((r: RackRow) => !blockedGatewayIds.has(r.gateway_id) && !r.stale).map((r: RackRow) => r.gateway_id),
-  );
-
   return {
     gateways: gateways.rows.map((g: GatewayRow) => ({
       gatewayId: g.gateway_id,
@@ -225,7 +208,7 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
       status:
         blockedGatewayIds.has(g.gateway_id)
           ? 'QUARANTINED'
-          : g.status === 'OFFLINE' || g.stale || !liveRackGatewayIds.has(g.gateway_id)
+          : g.status === 'OFFLINE'
             ? 'OFFLINE'
             : g.status,
       lastSeenAt: g.last_seen_at ? g.last_seen_at.toISOString() : null,
@@ -233,13 +216,15 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
     racks: racks.rows.filter((r: RackRow) => !blockedGatewayIds.has(r.gateway_id)).map((r: RackRow) => ({
       gatewayId: r.gateway_id,
       rackId: r.rack_id,
-      status: r.stale ? 'OFFLINE' : 'ONLINE',
+      status: r.status === 'connected' && r.data_current ? 'ONLINE' : r.status.toUpperCase(),
       lastSeenAt: r.last_seen_at ? r.last_seen_at.toISOString() : null,
+      dataCurrent: r.data_current,
+      connectionReason: r.connection_reason,
     })),
     slots: slots.rows.filter((s: SlotRow) => !blockedGatewayIds.has(s.gateway_id)).map((s: SlotRow) => ({
       gatewayId: s.gateway_id,
       rackId: s.rack_id,
-      slotId: s.slot_id,
+      slotId: s.slot_number,
       presence: s.presence,
       onlineState: s.online_state,
       cardType: s.card_type,
@@ -247,19 +232,22 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
     measurements: measurements.rows.filter((m: MeasurementRow) => !blockedGatewayIds.has(m.gateway_id)).map((m: MeasurementRow) => ({
       gatewayId: m.gateway_id,
       rackId: m.rack_id,
-      slotId: m.slot_id,
-      channelId: m.channel_id,
-      measurementType: m.measurement_type,
+      slotId: m.slot_number,
+      channelId: 1,
+      measurementType: m.sensor ?? m.card_type ?? 'VALUE',
       value: m.value,
-      unit: m.unit,
-      quality: m.quality,
+      valueDisplay: m.value_display,
+      valueWithUnit: m.value_with_unit,
+      measurementValid: m.measurement_valid,
+      unit: m.unit ?? '',
+      quality: m.measurement_valid ? 'GOOD' : 'BAD',
       updatedAt: m.updated_at.toISOString(),
       cardType: m.card_type,
       sensor: m.sensor,
-      freshness: m.freshness ?? 'FRESH',
+      freshness: m.data_status === 'current' ? 'FRESH' : 'STALE',
       channelStatus: m.channel_status,
-      alertThreshold: m.alert_threshold,
-      dangerThreshold: m.danger_threshold,
+      alertThreshold: null,
+      dangerThreshold: null,
       alertState: m.alert_state ?? 'INACTIVE',
       dangerState: m.danger_state ?? 'INACTIVE',
     })),
@@ -287,7 +275,7 @@ type HistoryRow = { value: number; source_timestamp_us: string };
 
 export async function getMeasurementHistory(
   gatewayId: string,
-  rackId: number,
+  rackId: string | number,
   slotId: number,
   channelId: number,
   limit: number,

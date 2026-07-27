@@ -103,31 +103,33 @@ function rackGatewayGroupKey(rack: DeviceNode, devices: DeviceNode[]): string {
 }
 
 function rackSortValue(rack: DeviceNode): string {
-  const rackId = typeof rack.realRackId === 'number' && Number.isInteger(rack.realRackId) ? String(rack.realRackId).padStart(6, '0') : '999999';
-  return `${rackId}|${rack.name.toLowerCase()}|${rack.id}`;
+  const rackId = rack.realRackId !== undefined && rack.realRackId !== null ? String(rack.realRackId) : 'zzzzzz';
+  const sortId = Number.isInteger(Number(rackId)) ? String(Number(rackId)).padStart(6, '0') : rackId;
+  return `${sortId}|${rack.name.toLowerCase()}|${rack.id}`;
 }
 
 function nextRackIdForGateway(
   gatewayId: string | null | undefined,
   devices: DeviceNode[],
   exceptDeviceId?: string | null,
-  preferredRackId?: number | null,
-): number {
+  preferredRackId?: string | number | null,
+): string {
   const gateway = gatewayId ? devices.find((device) => device.id === gatewayId && device.type === 'Gateway' && !device.archived) : undefined;
   const racks = gateway
     ? racksForGateway(gateway, devices)
     : devices.filter((device) => device.type === 'Rack' && !device.archived && device.gatewayId === gatewayId);
   const used = new Set(
     racks
-      .filter((rack) => rack.id !== exceptDeviceId && typeof rack.realRackId === 'number' && Number.isInteger(rack.realRackId))
-      .map((rack) => rack.realRackId as number),
+      .filter((rack) => rack.id !== exceptDeviceId && rack.realRackId !== undefined && rack.realRackId !== null && Number.isInteger(Number(rack.realRackId)))
+      .map((rack) => Number(rack.realRackId)),
   );
-  if (typeof preferredRackId === 'number' && Number.isInteger(preferredRackId) && preferredRackId > 0 && !used.has(preferredRackId)) {
-    return preferredRackId;
+  if (preferredRackId !== undefined && preferredRackId !== null && String(preferredRackId) !== '') {
+    const numeric = Number(preferredRackId);
+    if (!Number.isInteger(numeric) || numeric <= 0 || !used.has(numeric)) return String(preferredRackId);
   }
   let id = 1;
   while (used.has(id)) id += 1;
-  return id;
+  return String(id);
 }
 
 export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: ReactNode; currentUser?: PublicUser | null } = {}) {
