@@ -142,15 +142,31 @@ class CcV3Feed:
         channel_slot_map: dict[int, tuple[int, int]] | None = None,
         fallback_rack_id: str = "1",
         controller_slot_id: int = 13,
+        rack_id_pool: tuple[str, ...] | None = None,
     ) -> None:
         self._reader = reader
         self._rack_number_map = rack_number_map or {}
         self._channel_slot_map = channel_slot_map or {}
         self._fallback_rack_id = fallback_rack_id
         self._controller_slot_id = controller_slot_id
+        # With no explicit RACK_NUMBER_MAP, CC racks are assigned to the
+        # configured RACK_IDS in first-seen order (RACK_IDS=2,3 -> first CC rack
+        # is 2, second is 3). The assignment is stable per raw rack name; once
+        # the pool is exhausted the exact CC rack name is kept unchanged.
+        self._rack_id_pool = tuple(rack_id_pool or ())
+        self._auto_map: dict[str, str] = {}
         self._layouts: dict[str, str] = {}
         self._alarms: dict[tuple[str, int, int, str], bool] = {}
         self._revisions: dict[str, int] = {}
+
+    def _rack_overrides(self, frame: dict[str, Any]) -> dict[str, str]:
+        # An explicit RACK_NUMBER_MAP always wins and disables auto-assignment.
+        if self._rack_number_map or not self._rack_id_pool:
+            return self._rack_number_map
+        rack_number = str(frame.get("rack_number") or "").strip()
+        if rack_number and rack_number not in self._auto_map and len(self._auto_map) < len(self._rack_id_pool):
+            self._auto_map[rack_number] = self._rack_id_pool[len(self._auto_map)]
+        return self._auto_map
 
     def poll(self) -> CcSnapshot | None:
         frame = self._reader.read()
@@ -158,7 +174,7 @@ class CcV3Feed:
             return None
         return normalize(
             frame,
-            rack_number_map=self._rack_number_map,
+            rack_number_map=self._rack_overrides(frame),
             channel_slot_map=self._channel_slot_map,
             fallback_rack_id=self._fallback_rack_id,
             controller_slot_id=self._controller_slot_id,

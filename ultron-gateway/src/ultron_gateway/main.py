@@ -95,6 +95,7 @@ def run_cc_v3(config: Config, publisher: Publisher, is_running: Callable[[], boo
         channel_slot_map=config.channel_slot_map,
         fallback_rack_id=config.primary_rack_id,
         controller_slot_id=config.controller_slot_id,
+        rack_id_pool=config.rack_ids,
     )
     source_label = (
         f"looping fixture {config.cc_v3_test_fixture_path}"
