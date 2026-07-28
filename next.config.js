@@ -3,6 +3,23 @@ const isProd = process.env.NODE_ENV === 'production';
 // Content-Security-Policy. react-native-web injects styles inline, so
 // style-src needs 'unsafe-inline'. In dev, Next's HMR needs 'unsafe-eval' and a
 // websocket connection; production locks scripts down to same-origin.
+// The browser subscribes to the MQTT broker directly (see src/lib/brokerFrames),
+// so its exact origin has to be allowed in connect-src. Derived from the
+// configured URL rather than hardcoded or widened to `wss:`, so a change of
+// broker cannot silently leave the connection blocked or the policy too loose.
+// This is a build-time header, so MQTT_BROWSER_WS_URL must be present in the
+// build environment (the deploy workflow runs `vercel pull` first).
+const brokerOrigin = (() => {
+  const url = process.env.MQTT_BROWSER_WS_URL;
+  if (!url) return null;
+  try {
+    return new URL(url).origin;
+  } catch {
+    console.warn(`[csp] MQTT_BROWSER_WS_URL is not a valid URL: ${url}`);
+    return null;
+  }
+})();
+
 const csp = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -12,7 +29,9 @@ const csp = [
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
   isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-  isProd ? "connect-src 'self'" : "connect-src 'self' ws: wss:",
+  isProd
+    ? `connect-src 'self'${brokerOrigin ? ` ${brokerOrigin}` : ''}`
+    : "connect-src 'self' ws: wss:",
   "form-action 'self'",
   'upgrade-insecure-requests',
 ].join('; ');
