@@ -26,9 +26,11 @@ const csp = [
   "frame-ancestors 'none'",
   "object-src 'none'",
   "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  "style-src 'self' 'unsafe-inline'",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   isProd ? "script-src 'self'" : "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "worker-src 'self' blob:",
+  "media-src 'self' data: blob:",
   isProd
     ? `connect-src 'self'${brokerOrigin ? ` ${brokerOrigin}` : ''}`
     : "connect-src 'self' ws: wss:",
