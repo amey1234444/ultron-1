@@ -20,6 +20,11 @@ function numeric(value) {
   return null;
 }
 
+function integer(value) {
+  const number = numeric(value);
+  return Number.isInteger(number) ? number : null;
+}
+
 // When the gateway sampled the frame, carried through so latency can be measured
 // end to end (gateway sample → pixel) instead of guessed.
 function sourceCreatedAtMs(msg) {
@@ -30,7 +35,16 @@ function sourceCreatedAtMs(msg) {
 }
 
 function slotsOf(msg) {
-  return Array.isArray(msg.payload?.slots) ? msg.payload.slots.filter((slot) => slot && typeof slot === 'object') : [];
+  const slots = Array.isArray(msg.payload?.slots) ? msg.payload.slots : msg.payload?.records;
+  return Array.isArray(slots) ? slots.filter((slot) => slot && typeof slot === 'object' && Number.isInteger(slotNumber(slot))) : [];
+}
+
+function slotNumber(slot) {
+  return integer(slot.slot_number ?? slot.slot_id);
+}
+
+function channelNumber(slot) {
+  return integer(slot.channel_id ?? slot.channel_number ?? slot.channel) ?? 1;
 }
 
 function measurementIsValid(slot) {
@@ -45,8 +59,8 @@ function measurementFor(msg, slot, updatedAt) {
   return {
     gatewayId: msg.gateway_id,
     rackId: msg.rack_id,
-    slotId: slot.slot_number,
-    channelId: 1,
+    slotId: slotNumber(slot) ?? 1,
+    channelId: channelNumber(slot),
     measurementType: textOrNull(slot.sensor) ?? textOrNull(slot.card_type) ?? 'VALUE',
     value: numeric(slot.value_formatted ?? slot.value_raw),
     valueDisplay: textOrNull(slot.value_display),
@@ -145,7 +159,7 @@ export function buildLiveFrame(kind, msg, nowMs = Date.now()) {
       frame.slots.push({
         gatewayId: msg.gateway_id,
         rackId: msg.rack_id,
-        slotId: slot.slot_number,
+        slotId: slotNumber(slot) ?? 1,
         presence: 'PRESENT',
         onlineState: 'UNKNOWN',
         cardType: textOrNull(slot.card_type),
@@ -168,7 +182,7 @@ export function buildLiveFrame(kind, msg, nowMs = Date.now()) {
       frame.slots.push({
         gatewayId: msg.gateway_id,
         rackId: msg.rack_id,
-        slotId: slot.slot_number,
+        slotId: slotNumber(slot) ?? 1,
         presence: 'PRESENT',
         onlineState: 'ONLINE',
         cardType: textOrNull(slot.card_type),

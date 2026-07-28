@@ -1,21 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, withFresherMeasurements, type LiveFrame, type LiveState } from '../lib/liveTelemetry';
+import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, type LiveFrame, type LiveMeasurement, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
 import { fetchBrokerConfig, subscribeBrokerFrames, type BrokerSubscription } from '../src/lib/brokerFrames';
 
 // Live state has three transports, in order of latency:
 //
 //   1. MQTT over WebSocket straight from the broker (when configured): one hop
-//      from the gateway, at the gateway's own publish rate.
-//   2. SSE (/api/live/stream): frames the ingest pipeline pushes as soon as a
-//      message is validated, ahead of the writes it triggers.
-//   3. Polling /api/live/state, for browsers or proxies where neither works.
+//      from the gateway, at the gateway's own publish rate. This is the only
+//      transport allowed to paint channel telemetry/measurements.
+//   2. SSE (/api/live/stream): backend structure snapshots and non-measurement
+//      frames, used only until broker WebSocket takes over.
+//   3. Polling /api/live/state: backend structure reconciliation.
 //
-// Whichever transport carries frames, snapshots of the persisted state are still
-// needed: they decide which gateways may be shown at all and carry what a frame
-// cannot describe (alerts, racks going away).
+// Backend snapshots still decide which gateways may be shown at all and carry
+// what broker frames cannot describe (alerts, racks going away), but persisted
+// telemetry rows are deliberately ignored so channels reflect broker data only.
 const VISIBLE_POLL_INTERVAL_MS = 500;
 const HIDDEN_POLL_INTERVAL_MS = 5000;
 // Reconciliation cadence while the broker feeds the values.
@@ -24,11 +25,26 @@ const REQUEST_TIMEOUT_MS = 4000;
 // Consecutive stream failures before giving up on push for this page view.
 const MAX_STREAM_FAILURES = 3;
 // End-to-end budget: gateway sample → applied to state.
-const LATENCY_BUDGET_MS = 1500;
+const LATENCY_BUDGET_MS = 1000;
+const BROKER_STATE_TTL_MS = 30_000;
 
 // Measured gateway→browser latency of the most recent frames, so the budget can
 // be checked from the console (`__ultronLiveLatency`) instead of eyeballed.
-export const liveLatency: { lastMs: number | null; maxMs: number | null } = { lastMs: null, maxMs: null };
+export const liveLatency: {
+  brokerConnected: boolean;
+  lastFrameAt: string | null;
+  lastMeasurementFrameAt: string | null;
+  lastMs: number | null;
+  maxMs: number | null;
+  overBudgetCount: number;
+} = {
+  brokerConnected: false,
+  lastFrameAt: null,
+  lastMeasurementFrameAt: null,
+  lastMs: null,
+  maxMs: null,
+  overBudgetCount: 0,
+};
 
 function recordLatency(sourceCreatedAtMs: number | null | undefined, clockOffsetMs: number) {
   if (typeof sourceCreatedAtMs !== 'number') return;
@@ -37,8 +53,22 @@ function recordLatency(sourceCreatedAtMs: number | null | undefined, clockOffset
   liveLatency.lastMs = latencyMs;
   liveLatency.maxMs = Math.max(liveLatency.maxMs ?? 0, latencyMs);
   if (latencyMs > LATENCY_BUDGET_MS) {
+    liveLatency.overBudgetCount += 1;
     console.warn(`[live] gateway→UI ${Math.round(latencyMs)}ms over ${LATENCY_BUDGET_MS}ms budget`);
   }
+}
+
+function isRecent(iso: string | null | undefined) {
+  const parsed = Date.parse(iso ?? '');
+  return Number.isFinite(parsed) && Date.now() - parsed <= BROKER_STATE_TTL_MS;
+}
+
+function isNewer(candidateIso: string | null | undefined, currentIso: string | null | undefined) {
+  const candidate = Date.parse(candidateIso ?? '');
+  const current = Date.parse(currentIso ?? '');
+  if (!Number.isFinite(candidate)) return false;
+  if (!Number.isFinite(current)) return true;
+  return candidate > current;
 }
 
 function normalizeLiveState(json: Partial<LiveState>): LiveState {
@@ -48,6 +78,71 @@ function normalizeLiveState(json: Partial<LiveState>): LiveState {
     slots: json.slots ?? [],
     measurements: json.measurements ?? [],
     alerts: json.alerts ?? [],
+  };
+}
+
+function pointKey(measurement: LiveMeasurement): string {
+  return `${measurement.gatewayId}|${measurement.rackId}|${measurement.slotId}|${measurement.channelId}`;
+}
+
+function gatewayKey(gateway: { gatewayId: string }): string {
+  return gateway.gatewayId;
+}
+
+function rackKey(rack: { gatewayId: string; rackId: string }): string {
+  return `${rack.gatewayId}|${rack.rackId}`;
+}
+
+function slotKey(slot: { gatewayId: string; rackId: string; slotId: number }): string {
+  return `${slot.gatewayId}|${slot.rackId}|${slot.slotId}`;
+}
+
+function withoutMeasurements(frame: LiveFrame): LiveFrame {
+  return { ...frame, measurements: [] };
+}
+
+function withBrokerRealtime(snapshot: LiveState, previous: LiveState): LiveState {
+  const blockedGatewayIds = new Set(
+    snapshot.gateways
+      .filter((gateway) => ['QUARANTINED', 'BLOCKED'].includes(gateway.status.toUpperCase()))
+      .map((gateway) => gateway.gatewayId),
+  );
+
+  const gateways = new Map(snapshot.gateways.map((gateway) => [gatewayKey(gateway), gateway]));
+  for (const gateway of previous.gateways) {
+    const current = gateways.get(gatewayKey(gateway));
+    if (blockedGatewayIds.has(gateway.gatewayId) || !isRecent(gateway.lastSeenAt)) continue;
+    if (current && !isNewer(gateway.lastSeenAt, current.lastSeenAt)) continue;
+    gateways.set(gatewayKey(gateway), gateway);
+  }
+
+  const knownGateways = new Set(gateways.keys());
+  const racks = new Map(snapshot.racks.map((rack) => [rackKey(rack), rack]));
+  for (const rack of previous.racks) {
+    const current = racks.get(rackKey(rack));
+    if (!knownGateways.has(rack.gatewayId) || blockedGatewayIds.has(rack.gatewayId) || !isRecent(rack.lastSeenAt)) continue;
+    if (current && !isNewer(rack.lastSeenAt, current.lastSeenAt)) continue;
+    racks.set(rackKey(rack), rack);
+  }
+
+  const slots = new Map(snapshot.slots.map((slot) => [slotKey(slot), slot]));
+  for (const slot of previous.slots) {
+    if (!knownGateways.has(slot.gatewayId) || blockedGatewayIds.has(slot.gatewayId) || slots.has(slotKey(slot))) continue;
+    slots.set(slotKey(slot), slot);
+  }
+
+  const measurements = new Map<string, LiveMeasurement>();
+  for (const measurement of previous.measurements) {
+    if (!knownGateways.has(measurement.gatewayId) || blockedGatewayIds.has(measurement.gatewayId) || !isRecent(measurement.updatedAt)) continue;
+    measurements.set(pointKey(measurement), measurement);
+  }
+
+  return {
+    ...snapshot,
+    gateways: [...gateways.values()],
+    racks: [...racks.values()],
+    slots: [...slots.values()],
+    measurements: [...measurements.values()],
   };
 }
 
@@ -69,13 +164,13 @@ export function useLiveTelemetry(): LiveState {
 
     const applySnapshot = (json: Partial<LiveState> & { serverNowMs?: number }) => {
       if (typeof json.serverNowMs === 'number') clockOffsetMs = Date.now() - json.serverNowMs;
-      const snapshot = withClockOffset(normalizeLiveState(json), clockOffsetMs);
-      setState((current) => withFresherMeasurements(snapshot, current));
+      const snapshot = withClockOffset({ ...normalizeLiveState(json), measurements: [] }, clockOffsetMs);
+      setState((current) => withBrokerRealtime(snapshot, current));
     };
 
     // --- Fallback polling ---------------------------------------------------
-    // While the broker is delivering values, polling is only reconciliation; if
-    // that connection drops, polling goes back to carrying the values itself.
+    // Polling is structure-only reconciliation. It never carries channel
+    // telemetry; if broker frames stop, channel readings age out naturally.
     const nextDelay = () => {
       if (broker && brokerConnected) return BROKER_SNAPSHOT_INTERVAL_MS;
       return document.visibilityState === 'visible' ? VISIBLE_POLL_INTERVAL_MS : HIDDEN_POLL_INTERVAL_MS;
@@ -102,6 +197,9 @@ export function useLiveTelemetry(): LiveState {
       const frames = queued;
       queued = [];
       if (cancelled || frames.length === 0) return;
+      const now = new Date().toISOString();
+      liveLatency.lastFrameAt = now;
+      if (frames.some((frame) => (frame.measurements?.length ?? 0) > 0)) liveLatency.lastMeasurementFrameAt = now;
       for (const frame of frames) recordLatency(frame.sourceCreatedAtMs, 0);
       setState((current) => frames.reduce((state, frame) => mergeLiveFrame(state, frame, 0), current));
     };
@@ -176,7 +274,7 @@ export function useLiveTelemetry(): LiveState {
 
       stream.addEventListener('frame', (event) => {
         if (cancelled) return;
-        applyFrame(JSON.parse((event as MessageEvent<string>).data) as LiveFrame, clockOffsetMs);
+        applyFrame(withoutMeasurements(JSON.parse((event as MessageEvent<string>).data) as LiveFrame), clockOffsetMs);
       });
 
       // The server ends each stream before its host's function timeout; the
@@ -200,7 +298,10 @@ export function useLiveTelemetry(): LiveState {
       const subscription = await subscribeBrokerFrames(
         config,
         (frame) => { if (!cancelled) queueFrame(frame); },
-        (connected) => { brokerConnected = connected; },
+        (connected) => {
+          brokerConnected = connected;
+          liveLatency.brokerConnected = connected;
+        },
       );
       if (!subscription) return false;
       if (cancelled) {

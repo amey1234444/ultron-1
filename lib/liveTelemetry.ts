@@ -137,7 +137,13 @@ function replaceBy<T>(items: T[], patches: T[] | undefined, keyOf: (item: T) => 
 // instead of blanking between messages.
 export function mergeLiveFrame(state: LiveState, frame: LiveFrame, offsetMs = 0): LiveState {
   const knownGateways = new Map(state.gateways.map((gateway) => [gateway.gatewayId, gateway]));
-  const accepts = (gatewayId: string) => gatewayAcceptsFrames(knownGateways.get(gatewayId));
+  const frameGateways = new Map((frame.gateways ?? []).map((gateway) => [gateway.gatewayId, gateway]));
+  const accepts = (gatewayId: string) => {
+    const current = knownGateways.get(gatewayId);
+    if (current && !gatewayAcceptsFrames(current)) return false;
+    const incoming = frameGateways.get(gatewayId);
+    return gatewayAcceptsFrames(incoming ?? current);
+  };
 
   const gateways = replaceBy(
     state.gateways,

@@ -80,10 +80,23 @@ function numeric(value: unknown): number | null {
   return null;
 }
 
+function integer(value: unknown): number | null {
+  const number = numeric(value);
+  return Number.isInteger(number) ? number : null;
+}
+
 function slotsOf(msg: FrameEnvelope): Record<string, unknown>[] {
-  const slots = msg.payload.slots;
+  const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots : msg.payload.records;
   if (!Array.isArray(slots)) return [];
-  return slots.map(record).filter((slot) => Number.isInteger(slot.slot_number));
+  return slots.map(record).filter((slot) => Number.isInteger(slotNumber(slot)));
+}
+
+function slotNumber(slot: Record<string, unknown>): number | null {
+  return integer(slot.slot_number ?? slot.slot_id);
+}
+
+function channelNumber(slot: Record<string, unknown>): number {
+  return integer(slot.channel_id ?? slot.channel_number ?? slot.channel) ?? 1;
 }
 
 function measurementIsValid(slot: Record<string, unknown>): boolean {
@@ -98,8 +111,8 @@ function measurementFor(msg: FrameEnvelope, slot: Record<string, unknown>, updat
   return {
     gatewayId: msg.gateway_id,
     rackId: String(msg.rack_id),
-    slotId: Number(slot.slot_number),
-    channelId: 1,
+    slotId: slotNumber(slot) ?? 1,
+    channelId: channelNumber(slot),
     measurementType: textOrNull(slot.sensor) ?? textOrNull(slot.card_type) ?? 'VALUE',
     value: numeric(slot.value_formatted ?? slot.value_raw),
     valueDisplay: textOrNull(slot.value_display),
@@ -189,7 +202,7 @@ export function buildLiveFrame(kind: string, message: unknown, nowMs = Date.now(
       frame.slots!.push({
         gatewayId: msg.gateway_id,
         rackId: msg.rack_id,
-        slotId: Number(slot.slot_number),
+        slotId: slotNumber(slot) ?? 1,
         presence: 'PRESENT',
         onlineState: 'UNKNOWN',
         cardType: textOrNull(slot.card_type),
@@ -211,7 +224,7 @@ export function buildLiveFrame(kind: string, message: unknown, nowMs = Date.now(
       frame.slots!.push({
         gatewayId: msg.gateway_id,
         rackId: msg.rack_id,
-        slotId: Number(slot.slot_number),
+        slotId: slotNumber(slot) ?? 1,
         presence: 'PRESENT',
         onlineState: 'ONLINE',
         cardType: textOrNull(slot.card_type),
