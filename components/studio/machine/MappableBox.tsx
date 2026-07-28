@@ -106,7 +106,13 @@ export function MappableBox({
   const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
   const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel && dataLive);
-  const displayValue = typeof liveReading?.value === 'number' ? liveReading.value : liveValue;
+  // Between two telemetry frames (or across a stream reconnect) the reading is
+  // momentarily absent. Holding the last real value keeps a mapped point showing
+  // its measurement instead of flicking to demo data or a dash.
+  const lastReading = useRef<{ value: number; unit?: string } | null>(null);
+  if (typeof liveReading?.value === 'number') lastReading.current = { value: liveReading.value, unit: liveReading.unit };
+  const heldReading = typeof liveReading?.value === 'number' ? liveReading : lastReading.current ?? undefined;
+  const displayValue = typeof heldReading?.value === 'number' ? heldReading.value : liveValue;
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;
   const pickerGateways = useMemo(
@@ -139,6 +145,10 @@ export function MappableBox({
   useEffect(() => {
     if (!pickerOpen || channel) setChannelSearch('');
   }, [channel, pickerOpen]);
+
+  useEffect(() => {
+    lastReading.current = null;
+  }, [channel?.id]);
 
   useEffect(() => {
     if (!pickerOpen) {
@@ -225,7 +235,7 @@ export function MappableBox({
             channel={channel.code}
             title={channel.label}
             value={dataLive ? displayValue.toFixed(decimals) : '--'}
-            unit={dataLive ? liveReading?.unit ?? channel.unit : ''}
+            unit={dataLive ? heldReading?.unit ?? channel.unit : ''}
             status={status}
             interactive={!readOnly}
             dragHandlers={panResponder.panHandlers}

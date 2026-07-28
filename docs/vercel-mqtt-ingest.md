@@ -25,6 +25,11 @@ MQTT_INGEST_SECRET=generate-a-long-random-secret
 # Optional. Vercel Cron sends this as Authorization: Bearer <secret>.
 CRON_SECRET=generate-another-long-random-secret
 MQTT_STALE_AFTER_S=15
+# Session-mode connection string (port 5432) used only for LISTEN/NOTIFY, which
+# carries live frames to /api/live/stream. Falls back to DATABASE_URL; Supabase's
+# transaction pooler (6543) cannot LISTEN, and the stream then degrades to
+# snapshot polling.
+LIVE_NOTIFY_DATABASE_URL=postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-REGION.pooler.supabase.com:5432/postgres?sslmode=require
 ```
 
 The existing deployment workflow syncs it to Vercel.
@@ -120,7 +125,10 @@ where gateway_id = 'GW-001'
 order by slot_id, channel_id;
 ```
 
-The frontend polls `/api/live/state` every second, so rack LEDs should update shortly after rows are written.
+The frontend subscribes to `/api/live/stream`, which pushes each validated
+message as a live frame before the write above happens, so rack LEDs and channel
+values update as the message arrives rather than after it is persisted. It falls
+back to polling `/api/live/state` when the stream cannot be established.
 
 ## Stale Gateway Backstop
 

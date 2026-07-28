@@ -80,6 +80,95 @@ export type LiveState = {
 
 export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [], measurements: [], alerts: [] };
 
+// A frame pushed by the ingest pipeline: the part of the live state a single
+// MQTT message can describe, delivered before that message is persisted.
+export type LiveFrame = {
+  serverNowMs?: number;
+  gateways?: LiveGateway[];
+  racks?: LiveRack[];
+  slots?: LiveSlot[];
+  measurements?: LiveMeasurement[];
+};
+
+// A gateway the backend refuses to trust never gets state from a pushed frame:
+// only the persisted snapshot decides whether its data may be shown.
+function gatewayAcceptsFrames(gateway: LiveGateway | undefined): boolean {
+  if (!gateway) return false;
+  const status = gateway.status.toUpperCase();
+  return status !== 'QUARANTINED' && status !== 'BLOCKED';
+}
+
+// Timestamps travel on the server clock but freshness is judged against the
+// browser clock, so every arriving timestamp is rebased. Without this, a client
+// running a few seconds behind the server sees every reading as "in the future"
+// and one running ahead blanks fresh channels as stale.
+function rebase(iso: string | null | undefined, offsetMs: number): string {
+  const parsed = Date.parse(iso ?? '');
+  if (Number.isNaN(parsed)) return new Date(Date.now()).toISOString();
+  return offsetMs === 0 ? (iso as string) : new Date(parsed + offsetMs).toISOString();
+}
+
+export function withClockOffset(state: LiveState, offsetMs: number): LiveState {
+  if (offsetMs === 0) return state;
+  return {
+    ...state,
+    gateways: state.gateways.map((gateway) => ({ ...gateway, lastSeenAt: gateway.lastSeenAt ? rebase(gateway.lastSeenAt, offsetMs) : null })),
+    racks: state.racks.map((rack) => ({ ...rack, lastSeenAt: rack.lastSeenAt ? rebase(rack.lastSeenAt, offsetMs) : null })),
+    measurements: state.measurements.map((measurement) => ({ ...measurement, updatedAt: rebase(measurement.updatedAt, offsetMs) })),
+  };
+}
+
+function replaceBy<T>(items: T[], patches: T[] | undefined, keyOf: (item: T) => string, accept: (item: T) => boolean): { items: T[]; changed: boolean } {
+  if (!patches || patches.length === 0) return { items, changed: false };
+  const accepted = patches.filter(accept);
+  if (accepted.length === 0) return { items, changed: false };
+  const byKey = new Map(items.map((item) => [keyOf(item), item]));
+  for (const patch of accepted) byKey.set(keyOf(patch), patch);
+  return { items: [...byKey.values()], changed: true };
+}
+
+// Applies a pushed frame on top of the last persisted snapshot. Frames only ever
+// add or replace the points they carry, so a channel keeps its last known value
+// instead of blanking between messages.
+export function mergeLiveFrame(state: LiveState, frame: LiveFrame, offsetMs = 0): LiveState {
+  const knownGateways = new Map(state.gateways.map((gateway) => [gateway.gatewayId, gateway]));
+  const accepts = (gatewayId: string) => gatewayAcceptsFrames(knownGateways.get(gatewayId));
+
+  const gateways = replaceBy(
+    state.gateways,
+    frame.gateways?.map((gateway) => ({ ...gateway, lastSeenAt: rebase(gateway.lastSeenAt, offsetMs) })),
+    (gateway) => gateway.gatewayId,
+    (gateway) => accepts(gateway.gatewayId),
+  );
+  const racks = replaceBy(
+    state.racks,
+    frame.racks?.map((rack) => ({ ...rack, lastSeenAt: rebase(rack.lastSeenAt, offsetMs) })),
+    (rack) => `${rack.gatewayId}|${rack.rackId}`,
+    (rack) => accepts(rack.gatewayId),
+  );
+  const slots = replaceBy(
+    state.slots,
+    frame.slots,
+    (slot) => slotKey(slot.gatewayId, slot.rackId, slot.slotId),
+    (slot) => accepts(slot.gatewayId),
+  );
+  const measurements = replaceBy(
+    state.measurements,
+    frame.measurements?.map((measurement) => ({ ...measurement, updatedAt: rebase(measurement.updatedAt, offsetMs) })),
+    (measurement) => pointKey(measurement.gatewayId, measurement.rackId, measurement.slotId, measurement.channelId),
+    (measurement) => accepts(measurement.gatewayId),
+  );
+
+  if (!gateways.changed && !racks.changed && !slots.changed && !measurements.changed) return state;
+  return {
+    gateways: gateways.items,
+    racks: racks.items,
+    slots: slots.items,
+    measurements: measurements.items,
+    alerts: state.alerts,
+  };
+}
+
 export type ChannelLiveStatus = 'active' | 'stale' | 'idle';
 
 // A channel counts as live until roughly two publish intervals have passed: a
@@ -410,6 +499,25 @@ export function channelLiveStatus(device: DeviceNode, card: CardNode, channelId:
   if (measurement.quality && measurement.quality !== 'GOOD') return 'stale';
   if (measurement.measurementValid === false) return 'stale';
   return ageMs <= ACTIVE_MEASUREMENT_MAX_AGE_MS ? 'active' : 'stale';
+}
+
+// A stream reconnect or a snapshot that lands late must not blank a channel that
+// is otherwise streaming, so a channel counts as connected for a grace period
+// after its last good reading and keeps displaying that reading meanwhile.
+export const CHANNEL_LIVE_GRACE_MS = 15_000;
+
+export function channelHasRecentData(
+  device: DeviceNode,
+  card: CardNode,
+  channelId: number,
+  live: LiveState,
+  graceMs = CHANNEL_LIVE_GRACE_MS,
+): boolean {
+  const measurement = latestMeasurementForChannel(device, card, channelId, live);
+  if (!measurement) return false;
+  if (measurement.measurementValid === false) return false;
+  if (measurement.quality && measurement.quality !== 'GOOD') return false;
+  return Date.now() - Date.parse(measurement.updatedAt) <= graceMs;
 }
 
 export type ChannelAlarmLevel = 'normal' | 'alert' | 'danger';
