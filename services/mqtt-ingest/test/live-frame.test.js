@@ -32,6 +32,8 @@ test('telemetry frame carries the reading the canvas renders', () => {
   ]), 1_800_000_000_000);
 
   assert.equal(frame.serverNowMs, 1_800_000_000_000);
+  // created_at_us (µs) is carried as ms so latency is measurable end to end.
+  assert.equal(frame.sourceCreatedAtMs, 1_785_140_667_123);
   assert.equal(frame.racks.length, 1);
   assert.equal(frame.racks[0].gatewayId, 'Gateway-Alpha');
   assert.equal(frame.racks[0].rackId, 'Rack-A7');

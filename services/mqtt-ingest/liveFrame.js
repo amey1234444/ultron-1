@@ -20,6 +20,15 @@ function numeric(value) {
   return null;
 }
 
+// When the gateway sampled the frame, carried through so latency can be measured
+// end to end (gateway sample → pixel) instead of guessed.
+function sourceCreatedAtMs(msg) {
+  const micros = Number(msg.created_at_us);
+  if (Number.isFinite(micros) && micros > 0) return Math.round(micros / 1000);
+  const parsed = Date.parse(msg.created_at ?? '');
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
 function slotsOf(msg) {
   return Array.isArray(msg.payload?.slots) ? msg.payload.slots.filter((slot) => slot && typeof slot === 'object') : [];
 }
@@ -83,7 +92,7 @@ function controllerSlot(gatewayId, rackId, online) {
 // the UI renders (command responses, events).
 export function buildLiveFrame(kind, msg, nowMs = Date.now()) {
   const updatedAt = new Date(nowMs).toISOString();
-  const frame = { serverNowMs: nowMs, gateways: [], racks: [], slots: [], measurements: [] };
+  const frame = { serverNowMs: nowMs, sourceCreatedAtMs: sourceCreatedAtMs(msg), gateways: [], racks: [], slots: [], measurements: [] };
 
   if (kind === 'status') {
     const online = msg.payload?.state === 'ONLINE';

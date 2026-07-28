@@ -45,6 +45,10 @@ const CLIENT_ID = process.env.MQTT_BACKEND_CLIENT_ID ?? process.env.MQTT_CLIENT_
 const STALE_AFTER_S = Number(process.env.STALE_AFTER_S ?? 15);
 const MAX_PAYLOAD_BYTES = Number(process.env.MQTT_MAX_PAYLOAD_BYTES ?? 262_144);
 const METRICS_FLUSH_INTERVAL_MS = Number(process.env.METRICS_FLUSH_INTERVAL_MS ?? 2000);
+// Budget for gateway sample → frame published. Exceeding it means the broker,
+// the network or the gateway clock is the bottleneck, not this service.
+const LATENCY_BUDGET_MS = Number(process.env.LATENCY_BUDGET_MS ?? 1000);
+const LATENCY_WARN_INTERVAL_MS = 5000;
 // Kinds whose handler writes the full rack row, so binding must not write it too.
 const KINDS_UPSERTING_RACK = new Set(['telemetry', 'rack_health', 'topology']);
 const SUBSCRIPTIONS = [
@@ -144,6 +148,7 @@ async function onMessage(topic, buf) {
   if (frame) {
     void publishLiveFrame(frame);
     broadcast({ kind: parsed.kind, topic, message: msg, frame });
+    recordPublishLatency(frame);
   }
 
   bumpMetric(`messages_schema_${msg.schema.replaceAll('.', '_')}`);
@@ -155,6 +160,20 @@ async function onMessage(topic, buf) {
     ? `${parsed.kind}|${msg.message_id}`
     : `${parsed.kind}|${msg.gateway_id}|${msg.rack_id ?? ''}`;
   enqueue(persistKey, () => persist(topic, parsed, msg));
+}
+
+// Gateway sample → frame published, the part of end-to-end latency this service
+// owns. Exported as a metric so the budget is observable rather than assumed.
+let lastLatencyWarnAt = 0;
+
+function recordPublishLatency(frame) {
+  if (typeof frame.sourceCreatedAtMs !== 'number') return;
+  const latencyMs = frame.serverNowMs - frame.sourceCreatedAtMs;
+  setMetric('gateway_to_publish_latency_ms', Math.max(0, Math.round(latencyMs)));
+  if (latencyMs > LATENCY_BUDGET_MS && Date.now() - lastLatencyWarnAt > LATENCY_WARN_INTERVAL_MS) {
+    lastLatencyWarnAt = Date.now();
+    console.warn(`[latency] gateway→publish ${Math.round(latencyMs)}ms over ${LATENCY_BUDGET_MS}ms budget (broker backlog or gateway clock skew)`);
+  }
 }
 
 async function persist(topic, parsed, msg) {

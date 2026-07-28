@@ -24,6 +24,9 @@ const INVALID_DISPLAY = ['', 'invalid', 'nan', 'null', 'none'];
 
 export type LiveFrame = {
   serverNowMs: number;
+  // When the gateway sampled the frame, so latency can be measured end to end
+  // (gateway sample → pixel) instead of guessed.
+  sourceCreatedAtMs?: number | null;
   // Set when the update did not fit in a NOTIFY payload: subscribers reconcile
   // with a snapshot instead of losing the update.
   invalidate?: boolean;
@@ -37,8 +40,17 @@ type FrameEnvelope = {
   gateway_id: string;
   gateway_ip: string;
   rack_id?: string;
+  created_at?: string;
+  created_at_us?: string;
   payload: Record<string, unknown>;
 };
+
+function sourceCreatedAtMs(msg: FrameEnvelope): number | null {
+  const micros = Number(msg.created_at_us);
+  if (Number.isFinite(micros) && micros > 0) return Math.round(micros / 1000);
+  const parsed = Date.parse(msg.created_at ?? '');
+  return Number.isNaN(parsed) ? null : parsed;
+}
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -118,7 +130,7 @@ export function buildLiveFrame(kind: string, message: unknown, nowMs = Date.now(
   const msg = message as FrameEnvelope;
   if (!msg || typeof msg !== 'object' || typeof msg.gateway_id !== 'string') return null;
   const updatedAt = new Date(nowMs).toISOString();
-  const frame: LiveFrame = { serverNowMs: nowMs, gateways: [], racks: [], slots: [], measurements: [] };
+  const frame: LiveFrame = { serverNowMs: nowMs, sourceCreatedAtMs: sourceCreatedAtMs(msg), gateways: [], racks: [], slots: [], measurements: [] };
 
   if (kind === 'status') {
     const online = msg.payload.state === 'ONLINE';

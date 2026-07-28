@@ -84,6 +84,8 @@ export const EMPTY_LIVE_STATE: LiveState = { gateways: [], racks: [], slots: [],
 // MQTT message can describe, delivered before that message is persisted.
 export type LiveFrame = {
   serverNowMs?: number;
+  // When the gateway sampled the frame (server clock), for latency measurement.
+  sourceCreatedAtMs?: number | null;
   gateways?: LiveGateway[];
   racks?: LiveRack[];
   slots?: LiveSlot[];

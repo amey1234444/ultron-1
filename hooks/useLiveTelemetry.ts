@@ -16,6 +16,23 @@ const HIDDEN_POLL_INTERVAL_MS = 5000;
 const REQUEST_TIMEOUT_MS = 4000;
 // Consecutive stream failures before giving up on push for this page view.
 const MAX_STREAM_FAILURES = 3;
+// End-to-end budget: gateway sample → applied to state.
+const LATENCY_BUDGET_MS = 1500;
+
+// Measured gateway→browser latency of the most recent frames, so the budget can
+// be checked from the console (`__ultronLiveLatency`) instead of eyeballed.
+export const liveLatency: { lastMs: number | null; maxMs: number | null } = { lastMs: null, maxMs: null };
+
+function recordLatency(sourceCreatedAtMs: number | null | undefined, clockOffsetMs: number) {
+  if (typeof sourceCreatedAtMs !== 'number') return;
+  // The gateway timestamp is on the server clock, like every other timestamp.
+  const latencyMs = Date.now() - (sourceCreatedAtMs + clockOffsetMs);
+  liveLatency.lastMs = latencyMs;
+  liveLatency.maxMs = Math.max(liveLatency.maxMs ?? 0, latencyMs);
+  if (latencyMs > LATENCY_BUDGET_MS) {
+    console.warn(`[live] gateway→UI ${Math.round(latencyMs)}ms over ${LATENCY_BUDGET_MS}ms budget`);
+  }
+}
 
 function normalizeLiveState(json: Partial<LiveState>): LiveState {
   return {
@@ -112,6 +129,7 @@ export function useLiveTelemetry(): LiveState {
       stream.addEventListener('frame', (event) => {
         if (cancelled) return;
         const frame = JSON.parse((event as MessageEvent<string>).data) as LiveFrame;
+        recordLatency(frame.sourceCreatedAtMs, clockOffsetMs);
         setState((current) => mergeLiveFrame(current, frame, clockOffsetMs));
       });
 
@@ -134,6 +152,7 @@ export function useLiveTelemetry(): LiveState {
       schedule(0);
     };
 
+    (window as unknown as { __ultronLiveLatency?: typeof liveLatency }).__ultronLiveLatency = liveLatency;
     document.addEventListener('visibilitychange', onVisibilityChange);
     if (!openStream()) void poll();
 
