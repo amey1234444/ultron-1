@@ -4,7 +4,7 @@ import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-nat
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
-import { channelLiveStatus, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
+import { channelHasRecentData, channelLiveStatus, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
@@ -177,7 +177,8 @@ export function TrailBoard({
       if (rackState.status !== 'Online') return false;
       if (!card.enabled) return false;
       if (!live || (live.gateways.length === 0 && live.racks.length === 0 && live.slots.length === 0 && live.measurements.length === 0)) return true;
-      return channelLiveStatus(rackState, card, channelNumber, live) === 'active';
+      return channelLiveStatus(rackState, card, channelNumber, live) === 'active'
+        || channelHasRecentData(rackState, card, channelNumber, live);
     },
     [effectiveRack, live],
   );
@@ -210,7 +211,9 @@ export function TrailBoard({
       const rackState = effectiveRack(rack);
       if (rackState.status !== 'Online') return false;
       if (!live) return true;
-      return channelLiveStatus(rackState, card, channelNumberFor(channel), live) === 'active';
+      const channelNumber = channelNumberFor(channel);
+      return channelLiveStatus(rackState, card, channelNumber, live) === 'active'
+        || channelHasRecentData(rackState, card, channelNumber, live);
     },
     [cards, devices, effectiveRack, live],
   );

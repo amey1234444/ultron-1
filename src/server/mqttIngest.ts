@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 
 import { ensureSchema, query } from './db';
+import { buildLiveFrame, publishLiveFrame } from './liveFrame';
 
 type TopicKind = 'status' | 'topology' | 'rack_health' | 'inventory' | 'telemetry' | 'alarm' | 'command_response' | 'command_request';
 type ParsedTopic = { gatewayId: string; rackId: string | null; kind: TopicKind };
@@ -774,6 +775,8 @@ export function normalizeWebhookMessage(body: unknown): NormalizedWebhookMessage
 export async function ingestMqttMessage(topic: string, rawMessage: unknown, sourceEvent?: Record<string, unknown> | null): Promise<IngestResult> {
   await ensureSchema();
   const parsed = parseTopic(topic);
+  // Validation below is pure, so the frame can be published (and rendered) as
+  // soon as the message is known to be well formed — ahead of every write.
   if (!parsed) {
     await quarantine(topic, 'unknown topic', null);
     return { kind: 'status', fresh: false, quarantined: true, reason: 'unknown topic' };
@@ -803,6 +806,9 @@ export async function ingestMqttMessage(topic: string, rawMessage: unknown, sour
     await quarantine(topic, reason, msg);
     return { kind: parsed.kind, fresh: false, quarantined: true, reason };
   }
+  const frame = buildLiveFrame(parsed.kind, msg);
+  if (frame) await publishLiveFrame(frame);
+
   const binding = await bind(msg);
   const fresh = await claimMessage(msg, topic, sourceEvent);
   if (!fresh) return { kind: parsed.kind, fresh, bindingStatus: binding.status, bindingEvent: binding.event };

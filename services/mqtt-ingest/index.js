@@ -1,20 +1,29 @@
 // Ultron backend MQTT ingestion service (Phase D + E of the handover).
 //
-//   EMQX  →  this service  →  PostgreSQL  →  Next.js REST (/api/live) → UI
+//   EMQX ─┬→ live frame → pg_notify → Next.js /api/live/stream (SSE) → UI
+//         └→ persistence queue → PostgreSQL
 //
 // Pipeline per message: topic parse → JSON parse → schema validation →
-// identity validation (topic vs payload) → gateway/rack/IP binding →
-// message_id dedup → handler → DB → WebSocket broadcast.
+// identity validation (topic vs payload) → publish live frame → queue
+// persistence (binding, dedup, handler, DB).
+//
+// The two branches are deliberately split: the UI is fed from the validated
+// message itself, so a reading reaches the canvas in one broker hop instead of
+// waiting for every write the frame triggers.
 
 import mqtt from 'mqtt';
 import { readFileSync } from 'node:fs';
 import { WebSocketServer } from 'ws';
 
 import { ensureSchema } from './db.js';
+import { buildLiveFrame } from './liveFrame.js';
+import { publishLiveFrame } from './liveBus.js';
+import { coalescedCount, enqueue, queueDepth } from './persistQueue.js';
 import {
   bind,
   bumpMetric,
   claimMessage,
+  flushMetrics,
   handleEvent,
   handleInventory,
   handleRackHealth,
@@ -35,6 +44,13 @@ const MQTT_USE_TLS = !['0', 'false', 'no'].includes(String(process.env.MQTT_USE_
 const CLIENT_ID = process.env.MQTT_BACKEND_CLIENT_ID ?? process.env.MQTT_CLIENT_ID ?? 'ultron-backend-ingress-01';
 const STALE_AFTER_S = Number(process.env.STALE_AFTER_S ?? 15);
 const MAX_PAYLOAD_BYTES = Number(process.env.MQTT_MAX_PAYLOAD_BYTES ?? 262_144);
+const METRICS_FLUSH_INTERVAL_MS = Number(process.env.METRICS_FLUSH_INTERVAL_MS ?? 2000);
+// Budget for gateway sample → frame published. Exceeding it means the broker,
+// the network or the gateway clock is the bottleneck, not this service.
+const LATENCY_BUDGET_MS = Number(process.env.LATENCY_BUDGET_MS ?? 1000);
+const LATENCY_WARN_INTERVAL_MS = 5000;
+// Kinds whose handler writes the full rack row, so binding must not write it too.
+const KINDS_UPSERTING_RACK = new Set(['telemetry', 'rack_health', 'topology']);
 const SUBSCRIPTIONS = [
   'ultron/v1/gateways/+/status',
   'ultron/v1/gateways/+/topology',
@@ -70,7 +86,7 @@ async function onMessage(topic, buf) {
     return;
   }
   if (buf.length > MAX_PAYLOAD_BYTES) {
-    await bumpMetric('payload_too_large');
+    bumpMetric('payload_too_large');
     return quarantine(topic, 'payload too large', null);
   }
 
@@ -78,51 +94,90 @@ async function onMessage(topic, buf) {
   try {
     msg = JSON.parse(buf.toString('utf8'));
   } catch {
-    await bumpMetric('parse_failures');
+    bumpMetric('parse_failures');
     return quarantine(topic, 'invalid JSON', null);
   }
 
   const envelopeErrors = validateEnvelope(msg);
   if (envelopeErrors.length > 0) {
-    await bumpMetric('schema_failures');
+    bumpMetric('schema_failures');
     return quarantine(topic, `envelope: ${envelopeErrors.join('; ')}`, msg);
   }
 
   const expectedSchema = SCHEMA_FOR_KIND[parsed.kind];
   if (expectedSchema && msg.schema !== expectedSchema) {
-    await bumpMetric('schema_failures');
+    bumpMetric('schema_failures');
     return quarantine(topic, `schema ${msg.schema} does not match topic kind ${parsed.kind}`, msg);
   }
 
   const payloadErrors = validatePayload(msg.schema, msg.payload);
   if (payloadErrors.length > 0) {
-    await bumpMetric('schema_failures');
+    bumpMetric('schema_failures');
     return quarantine(topic, `payload: ${payloadErrors.join('; ')}`, msg);
   }
 
   const isRackTopic = parsed.rackId !== null;
   if (!isRackTopic && msg.rack_id !== undefined) {
-    await bumpMetric('identity_mismatches');
+    bumpMetric('identity_mismatches');
     return quarantine(topic, 'gateway topic must not contain rack_id', msg);
   }
   if (isRackTopic && typeof msg.rack_id !== 'string') {
-    await bumpMetric('identity_mismatches');
+    bumpMetric('identity_mismatches');
     return quarantine(topic, 'rack topic missing rack_id', msg);
   }
 
   // Identity validation: topic segments must match the payload envelope.
   if (parsed.gatewayId !== msg.gateway_id) {
-    await bumpMetric('identity_mismatches');
+    bumpMetric('identity_mismatches');
     console.warn(`[reject] topic gateway ${parsed.gatewayId} != payload ${msg.gateway_id} (${topic})`);
     return quarantine(topic, 'topic/payload gateway_id mismatch', msg);
   }
   if (parsed.rackId !== null && parsed.rackId !== msg.rack_id) {
-    await bumpMetric('identity_mismatches');
+    bumpMetric('identity_mismatches');
     console.warn(`[reject] topic rack ${parsed.rackId} != payload ${msg.rack_id} (${topic})`);
     return quarantine(topic, 'topic/payload rack_id mismatch', msg);
   }
 
-  const binding = await bind(msg);
+  // ---- Realtime branch: straight to the UI, no database involved ----------
+  // Everything above is pure validation, so the frame ships now — binding,
+  // deduplication and quarantine all run in the persistence branch. A frame
+  // therefore carries no authorization of its own: the browser only applies
+  // frames for gateways its persisted snapshot already shows as commissioned,
+  // which is what keeps an unknown or quarantined gateway off the canvas.
+  const frame = buildLiveFrame(parsed.kind, msg);
+  if (frame) {
+    void publishLiveFrame(frame);
+    broadcast({ kind: parsed.kind, topic, message: msg, frame });
+    recordPublishLatency(frame);
+  }
+
+  bumpMetric(`messages_schema_${msg.schema.replaceAll('.', '_')}`);
+  bumpMetric('messages_total');
+  setMetric('last_message_unix_seconds', Math.floor(Date.now() / 1000));
+
+  // ---- Persistence branch: queued, coalesced, off the latency path --------
+  const persistKey = parsed.kind === 'alarm' || parsed.kind === 'fault' || parsed.kind === 'system'
+    ? `${parsed.kind}|${msg.message_id}`
+    : `${parsed.kind}|${msg.gateway_id}|${msg.rack_id ?? ''}`;
+  enqueue(persistKey, () => persist(topic, parsed, msg));
+}
+
+// Gateway sample → frame published, the part of end-to-end latency this service
+// owns. Exported as a metric so the budget is observable rather than assumed.
+let lastLatencyWarnAt = 0;
+
+function recordPublishLatency(frame) {
+  if (typeof frame.sourceCreatedAtMs !== 'number') return;
+  const latencyMs = frame.serverNowMs - frame.sourceCreatedAtMs;
+  setMetric('gateway_to_publish_latency_ms', Math.max(0, Math.round(latencyMs)));
+  if (latencyMs > LATENCY_BUDGET_MS && Date.now() - lastLatencyWarnAt > LATENCY_WARN_INTERVAL_MS) {
+    lastLatencyWarnAt = Date.now();
+    console.warn(`[latency] gateway→publish ${Math.round(latencyMs)}ms over ${LATENCY_BUDGET_MS}ms budget (broker backlog or gateway clock skew)`);
+  }
+}
+
+async function persist(topic, parsed, msg) {
+  const binding = await bind(msg, { ensureRackRow: !KINDS_UPSERTING_RACK.has(parsed.kind) });
   if (binding.event === 'UNCLAIMED') {
     console.warn(`[quarantine] unknown gateway ${msg.gateway_id} @ ${msg.gateway_ip} — awaiting commissioning`);
   } else if (binding.event === 'IP_NOT_CONFIGURED') {
@@ -154,11 +209,9 @@ async function onMessage(topic, buf) {
     case 'inventory':
       await handleInventory(msg);
       break;
-    case 'telemetry': {
-      const stored = await handleTelemetry(msg);
-      console.log(`[telemetry] ${msg.gateway_id}/rack ${msg.rack_id}: ${stored}/${msg.payload.slots.length} slots`);
+    case 'telemetry':
+      await handleTelemetry(msg);
       break;
-    }
     case 'alarm':
     case 'fault':
     case 'system':
@@ -170,11 +223,6 @@ async function onMessage(topic, buf) {
       // the command phase.
       break;
   }
-
-  await bumpMetric(`messages_schema_${msg.schema.replaceAll('.', '_')}`);
-  await bumpMetric('messages_total');
-  await setMetric('last_message_unix_seconds', Math.floor(Date.now() / 1000));
-  broadcast({ kind: parsed.kind, topic, message: msg });
 }
 
 function cert(path) {
@@ -225,6 +273,12 @@ async function main() {
   setInterval(() => {
     markStaleGateways(STALE_AFTER_S).catch((err) => console.error('[stale]', err.message));
   }, 5000);
+
+  setInterval(() => {
+    setMetric('persist_queue_depth', queueDepth());
+    setMetric('persist_coalesced_total', coalescedCount());
+    flushMetrics().catch((err) => console.error('[metrics]', err.message));
+  }, METRICS_FLUSH_INTERVAL_MS);
 }
 
 main().catch((err) => {

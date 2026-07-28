@@ -98,26 +98,55 @@ function json(value) {
   return JSON.stringify(value ?? {});
 }
 
-export async function bumpMetric(metricName, by = 1) {
-  await query(
-    `INSERT INTO mqtt_ingest_metrics (metric_name, metric_value)
-     VALUES ($1,$2)
-     ON CONFLICT (metric_name) DO UPDATE SET
-       metric_value = mqtt_ingest_metrics.metric_value + EXCLUDED.metric_value,
-       updated_at = now()`,
-    [metricName, by],
-  );
+// Metrics are counters, not state the UI reads: buffer them in memory and flush
+// periodically so a 12-slot telemetry frame does not spend three database round
+// trips on bookkeeping.
+const metricDeltas = new Map();
+const metricValues = new Map();
+
+export function bumpMetric(metricName, by = 1) {
+  metricDeltas.set(metricName, (metricDeltas.get(metricName) ?? 0) + by);
 }
 
-export async function setMetric(metricName, value) {
-  await query(
-    `INSERT INTO mqtt_ingest_metrics (metric_name, metric_value)
-     VALUES ($1,$2)
-     ON CONFLICT (metric_name) DO UPDATE SET
-       metric_value = EXCLUDED.metric_value,
-       updated_at = now()`,
-    [metricName, value],
-  );
+export function setMetric(metricName, value) {
+  metricValues.set(metricName, value);
+}
+
+function multiRowValues(rowCount, columnCasts) {
+  const rows = [];
+  let param = 0;
+  for (let row = 0; row < rowCount; row += 1) {
+    rows.push(`(${columnCasts.map((cast) => `$${(param += 1)}${cast}`).join(',')})`);
+  }
+  return rows.join(',');
+}
+
+export async function flushMetrics() {
+  const deltas = [...metricDeltas.entries()];
+  const values = [...metricValues.entries()];
+  metricDeltas.clear();
+  metricValues.clear();
+
+  if (deltas.length > 0) {
+    await query(
+      `INSERT INTO mqtt_ingest_metrics (metric_name, metric_value)
+       VALUES ${multiRowValues(deltas.length, ['::text', '::bigint'])}
+       ON CONFLICT (metric_name) DO UPDATE SET
+         metric_value = mqtt_ingest_metrics.metric_value + EXCLUDED.metric_value,
+         updated_at = now()`,
+      deltas.flat(),
+    );
+  }
+  if (values.length > 0) {
+    await query(
+      `INSERT INTO mqtt_ingest_metrics (metric_name, metric_value)
+       VALUES ${multiRowValues(values.length, ['::text', '::bigint'])}
+       ON CONFLICT (metric_name) DO UPDATE SET
+         metric_value = EXCLUDED.metric_value,
+         updated_at = now()`,
+      values.flat(),
+    );
+  }
 }
 
 export async function claimMessage(msg, topic) {
@@ -128,12 +157,12 @@ export async function claimMessage(msg, topic) {
      ON CONFLICT (message_id) DO NOTHING`,
     [msg.message_id, topic, msg.schema, msg.schema_version, msg.gateway_id, msg.gateway_ip, msg.rack_id ?? null, hash],
   );
-  if (res.rowCount === 0) await bumpMetric('qos_duplicates');
+  if (res.rowCount === 0) bumpMetric('qos_duplicates');
   return res.rowCount === 1;
 }
 
 export async function quarantine(topic, reason, msg) {
-  await bumpMetric('quarantine_messages');
+  bumpMetric('quarantine_messages');
   await query(
     `INSERT INTO mqtt_quarantine (topic, reason, gateway_id, gateway_ip, rack_id, raw_payload)
      VALUES ($1,$2,$3,$4,$5,$6)`,
@@ -141,7 +170,12 @@ export async function quarantine(topic, reason, msg) {
   );
 }
 
-export async function bind(msg) {
+// IP history is an audit trail, so it only needs writing when the reported
+// address actually changes (re-checked periodically in case the row was pruned).
+const IP_HISTORY_REFRESH_MS = 60_000;
+const lastIpHistoryWrite = new Map();
+
+export async function bind(msg, options = {}) {
   await query(
     `INSERT INTO gateways (gateway_id, current_ip, gateway_boot_id, mqtt_client_id, status, mqtt_state, last_seen_at)
      VALUES ($1,$2,$3,$4,'UNKNOWN','UNKNOWN', now())
@@ -153,14 +187,21 @@ export async function bind(msg) {
     [msg.gateway_id, msg.gateway_ip, msg.gateway_boot_id, process.env.MQTT_BACKEND_CLIENT_ID ?? 'ultron-backend'],
   );
 
-  await query(
-    `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
-     VALUES ($1,$2,true)
-     ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now(), approved = true`,
-    [msg.gateway_id, msg.gateway_ip],
-  );
+  const historyKey = `${msg.gateway_id}|${msg.gateway_ip}`;
+  const writtenAt = lastIpHistoryWrite.get(historyKey) ?? 0;
+  if (Date.now() - writtenAt > IP_HISTORY_REFRESH_MS) {
+    lastIpHistoryWrite.set(historyKey, Date.now());
+    await query(
+      `INSERT INTO gateway_ip_history (gateway_id, ip_address, approved)
+       VALUES ($1,$2,true)
+       ON CONFLICT (gateway_id, ip_address) DO UPDATE SET last_seen_at = now(), approved = true`,
+      [msg.gateway_id, msg.gateway_ip],
+    );
+  }
 
-  if (typeof msg.rack_id === 'string') {
+  // Telemetry, health and topology upsert the rack row with full state anyway,
+  // so those kinds skip this write instead of paying for it twice.
+  if (typeof msg.rack_id === 'string' && options.ensureRackRow !== false) {
     await ensureRack(msg);
   }
 
@@ -182,8 +223,32 @@ async function ensureRack(msg) {
   );
 }
 
+// The studio hierarchy only changes when the rack's card layout or IP changes,
+// but telemetry repeats the same layout twice a second. Fingerprint what the
+// sync would write and skip the ~16 statements while it is unchanged.
+const STUDIO_SYNC_REFRESH_MS = 60_000;
+const studioSyncState = new Map();
+
+function studioSyncFingerprint(msg, slots) {
+  const connection = msg.payload?.connection && typeof msg.payload.connection === 'object' ? msg.payload.connection : {};
+  const ip = textOrNull(connection.current_ip ?? msg.payload?.current_ip) ?? '';
+  const layout = slots
+    .filter((slot) => Number.isInteger(slot?.slot_number))
+    .map((slot) => [slot.slot_number, studioCardType(slot), JSON.stringify(studioCardConfig(studioCardType(slot), slot))].join(':'))
+    .sort()
+    .join('|');
+  return `${ip}#${layout}`;
+}
+
 async function ensureStudioRackAndSlots(msg, slots = []) {
   if (typeof msg.rack_id !== 'string') return;
+
+  const cacheKey = `${msg.gateway_id}|${msg.rack_id}`;
+  const fingerprint = studioSyncFingerprint(msg, slots);
+  const cached = studioSyncState.get(cacheKey);
+  if (cached && cached.fingerprint === fingerprint && Date.now() - cached.syncedAt < STUDIO_SYNC_REFRESH_MS) return;
+  studioSyncState.set(cacheKey, { fingerprint, syncedAt: Date.now() });
+
   const gateway = await query(
     `SELECT id, project_id
      FROM studio_devices
@@ -323,7 +388,14 @@ async function upsertControllerSlot(msg, online) {
   );
 }
 
-async function refreshGatewayRackState(gatewayId) {
+// Recomputing the gateway's rack counters is only worth a round trip when a
+// rack actually changed state; between changes it is rate limited.
+const GATEWAY_REFRESH_MIN_INTERVAL_MS = 1000;
+const lastGatewayRefresh = new Map();
+
+async function refreshGatewayRackState(gatewayId, options = {}) {
+  if (!options.force && Date.now() - (lastGatewayRefresh.get(gatewayId) ?? 0) < GATEWAY_REFRESH_MIN_INTERVAL_MS) return;
+  lastGatewayRefresh.set(gatewayId, Date.now());
   await query(
     `UPDATE gateways g
      SET connected_racks = counts.connected_racks,
@@ -345,37 +417,78 @@ async function refreshGatewayRackState(gatewayId) {
   );
 }
 
-async function currentGatewayAllows(msg, force = false) {
-  if (force) return true;
-  const res = await query(
-    `SELECT gateway_boot_id, last_gateway_sequence, last_source_created_at_us
-     FROM gateways WHERE gateway_id = $1`,
-    [msg.gateway_id],
-  );
-  const row = res.rows[0];
-  if (!row) return true;
-  if (row.gateway_boot_id && row.gateway_boot_id !== msg.gateway_boot_id) return true;
+// Out-of-order rejection compares the incoming frame against the newest one
+// already applied. That watermark is this process's own write history, so it is
+// tracked in memory and only read from the database once per gateway/rack —
+// otherwise every frame would spend a round trip re-reading what it just wrote.
+const gatewayWatermark = new Map();
+const rackWatermark = new Map();
+
+function watermarkAllows(watermark, msg) {
+  if (!watermark) return true;
+  if (watermark.bootId && watermark.bootId !== msg.gateway_boot_id) return true;
   const incomingUs = BigInt(createdAtUs(msg));
-  const storedUs = BigInt(String(row.last_source_created_at_us ?? -1));
+  const storedUs = BigInt(String(watermark.createdAtUs ?? -1));
   if (incomingUs > storedUs) return true;
   if (incomingUs < storedUs) return false;
-  return Number(msg.gateway_sequence) >= Number(row.last_gateway_sequence ?? -1);
+  return Number(msg.gateway_sequence) >= Number(watermark.sequence ?? -1);
+}
+
+function rememberGateway(msg) {
+  gatewayWatermark.set(msg.gateway_id, {
+    bootId: msg.gateway_boot_id,
+    sequence: msg.gateway_sequence,
+    createdAtUs: createdAtUs(msg),
+  });
+}
+
+function rememberRack(msg) {
+  rackWatermark.set(`${msg.gateway_id}|${msg.rack_id}`, {
+    bootId: msg.gateway_boot_id,
+    sequence: msg.gateway_sequence,
+    createdAtUs: createdAtUs(msg),
+  });
+}
+
+async function currentGatewayAllows(msg, force = false) {
+  if (force) {
+    rememberGateway(msg);
+    return true;
+  }
+  if (!gatewayWatermark.has(msg.gateway_id)) {
+    const res = await query(
+      `SELECT gateway_boot_id, last_gateway_sequence, last_source_created_at_us
+       FROM gateways WHERE gateway_id = $1`,
+      [msg.gateway_id],
+    );
+    const row = res.rows[0];
+    gatewayWatermark.set(
+      msg.gateway_id,
+      row ? { bootId: row.gateway_boot_id, sequence: row.last_gateway_sequence, createdAtUs: row.last_source_created_at_us } : null,
+    );
+  }
+  if (!watermarkAllows(gatewayWatermark.get(msg.gateway_id), msg)) return false;
+  rememberGateway(msg);
+  return true;
 }
 
 async function currentRackAllows(msg) {
-  const res = await query(
-    `SELECT last_gateway_boot_id, last_gateway_sequence, last_source_created_at_us
-     FROM racks WHERE gateway_id = $1 AND rack_id = $2`,
-    [msg.gateway_id, msg.rack_id],
-  );
-  const row = res.rows[0];
-  if (!row) return true;
-  if (row.last_gateway_boot_id && row.last_gateway_boot_id !== msg.gateway_boot_id) return true;
-  const incomingUs = BigInt(createdAtUs(msg));
-  const storedUs = BigInt(String(row.last_source_created_at_us ?? -1));
-  if (incomingUs > storedUs) return true;
-  if (incomingUs < storedUs) return false;
-  return Number(msg.gateway_sequence) >= Number(row.last_gateway_sequence ?? -1);
+  const key = `${msg.gateway_id}|${msg.rack_id}`;
+  if (!rackWatermark.has(key)) {
+    const res = await query(
+      `SELECT last_gateway_boot_id, last_gateway_sequence, last_source_created_at_us
+       FROM racks WHERE gateway_id = $1 AND rack_id = $2`,
+      [msg.gateway_id, msg.rack_id],
+    );
+    const row = res.rows[0];
+    rackWatermark.set(
+      key,
+      row ? { bootId: row.last_gateway_boot_id, sequence: row.last_gateway_sequence, createdAtUs: row.last_source_created_at_us } : null,
+    );
+  }
+  if (!watermarkAllows(rackWatermark.get(key), msg)) return false;
+  rememberRack(msg);
+  return true;
 }
 
 async function upsertRack(msg, patch = {}) {
@@ -436,7 +549,7 @@ async function upsertRack(msg, patch = {}) {
 export async function handleStatus(msg) {
   const forceLastWillOffline = msg.payload.state === 'OFFLINE';
   if (!(await currentGatewayAllows(msg, forceLastWillOffline))) {
-    await bumpMetric('older_messages_ignored');
+    bumpMetric('older_messages_ignored');
     return;
   }
   const summary = msg.payload.rack_summary && typeof msg.payload.rack_summary === 'object' ? msg.payload.rack_summary : {};
@@ -479,7 +592,7 @@ export async function handleStatus(msg) {
 
 export async function handleTopology(msg) {
   if (!(await currentGatewayAllows(msg))) {
-    await bumpMetric('older_messages_ignored');
+    bumpMetric('older_messages_ignored');
     return;
   }
   const racks = Array.isArray(msg.payload.racks) ? msg.payload.racks : [];
@@ -533,12 +646,12 @@ export async function handleTopology(msg) {
      WHERE gateway_id = $1 AND slot_number = $2 AND NOT (rack_id = ANY($3::text[]))`,
     [msg.gateway_id, CONTROLLER_SLOT, activeRackIds],
   );
-  await refreshGatewayRackState(msg.gateway_id);
+  await refreshGatewayRackState(msg.gateway_id, { force: true });
 }
 
 export async function handleRackHealth(msg) {
   if (!(await currentRackAllows(msg))) {
-    await bumpMetric('older_messages_ignored');
+    bumpMetric('older_messages_ignored');
     return;
   }
   await upsertRack(msg);
@@ -551,7 +664,7 @@ export async function handleRackHealth(msg) {
       [msg.gateway_id, msg.rack_id],
     );
   }
-  await refreshGatewayRackState(msg.gateway_id);
+  await refreshGatewayRackState(msg.gateway_id, { force: true });
 }
 
 export async function handleInventory(msg) {
@@ -644,98 +757,152 @@ function slotParams(msg, slot) {
   ];
 }
 
+// One statement per table instead of two per slot: a 12-slot frame drops from
+// 24 round trips to 2.
+const INVENTORY_SLOT_CASTS = [
+  '::text', '::text', '::int', '::text', '::text', '::text', '::bigint',
+  '::int', '::int', '::text', '::int', '::text', '::int', '::jsonb',
+];
+const SLOT_LATEST_CASTS = [
+  '::text', '::text', '::int', '::text', '::int', '::text', '::int', '::text',
+  '::int', '::text', '::int', '::text', '::int', '::text', '::text', '::text',
+  '::boolean', '::text', '::text', '::text', '::text', '::text', '::text',
+  '::text', '::int', '::text', '::int', '::text', '::numeric', '::bigint',
+  '::text', '::jsonb', '::boolean',
+];
+
+function inventorySlotRow(msg, slot) {
+  return [
+    msg.gateway_id,
+    msg.rack_id,
+    slot.slot_number,
+    'PRESENT',
+    'ONLINE',
+    textOrNull(slot.card_type),
+    msg.gateway_sequence,
+    intOrNull(slot.card_type_code),
+    intOrNull(slot.sensor_code),
+    textOrNull(slot.sensor),
+    intOrNull(slot.unit_code),
+    textOrNull(slot.unit),
+    intOrNull(slot.decimal_places),
+    json(slot),
+  ];
+}
+
+function controllerInventoryRow(msg, online) {
+  return [
+    msg.gateway_id,
+    msg.rack_id,
+    CONTROLLER_SLOT,
+    online ? 'PRESENT' : 'ABSENT',
+    online ? 'ONLINE' : 'OFFLINE',
+    'Communication Controller',
+    msg.gateway_sequence,
+    null,
+    null,
+    'Rack Communication',
+    null,
+    '',
+    null,
+    json({ ...CONTROLLER_SLOT_PAYLOAD, online }),
+  ];
+}
+
+async function upsertInventorySlots(rows) {
+  if (rows.length === 0) return;
+  await query(
+    `INSERT INTO rack_inventory_slots (
+       gateway_id, rack_id, slot_number, presence, online_state, card_type,
+       snapshot_revision, card_type_code, sensor_code, sensor, unit_code, unit,
+       decimal_places, slot_payload
+     )
+     VALUES ${multiRowValues(rows.length, INVENTORY_SLOT_CASTS)}
+     ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
+       presence = EXCLUDED.presence,
+       online_state = EXCLUDED.online_state,
+       card_type = COALESCE(EXCLUDED.card_type, rack_inventory_slots.card_type),
+       card_type_code = COALESCE(EXCLUDED.card_type_code, rack_inventory_slots.card_type_code),
+       sensor_code = COALESCE(EXCLUDED.sensor_code, rack_inventory_slots.sensor_code),
+       sensor = COALESCE(EXCLUDED.sensor, rack_inventory_slots.sensor),
+       unit_code = COALESCE(EXCLUDED.unit_code, rack_inventory_slots.unit_code),
+       unit = COALESCE(EXCLUDED.unit, rack_inventory_slots.unit),
+       decimal_places = COALESCE(EXCLUDED.decimal_places, rack_inventory_slots.decimal_places),
+       slot_payload = rack_inventory_slots.slot_payload || EXCLUDED.slot_payload,
+       updated_at = now()`,
+    rows.flat(),
+  );
+}
+
+async function upsertSlotLatest(msg, slots) {
+  if (slots.length === 0) return;
+  await query(
+    `INSERT INTO rack_slot_latest (
+       gateway_id, rack_id, slot_number, data_status, channel_status_code, channel_status,
+       card_type_code, card_type, sensor_code, sensor, unit_code, unit, decimal_places,
+       value_raw, value_formatted, value_with_unit, measurement_valid, value_display,
+       alert_value_raw, alert_value_formatted, alert_with_unit,
+       danger_value_raw, danger_value_formatted, danger_with_unit,
+       alert_status_code, alert_status, danger_status_code, danger_status,
+       source_timestamp_us, gateway_sequence, gateway_boot_id, payload, live
+     )
+     VALUES ${multiRowValues(slots.length, SLOT_LATEST_CASTS)}
+     ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
+       data_status = EXCLUDED.data_status,
+       channel_status_code = EXCLUDED.channel_status_code,
+       channel_status = EXCLUDED.channel_status,
+       card_type_code = EXCLUDED.card_type_code,
+       card_type = EXCLUDED.card_type,
+       sensor_code = EXCLUDED.sensor_code,
+       sensor = EXCLUDED.sensor,
+       unit_code = EXCLUDED.unit_code,
+       unit = EXCLUDED.unit,
+       decimal_places = EXCLUDED.decimal_places,
+       value_raw = EXCLUDED.value_raw,
+       value_formatted = EXCLUDED.value_formatted,
+       value_with_unit = EXCLUDED.value_with_unit,
+       measurement_valid = EXCLUDED.measurement_valid,
+       value_display = EXCLUDED.value_display,
+       alert_value_raw = EXCLUDED.alert_value_raw,
+       alert_value_formatted = EXCLUDED.alert_value_formatted,
+       alert_with_unit = EXCLUDED.alert_with_unit,
+       danger_value_raw = EXCLUDED.danger_value_raw,
+       danger_value_formatted = EXCLUDED.danger_value_formatted,
+       danger_with_unit = EXCLUDED.danger_with_unit,
+       alert_status_code = EXCLUDED.alert_status_code,
+       alert_status = EXCLUDED.alert_status,
+       danger_status_code = EXCLUDED.danger_status_code,
+       danger_status = EXCLUDED.danger_status,
+       source_timestamp_us = EXCLUDED.source_timestamp_us,
+       gateway_sequence = EXCLUDED.gateway_sequence,
+       gateway_boot_id = EXCLUDED.gateway_boot_id,
+       payload = EXCLUDED.payload,
+       live = EXCLUDED.live,
+       updated_at = now()
+     WHERE rack_slot_latest.gateway_boot_id <> EXCLUDED.gateway_boot_id
+        OR rack_slot_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
+    slots.flatMap((slot) => slotParams(msg, slot)),
+  );
+}
+
 export async function handleTelemetry(msg) {
   if (!(await currentRackAllows(msg))) {
-    await bumpMetric('older_messages_ignored');
+    bumpMetric('older_messages_ignored');
     return 0;
   }
-  await upsertRack(msg, { status: 'connected', dataCurrent: msg.payload.telemetry?.data_current === true });
-  const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots : [];
+  const dataCurrent = msg.payload.telemetry?.data_current === true;
+  await upsertRack(msg, { status: 'connected', dataCurrent });
+  const slots = (Array.isArray(msg.payload.slots) ? msg.payload.slots : []).filter((slot) => Number.isInteger(slot?.slot_number));
   await ensureStudioRackAndSlots(msg, slots);
-  for (const slot of slots) {
-    await query(
-      `INSERT INTO rack_inventory_slots (
-         gateway_id, rack_id, slot_number, presence, online_state, card_type,
-         snapshot_revision, card_type_code, sensor_code, sensor, unit_code, unit,
-         decimal_places, slot_payload, updated_at
-       )
-       VALUES ($1,$2,$3,'PRESENT','ONLINE',$4,$5,$6,$7,$8,$9,$10,$11,$12,now())
-       ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
-         presence = EXCLUDED.presence,
-         online_state = EXCLUDED.online_state,
-         card_type = COALESCE(EXCLUDED.card_type, rack_inventory_slots.card_type),
-         card_type_code = COALESCE(EXCLUDED.card_type_code, rack_inventory_slots.card_type_code),
-         sensor_code = COALESCE(EXCLUDED.sensor_code, rack_inventory_slots.sensor_code),
-         sensor = COALESCE(EXCLUDED.sensor, rack_inventory_slots.sensor),
-         unit_code = COALESCE(EXCLUDED.unit_code, rack_inventory_slots.unit_code),
-         unit = COALESCE(EXCLUDED.unit, rack_inventory_slots.unit),
-         decimal_places = COALESCE(EXCLUDED.decimal_places, rack_inventory_slots.decimal_places),
-         slot_payload = rack_inventory_slots.slot_payload || EXCLUDED.slot_payload,
-         updated_at = now()`,
-      [
-        msg.gateway_id,
-        msg.rack_id,
-        slot.slot_number,
-        textOrNull(slot.card_type),
-        msg.gateway_sequence,
-        intOrNull(slot.card_type_code),
-        intOrNull(slot.sensor_code),
-        textOrNull(slot.sensor),
-        intOrNull(slot.unit_code),
-        textOrNull(slot.unit),
-        intOrNull(slot.decimal_places),
-        json(slot),
-      ],
-    );
-    await query(
-      `INSERT INTO rack_slot_latest (
-         gateway_id, rack_id, slot_number, data_status, channel_status_code, channel_status,
-         card_type_code, card_type, sensor_code, sensor, unit_code, unit, decimal_places,
-         value_raw, value_formatted, value_with_unit, measurement_valid, value_display,
-         alert_value_raw, alert_value_formatted, alert_with_unit,
-         danger_value_raw, danger_value_formatted, danger_with_unit,
-         alert_status_code, alert_status, danger_status_code, danger_status,
-         source_timestamp_us, gateway_sequence, gateway_boot_id, payload, live, updated_at
-       )
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,now())
-       ON CONFLICT (gateway_id, rack_id, slot_number) DO UPDATE SET
-         data_status = EXCLUDED.data_status,
-         channel_status_code = EXCLUDED.channel_status_code,
-         channel_status = EXCLUDED.channel_status,
-         card_type_code = EXCLUDED.card_type_code,
-         card_type = EXCLUDED.card_type,
-         sensor_code = EXCLUDED.sensor_code,
-         sensor = EXCLUDED.sensor,
-         unit_code = EXCLUDED.unit_code,
-         unit = EXCLUDED.unit,
-         decimal_places = EXCLUDED.decimal_places,
-         value_raw = EXCLUDED.value_raw,
-         value_formatted = EXCLUDED.value_formatted,
-         value_with_unit = EXCLUDED.value_with_unit,
-         measurement_valid = EXCLUDED.measurement_valid,
-         value_display = EXCLUDED.value_display,
-         alert_value_raw = EXCLUDED.alert_value_raw,
-         alert_value_formatted = EXCLUDED.alert_value_formatted,
-         alert_with_unit = EXCLUDED.alert_with_unit,
-         danger_value_raw = EXCLUDED.danger_value_raw,
-         danger_value_formatted = EXCLUDED.danger_value_formatted,
-         danger_with_unit = EXCLUDED.danger_with_unit,
-         alert_status_code = EXCLUDED.alert_status_code,
-         alert_status = EXCLUDED.alert_status,
-         danger_status_code = EXCLUDED.danger_status_code,
-         danger_status = EXCLUDED.danger_status,
-         source_timestamp_us = EXCLUDED.source_timestamp_us,
-         gateway_sequence = EXCLUDED.gateway_sequence,
-         gateway_boot_id = EXCLUDED.gateway_boot_id,
-         payload = EXCLUDED.payload,
-         live = EXCLUDED.live,
-         updated_at = now()
-       WHERE rack_slot_latest.gateway_boot_id <> EXCLUDED.gateway_boot_id
-          OR rack_slot_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
-      slotParams(msg, slot),
-    );
-  }
-  await upsertControllerSlot(msg, msg.payload.telemetry?.data_current === true);
+
+  // The controller slot describes the rack link rather than a card, so its row
+  // replaces any slot the frame reports at the same number.
+  const inventoryRows = [
+    ...slots.filter((slot) => slot.slot_number !== CONTROLLER_SLOT).map((slot) => inventorySlotRow(msg, slot)),
+    controllerInventoryRow(msg, dataCurrent),
+  ];
+  await upsertInventorySlots(inventoryRows);
+  await upsertSlotLatest(msg, slots);
   await refreshGatewayRackState(msg.gateway_id);
   return slots.length;
 }
@@ -749,7 +916,7 @@ export async function handleEvent(msg, kind) {
 }
 
 export async function handleTombstone(topic, parsed) {
-  await bumpMetric('retained_tombstones');
+  bumpMetric('retained_tombstones');
   if (parsed.kind === 'inventory') {
     await query(`DELETE FROM rack_inventory_slots WHERE gateway_id = $1 AND rack_id = $2`, [parsed.gatewayId, parsed.rackId]);
   }
@@ -765,7 +932,7 @@ export async function handleTombstone(topic, parsed) {
       [parsed.gatewayId, parsed.rackId, CONTROLLER_SLOT],
     );
     await query(`UPDATE rack_slot_latest SET live = false, measurement_valid = false WHERE gateway_id = $1 AND rack_id = $2`, [parsed.gatewayId, parsed.rackId]);
-    await refreshGatewayRackState(parsed.gatewayId);
+    await refreshGatewayRackState(parsed.gatewayId, { force: true });
   }
 }
 
