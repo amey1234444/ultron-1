@@ -13,6 +13,9 @@ name: Deploy to Vercel
 # - MQTT_INGEST_SECRET
 # - CRON_SECRET (optional)
 # - MQTT_STALE_AFTER_S (optional)
+# - MQTT_BROWSER_WS_URL (optional; enables browser-direct broker subscription)
+# - MQTT_BROWSER_USERNAME (optional; must be a subscribe-only broker user)
+# - MQTT_BROWSER_PASSWORD (optional)
 # - ABSTRACT_EMAIL_REPUTATION_API_KEY (optional; signup email-reputation gate)
 # - SUPER_ADMIN_PASSWORD
 # - ADMIN_PASSWORD
@@ -46,6 +49,9 @@ jobs:
       MQTT_INGEST_SECRET: ${{ secrets.MQTT_INGEST_SECRET }}
       CRON_SECRET: ${{ secrets.CRON_SECRET }}
       MQTT_STALE_AFTER_S: ${{ secrets.MQTT_STALE_AFTER_S }}
+      MQTT_BROWSER_WS_URL: ${{ secrets.MQTT_BROWSER_WS_URL }}
+      MQTT_BROWSER_USERNAME: ${{ secrets.MQTT_BROWSER_USERNAME }}
+      MQTT_BROWSER_PASSWORD: ${{ secrets.MQTT_BROWSER_PASSWORD }}
       ABSTRACT_EMAIL_REPUTATION_API_KEY: ${{ secrets.ABSTRACT_EMAIL_REPUTATION_API_KEY }}
       SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
@@ -125,6 +131,15 @@ jobs:
             echo "MQTT_STALE_AFTER_S is not configured; application default is 15 seconds"
           fi
 
+          # The browser subscribes to the broker itself when these are set,
+          # which is the low-latency display path. Without them the UI stays on
+          # /api/live/stream.
+          if [ -n "$MQTT_BROWSER_WS_URL" ]; then
+            echo "MQTT_BROWSER_WS_URL is configured"
+          else
+            echo "MQTT_BROWSER_WS_URL is not configured; the UI uses /api/live/stream instead of the broker"
+          fi
+
           # ABSTRACT_EMAIL_REPUTATION_API_KEY is optional: the signup email
           # reputation gate fails OPEN when it is absent (accounts are still
           # created, with reputation status 'unknown').
@@ -176,6 +191,12 @@ jobs:
 
           if [ -n "$MQTT_STALE_AFTER_S" ]; then
             sync_secret "MQTT_STALE_AFTER_S" "$MQTT_STALE_AFTER_S"
+          fi
+
+          if [ -n "$MQTT_BROWSER_WS_URL" ]; then
+            sync_secret "MQTT_BROWSER_WS_URL" "$MQTT_BROWSER_WS_URL"
+            sync_secret "MQTT_BROWSER_USERNAME" "$MQTT_BROWSER_USERNAME"
+            sync_secret "MQTT_BROWSER_PASSWORD" "$MQTT_BROWSER_PASSWORD"
           fi
 
           if [ -n "$ABSTRACT_EMAIL_REPUTATION_API_KEY" ]; then
