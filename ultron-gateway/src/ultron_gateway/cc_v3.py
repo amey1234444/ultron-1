@@ -365,6 +365,7 @@ def normalize(
         slot_payload.update(
             {
                 "slot_number": slot_id,
+                "channel_id": channel_id,
                 "data_status": "current" if measurement_valid else "invalid",
                 "measurement_valid": measurement_valid,
                 "value_display": str(entry.get("value_formatted") or value),

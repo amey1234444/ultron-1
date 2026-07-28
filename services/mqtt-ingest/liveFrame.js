@@ -46,7 +46,7 @@ function measurementFor(msg, slot, updatedAt) {
     gatewayId: msg.gateway_id,
     rackId: msg.rack_id,
     slotId: slot.slot_number,
-    channelId: 1,
+    channelId: Number.isInteger(slot.channel_id) ? slot.channel_id : 1,
     measurementType: textOrNull(slot.sensor) ?? textOrNull(slot.card_type) ?? 'VALUE',
     value: numeric(slot.value_formatted ?? slot.value_raw),
     valueDisplay: textOrNull(slot.value_display),

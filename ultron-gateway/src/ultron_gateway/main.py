@@ -111,6 +111,7 @@ def run_cc_v3(config: Config, publisher: Publisher, is_running: Callable[[], boo
         while is_running():
             snapshot = feed.poll()
             if snapshot is not None:
+                snapshot = feed.complete_snapshot(snapshot)
                 latest = snapshot
                 inventory = feed.inventory_if_changed(snapshot)
                 if inventory is not None:

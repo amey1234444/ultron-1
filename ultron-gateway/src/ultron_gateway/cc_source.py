@@ -12,10 +12,12 @@ from __future__ import annotations
 import hashlib
 import json
 import socket
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Protocol
 
 from .cc_v3 import Alarm, CcSnapshot, normalize
+from .rack_model import Measurement, RackModel, Slot
 
 
 class SnapshotReader(Protocol):
@@ -151,6 +153,9 @@ class CcV3Feed:
         self._layouts: dict[str, str] = {}
         self._alarms: dict[tuple[str, int, int, str], bool] = {}
         self._revisions: dict[str, int] = {}
+        self._slot_payloads: dict[str, dict[tuple[int, int], dict[str, Any]]] = {}
+        self._measurements: dict[str, dict[tuple[int, int], Measurement]] = {}
+        self._slots: dict[str, dict[int, Slot]] = {}
 
     def poll(self) -> CcSnapshot | None:
         frame = self._reader.read()
@@ -162,6 +167,44 @@ class CcV3Feed:
             channel_slot_map=self._channel_slot_map,
             fallback_rack_id=self._fallback_rack_id,
             controller_slot_id=self._controller_slot_id,
+        )
+
+    def complete_snapshot(self, snapshot: CcSnapshot) -> CcSnapshot:
+        """Return the latest full rack frame, merging partial channel updates.
+
+        Some CC sources emit channels in groups. The UI freshness check is per
+        channel, so publishing only the current group makes the rack appear to
+        rotate. This keeps the latest valid channel payloads for the rack and
+        publishes them together in the next telemetry frame.
+        """
+        payloads = self._slot_payloads.setdefault(snapshot.rack_id, {})
+        measurements = self._measurements.setdefault(snapshot.rack_id, {})
+        slots = self._slots.setdefault(snapshot.rack_id, {})
+
+        for payload in snapshot.slot_payloads:
+            slot_number = payload.get("slot_number")
+            channel_id = payload.get("channel_id", 1)
+            if not isinstance(slot_number, int) or not isinstance(channel_id, int):
+                continue
+            payloads[(slot_number, channel_id)] = payload
+
+        for measurement in snapshot.measurements:
+            measurements[(measurement.slot_number, measurement.channel_id)] = measurement
+
+        for slot in snapshot.rack.slots:
+            slots[slot.slot_number] = slot
+
+        rack = RackModel(
+            rack_id=snapshot.rack.rack_id,
+            snapshot_revision=snapshot.rack.snapshot_revision,
+            slots=[slots[key] for key in sorted(slots)],
+        )
+        ordered_keys = sorted(payloads)
+        return replace(
+            snapshot,
+            rack=rack,
+            slot_payloads=[payloads[key] for key in ordered_keys],
+            measurements=[measurements[key] for key in sorted(measurements)],
         )
 
     def inventory_if_changed(self, snapshot: CcSnapshot) -> dict[str, Any] | None:
