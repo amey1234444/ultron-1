@@ -21,10 +21,10 @@ class Publisher:
         self._client = client
         self._spool = spool
 
-    def _send(self, topic: str, message: dict[str, Any], retain: bool) -> None:
+    def _send(self, topic: str, message: dict[str, Any], retain: bool, qos: int = 1) -> None:
         validate_envelope(message)
-        print(f"[mqtt-publish] topic={topic} retain={retain} schema={message.get('schema')} message_id={message.get('message_id')}", flush=True)
-        if self._client.connected and self._client.publish(topic, message, retain=retain):
+        print(f"[mqtt-publish] topic={topic} retain={retain} qos={qos} schema={message.get('schema')} message_id={message.get('message_id')}", flush=True)
+        if self._client.connected and self._client.publish(topic, message, retain=retain, qos=qos):
             return
         self._spool.push(topic, message, retain=retain)
 
@@ -51,7 +51,10 @@ class Publisher:
 
     def telemetry(self, rack_id: str, payload: dict[str, Any]) -> None:
         message = self._envelope.build("ultron.rack.telemetry", rack_id, payload)
-        self._send(topics.telemetry(self._envelope.gateway_id, rack_id), message, retain=False)
+        qos = max(0, min(1, self._client.telemetry_qos))
+        self._send(topics.telemetry(self._envelope.gateway_id, rack_id), message, retain=False, qos=qos)
+        if self._client.publish_latest_telemetry:
+            self._send(topics.telemetry_latest(self._envelope.gateway_id, rack_id), message, retain=True, qos=qos)
 
     def event(self, rack_id: str, kind: str, payload: dict[str, Any]) -> None:
         message = self._envelope.build(f"ultron.event.{kind}", rack_id, payload)

@@ -34,6 +34,10 @@ def telemetry(gateway_id: str, rack_id: str) -> str:
     return f"{PREFIX}/{_segment(gateway_id)}/racks/{_segment(rack_id)}/telemetry"
 
 
+def telemetry_latest(gateway_id: str, rack_id: str) -> str:
+    return f"{telemetry(gateway_id, rack_id)}/latest"
+
+
 def command_request_filter(gateway_id: str) -> str:
     return f"{PREFIX}/{_segment(gateway_id)}/racks/+/commands/request"
 

@@ -1,4 +1,4 @@
-"""MQTT 5 client wrapper (paho-mqtt v2): TLS, Last Will, QoS 1 publish."""
+"""MQTT 5 client wrapper (paho-mqtt v2): TLS, Last Will, configurable QoS."""
 
 from __future__ import annotations
 
@@ -84,8 +84,16 @@ class MqttClient:
     def connected(self) -> bool:
         return self._connected.is_set()
 
-    def publish(self, topic: str, message: dict[str, Any], retain: bool = False) -> bool:
-        info = self._client.publish(topic, json.dumps(message), qos=1, retain=retain)
+    @property
+    def telemetry_qos(self) -> int:
+        return self._config.telemetry_qos
+
+    @property
+    def publish_latest_telemetry(self) -> bool:
+        return self._config.publish_latest_telemetry
+
+    def publish(self, topic: str, message: dict[str, Any], retain: bool = False, qos: int = 1) -> bool:
+        info = self._client.publish(topic, json.dumps(message), qos=qos, retain=retain)
         return info.rc == mqtt.MQTT_ERR_SUCCESS
 
     def disconnect(self) -> None:

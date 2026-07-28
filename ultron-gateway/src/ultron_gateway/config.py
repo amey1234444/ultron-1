@@ -94,6 +94,10 @@ class Config:
     telemetry_interval_s: float = field(
         default_factory=lambda: float(os.environ.get("TELEMETRY_INTERVAL_S", "0.5"))
     )
+    telemetry_qos: int = field(default_factory=lambda: int(os.environ.get("MQTT_TELEMETRY_QOS", "0")))
+    publish_latest_telemetry: bool = field(
+        default_factory=lambda: os.environ.get("MQTT_PUBLISH_LATEST_TELEMETRY", "1") != "0"
+    )
 
     # Data source: the simulator (Colab/dev) or Ultron Gateway v3 CC telemetry
     # (Raspberry Pi). v3 writes latest_telemetry.json and can stream frames over
