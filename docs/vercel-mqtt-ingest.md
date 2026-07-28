@@ -130,6 +130,42 @@ message as a live frame before the write above happens, so rack LEDs and channel
 values update as the message arrives rather than after it is persisted. It falls
 back to polling `/api/live/state` when the stream cannot be established.
 
+## Browser-Direct MQTT (lowest latency)
+
+The HTTP action above is a *persistence* path: every message costs a serverless
+invocation and a set of writes, and nothing the function is slow to accept ever
+reaches the UI. For display, the browser can subscribe to the broker itself:
+
+```text
+Gateway -> EMQX ─┬─ wss ────────────────────────────────> browser (renders immediately)
+                 └─ HTTP action -> /api/mqtt/ingest -> Supabase (history)
+```
+
+This is the only way to get MQTT into a Vercel deployment: a function cannot hold
+a broker connection open, but the page can. Values then arrive at the gateway's
+own publish rate, one broker hop behind the sample, and the database is entirely
+off the display path.
+
+Set up a **subscribe-only** broker user (EMQX: Access Control -> Authentication
+for the credentials, then Authorization with a rule allowing only `subscribe` on
+`ultron/v1/#` and denying publish). Then, in the Vercel Production environment:
+
+```env
+MQTT_BROWSER_WS_URL=wss://YOUR-EMQX-HOST:8084/mqtt
+MQTT_BROWSER_USERNAME=ultron-ui-readonly
+MQTT_BROWSER_PASSWORD=...
+```
+
+`/api/live/broker` serves these to authenticated sessions only, and the browser
+connects with a per-tab client id. Anything the browser receives is still checked
+against the persisted snapshot before it is displayed: `mergeLiveFrame` drops
+frames for gateways the database does not list as commissioned, so a rogue
+publisher cannot invent a device or resurrect a quarantined one. Snapshots keep
+arriving every 5s to reconcile alerts and removals, and never overwrite a reading
+that is newer than the persisted one.
+
+Leave `MQTT_BROWSER_WS_URL` unset to keep the UI on `/api/live/stream`.
+
 ## Stale Gateway Backstop
 
 The live-state API already reports a gateway as `OFFLINE` when it has not

@@ -1,10 +1,9 @@
 import { createHash } from 'crypto';
 
+import { buildLiveFrame, parseLiveTopic, type TopicKind } from '../../lib/liveFrame';
 import { ensureSchema, query } from './db';
-import { buildLiveFrame, publishLiveFrame } from './liveFrame';
+import { publishLiveFrame } from './liveFrame';
 
-type TopicKind = 'status' | 'topology' | 'rack_health' | 'inventory' | 'telemetry' | 'alarm' | 'command_response' | 'command_request';
-type ParsedTopic = { gatewayId: string; rackId: string | null; kind: TopicKind };
 type MqttEnvelope = {
   schema: string;
   schema_version: string;
@@ -45,35 +44,6 @@ const SCHEMA_FOR_KIND: Partial<Record<TopicKind, string>> = {
   alarm: 'ultron.event.alarm',
   command_response: 'ultron.command.response',
 };
-
-function decodeSegment(segment: string): string | null {
-  try {
-    const decoded = decodeURIComponent(segment);
-    return decoded.length > 0 ? decoded : null;
-  } catch {
-    return null;
-  }
-}
-
-function parseTopic(topic: string): ParsedTopic | null {
-  const parts = topic.split('/');
-  if (parts.length < 5 || parts[0] !== 'ultron' || parts[1] !== 'v1' || parts[2] !== 'gateways') return null;
-  const gatewayId = decodeSegment(parts[3]);
-  if (!gatewayId) return null;
-  if (parts.length === 5 && parts[4] === 'status') return { gatewayId, rackId: null, kind: 'status' };
-  if (parts.length === 5 && parts[4] === 'topology') return { gatewayId, rackId: null, kind: 'topology' };
-  if (parts.length < 7 || parts[4] !== 'racks') return null;
-  const rackId = decodeSegment(parts[5]);
-  if (!rackId) return null;
-  const rest = parts.slice(6).join('/');
-  if (rest === 'health') return { gatewayId, rackId, kind: 'rack_health' };
-  if (rest === 'inventory') return { gatewayId, rackId, kind: 'inventory' };
-  if (rest === 'telemetry') return { gatewayId, rackId, kind: 'telemetry' };
-  if (rest === 'events/alarm') return { gatewayId, rackId, kind: 'alarm' };
-  if (rest === 'commands/response') return { gatewayId, rackId, kind: 'command_response' };
-  if (rest === 'commands/request') return { gatewayId, rackId, kind: 'command_request' };
-  return null;
-}
 
 function objectValue(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null;
@@ -774,7 +744,7 @@ export function normalizeWebhookMessage(body: unknown): NormalizedWebhookMessage
 
 export async function ingestMqttMessage(topic: string, rawMessage: unknown, sourceEvent?: Record<string, unknown> | null): Promise<IngestResult> {
   await ensureSchema();
-  const parsed = parseTopic(topic);
+  const parsed = parseLiveTopic(topic);
   // Validation below is pure, so the frame can be published (and rendered) as
   // soon as the message is known to be well formed — ahead of every write.
   if (!parsed) {

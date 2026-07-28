@@ -1,18 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
-import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, type LiveFrame, type LiveState } from '../lib/liveTelemetry';
+import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, withFresherMeasurements, type LiveFrame, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
+import { fetchBrokerConfig, subscribeBrokerFrames, type BrokerSubscription } from '../src/lib/brokerFrames';
 
-// Live state arrives over SSE (/api/live/stream): the ingest pipeline pushes a
-// frame the moment a message is validated, so a reading renders without waiting
-// for the writes it triggers. Snapshots on the same stream reconcile everything
-// a frame cannot describe (alerts, racks going away).
+// Live state has three transports, in order of latency:
 //
-// Polling /api/live/state remains as a fallback for browsers or proxies where
-// the stream cannot be established.
+//   1. MQTT over WebSocket straight from the broker (when configured): one hop
+//      from the gateway, at the gateway's own publish rate.
+//   2. SSE (/api/live/stream): frames the ingest pipeline pushes as soon as a
+//      message is validated, ahead of the writes it triggers.
+//   3. Polling /api/live/state, for browsers or proxies where neither works.
+//
+// Whichever transport carries frames, snapshots of the persisted state are still
+// needed: they decide which gateways may be shown at all and carry what a frame
+// cannot describe (alerts, racks going away).
 const VISIBLE_POLL_INTERVAL_MS = 500;
 const HIDDEN_POLL_INTERVAL_MS = 5000;
+// Reconciliation cadence while the broker feeds the values.
+const BROKER_SNAPSHOT_INTERVAL_MS = 5000;
 const REQUEST_TIMEOUT_MS = 4000;
 // Consecutive stream failures before giving up on push for this page view.
 const MAX_STREAM_FAILURES = 3;
@@ -55,19 +62,60 @@ export function useLiveTelemetry(): LiveState {
     let lastPayload = '';
     let inFlight: AbortController | null = null;
     let source: EventSource | null = null;
+    let broker: BrokerSubscription | null = null;
+    let brokerConnected = false;
     let streamFailures = 0;
     let clockOffsetMs = 0;
 
     const applySnapshot = (json: Partial<LiveState> & { serverNowMs?: number }) => {
       if (typeof json.serverNowMs === 'number') clockOffsetMs = Date.now() - json.serverNowMs;
-      setState(withClockOffset(normalizeLiveState(json), clockOffsetMs));
+      const snapshot = withClockOffset(normalizeLiveState(json), clockOffsetMs);
+      setState((current) => withFresherMeasurements(snapshot, current));
     };
 
     // --- Fallback polling ---------------------------------------------------
-    const nextDelay = () => (document.visibilityState === 'visible' ? VISIBLE_POLL_INTERVAL_MS : HIDDEN_POLL_INTERVAL_MS);
+    // While the broker is delivering values, polling is only reconciliation; if
+    // that connection drops, polling goes back to carrying the values itself.
+    const nextDelay = () => {
+      if (broker && brokerConnected) return BROKER_SNAPSHOT_INTERVAL_MS;
+      return document.visibilityState === 'visible' ? VISIBLE_POLL_INTERVAL_MS : HIDDEN_POLL_INTERVAL_MS;
+    };
 
     const schedule = (delay = nextDelay()) => {
       if (!cancelled && !source) timer = setTimeout(poll, delay);
+    };
+
+    const applyFrame = (frame: LiveFrame, offsetMs: number) => {
+      recordLatency(frame.sourceCreatedAtMs, offsetMs);
+      setState((current) => mergeLiveFrame(current, frame, offsetMs));
+    };
+
+    // A rack publishing at high frequency would otherwise re-render the canvas
+    // once per message per rack. Frames are merged in arrival order and applied
+    // in a single update per painted frame, so throughput costs one render.
+    let queued: LiveFrame[] = [];
+    let flushHandle: number | null = null;
+    let cancelFlush: (handle: number) => void = () => {};
+
+    const flushFrames = () => {
+      flushHandle = null;
+      const frames = queued;
+      queued = [];
+      if (cancelled || frames.length === 0) return;
+      for (const frame of frames) recordLatency(frame.sourceCreatedAtMs, 0);
+      setState((current) => frames.reduce((state, frame) => mergeLiveFrame(state, frame, 0), current));
+    };
+
+    const queueFrame = (frame: LiveFrame) => {
+      queued.push(frame);
+      if (flushHandle !== null) return;
+      if (typeof requestAnimationFrame === 'function') {
+        flushHandle = requestAnimationFrame(flushFrames);
+        cancelFlush = cancelAnimationFrame;
+      } else {
+        flushHandle = setTimeout(flushFrames, 50) as unknown as number;
+        cancelFlush = clearTimeout as unknown as (handle: number) => void;
+      }
     };
 
     const poll = async () => {
@@ -128,9 +176,7 @@ export function useLiveTelemetry(): LiveState {
 
       stream.addEventListener('frame', (event) => {
         if (cancelled) return;
-        const frame = JSON.parse((event as MessageEvent<string>).data) as LiveFrame;
-        recordLatency(frame.sourceCreatedAtMs, clockOffsetMs);
-        setState((current) => mergeLiveFrame(current, frame, clockOffsetMs));
+        applyFrame(JSON.parse((event as MessageEvent<string>).data) as LiveFrame, clockOffsetMs);
       });
 
       // The server ends each stream before its host's function timeout; the
@@ -145,6 +191,30 @@ export function useLiveTelemetry(): LiveState {
       return true;
     };
 
+    // --- Broker subscription ------------------------------------------------
+    // Frames built in the browser carry browser-clock timestamps, so they merge
+    // with no offset (unlike server-sent frames), and are batched per paint.
+    const openBroker = async () => {
+      const config = await fetchBrokerConfig();
+      if (cancelled || !config.enabled) return false;
+      const subscription = await subscribeBrokerFrames(
+        config,
+        (frame) => { if (!cancelled) queueFrame(frame); },
+        (connected) => { brokerConnected = connected; },
+      );
+      if (!subscription) return false;
+      if (cancelled) {
+        subscription.close();
+        return false;
+      }
+      broker = subscription;
+      // Values now come from the broker; the snapshot only reconciles.
+      closeStream();
+      if (timer) clearTimeout(timer);
+      schedule(0);
+      return true;
+    };
+
     const onVisibilityChange = () => {
       if (document.visibilityState !== 'visible') return;
       if (source) return;
@@ -155,10 +225,15 @@ export function useLiveTelemetry(): LiveState {
     (window as unknown as { __ultronLiveLatency?: typeof liveLatency }).__ultronLiveLatency = liveLatency;
     document.addEventListener('visibilitychange', onVisibilityChange);
     if (!openStream()) void poll();
+    // The broker takes over from the stream once it is connected; until then the
+    // stream (or polling) is already serving state.
+    void openBroker().catch(() => false);
 
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      broker?.close();
+      if (flushHandle !== null) cancelFlush(flushHandle);
       closeStream();
       inFlight?.abort();
       if (timer) clearTimeout(timer);

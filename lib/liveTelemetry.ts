@@ -86,6 +86,9 @@ export type LiveFrame = {
   serverNowMs?: number;
   // When the gateway sampled the frame (server clock), for latency measurement.
   sourceCreatedAtMs?: number | null;
+  // Set when the update did not fit in its transport: subscribers reconcile with
+  // a snapshot instead of losing the update.
+  invalidate?: boolean;
   gateways?: LiveGateway[];
   racks?: LiveRack[];
   slots?: LiveSlot[];
@@ -169,6 +172,30 @@ export function mergeLiveFrame(state: LiveState, frame: LiveFrame, offsetMs = 0)
     measurements: measurements.items,
     alerts: state.alerts,
   };
+}
+
+// A persisted snapshot is authoritative about structure (which gateways exist,
+// which racks went away, alerts) but it is always at least one write behind the
+// readings the browser already received from the broker. Keeping whichever
+// reading is newer stops a snapshot from rewinding a channel to a stale value —
+// or blanking it while the write it describes is still in flight.
+export function withFresherMeasurements(snapshot: LiveState, previous: LiveState): LiveState {
+  if (previous.measurements.length === 0) return snapshot;
+  const known = new Set(snapshot.gateways.map((gateway) => gateway.gatewayId));
+  const byKey = new Map(snapshot.measurements.map((measurement) => [
+    pointKey(measurement.gatewayId, measurement.rackId, measurement.slotId, measurement.channelId),
+    measurement,
+  ]));
+  let changed = false;
+  for (const measurement of previous.measurements) {
+    if (!known.has(measurement.gatewayId)) continue;
+    const key = pointKey(measurement.gatewayId, measurement.rackId, measurement.slotId, measurement.channelId);
+    const persisted = byKey.get(key);
+    if (persisted && Date.parse(persisted.updatedAt) >= Date.parse(measurement.updatedAt)) continue;
+    byKey.set(key, measurement);
+    changed = true;
+  }
+  return changed ? { ...snapshot, measurements: [...byKey.values()] } : snapshot;
 }
 
 export type ChannelLiveStatus = 'active' | 'stale' | 'idle';
