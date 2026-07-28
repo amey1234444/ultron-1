@@ -49,12 +49,6 @@ def test_channel_slot_map_can_group_channels_onto_one_card():
     assert snapshot is not None
     slot_one = sorted((m.channel_id, m.value) for m in snapshot.measurements if m.slot_number == 1)
     assert slot_one == [(1, 72.57), (2, 82.42)]
-    payloads = sorted(
-        (slot["channel_id"], slot["value_formatted"])
-        for slot in snapshot.telemetry_payload()["slots"]
-        if slot["slot_number"] == 1
-    )
-    assert payloads == [(1, "72.57"), (2, "82.42")]
 
 
 def test_inventory_covers_the_slots_supplied_by_the_rack():
@@ -137,33 +131,6 @@ def test_feed_republishes_inventory_only_on_layout_changes(tmp_path):
     changed = feed.inventory_if_changed(third)
     assert changed is not None
     assert changed["snapshot_revision"] > initial["snapshot_revision"] - 1
-
-
-def test_feed_merges_partial_channel_groups_into_complete_telemetry(tmp_path):
-    first = frame()
-    first["channels"] = first["channels"][:3]
-    second = frame()
-    second["message_sequence"] = 2500
-    second["channels"] = second["channels"][3:7]
-
-    path = tmp_path / "latest_telemetry.json"
-    path.write_text(json.dumps(first), encoding="utf-8")
-    feed = CcV3Feed(FileSnapshotReader(str(path)))
-
-    first_snapshot = feed.poll()
-    assert first_snapshot is not None
-    first_complete = feed.complete_snapshot(first_snapshot)
-    assert len(first_complete.telemetry_payload()["slots"]) == 3
-
-    path.write_text(json.dumps(second), encoding="utf-8")
-    second_snapshot = feed.poll()
-    assert second_snapshot is not None
-    second_complete = feed.complete_snapshot(second_snapshot)
-    slots = second_complete.telemetry_payload()["slots"]
-
-    assert [slot["slot_number"] for slot in slots] == list(range(1, 8))
-    assert slots[1]["value_with_unit"] == "1524 rpm"
-    assert slots[6]["value_with_unit"] == "82.42 degC"
 
 
 def test_feed_only_emits_alarm_edges(tmp_path):

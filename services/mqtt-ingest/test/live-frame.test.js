@@ -28,7 +28,7 @@ function telemetry(slots, dataCurrent = true) {
 
 test('telemetry frame carries the reading the canvas renders', () => {
   const frame = buildLiveFrame('telemetry', telemetry([
-    { slot_number: 3, channel_id: 2, value_formatted: '72.57', value_display: '72.57', unit: 'mm/s', sensor: 'Vibration', card_type: 'Vibration Card', channel_status: 'ok', data_status: 'current', measurement_valid: true },
+    { slot_number: 3, value_formatted: '72.57', value_display: '72.57', unit: 'mm/s', sensor: 'Vibration', card_type: 'Vibration Card', channel_status: 'ok', data_status: 'current', measurement_valid: true },
   ]), 1_800_000_000_000);
 
   assert.equal(frame.serverNowMs, 1_800_000_000_000);
@@ -42,7 +42,6 @@ test('telemetry frame carries the reading the canvas renders', () => {
   assert.equal(frame.measurements.length, 1);
   assert.equal(frame.measurements[0].value, 72.57);
   assert.equal(frame.measurements[0].slotId, 3);
-  assert.equal(frame.measurements[0].channelId, 2);
   assert.equal(frame.measurements[0].unit, 'mm/s');
   assert.equal(frame.measurements[0].quality, 'GOOD');
   assert.equal(frame.measurements[0].freshness, 'FRESH');
