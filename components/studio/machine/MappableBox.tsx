@@ -4,6 +4,7 @@ import { PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'reac
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { gatewayForRack, racksForGateway, type DeviceNode } from '../../../lib/devices';
+import { useLiveMeasurement } from '../../../lib/liveMeasurementBus';
 import type { ChannelRef } from '../../../lib/rack';
 import type { TrailStatus } from './AdjustableTrail';
 import { LIVE_RANGE_FOR_LETTER, useLiveValue } from './liveValue';
@@ -48,6 +49,7 @@ export type MappableBoxProps = {
   channel: ChannelRef | null;
   dataLive?: boolean;
   liveReading?: { value: number | null; unit?: string };
+  liveMeasurementKey?: string | null;
   channels: ChannelRef[];
   pickableChannels?: ChannelRef[];
   devices?: DeviceNode[];
@@ -81,6 +83,7 @@ export function MappableBox({
   channel,
   dataLive = true,
   liveReading,
+  liveMeasurementKey,
   channels,
   pickableChannels,
   devices = [],
@@ -105,13 +108,15 @@ export function MappableBox({
   const [channelSearch, setChannelSearch] = useState('');
   const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
   const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
+  const brokerReading = useLiveMeasurement(liveMeasurementKey);
+  const effectiveReading = brokerReading ?? liveReading;
   const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel && dataLive);
   // Between two telemetry frames (or across a stream reconnect) the reading is
   // momentarily absent. Holding the last real value keeps a mapped point showing
   // its measurement instead of flicking to demo data or a dash.
   const lastReading = useRef<{ value: number; unit?: string } | null>(null);
-  if (typeof liveReading?.value === 'number') lastReading.current = { value: liveReading.value, unit: liveReading.unit };
-  const heldReading = typeof liveReading?.value === 'number' ? liveReading : lastReading.current ?? undefined;
+  if (typeof effectiveReading?.value === 'number') lastReading.current = { value: effectiveReading.value, unit: effectiveReading.unit };
+  const heldReading = typeof effectiveReading?.value === 'number' ? effectiveReading : lastReading.current ?? undefined;
   const displayValue = typeof heldReading?.value === 'number' ? heldReading.value : liveValue;
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;

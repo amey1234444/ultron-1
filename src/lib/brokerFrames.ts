@@ -27,6 +27,7 @@ export type BrokerSubscription = { close: () => void };
 // Kinds a frame can describe; the rest (alarms, command responses) reach the UI
 // through the persisted snapshot.
 const RENDERABLE = new Set(['status', 'topology', 'rack_health', 'inventory', 'telemetry']);
+const MAX_RETAINED_TELEMETRY_AGE_MS = 5_000;
 
 export async function fetchBrokerConfig(): Promise<BrokerConfig> {
   try {
@@ -38,7 +39,15 @@ export async function fetchBrokerConfig(): Promise<BrokerConfig> {
   }
 }
 
-function frameFrom(topic: string, payload: Uint8Array): LiveFrame | null {
+function sourceCreatedAtMs(message: unknown): number | null {
+  const msg = message as { created_at_us?: unknown; created_at?: unknown };
+  const micros = Number(msg.created_at_us);
+  if (Number.isFinite(micros) && micros > 0) return Math.round(micros / 1000);
+  const parsed = Date.parse(typeof msg.created_at === 'string' ? msg.created_at : '');
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function frameFrom(topic: string, payload: Uint8Array, retained = false): LiveFrame | null {
   const parsed = parseLiveTopic(topic);
   if (!parsed || !RENDERABLE.has(parsed.kind)) return null;
   let message: unknown;
@@ -51,6 +60,10 @@ function frameFrom(topic: string, payload: Uint8Array): LiveFrame | null {
   // Topic and payload must agree, exactly as the ingest pipeline requires.
   if (envelope.gateway_id !== parsed.gatewayId) return null;
   if (parsed.rackId !== null && envelope.rack_id !== parsed.rackId) return null;
+  if (retained && parsed.kind === 'telemetry') {
+    const sourceMs = sourceCreatedAtMs(message);
+    if (sourceMs === null || Date.now() - sourceMs > MAX_RETAINED_TELEMETRY_AGE_MS) return null;
+  }
   return buildLiveFrame(parsed.kind, message);
 }
 
@@ -82,8 +95,8 @@ export async function subscribeBrokerFrames(
   });
   client.on('close', () => onStatus?.(false));
   client.on('error', () => onStatus?.(false));
-  client.on('message', (topic, payload) => {
-    const frame = frameFrom(topic, payload);
+  client.on('message', (topic, payload, packet) => {
+    const frame = frameFrom(topic, payload, packet.retain);
     if (frame) onFrame(frame);
   });
 

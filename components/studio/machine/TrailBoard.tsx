@@ -3,7 +3,8 @@ import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-nat
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
+import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
+import { liveMeasurementKey } from '../../../lib/liveMeasurementBus';
 import { channelHasRecentData, channelLiveStatus, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
@@ -228,6 +229,19 @@ export function TrailBoard({
       return latestMeasurementForChannel(rackState, card, channelNumberFor(channel), live);
     },
     [cards, devices, effectiveRack, live],
+  );
+  const liveMeasurementKeyFor = useCallback(
+    (channel: ChannelRef | null): string | null => {
+      if (!channel) return null;
+      const rack = devices.find((device) => device.id === channel.rackId);
+      if (!rack) return null;
+      const gateway = gatewayForRack(rack, devices);
+      const gatewayId = rack.realGatewayId ?? gateway?.realGatewayId;
+      const rackId = rack.realRackId;
+      if (!gatewayId || rackId === undefined || rackId === null || String(rackId) === '') return null;
+      return liveMeasurementKey(gatewayId, String(rackId), channel.slot, channelNumberFor(channel));
+    },
+    [devices],
   );
   const channelsRef = useRef(channels);
   const trailsRef = useRef(trails);
@@ -647,6 +661,7 @@ export function TrailBoard({
               channel={channel}
               dataLive={isChannelLive(channel)}
               liveReading={liveReadingFor(channel)}
+              liveMeasurementKey={liveMeasurementKeyFor(channel)}
               channels={channels}
               pickableChannels={pickableChannels}
               devices={devices}

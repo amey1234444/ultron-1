@@ -21,6 +21,7 @@ const DEFAULT_TOPICS = [
   'ultron/v1/gateways/+/racks/+/health',
   'ultron/v1/gateways/+/racks/+/inventory',
   'ultron/v1/gateways/+/racks/+/telemetry',
+  'ultron/v1/gateways/+/racks/+/telemetry/latest',
 ];
 
 export type BrokerConfig = {

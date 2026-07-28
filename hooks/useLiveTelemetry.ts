@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { pruneLiveMeasurements, publishLiveMeasurements } from '../lib/liveMeasurementBus';
 import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, type LiveFrame, type LiveMeasurement, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
 import { fetchBrokerConfig, subscribeBrokerFrames, type BrokerSubscription } from '../src/lib/brokerFrames';
@@ -146,6 +147,10 @@ function withBrokerRealtime(snapshot: LiveState, previous: LiveState): LiveState
   };
 }
 
+function publishBrokerFrameMeasurements(frame: LiveFrame, blockedGatewayIds: Set<string>) {
+  publishLiveMeasurements(frame.measurements?.filter((measurement) => !blockedGatewayIds.has(measurement.gatewayId)));
+}
+
 export function useLiveTelemetry(): LiveState {
   const [state, setState] = useState<LiveState>(EMPTY_LIVE_STATE);
 
@@ -161,10 +166,17 @@ export function useLiveTelemetry(): LiveState {
     let brokerConnected = false;
     let streamFailures = 0;
     let clockOffsetMs = 0;
+    let blockedGatewayIds = new Set<string>();
 
     const applySnapshot = (json: Partial<LiveState> & { serverNowMs?: number }) => {
       if (typeof json.serverNowMs === 'number') clockOffsetMs = Date.now() - json.serverNowMs;
       const snapshot = withClockOffset({ ...normalizeLiveState(json), measurements: [] }, clockOffsetMs);
+      blockedGatewayIds = new Set(
+        snapshot.gateways
+          .filter((gateway) => ['QUARANTINED', 'BLOCKED'].includes(gateway.status.toUpperCase()))
+          .map((gateway) => gateway.gatewayId),
+      );
+      pruneLiveMeasurements((measurement) => !blockedGatewayIds.has(measurement.gatewayId) && isRecent(measurement.updatedAt));
       setState((current) => withBrokerRealtime(snapshot, current));
     };
 
@@ -201,6 +213,7 @@ export function useLiveTelemetry(): LiveState {
       liveLatency.lastFrameAt = now;
       if (frames.some((frame) => (frame.measurements?.length ?? 0) > 0)) liveLatency.lastMeasurementFrameAt = now;
       for (const frame of frames) recordLatency(frame.sourceCreatedAtMs, 0);
+      frames.forEach((frame) => publishBrokerFrameMeasurements(frame, blockedGatewayIds));
       setState((current) => frames.reduce((state, frame) => mergeLiveFrame(state, frame, 0), current));
     };
 

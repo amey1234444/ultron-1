@@ -52,7 +52,7 @@ export function parseLiveTopic(topic: string): ParsedTopic | null {
   const rest = parts.slice(6).join('/');
   if (rest === 'health') return { gatewayId, rackId, kind: 'rack_health' };
   if (rest === 'inventory') return { gatewayId, rackId, kind: 'inventory' };
-  if (rest === 'telemetry') return { gatewayId, rackId, kind: 'telemetry' };
+  if (rest === 'telemetry' || rest === 'telemetry/latest') return { gatewayId, rackId, kind: 'telemetry' };
   if (rest === 'events/alarm') return { gatewayId, rackId, kind: 'alarm' };
   if (rest === 'commands/response') return { gatewayId, rackId, kind: 'command_response' };
   if (rest === 'commands/request') return { gatewayId, rackId, kind: 'command_request' };
