@@ -1,5 +1,8 @@
 # Vercel MQTT Ingestion
 
+This is the legacy broker path. For the brokerless Render WebSocket deployment,
+use `docs/direct-websocket-render-vercel.md` instead.
+
 Use this path when you want MQTT ingestion to live in the Vercel application
 instead of redeploying/running the standalone `services/mqtt-ingest` worker:
 

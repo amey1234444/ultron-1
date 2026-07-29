@@ -1,0 +1,58 @@
+# Single-service Render Blueprint for Ultron.
+#
+# This one web service serves the Next.js app and terminates gateway/live
+# WebSockets on the same public Render URL:
+# - https://<service>.onrender.com/       -> app
+# - wss://<service>.onrender.com/ws/gateway -> gateway ingest
+# - wss://<service>.onrender.com/ws/live    -> frontend live frames
+#
+# Fill sync:false values in the Render dashboard during Blueprint setup.
+
+services:
+  - type: web
+    name: ultron
+    runtime: node
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:render
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.19.4
+      - key: NODE_ENV
+        value: production
+      - key: AUTH_SECRET
+        generateValue: true
+      - key: CAPTCHA_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: LIVE_NOTIFY_DATABASE_URL
+        sync: false
+      - key: INGEST_TRANSPORT
+        value: websocket
+      - key: GATEWAY_WS_PATH
+        value: /ws/gateway
+      - key: LIVE_WS_PATH
+        value: /ws/live
+      - key: DIRECT_WS_GATEWAY_SECRET
+        sync: false
+      - key: DIRECT_WS_MAX_PAYLOAD_BYTES
+        value: 262144
+      - key: PERSISTENCE_ENABLED
+        value: true
+      - key: STALE_AFTER_S
+        value: 15
+      - key: METRICS_FLUSH_INTERVAL_MS
+        value: 2000
+      - key: LATENCY_BUDGET_MS
+        value: 1000
+      - key: CRON_SECRET
+        generateValue: true
+      - key: ABSTRACT_EMAIL_REPUTATION_API_KEY
+        sync: false
+      - key: SUPER_ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: USER_PASSWORD
+        sync: false

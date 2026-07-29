@@ -6,8 +6,12 @@ gateway:
   rack_id: 1                       # legacy single-rack fallback
   rack_ids: [1, 2, 3, 4]           # match Rack Script IDs shown inside the gateway
   gateway_ip: 192.168.10.10        # or primary_interface: eth0
+transport:
+  mode: websocket
+  direct_ws_url: wss://YOUR-RENDER-INGEST.onrender.com/ws/gateway
+  # DIRECT_WS_TOKEN is supplied from the environment, not this file.
 mqtt:
-  host: your-emqx-host
+  host: your-emqx-host # fallback only when GATEWAY_TRANSPORT=mqtt
   port: 8883
   tls: true
   client_id: ultron-gw-ultron-gw-demo-01 # derived: ultron-gw-{gateway_id}

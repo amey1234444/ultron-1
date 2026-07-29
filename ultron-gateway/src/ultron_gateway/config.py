@@ -89,6 +89,11 @@ class Config:
     mqtt_ca_cert: str | None = field(default_factory=lambda: os.environ.get("MQTT_CA_CERT") or None)
     mqtt_client_cert: str | None = field(default_factory=lambda: os.environ.get("MQTT_CLIENT_CERT") or None)
     mqtt_client_key: str | None = field(default_factory=lambda: os.environ.get("MQTT_CLIENT_KEY") or None)
+    gateway_transport: str = field(
+        default_factory=lambda: os.environ.get("GATEWAY_TRANSPORT", "mqtt").strip().lower()
+    )
+    direct_ws_url: str = field(default_factory=lambda: os.environ.get("DIRECT_WS_URL", ""))
+    direct_ws_token: str | None = field(default_factory=lambda: os.environ.get("DIRECT_WS_TOKEN") or None)
 
     state_dir: str = field(default_factory=lambda: os.environ.get("GATEWAY_STATE_DIR", "./state"))
     telemetry_interval_s: float = field(

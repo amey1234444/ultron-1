@@ -1,6 +1,8 @@
-# Ultron MQTT ingest service
+# Ultron ingest service
 
-Long-running backend MQTT 5 subscriber (Phases D + E of the handover):
+Long-running backend ingest worker (Phases D + E of the handover). The default
+production transport is direct gateway WebSocket on Render; MQTT/EMQX is kept as
+an explicit fallback with `INGEST_TRANSPORT=mqtt` or `both`:
 
 ```
                                     ┌─ live frame ─→ pg_notify(ultron_live) ─→ /api/live/stream ─→ frontend
@@ -29,7 +31,7 @@ history resolution rather than liveness. Depth and coalescing are exported as th
 ```bash
 cd services/mqtt-ingest
 npm install
-cp .env.example .env   # fill in EMQX + DATABASE_URL
+cp .env.example .env   # fill in DIRECT_WS_GATEWAY_SECRET + DATABASE_URL
 node --env-file=.env index.js
 ```
 

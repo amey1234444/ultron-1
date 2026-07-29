@@ -4,42 +4,42 @@ import { Platform } from 'react-native';
 import { pruneLiveMeasurements, publishLiveMeasurements } from '../lib/liveMeasurementBus';
 import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, type LiveFrame, type LiveMeasurement, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
-import { fetchBrokerConfig, subscribeBrokerFrames, type BrokerSubscription } from '../src/lib/brokerFrames';
+import { directWsConfig, subscribeDirectWsFrames, type DirectWsSubscription } from '../src/lib/directWsFrames';
 
 // Live state has three transports, in order of latency:
 //
-//   1. MQTT over WebSocket straight from the broker (when configured): one hop
-//      from the gateway, at the gateway's own publish rate. This is the only
-//      transport allowed to paint channel telemetry/measurements.
+//   1. Direct WebSocket frames from the Render ingest service (when configured):
+//      one backend hop from the gateway, at the gateway's own publish rate. This
+//      is the only transport allowed to paint channel telemetry/measurements.
 //   2. SSE (/api/live/stream): backend structure snapshots and non-measurement
-//      frames, used only until broker WebSocket takes over.
+//      frames, used only until direct WebSocket takes over.
 //   3. Polling /api/live/state: backend structure reconciliation.
 //
 // Backend snapshots still decide which gateways may be shown at all and carry
-// what broker frames cannot describe (alerts, racks going away), but persisted
-// telemetry rows are deliberately ignored so channels reflect broker data only.
+// what direct frames cannot describe (alerts, racks going away), but persisted
+// telemetry rows are deliberately ignored so channels reflect direct data only.
 const VISIBLE_POLL_INTERVAL_MS = 500;
 const HIDDEN_POLL_INTERVAL_MS = 5000;
-// Reconciliation cadence while the broker feeds the values.
-const BROKER_SNAPSHOT_INTERVAL_MS = 5000;
+// Reconciliation cadence while the direct WebSocket feeds the values.
+const DIRECT_WS_SNAPSHOT_INTERVAL_MS = 5000;
 const REQUEST_TIMEOUT_MS = 4000;
 // Consecutive stream failures before giving up on push for this page view.
 const MAX_STREAM_FAILURES = 3;
 // End-to-end budget: gateway sample → applied to state.
 const LATENCY_BUDGET_MS = 1000;
-const BROKER_STATE_TTL_MS = 30_000;
+const DIRECT_WS_STATE_TTL_MS = 30_000;
 
 // Measured gateway→browser latency of the most recent frames, so the budget can
 // be checked from the console (`__ultronLiveLatency`) instead of eyeballed.
 export const liveLatency: {
-  brokerConnected: boolean;
+  directWsConnected: boolean;
   lastFrameAt: string | null;
   lastMeasurementFrameAt: string | null;
   lastMs: number | null;
   maxMs: number | null;
   overBudgetCount: number;
 } = {
-  brokerConnected: false,
+  directWsConnected: false,
   lastFrameAt: null,
   lastMeasurementFrameAt: null,
   lastMs: null,
@@ -61,7 +61,7 @@ function recordLatency(sourceCreatedAtMs: number | null | undefined, clockOffset
 
 function isRecent(iso: string | null | undefined) {
   const parsed = Date.parse(iso ?? '');
-  return Number.isFinite(parsed) && Date.now() - parsed <= BROKER_STATE_TTL_MS;
+  return Number.isFinite(parsed) && Date.now() - parsed <= DIRECT_WS_STATE_TTL_MS;
 }
 
 function isNewer(candidateIso: string | null | undefined, currentIso: string | null | undefined) {
@@ -102,7 +102,7 @@ function withoutMeasurements(frame: LiveFrame): LiveFrame {
   return { ...frame, measurements: [] };
 }
 
-function withBrokerRealtime(snapshot: LiveState, previous: LiveState): LiveState {
+function withDirectRealtime(snapshot: LiveState, previous: LiveState): LiveState {
   const blockedGatewayIds = new Set(
     snapshot.gateways
       .filter((gateway) => ['QUARANTINED', 'BLOCKED'].includes(gateway.status.toUpperCase()))
@@ -147,7 +147,7 @@ function withBrokerRealtime(snapshot: LiveState, previous: LiveState): LiveState
   };
 }
 
-function publishBrokerFrameMeasurements(frame: LiveFrame, blockedGatewayIds: Set<string>) {
+function publishDirectFrameMeasurements(frame: LiveFrame, blockedGatewayIds: Set<string>) {
   publishLiveMeasurements(frame.measurements?.filter((measurement) => !blockedGatewayIds.has(measurement.gatewayId)));
 }
 
@@ -162,8 +162,8 @@ export function useLiveTelemetry(): LiveState {
     let lastPayload = '';
     let inFlight: AbortController | null = null;
     let source: EventSource | null = null;
-    let broker: BrokerSubscription | null = null;
-    let brokerConnected = false;
+    let directWs: DirectWsSubscription | null = null;
+    let directWsConnected = false;
     let streamFailures = 0;
     let clockOffsetMs = 0;
     let blockedGatewayIds = new Set<string>();
@@ -177,14 +177,14 @@ export function useLiveTelemetry(): LiveState {
           .map((gateway) => gateway.gatewayId),
       );
       pruneLiveMeasurements((measurement) => !blockedGatewayIds.has(measurement.gatewayId) && isRecent(measurement.updatedAt));
-      setState((current) => withBrokerRealtime(snapshot, current));
+      setState((current) => withDirectRealtime(snapshot, current));
     };
 
     // --- Fallback polling ---------------------------------------------------
     // Polling is structure-only reconciliation. It never carries channel
-    // telemetry; if broker frames stop, channel readings age out naturally.
+    // telemetry; if direct frames stop, channel readings age out naturally.
     const nextDelay = () => {
-      if (broker && brokerConnected) return BROKER_SNAPSHOT_INTERVAL_MS;
+      if (directWs && directWsConnected) return DIRECT_WS_SNAPSHOT_INTERVAL_MS;
       return document.visibilityState === 'visible' ? VISIBLE_POLL_INTERVAL_MS : HIDDEN_POLL_INTERVAL_MS;
     };
 
@@ -213,7 +213,7 @@ export function useLiveTelemetry(): LiveState {
       liveLatency.lastFrameAt = now;
       if (frames.some((frame) => (frame.measurements?.length ?? 0) > 0)) liveLatency.lastMeasurementFrameAt = now;
       for (const frame of frames) recordLatency(frame.sourceCreatedAtMs, 0);
-      frames.forEach((frame) => publishBrokerFrameMeasurements(frame, blockedGatewayIds));
+      frames.forEach((frame) => publishDirectFrameMeasurements(frame, blockedGatewayIds));
       setState((current) => frames.reduce((state, frame) => mergeLiveFrame(state, frame, 0), current));
     };
 
@@ -302,18 +302,18 @@ export function useLiveTelemetry(): LiveState {
       return true;
     };
 
-    // --- Broker subscription ------------------------------------------------
-    // Frames built in the browser carry browser-clock timestamps, so they merge
-    // with no offset (unlike server-sent frames), and are batched per paint.
-    const openBroker = async () => {
-      const config = await fetchBrokerConfig();
+    // --- Direct live WebSocket ----------------------------------------------
+    // Frames delivered by the ingest service already carry server timestamps
+    // for freshness, and are batched per paint.
+    const openDirectWs = () => {
+      const config = directWsConfig();
       if (cancelled || !config.enabled) return false;
-      const subscription = await subscribeBrokerFrames(
+      const subscription = subscribeDirectWsFrames(
         config,
         (frame) => { if (!cancelled) queueFrame(frame); },
         (connected) => {
-          brokerConnected = connected;
-          liveLatency.brokerConnected = connected;
+          directWsConnected = connected;
+          liveLatency.directWsConnected = connected;
         },
       );
       if (!subscription) return false;
@@ -321,8 +321,8 @@ export function useLiveTelemetry(): LiveState {
         subscription.close();
         return false;
       }
-      broker = subscription;
-      // Values now come from the broker; the snapshot only reconciles.
+      directWs = subscription;
+      // Values now come from direct WebSocket; the snapshot only reconciles.
       closeStream();
       if (timer) clearTimeout(timer);
       schedule(0);
@@ -339,14 +339,14 @@ export function useLiveTelemetry(): LiveState {
     (window as unknown as { __ultronLiveLatency?: typeof liveLatency }).__ultronLiveLatency = liveLatency;
     document.addEventListener('visibilitychange', onVisibilityChange);
     if (!openStream()) void poll();
-    // The broker takes over from the stream once it is connected; until then the
-    // stream (or polling) is already serving state.
-    void openBroker().catch(() => false);
+    // Direct WebSocket takes over from the stream once configured; until then
+    // the stream (or polling) is already serving state.
+    openDirectWs();
 
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      broker?.close();
+      directWs?.close();
       if (flushHandle !== null) cancelFlush(flushHandle);
       closeStream();
       inFlight?.abort();

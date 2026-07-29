@@ -5,6 +5,7 @@ description = "Ultron gateway: CC/RCC (or simulator) -> canonical rack model -> 
 requires-python = ">=3.10"
 dependencies = [
     "paho-mqtt>=2.1.0",
+    "websocket-client>=1.8.0",
 ]
 
 [project.scripts]

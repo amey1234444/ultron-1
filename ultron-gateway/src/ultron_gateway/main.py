@@ -18,6 +18,7 @@ from .cc_source import CcV3Feed, build_looping_fixture_reader, build_reader
 from .cc_v3 import CcSnapshot
 from .command_consumer import CommandConsumer
 from .config import Config
+from .direct_ws_client import DirectWebSocketClient
 from .envelope import EnvelopeBuilder
 from .identity import new_boot_id, resolve_gateway_ip
 from .mqtt_client import MqttClient
@@ -164,7 +165,11 @@ def main() -> None:
     envelope = EnvelopeBuilder(config.gateway_id, boot_id, gateway_ip, sequence)
 
     will = envelope.build("ultron.gateway.status", None, {"state": "OFFLINE", "mqtt_state": "DISCONNECTED", "reason": "unexpected_disconnect"})
-    client = MqttClient(config, topics.status(config.gateway_id), will)
+    client = (
+        DirectWebSocketClient(config)
+        if config.gateway_transport in {"websocket", "ws", "direct_ws", "direct-websocket"}
+        else MqttClient(config, topics.status(config.gateway_id), will)
+    )
 
     spool = Spool(config.state_dir)
     publisher = Publisher(envelope, client, spool)
@@ -172,7 +177,8 @@ def main() -> None:
     client.subscribe_commands(topics.command_request_filter(config.gateway_id), consumer.handle)
 
     rack_label = ",".join(str(rack_id) for rack_id in config.rack_ids)
-    print(f"[gateway] {config.gateway_id} racks {rack_label} ip {gateway_ip} -> {config.mqtt_host}:{config.mqtt_port} source {config.data_source}")
+    target = config.direct_ws_url if isinstance(client, DirectWebSocketClient) else f"{config.mqtt_host}:{config.mqtt_port}"
+    print(f"[gateway] {config.gateway_id} racks {rack_label} ip {gateway_ip} -> {target} source {config.data_source}")
     client.connect()
     started = time.monotonic()
 

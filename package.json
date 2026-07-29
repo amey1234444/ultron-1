@@ -31,7 +31,8 @@
     "react-native-screens": "4.25.2",
     "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2",
-    "react-native-worklets": "0.10.0"
+    "react-native-worklets": "0.10.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
@@ -55,6 +56,7 @@
     "dev": "next dev",
     "build": "next build",
     "start:next": "next start",
+    "start:render": "node server.mjs",
     "lint": "next lint",
     "typecheck": "tsc --noEmit"
   },

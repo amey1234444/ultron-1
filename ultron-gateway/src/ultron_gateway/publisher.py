@@ -23,13 +23,15 @@ class Publisher:
 
     def _send(self, topic: str, message: dict[str, Any], retain: bool, qos: int = 1) -> None:
         validate_envelope(message)
-        print(f"[mqtt-publish] topic={topic} retain={retain} qos={qos} schema={message.get('schema')} message_id={message.get('message_id')}", flush=True)
-        if self._client.connected and self._client.publish(topic, message, retain=retain, qos=qos):
+        print(f"[publish] topic={topic} retain={retain} qos={qos} schema={message.get('schema')} message_id={message.get('message_id')}", flush=True)
+        can_publish = self._client.connected or getattr(self._client, "publish_when_disconnected", False)
+        if can_publish and self._client.publish(topic, message, retain=retain, qos=qos):
             return
         self._spool.push(topic, message, retain=retain)
 
     def replay_spool(self) -> int:
-        if not self._client.connected:
+        can_publish = self._client.connected or getattr(self._client, "publish_when_disconnected", False)
+        if not can_publish:
             return 0
         return self._spool.drain(self._client.publish)
 
