@@ -26,7 +26,7 @@ The included `render.yaml` creates this single service.
 Build command:
 
 ```bash
-npm ci && npm run build
+npm ci --include=dev && npm run build
 ```
 
 Start command:
