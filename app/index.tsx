@@ -873,7 +873,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
               onModeChange={setMachineWorkspaceMode}
               canConfigure={canEditDeleteSchema}
-              canSaveTemplate={currentUser?.role === 'super_admin'}
+              canSaveTemplate={canEditDeleteSchema}
             />
           ) : selected.kind === 'device' && selectedDevice && selectedDevice.type === 'Gateway' ? (
             <GatewayDetail
