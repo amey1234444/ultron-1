@@ -18,6 +18,7 @@ type TopBarProps = {
   canConfigure?: boolean;
   configureMode?: boolean;
   onConfigureModeChange?: (enabled: boolean) => void;
+  onLogoPress?: () => void;
 };
 
 function formatClock(d: Date): string {
@@ -218,6 +219,7 @@ export function TopBar({
   canConfigure = false,
   configureMode = false,
   onConfigureModeChange,
+  onLogoPress,
 }: TopBarProps) {
   const { isDark } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -246,11 +248,13 @@ export function TopBar({
       style={glassStyle}
     >
       <View className="flex-row items-center gap-3">
-        <Image
-          source={isDark ? LOGO_DARK : LOGO_LIGHT}
-          style={{ height: LOGO_HEIGHT, width: LOGO_HEIGHT * LOGO_ASPECT }}
-          resizeMode="contain"
-        />
+        <Pressable onPress={onLogoPress} accessibilityRole="button" accessibilityLabel="Go to main page">
+          <Image
+            source={isDark ? LOGO_DARK : LOGO_LIGHT}
+            style={{ height: LOGO_HEIGHT, width: LOGO_HEIGHT * LOGO_ASPECT }}
+            resizeMode="contain"
+          />
+        </Pressable>
         {!isNarrow && (
           <>
             <Divider color={dividerColor} />

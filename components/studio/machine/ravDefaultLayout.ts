@@ -85,7 +85,7 @@ export function hasDefaultLayout(machineTemplate: string) {
   return machineTemplate === 'Rotary Airlock Valve';
 }
 
-export function createRavDefaultLayout(channels: ChannelRef[], machineRect?: MachineRect | null): SavedLayout {
+export function createRavDefaultLayout(_channels: ChannelRef[], machineRect?: MachineRect | null): SavedLayout {
   const rect = machineRect ?? REFERENCE_MACHINE_RECT;
   const svgToStage = (sx: number, sy: number) => ({
     x: rect.x + (sx / SVG_W) * rect.width,
@@ -96,15 +96,11 @@ export function createRavDefaultLayout(channels: ChannelRef[], machineRect?: Mac
   const boxes: Box[] = [];
 
   for (const p of TEMPLATE_POINTS) {
-    const channel = channels.find((c) => c.code === p.code) ?? null;
     const box: Box = {
       id: makeId('box'),
       x: p.boxX,
       y: p.boxY,
-      // Linked boxes display the channel's own label; keep ours only as the
-      // fallback text when no matching channel exists in this workspace.
-      label: channel ? '' : p.label,
-      channelId: channel?.id,
+      label: p.label,
     };
     boxes.push(box);
 

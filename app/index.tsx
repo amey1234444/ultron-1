@@ -741,6 +741,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const editingDevice = editingDeviceId ? (storedDevices.find((d) => d.id === editingDeviceId) ?? devices.find((d) => d.id === editingDeviceId)) : null;
   const deleteDeviceInfo = deleteDeviceId ? (storedDevices.find((d) => d.id === deleteDeviceId) ?? devices.find((d) => d.id === deleteDeviceId)) : null;
   const topBarProjectName = selectedProject?.name ?? (selectedFolder ? projects.find((p) => p.id === selectedFolder.projectId)?.name : undefined);
+  const detailTopClearance = leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'machine' || selected.kind === 'device') ? 44 : 0;
 
   const renameCurrentName =
     renameTarget?.kind === 'project'
@@ -781,6 +782,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         canConfigure={hasConfigureAccess}
         configureMode={configureMode}
         onConfigureModeChange={setConfigureMode}
+        onLogoPress={() => setSelected({ kind: 'none' })}
       />
 
       {ipChangeNotice && (
@@ -854,7 +856,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           </>
         )}
 
-        <View className="relative flex-1">
+        <View className="relative flex-1" style={detailTopClearance ? { paddingTop: detailTopClearance } : undefined}>
           {selected.kind === 'machine' && selectedMachine ? (
             <MachineWorkspace
               key={selectedMachine.id}

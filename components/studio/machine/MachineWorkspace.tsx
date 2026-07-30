@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
@@ -8,12 +8,9 @@ import type { LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal } from '../../../lib/localPersist';
 import type { MachineComponent, MachineNode } from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
-import { PanelToggle } from '../PanelToggle';
 import { AlarmView } from './AlarmView';
 import { MachineOverview } from './MachineOverview';
-import { ComponentTypeIcon } from './machineIcons';
 import { MachineCanvas } from './MachineCanvas';
-import { computePointCode, PointCard } from './PointCard';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { StageGrid, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
@@ -38,10 +35,8 @@ type MachineWorkspaceProps = {
   // parent uses this to hide the hierarchy sidebar while it's active.
   onModeChange?: (mode: WorkspaceMode) => void;
 };
-type RightTab = 'components' | 'properties';
 type ActualTab = 'machine' | 'rack' | 'overview' | 'alarm' | 'trend';
 
-const RIGHT_PANEL_WIDTH = 288;
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.1;
@@ -62,18 +57,6 @@ function ActualSubTab({ label, active, onPress }: { label: string; active: boole
       )}
     >
       <Text className={cn('font-body-medium text-[11px]', active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function RightTabButton({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
-  return (
-    <Pressable onPress={onPress} className={cn('flex-1 items-center border-b-2 py-3', active ? (isDark ? 'border-ink' : 'border-ink-inverse') : cn('border-transparent', lineClass))}>
-      <Text className={cn('font-body-medium text-xs', active ? (isDark ? 'text-ink' : 'text-ink-inverse') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
         {label}
       </Text>
     </Pressable>
@@ -103,15 +86,13 @@ function ZoomControls({ zoom, onZoomOut, onReset, onZoomIn }: { zoom: number; on
   );
 }
 
-function ComponentRow({ component, selected, onPress }: { component: MachineComponent; selected: boolean; onPress: () => void }) {
+export function ComponentRow({ component, selected, onPress }: { component: MachineComponent; selected: boolean; onPress: () => void }) {
   const { isDark } = useAppTheme();
-  const iconColor = isDark ? '#F5F5F5' : '#0A0A0A';
   return (
     <Pressable
       onPress={onPress}
       className={cn('flex-row items-center gap-2 rounded-lg px-3 py-2', selected && (isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel'))}
     >
-      <ComponentTypeIcon type={component.type} color={iconColor} size={16} />
       <View className="flex-1">
         <Text numberOfLines={1} className={cn('font-body-medium text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
           {component.label}
@@ -136,9 +117,6 @@ export function MachineWorkspace({
   canConfigure = false,
 }: MachineWorkspaceProps) {
   const { isDark } = useAppTheme();
-  const { width } = useWindowDimensions();
-  const isNarrow = width > 0 && width < 900;
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   const mode: WorkspaceMode = canConfigure ? 'design' : 'actual';
@@ -147,9 +125,7 @@ export function MachineWorkspace({
     return () => onModeChange?.('design');
   }, [mode, onModeChange]);
   const [actualTab, setActualTab] = useState<ActualTab>('machine');
-  const [rightTab, setRightTab] = useState<RightTab>('components');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(machine.components[0]?.id ?? null);
-  const [rightCollapsed, setRightCollapsed] = useState(false);
   const [zoom, setZoom] = useState(1);
   // Layout of the machine wrapper in *stage coordinates* (the stage is a fixed
   // 1600×900 design space, so this never changes with window size, panels, or
@@ -165,10 +141,6 @@ export function MachineWorkspace({
 
   const isActual = mode === 'actual';
   const readOnlyCanvas = !canConfigure || isActual;
-
-  useEffect(() => {
-    if (isNarrow) setRightCollapsed(true);
-  }, [isNarrow]);
 
   // Rack/Overview/Alarm/Trend reflect the last *saved* box↔channel mappings
   // (the same localStorage layout TrailBoard persists via "Save Config") —
@@ -244,14 +216,8 @@ export function MachineWorkspace({
     return { x: centerX - width / 2, y: centerY - height / 2, width, height };
   }, [machineLayout, zoom, machine.template]);
 
-  const selectedComponent = useMemo(
-    () => machine.components.find((c) => c.id === selectedComponentId) ?? null,
-    [machine.components, selectedComponentId],
-  );
-
   const selectComponent = (component: MachineComponent) => {
     setSelectedComponentId(component.id);
-    setRightTab('properties');
   };
 
   const backButton = (
@@ -366,58 +332,6 @@ export function MachineWorkspace({
             )}
           </View>
 
-          {!isActual && (
-            <PanelToggle
-              collapsed={rightCollapsed}
-              onPress={() => setRightCollapsed((v) => !v)}
-              right={rightCollapsed ? 8 : RIGHT_PANEL_WIDTH - 12}
-              testID="ui.panel.right.toggle"
-            />
-          )}
-
-          {!isActual && !rightCollapsed && (
-            <View className={cn('w-72 border-l', lineClass)}>
-              <View className={cn('flex-row border-b', lineClass)}>
-                <RightTabButton label="Components" active={rightTab === 'components'} onPress={() => setRightTab('components')} />
-                <RightTabButton label="Properties" active={rightTab === 'properties'} onPress={() => setRightTab('properties')} />
-              </View>
-
-              {rightTab === 'components' ? (
-                <View className="gap-1 p-3">
-                  {machine.components.map((component) => (
-                    <ComponentRow
-                      key={component.id}
-                      component={component}
-                      selected={component.id === selectedComponentId}
-                      onPress={() => selectComponent(component)}
-                    />
-                  ))}
-                </View>
-              ) : selectedComponent ? (
-                <View className="gap-4 p-4">
-                  <View className="flex-row items-center gap-2">
-                    <ComponentTypeIcon type={selectedComponent.type} color={isDark ? '#F5F5F5' : '#0A0A0A'} size={18} />
-                    <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{selectedComponent.label}</Text>
-                  </View>
-
-                  {selectedComponent.points.length === 0 ? (
-                    <Text className={cn('font-body text-xs italic', mutedClass)}>This component has no measurement points.</Text>
-                  ) : (
-                    <View className="gap-2">
-                      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Measurement Points</Text>
-                      {selectedComponent.points.map((point) => (
-                        <PointCard key={point.id} code={computePointCode(selectedComponent.points, point.id)} point={point} />
-                      ))}
-                    </View>
-                  )}
-                </View>
-              ) : (
-                <View className="p-4">
-                  <Text className={cn('font-body text-xs italic', mutedClass)}>Select a component to view its properties.</Text>
-                </View>
-              )}
-            </View>
-          )}
         </View>
       )}
     </View>

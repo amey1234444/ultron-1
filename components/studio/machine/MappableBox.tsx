@@ -12,7 +12,7 @@ import { PointCard18, POINT_CARD_HEIGHT, POINT_CARD_WIDTH } from './PointCard18'
 
 export type Point = { x: number; y: number };
 
-export const UNLINKED_BOX_WIDTH = 236;
+export const UNLINKED_BOX_WIDTH = POINT_CARD_WIDTH;
 export const MAPPABLE_BOX_WIDTH = POINT_CARD_WIDTH;
 export const MAPPABLE_BOX_HEIGHT = POINT_CARD_HEIGHT;
 
@@ -272,8 +272,16 @@ export function MappableBox({
 
       <View
         onLayout={(e) => onSizeChange?.({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-        className={cn('overflow-hidden rounded-xl border border-dashed', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
-        style={{ position: 'absolute', left: x + 12, top: y - 30, width: UNLINKED_BOX_WIDTH }}
+        className={cn('rounded-xl border border-dashed', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
+        style={{
+          position: 'absolute',
+          left: x + 12,
+          top: y - 30,
+          width: UNLINKED_BOX_WIDTH,
+          height: MAPPABLE_BOX_HEIGHT,
+          zIndex: pickerOpen ? 1000 : 1,
+          overflow: 'visible',
+        }}
       >
         <View
           {...panResponder.panHandlers}
@@ -308,7 +316,18 @@ export function MappableBox({
         )}
 
         {pickerOpen && !channel && !readOnly && (
-          <View className={cn('border-t', lineClass)}>
+          <View
+            className={cn('absolute inset-x-0 rounded-b-xl border border-t', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
+            style={{
+              top: MAPPABLE_BOX_HEIGHT - 1,
+              zIndex: 1001,
+              shadowColor: '#000000',
+              shadowOpacity: isDark ? 0.35 : 0.12,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 8,
+            }}
+          >
             {pickerChannels.length === 0 ? (
               <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No active rack channels yet.</Text>
             ) : devices.length > 0 && !selectedGateway ? (
