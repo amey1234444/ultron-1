@@ -228,7 +228,9 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     setCards,
     setMachines,
     getLayout,
+    getTemplateLayout,
     saveLayout,
+    saveTemplateLayout,
   } = useStudioStore();
 
   // Real gateway/rack connectivity from the MQTT ingestion pipeline overlays
@@ -865,10 +867,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               cards={visibleCards}
               live={realMode ? liveState : undefined}
               layout={getLayout(selectedMachine.id)}
+              templateLayout={getTemplateLayout(selectedMachine.template)}
               onSaveLayout={saveLayout}
+              onSaveTemplate={saveTemplateLayout}
               onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
               onModeChange={setMachineWorkspaceMode}
               canConfigure={canEditDeleteSchema}
+              canSaveTemplate={currentUser?.role === 'super_admin'}
             />
           ) : selected.kind === 'device' && selectedDevice && selectedDevice.type === 'Gateway' ? (
             <GatewayDetail

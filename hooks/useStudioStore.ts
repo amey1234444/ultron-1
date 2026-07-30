@@ -32,7 +32,9 @@ export type StudioStore = Hierarchy & {
   setDevices: Dispatch<SetStateAction<DeviceNode[]>>;
   setCards: Dispatch<SetStateAction<CardNode[]>>;
   getLayout: (machineId: string) => SavedLayout | null;
+  getTemplateLayout: (machineTemplate: string) => SavedLayout | null;
   saveLayout: (machineId: string, layout: SavedLayout) => void;
+  saveTemplateLayout: (machineTemplate: string, layout: SavedLayout) => void;
 };
 
 const SAVE_DEBOUNCE_MS = 700;
@@ -49,6 +51,7 @@ export function useStudioStore(): StudioStore {
   const [devices, setDevicesRaw] = useState<DeviceNode[]>(SEED.devices);
   const [cards, setCardsRaw] = useState<CardNode[]>(SEED.cards);
   const [layouts, setLayoutsRaw] = useState<Record<string, SavedLayout>>({});
+  const [templateLayouts, setTemplateLayoutsRaw] = useState<Record<string, SavedLayout>>({});
 
   const [ready, setReady] = useState(false);
   const [persisted, setPersisted] = useState(false);
@@ -66,6 +69,7 @@ export function useStudioStore(): StudioStore {
   const applyWorkspace = useCallback((w: {
     projects: ProjectNode[]; folders: FolderNode[]; machines: MachineNode[];
     devices: DeviceNode[]; cards: CardNode[]; layouts?: Record<string, SavedLayout>;
+    templates?: Record<string, SavedLayout>;
     hierRevision: number; layoutRevision: number;
   }) => {
     setProjectsRaw(w.projects);
@@ -74,6 +78,7 @@ export function useStudioStore(): StudioStore {
     setDevicesRaw(w.devices);
     setCardsRaw(w.cards);
     setLayoutsRaw(w.layouts ?? {});
+    setTemplateLayoutsRaw(w.templates ?? {});
     hierRev.current = w.hierRevision;
     layoutRev.current = w.layoutRevision;
   }, []);
@@ -121,6 +126,7 @@ export function useStudioStore(): StudioStore {
   const setCards = useCallback<Dispatch<SetStateAction<CardNode[]>>>((a) => { setCardsRaw(a); scheduleHierarchySave(); }, [scheduleHierarchySave]);
 
   const getLayout = useCallback((machineId: string): SavedLayout | null => layouts[machineId] ?? null, [layouts]);
+  const getTemplateLayout = useCallback((machineTemplate: string): SavedLayout | null => templateLayouts[machineTemplate] ?? null, [templateLayouts]);
 
   const saveLayout = useCallback((machineId: string, layout: SavedLayout) => {
     setLayoutsRaw((prev) => ({ ...prev, [machineId]: layout }));
@@ -137,6 +143,25 @@ export function useStudioStore(): StudioStore {
         }
       } catch {
         // Offline — kept locally; will re-sync on next explicit save.
+      }
+    })();
+  }, []);
+
+  const saveTemplateLayout = useCallback((machineTemplate: string, layout: SavedLayout) => {
+    setTemplateLayoutsRaw((prev) => ({ ...prev, [machineTemplate]: layout }));
+    if (!persistedRef.current) return;
+    void (async () => {
+      try {
+        const res = await apiFetch('/api/studio/template', {
+          method: 'PUT',
+          body: JSON.stringify({ machineTemplate, layout }),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { layoutRevision?: number };
+          if (typeof json.layoutRevision === 'number') layoutRev.current = json.layoutRevision;
+        }
+      } catch {
+        // Offline - kept locally; will re-sync on next explicit template save.
       }
     })();
   }, []);
@@ -201,6 +226,6 @@ export function useStudioStore(): StudioStore {
     ready, persisted,
     projects, folders, machines, devices, cards,
     setProjects, setFolders, setMachines, setDevices, setCards,
-    getLayout, saveLayout,
+    getLayout, getTemplateLayout, saveLayout, saveTemplateLayout,
   };
 }

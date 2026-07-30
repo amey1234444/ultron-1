@@ -28,9 +28,12 @@ type MachineWorkspaceProps = {
   // and actual views read it so they stay in sync across users; null falls back
   // to localStorage / the template default.
   layout?: SavedLayout | null;
+  templateLayout?: SavedLayout | null;
   onSaveLayout?: (machineId: string, layout: SavedLayout) => void;
+  onSaveTemplate?: (machineTemplate: string, layout: SavedLayout) => void;
   onBack: () => void;
   canConfigure?: boolean;
+  canSaveTemplate?: boolean;
   // Actual View is meant to be a full-screen "deployed dashboard" preview — the
   // parent uses this to hide the hierarchy sidebar while it's active.
   onModeChange?: (mode: WorkspaceMode) => void;
@@ -111,10 +114,13 @@ export function MachineWorkspace({
   cards,
   live,
   layout,
+  templateLayout,
   onSaveLayout,
+  onSaveTemplate,
   onBack,
   onModeChange,
   canConfigure = false,
+  canSaveTemplate = false,
 }: MachineWorkspaceProps) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
@@ -319,12 +325,15 @@ export function MachineWorkspace({
                   machineRect={machineRect}
                   machineId={machine.id}
                   machineTemplate={machine.template}
+                  templateLayout={templateLayout ?? null}
                   initialLayout={layout ?? null}
                   onSaveLayout={onSaveLayout}
+                  onSaveTemplate={onSaveTemplate}
                   stageStyle={stageStyle}
                   stageScale={stageScale}
                   readOnly={readOnlyCanvas}
                   hideUnlink={readOnlyCanvas}
+                  canSaveTemplate={canSaveTemplate}
                 />
 
                 <ZoomControls zoom={zoom} onZoomOut={zoomOut} onReset={resetZoom} onZoomIn={zoomIn} />

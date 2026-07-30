@@ -78,7 +78,10 @@ type TrailBoardProps = {
   // provided it seeds the board; "Save Config" persists back through
   // onSaveLayout so the change is visible to every other user.
   initialLayout?: SavedLayout | null;
+  templateLayout?: SavedLayout | null;
   onSaveLayout?: (machineId: string, layout: SavedLayout) => void;
+  onSaveTemplate?: (machineTemplate: string, layout: SavedLayout) => void;
+  canSaveTemplate?: boolean;
 };
 
 export type SavedLayout = { trails: Trail[]; boxes: Box[] };
@@ -164,7 +167,10 @@ export function TrailBoard({
   readOnly = false,
   hideUnlink = false,
   initialLayout = null,
+  templateLayout = null,
   onSaveLayout,
+  onSaveTemplate,
+  canSaveTemplate = false,
 }: TrailBoardProps) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -188,7 +194,7 @@ export function TrailBoard({
   const initialLayoutRef = useRef<SavedLayout | null>(null);
   if (initialLayoutRef.current === null) {
     const saved = initialLayout ?? loadLocal<SavedLayout>(storageKey);
-    initialLayoutRef.current = saved ?? { trails: [], boxes: [] };
+    initialLayoutRef.current = saved ?? templateLayout ?? { trails: [], boxes: [] };
   }
 
   const [trails, setTrails] = useState<Trail[]>(initialLayoutRef.current.trails);
@@ -199,7 +205,9 @@ export function TrailBoard({
   const [boxLiveValues, setBoxLiveValues] = useState<Record<string, number>>({});
   const [boxSizes, setBoxSizes] = useState<Record<string, { width: number; height: number }>>({});
   const [justSaved, setJustSaved] = useState(false);
+  const [justSavedTemplate, setJustSavedTemplate] = useState(false);
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedTemplateFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
   const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter }), [devices, cards, pickableChannelFilter]);
@@ -326,7 +334,7 @@ export function TrailBoard({
     // Generate against the machine's *current* rect (it shrinks/grows with
     // zoom) — endpoints and bends land exactly on the artwork as rendered
     // right now, not where it would sit at 100%.
-    const layout = createRavDefaultLayout(pickableChannels, machineRect);
+    const layout = templateLayout ?? createRavDefaultLayout(pickableChannels, machineRect);
     trailsRef.current = layout.trails;
     boxesRef.current = layout.boxes;
     setTrails(layout.trails);
@@ -344,9 +352,28 @@ export function TrailBoard({
     savedFlashTimer.current = setTimeout(() => setJustSaved(false), 1600);
   };
 
+  const templateSafeLayout = () => {
+    const layout = layoutWithCenters(trailsRef.current, boxesRef.current);
+    return {
+      trails: layout.trails,
+      boxes: layout.boxes.map((box) => {
+        const { channelId: _channelId, ...rest } = box;
+        return rest;
+      }),
+    };
+  };
+
+  const saveTemplate = () => {
+    onSaveTemplate?.(machineTemplate, templateSafeLayout());
+    setJustSavedTemplate(true);
+    if (savedTemplateFlashTimer.current) clearTimeout(savedTemplateFlashTimer.current);
+    savedTemplateFlashTimer.current = setTimeout(() => setJustSavedTemplate(false), 1600);
+  };
+
   useEffect(() => {
     return () => {
       if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
+      if (savedTemplateFlashTimer.current) clearTimeout(savedTemplateFlashTimer.current);
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       if (pendingLayout.current) {
         onSaveLayoutRef.current?.(machineId, pendingLayout.current);
@@ -354,6 +381,14 @@ export function TrailBoard({
       }
     };
   }, [machineId]);
+
+  useEffect(() => {
+    if (initialLayout || !templateLayout || trailsRef.current.length > 0 || boxesRef.current.length > 0) return;
+    trailsRef.current = templateLayout.trails;
+    boxesRef.current = templateLayout.boxes;
+    setTrails(templateLayout.trails);
+    setBoxes(templateLayout.boxes);
+  }, [initialLayout, templateLayout]);
 
   // Entering Actual View drops any active selection so no editing chrome
   // (highlight ring, bend toolbar) leaks into the clean monitor rendering.
@@ -599,6 +634,11 @@ export function TrailBoard({
           {hasDefaultLayout(machineTemplate) && (
             <Pressable onPress={applyTemplateLayout} className="rounded-full border border-accent/35 bg-accent/10 px-3 py-1.5">
               <Text className="font-body-bold text-xs text-accent">⟲ Template</Text>
+            </Pressable>
+          )}
+          {canSaveTemplate && onSaveTemplate && (
+            <Pressable onPress={saveTemplate} className="rounded-full border border-accent/35 bg-accent/10 px-3 py-1.5">
+              <Text className="font-body-bold text-xs text-accent">{justSavedTemplate ? 'Saved Template' : 'Save Template'}</Text>
             </Pressable>
           )}
           <Pressable onPress={saveConfig} className="rounded-full border border-status-success/40 bg-status-success/10 px-3 py-1.5">

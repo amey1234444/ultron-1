@@ -26,6 +26,7 @@ export type Workspace = {
   devices: DeviceNode[];
   cards: CardNode[];
   layouts: Record<string, Layout>;
+  templates: Record<string, Layout>;
   hierRevision: number;
   layoutRevision: number;
 };
@@ -230,24 +231,33 @@ type DeviceRow = {
 };
 type CardRow = { id: string; device_id: string; slot: number; type: string; enabled: boolean; config: unknown };
 type LayoutRow = { machine_id: string; trails: unknown; boxes: unknown };
+type TemplateLayoutRow = { machine_template: string; trails: unknown; boxes: unknown };
 
 export async function getWorkspace(): Promise<Workspace | null> {
   if (!isDbEnabled()) return null;
   await ready();
 
-  const [projects, folders, machines, devices, cards, layouts, meta] = await Promise.all([
+  const [projects, folders, machines, devices, cards, layouts, templates, meta] = await Promise.all([
     query<ProjectRow>('SELECT * FROM studio_projects ORDER BY sort_order ASC'),
     query<FolderRow>('SELECT * FROM studio_folders ORDER BY sort_order ASC'),
     query<MachineRow>('SELECT * FROM studio_machines ORDER BY sort_order ASC'),
     query<DeviceRow>('SELECT * FROM studio_devices ORDER BY sort_order ASC'),
     query<CardRow>('SELECT * FROM studio_cards ORDER BY sort_order ASC'),
     query<LayoutRow>('SELECT * FROM studio_machine_layouts'),
+    query<TemplateLayoutRow>('SELECT * FROM studio_machine_templates'),
     query<{ hier_revision: string; layout_revision: string }>('SELECT hier_revision, layout_revision FROM studio_meta WHERE id = 1'),
   ]);
 
   const layoutMap: Record<string, Layout> = {};
   for (const r of layouts.rows) {
     layoutMap[r.machine_id] = {
+      trails: Array.isArray(r.trails) ? r.trails : [],
+      boxes: Array.isArray(r.boxes) ? r.boxes : [],
+    };
+  }
+  const templateMap: Record<string, Layout> = {};
+  for (const r of templates.rows) {
+    templateMap[r.machine_template] = {
       trails: Array.isArray(r.trails) ? r.trails : [],
       boxes: Array.isArray(r.boxes) ? r.boxes : [],
     };
@@ -275,6 +285,7 @@ export async function getWorkspace(): Promise<Workspace | null> {
       enabled: r.enabled, config: (r.config ?? {}) as CardNode['config'],
     })),
     layouts: layoutMap,
+    templates: templateMap,
     hierRevision: Number(meta.rows[0]?.hier_revision ?? 0),
     layoutRevision: Number(meta.rows[0]?.layout_revision ?? 0),
   };
@@ -366,6 +377,34 @@ export async function saveMachineLayout(machineId: string, layout: Layout): Prom
           ],
         );
       }
+      const cur = await client.query<{ layout_revision: string }>('SELECT layout_revision FROM studio_meta WHERE id = 1 FOR UPDATE');
+      const next = Number(cur.rows[0]?.layout_revision ?? 0) + 1;
+      await client.query('UPDATE studio_meta SET layout_revision = $1, updated_at = now() WHERE id = 1', [String(next)] as never[]);
+      await client.query('COMMIT');
+      return { layoutRevision: next };
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    }
+  });
+}
+
+export async function saveMachineTemplate(machineTemplate: string, layout: Layout): Promise<{ layoutRevision: number }> {
+  await ready();
+  return withClient(async (client) => {
+    await client.query('BEGIN');
+    try {
+      const template = machineTemplate.trim();
+      if (!template) throw new ApiError(400, 'Invalid machine template.');
+      const trails = Array.isArray(layout.trails) ? layout.trails : [];
+      const boxes = Array.isArray(layout.boxes) ? layout.boxes : [];
+      await q(
+        client,
+        `INSERT INTO studio_machine_templates (machine_template, trails, boxes, updated_at)
+         VALUES ($1, $2::jsonb, $3::jsonb, now())
+         ON CONFLICT (machine_template) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes, updated_at = now()`,
+        [template, JSON.stringify(trails), JSON.stringify(boxes)],
+      );
       const cur = await client.query<{ layout_revision: string }>('SELECT layout_revision FROM studio_meta WHERE id = 1 FOR UPDATE');
       const next = Number(cur.rows[0]?.layout_revision ?? 0) + 1;
       await client.query('UPDATE studio_meta SET layout_revision = $1, updated_at = now() WHERE id = 1', [String(next)] as never[]);

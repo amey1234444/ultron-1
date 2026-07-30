@@ -24,21 +24,22 @@ type TemplatePoint = {
   label: string;
   side: 'left' | 'right';
   anchor: ReferencePoint;
-  points: ReferencePoint[];
+  boxEnd: ReferencePoint;
+  bend?: ReferencePoint;
 };
 
 const TEMPLATE_POINTS: TemplatePoint[] = [
-  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'left', anchor: { x: 405, y: 218 }, points: [{ x: 255, y: 124 }, { x: 415, y: 124 }, { x: 455, y: 160 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'left', anchor: { x: 126, y: 357 }, points: [{ x: 255, y: 294 }, { x: 355, y: 294 }, { x: 395, y: 330 }] },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 126, y: 403 }, points: [{ x: 255, y: 464 }, { x: 355, y: 464 }, { x: 395, y: 425 }] },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 405, y: 542 }, points: [{ x: 255, y: 634 }, { x: 410, y: 634 }, { x: 455, y: 600 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 218 }, points: [{ x: 1185, y: 79 }, { x: 1035, y: 79 }, { x: 995, y: 118 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 328 }, points: [{ x: 1185, y: 184 }, { x: 1040, y: 184 }, { x: 1005, y: 220 }] },
-  { code: 'T2', label: 'Process Card CH2', side: 'right', anchor: { x: 840, y: 318 }, points: [{ x: 1185, y: 289 }, { x: 1045, y: 289 }, { x: 1005, y: 330 }] },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'right', anchor: { x: 1165, y: 380 }, points: [{ x: 1185, y: 394 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 432 }, points: [{ x: 1185, y: 499 }, { x: 1045, y: 499 }, { x: 1005, y: 460 }] },
-  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'right', anchor: { x: 700, y: 522 }, points: [{ x: 1185, y: 604 }, { x: 1040, y: 604 }, { x: 1000, y: 565 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 542 }, points: [{ x: 1185, y: 709 }, { x: 1035, y: 709 }, { x: 980, y: 650 }] },
+  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'left', anchor: { x: 405, y: 218 }, boxEnd: { x: 255, y: 124 }, bend: { x: 415, y: 124 } },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'left', anchor: { x: 126, y: 357 }, boxEnd: { x: 255, y: 294 }, bend: { x: 355, y: 294 } },
+  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 126, y: 403 }, boxEnd: { x: 255, y: 464 }, bend: { x: 355, y: 464 } },
+  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 405, y: 542 }, boxEnd: { x: 255, y: 634 }, bend: { x: 410, y: 634 } },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 218 }, boxEnd: { x: 1185, y: 79 }, bend: { x: 1035, y: 79 } },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 328 }, boxEnd: { x: 1185, y: 184 }, bend: { x: 1040, y: 184 } },
+  { code: 'T2', label: 'Process Card CH2', side: 'right', anchor: { x: 840, y: 318 }, boxEnd: { x: 1185, y: 289 }, bend: { x: 1045, y: 289 } },
+  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'right', anchor: { x: 1165, y: 380 }, boxEnd: { x: 1185, y: 394 } },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 432 }, boxEnd: { x: 1185, y: 499 }, bend: { x: 1045, y: 499 } },
+  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'right', anchor: { x: 700, y: 522 }, boxEnd: { x: 1185, y: 604 }, bend: { x: 1040, y: 604 } },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 542 }, boxEnd: { x: 1185, y: 709 }, bend: { x: 1035, y: 709 } },
 ];
 
 function makeId(prefix: string) {
@@ -106,13 +107,13 @@ export function createRavDefaultLayout(_channels: ChannelRef[], machineRect?: Ma
   const boxes: Box[] = [];
 
   for (const templatePoint of TEMPLATE_POINTS) {
-    const referenceBoxEnd = stageFromReference(templatePoint.points[0]);
+    const referenceBoxEnd = stageFromReference(templatePoint.boxEnd);
     const box = boxFromEndpoint(referenceBoxEnd, templatePoint.side, templatePoint.label);
     const boxEnd = boxEndpoint(box, templatePoint.side);
 
     const { x: sx, y: sy } = templatePoint.anchor;
     const machineEnd = svgToStage(sx, sy);
-    const bends = templatePoint.points.slice(1).map(stageFromReference).reverse();
+    const bends = templatePoint.bend ? [stageFromReference(templatePoint.bend)] : [];
 
     boxes.push(box);
     trails.push({

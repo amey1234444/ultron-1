@@ -421,6 +421,14 @@ async function migrate(): Promise<void> {
     );
   `);
   await query(`
+    CREATE TABLE IF NOT EXISTS studio_machine_templates (
+      machine_template TEXT PRIMARY KEY,
+      trails           JSONB NOT NULL DEFAULT '[]'::jsonb,
+      boxes            JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`
     CREATE TABLE IF NOT EXISTS studio_machine_canvas_cards (
       id          TEXT NOT NULL,
       machine_id  TEXT NOT NULL,
