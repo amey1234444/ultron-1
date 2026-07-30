@@ -11,8 +11,6 @@ const REFERENCE_CANVAS_H = 820;
 const REFERENCE_STAGE_SCALE = Math.min(STAGE_W / REFERENCE_CANVAS_W, STAGE_H / REFERENCE_CANVAS_H);
 const REFERENCE_STAGE_X = (STAGE_W - REFERENCE_CANVAS_W * REFERENCE_STAGE_SCALE) / 2;
 const REFERENCE_STAGE_Y = (STAGE_H - REFERENCE_CANVAS_H * REFERENCE_STAGE_SCALE) / 2;
-const REFERENCE_MAPPING_MACHINE = { x: 315, y: 130, width: 800, height: 560 };
-
 const SVG_W = 1200;
 const SVG_H = 760;
 const BOX_CONNECTOR_GAP = 8;
@@ -25,21 +23,22 @@ type TemplatePoint = {
   code: string;
   label: string;
   side: 'left' | 'right';
+  anchor: ReferencePoint;
   points: ReferencePoint[];
 };
 
 const TEMPLATE_POINTS: TemplatePoint[] = [
-  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'left', points: [{ x: 255, y: 124 }, { x: 415, y: 124 }, { x: 455, y: 160 }, { x: 495, y: 230 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'left', points: [{ x: 255, y: 294 }, { x: 355, y: 294 }, { x: 395, y: 330 }, { x: 395, y: 365 }] },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', points: [{ x: 255, y: 464 }, { x: 355, y: 464 }, { x: 395, y: 425 }, { x: 395, y: 400 }] },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', points: [{ x: 255, y: 634 }, { x: 410, y: 634 }, { x: 455, y: 600 }, { x: 495, y: 570 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', points: [{ x: 1185, y: 79 }, { x: 1035, y: 79 }, { x: 995, y: 118 }, { x: 925, y: 230 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', points: [{ x: 1185, y: 184 }, { x: 1040, y: 184 }, { x: 1005, y: 220 }, { x: 965, y: 305 }] },
-  { code: 'T2', label: 'Process Card CH2', side: 'right', points: [{ x: 1185, y: 289 }, { x: 1045, y: 289 }, { x: 1005, y: 330 }, { x: 965, y: 375 }] },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'right', points: [{ x: 1185, y: 394 }, { x: 1090, y: 394 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', points: [{ x: 1185, y: 499 }, { x: 1045, y: 499 }, { x: 1005, y: 460 }, { x: 965, y: 430 }] },
-  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'right', points: [{ x: 1185, y: 604 }, { x: 1040, y: 604 }, { x: 1000, y: 565 }, { x: 965, y: 530 }] },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', points: [{ x: 1185, y: 709 }, { x: 1035, y: 709 }, { x: 980, y: 650 }, { x: 910, y: 565 }] },
+  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'left', anchor: { x: 405, y: 218 }, points: [{ x: 255, y: 124 }, { x: 415, y: 124 }, { x: 455, y: 160 }] },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'left', anchor: { x: 126, y: 357 }, points: [{ x: 255, y: 294 }, { x: 355, y: 294 }, { x: 395, y: 330 }] },
+  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 126, y: 403 }, points: [{ x: 255, y: 464 }, { x: 355, y: 464 }, { x: 395, y: 425 }] },
+  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 405, y: 542 }, points: [{ x: 255, y: 634 }, { x: 410, y: 634 }, { x: 455, y: 600 }] },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 218 }, points: [{ x: 1185, y: 79 }, { x: 1035, y: 79 }, { x: 995, y: 118 }] },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 328 }, points: [{ x: 1185, y: 184 }, { x: 1040, y: 184 }, { x: 1005, y: 220 }] },
+  { code: 'T2', label: 'Process Card CH2', side: 'right', anchor: { x: 840, y: 318 }, points: [{ x: 1185, y: 289 }, { x: 1045, y: 289 }, { x: 1005, y: 330 }] },
+  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'right', anchor: { x: 1165, y: 380 }, points: [{ x: 1185, y: 394 }] },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 432 }, points: [{ x: 1185, y: 499 }, { x: 1045, y: 499 }, { x: 1005, y: 460 }] },
+  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'right', anchor: { x: 700, y: 522 }, points: [{ x: 1185, y: 604 }, { x: 1040, y: 604 }, { x: 1000, y: 565 }] },
+  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 542 }, points: [{ x: 1185, y: 709 }, { x: 1035, y: 709 }, { x: 980, y: 650 }] },
 ];
 
 function makeId(prefix: string) {
@@ -54,13 +53,6 @@ function stageFromReference(point: ReferencePoint) {
   return {
     x: REFERENCE_STAGE_X + point.x * REFERENCE_STAGE_SCALE,
     y: REFERENCE_STAGE_Y + point.y * REFERENCE_STAGE_SCALE,
-  };
-}
-
-function svgPointFromReference(point: ReferencePoint) {
-  return {
-    sx: ((point.x - REFERENCE_MAPPING_MACHINE.x) / REFERENCE_MAPPING_MACHINE.width) * SVG_W,
-    sy: ((point.y - REFERENCE_MAPPING_MACHINE.y) / REFERENCE_MAPPING_MACHINE.height) * SVG_H,
   };
 }
 
@@ -118,10 +110,9 @@ export function createRavDefaultLayout(_channels: ChannelRef[], machineRect?: Ma
     const box = boxFromEndpoint(referenceBoxEnd, templatePoint.side, templatePoint.label);
     const boxEnd = boxEndpoint(box, templatePoint.side);
 
-    const machineReferencePoint = templatePoint.points[templatePoint.points.length - 1];
-    const { sx, sy } = svgPointFromReference(machineReferencePoint);
+    const { x: sx, y: sy } = templatePoint.anchor;
     const machineEnd = svgToStage(sx, sy);
-    const bends = templatePoint.points.slice(1, -1).map(stageFromReference).reverse();
+    const bends = templatePoint.points.slice(1).map(stageFromReference).reverse();
 
     boxes.push(box);
     trails.push({
