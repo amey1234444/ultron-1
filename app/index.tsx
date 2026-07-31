@@ -10,6 +10,7 @@ import { ConfirmDialog } from '../components/studio/ConfirmDialog';
 import { ContextMenu, type ContextMenuState, type ContextMenuTarget } from '../components/studio/ContextMenu';
 import { CreateFolderDialog, type NewFolder } from '../components/studio/CreateFolderDialog';
 import { CreateProjectDialog, type NewProject } from '../components/studio/CreateProjectDialog';
+import { DashboardOverview } from '../components/studio/DashboardOverview';
 import { DeviceDetail } from '../components/studio/DeviceDetail';
 import { DeviceMenu, type DeviceMenuState } from '../components/studio/DeviceMenu';
 import { DevicesTable } from '../components/studio/DevicesTable';
@@ -956,15 +957,18 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               </View>
             )
           ) : selected.kind === 'none' || projects.length === 0 ? (
-            <EmptyState title="NO PROJECT CREATED" description="Create your first project to begin.">
-              {canEditDeleteSchema && (
-                <ActionButton
-                  label="Create Project"
-                  permission={PERMISSIONS.PROJECT_CREATE}
-                  onPress={() => setCreateProjectVisible(true)}
-                />
-              )}
-            </EmptyState>
+            <DashboardOverview
+              projects={projects}
+              folders={folders}
+              machines={machines}
+              devices={devices}
+              cards={visibleCards}
+              live={realMode ? liveState : undefined}
+              realMode={realMode}
+              currentUser={currentUser}
+              onOpenDevices={() => setSelected({ kind: 'devices' })}
+              onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
+            />
           ) : selectedProject ? (
             <HierarchyContents
               title={selectedProject.name}
