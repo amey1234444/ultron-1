@@ -743,7 +743,6 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const selectedMachine = selected.kind === 'machine' ? machines.find((m) => m.id === selected.id) : undefined;
   const editingDevice = editingDeviceId ? (storedDevices.find((d) => d.id === editingDeviceId) ?? devices.find((d) => d.id === editingDeviceId)) : null;
   const deleteDeviceInfo = deleteDeviceId ? (storedDevices.find((d) => d.id === deleteDeviceId) ?? devices.find((d) => d.id === deleteDeviceId)) : null;
-  const topBarProjectName = selectedProject?.name ?? (selectedFolder ? projects.find((p) => p.id === selectedFolder.projectId)?.name : undefined);
   const detailTopClearance = leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'machine' || selected.kind === 'device') ? 44 : 0;
 
   const renameCurrentName =
@@ -780,7 +779,6 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   return (
     <SafeAreaView className={cn('flex-1', isDark ? 'bg-surface-dark' : 'bg-surface-light')} edges={['top', 'bottom']}>
       <TopBar
-        projectName={topBarProjectName}
         devices={devices}
         canConfigure={hasConfigureAccess}
         configureMode={configureMode}

@@ -20,7 +20,7 @@ type SignupResult = { pending: boolean; message: string };
 type AuthState = {
   user: PublicUser | null;
   loading: boolean;
-  login: (username: string, password: string, captchaToken: string, captchaAnswer: string) => Promise<void>;
+  login: (username: string, password: string) => Promise<void>;
   signup: (input: SignupInput) => Promise<SignupResult>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
@@ -58,10 +58,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => clearInterval(id);
   }, [user]);
 
-  const login = useCallback(async (username: string, password: string, captchaToken: string, captchaAnswer: string) => {
+  const login = useCallback(async (username: string, password: string) => {
     const res = await apiFetch('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username, password, captchaToken, captchaAnswer }),
+      body: JSON.stringify({ username, password }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Login failed.');

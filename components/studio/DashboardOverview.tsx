@@ -86,9 +86,9 @@ function toneColor(tone: Tone) {
   }
 }
 
-function Sparkline({ values, color = '#16a34a', bars = false }: { values: readonly number[]; color?: string; bars?: boolean }) {
-  const width = 78;
-  const height = 28;
+function Sparkline({ values, color = '#16a34a', bars = false, compact = false }: { values: readonly number[]; color?: string; bars?: boolean; compact?: boolean }) {
+  const width = compact ? 56 : 78;
+  const height = compact ? 18 : 28;
   const min = Math.min(...values);
   const max = Math.max(...values);
   const spread = Math.max(1, max - min);
@@ -129,6 +129,7 @@ function KpiCard({
   tone,
   spark,
   bars,
+  compact = false,
 }: {
   icon: IconName;
   label: string;
@@ -139,33 +140,34 @@ function KpiCard({
   tone: Tone;
   spark: number[];
   bars?: boolean;
+  compact?: boolean;
 }) {
   const { isDark } = useAppTheme();
   const color = toneColor(tone);
   return (
-    <View className={cn('min-w-[145px] flex-1 rounded-lg border p-2', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-      <View className="flex-row items-start gap-3">
-        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}16` }}>
-          <MaterialCommunityIcons name={icon} size={18} color={color} />
+    <View className={cn(compact ? 'min-w-[132px] flex-1 rounded-lg border p-2' : 'min-w-[145px] flex-1 rounded-lg border p-2', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+      <View className={cn('flex-row items-start', compact ? 'gap-2' : 'gap-3')}>
+        <View className={cn(compact ? 'h-7 w-7' : 'h-8 w-8', 'items-center justify-center rounded-lg')} style={{ backgroundColor: `${color}16` }}>
+          <MaterialCommunityIcons name={icon} size={compact ? 16 : 18} color={color} />
         </View>
         <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className={cn('font-body-bold text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+          <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
             {label}
           </Text>
-          <View className="mt-1 flex-row items-end gap-1">
-            <Text className={cn('font-display text-xl', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
-            {unit && <Text className={cn('pb-1 font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>}
+          <View className={cn('flex-row items-end gap-1', compact ? 'mt-0.5' : 'mt-1')}>
+            <Text className={cn('font-display', compact ? 'text-lg' : 'text-xl', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
+            {unit && <Text className={cn('pb-0.5 font-body-medium', compact ? 'text-[10px]' : 'text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>}
           </View>
-          <Text numberOfLines={1} className={cn('font-body text-[11px]', color === '#dc2626' ? 'text-status-danger' : 'text-status-success')}>
+          <Text numberOfLines={1} className={cn('font-body', compact ? 'text-[9px]' : 'text-[11px]', color === '#dc2626' ? 'text-status-danger' : 'text-status-success')}>
             {delta}
           </Text>
         </View>
       </View>
-      <View className="mt-2 flex-row items-end justify-between">
-        <Text numberOfLines={1} className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+      <View className={cn('flex-row items-end justify-between', compact ? 'mt-0.5' : 'mt-2')}>
+        <Text numberOfLines={1} className={cn('font-body', compact ? 'max-w-[58px] text-[9px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
           {detail}
         </Text>
-        <Sparkline values={spark} color={color} bars={bars} />
+        <Sparkline values={spark} color={color} bars={bars} compact={compact} />
       </View>
     </View>
   );
@@ -175,15 +177,15 @@ function sectionClass(isDark: boolean) {
   return cn('rounded-lg border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white');
 }
 
-function SectionHeader({ icon, title, action }: { icon?: IconName; title: string; action?: string }) {
+function SectionHeader({ icon, title, action, compact = false }: { icon?: IconName; title: string; action?: string; compact?: boolean }) {
   const { isDark } = useAppTheme();
   return (
-    <View className={cn('flex-row items-center justify-between border-b px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
+    <View className={cn('flex-row items-center justify-between border-b', compact ? 'px-3 py-2' : 'px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
       <View className="flex-row items-center gap-2">
-        {icon && <MaterialCommunityIcons name={icon} size={16} color={isDark ? '#F5F5F5' : '#111827'} />}
-        <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
+        {icon && <MaterialCommunityIcons name={icon} size={compact ? 14 : 16} color={isDark ? '#F5F5F5' : '#111827'} />}
+        <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-xs' : 'text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
       </View>
-      {action && <Text className="font-body-medium text-[11px] text-primary-blue">{action}</Text>}
+      {action && <Text numberOfLines={1} className={cn('font-body-medium text-primary-blue', compact ? 'text-[10px]' : 'text-[11px]')}>{action}</Text>}
     </View>
   );
 }
@@ -201,10 +203,11 @@ function arcPath(cx: number, cy: number, radius: number, startAngle: number, end
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
 }
 
-function HealthGauge({ score }: { score: number }) {
+function HealthGauge({ score, compact = false }: { score: number; compact?: boolean }) {
   const valueAngle = -180 + clamp(score, 0, 100) * 1.8;
+  const height = compact ? 106 : 170;
   return (
-    <Svg width="100%" height={170} viewBox="0 0 240 170">
+    <Svg width="100%" height={height} viewBox="0 0 240 170">
       <Path d={arcPath(120, 132, 92, -180, 0)} fill="none" stroke="#e5e7eb" strokeWidth={16} strokeLinecap="round" />
       <Path d={arcPath(120, 132, 92, -180, valueAngle)} fill="none" stroke="#16a34a" strokeWidth={16} strokeLinecap="round" />
       <Path d={arcPath(120, 132, 92, -16, 0)} fill="none" stroke="#ef4444" strokeWidth={16} strokeLinecap="round" />
@@ -222,7 +225,7 @@ function HealthGauge({ score }: { score: number }) {
   );
 }
 
-function HealthAnalysis({ score, updatedAt }: { score: number; updatedAt: string }) {
+function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; updatedAt: string; compact?: boolean }) {
   const { isDark } = useAppTheme();
   const contributors = ['Boiler Feed Pump-02', 'Compressor-03', 'Cooling Tower-01'];
   const metrics = [
@@ -234,29 +237,29 @@ function HealthAnalysis({ score, updatedAt }: { score: number; updatedAt: string
 
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[260px] flex-[0.7]')}>
-      <SectionHeader icon="heart-pulse" title="Overall Health" />
-      <View className="px-4 pb-4 pt-2">
-        <HealthGauge score={score} />
-        <View className="gap-2">
+      <SectionHeader icon="heart-pulse" title="Overall Health" compact={compact} />
+      <View className={compact ? 'px-3 pb-2 pt-1' : 'px-4 pb-4 pt-2'}>
+        <HealthGauge score={score} compact={compact} />
+        <View className={compact ? 'gap-1.5' : 'gap-2'}>
           {metrics.map(([label, value]) => (
             <View key={label}>
-              <View className="mb-1 flex-row justify-between">
-                <Text className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
-                <Text className={cn('font-mono text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{value}%</Text>
+              <View className="mb-0.5 flex-row justify-between">
+                <Text className={cn('font-body-medium', compact ? 'text-[9px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
+                <Text className={cn('font-mono', compact ? 'text-[9px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{value}%</Text>
               </View>
-              <View className={cn('h-1.5 rounded-full', isDark ? 'bg-white/10' : 'bg-slate-100')}>
-                <View className="h-1.5 rounded-full bg-status-success" style={{ width: `${value}%` }} />
+              <View className={cn(compact ? 'h-1' : 'h-1.5', 'rounded-full', isDark ? 'bg-white/10' : 'bg-slate-100')}>
+                <View className={cn(compact ? 'h-1' : 'h-1.5', 'rounded-full bg-status-success')} style={{ width: `${value}%` }} />
               </View>
             </View>
           ))}
         </View>
-        <View className={cn('mt-3 rounded-md px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')}>
+        {!compact && <View className={cn('mt-3 rounded-md px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')}>
           <Text className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Reduced by</Text>
           <Text className={cn('mt-1 font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
             {contributors.join(', ')}
           </Text>
           <Text className={cn('mt-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Calculated {updatedAt}</Text>
-        </View>
+        </View>}
       </View>
     </View>
   );
@@ -307,14 +310,13 @@ function TrendLine({
   );
 }
 
-function StackedBars() {
+function StackedBars({ height = 170 }: { height?: number } = {}) {
   const days = ['May 18', 'May 19', 'May 20', 'May 21', 'May 22', 'May 23', 'May 24'];
   const critical = [10, 11, 18, 15, 20, 13, 16];
   const warning = [22, 29, 34, 27, 31, 36, 30];
   const info = [14, 18, 16, 12, 20, 15, 18];
-  const height = 170;
   const width = 520;
-  const baseY = 136;
+  const baseY = height - 34;
   const max = 80;
   const barW = 28;
   return (
@@ -332,7 +334,7 @@ function StackedBars() {
             <Rect x={x} y={baseY - cH} width={barW} height={cH} fill="#ef4444" />
             <Rect x={x} y={baseY - cH - wH} width={barW} height={wH} fill="#f59e0b" />
             <Rect x={x} y={baseY - cH - wH - iH} width={barW} height={iH} fill="#2f80ed" />
-            <SvgText x={x - 8} y={156} fontSize={10} fill="#64748b">
+            <SvgText x={x - 8} y={height - 12} fontSize={10} fill="#64748b">
               {day.slice(4)}
             </SvgText>
           </G>
@@ -342,8 +344,9 @@ function StackedBars() {
   );
 }
 
-function DonutChart({ total }: { total: number }) {
-  const radius = 46;
+function DonutChart({ total, size = 150 }: { total: number; size?: number }) {
+  const scale = size / 150;
+  const radius = 46 * scale;
   const circumference = 2 * Math.PI * radius;
   const segments = [
     { label: 'Critical', value: 10, color: '#ef4444' },
@@ -353,32 +356,32 @@ function DonutChart({ total }: { total: number }) {
   ];
   let offset = 0;
   return (
-    <Svg width={150} height={150} viewBox="0 0 150 150">
-      <Circle cx={75} cy={75} r={radius} stroke="#e5e7eb" strokeWidth={18} fill="none" />
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <Circle cx={size / 2} cy={size / 2} r={radius} stroke="#e5e7eb" strokeWidth={18 * scale} fill="none" />
       {segments.map((segment) => {
         const length = (segment.value / total) * circumference;
         const item = (
           <Circle
             key={segment.label}
-            cx={75}
-            cy={75}
+            cx={size / 2}
+            cy={size / 2}
             r={radius}
             stroke={segment.color}
-            strokeWidth={18}
+            strokeWidth={18 * scale}
             fill="none"
             strokeDasharray={`${length} ${circumference - length}`}
             strokeDashoffset={-offset}
             strokeLinecap="butt"
-            transform="rotate(-90 75 75)"
+            transform={`rotate(-90 ${size / 2} ${size / 2})`}
           />
         );
         offset += length;
         return item;
       })}
-      <SvgText x={75} y={72} textAnchor="middle" fontSize={22} fontWeight="700" fill="#111827">
+      <SvgText x={size / 2} y={size / 2 - 3} textAnchor="middle" fontSize={22 * scale} fontWeight="700" fill="#111827">
         {total}
       </SvgText>
-      <SvgText x={75} y={91} textAnchor="middle" fontSize={12} fill="#64748b">
+      <SvgText x={size / 2} y={size / 2 + 16 * scale} textAnchor="middle" fontSize={12 * scale} fill="#64748b">
         Total
       </SvgText>
     </Svg>
@@ -397,12 +400,12 @@ function PlantMapPanel({ compact = false }: { compact?: boolean } = {}) {
   ] as const;
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[560px] flex-[1.35]')}>
-      <View className={cn('flex-row items-center justify-between border-b px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
+      <View className={cn('flex-row items-center justify-between border-b', compact ? 'px-3 py-2' : 'px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
         <View>
-          <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Plant Overview</Text>
-          <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Location markers use saved map coordinates when configured</Text>
+          <Text className={cn('font-body-bold', compact ? 'text-xs' : 'text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Plant Overview</Text>
+          <Text numberOfLines={1} className={cn('font-body', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Location markers use saved map coordinates when configured</Text>
         </View>
-        <View className="flex-row gap-4">
+        <View className={cn('flex-row', compact ? 'gap-2' : 'gap-4')}>
           {(['healthy', 'warning', 'critical', 'offline'] as const).map((status) => (
             <View key={status} className="flex-row items-center gap-1">
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: STATUS_COLORS[status] }} />
@@ -413,7 +416,7 @@ function PlantMapPanel({ compact = false }: { compact?: boolean } = {}) {
       </View>
       <View
         className={cn('relative overflow-hidden px-3 py-2', isDark ? 'bg-slate-950' : 'bg-[#f7fbff]')}
-        style={{ height: compact ? 260 : 350 }}
+        style={{ height: compact ? 230 : 350 }}
       >
         <Svg width="100%" height="100%" viewBox="0 0 640 330" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
           <Rect x={0} y={0} width={640} height={330} fill={isDark ? '#07111f' : '#f7fbff'} />
@@ -430,10 +433,10 @@ function PlantMapPanel({ compact = false }: { compact?: boolean } = {}) {
           resizeMode="contain"
           style={{
             position: 'absolute',
-            left: compact ? 56 : 46,
-            right: compact ? 20 : 24,
-            top: compact ? 18 : 24,
-            bottom: compact ? 0 : 8,
+            left: compact ? 48 : 46,
+            right: compact ? 18 : 24,
+            top: compact ? 10 : 24,
+            bottom: compact ? -8 : 8,
             opacity: isDark ? 0.86 : 0.98,
           }}
         />
@@ -447,22 +450,22 @@ function PlantMapPanel({ compact = false }: { compact?: boolean } = {}) {
                 <Line x1={area.x} y1={area.y} x2={labelX + 68} y2={labelY + 34} stroke={color} strokeWidth={2.25} />
                 <Circle cx={area.x} cy={area.y} r={11} fill={`${color}22`} stroke={color} strokeWidth={2} />
                 <Circle cx={area.x} cy={area.y} r={5} fill={color} stroke="#ffffff" strokeWidth={2} />
-                <Rect x={labelX} y={labelY} width={134} height={54} rx={7} fill="#ffffff" opacity={0.94} stroke="#dbe3ec" />
-                <SvgText x={labelX + 12} y={labelY + 20} fontSize={11} fontWeight="700" fill="#111827">
+                <Rect x={labelX} y={labelY} width={compact ? 120 : 134} height={compact ? 42 : 54} rx={7} fill="#ffffff" opacity={0.94} stroke="#dbe3ec" />
+                <SvgText x={labelX + 10} y={labelY + 17} fontSize={compact ? 9 : 11} fontWeight="700" fill="#111827">
                   {area.name}
                 </SvgText>
-                <Circle cx={labelX + 13} cy={labelY + 35} r={4} fill={color} />
-                <SvgText x={labelX + 24} y={labelY + 39} fontSize={10} fill="#334155">
+                <Circle cx={labelX + 11} cy={labelY + (compact ? 29 : 35)} r={3.5} fill={color} />
+                <SvgText x={labelX + 21} y={labelY + (compact ? 32 : 39)} fontSize={compact ? 8 : 10} fill="#334155">
                   {area.status === 'healthy' ? 'Healthy' : 'Warning'} - {area.count} machines
                 </SvgText>
               </G>
             );
           })}
         </Svg>
-        <View className="absolute left-5 top-16 gap-2">
+        <View className={cn('absolute gap-1.5', compact ? 'left-3 top-12' : 'left-5 top-16')}>
           {['target', 'plus', 'minus', 'crosshairs-gps'].map((icon) => (
-            <Pressable key={icon} className={cn('h-8 w-8 items-center justify-center rounded-md border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-              <MaterialCommunityIcons name={icon as IconName} size={16} color={isDark ? '#F5F5F5' : '#111827'} />
+            <Pressable key={icon} className={cn(compact ? 'h-7 w-7' : 'h-8 w-8', 'items-center justify-center rounded-md border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+              <MaterialCommunityIcons name={icon as IconName} size={compact ? 14 : 16} color={isDark ? '#F5F5F5' : '#111827'} />
             </Pressable>
           ))}
         </View>
@@ -471,7 +474,7 @@ function PlantMapPanel({ compact = false }: { compact?: boolean } = {}) {
   );
 }
 
-function LiveAlarmFeed() {
+function LiveAlarmFeed({ compact = false }: { compact?: boolean } = {}) {
   const { isDark } = useAppTheme();
   const alarms = [
     ['Critical', 'High vibration detected', 'Compressor-03', 'Compressor Area', 'V1', '10:24:12 AM', '12.8 mm/s', '> 10.0', 'Ack', 'R. Singh', '12m'],
@@ -482,39 +485,39 @@ function LiveAlarmFeed() {
   ];
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[440px] flex-1')}>
-      <SectionHeader icon="bell-alert-outline" title="Live Alarm Feed" action="View all alarms" />
-      <View className="px-3 py-2">
-        <View className="mb-2 flex-row items-center gap-2">
+      <SectionHeader icon="bell-alert-outline" title="Live Alarm Feed" action="View all alarms" compact={compact} />
+      <View className={compact ? 'px-2 py-1.5' : 'px-3 py-2'}>
+        <View className={cn('flex-row items-center gap-2', compact ? 'mb-1' : 'mb-2')}>
           {['Severity', 'Area', 'Source', 'Ack', 'History'].map((filter) => (
-            <Pressable key={filter} className={cn('rounded-full border px-2.5 py-1', isDark ? 'border-line-dark' : 'border-line-light')}>
-              <Text className={cn('font-body-medium text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{filter}</Text>
+            <Pressable key={filter} className={cn('rounded-full border', compact ? 'px-2 py-0.5' : 'px-2.5 py-1', isDark ? 'border-line-dark' : 'border-line-light')}>
+              <Text className={cn('font-body-medium', compact ? 'text-[9px]' : 'text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{filter}</Text>
             </Pressable>
           ))}
         </View>
         <View className={cn('rounded-md border', isDark ? 'border-line-dark' : 'border-line-light')}>
-          {alarms.map((alarm, index) => {
+          {alarms.slice(0, compact ? 4 : alarms.length).map((alarm, index) => {
             const severity = alarm[0];
             const color = severity === 'Critical' ? '#ef4444' : severity === 'Warning' ? '#f59e0b' : '#2f80ed';
             return (
-              <View key={`${alarm[1]}-${index}`} className={cn('flex-row items-center gap-2 border-b px-2 py-2 last:border-b-0', isDark ? 'border-line-dark' : 'border-line-light')}>
-                <Text className="w-14 rounded px-1.5 py-1 text-center font-body-bold text-[10px]" style={{ color, backgroundColor: `${color}16` }}>
+              <View key={`${alarm[1]}-${index}`} className={cn('flex-row items-center border-b last:border-b-0', compact ? 'gap-1 px-2 py-1' : 'gap-2 px-2 py-2', isDark ? 'border-line-dark' : 'border-line-light')}>
+                <Text className={cn('rounded px-1.5 text-center font-body-bold', compact ? 'w-12 py-0.5 text-[9px]' : 'w-14 py-1 text-[10px]')} style={{ color, backgroundColor: `${color}16` }}>
                   {severity}
                 </Text>
                 <View className="min-w-0 flex-[1.4]">
-                  <Text numberOfLines={1} className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[1]}</Text>
-                  <Text numberOfLines={1} className={cn('font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[2]} - {alarm[3]}</Text>
+                  <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[1]}</Text>
+                  {!compact && <Text numberOfLines={1} className={cn('font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[2]} - {alarm[3]}</Text>}
                 </View>
-                <Text className={cn('w-8 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[4]}</Text>
-                <Text className={cn('w-16 font-mono text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[6]}</Text>
-                <Text className={cn('w-14 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[7]}</Text>
-                <Text className={cn('w-20 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[5]}</Text>
-                <Text className={cn('w-14 font-body-medium text-[10px]', alarm[8] === 'Ack' ? 'text-status-success' : 'text-status-warning')}>{alarm[8]}</Text>
-                <Text numberOfLines={1} className={cn('w-16 font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[9]}</Text>
-                <Text className={cn('w-10 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[10]}</Text>
+                <Text className={cn(compact ? 'w-8 text-[9px]' : 'w-8 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[4]}</Text>
+                <Text className={cn(compact ? 'w-11 text-[9px]' : 'w-16 text-[10px]', 'font-mono', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[6]}</Text>
+                {!compact && <Text className={cn('w-14 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[7]}</Text>}
+                <Text className={cn(compact ? 'w-11 text-[9px]' : 'w-20 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[5]}</Text>
+                <Text className={cn(compact ? 'w-9 text-[9px]' : 'w-14 text-[10px]', 'font-body-medium', alarm[8] === 'Ack' ? 'text-status-success' : 'text-status-warning')}>{alarm[8]}</Text>
+                {!compact && <Text numberOfLines={1} className={cn('w-16 font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[9]}</Text>}
+                <Text className={cn(compact ? 'w-8 text-[9px]' : 'w-10 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[10]}</Text>
                 <View className="flex-row gap-1">
                   {['check', 'comment-text-outline', 'account-arrow-right-outline', 'clock-outline', 'chart-line'].map((icon) => (
-                    <Pressable key={icon} className={cn('h-6 w-6 items-center justify-center rounded border', isDark ? 'border-line-dark' : 'border-line-light')}>
-                      <MaterialCommunityIcons name={icon as IconName} size={13} color={isDark ? '#F5F5F5' : '#111827'} />
+                    <Pressable key={icon} className={cn(compact ? 'h-5 w-5' : 'h-6 w-6', 'items-center justify-center rounded border', isDark ? 'border-line-dark' : 'border-line-light')}>
+                      <MaterialCommunityIcons name={icon as IconName} size={compact ? 11 : 13} color={isDark ? '#F5F5F5' : '#111827'} />
                     </Pressable>
                   ))}
                 </View>
@@ -527,7 +530,7 @@ function LiveAlarmFeed() {
   );
 }
 
-function SystemStatus({ connectedGateways, totalGateways }: { connectedGateways: number; totalGateways: number }) {
+function SystemStatus({ connectedGateways, totalGateways, compact = false }: { connectedGateways: number; totalGateways: number; compact?: boolean }) {
   const { isDark } = useAppTheme();
   const services = [
     ['MQTT Broker', 'healthy'],
@@ -542,16 +545,16 @@ function SystemStatus({ connectedGateways, totalGateways }: { connectedGateways:
   ];
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[300px] flex-1')}>
-      <SectionHeader icon="server-network" title="System Status" action="View all" />
-      <View className="flex-row flex-wrap gap-2 p-3">
-        {services.map(([service, status]) => {
+      <SectionHeader icon="server-network" title="System Status" action="View all" compact={compact} />
+      <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
+        {services.slice(0, compact ? 4 : services.length).map(([service, status]) => {
           const color = status === 'healthy' ? '#16a34a' : status === 'degraded' ? '#f59e0b' : '#ef4444';
           return (
-            <View key={service} className={cn('min-w-[210px] flex-1 flex-row items-center justify-between rounded-md px-2 py-1.5', isDark ? 'bg-white/5' : 'bg-slate-50')}>
-              <Text numberOfLines={1} className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{service}</Text>
+            <View key={service} className={cn(compact ? 'min-w-[150px] px-2 py-1' : 'min-w-[210px] px-2 py-1.5', 'flex-1 flex-row items-center justify-between rounded-md', isDark ? 'bg-white/5' : 'bg-slate-50')}>
+              <Text numberOfLines={1} className={cn('font-body-medium', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{service}</Text>
               <View className="flex-row items-center gap-1">
                 <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
-                <Text className={cn('font-body-medium text-[10px]', status === 'healthy' ? 'text-status-success' : 'text-status-warning')}>{status}</Text>
+                <Text className={cn('font-body-medium', compact ? 'text-[9px]' : 'text-[10px]', status === 'healthy' ? 'text-status-success' : 'text-status-warning')}>{status}</Text>
               </View>
             </View>
           );
@@ -561,7 +564,7 @@ function SystemStatus({ connectedGateways, totalGateways }: { connectedGateways:
   );
 }
 
-function TelemetrySnapshot({ activeChannels, configuredChannels, lastUpdate }: { activeChannels: number; configuredChannels: number; lastUpdate: string }) {
+function TelemetrySnapshot({ activeChannels, configuredChannels, lastUpdate, compact = false }: { activeChannels: number; configuredChannels: number; lastUpdate: string; compact?: boolean }) {
   const { isDark } = useAppTheme();
   const snapshots = [
     ['Packet Rate', '2,845', 'pkt/s', SPARK_BLUE],
@@ -571,16 +574,16 @@ function TelemetrySnapshot({ activeChannels, configuredChannels, lastUpdate }: {
   ] as const;
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[360px] flex-1')}>
-      <SectionHeader icon="pulse" title="Live Telemetry Snapshot" />
-      <View className="flex-row flex-wrap gap-2 p-3">
+      <SectionHeader icon="pulse" title="Live Telemetry Snapshot" compact={compact} />
+      <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {snapshots.map(([label, value, unit, spark]) => (
-          <View key={label} className={cn('min-w-[150px] flex-1 rounded-md px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')}>
-            <Text className={cn('font-body-medium text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{label}</Text>
-            <View className="mt-1 flex-row items-end gap-1">
-              <Text className={cn('font-display text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
-              <Text className={cn('pb-1 font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>
+          <View key={label} className={cn(compact ? 'min-w-[118px] px-2 py-1.5' : 'min-w-[150px] px-3 py-2', 'flex-1 rounded-md', isDark ? 'bg-white/5' : 'bg-slate-50')}>
+            <Text className={cn('font-body-medium', compact ? 'text-[9px]' : 'text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{label}</Text>
+            <View className={cn('flex-row items-end gap-1', compact ? 'mt-0.5' : 'mt-1')}>
+              <Text className={cn('font-display', compact ? 'text-sm' : 'text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
+              <Text className={cn('pb-0.5 font-body', compact ? 'text-[9px]' : 'text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>
             </View>
-            <Sparkline values={spark} color="#2563eb" />
+            {!compact && <Sparkline values={spark} color="#2563eb" />}
           </View>
         ))}
       </View>
@@ -588,17 +591,17 @@ function TelemetrySnapshot({ activeChannels, configuredChannels, lastUpdate }: {
   );
 }
 
-function ChartCard({ title, action, children }: { title: string; action?: string; children: ReactNode }) {
+function ChartCard({ title, action, children, compact = false }: { title: string; action?: string; children: ReactNode; compact?: boolean }) {
   const { isDark } = useAppTheme();
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[310px] flex-1')}>
-      <SectionHeader title={title} action={action ?? 'Last 7 Days'} />
-      <View className="p-3">{children}</View>
+      <SectionHeader title={title} action={action ?? 'Last 7 Days'} compact={compact} />
+      <View className={compact ? 'p-2' : 'p-3'}>{children}</View>
     </View>
   );
 }
 
-function MachinesAttention({ machines, onOpenMachine }: { machines: MachineNode[]; onOpenMachine: (id: string) => void }) {
+function MachinesAttention({ machines, onOpenMachine, compact = false }: { machines: MachineNode[]; onOpenMachine: (id: string) => void; compact?: boolean }) {
   const { isDark } = useAppTheme();
   const fallbackMachineId = machines[0]?.id;
   const rows = [
@@ -610,33 +613,35 @@ function MachinesAttention({ machines, onOpenMachine }: { machines: MachineNode[
   ];
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[620px] flex-[1.25]')}>
-      <SectionHeader icon="alert-decagram-outline" title="Machines Requiring Attention" />
-      <View className="px-3 py-2">
+      <SectionHeader icon="alert-decagram-outline" title="Machines Requiring Attention" compact={compact} />
+      <View className={compact ? 'px-2 py-1.5' : 'px-3 py-2'}>
         <View className="flex-row px-2 py-1">
-          {['Machine', 'Area', 'Health', 'Issue', 'Alarms', 'Last Alarm', 'Telemetry', 'Risk', 'Owner', 'Action'].map((heading, index) => (
-            <Text key={heading} className={cn('font-body-bold text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted', index < 2 ? 'flex-[1.1]' : index === 3 ? 'flex-[1.2]' : 'flex-1')}>
+          {(compact ? ['Machine', 'Area', 'Health', 'Issue', 'Alarms', 'Action'] : ['Machine', 'Area', 'Health', 'Issue', 'Alarms', 'Last Alarm', 'Telemetry', 'Risk', 'Owner', 'Action']).map((heading, index) => (
+            <Text key={heading} className={cn('font-body-bold', compact ? 'text-[9px]' : 'text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted', index < 2 ? 'flex-[1.1]' : index === 3 ? 'flex-[1.2]' : 'flex-1')}>
               {heading}
             </Text>
           ))}
         </View>
-        {rows.map((row, index) => {
+        {rows.slice(0, compact ? 3 : rows.length).map((row, index) => {
           const health = Number(row[2]);
           const riskColor = row[7] === 'High' ? '#ef4444' : row[7] === 'Medium' ? '#f59e0b' : '#16a34a';
           return (
-            <View key={row[0]} className={cn('flex-row items-center rounded-md px-2 py-2', index % 2 === 0 && (isDark ? 'bg-white/5' : 'bg-slate-50'))}>
-              <Text className={cn('flex-[1.1] font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row[0]}</Text>
-              <Text className={cn('flex-[1.1] font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[1]}</Text>
-              <Text className="flex-1 rounded px-2 py-1 text-center font-body-bold text-[10px]" style={{ color: health < 50 ? '#ef4444' : health < 75 ? '#f59e0b' : '#16a34a', backgroundColor: health < 50 ? '#fee2e2' : health < 75 ? '#fef3c7' : '#dcfce7' }}>
+            <View key={row[0]} className={cn('flex-row items-center rounded-md px-2', compact ? 'py-1' : 'py-2', index % 2 === 0 && (isDark ? 'bg-white/5' : 'bg-slate-50'))}>
+              <Text numberOfLines={compact ? 1 : undefined} className={cn('flex-[1.1] font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row[0]}</Text>
+              <Text numberOfLines={compact ? 1 : undefined} className={cn('flex-[1.1] font-body', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[1]}</Text>
+              <Text className={cn('flex-1 rounded px-2 text-center font-body-bold', compact ? 'py-0.5 text-[9px]' : 'py-1 text-[10px]')} style={{ color: health < 50 ? '#ef4444' : health < 75 ? '#f59e0b' : '#16a34a', backgroundColor: health < 50 ? '#fee2e2' : health < 75 ? '#fef3c7' : '#dcfce7' }}>
                 {row[2]}
               </Text>
-              <Text className={cn('flex-[1.2] font-body text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row[3]}</Text>
-              <Text className="flex-1 font-mono text-[11px] text-status-danger">{row[4]}</Text>
-              <Text className={cn('flex-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[5]}</Text>
-              <Text className={cn('flex-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[6]}</Text>
-              <Text className="flex-1 font-body-bold text-[10px]" style={{ color: riskColor }}>{row[7]}</Text>
-              <Text className={cn('flex-1 font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[8]}</Text>
+              <Text numberOfLines={1} className={cn('flex-[1.2] font-body', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row[3]}</Text>
+              <Text className={cn('flex-1 font-mono text-status-danger', compact ? 'text-[10px]' : 'text-[11px]')}>{row[4]}</Text>
+              {!compact && <>
+                <Text className={cn('flex-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[5]}</Text>
+                <Text className={cn('flex-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[6]}</Text>
+                <Text className="flex-1 font-body-bold text-[10px]" style={{ color: riskColor }}>{row[7]}</Text>
+                <Text className={cn('flex-1 font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row[8]}</Text>
+              </>}
               <Pressable disabled={!fallbackMachineId} onPress={() => fallbackMachineId && onOpenMachine(fallbackMachineId)} className="flex-1 rounded-md bg-primary-blue/10 px-2 py-1">
-                <Text className="text-center font-body-bold text-[10px] text-primary-blue">View Details</Text>
+                <Text className={cn('text-center font-body-bold text-primary-blue', compact ? 'text-[9px]' : 'text-[10px]')}>View Details</Text>
               </Pressable>
             </View>
           );
@@ -646,7 +651,7 @@ function MachinesAttention({ machines, onOpenMachine }: { machines: MachineNode[
   );
 }
 
-function InsightsPanel() {
+function InsightsPanel({ compact = false }: { compact?: boolean } = {}) {
   const { isDark } = useAppTheme();
   const insights = [
     ['Compressor-03', 'Unbalanced motor detected', 'Check bearing condition', 'V1 12.8 mm/s, T2 82 C', '92%', 'High'],
@@ -656,27 +661,27 @@ function InsightsPanel() {
   ];
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[420px] flex-1')}>
-      <SectionHeader icon="lightbulb-on-outline" title="Insights and Recommended Actions" action="View all" />
-      <View className="gap-2 p-3">
-        {insights.map((item) => {
+      <SectionHeader icon="lightbulb-on-outline" title="Insights and Recommended Actions" action="View all" compact={compact} />
+      <View className={cn(compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
+        {insights.slice(0, compact ? 2 : insights.length).map((item) => {
           const color = item[5] === 'High' ? '#ef4444' : item[5] === 'Medium' ? '#f59e0b' : '#16a34a';
           return (
-            <View key={`${item[0]}-${item[1]}`} className={cn('rounded-md border-l-4 px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')} style={{ borderLeftColor: color }}>
+            <View key={`${item[0]}-${item[1]}`} className={cn('rounded-md border-l-4', compact ? 'px-2 py-1.5' : 'px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')} style={{ borderLeftColor: color }}>
               <View className="flex-row items-start justify-between gap-2">
                 <View className="min-w-0 flex-1">
-                  <Text numberOfLines={1} className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{item[0]}: {item[1]}</Text>
-                  <Text numberOfLines={1} className={cn('mt-0.5 font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Probable cause: process drift. Recommended: {item[2]}</Text>
-                  <Text numberOfLines={1} className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{item[3]} - Confidence {item[4]}</Text>
+                  <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{item[0]}: {item[1]}</Text>
+                  <Text numberOfLines={1} className={cn('mt-0.5 font-body', compact ? 'text-[9px]' : 'text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Probable cause: process drift. Recommended: {item[2]}</Text>
+                  {!compact && <Text numberOfLines={1} className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{item[3]} - Confidence {item[4]}</Text>}
                 </View>
-                <Text className="rounded px-2 py-1 font-body-bold text-[10px]" style={{ color, backgroundColor: `${color}16` }}>{item[5]}</Text>
+                <Text className={cn('rounded px-2 font-body-bold', compact ? 'py-0.5 text-[9px]' : 'py-1 text-[10px]')} style={{ color, backgroundColor: `${color}16` }}>{item[5]}</Text>
               </View>
-              <View className="mt-2 flex-row gap-2">
+              {!compact && <View className="mt-2 flex-row gap-2">
                 {['Create WO', 'Assign', 'Accept', 'Dismiss'].map((action) => (
                   <Pressable key={action} className={cn('rounded-md border px-2 py-1', isDark ? 'border-line-dark' : 'border-line-light')}>
                     <Text className={cn('font-body-medium text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{action}</Text>
                   </Pressable>
                 ))}
-              </View>
+              </View>}
             </View>
           );
         })}
@@ -685,7 +690,7 @@ function InsightsPanel() {
   );
 }
 
-function QuickActions({ onOpenDevices, onOpenCanvas }: { onOpenDevices: () => void; onOpenCanvas: () => void }) {
+function QuickActions({ onOpenDevices, onOpenCanvas, compact = false }: { onOpenDevices: () => void; onOpenCanvas: () => void; compact?: boolean }) {
   const { isDark } = useAppTheme();
   const actions = [
     ['bell-alert-outline', 'View Critical Alarms'],
@@ -697,12 +702,12 @@ function QuickActions({ onOpenDevices, onOpenCanvas }: { onOpenDevices: () => vo
   ] as const;
   return (
     <View className={cn(sectionClass(isDark), 'min-w-[420px] flex-1')}>
-      <SectionHeader icon="cursor-default-click-outline" title="Quick Actions and Shortcuts" />
-      <View className="flex-row flex-wrap gap-2 p-3">
+      <SectionHeader icon="cursor-default-click-outline" title="Quick Actions and Shortcuts" compact={compact} />
+      <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {actions.map(([icon, label]) => (
-          <Pressable key={label} onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined} className={cn('min-w-[150px] flex-1 flex-row items-center gap-2 rounded-md border px-3 py-3', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name={icon} size={17} color={label.includes('Critical') ? '#ef4444' : label === 'Open Canvas' ? '#2563eb' : isDark ? '#F5F5F5' : '#111827'} />
-            <Text numberOfLines={1} className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
+          <Pressable key={label} onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined} className={cn(compact ? 'min-w-[122px] px-2 py-2' : 'min-w-[150px] px-3 py-3', 'flex-1 flex-row items-center gap-2 rounded-md border', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}>
+            <MaterialCommunityIcons name={icon} size={compact ? 15 : 17} color={label.includes('Critical') ? '#ef4444' : label === 'Open Canvas' ? '#2563eb' : isDark ? '#F5F5F5' : '#111827'} />
+            <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
           </Pressable>
         ))}
       </View>
@@ -759,11 +764,15 @@ export function DashboardOverview({
   onOpenMachine,
 }: DashboardOverviewProps) {
   const { isDark } = useAppTheme();
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const [now, setNow] = useState(() => new Date());
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
   const [activePanel, setActivePanel] = useState<DetailPanel | null>(null);
   const isCompact = width > 0 && width < 900;
+  const isShortViewport = height > 0 && height < 950;
+  const dashboardSizes = isShortViewport
+    ? { top: 40, kpi: 72, main: 280, system: 66, charts: 122, bottom: 112, chartLine: 80, donut: 84 }
+    : { top: 40, kpi: 78, main: 300, system: 72, charts: 126, bottom: 132, chartLine: 88, donut: 92 };
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -804,23 +813,23 @@ export function DashboardOverview({
   const openPanel = (panel: DetailPanel) => setActivePanel(panel);
   const closePanel = () => setActivePanel(null);
 
-  const kpiCards = (
+  const renderKpiCards = (compact: boolean) => (
     <>
-      <KpiCard icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} />
-      <KpiCard icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} />
-      <KpiCard icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} />
-      <KpiCard icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} />
-      <KpiCard icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} />
-      <KpiCard icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars />
-      <KpiCard icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} />
-      <KpiCard icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} />
+      <KpiCard icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} compact={compact} />
+      <KpiCard icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />
+      <KpiCard icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />
+      <KpiCard icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />
+      <KpiCard icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />
+      <KpiCard icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars compact={compact} />
+      <KpiCard icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} compact={compact} />
+      <KpiCard icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} compact={compact} />
     </>
   );
 
   const renderDetail = () => {
     switch (activePanel) {
       case 'kpis':
-        return <View className="flex-row flex-wrap gap-3">{kpiCards}</View>;
+        return <View className="flex-row flex-wrap gap-3">{renderKpiCards(false)}</View>;
       case 'plant':
         return <PlantMapPanel />;
       case 'health':
@@ -883,9 +892,9 @@ export function DashboardOverview({
   };
 
   return (
-    <View className={cn('flex-1 overflow-hidden p-2.5', isDark ? 'bg-surface' : 'bg-slate-50')}>
-      <View className="flex-1 gap-2">
-        <View className="flex-row items-center gap-2" style={{ height: 42 }}>
+    <View className={cn('flex-1 overflow-hidden p-2', isDark ? 'bg-surface' : 'bg-slate-50')}>
+      <View className={cn('flex-1', isShortViewport ? 'gap-1' : 'gap-1.5')}>
+        <View className="flex-row items-center gap-2" style={{ height: dashboardSizes.top }}>
           <Pressable className={cn('h-10 min-w-[190px] flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
             <MaterialCommunityIcons name="office-building-marker-outline" size={17} color={isDark ? '#F5F5F5' : '#111827'} />
             <Text className={cn('flex-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{plantName}</Text>
@@ -933,46 +942,46 @@ export function DashboardOverview({
           </View>
         </View>
 
-        <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2 overflow-hidden" style={{ height: 86 }}>
-          {kpiCards}
+        <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.kpi }}>
+          {renderKpiCards(true)}
         </Pressable>
 
-        <View className="min-h-0 flex-[1.15] flex-row gap-2 overflow-hidden">
+        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.main }}>
           <Pressable onPress={() => openPanel('plant')} className="min-w-[520px] flex-[1.35] overflow-hidden">
             <PlantMapPanel compact />
           </Pressable>
           <Pressable onPress={() => openPanel('health')} className="min-w-[235px] flex-[0.55] overflow-hidden">
-            <HealthAnalysis score={84} updatedAt={lastUpdate} />
+            <HealthAnalysis score={84} updatedAt={lastUpdate} compact />
           </Pressable>
           <Pressable onPress={() => openPanel('alarms')} className="min-w-[390px] flex-1 overflow-hidden">
-            <LiveAlarmFeed />
+            <LiveAlarmFeed compact />
           </Pressable>
         </View>
 
-        <View className="flex-row gap-2 overflow-hidden" style={{ height: 90 }}>
+        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.system }}>
           <Pressable onPress={() => openPanel('system')} className="flex-1 overflow-hidden">
-            <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} />
+            <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} compact />
           </Pressable>
           <Pressable onPress={() => openPanel('telemetry')} className="flex-1 overflow-hidden">
-            <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} />
+            <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} compact />
           </Pressable>
         </View>
 
-        <View className="flex-row gap-2 overflow-hidden" style={{ height: 150 }}>
+        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.charts }}>
           <Pressable onPress={() => openPanel('healthTrend')} className="flex-1 overflow-hidden">
-            <ChartCard title="Health Trend" action={timeRange}>
-              <TrendLine values={HEALTH_TREND} previous={PREVIOUS_HEALTH_TREND} height={112} />
+            <ChartCard title="Health Trend" action={timeRange} compact>
+              <TrendLine values={HEALTH_TREND} previous={PREVIOUS_HEALTH_TREND} height={dashboardSizes.chartLine} />
             </ChartCard>
           </Pressable>
           <Pressable onPress={() => openPanel('alarmTrend')} className="flex-1 overflow-hidden">
-            <ChartCard title="Alarm Trend" action="New vs active">
-              <StackedBars />
+            <ChartCard title="Alarm Trend" action="New vs active" compact>
+              <StackedBars height={dashboardSizes.chartLine} />
             </ChartCard>
           </Pressable>
           <Pressable onPress={() => openPanel('severity')} className="flex-1 overflow-hidden">
-            <ChartCard title="Alarm by Severity" action="Clickable filters">
+            <ChartCard title="Alarm by Severity" action="Clickable filters" compact>
               <View className="flex-row items-center justify-around">
-                <DonutChart total={56} />
+                <DonutChart total={56} size={dashboardSizes.donut} />
                 <View className="gap-1">
                   {[
                     ['Critical', '10', '#ef4444'],
@@ -991,21 +1000,21 @@ export function DashboardOverview({
             </ChartCard>
           </Pressable>
           <Pressable onPress={() => openPanel('throughput')} className="flex-1 overflow-hidden">
-            <ChartCard title="Throughput vs Energy" action={timeRange}>
-              <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={112} />
+            <ChartCard title="Throughput vs Energy" action={timeRange} compact>
+              <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={dashboardSizes.chartLine} />
             </ChartCard>
           </Pressable>
         </View>
 
-        <View className="flex-row gap-2 overflow-hidden" style={{ height: 128 }}>
+        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.bottom }}>
           <Pressable onPress={() => openPanel('machines')} className="flex-[1.25] overflow-hidden">
-            <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} />
+            <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} compact />
           </Pressable>
           <Pressable onPress={() => openPanel('insights')} className="flex-1 overflow-hidden">
-            <InsightsPanel />
+            <InsightsPanel compact />
           </Pressable>
           <Pressable onPress={() => openPanel('actions')} className="flex-1 overflow-hidden">
-            <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} />
+            <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} compact />
           </Pressable>
         </View>
       </View>

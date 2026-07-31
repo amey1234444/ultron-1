@@ -118,7 +118,7 @@ export type Captcha = {
 };
 
 // Fetches a fresh challenge from /api/captcha and tracks the user's answer.
-// Shared by the login and signup screens so both flows are CAPTCHA-gated.
+// Used by signup/create-account so automated account creation is CAPTCHA-gated.
 export function useCaptcha(): Captcha {
   const [answer, setAnswer] = useState('');
   const [token, setToken] = useState('');

@@ -1,6 +1,5 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { verifyCaptcha } from '../../../server/captcha';
 import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
@@ -16,17 +15,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     }
     await enforceRateLimit(req, res, 'login');
 
-    const { username, password, captchaToken, captchaAnswer } = (req.body ?? {}) as {
+    const { username, password } = (req.body ?? {}) as {
       username?: string;
       password?: string;
-      captchaToken?: string;
-      captchaAnswer?: string;
     };
     if (!username || !password) {
       return res.status(400).json({ error: 'Username and password are required.' });
-    }
-    if (!verifyCaptcha(captchaToken, captchaAnswer)) {
-      return res.status(400).json({ error: 'CAPTCHA verification failed. Please try again.' });
     }
     const user = await verifyCredentials(username, password);
     if (!user) {

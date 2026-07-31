@@ -12,7 +12,6 @@ const LOGO_ASPECT = 284 / 77;
 const LOGO_HEIGHT = 24;
 
 type TopBarProps = {
-  projectName?: string | null;
   alarmCount?: number;
   devices?: DeviceNode[];
   canConfigure?: boolean;
@@ -213,7 +212,6 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
 }
 
 export function TopBar({
-  projectName,
   alarmCount = 0,
   devices = [],
   canConfigure = false,
@@ -255,14 +253,6 @@ export function TopBar({
             resizeMode="contain"
           />
         </Pressable>
-        {!isNarrow && (
-          <>
-            <Divider color={dividerColor} />
-            <Text numberOfLines={1} className={cn('font-body-medium text-sm', mutedClass)} style={{ maxWidth: 220 }}>
-              {projectName || 'Studio'}
-            </Text>
-          </>
-        )}
       </View>
 
       <View className="flex-row flex-wrap items-center justify-end gap-3">
