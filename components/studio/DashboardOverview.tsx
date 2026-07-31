@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Image, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -27,6 +27,20 @@ type DashboardOverviewProps = {
 
 type IconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 type Tone = 'green' | 'blue' | 'amber' | 'red' | 'purple' | 'cyan' | 'slate';
+type DetailPanel =
+  | 'kpis'
+  | 'plant'
+  | 'health'
+  | 'alarms'
+  | 'system'
+  | 'telemetry'
+  | 'healthTrend'
+  | 'alarmTrend'
+  | 'severity'
+  | 'throughput'
+  | 'machines'
+  | 'insights'
+  | 'actions';
 
 const STATUS_COLORS = {
   healthy: '#22c55e',
@@ -43,6 +57,7 @@ const HEALTH_TREND = [86, 88, 92, 96, 79, 88, 94, 82, 98, 91, 99, 90, 84];
 const PREVIOUS_HEALTH_TREND = [76, 79, 81, 84, 77, 80, 82, 83, 85, 86, 84, 88, 87];
 const THROUGHPUT = [150, 160, 140, 182, 153, 169, 126, 201, 224, 228, 282, 338, 289, 238, 190, 176];
 const ENERGY = [18, 24, 20, 27, 19, 23, 16, 22, 24, 30, 27, 43, 48, 34, 30, 26];
+const PLANT_OVERVIEW_IMAGE_URI = '/dashboard/plant-overview.png';
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -128,17 +143,17 @@ function KpiCard({
   const { isDark } = useAppTheme();
   const color = toneColor(tone);
   return (
-    <View className={cn('min-w-[178px] flex-1 rounded-lg border p-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+    <View className={cn('min-w-[145px] flex-1 rounded-lg border p-2', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
       <View className="flex-row items-start gap-3">
-        <View className="h-10 w-10 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}16` }}>
-          <MaterialCommunityIcons name={icon} size={22} color={color} />
+        <View className="h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: `${color}16` }}>
+          <MaterialCommunityIcons name={icon} size={18} color={color} />
         </View>
         <View className="min-w-0 flex-1">
           <Text numberOfLines={1} className={cn('font-body-bold text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
             {label}
           </Text>
           <View className="mt-1 flex-row items-end gap-1">
-            <Text className={cn('font-display text-2xl', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
+            <Text className={cn('font-display text-xl', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
             {unit && <Text className={cn('pb-1 font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>}
           </View>
           <Text numberOfLines={1} className={cn('font-body text-[11px]', color === '#dc2626' ? 'text-status-danger' : 'text-status-success')}>
@@ -370,7 +385,7 @@ function DonutChart({ total }: { total: number }) {
   );
 }
 
-function PlantMapPanel() {
+function PlantMapPanel({ compact = false }: { compact?: boolean } = {}) {
   const { isDark } = useAppTheme();
   const areas = [
     { name: 'Compressor Area', x: 143, y: 62, status: 'healthy', count: 18 },
@@ -396,31 +411,43 @@ function PlantMapPanel() {
           ))}
         </View>
       </View>
-      <View className="relative overflow-hidden px-3 py-3">
-        <Svg width="100%" height={330} viewBox="0 0 640 330">
-          <Rect x={32} y={44} width={570} height={250} rx={16} fill={isDark ? '#0f172a' : '#f8fafc'} stroke={isDark ? '#334155' : '#dbe3ec'} />
-          <Path d="M84 236 L244 132 L470 166 L344 268 Z" fill="#e8eef5" stroke="#9aa8b6" strokeWidth={2} />
-          <Path d="M120 219 L264 154 L424 176 L320 245 Z" fill="#f7fbff" stroke="#b5c1cc" />
-          <Path d="M100 196 C170 150 214 143 288 157 C356 169 410 160 510 112" fill="none" stroke="#94a3b8" strokeWidth={5} opacity={0.55} />
-          <Path d="M94 214 C173 176 231 180 297 198 C374 219 447 211 533 185" fill="none" stroke="#64748b" strokeWidth={4} opacity={0.52} />
-          {[165, 198, 365, 413, 464].map((x, i) => (
-            <G key={x}>
-              <Rect x={x} y={90 + (i % 2) * 18} width={36} height={102 - (i % 2) * 18} rx={8} fill="#f1f5f9" stroke="#94a3b8" />
-              <Rect x={x + 8} y={72 + (i % 2) * 18} width={20} height={32} rx={5} fill="#e2e8f0" stroke="#94a3b8" />
-            </G>
+      <View
+        className={cn('relative overflow-hidden px-3 py-2', isDark ? 'bg-slate-950' : 'bg-[#f7fbff]')}
+        style={{ height: compact ? 260 : 350 }}
+      >
+        <Svg width="100%" height="100%" viewBox="0 0 640 330" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
+          <Rect x={0} y={0} width={640} height={330} fill={isDark ? '#07111f' : '#f7fbff'} />
+          {Array.from({ length: 17 }).map((_, index) => (
+            <Line key={`v-${index}`} x1={index * 40} x2={index * 40} y1={0} y2={330} stroke={isDark ? '#1e293b' : '#e2edf7'} strokeWidth={1} />
           ))}
-          <Rect x={224} y={190} width={140} height={55} rx={8} fill="#f8fafc" stroke="#64748b" />
-          <Rect x={375} y={207} width={88} height={42} rx={8} fill="#e5e7eb" stroke="#64748b" />
-          <Rect x={473} y={187} width={54} height={34} rx={6} fill="#e2e8f0" stroke="#64748b" />
+          {Array.from({ length: 10 }).map((_, index) => (
+            <Line key={`h-${index}`} x1={0} x2={640} y1={index * 36} y2={index * 36} stroke={isDark ? '#1e293b' : '#e2edf7'} strokeWidth={1} />
+          ))}
+          <Path d="M58 285 C174 316 410 316 580 257" fill="none" stroke={isDark ? '#1f2937' : '#d7e6f4'} strokeWidth={28} opacity={0.5} />
+        </Svg>
+        <Image
+          source={{ uri: PLANT_OVERVIEW_IMAGE_URI }}
+          resizeMode="contain"
+          style={{
+            position: 'absolute',
+            left: compact ? 56 : 46,
+            right: compact ? 20 : 24,
+            top: compact ? 18 : 24,
+            bottom: compact ? 0 : 8,
+            opacity: isDark ? 0.86 : 0.98,
+          }}
+        />
+        <Svg width="100%" height="100%" viewBox="0 0 640 330" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
           {areas.map((area) => {
             const color = STATUS_COLORS[area.status];
             const labelX = area.x < 160 ? area.x - 18 : area.x > 460 ? area.x - 128 : area.x - 54;
             const labelY = area.y < 110 ? area.y - 44 : area.y + 18;
             return (
               <G key={area.name}>
-                <Line x1={area.x} y1={area.y} x2={labelX + 68} y2={labelY + 34} stroke={color} strokeWidth={2} />
-                <Circle cx={area.x} cy={area.y} r={9} fill="#ffffff" stroke={color} strokeWidth={4} />
-                <Rect x={labelX} y={labelY} width={134} height={54} rx={7} fill="#ffffff" stroke="#dbe3ec" />
+                <Line x1={area.x} y1={area.y} x2={labelX + 68} y2={labelY + 34} stroke={color} strokeWidth={2.25} />
+                <Circle cx={area.x} cy={area.y} r={11} fill={`${color}22`} stroke={color} strokeWidth={2} />
+                <Circle cx={area.x} cy={area.y} r={5} fill={color} stroke="#ffffff" strokeWidth={2} />
+                <Rect x={labelX} y={labelY} width={134} height={54} rx={7} fill="#ffffff" opacity={0.94} stroke="#dbe3ec" />
                 <SvgText x={labelX + 12} y={labelY + 20} fontSize={11} fontWeight="700" fill="#111827">
                   {area.name}
                 </SvgText>
@@ -683,6 +710,42 @@ function QuickActions({ onOpenDevices, onOpenCanvas }: { onOpenDevices: () => vo
   );
 }
 
+function DashboardDetailModal({
+  visible,
+  title,
+  onClose,
+  children,
+}: {
+  visible: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+}) {
+  const { isDark } = useAppTheme();
+  const { width, height } = useWindowDimensions();
+  const modalWidth = Math.min(Math.max(width - 32, 320), 1280);
+  const modalHeight = Math.min(Math.max(height - 64, 360), 820);
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <View className="flex-1 items-center justify-center bg-black/45 p-4">
+        <View
+          className={cn('overflow-hidden rounded-xl border shadow-2xl', isDark ? 'border-line-dark bg-surface' : 'border-line-light bg-white')}
+          style={{ width: modalWidth, maxHeight: modalHeight }}
+        >
+          <View className={cn('flex-row items-center justify-between border-b px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
+            <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
+            <Pressable onPress={onClose} className={cn('rounded-lg border px-3 py-1.5', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-slate-50')}>
+              <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Cancel</Text>
+            </Pressable>
+          </View>
+          <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }}>{children}</ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export function DashboardOverview({
   projects,
   folders,
@@ -699,6 +762,7 @@ export function DashboardOverview({
   const { width } = useWindowDimensions();
   const [now, setNow] = useState(() => new Date());
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
+  const [activePanel, setActivePanel] = useState<DetailPanel | null>(null);
   const isCompact = width > 0 && width < 900;
 
   useEffect(() => {
@@ -722,87 +786,65 @@ export function DashboardOverview({
   const userName = currentUser?.name || currentUser?.username || 'Admin User';
   const roleLabel = currentUser ? ROLE_LABEL[currentUser.role] : 'Administrator';
   const streamHealthy = !realMode || !!live?.gateways.length || !!live?.measurements.length;
+  const detailTitles: Record<DetailPanel, string> = {
+    kpis: 'Primary Realtime KPIs',
+    plant: 'Interactive Plant Overview',
+    health: 'Overall Health Analysis',
+    alarms: 'Live Alarm Feed',
+    system: 'System Status',
+    telemetry: 'Live Telemetry Snapshot',
+    healthTrend: 'Health Trend',
+    alarmTrend: 'Alarm Trend',
+    severity: 'Alarm Distribution by Severity',
+    throughput: 'Throughput vs Energy',
+    machines: 'Machines Requiring Attention',
+    insights: 'Insights and Recommended Actions',
+    actions: 'Quick Actions and Shortcuts',
+  };
+  const openPanel = (panel: DetailPanel) => setActivePanel(panel);
+  const closePanel = () => setActivePanel(null);
 
-  return (
-    <View className={cn('flex-1', isDark ? 'bg-surface' : 'bg-slate-50')}>
-      <ScrollView className="flex-1" contentContainerClassName="gap-3 p-3 lg:p-4">
-        <View className="flex-row flex-wrap items-center gap-3">
-          <Pressable className={cn('h-11 min-w-[210px] flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name="office-building-marker-outline" size={18} color={isDark ? '#F5F5F5' : '#111827'} />
-            <Text className={cn('flex-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{plantName}</Text>
-            <MaterialCommunityIcons name="chevron-down" size={18} color={isDark ? '#999' : '#64748b'} />
-          </Pressable>
+  const kpiCards = (
+    <>
+      <KpiCard icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} />
+      <KpiCard icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} />
+      <KpiCard icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} />
+      <KpiCard icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} />
+      <KpiCard icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} />
+      <KpiCard icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars />
+      <KpiCard icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} />
+      <KpiCard icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} />
+    </>
+  );
 
-          <View className={cn('h-11 min-w-[280px] flex-1 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name="magnify" size={18} color={isDark ? '#999' : '#64748b'} />
-            <Text className={cn('flex-1 font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Search assets, tags, gateways, racks, machines...</Text>
-            {!isCompact && <Text className={cn('rounded bg-slate-100 px-2 py-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Ctrl + K</Text>}
-          </View>
-
-          <Pressable
-            onPress={() => setTimeRange((value) => (value === 'Last Hour' ? 'Last 24 Hours' : value === 'Last 24 Hours' ? 'Last 7 Days' : value === 'Last 7 Days' ? 'Custom' : 'Last Hour'))}
-            className={cn('h-11 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
-          >
-            <MaterialCommunityIcons name="calendar-clock" size={17} color={isDark ? '#F5F5F5' : '#111827'} />
-            <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{timeRange}</Text>
-            <MaterialCommunityIcons name="chevron-down" size={18} color={isDark ? '#999' : '#64748b'} />
-          </Pressable>
-
-          <Pressable className={cn('h-11 w-11 items-center justify-center rounded-lg border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name="refresh" size={19} color={isDark ? '#F5F5F5' : '#111827'} />
-          </Pressable>
-
-          <View className={cn('h-11 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <View className="h-2 w-2 rounded-full bg-status-success" />
-            <Text className="font-body-bold text-xs text-status-success">LIVE</Text>
-          </View>
-
-          <View className={cn('h-11 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name={streamHealthy ? 'access-point-check' : 'access-point-off'} size={17} color={streamHealthy ? '#16a34a' : '#f59e0b'} />
-            <Text className={cn('font-body-bold text-xs', streamHealthy ? 'text-status-success' : 'text-status-warning')}>{streamHealthy ? 'Stream Healthy' : 'Stream Stale'}</Text>
-          </View>
-
-          <Text className={cn('font-mono text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Last update: {lastUpdate}</Text>
-          <View className={cn('ml-auto flex-row items-center gap-2 rounded-lg border px-3 py-2', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <View className={cn('h-8 w-8 items-center justify-center rounded-full', isDark ? 'bg-white/10' : 'bg-ink-inverse')}>
-              <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-white')}>{userName.slice(0, 2).toUpperCase()}</Text>
-            </View>
-            <View>
-              <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>{userName}</Text>
-              <Text className={cn('font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{roleLabel}</Text>
-            </View>
-          </View>
-        </View>
-
-        <View className="flex-row flex-wrap gap-3">
-          <KpiCard icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} />
-          <KpiCard icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} />
-          <KpiCard icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} />
-          <KpiCard icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} />
-          <KpiCard icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} />
-          <KpiCard icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars />
-          <KpiCard icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} />
-          <KpiCard icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} />
-        </View>
-
-        <View className="flex-row flex-wrap gap-3">
-          <PlantMapPanel />
-          <HealthAnalysis score={84} updatedAt={lastUpdate} />
-          <LiveAlarmFeed />
-        </View>
-
-        <View className="flex-row flex-wrap gap-3">
-          <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} />
-          <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} />
-        </View>
-
-        <View className="flex-row flex-wrap gap-3">
+  const renderDetail = () => {
+    switch (activePanel) {
+      case 'kpis':
+        return <View className="flex-row flex-wrap gap-3">{kpiCards}</View>;
+      case 'plant':
+        return <PlantMapPanel />;
+      case 'health':
+        return <HealthAnalysis score={84} updatedAt={lastUpdate} />;
+      case 'alarms':
+        return <LiveAlarmFeed />;
+      case 'system':
+        return <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} />;
+      case 'telemetry':
+        return <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} />;
+      case 'healthTrend':
+        return (
           <ChartCard title="Health Trend" action={timeRange}>
             <TrendLine values={HEALTH_TREND} previous={PREVIOUS_HEALTH_TREND} />
           </ChartCard>
+        );
+      case 'alarmTrend':
+        return (
           <ChartCard title="Alarm Trend" action="New vs active">
             <StackedBars />
           </ChartCard>
+        );
+      case 'severity':
+        return (
           <ChartCard title="Alarm by Severity" action="Clickable filters">
             <View className="flex-row items-center justify-around">
               <DonutChart total={56} />
@@ -822,24 +864,155 @@ export function DashboardOverview({
               </View>
             </View>
           </ChartCard>
+        );
+      case 'throughput':
+        return (
           <ChartCard title="Throughput vs Energy" action={timeRange}>
             <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" />
           </ChartCard>
+        );
+      case 'machines':
+        return <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} />;
+      case 'insights':
+        return <InsightsPanel />;
+      case 'actions':
+        return <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} />;
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <View className={cn('flex-1 overflow-hidden p-2.5', isDark ? 'bg-surface' : 'bg-slate-50')}>
+      <View className="flex-1 gap-2">
+        <View className="flex-row items-center gap-2" style={{ height: 42 }}>
+          <Pressable className={cn('h-10 min-w-[190px] flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <MaterialCommunityIcons name="office-building-marker-outline" size={17} color={isDark ? '#F5F5F5' : '#111827'} />
+            <Text className={cn('flex-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{plantName}</Text>
+            <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
+          </Pressable>
+
+          <View className={cn('h-10 min-w-[260px] flex-1 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <MaterialCommunityIcons name="magnify" size={17} color={isDark ? '#999' : '#64748b'} />
+            <Text className={cn('flex-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Search assets, tags, gateways, racks, machines...</Text>
+            {!isCompact && <Text className={cn('rounded bg-slate-100 px-2 py-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Ctrl + K</Text>}
+          </View>
+
+          <Pressable
+            onPress={() => setTimeRange((value) => (value === 'Last Hour' ? 'Last 24 Hours' : value === 'Last 24 Hours' ? 'Last 7 Days' : value === 'Last 7 Days' ? 'Custom' : 'Last Hour'))}
+            className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
+          >
+            <MaterialCommunityIcons name="calendar-clock" size={16} color={isDark ? '#F5F5F5' : '#111827'} />
+            <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>{timeRange}</Text>
+            <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
+          </Pressable>
+
+          <Pressable className={cn('h-10 w-10 items-center justify-center rounded-lg border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <MaterialCommunityIcons name="refresh" size={18} color={isDark ? '#F5F5F5' : '#111827'} />
+          </Pressable>
+
+          <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <View className="h-2 w-2 rounded-full bg-status-success" />
+            <Text className="font-body-bold text-xs text-status-success">LIVE</Text>
+          </View>
+
+          <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <MaterialCommunityIcons name={streamHealthy ? 'access-point-check' : 'access-point-off'} size={16} color={streamHealthy ? '#16a34a' : '#f59e0b'} />
+            <Text className={cn('font-body-bold text-xs', streamHealthy ? 'text-status-success' : 'text-status-warning')}>{streamHealthy ? 'Stream Healthy' : 'Stream Stale'}</Text>
+          </View>
+
+          <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Last update: {lastUpdate}</Text>
+          <View className={cn('flex-row items-center gap-2 rounded-lg border px-2 py-1.5', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <View className={cn('h-7 w-7 items-center justify-center rounded-full', isDark ? 'bg-white/10' : 'bg-ink-inverse')}>
+              <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-white')}>{userName.slice(0, 2).toUpperCase()}</Text>
+            </View>
+            <View>
+              <Text className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{userName}</Text>
+              <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{roleLabel}</Text>
+            </View>
+          </View>
         </View>
 
-        <View className="flex-row flex-wrap gap-3">
-          <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} />
-          <InsightsPanel />
-          <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} />
+        <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2 overflow-hidden" style={{ height: 86 }}>
+          {kpiCards}
+        </Pressable>
+
+        <View className="min-h-0 flex-[1.15] flex-row gap-2 overflow-hidden">
+          <Pressable onPress={() => openPanel('plant')} className="min-w-[520px] flex-[1.35] overflow-hidden">
+            <PlantMapPanel compact />
+          </Pressable>
+          <Pressable onPress={() => openPanel('health')} className="min-w-[235px] flex-[0.55] overflow-hidden">
+            <HealthAnalysis score={84} updatedAt={lastUpdate} />
+          </Pressable>
+          <Pressable onPress={() => openPanel('alarms')} className="min-w-[390px] flex-1 overflow-hidden">
+            <LiveAlarmFeed />
+          </Pressable>
         </View>
 
-        <View className={cn('flex-row flex-wrap items-center justify-between gap-2 rounded-lg border px-4 py-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-          <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            Realtime behavior: snapshot-first reconnect, stale-data state, last-known values, smooth chart updates, alarm sound/browser notification controls, and RBAC-aware actions.
-          </Text>
-          <Text className={cn('font-mono text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Timezone: Asia/Kolkata (IST)</Text>
+        <View className="flex-row gap-2 overflow-hidden" style={{ height: 90 }}>
+          <Pressable onPress={() => openPanel('system')} className="flex-1 overflow-hidden">
+            <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} />
+          </Pressable>
+          <Pressable onPress={() => openPanel('telemetry')} className="flex-1 overflow-hidden">
+            <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} />
+          </Pressable>
         </View>
-      </ScrollView>
+
+        <View className="flex-row gap-2 overflow-hidden" style={{ height: 150 }}>
+          <Pressable onPress={() => openPanel('healthTrend')} className="flex-1 overflow-hidden">
+            <ChartCard title="Health Trend" action={timeRange}>
+              <TrendLine values={HEALTH_TREND} previous={PREVIOUS_HEALTH_TREND} height={112} />
+            </ChartCard>
+          </Pressable>
+          <Pressable onPress={() => openPanel('alarmTrend')} className="flex-1 overflow-hidden">
+            <ChartCard title="Alarm Trend" action="New vs active">
+              <StackedBars />
+            </ChartCard>
+          </Pressable>
+          <Pressable onPress={() => openPanel('severity')} className="flex-1 overflow-hidden">
+            <ChartCard title="Alarm by Severity" action="Clickable filters">
+              <View className="flex-row items-center justify-around">
+                <DonutChart total={56} />
+                <View className="gap-1">
+                  {[
+                    ['Critical', '10', '#ef4444'],
+                    ['Warning', '28', '#f59e0b'],
+                    ['Info', '14', '#2f80ed'],
+                    ['Ack', '4', '#64748b'],
+                  ].map(([label, value, color]) => (
+                    <View key={label} className="flex-row items-center gap-1.5">
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+                      <Text className={cn('w-14 font-body-medium text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
+                      <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{value}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            </ChartCard>
+          </Pressable>
+          <Pressable onPress={() => openPanel('throughput')} className="flex-1 overflow-hidden">
+            <ChartCard title="Throughput vs Energy" action={timeRange}>
+              <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={112} />
+            </ChartCard>
+          </Pressable>
+        </View>
+
+        <View className="flex-row gap-2 overflow-hidden" style={{ height: 128 }}>
+          <Pressable onPress={() => openPanel('machines')} className="flex-[1.25] overflow-hidden">
+            <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} />
+          </Pressable>
+          <Pressable onPress={() => openPanel('insights')} className="flex-1 overflow-hidden">
+            <InsightsPanel />
+          </Pressable>
+          <Pressable onPress={() => openPanel('actions')} className="flex-1 overflow-hidden">
+            <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} />
+          </Pressable>
+        </View>
+      </View>
+
+      <DashboardDetailModal visible={activePanel !== null} title={activePanel ? detailTitles[activePanel] : ''} onClose={closePanel}>
+        {renderDetail()}
+      </DashboardDetailModal>
     </View>
   );
 }
