@@ -145,7 +145,7 @@ function KpiCard({
   const { isDark } = useAppTheme();
   const color = toneColor(tone);
   return (
-    <View className={cn(compact ? 'min-w-[132px] flex-1 rounded-lg border p-2' : 'min-w-[145px] flex-1 rounded-lg border p-2', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+    <View className={cn(compact ? 'min-w-[170px] flex-1 rounded-lg border p-2' : 'min-w-[180px] flex-1 rounded-lg border p-2', 'h-full overflow-hidden', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
       <View className={cn('flex-row items-start', compact ? 'gap-2' : 'gap-3')}>
         <View className={cn(compact ? 'h-7 w-7' : 'h-8 w-8', 'items-center justify-center rounded-lg')} style={{ backgroundColor: `${color}16` }}>
           <MaterialCommunityIcons name={icon} size={compact ? 16 : 18} color={color} />
@@ -174,7 +174,7 @@ function KpiCard({
 }
 
 function sectionClass(isDark: boolean) {
-  return cn('rounded-lg border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white');
+  return cn('h-full overflow-hidden rounded-lg border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white');
 }
 
 function SectionHeader({ icon, title, action, compact = false }: { icon?: IconName; title: string; action?: string; compact?: boolean }) {
@@ -770,9 +770,8 @@ export function DashboardOverview({
   const [activePanel, setActivePanel] = useState<DetailPanel | null>(null);
   const isCompact = width > 0 && width < 900;
   const isShortViewport = height > 0 && height < 950;
-  const dashboardSizes = isShortViewport
-    ? { top: 40, kpi: 72, main: 280, system: 66, charts: 122, bottom: 112, chartLine: 80, donut: 84 }
-    : { top: 40, kpi: 78, main: 300, system: 72, charts: 126, bottom: 132, chartLine: 88, donut: 92 };
+  const dashboardMinWidth = 1520;
+  const dashboardSizes = { top: 44, kpi: 106, main: 304, system: 96, charts: 164, bottom: 210, chartLine: 108, donut: 104 };
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -892,132 +891,147 @@ export function DashboardOverview({
   };
 
   return (
-    <View className={cn('flex-1 overflow-hidden p-2', isDark ? 'bg-surface' : 'bg-slate-50')}>
-      <View className={cn('flex-1', isShortViewport ? 'gap-1' : 'gap-1.5')}>
-        <View className="flex-row items-center gap-2" style={{ height: dashboardSizes.top }}>
-          <Pressable className={cn('h-10 min-w-[190px] flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name="office-building-marker-outline" size={17} color={isDark ? '#F5F5F5' : '#111827'} />
-            <Text className={cn('flex-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{plantName}</Text>
-            <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
-          </Pressable>
+    <View className={cn('flex-1', isDark ? 'bg-surface' : 'bg-slate-50')} style={{ minHeight: 0 }}>
+      <ScrollView
+        className="flex-1"
+        style={{ minHeight: 0 }}
+        showsVerticalScrollIndicator
+        contentContainerStyle={{ flexGrow: 1, padding: 8, paddingBottom: 24 }}
+      >
+        <ScrollView
+          horizontal
+          nestedScrollEnabled
+          showsHorizontalScrollIndicator
+          style={{ minHeight: 0 }}
+          contentContainerStyle={{ flexGrow: 1, minWidth: dashboardMinWidth }}
+        >
+          <View className={cn(isShortViewport ? 'gap-1.5' : 'gap-2')} style={{ minWidth: dashboardMinWidth, flexGrow: 1 }}>
+            <View className="flex-row items-center gap-2" style={{ height: dashboardSizes.top }}>
+              <Pressable className={cn('h-10 min-w-[190px] flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+                <MaterialCommunityIcons name="office-building-marker-outline" size={17} color={isDark ? '#F5F5F5' : '#111827'} />
+                <Text className={cn('flex-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{plantName}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
+              </Pressable>
 
-          <View className={cn('h-10 min-w-[260px] flex-1 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name="magnify" size={17} color={isDark ? '#999' : '#64748b'} />
-            <Text className={cn('flex-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Search assets, tags, gateways, racks, machines...</Text>
-            {!isCompact && <Text className={cn('rounded bg-slate-100 px-2 py-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Ctrl + K</Text>}
-          </View>
+              <View className={cn('h-10 min-w-[260px] flex-1 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+                <MaterialCommunityIcons name="magnify" size={17} color={isDark ? '#999' : '#64748b'} />
+                <Text className={cn('flex-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Search assets, tags, gateways, racks, machines...</Text>
+                {!isCompact && <Text className={cn('rounded bg-slate-100 px-2 py-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Ctrl + K</Text>}
+              </View>
 
-          <Pressable
-            onPress={() => setTimeRange((value) => (value === 'Last Hour' ? 'Last 24 Hours' : value === 'Last 24 Hours' ? 'Last 7 Days' : value === 'Last 7 Days' ? 'Custom' : 'Last Hour'))}
-            className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
-          >
-            <MaterialCommunityIcons name="calendar-clock" size={16} color={isDark ? '#F5F5F5' : '#111827'} />
-            <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>{timeRange}</Text>
-            <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
-          </Pressable>
+              <Pressable
+                onPress={() => setTimeRange((value) => (value === 'Last Hour' ? 'Last 24 Hours' : value === 'Last 24 Hours' ? 'Last 7 Days' : value === 'Last 7 Days' ? 'Custom' : 'Last Hour'))}
+                className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
+              >
+                <MaterialCommunityIcons name="calendar-clock" size={16} color={isDark ? '#F5F5F5' : '#111827'} />
+                <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>{timeRange}</Text>
+                <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
+              </Pressable>
 
-          <Pressable className={cn('h-10 w-10 items-center justify-center rounded-lg border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name="refresh" size={18} color={isDark ? '#F5F5F5' : '#111827'} />
-          </Pressable>
+              <Pressable className={cn('h-10 w-10 items-center justify-center rounded-lg border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+                <MaterialCommunityIcons name="refresh" size={18} color={isDark ? '#F5F5F5' : '#111827'} />
+              </Pressable>
 
-          <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <View className="h-2 w-2 rounded-full bg-status-success" />
-            <Text className="font-body-bold text-xs text-status-success">LIVE</Text>
-          </View>
+              <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+                <View className="h-2 w-2 rounded-full bg-status-success" />
+                <Text className="font-body-bold text-xs text-status-success">LIVE</Text>
+              </View>
 
-          <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <MaterialCommunityIcons name={streamHealthy ? 'access-point-check' : 'access-point-off'} size={16} color={streamHealthy ? '#16a34a' : '#f59e0b'} />
-            <Text className={cn('font-body-bold text-xs', streamHealthy ? 'text-status-success' : 'text-status-warning')}>{streamHealthy ? 'Stream Healthy' : 'Stream Stale'}</Text>
-          </View>
+              <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+                <MaterialCommunityIcons name={streamHealthy ? 'access-point-check' : 'access-point-off'} size={16} color={streamHealthy ? '#16a34a' : '#f59e0b'} />
+                <Text className={cn('font-body-bold text-xs', streamHealthy ? 'text-status-success' : 'text-status-warning')}>{streamHealthy ? 'Stream Healthy' : 'Stream Stale'}</Text>
+              </View>
 
-          <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Last update: {lastUpdate}</Text>
-          <View className={cn('flex-row items-center gap-2 rounded-lg border px-2 py-1.5', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
-            <View className={cn('h-7 w-7 items-center justify-center rounded-full', isDark ? 'bg-white/10' : 'bg-ink-inverse')}>
-              <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-white')}>{userName.slice(0, 2).toUpperCase()}</Text>
-            </View>
-            <View>
-              <Text className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{userName}</Text>
-              <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{roleLabel}</Text>
-            </View>
-          </View>
-        </View>
-
-        <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.kpi }}>
-          {renderKpiCards(true)}
-        </Pressable>
-
-        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.main }}>
-          <Pressable onPress={() => openPanel('plant')} className="min-w-[520px] flex-[1.35] overflow-hidden">
-            <PlantMapPanel compact />
-          </Pressable>
-          <Pressable onPress={() => openPanel('health')} className="min-w-[235px] flex-[0.55] overflow-hidden">
-            <HealthAnalysis score={84} updatedAt={lastUpdate} compact />
-          </Pressable>
-          <Pressable onPress={() => openPanel('alarms')} className="min-w-[390px] flex-1 overflow-hidden">
-            <LiveAlarmFeed compact />
-          </Pressable>
-        </View>
-
-        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.system }}>
-          <Pressable onPress={() => openPanel('system')} className="flex-1 overflow-hidden">
-            <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} compact />
-          </Pressable>
-          <Pressable onPress={() => openPanel('telemetry')} className="flex-1 overflow-hidden">
-            <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} compact />
-          </Pressable>
-        </View>
-
-        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.charts }}>
-          <Pressable onPress={() => openPanel('healthTrend')} className="flex-1 overflow-hidden">
-            <ChartCard title="Health Trend" action={timeRange} compact>
-              <TrendLine values={HEALTH_TREND} previous={PREVIOUS_HEALTH_TREND} height={dashboardSizes.chartLine} />
-            </ChartCard>
-          </Pressable>
-          <Pressable onPress={() => openPanel('alarmTrend')} className="flex-1 overflow-hidden">
-            <ChartCard title="Alarm Trend" action="New vs active" compact>
-              <StackedBars height={dashboardSizes.chartLine} />
-            </ChartCard>
-          </Pressable>
-          <Pressable onPress={() => openPanel('severity')} className="flex-1 overflow-hidden">
-            <ChartCard title="Alarm by Severity" action="Clickable filters" compact>
-              <View className="flex-row items-center justify-around">
-                <DonutChart total={56} size={dashboardSizes.donut} />
-                <View className="gap-1">
-                  {[
-                    ['Critical', '10', '#ef4444'],
-                    ['Warning', '28', '#f59e0b'],
-                    ['Info', '14', '#2f80ed'],
-                    ['Ack', '4', '#64748b'],
-                  ].map(([label, value, color]) => (
-                    <View key={label} className="flex-row items-center gap-1.5">
-                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
-                      <Text className={cn('w-14 font-body-medium text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
-                      <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{value}</Text>
-                    </View>
-                  ))}
+              <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Last update: {lastUpdate}</Text>
+              <View className={cn('flex-row items-center gap-2 rounded-lg border px-2 py-1.5', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+                <View className={cn('h-7 w-7 items-center justify-center rounded-full', isDark ? 'bg-white/10' : 'bg-ink-inverse')}>
+                  <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-white')}>{userName.slice(0, 2).toUpperCase()}</Text>
+                </View>
+                <View>
+                  <Text className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{userName}</Text>
+                  <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{roleLabel}</Text>
                 </View>
               </View>
-            </ChartCard>
-          </Pressable>
-          <Pressable onPress={() => openPanel('throughput')} className="flex-1 overflow-hidden">
-            <ChartCard title="Throughput vs Energy" action={timeRange} compact>
-              <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={dashboardSizes.chartLine} />
-            </ChartCard>
-          </Pressable>
-        </View>
+            </View>
 
-        <View className="flex-row gap-2 overflow-hidden" style={{ height: dashboardSizes.bottom }}>
-          <Pressable onPress={() => openPanel('machines')} className="flex-[1.25] overflow-hidden">
-            <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} compact />
-          </Pressable>
-          <Pressable onPress={() => openPanel('insights')} className="flex-1 overflow-hidden">
-            <InsightsPanel compact />
-          </Pressable>
-          <Pressable onPress={() => openPanel('actions')} className="flex-1 overflow-hidden">
-            <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} compact />
-          </Pressable>
-        </View>
-      </View>
+            <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2" style={{ height: dashboardSizes.kpi }}>
+              {renderKpiCards(true)}
+            </Pressable>
+
+            <View className="flex-row gap-2" style={{ height: dashboardSizes.main }}>
+              <Pressable onPress={() => openPanel('plant')} className="min-w-[520px] flex-[1.35]">
+                <PlantMapPanel compact />
+              </Pressable>
+              <Pressable onPress={() => openPanel('health')} className="min-w-[235px] flex-[0.55]">
+                <HealthAnalysis score={84} updatedAt={lastUpdate} compact />
+              </Pressable>
+              <Pressable onPress={() => openPanel('alarms')} className="min-w-[390px] flex-1">
+                <LiveAlarmFeed compact />
+              </Pressable>
+            </View>
+
+            <View className="flex-row gap-2" style={{ height: dashboardSizes.system }}>
+              <Pressable onPress={() => openPanel('system')} className="flex-1">
+                <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} compact />
+              </Pressable>
+              <Pressable onPress={() => openPanel('telemetry')} className="flex-1">
+                <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} compact />
+              </Pressable>
+            </View>
+
+            <View className="flex-row gap-2" style={{ height: dashboardSizes.charts }}>
+              <Pressable onPress={() => openPanel('healthTrend')} className="flex-1">
+                <ChartCard title="Health Trend" action={timeRange} compact>
+                  <TrendLine values={HEALTH_TREND} previous={PREVIOUS_HEALTH_TREND} height={dashboardSizes.chartLine} />
+                </ChartCard>
+              </Pressable>
+              <Pressable onPress={() => openPanel('alarmTrend')} className="flex-1">
+                <ChartCard title="Alarm Trend" action="New vs active" compact>
+                  <StackedBars height={dashboardSizes.chartLine} />
+                </ChartCard>
+              </Pressable>
+              <Pressable onPress={() => openPanel('severity')} className="flex-1">
+                <ChartCard title="Alarm by Severity" action="Clickable filters" compact>
+                  <View className="flex-row items-center justify-around">
+                    <DonutChart total={56} size={dashboardSizes.donut} />
+                    <View className="gap-1">
+                      {[
+                        ['Critical', '10', '#ef4444'],
+                        ['Warning', '28', '#f59e0b'],
+                        ['Info', '14', '#2f80ed'],
+                        ['Ack', '4', '#64748b'],
+                      ].map(([label, value, color]) => (
+                        <View key={label} className="flex-row items-center gap-1.5">
+                          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: color }} />
+                          <Text className={cn('w-14 font-body-medium text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
+                          <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{value}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                </ChartCard>
+              </Pressable>
+              <Pressable onPress={() => openPanel('throughput')} className="flex-1">
+                <ChartCard title="Throughput vs Energy" action={timeRange} compact>
+                  <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={dashboardSizes.chartLine} />
+                </ChartCard>
+              </Pressable>
+            </View>
+
+            <View className="flex-row gap-2" style={{ height: dashboardSizes.bottom }}>
+              <Pressable onPress={() => openPanel('machines')} className="flex-[1.25]">
+                <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} compact />
+              </Pressable>
+              <Pressable onPress={() => openPanel('insights')} className="flex-1">
+                <InsightsPanel compact />
+              </Pressable>
+              <Pressable onPress={() => openPanel('actions')} className="flex-1">
+                <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} compact />
+              </Pressable>
+            </View>
+          </View>
+        </ScrollView>
+      </ScrollView>
 
       <DashboardDetailModal visible={activePanel !== null} title={activePanel ? detailTitles[activePanel] : ''} onClose={closePanel}>
         {renderDetail()}
