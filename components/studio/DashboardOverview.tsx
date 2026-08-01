@@ -130,6 +130,7 @@ function KpiCard({
   spark,
   bars,
   compact = false,
+  onPress,
 }: {
   icon: IconName;
   label: string;
@@ -141,35 +142,45 @@ function KpiCard({
   spark: number[];
   bars?: boolean;
   compact?: boolean;
+  onPress?: () => void;
 }) {
   const { isDark } = useAppTheme();
   const color = toneColor(tone);
   return (
-    <View className={cn(compact ? 'min-w-[148px] flex-1 rounded-lg border p-2' : 'min-w-[170px] flex-1 rounded-lg border p-2', 'h-full overflow-hidden', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+    <Pressable
+      disabled={!onPress}
+      onPress={onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      className={cn(compact ? 'min-w-0 flex-1 rounded-lg border px-2 py-2' : 'min-w-[170px] flex-1 rounded-lg border p-2', 'h-full overflow-hidden', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
+    >
       <View className={cn('flex-row items-start', compact ? 'gap-2' : 'gap-3')}>
-        <View className={cn(compact ? 'h-7 w-7' : 'h-8 w-8', 'items-center justify-center rounded-lg')} style={{ backgroundColor: `${color}16` }}>
-          <MaterialCommunityIcons name={icon} size={compact ? 16 : 18} color={color} />
+        <View className={cn(compact ? 'h-6 w-6' : 'h-8 w-8', 'items-center justify-center rounded-lg')} style={{ backgroundColor: `${color}16` }}>
+          <MaterialCommunityIcons name={icon} size={compact ? 14 : 18} color={color} />
         </View>
         <View className="min-w-0 flex-1">
           <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
             {label}
           </Text>
-          <View className={cn('flex-row items-end gap-1', compact ? 'mt-0.5' : 'mt-1')}>
-            <Text className={cn('font-display', compact ? 'text-lg' : 'text-xl', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
-            {unit && <Text className={cn('pb-0.5 font-body-medium', compact ? 'text-[10px]' : 'text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>}
+          <View className={cn('flex-row items-end gap-1', compact ? 'mt-0' : 'mt-1')}>
+            <Text className={cn('font-display', compact ? 'text-base' : 'text-xl', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
+            {unit && <Text numberOfLines={1} className={cn('pb-0.5 font-body-medium', compact ? 'text-[9px]' : 'text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>}
           </View>
           <Text numberOfLines={1} className={cn('font-body', compact ? 'text-[9px]' : 'text-[11px]', color === '#dc2626' ? 'text-status-danger' : 'text-status-success')}>
             {delta}
           </Text>
         </View>
       </View>
-      <View className={cn('flex-row items-end justify-between', compact ? 'mt-0.5' : 'mt-2')}>
-        <Text numberOfLines={1} className={cn('font-body', compact ? 'max-w-[58px] text-[9px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          {detail}
-        </Text>
-        <Sparkline values={spark} color={color} bars={bars} compact={compact} />
+      <View className={cn('flex-row items-end justify-between', compact ? 'mt-1' : 'mt-2')}>
+        {!compact && (
+          <Text numberOfLines={1} className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            {detail}
+          </Text>
+        )}
+        <View className={compact ? 'ml-auto' : undefined}>
+          <Sparkline values={spark} color={color} bars={bars} compact={compact} />
+        </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
@@ -204,21 +215,34 @@ function arcPath(cx: number, cy: number, radius: number, startAngle: number, end
 }
 
 function HealthGauge({ score, compact = false }: { score: number; compact?: boolean }) {
-  const valueAngle = -180 + clamp(score, 0, 100) * 1.8;
-  const height = compact ? 106 : 170;
+  const size = compact ? 164 : 168;
+  const stroke = compact ? 14 : 16;
+  const radius = size / 2 - stroke / 2 - 2;
+  const circumference = 2 * Math.PI * radius;
+  const progress = circumference * (clamp(score, 0, 100) / 100);
   return (
-    <Svg width="100%" height={height} viewBox="0 0 240 170">
-      <Path d={arcPath(120, 132, 92, -180, 0)} fill="none" stroke="#e5e7eb" strokeWidth={16} strokeLinecap="round" />
-      <Path d={arcPath(120, 132, 92, -180, valueAngle)} fill="none" stroke="#16a34a" strokeWidth={16} strokeLinecap="round" />
-      <Path d={arcPath(120, 132, 92, -16, 0)} fill="none" stroke="#ef4444" strokeWidth={16} strokeLinecap="round" />
-      <Path d={arcPath(120, 132, 92, -28, -18)} fill="none" stroke="#f59e0b" strokeWidth={16} strokeLinecap="round" />
-      <SvgText x="120" y="104" textAnchor="middle" fontSize="40" fontWeight="700" fill="#111827">
+    <Svg width="100%" height={compact ? 186 : 180} viewBox={`0 0 ${size} ${size}`}>
+      <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke="#16a34a"
+        strokeWidth={stroke}
+        strokeDasharray={`${progress} ${circumference - progress}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+      <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f59e0b" strokeWidth={stroke} strokeDasharray={`${circumference * 0.05} ${circumference * 0.95}`} strokeDashoffset={-circumference * 0.84} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#ef4444" strokeWidth={stroke} strokeDasharray={`${circumference * 0.08} ${circumference * 0.92}`} strokeDashoffset={-circumference * 0.9} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      <SvgText x={size / 2} y={size / 2 - 4} textAnchor="middle" fontSize={compact ? 32 : 40} fontWeight="700" fill="#111827">
         {score}
       </SvgText>
-      <SvgText x="158" y="105" fontSize="16" fill="#475569">
+      <SvgText x={size / 2 + (compact ? 28 : 36)} y={size / 2 - 3} fontSize={compact ? 11 : 14} fill="#475569">
         /100
       </SvgText>
-      <SvgText x="120" y="132" textAnchor="middle" fontSize="17" fontWeight="700" fill="#16a34a">
+      <SvgText x={size / 2} y={size / 2 + 24} textAnchor="middle" fontSize={compact ? 13 : 16} fontWeight="700" fill="#16a34a">
         Good
       </SvgText>
     </Svg>
@@ -238,17 +262,19 @@ function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; 
   return (
     <View className={cn(sectionClass(isDark), 'flex-[0.7]')}>
       <SectionHeader icon="heart-pulse" title="Overall Health" compact={compact} />
-      <View className={compact ? 'px-3 pb-2 pt-1' : 'px-4 pb-4 pt-2'}>
-        <HealthGauge score={score} compact={compact} />
-        <View className={compact ? 'gap-1.5' : 'gap-2'}>
+      <View className={cn('flex-1 justify-between', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-2')}>
+        <View className="flex-1 items-center justify-center">
+          <HealthGauge score={score} compact={compact} />
+        </View>
+        <View className={compact ? 'gap-2.5' : 'gap-2'}>
           {metrics.map(([label, value]) => (
             <View key={label}>
               <View className="mb-0.5 flex-row justify-between">
-                <Text className={cn('font-body-medium', compact ? 'text-[9px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
-                <Text className={cn('font-mono', compact ? 'text-[9px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{value}%</Text>
+                <Text className={cn('font-body-medium', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
+                <Text className={cn('font-mono', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{value}%</Text>
               </View>
-              <View className={cn(compact ? 'h-1' : 'h-1.5', 'rounded-full', isDark ? 'bg-white/10' : 'bg-slate-100')}>
-                <View className={cn(compact ? 'h-1' : 'h-1.5', 'rounded-full bg-status-success')} style={{ width: `${value}%` }} />
+              <View className={cn(compact ? 'h-1.5' : 'h-1.5', 'rounded-full', isDark ? 'bg-white/10' : 'bg-slate-100')}>
+                <View className={cn(compact ? 'h-1.5' : 'h-1.5', 'rounded-full bg-status-success')} style={{ width: `${value}%` }} />
               </View>
             </View>
           ))}
@@ -495,26 +521,39 @@ function LiveAlarmFeed({ compact = false }: { compact?: boolean } = {}) {
           ))}
         </View>
         <View className={cn('rounded-md border', isDark ? 'border-line-dark' : 'border-line-light')}>
+          {compact && (
+            <View className={cn('flex-row items-center border-b px-2 py-1', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-slate-50')}>
+              <Text className={cn('w-16 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Severity</Text>
+              <Text className={cn('min-w-0 flex-1 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Alarm</Text>
+              <Text className={cn('w-8 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Pt</Text>
+              <Text className={cn('w-14 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Value</Text>
+              <Text className={cn('w-12 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Time</Text>
+              <Text className={cn('w-11 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>State</Text>
+              <Text className={cn('w-8 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Age</Text>
+              <Text className={cn('w-[116px] text-right font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Actions</Text>
+            </View>
+          )}
           {alarms.slice(0, compact ? 4 : alarms.length).map((alarm, index) => {
             const severity = alarm[0];
             const color = severity === 'Critical' ? '#ef4444' : severity === 'Warning' ? '#f59e0b' : '#2f80ed';
+            const compactTime = alarm[5].slice(0, 5);
             return (
-              <View key={`${alarm[1]}-${index}`} className={cn('flex-row items-center border-b last:border-b-0', compact ? 'gap-1 px-2 py-1' : 'gap-2 px-2 py-2', isDark ? 'border-line-dark' : 'border-line-light')}>
-                <Text className={cn('rounded px-1.5 text-center font-body-bold', compact ? 'w-12 py-0.5 text-[9px]' : 'w-14 py-1 text-[10px]')} style={{ color, backgroundColor: `${color}16` }}>
+              <View key={`${alarm[1]}-${index}`} className={cn('flex-row items-center border-b last:border-b-0', compact ? 'px-2 py-1.5' : 'gap-2 px-2 py-2', isDark ? 'border-line-dark' : 'border-line-light')}>
+                <Text numberOfLines={1} className={cn('rounded px-1.5 text-center font-body-bold', compact ? 'w-16 py-0.5 text-[9px]' : 'w-14 py-1 text-[10px]')} style={{ color, backgroundColor: `${color}16` }}>
                   {severity}
                 </Text>
-                <View className="min-w-0 flex-[1.4]">
+                <View className={cn('min-w-0', compact ? 'flex-1 px-2' : 'flex-[1.4]')}>
                   <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[1]}</Text>
                   {!compact && <Text numberOfLines={1} className={cn('font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[2]} - {alarm[3]}</Text>}
                 </View>
                 <Text className={cn(compact ? 'w-8 text-[9px]' : 'w-8 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[4]}</Text>
-                <Text className={cn(compact ? 'w-11 text-[9px]' : 'w-16 text-[10px]', 'font-mono', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[6]}</Text>
+                <Text numberOfLines={1} className={cn(compact ? 'w-14 text-[9px]' : 'w-16 text-[10px]', 'font-mono', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[6]}</Text>
                 {!compact && <Text className={cn('w-14 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[7]}</Text>}
-                <Text className={cn(compact ? 'w-11 text-[9px]' : 'w-20 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[5]}</Text>
-                <Text className={cn(compact ? 'w-9 text-[9px]' : 'w-14 text-[10px]', 'font-body-medium', alarm[8] === 'Ack' ? 'text-status-success' : 'text-status-warning')}>{alarm[8]}</Text>
+                <Text className={cn(compact ? 'w-12 text-[9px]' : 'w-20 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{compact ? compactTime : alarm[5]}</Text>
+                <Text className={cn(compact ? 'w-11 text-[9px]' : 'w-14 text-[10px]', 'font-body-medium', alarm[8] === 'Ack' ? 'text-status-success' : 'text-status-warning')}>{alarm[8]}</Text>
                 {!compact && <Text numberOfLines={1} className={cn('w-16 font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[9]}</Text>}
                 <Text className={cn(compact ? 'w-8 text-[9px]' : 'w-10 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[10]}</Text>
-                <View className="flex-row gap-1">
+                <View className={cn('flex-row gap-1', compact ? 'w-[116px] justify-end' : undefined)}>
                   {['check', 'comment-text-outline', 'account-arrow-right-outline', 'clock-outline', 'chart-line'].map((icon) => (
                     <Pressable key={icon} className={cn(compact ? 'h-5 w-5' : 'h-6 w-6', 'items-center justify-center rounded border', isDark ? 'border-line-dark' : 'border-line-light')}>
                       <MaterialCommunityIcons name={icon as IconName} size={compact ? 11 : 13} color={isDark ? '#F5F5F5' : '#111827'} />
@@ -705,7 +744,7 @@ function QuickActions({ onOpenDevices, onOpenCanvas, compact = false }: { onOpen
       <SectionHeader icon="cursor-default-click-outline" title="Quick Actions and Shortcuts" compact={compact} />
       <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {actions.map(([icon, label]) => (
-          <Pressable key={label} onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined} className={cn(compact ? 'min-w-[122px] px-2 py-2' : 'min-w-[150px] px-3 py-3', 'flex-1 flex-row items-center gap-2 rounded-md border', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}>
+          <Pressable key={label} onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined} className={cn(compact ? 'min-w-[112px] px-2 py-1.5' : 'min-w-[150px] px-3 py-3', 'flex-1 flex-row items-center gap-2 rounded-md border', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}>
             <MaterialCommunityIcons name={icon} size={compact ? 15 : 17} color={label.includes('Critical') ? '#ef4444' : label === 'Open Canvas' ? '#2563eb' : isDark ? '#F5F5F5' : '#111827'} />
             <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
           </Pressable>
@@ -768,9 +807,10 @@ export function DashboardOverview({
   const [now, setNow] = useState(() => new Date());
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
   const [activePanel, setActivePanel] = useState<DetailPanel | null>(null);
+  const [activeKpiIndex, setActiveKpiIndex] = useState<number | null>(null);
   const isCompact = width > 0 && width < 900;
   const isShortViewport = height > 0 && height < 950;
-  const dashboardSizes = { top: 44, kpi: 106, main: 324, system: 96, charts: 176, bottom: 220, chartLine: 116, donut: 108 };
+  const dashboardSizes = { top: 44, kpi: 84, main: 348, system: 96, charts: 176, chartAction: 156, bottom: 330, chartLine: 116, chartActionLine: 96, donut: 92 };
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -809,17 +849,20 @@ export function DashboardOverview({
     actions: 'Quick Actions and Shortcuts',
   };
   const openPanel = (panel: DetailPanel) => setActivePanel(panel);
-  const closePanel = () => setActivePanel(null);
+  const closePanel = () => {
+    setActivePanel(null);
+    setActiveKpiIndex(null);
+  };
 
   const getKpiCards = (compact: boolean) => [
-    <KpiCard key="health" icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} compact={compact} />,
-    <KpiCard key="oee" icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />,
-    <KpiCard key="machines" icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />,
-    <KpiCard key="channels" icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />,
-    <KpiCard key="gateways" icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />,
-    <KpiCard key="alarms" icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars compact={compact} />,
-    <KpiCard key="energy" icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} compact={compact} />,
-    <KpiCard key="uptime" icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} compact={compact} />,
+    <KpiCard key="health" icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} compact={compact} onPress={compact ? () => { setActiveKpiIndex(0); openPanel('kpis'); } : undefined} />,
+    <KpiCard key="oee" icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} onPress={compact ? () => { setActiveKpiIndex(1); openPanel('kpis'); } : undefined} />,
+    <KpiCard key="machines" icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} onPress={compact ? () => { setActiveKpiIndex(2); openPanel('kpis'); } : undefined} />,
+    <KpiCard key="channels" icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} onPress={compact ? () => { setActiveKpiIndex(3); openPanel('kpis'); } : undefined} />,
+    <KpiCard key="gateways" icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} onPress={compact ? () => { setActiveKpiIndex(4); openPanel('kpis'); } : undefined} />,
+    <KpiCard key="alarms" icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars compact={compact} onPress={compact ? () => { setActiveKpiIndex(5); openPanel('kpis'); } : undefined} />,
+    <KpiCard key="energy" icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} compact={compact} onPress={compact ? () => { setActiveKpiIndex(6); openPanel('kpis'); } : undefined} />,
+    <KpiCard key="uptime" icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} compact={compact} onPress={compact ? () => { setActiveKpiIndex(7); openPanel('kpis'); } : undefined} />,
   ];
 
   const renderKpiCards = (compact: boolean) => getKpiCards(compact);
@@ -827,6 +870,9 @@ export function DashboardOverview({
   const renderDetail = () => {
     switch (activePanel) {
       case 'kpis':
+        if (activeKpiIndex !== null) {
+          return <View style={{ height: 126, width: '100%', maxWidth: 360 }}>{getKpiCards(false)[activeKpiIndex]}</View>;
+        }
         return <View className="flex-row flex-wrap gap-3">{renderKpiCards(false)}</View>;
       case 'plant':
         return <PlantMapPanel />;
@@ -947,13 +993,8 @@ export function DashboardOverview({
               </View>
           </View>
 
-          <View className="gap-2" style={{ width: '100%' }}>
-            <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2" style={{ height: dashboardSizes.kpi, width: '100%' }}>
-              {dashboardKpiCards.slice(0, 4)}
-            </Pressable>
-            <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2" style={{ height: dashboardSizes.kpi, width: '100%' }}>
-              {dashboardKpiCards.slice(4)}
-            </Pressable>
+          <View className="flex-row gap-2" style={{ height: dashboardSizes.kpi, width: '100%' }}>
+            {dashboardKpiCards}
           </View>
 
           <View className="flex-row gap-2" style={{ height: dashboardSizes.main, width: '100%' }}>
@@ -990,12 +1031,12 @@ export function DashboardOverview({
               </Pressable>
           </View>
 
-          <View className="flex-row gap-2" style={{ height: dashboardSizes.charts, width: '100%' }}>
-              <Pressable onPress={() => openPanel('severity')} className="flex-1">
+          <View className="flex-row gap-2" style={{ height: dashboardSizes.chartAction, width: '100%' }}>
+              <Pressable onPress={() => openPanel('severity')} className="flex-[0.7]">
                 <ChartCard title="Alarm by Severity" action="Clickable filters" compact>
                   <View className="flex-row items-center justify-around">
                     <DonutChart total={56} size={dashboardSizes.donut} />
-                    <View className="gap-1">
+                    <View className="gap-0.5">
                       {[
                         ['Critical', '10', '#ef4444'],
                         ['Warning', '28', '#f59e0b'],
@@ -1012,22 +1053,22 @@ export function DashboardOverview({
                   </View>
                 </ChartCard>
               </Pressable>
-              <Pressable onPress={() => openPanel('throughput')} className="flex-1">
+              <Pressable onPress={() => openPanel('throughput')} className="flex-[0.9]">
                 <ChartCard title="Throughput vs Energy" action={timeRange} compact>
-                  <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={dashboardSizes.chartLine} />
+                  <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={dashboardSizes.chartActionLine} />
                 </ChartCard>
+              </Pressable>
+              <Pressable onPress={() => openPanel('actions')} className="flex-[1.15]">
+                <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} compact />
               </Pressable>
           </View>
 
           <View className="flex-row gap-2" style={{ height: dashboardSizes.bottom, width: '100%' }}>
-              <Pressable onPress={() => openPanel('machines')} className="flex-[1.25]">
-                <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} compact />
+              <Pressable onPress={() => openPanel('machines')} className="flex-[1.45]">
+                <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} />
               </Pressable>
-              <Pressable onPress={() => openPanel('insights')} className="flex-1">
-                <InsightsPanel compact />
-              </Pressable>
-              <Pressable onPress={() => openPanel('actions')} className="flex-1">
-                <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} compact />
+              <Pressable onPress={() => openPanel('insights')} className="flex-[1.15]">
+                <InsightsPanel />
               </Pressable>
           </View>
         </View>
