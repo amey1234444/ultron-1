@@ -215,13 +215,13 @@ function arcPath(cx: number, cy: number, radius: number, startAngle: number, end
 }
 
 function HealthGauge({ score, compact = false }: { score: number; compact?: boolean }) {
-  const size = compact ? 164 : 168;
+  const size = compact ? 150 : 168;
   const stroke = compact ? 14 : 16;
   const radius = size / 2 - stroke / 2 - 2;
   const circumference = 2 * Math.PI * radius;
   const progress = circumference * (clamp(score, 0, 100) / 100);
   return (
-    <Svg width="100%" height={compact ? 186 : 180} viewBox={`0 0 ${size} ${size}`}>
+    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
       <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#e5e7eb" strokeWidth={stroke} />
       <Circle
         cx={size / 2}
@@ -236,13 +236,13 @@ function HealthGauge({ score, compact = false }: { score: number; compact?: bool
       />
       <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#f59e0b" strokeWidth={stroke} strokeDasharray={`${circumference * 0.05} ${circumference * 0.95}`} strokeDashoffset={-circumference * 0.84} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       <Circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="#ef4444" strokeWidth={stroke} strokeDasharray={`${circumference * 0.08} ${circumference * 0.92}`} strokeDashoffset={-circumference * 0.9} strokeLinecap="round" transform={`rotate(-90 ${size / 2} ${size / 2})`} />
-      <SvgText x={size / 2} y={size / 2 - 4} textAnchor="middle" fontSize={compact ? 32 : 40} fontWeight="700" fill="#111827">
+      <SvgText x={size / 2} y={size / 2 - 4} textAnchor="middle" fontSize={compact ? 30 : 40} fontWeight="700" fill="#111827">
         {score}
       </SvgText>
-      <SvgText x={size / 2 + (compact ? 28 : 36)} y={size / 2 - 3} fontSize={compact ? 11 : 14} fill="#475569">
+      <SvgText x={size / 2 + (compact ? 27 : 36)} y={size / 2 - 3} fontSize={compact ? 10 : 14} fill="#475569">
         /100
       </SvgText>
-      <SvgText x={size / 2} y={size / 2 + 24} textAnchor="middle" fontSize={compact ? 13 : 16} fontWeight="700" fill="#16a34a">
+      <SvgText x={size / 2} y={size / 2 + 23} textAnchor="middle" fontSize={compact ? 12 : 16} fontWeight="700" fill="#16a34a">
         Good
       </SvgText>
     </Svg>
@@ -287,10 +287,10 @@ function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; 
           <Text className={cn('mt-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Calculated {updatedAt}</Text>
         </View>}
         {compact && (
-          <View className={cn('mt-3 flex-row items-center justify-between rounded-md px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')}>
+          <View className={cn('mt-3 flex-row items-center justify-between rounded-md px-3 py-3', isDark ? 'bg-white/5' : 'bg-slate-50')}>
             <View>
               <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Stable operating band</Text>
-              <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Updated {updatedAt}</Text>
+              <Text className={cn('mt-0.5 font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Updated {updatedAt}</Text>
             </View>
             <Text className="rounded bg-status-success/10 px-2 py-1 font-body-bold text-[10px] text-status-success">Good</Text>
           </View>
@@ -757,6 +757,7 @@ function QuickActions({ onOpenDevices, onOpenCanvas, compact = false }: { onOpen
             key={label}
             onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined}
             className={cn(compact ? 'min-w-[112px] basis-[31%] justify-center px-2 py-1.5' : 'min-w-[150px] px-3 py-3', 'flex-1 flex-row items-center gap-2 rounded-md border', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}
+            style={compact ? { height: '47%' } : undefined}
           >
             <MaterialCommunityIcons name={icon} size={compact ? 15 : 17} color={label.includes('Critical') ? '#ef4444' : label === 'Open Canvas' ? '#2563eb' : isDark ? '#F5F5F5' : '#111827'} />
             <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
