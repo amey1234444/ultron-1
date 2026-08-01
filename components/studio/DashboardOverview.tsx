@@ -145,7 +145,7 @@ function KpiCard({
   const { isDark } = useAppTheme();
   const color = toneColor(tone);
   return (
-    <View className={cn(compact ? 'min-w-[170px] flex-1 rounded-lg border p-2' : 'min-w-[180px] flex-1 rounded-lg border p-2', 'h-full overflow-hidden', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+    <View className={cn(compact ? 'min-w-[148px] flex-1 rounded-lg border p-2' : 'min-w-[170px] flex-1 rounded-lg border p-2', 'h-full overflow-hidden', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
       <View className={cn('flex-row items-start', compact ? 'gap-2' : 'gap-3')}>
         <View className={cn(compact ? 'h-7 w-7' : 'h-8 w-8', 'items-center justify-center rounded-lg')} style={{ backgroundColor: `${color}16` }}>
           <MaterialCommunityIcons name={icon} size={compact ? 16 : 18} color={color} />
@@ -236,7 +236,7 @@ function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; 
   ] as const;
 
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[260px] flex-[0.7]')}>
+    <View className={cn(sectionClass(isDark), 'flex-[0.7]')}>
       <SectionHeader icon="heart-pulse" title="Overall Health" compact={compact} />
       <View className={compact ? 'px-3 pb-2 pt-1' : 'px-4 pb-4 pt-2'}>
         <HealthGauge score={score} compact={compact} />
@@ -399,7 +399,7 @@ function PlantMapPanel({ compact = false }: { compact?: boolean } = {}) {
     { name: 'Rotary Airlock', x: 489, y: 315, status: 'healthy', count: 3 },
   ] as const;
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[560px] flex-[1.35]')}>
+    <View className={cn(sectionClass(isDark), 'flex-[1.35]')}>
       <View className={cn('flex-row items-center justify-between border-b', compact ? 'px-3 py-2' : 'px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
         <View>
           <Text className={cn('font-body-bold', compact ? 'text-xs' : 'text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Plant Overview</Text>
@@ -484,7 +484,7 @@ function LiveAlarmFeed({ compact = false }: { compact?: boolean } = {}) {
     ['Info', 'Gateway recovered', 'rack-gw-01', 'Utility Area', '-', '10:18:47 AM', 'Online', '-', 'Ack', 'System', '4m'],
   ];
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[440px] flex-1')}>
+    <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader icon="bell-alert-outline" title="Live Alarm Feed" action="View all alarms" compact={compact} />
       <View className={compact ? 'px-2 py-1.5' : 'px-3 py-2'}>
         <View className={cn('flex-row items-center gap-2', compact ? 'mb-1' : 'mb-2')}>
@@ -544,7 +544,7 @@ function SystemStatus({ connectedGateways, totalGateways, compact = false }: { c
     ['Notifications', 'healthy'],
   ];
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[300px] flex-1')}>
+    <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader icon="server-network" title="System Status" action="View all" compact={compact} />
       <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {services.slice(0, compact ? 4 : services.length).map(([service, status]) => {
@@ -573,7 +573,7 @@ function TelemetrySnapshot({ activeChannels, configuredChannels, lastUpdate, com
     ['Devices Streaming', String(activeChannels), `/ ${configuredChannels}`, SPARK_HEALTH],
   ] as const;
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[360px] flex-1')}>
+    <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader icon="pulse" title="Live Telemetry Snapshot" compact={compact} />
       <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {snapshots.map(([label, value, unit, spark]) => (
@@ -594,7 +594,7 @@ function TelemetrySnapshot({ activeChannels, configuredChannels, lastUpdate, com
 function ChartCard({ title, action, children, compact = false }: { title: string; action?: string; children: ReactNode; compact?: boolean }) {
   const { isDark } = useAppTheme();
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[310px] flex-1')}>
+    <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader title={title} action={action ?? 'Last 7 Days'} compact={compact} />
       <View className={compact ? 'p-2' : 'p-3'}>{children}</View>
     </View>
@@ -612,7 +612,7 @@ function MachinesAttention({ machines, onOpenMachine, compact = false }: { machi
     ['Pump Line-04', 'Process Pump Line', '90', 'Flow deviation', '1', '10:22:58 AM', '10:24:25 AM', 'Low', 'P. Mehta', 'Verify valve'],
   ];
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[620px] flex-[1.25]')}>
+    <View className={cn(sectionClass(isDark), 'flex-[1.25]')}>
       <SectionHeader icon="alert-decagram-outline" title="Machines Requiring Attention" compact={compact} />
       <View className={compact ? 'px-2 py-1.5' : 'px-3 py-2'}>
         <View className="flex-row px-2 py-1">
@@ -660,7 +660,7 @@ function InsightsPanel({ compact = false }: { compact?: boolean } = {}) {
     ['Rotary Airlock', 'Check media and valves', 'Schedule lubrication inspection', 'Current stable, vibration rising', '71%', 'Low'],
   ];
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[420px] flex-1')}>
+    <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader icon="lightbulb-on-outline" title="Insights and Recommended Actions" action="View all" compact={compact} />
       <View className={cn(compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {insights.slice(0, compact ? 2 : insights.length).map((item) => {
@@ -701,7 +701,7 @@ function QuickActions({ onOpenDevices, onOpenCanvas, compact = false }: { onOpen
     ['magnify', 'Asset Search'],
   ] as const;
   return (
-    <View className={cn(sectionClass(isDark), 'min-w-[420px] flex-1')}>
+    <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader icon="cursor-default-click-outline" title="Quick Actions and Shortcuts" compact={compact} />
       <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {actions.map(([icon, label]) => (
@@ -770,8 +770,7 @@ export function DashboardOverview({
   const [activePanel, setActivePanel] = useState<DetailPanel | null>(null);
   const isCompact = width > 0 && width < 900;
   const isShortViewport = height > 0 && height < 950;
-  const dashboardMinWidth = 1520;
-  const dashboardSizes = { top: 44, kpi: 106, main: 304, system: 96, charts: 164, bottom: 210, chartLine: 108, donut: 104 };
+  const dashboardSizes = { top: 44, kpi: 106, main: 324, system: 96, charts: 176, bottom: 220, chartLine: 116, donut: 108 };
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -812,18 +811,18 @@ export function DashboardOverview({
   const openPanel = (panel: DetailPanel) => setActivePanel(panel);
   const closePanel = () => setActivePanel(null);
 
-  const renderKpiCards = (compact: boolean) => (
-    <>
-      <KpiCard icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} compact={compact} />
-      <KpiCard icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />
-      <KpiCard icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />
-      <KpiCard icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />
-      <KpiCard icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />
-      <KpiCard icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars compact={compact} />
-      <KpiCard icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} compact={compact} />
-      <KpiCard icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} compact={compact} />
-    </>
-  );
+  const getKpiCards = (compact: boolean) => [
+    <KpiCard key="health" icon="heart-pulse" label="Overall Health" value="84" unit="/100" detail="Good classification" delta="+4 pts vs yesterday" tone="green" spark={SPARK_HEALTH} compact={compact} />,
+    <KpiCard key="oee" icon="bullseye-arrow" label="OEE" value="72.6" unit="%" detail="Availability weighted" delta="+2.2% vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />,
+    <KpiCard key="machines" icon="robot-industrial-outline" label="Machines Online" value={String(machinesOnline)} unit={`/ ${machinesTotal}`} detail="Online versus total" delta="+6 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />,
+    <KpiCard key="channels" icon="pulse" label="Active Channels" value={activeChannels.toLocaleString()} unit={`/ ${configuredChannels.toLocaleString()}`} detail="Streaming now" delta="+96 vs yesterday" tone="blue" spark={SPARK_BLUE} compact={compact} />,
+    <KpiCard key="gateways" icon="router-network" label="Gateways Connected" value={String(connectedGateways)} unit={`/ ${totalGateways}`} detail="Edge transport" delta="+1 vs yesterday" tone="slate" spark={SPARK_HEALTH} compact={compact} />,
+    <KpiCard key="alarms" icon="bell-alert-outline" label="Alarm Count" value="12" detail="3 Critical, 9 Warning" delta="-3 vs yesterday" tone="red" spark={SPARK_AMBER} bars compact={compact} />,
+    <KpiCard key="energy" icon="lightning-bolt-outline" label="Energy Today" value="18.7" unit="MWh" detail="Plant consumption" delta="+4.5% vs yesterday" tone="green" spark={ENERGY.slice(0, 8)} compact={compact} />,
+    <KpiCard key="uptime" icon="shield-check-outline" label="Uptime" value="99.33" unit="%" detail="System uptime" delta="+0.18% vs yesterday" tone="blue" spark={SPARK_HEALTH} compact={compact} />,
+  ];
+
+  const renderKpiCards = (compact: boolean) => getKpiCards(compact);
 
   const renderDetail = () => {
     switch (activePanel) {
@@ -889,6 +888,7 @@ export function DashboardOverview({
         return null;
     }
   };
+  const dashboardKpiCards = getKpiCards(true);
 
   return (
     <View className={cn('flex-1', isDark ? 'bg-surface' : 'bg-slate-50')} style={{ minHeight: 0 }}>
@@ -898,15 +898,8 @@ export function DashboardOverview({
         showsVerticalScrollIndicator
         contentContainerStyle={{ flexGrow: 1, padding: 8, paddingBottom: 24 }}
       >
-        <ScrollView
-          horizontal
-          nestedScrollEnabled
-          showsHorizontalScrollIndicator
-          style={{ minHeight: 0 }}
-          contentContainerStyle={{ flexGrow: 1, minWidth: dashboardMinWidth }}
-        >
-          <View className={cn(isShortViewport ? 'gap-1.5' : 'gap-2')} style={{ minWidth: dashboardMinWidth, flexGrow: 1 }}>
-            <View className="flex-row items-center gap-2" style={{ height: dashboardSizes.top }}>
+        <View className={cn(isShortViewport ? 'gap-1.5' : 'gap-2')} style={{ flexGrow: 1, width: '100%' }}>
+          <View className="flex-row flex-wrap items-center gap-2" style={{ minHeight: dashboardSizes.top }}>
               <Pressable className={cn('h-10 min-w-[190px] flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
                 <MaterialCommunityIcons name="office-building-marker-outline" size={17} color={isDark ? '#F5F5F5' : '#111827'} />
                 <Text className={cn('flex-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{plantName}</Text>
@@ -952,34 +945,39 @@ export function DashboardOverview({
                   <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{roleLabel}</Text>
                 </View>
               </View>
-            </View>
+          </View>
 
-            <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2" style={{ height: dashboardSizes.kpi }}>
-              {renderKpiCards(true)}
+          <View className="gap-2" style={{ width: '100%' }}>
+            <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2" style={{ height: dashboardSizes.kpi, width: '100%' }}>
+              {dashboardKpiCards.slice(0, 4)}
             </Pressable>
+            <Pressable onPress={() => openPanel('kpis')} className="flex-row gap-2" style={{ height: dashboardSizes.kpi, width: '100%' }}>
+              {dashboardKpiCards.slice(4)}
+            </Pressable>
+          </View>
 
-            <View className="flex-row gap-2" style={{ height: dashboardSizes.main }}>
-              <Pressable onPress={() => openPanel('plant')} className="min-w-[520px] flex-[1.35]">
+          <View className="flex-row gap-2" style={{ height: dashboardSizes.main, width: '100%' }}>
+              <Pressable onPress={() => openPanel('plant')} className="flex-[1.35]">
                 <PlantMapPanel compact />
               </Pressable>
-              <Pressable onPress={() => openPanel('health')} className="min-w-[235px] flex-[0.55]">
+              <Pressable onPress={() => openPanel('health')} className="flex-[0.55]">
                 <HealthAnalysis score={84} updatedAt={lastUpdate} compact />
               </Pressable>
-              <Pressable onPress={() => openPanel('alarms')} className="min-w-[390px] flex-1">
+              <Pressable onPress={() => openPanel('alarms')} className="flex-1">
                 <LiveAlarmFeed compact />
               </Pressable>
-            </View>
+          </View>
 
-            <View className="flex-row gap-2" style={{ height: dashboardSizes.system }}>
+          <View className="flex-row gap-2" style={{ height: dashboardSizes.system, width: '100%' }}>
               <Pressable onPress={() => openPanel('system')} className="flex-1">
                 <SystemStatus connectedGateways={connectedGateways} totalGateways={totalGateways} compact />
               </Pressable>
               <Pressable onPress={() => openPanel('telemetry')} className="flex-1">
                 <TelemetrySnapshot activeChannels={activeChannels} configuredChannels={configuredChannels} lastUpdate={lastUpdate} compact />
               </Pressable>
-            </View>
+          </View>
 
-            <View className="flex-row gap-2" style={{ height: dashboardSizes.charts }}>
+          <View className="flex-row gap-2" style={{ height: dashboardSizes.charts, width: '100%' }}>
               <Pressable onPress={() => openPanel('healthTrend')} className="flex-1">
                 <ChartCard title="Health Trend" action={timeRange} compact>
                   <TrendLine values={HEALTH_TREND} previous={PREVIOUS_HEALTH_TREND} height={dashboardSizes.chartLine} />
@@ -990,6 +988,9 @@ export function DashboardOverview({
                   <StackedBars height={dashboardSizes.chartLine} />
                 </ChartCard>
               </Pressable>
+          </View>
+
+          <View className="flex-row gap-2" style={{ height: dashboardSizes.charts, width: '100%' }}>
               <Pressable onPress={() => openPanel('severity')} className="flex-1">
                 <ChartCard title="Alarm by Severity" action="Clickable filters" compact>
                   <View className="flex-row items-center justify-around">
@@ -1016,9 +1017,9 @@ export function DashboardOverview({
                   <TrendLine values={THROUGHPUT.map((value) => value / 3.6)} previous={ENERGY.map((value) => value * 1.6)} color="#2563eb" height={dashboardSizes.chartLine} />
                 </ChartCard>
               </Pressable>
-            </View>
+          </View>
 
-            <View className="flex-row gap-2" style={{ height: dashboardSizes.bottom }}>
+          <View className="flex-row gap-2" style={{ height: dashboardSizes.bottom, width: '100%' }}>
               <Pressable onPress={() => openPanel('machines')} className="flex-[1.25]">
                 <MachinesAttention machines={machines} onOpenMachine={onOpenMachine} compact />
               </Pressable>
@@ -1028,9 +1029,8 @@ export function DashboardOverview({
               <Pressable onPress={() => openPanel('actions')} className="flex-1">
                 <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} compact />
               </Pressable>
-            </View>
           </View>
-        </ScrollView>
+        </View>
       </ScrollView>
 
       <DashboardDetailModal visible={activePanel !== null} title={activePanel ? detailTitles[activePanel] : ''} onClose={closePanel}>
