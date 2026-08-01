@@ -262,11 +262,11 @@ function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; 
   return (
     <View className={cn(sectionClass(isDark), 'flex-[0.7]')}>
       <SectionHeader icon="heart-pulse" title="Overall Health" compact={compact} />
-      <View className={cn('flex-1 justify-between', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-2')}>
+      <View className={cn('flex-1 justify-between', compact ? 'px-4 pb-3 pt-3' : 'px-4 pb-4 pt-2')}>
         <View className="flex-1 items-center justify-center">
           <HealthGauge score={score} compact={compact} />
         </View>
-        <View className={compact ? 'gap-2.5' : 'gap-2'}>
+        <View className={compact ? 'gap-2' : 'gap-2'}>
           {metrics.map(([label, value]) => (
             <View key={label}>
               <View className="mb-0.5 flex-row justify-between">
@@ -286,6 +286,15 @@ function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; 
           </Text>
           <Text className={cn('mt-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Calculated {updatedAt}</Text>
         </View>}
+        {compact && (
+          <View className={cn('mt-3 flex-row items-center justify-between rounded-md px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')}>
+            <View>
+              <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Stable operating band</Text>
+              <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Updated {updatedAt}</Text>
+            </View>
+            <Text className="rounded bg-status-success/10 px-2 py-1 font-body-bold text-[10px] text-status-success">Good</Text>
+          </View>
+        )}
       </View>
     </View>
   );
@@ -742,9 +751,13 @@ function QuickActions({ onOpenDevices, onOpenCanvas, compact = false }: { onOpen
   return (
     <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader icon="cursor-default-click-outline" title="Quick Actions and Shortcuts" compact={compact} />
-      <View className={cn('flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
+      <View className={cn('flex-1 flex-row flex-wrap', compact ? 'gap-1.5 p-2' : 'gap-2 p-3')}>
         {actions.map(([icon, label]) => (
-          <Pressable key={label} onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined} className={cn(compact ? 'min-w-[112px] px-2 py-1.5' : 'min-w-[150px] px-3 py-3', 'flex-1 flex-row items-center gap-2 rounded-md border', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}>
+          <Pressable
+            key={label}
+            onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined}
+            className={cn(compact ? 'min-w-[112px] basis-[31%] justify-center px-2 py-1.5' : 'min-w-[150px] px-3 py-3', 'flex-1 flex-row items-center gap-2 rounded-md border', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}
+          >
             <MaterialCommunityIcons name={icon} size={compact ? 15 : 17} color={label.includes('Critical') ? '#ef4444' : label === 'Open Canvas' ? '#2563eb' : isDark ? '#F5F5F5' : '#111827'} />
             <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
           </Pressable>
@@ -759,16 +772,18 @@ function DashboardDetailModal({
   title,
   onClose,
   children,
+  compactPanel = false,
 }: {
   visible: boolean;
   title: string;
   onClose: () => void;
   children: ReactNode;
+  compactPanel?: boolean;
 }) {
   const { isDark } = useAppTheme();
   const { width, height } = useWindowDimensions();
-  const modalWidth = Math.min(Math.max(width - 32, 320), 1280);
-  const modalHeight = Math.min(Math.max(height - 64, 360), 820);
+  const modalWidth = compactPanel ? Math.min(Math.max(width - 48, 320), 520) : Math.min(Math.max(width - 32, 320), 1280);
+  const modalHeight = compactPanel ? Math.min(Math.max(height - 160, 260), 360) : Math.min(Math.max(height - 64, 360), 820);
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -783,7 +798,7 @@ function DashboardDetailModal({
               <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Cancel</Text>
             </Pressable>
           </View>
-          <ScrollView contentContainerStyle={{ padding: 12, gap: 12 }}>{children}</ScrollView>
+          <ScrollView contentContainerStyle={{ padding: 12, gap: 12, flexGrow: compactPanel ? 0 : undefined }}>{children}</ScrollView>
         </View>
       </View>
     </Modal>
@@ -870,9 +885,7 @@ export function DashboardOverview({
   const renderDetail = () => {
     switch (activePanel) {
       case 'kpis':
-        if (activeKpiIndex !== null) {
-          return <View style={{ height: 126, width: '100%', maxWidth: 360 }}>{getKpiCards(false)[activeKpiIndex]}</View>;
-        }
+        if (activeKpiIndex !== null) return <View style={{ height: 126 }}>{getKpiCards(false)[activeKpiIndex]}</View>;
         return <View className="flex-row flex-wrap gap-3">{renderKpiCards(false)}</View>;
       case 'plant':
         return <PlantMapPanel />;
@@ -1074,7 +1087,7 @@ export function DashboardOverview({
         </View>
       </ScrollView>
 
-      <DashboardDetailModal visible={activePanel !== null} title={activePanel ? detailTitles[activePanel] : ''} onClose={closePanel}>
+      <DashboardDetailModal visible={activePanel !== null} title={activePanel ? detailTitles[activePanel] : ''} onClose={closePanel} compactPanel={activePanel === 'kpis' && activeKpiIndex !== null}>
         {renderDetail()}
       </DashboardDetailModal>
     </View>
