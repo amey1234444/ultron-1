@@ -215,7 +215,7 @@ function arcPath(cx: number, cy: number, radius: number, startAngle: number, end
 }
 
 function HealthGauge({ score, compact = false }: { score: number; compact?: boolean }) {
-  const size = compact ? 150 : 168;
+  const size = compact ? 176 : 168;
   const stroke = compact ? 14 : 16;
   const radius = size / 2 - stroke / 2 - 2;
   const circumference = 2 * Math.PI * radius;
@@ -260,10 +260,10 @@ function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; 
   ] as const;
 
   return (
-    <View className={cn(sectionClass(isDark), 'flex-[0.7]')}>
+    <View className={cn(sectionClass(isDark), 'flex-[0.7]')} style={{ flex: 1 }}>
       <SectionHeader icon="heart-pulse" title="Overall Health" compact={compact} />
-      <View className={cn('flex-1 justify-between', compact ? 'px-4 pb-3 pt-3' : 'px-4 pb-4 pt-2')}>
-        <View className="flex-1 items-center justify-center">
+      <View className={cn('justify-between', compact ? 'px-4 pb-4 pt-3' : 'px-4 pb-4 pt-2')} style={{ flex: 1, minHeight: 0 }}>
+        <View className="items-center justify-center" style={{ flex: compact ? 1.25 : 1 }}>
           <HealthGauge score={score} compact={compact} />
         </View>
         <View className={compact ? 'gap-2' : 'gap-2'}>
@@ -287,7 +287,7 @@ function HealthAnalysis({ score, updatedAt, compact = false }: { score: number; 
           <Text className={cn('mt-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Calculated {updatedAt}</Text>
         </View>}
         {compact && (
-          <View className={cn('mt-3 flex-row items-center justify-between rounded-md px-3 py-3', isDark ? 'bg-white/5' : 'bg-slate-50')}>
+          <View className={cn('mt-3 flex-row items-center justify-between rounded-md px-3 py-4', isDark ? 'bg-white/5' : 'bg-slate-50')}>
             <View>
               <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Stable operating band</Text>
               <Text className={cn('mt-0.5 font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Updated {updatedAt}</Text>
@@ -518,6 +518,15 @@ function LiveAlarmFeed({ compact = false }: { compact?: boolean } = {}) {
     ['Warning', 'Motor overcurrent', 'Turbine-01', 'Turbine Hall', 'C1', '10:22:31 AM', '41 A', '> 38', 'Ack', 'S. Rao', '34m'],
     ['Info', 'Gateway recovered', 'rack-gw-01', 'Utility Area', '-', '10:18:47 AM', 'Online', '-', 'Ack', 'System', '4m'],
   ];
+  const compactColumns = {
+    severity: 74,
+    point: 28,
+    value: 70,
+    time: 48,
+    state: 50,
+    age: 36,
+    actions: 116,
+  };
   return (
     <View className={cn(sectionClass(isDark), 'flex-1')}>
       <SectionHeader icon="bell-alert-outline" title="Live Alarm Feed" action="View all alarms" compact={compact} />
@@ -531,15 +540,15 @@ function LiveAlarmFeed({ compact = false }: { compact?: boolean } = {}) {
         </View>
         <View className={cn('rounded-md border', isDark ? 'border-line-dark' : 'border-line-light')}>
           {compact && (
-            <View className={cn('flex-row items-center border-b px-2 py-1', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-slate-50')}>
-              <Text className={cn('w-16 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Severity</Text>
-              <Text className={cn('min-w-0 flex-1 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Alarm</Text>
-              <Text className={cn('w-8 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Pt</Text>
-              <Text className={cn('w-14 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Value</Text>
-              <Text className={cn('w-12 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Time</Text>
-              <Text className={cn('w-11 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>State</Text>
-              <Text className={cn('w-8 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Age</Text>
-              <Text className={cn('w-[116px] text-right font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Actions</Text>
+            <View className={cn('flex-row items-center border-b px-2 py-2', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-slate-50')}>
+              <Text numberOfLines={1} className={cn('font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={{ width: compactColumns.severity }}>Severity</Text>
+              <Text numberOfLines={1} className={cn('min-w-0 flex-1 px-2 font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Alarm</Text>
+              <Text numberOfLines={1} className={cn('font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={{ width: compactColumns.point }}>Pt</Text>
+              <Text numberOfLines={1} className={cn('font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={{ width: compactColumns.value }}>Value</Text>
+              <Text numberOfLines={1} className={cn('font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={{ width: compactColumns.time }}>Time</Text>
+              <Text numberOfLines={1} className={cn('font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={{ width: compactColumns.state }}>State</Text>
+              <Text numberOfLines={1} className={cn('font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={{ width: compactColumns.age }}>Age</Text>
+              <Text numberOfLines={1} className={cn('text-right font-body-bold text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={{ width: compactColumns.actions }}>Actions</Text>
             </View>
           )}
           {alarms.slice(0, compact ? 4 : alarms.length).map((alarm, index) => {
@@ -548,21 +557,21 @@ function LiveAlarmFeed({ compact = false }: { compact?: boolean } = {}) {
             const compactTime = alarm[5].slice(0, 5);
             return (
               <View key={`${alarm[1]}-${index}`} className={cn('flex-row items-center border-b last:border-b-0', compact ? 'px-2 py-1.5' : 'gap-2 px-2 py-2', isDark ? 'border-line-dark' : 'border-line-light')}>
-                <Text numberOfLines={1} className={cn('rounded px-1.5 text-center font-body-bold', compact ? 'w-16 py-0.5 text-[9px]' : 'w-14 py-1 text-[10px]')} style={{ color, backgroundColor: `${color}16` }}>
+                <Text numberOfLines={1} className={cn('rounded px-1.5 text-center font-body-bold', compact ? 'py-0.5 text-[9px]' : 'w-14 py-1 text-[10px]')} style={compact ? { color, backgroundColor: `${color}16`, width: compactColumns.severity } : { color, backgroundColor: `${color}16` }}>
                   {severity}
                 </Text>
                 <View className={cn('min-w-0', compact ? 'flex-1 px-2' : 'flex-[1.4]')}>
                   <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[10px]' : 'text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[1]}</Text>
                   {!compact && <Text numberOfLines={1} className={cn('font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[2]} - {alarm[3]}</Text>}
                 </View>
-                <Text className={cn(compact ? 'w-8 text-[9px]' : 'w-8 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[4]}</Text>
-                <Text numberOfLines={1} className={cn(compact ? 'w-14 text-[9px]' : 'w-16 text-[10px]', 'font-mono', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm[6]}</Text>
+                <Text className={cn(compact ? 'text-[9px]' : 'w-8 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={compact ? { width: compactColumns.point } : undefined}>{alarm[4]}</Text>
+                <Text numberOfLines={1} className={cn(compact ? 'text-[9px]' : 'w-16 text-[10px]', 'font-mono', isDark ? 'text-ink' : 'text-ink-inverse')} style={compact ? { width: compactColumns.value } : undefined}>{alarm[6]}</Text>
                 {!compact && <Text className={cn('w-14 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[7]}</Text>}
-                <Text className={cn(compact ? 'w-12 text-[9px]' : 'w-20 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{compact ? compactTime : alarm[5]}</Text>
-                <Text className={cn(compact ? 'w-11 text-[9px]' : 'w-14 text-[10px]', 'font-body-medium', alarm[8] === 'Ack' ? 'text-status-success' : 'text-status-warning')}>{alarm[8]}</Text>
+                <Text className={cn(compact ? 'text-[9px]' : 'w-20 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={compact ? { width: compactColumns.time } : undefined}>{compact ? compactTime : alarm[5]}</Text>
+                <Text className={cn(compact ? 'text-[9px]' : 'w-14 text-[10px]', 'font-body-medium', alarm[8] === 'Ack' ? 'text-status-success' : 'text-status-warning')} style={compact ? { width: compactColumns.state } : undefined}>{alarm[8]}</Text>
                 {!compact && <Text numberOfLines={1} className={cn('w-16 font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[9]}</Text>}
-                <Text className={cn(compact ? 'w-8 text-[9px]' : 'w-10 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm[10]}</Text>
-                <View className={cn('flex-row gap-1', compact ? 'w-[116px] justify-end' : undefined)}>
+                <Text className={cn(compact ? 'text-[9px]' : 'w-10 text-[10px]', 'font-mono', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')} style={compact ? { width: compactColumns.age } : undefined}>{alarm[10]}</Text>
+                <View className={cn('flex-row gap-1', compact ? 'justify-end' : undefined)} style={compact ? { width: compactColumns.actions } : undefined}>
                   {['check', 'comment-text-outline', 'account-arrow-right-outline', 'clock-outline', 'chart-line'].map((icon) => (
                     <Pressable key={icon} className={cn(compact ? 'h-5 w-5' : 'h-6 w-6', 'items-center justify-center rounded border', isDark ? 'border-line-dark' : 'border-line-light')}>
                       <MaterialCommunityIcons name={icon as IconName} size={compact ? 11 : 13} color={isDark ? '#F5F5F5' : '#111827'} />
@@ -995,7 +1004,6 @@ export function DashboardOverview({
                 <Text className={cn('font-body-bold text-xs', streamHealthy ? 'text-status-success' : 'text-status-warning')}>{streamHealthy ? 'Stream Healthy' : 'Stream Stale'}</Text>
               </View>
 
-              <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Last update: {lastUpdate}</Text>
               <View className={cn('flex-row items-center gap-2 rounded-lg border px-2 py-1.5', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
                 <View className={cn('h-7 w-7 items-center justify-center rounded-full', isDark ? 'bg-white/10' : 'bg-ink-inverse')}>
                   <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-white')}>{userName.slice(0, 2).toUpperCase()}</Text>
