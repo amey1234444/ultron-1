@@ -5,12 +5,20 @@ import { query } from './db.js';
 const textOrNull = (value) => (typeof value === 'string' && value.length > 0 ? value : null);
 const bool = (value) => value === true;
 const intOrNull = (value) => (Number.isInteger(value) ? value : null);
+const numericOrNull = (value) => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value.trim())) return Number(value);
+  return null;
+};
 const decimalStringOrNull = (value) => {
   if (value === null || value === undefined) return null;
   if (typeof value === 'number' && Number.isFinite(value)) return String(value);
   if (typeof value === 'string') return value;
   return null;
 };
+
+const channelIdOf = (slot) => intOrNull(slot.channel_id) ?? intOrNull(slot.channel_number) ?? intOrNull(slot.channel) ?? 1;
+const measurementTypeOf = (slot) => textOrNull(slot.sensor) ?? textOrNull(slot.card_type) ?? 'VALUE';
 
 function stableId(prefix, ...parts) {
   return `${prefix}-${createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 16)}`;
@@ -770,6 +778,11 @@ const SLOT_LATEST_CASTS = [
   '::text', '::int', '::text', '::int', '::text', '::numeric', '::bigint',
   '::text', '::jsonb', '::boolean',
 ];
+const CHANNEL_MEASUREMENT_CASTS = [
+  '::text', '::text', '::int', '::int', '::text', '::double precision',
+  '::text', '::text', '::bigint', '::numeric', '::text', '::text',
+  '::text', '::text', '::double precision', '::double precision', '::text', '::text',
+];
 
 function inventorySlotRow(msg, slot) {
   return [
@@ -806,6 +819,35 @@ function controllerInventoryRow(msg, online) {
     '',
     null,
     json({ ...CONTROLLER_SLOT_PAYLOAD, online }),
+  ];
+}
+
+function channelMeasurementRow(msg, slot) {
+  const value = numericOrNull(slot.value_formatted ?? slot.value_raw);
+  if (value === null) return null;
+  const display = String(slot.value_display ?? slot.value_formatted ?? '').trim().toLowerCase();
+  const measurementValid = slot.measurement_valid === true
+    && String(slot.channel_status ?? 'ok').toLowerCase() === 'ok'
+    && !['', 'invalid', 'nan', 'null', 'none'].includes(display);
+  return [
+    msg.gateway_id,
+    msg.rack_id,
+    slot.slot_number,
+    channelIdOf(slot),
+    measurementTypeOf(slot),
+    value,
+    textOrNull(slot.unit) ?? '',
+    measurementValid ? 'GOOD' : 'BAD',
+    msg.gateway_sequence,
+    createdAtUs(msg),
+    textOrNull(slot.card_type),
+    textOrNull(slot.sensor),
+    String(slot.data_status ?? '').toLowerCase() === 'current' ? 'FRESH' : 'STALE',
+    textOrNull(slot.channel_status),
+    numericOrNull(slot.alert_value_formatted ?? slot.alert_value_raw),
+    numericOrNull(slot.danger_value_formatted ?? slot.danger_value_raw),
+    textOrNull(slot.alert_status) ?? 'INACTIVE',
+    textOrNull(slot.danger_status) ?? 'INACTIVE',
   ];
 }
 
@@ -885,6 +927,46 @@ async function upsertSlotLatest(msg, slots) {
   );
 }
 
+async function upsertChannelMeasurements(msg, slots) {
+  const rows = slots.map((slot) => channelMeasurementRow(msg, slot)).filter(Boolean);
+  if (rows.length === 0) return;
+  await query(
+    `INSERT INTO measurement_latest (
+       gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality,
+       source_sequence, source_timestamp_us, card_type, sensor, freshness, channel_status,
+       alert_threshold, danger_threshold, alert_state, danger_state
+     )
+     VALUES ${multiRowValues(rows.length, CHANNEL_MEASUREMENT_CASTS)}
+     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type) DO UPDATE SET
+       value = EXCLUDED.value,
+       unit = EXCLUDED.unit,
+       quality = EXCLUDED.quality,
+       source_sequence = EXCLUDED.source_sequence,
+       source_timestamp_us = EXCLUDED.source_timestamp_us,
+       card_type = EXCLUDED.card_type,
+       sensor = EXCLUDED.sensor,
+       freshness = EXCLUDED.freshness,
+       channel_status = EXCLUDED.channel_status,
+       alert_threshold = EXCLUDED.alert_threshold,
+       danger_threshold = EXCLUDED.danger_threshold,
+       alert_state = EXCLUDED.alert_state,
+       danger_state = EXCLUDED.danger_state,
+       updated_at = now()
+     WHERE measurement_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
+    rows.flat(),
+  );
+  await query(
+    `INSERT INTO measurement_history (
+       gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality,
+       source_sequence, source_timestamp_us, card_type, sensor, freshness, channel_status,
+       alert_threshold, danger_threshold, alert_state, danger_state
+     )
+     VALUES ${multiRowValues(rows.length, CHANNEL_MEASUREMENT_CASTS)}
+     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
+    rows.flat(),
+  );
+}
+
 export async function handleTelemetry(msg) {
   if (!(await currentRackAllows(msg))) {
     bumpMetric('older_messages_ignored');
@@ -903,6 +985,7 @@ export async function handleTelemetry(msg) {
   ];
   await upsertInventorySlots(inventoryRows);
   await upsertSlotLatest(msg, slots);
+  await upsertChannelMeasurements(msg, slots);
   await refreshGatewayRackState(msg.gateway_id);
   return slots.length;
 }

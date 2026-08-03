@@ -131,6 +131,20 @@ function intValue(value: unknown): number | null {
   return Number.isInteger(value) ? (value as number) : null;
 }
 
+function numericValue(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string' && /^-?\d+(\.\d+)?$/.test(value.trim())) return Number(value);
+  return null;
+}
+
+function channelIdValue(slot: Record<string, unknown>): number {
+  return intValue(slot.channel_id) ?? intValue(slot.channel_number) ?? intValue(slot.channel) ?? 1;
+}
+
+function measurementType(slot: Record<string, unknown>): string {
+  return stringValue(slot.sensor) ?? stringValue(slot.card_type) ?? 'VALUE';
+}
+
 function createdAtUs(msg: MqttEnvelope): string {
   return /^\d+$/.test(msg.created_at_us) ? msg.created_at_us : '0';
 }
@@ -643,6 +657,68 @@ function slotParams(msg: MqttEnvelope, slot: Record<string, unknown>): unknown[]
   ];
 }
 
+async function storeChannelMeasurement(msg: MqttEnvelope, slot: Record<string, unknown>): Promise<void> {
+  const value = numericValue(slot.value_formatted ?? slot.value_raw);
+  if (value === null) return;
+  const display = String(slot.value_display ?? slot.value_formatted ?? '').trim().toLowerCase();
+  const measurementValid = slot.measurement_valid === true && String(slot.channel_status ?? 'ok').toLowerCase() === 'ok' && !['', 'invalid', 'nan', 'null', 'none'].includes(display);
+  const params = [
+    msg.gateway_id,
+    msg.rack_id,
+    slot.slot_number,
+    channelIdValue(slot),
+    measurementType(slot),
+    value,
+    stringValue(slot.unit) ?? '',
+    measurementValid ? 'GOOD' : 'BAD',
+    msg.gateway_sequence,
+    createdAtUs(msg),
+    stringValue(slot.card_type),
+    stringValue(slot.sensor),
+    String(slot.data_status ?? '').toLowerCase() === 'current' ? 'FRESH' : 'STALE',
+    stringValue(slot.channel_status),
+    numericValue(slot.alert_value_formatted ?? slot.alert_value_raw),
+    numericValue(slot.danger_value_formatted ?? slot.danger_value_raw),
+    stringValue(slot.alert_status) ?? 'INACTIVE',
+    stringValue(slot.danger_status) ?? 'INACTIVE',
+  ];
+  await query(
+    `INSERT INTO measurement_latest (
+       gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality,
+       source_sequence, source_timestamp_us, card_type, sensor, freshness, channel_status,
+       alert_threshold, danger_threshold, alert_state, danger_state, updated_at
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,now())
+     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type) DO UPDATE SET
+       value = EXCLUDED.value,
+       unit = EXCLUDED.unit,
+       quality = EXCLUDED.quality,
+       source_sequence = EXCLUDED.source_sequence,
+       source_timestamp_us = EXCLUDED.source_timestamp_us,
+       card_type = EXCLUDED.card_type,
+       sensor = EXCLUDED.sensor,
+       freshness = EXCLUDED.freshness,
+       channel_status = EXCLUDED.channel_status,
+       alert_threshold = EXCLUDED.alert_threshold,
+       danger_threshold = EXCLUDED.danger_threshold,
+       alert_state = EXCLUDED.alert_state,
+       danger_state = EXCLUDED.danger_state,
+       updated_at = now()
+     WHERE measurement_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
+    params,
+  );
+  await query(
+    `INSERT INTO measurement_history (
+       gateway_id, rack_id, slot_id, channel_id, measurement_type, value, unit, quality,
+       source_sequence, source_timestamp_us, card_type, sensor, freshness, channel_status,
+       alert_threshold, danger_threshold, alert_state, danger_state, received_at
+     )
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,now())
+     ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
+    params,
+  );
+}
+
 async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
   if (!(await rackAllows(msg))) return 0;
   await upsertRack(msg, { status: 'connected', dataCurrent: objectValue(msg.payload.telemetry)?.data_current === true });
@@ -713,6 +789,7 @@ async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
           OR rack_slot_latest.source_timestamp_us <= EXCLUDED.source_timestamp_us`,
       slotParams(msg, slot),
     );
+    await storeChannelMeasurement(msg, slot);
   }
   await upsertControllerSlot(msg, objectValue(msg.payload.telemetry)?.data_current === true);
   await refreshGatewayRackState(msg.gateway_id);

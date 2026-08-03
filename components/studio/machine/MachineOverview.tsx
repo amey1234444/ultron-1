@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import { analyzeRotaryAirlock, type AnalysisReading, type AnalysisSignalCode, type RotaryAirlockAnalysisResult } from '../../../lib/analysis/rotaryAirlockAnalyzer';
 import { cn } from '../../../lib/cn';
 import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
 import { latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
@@ -82,6 +83,22 @@ const TONE_COLOUR: Record<Tone, string> = {
   info: INFO_COLOUR,
   muted: MUTED_COLOUR,
 };
+
+const LABEL_TO_SIGNAL: { match: RegExp; code: AnalysisSignalCode }[] = [
+  { match: /motor.*current|current/i, code: 'motor_current' },
+  { match: /rotor.*speed|speed|rpm/i, code: 'rotor_speed' },
+  { match: /de.*bearing.*temp|drive.*bearing.*temp/i, code: 'de_bearing_temperature' },
+  { match: /nde.*bearing.*temp|non.*drive.*bearing.*temp/i, code: 'nde_bearing_temperature' },
+  { match: /de.*vib|drive.*vib/i, code: 'de_vibration_acceleration_rms' },
+  { match: /nde.*vib|non.*drive.*vib/i, code: 'nde_vibration_acceleration_rms' },
+  { match: /inlet.*pressure/i, code: 'inlet_pressure' },
+  { match: /outlet.*pressure|discharge.*pressure/i, code: 'outlet_pressure' },
+  { match: /material.*temp/i, code: 'material_temperature' },
+];
+
+function signalCodeFor(label: string): AnalysisSignalCode | null {
+  return LABEL_TO_SIGNAL.find((entry) => entry.match.test(label))?.code ?? null;
+}
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
@@ -551,6 +568,68 @@ function FindingPanel({ finding }: { finding: Finding }) {
   );
 }
 
+function DeepAnalyzerPanel({ analysis }: { analysis: RotaryAirlockAnalysisResult }) {
+  const { isDark } = useAppTheme();
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const anomalyTone: Tone = analysis.anomaly.severity === 'critical' || analysis.anomaly.severity === 'high' ? 'critical' : analysis.anomaly.severity === 'medium' || analysis.anomaly.severity === 'low' ? 'warning' : 'live';
+  const maintenanceTone: Tone = analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high' ? 'critical' : analysis.maintenance.caseRequired ? 'warning' : 'live';
+  const badQuality = analysis.quality.filter((item) => item.status === 'BAD' || item.status === 'DEGRADED');
+  const baselines = analysis.baselines.filter((baseline) => baseline.maturity !== 'unavailable').slice(0, 4);
+
+  return (
+    <View className="gap-4">
+      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Deep analyzer</Text>
+
+      <View className="flex-row flex-wrap gap-3">
+        <SummaryPanel
+          title="Anomaly"
+          value={analysis.anomaly.severity === 'none' ? 'No active anomaly' : `${analysis.anomaly.severity} ${analysis.anomaly.state}`}
+          detail={analysis.anomaly.contributors[0]?.description ?? analysis.anomaly.limitations[0] ?? 'Baseline comparison is quiet.'}
+          tone={anomalyTone}
+          meta={analysis.anomaly.score.toFixed(1)}
+        />
+        <SummaryPanel
+          title="Maintenance"
+          value={analysis.maintenance.title}
+          detail={analysis.maintenance.caseRequired ? analysis.maintenance.recommendedActions[0] : 'No maintenance case is required from current evidence.'}
+          tone={maintenanceTone}
+          meta={analysis.maintenance.priority}
+        />
+        <SummaryPanel
+          title="Doctor Report"
+          value={analysis.doctorReport.summary}
+          detail={analysis.doctorReport.nextChecks[0] ?? 'No immediate follow-up check.'}
+          tone={maintenanceTone}
+        />
+      </View>
+
+      <View className="flex-row flex-wrap gap-6">
+        <View className="gap-2" style={{ width: 360 }}>
+          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Signal quality engine</Text>
+          {(badQuality.length > 0 ? badQuality : analysis.quality.slice(0, 3)).map((item) => (
+            <Text key={item.code} className={cn('font-body text-xs leading-4', item.status === 'GOOD' ? mutedClass : textClass)}>
+              - {item.code}: {item.status} ({item.checks.join(', ')})
+            </Text>
+          ))}
+        </View>
+        <View className="gap-2" style={{ width: 360 }}>
+          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Baseline lifecycle</Text>
+          {baselines.length === 0 ? (
+            <Text className={cn('font-body text-xs leading-4', mutedClass)}>- No mature baseline yet; analyzer will learn as history accumulates.</Text>
+          ) : (
+            baselines.map((baseline) => (
+              <Text key={baseline.code} className={cn('font-body text-xs leading-4', textClass)}>
+                - {baseline.code}: {baseline.maturity}, {baseline.sampleCount} samples
+              </Text>
+            ))
+          )}
+        </View>
+      </View>
+    </View>
+  );
+}
+
 export type MachineOverviewProps = {
   mappedChannels: MappedChannel[];
   devices: DeviceNode[];
@@ -597,6 +676,25 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
   );
 
   const analysis = useMemo(() => analyseMachine(mappedChannels, effectiveSamples, expectedPoints), [effectiveSamples, expectedPoints, mappedChannels]);
+  const deepAnalysis = useMemo(() => {
+    const now = new Date().toISOString();
+    const readings: AnalysisReading[] = mappedChannels.flatMap((mapped) => {
+      const code = signalCodeFor(`${mapped.label} ${mapped.channel.label}`);
+      const value = effectiveSamples[mapped.id];
+      if (!code || value === undefined) return [];
+      const measurement = liveMeasurementForChannel(mapped.channel, devices, cards, live);
+      return [{
+        code,
+        value,
+        unit: measurement?.unit ?? mapped.channel.unit,
+        quality: measurement?.quality ?? 'GOOD',
+        valid: measurement?.measurementValid ?? true,
+        timestamp: measurement?.updatedAt ?? now,
+        source: measurement ? 'gateway' as const : 'demo' as const,
+      }];
+    });
+    return analyzeRotaryAirlock({ readings, now });
+  }, [cards, devices, effectiveSamples, live, mappedChannels]);
 
   if (mappedChannels.length === 0) {
     return (
@@ -659,6 +757,8 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
         <BulletList title="Analysis limits" items={analysis.blockers} tone={analysis.readinessTone} />
         <BulletList title="Signal quality" items={analysis.weakSignals} tone={analysis.weakSignals.length > 0 ? 'warning' : 'live'} />
       </View>
+
+      <DeepAnalyzerPanel analysis={deepAnalysis} />
 
       <View className="gap-3">
         <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Probable condition</Text>

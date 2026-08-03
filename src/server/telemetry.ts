@@ -78,7 +78,9 @@ type SlotRow = { gateway_id: string; rack_id: string; slot_number: number; prese
 type MeasurementRow = {
   gateway_id: string;
   rack_id: string;
-  slot_number: number;
+  slot_id: number;
+  channel_id: number;
+  measurement_type: string;
   value: number | null;
   value_display: string | null;
   value_with_unit: string | null;
@@ -87,8 +89,10 @@ type MeasurementRow = {
   updated_at: Date;
   card_type: string | null;
   sensor: string | null;
-  data_status: string | null;
+  freshness: string | null;
   channel_status: string | null;
+  alert_threshold: number | null;
+  danger_threshold: number | null;
   alert_state: string | null;
   danger_state: string | null;
 };
@@ -127,13 +131,15 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
        FROM rack_inventory_slots ORDER BY gateway_id, rack_id, slot_number`,
     ),
     query<MeasurementRow>(
-      `SELECT gateway_id, rack_id, slot_number,
-              CASE WHEN value_formatted ~ '^-?[0-9]+(\\.[0-9]+)?$' THEN value_formatted::double precision ELSE NULL END AS value,
-              value_display, value_with_unit, measurement_valid, unit, updated_at,
-              card_type, sensor, data_status, channel_status, alert_status AS alert_state, danger_status AS danger_state
-       FROM rack_slot_latest
-       WHERE live = true
-       ORDER BY gateway_id, rack_id, slot_number`,
+      `SELECT gateway_id, rack_id, slot_id, channel_id, measurement_type,
+              value, NULL::text AS value_display,
+              CASE WHEN unit <> '' THEN concat(value::text, ' ', unit) ELSE value::text END AS value_with_unit,
+              quality = 'GOOD' AS measurement_valid, unit, updated_at,
+              card_type, sensor, freshness, channel_status, alert_threshold, danger_threshold,
+              alert_state, danger_state
+       FROM measurement_latest
+       WHERE updated_at > now() - interval '20 seconds'
+       ORDER BY gateway_id, rack_id, slot_id, channel_id`,
     ),
     query<AlertRow>(
       `SELECT q.id, q.gateway_id, q.gateway_ip, q.received_at,
@@ -239,9 +245,9 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
     measurements: measurements.rows.filter((m: MeasurementRow) => !blockedGatewayIds.has(m.gateway_id)).map((m: MeasurementRow) => ({
       gatewayId: m.gateway_id,
       rackId: m.rack_id,
-      slotId: m.slot_number,
-      channelId: 1,
-      measurementType: m.sensor ?? m.card_type ?? 'VALUE',
+      slotId: m.slot_id,
+      channelId: m.channel_id,
+      measurementType: m.measurement_type,
       value: m.value,
       valueDisplay: m.value_display,
       valueWithUnit: m.value_with_unit,
@@ -251,10 +257,10 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
       updatedAt: m.updated_at.toISOString(),
       cardType: m.card_type,
       sensor: m.sensor,
-      freshness: m.data_status === 'current' ? 'FRESH' : 'STALE',
+      freshness: m.freshness ?? 'FRESH',
       channelStatus: m.channel_status,
-      alertThreshold: null,
-      dangerThreshold: null,
+      alertThreshold: m.alert_threshold,
+      dangerThreshold: m.danger_threshold,
       alertState: m.alert_state ?? 'INACTIVE',
       dangerState: m.danger_state ?? 'INACTIVE',
     })),
