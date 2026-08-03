@@ -3,7 +3,9 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import type { ChannelRef } from '../../../lib/rack';
+import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
+import { latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
+import type { CardNode, ChannelRef } from '../../../lib/rack';
 import { LIVE_RANGE_FOR_LETTER, useLiveValue, type LiveKindLetter } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -19,9 +21,10 @@ const SECTION_FOR_LETTER: Partial<Record<LiveKindLetter, string>> = {
   S: 'Speed Overview',
   P: 'Pressure Overview',
   C: 'Current Overview',
+  X: 'Mapped Signals',
 };
 
-const SECTION_ORDER: LiveKindLetter[] = ['P', 'T', 'V', 'S', 'C'];
+const SECTION_ORDER: LiveKindLetter[] = ['P', 'T', 'V', 'S', 'C', 'X'];
 
 const KIND_LABEL: Record<LiveKindLetter, string> = {
   V: 'Vibration',
@@ -96,8 +99,16 @@ function alarmLevel(channel: ChannelRef, value: number): AlarmLevel {
   return 'normal';
 }
 
-function valuePosition(letter: LiveKindLetter, value: number): number {
-  const range = LIVE_RANGE_FOR_LETTER[letter];
+function valuePosition(channel: ChannelRef, value: number): number {
+  if (channel.letter === 'S') {
+    const max = channel.alarmCritical ?? channel.alarmWarning ?? (value < 200 ? 45 : LIVE_RANGE_FOR_LETTER.S.max);
+    return clamp(value / (max || 1), 0, 1);
+  }
+  if (channel.alarmCritical !== undefined || channel.alarmWarning !== undefined) {
+    const max = channel.alarmCritical ?? (channel.alarmWarning ?? 1) * 1.5;
+    return clamp(value / (max || 1), 0, 1);
+  }
+  const range = LIVE_RANGE_FOR_LETTER[channel.letter];
   return clamp((value - range.min) / (range.max - range.min || 1), 0, 1);
 }
 
@@ -128,6 +139,26 @@ function codeLabel(signal: SignalValue) {
   return `${signal.mapped.channel.code} ${signal.mapped.label}`;
 }
 
+function channelNumberFor(channel: ChannelRef): number {
+  const match = channel.id.match(/\.CH(\d+)$/);
+  return match ? Number(match[1]) : 1;
+}
+
+function usableMeasurementValue(measurement: LiveMeasurement | undefined): number | undefined {
+  if (!measurement) return undefined;
+  if (measurement.measurementValid === false) return undefined;
+  if (measurement.quality && measurement.quality !== 'GOOD') return undefined;
+  return typeof measurement.value === 'number' ? measurement.value : undefined;
+}
+
+function liveMeasurementForChannel(channel: ChannelRef, devices: DeviceNode[], cards: CardNode[], live?: LiveState): LiveMeasurement | undefined {
+  if (!live) return undefined;
+  const rack = devices.find((device) => device.id === channel.rackId);
+  const card = cards.find((candidate) => candidate.deviceId === channel.rackId && candidate.slot === channel.slot);
+  if (!rack || !card) return undefined;
+  return latestMeasurementForChannel(deviceWithGatewayConnectionState(rack, devices), card, channelNumberFor(channel), live);
+}
+
 function severityRank(finding: Finding) {
   const urgencyRank = { Critical: 4, High: 3, Medium: 2, Low: 1 }[finding.urgency];
   return urgencyRank * 100 + finding.confidence;
@@ -142,7 +173,7 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
         mapped,
         value,
         level: alarmLevel(mapped.channel, value),
-        position: valuePosition(mapped.channel.letter, value),
+        position: valuePosition(mapped.channel, value),
       };
     })
     .filter((signal): signal is SignalValue => signal !== null);
@@ -150,8 +181,10 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
   const byLetter = (letter: LiveKindLetter) => signals.filter((signal) => signal.mapped.channel.letter === letter);
   const mappedLetters = new Set(mappedChannels.map((mapped) => mapped.channel.letter));
   const liveLetters = new Set(signals.map((signal) => signal.mapped.channel.letter));
-  const required: LiveKindLetter[] = ['V', 'T', 'S', 'C'];
+  const required: LiveKindLetter[] = ['S', 'C'];
+  const diagnostic: LiveKindLetter[] = ['P', 'V', 'T'];
   const missingKinds = required.filter((letter) => !mappedLetters.has(letter));
+  const missingDiagnosticKinds = diagnostic.filter((letter) => !mappedLetters.has(letter));
   const liveMissingKinds = required.filter((letter) => mappedLetters.has(letter) && !liveLetters.has(letter));
   const liveCount = signals.length;
   const coverage = expectedPoints > 0 ? clamp(mappedChannels.length / expectedPoints, 0, 1) : mappedChannels.length > 0 ? 1 : 0;
@@ -170,7 +203,10 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
     blockers.push(`${liveMissingKinds.map((letter) => KIND_LABEL[letter]).join(', ')} mapped but not sampled yet`);
   }
   if (missingKinds.length > 0) {
-    blockers.push(`${missingKinds.map((letter) => KIND_LABEL[letter]).join(', ')} evidence missing`);
+    blockers.push(`${missingKinds.map((letter) => KIND_LABEL[letter]).join(', ')} essential state evidence missing`);
+  }
+  if (missingDiagnosticKinds.length > 0) {
+    blockers.push(`${missingDiagnosticKinds.map((letter) => KIND_LABEL[letter]).join(', ')} diagnostic evidence missing`);
   }
   if (critical.length > 0) weakSignals.push(`${critical.length} channel${critical.length === 1 ? '' : 's'} above critical threshold`);
   if (warning.length > 0) weakSignals.push(`${warning.length} channel${warning.length === 1 ? '' : 's'} above warning threshold`);
@@ -321,7 +357,7 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
   const readinessTone: Tone = readinessPercent < 55 ? 'critical' : readinessPercent < 80 ? 'warning' : readinessPercent < 100 ? 'info' : 'live';
   const readinessLabel = readinessPercent < 55 ? 'Not analysis-ready' : readinessPercent < 80 ? 'Partial evidence' : readinessPercent < 100 ? 'Nearly ready' : 'Analysis-ready';
 
-  const derived = [
+  const derived: MachineAnalysis['derived'] = [
     {
       label: 'Mapped evidence',
       value: expectedPoints > 0 ? `${mappedChannels.length}/${expectedPoints}` : String(mappedChannels.length),
@@ -365,17 +401,13 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
   };
 }
 
-function OverviewCard({ mapped, value, onSample }: { mapped: MappedChannel; value: number; onSample: (id: string, value: number) => void }) {
+function OverviewCard({ mapped, value }: { mapped: MappedChannel; value: number | undefined }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const { channel, label } = mapped;
-  const colour = statusColour(channel, value);
+  const colour = value === undefined ? MUTED_COLOUR : statusColour(channel, value);
   const range = LIVE_RANGE_FOR_LETTER[channel.letter];
-
-  useEffect(() => {
-    onSample(mapped.id, value);
-  }, [mapped.id, onSample, value]);
 
   return (
     <View
@@ -396,15 +428,20 @@ function OverviewCard({ mapped, value, onSample }: { mapped: MappedChannel; valu
       </Text>
 
       <Text style={{ color: colour }} className="font-mono text-sm font-bold">
-        {value.toFixed(range.decimals)} {channel.unit}
+        {value === undefined ? 'Sampling...' : `${value.toFixed(range.decimals)} ${channel.unit}`}
       </Text>
     </View>
   );
 }
 
-function SampledOverviewCard({ mapped, onSample }: { mapped: MappedChannel; onSample: (id: string, value: number) => void }) {
+function SampleCollector({ mapped, onSample }: { mapped: MappedChannel; onSample: (id: string, value: number) => void }) {
   const value = useLiveValue(mapped.channel.letter, true);
-  return <OverviewCard mapped={mapped} value={value} onSample={onSample} />;
+
+  useEffect(() => {
+    onSample(mapped.id, value);
+  }, [mapped.id, onSample, value]);
+
+  return null;
 }
 
 function AnalysisStat({ label, value, tone }: { label: string; value: string; tone: Tone }) {
@@ -516,6 +553,9 @@ function FindingPanel({ finding }: { finding: Finding }) {
 
 export type MachineOverviewProps = {
   mappedChannels: MappedChannel[];
+  devices: DeviceNode[];
+  cards: CardNode[];
+  live?: LiveState;
   // Total measurement points defined on the machine template (e.g. RAV's Motor
   // component lists 6) compared against the saved box-to-channel mappings.
   expectedPoints: number;
@@ -524,7 +564,7 @@ export type MachineOverviewProps = {
 // Actual View -> Overview: the in-app analysis layer. It keeps the mapped live
 // channel cards, then applies the analyzer-style RAV rules directly against the
 // saved mappings so "missing" and "unavailable" never get treated as healthy.
-export function MachineOverview({ mappedChannels, expectedPoints }: MachineOverviewProps) {
+export function MachineOverview({ mappedChannels, devices, cards, live, expectedPoints }: MachineOverviewProps) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
@@ -542,7 +582,21 @@ export function MachineOverview({ mappedChannels, expectedPoints }: MachineOverv
     });
   }, [mappedChannels]);
 
-  const analysis = useMemo(() => analyseMachine(mappedChannels, samples, expectedPoints), [expectedPoints, mappedChannels, samples]);
+  const effectiveSamples = useMemo<SampleMap>(() => {
+    const next: SampleMap = { ...samples };
+    for (const mapped of mappedChannels) {
+      const value = usableMeasurementValue(liveMeasurementForChannel(mapped.channel, devices, cards, live));
+      if (value !== undefined) next[mapped.id] = value;
+    }
+    return next;
+  }, [cards, devices, live, mappedChannels, samples]);
+
+  const hasGatewaySamples = useMemo(
+    () => mappedChannels.some((mapped) => usableMeasurementValue(liveMeasurementForChannel(mapped.channel, devices, cards, live)) !== undefined),
+    [cards, devices, live, mappedChannels],
+  );
+
+  const analysis = useMemo(() => analyseMachine(mappedChannels, effectiveSamples, expectedPoints), [effectiveSamples, expectedPoints, mappedChannels]);
 
   if (mappedChannels.length === 0) {
     return (
@@ -557,6 +611,9 @@ export function MachineOverview({ mappedChannels, expectedPoints }: MachineOverv
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 24 }}>
       <View className="gap-1">
+        {mappedChannels.map((mapped) => (
+          <SampleCollector key={`collector.${mapped.id}`} mapped={mapped} onSample={onSample} />
+        ))}
         {expectedPoints > 0 && (
           <Text className={cn('font-body text-[11px]', mutedClass)}>
             {mappedChannels.length} of {expectedPoints} expected points mapped
@@ -564,7 +621,7 @@ export function MachineOverview({ mappedChannels, expectedPoints }: MachineOverv
         )}
         <Text className={cn('font-body-bold text-xl', textClass)}>Machine analysis</Text>
         <Text className={cn('font-body text-xs leading-5', mutedClass)}>
-          Analyzer evidence is calculated from saved rack mappings, live values, configured thresholds, and rotary-airlock operating rules.
+          Analyzer evidence is calculated from saved rack mappings, {hasGatewaySamples ? 'gateway telemetry' : 'demo live values'}, configured thresholds, and rotary-airlock operating rules.
         </Text>
       </View>
 
@@ -650,7 +707,7 @@ export function MachineOverview({ mappedChannels, expectedPoints }: MachineOverv
             <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>{SECTION_FOR_LETTER[letter]}</Text>
             <View className="flex-row flex-wrap gap-3">
               {inSection.map((mapped) => (
-                <SampledOverviewCard key={mapped.id} mapped={mapped} onSample={onSample} />
+                <OverviewCard key={mapped.id} mapped={mapped} value={effectiveSamples[mapped.id]} />
               ))}
             </View>
           </View>

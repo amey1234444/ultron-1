@@ -45,6 +45,7 @@ export type MachineNode = {
 };
 
 type TemplateComponentDef = { type: ComponentType; label?: string };
+type PointDef = { label: string; kind: MeasurementPointKind };
 
 const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
   'Centrifugal Pump': [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Pump' }],
@@ -58,7 +59,42 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
   'Custom Machine': [],
 };
 
-function pointLabels(type: ComponentType): { label: string; kind: MeasurementPointKind }[] {
+const RAV_ANALYSIS_COMPONENTS: { type: ComponentType; label: string; points: PointDef[] }[] = [
+  {
+    type: 'Motor',
+    label: 'Drive',
+    points: [
+      { label: 'Motor Current', kind: 'Current' },
+      { label: 'Rotor Speed', kind: 'Speed' },
+    ],
+  },
+  {
+    type: 'Bearing',
+    label: 'Bearings',
+    points: [
+      { label: 'DE Bearing Temperature', kind: 'Temperature' },
+      { label: 'NDE Bearing Temperature', kind: 'Temperature' },
+      { label: 'DE Vibration Acceleration RMS', kind: 'Vibration' },
+      { label: 'NDE Vibration Acceleration RMS', kind: 'Vibration' },
+    ],
+  },
+  {
+    type: 'Custom Component',
+    label: 'Process',
+    points: [
+      { label: 'Inlet Pressure', kind: 'Pressure' },
+      { label: 'Outlet Pressure', kind: 'Pressure' },
+      { label: 'Material Temperature', kind: 'Temperature' },
+    ],
+  },
+];
+
+export function expectedPointsForTemplate(template: MachineTemplate): number {
+  if (template === 'Rotary Airlock Valve') return RAV_ANALYSIS_COMPONENTS.reduce((sum, component) => sum + component.points.length, 0);
+  return TEMPLATE_COMPONENTS[template].reduce((sum, component) => sum + pointLabels(component.type).length, 0);
+}
+
+function pointLabels(type: ComponentType): PointDef[] {
   switch (type) {
     case 'Motor':
       return [
@@ -107,6 +143,15 @@ function pointLabels(type: ComponentType): { label: string; kind: MeasurementPoi
 }
 
 export function componentsForTemplate(template: MachineTemplate, makeId: () => string): MachineComponent[] {
+  if (template === 'Rotary Airlock Valve') {
+    return RAV_ANALYSIS_COMPONENTS.map((component) => ({
+      id: makeId(),
+      type: component.type,
+      label: component.label,
+      points: component.points.map((point) => ({ id: makeId(), label: point.label, kind: point.kind, status: 'Not Configured' as const })),
+    }));
+  }
+
   const defs = TEMPLATE_COMPONENTS[template];
 
   return defs.map((def, index) => {

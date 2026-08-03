@@ -6,7 +6,7 @@ import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal } from '../../../lib/localPersist';
-import type { MachineComponent, MachineNode } from '../../../lib/machines';
+import { expectedPointsForTemplate, type MachineComponent, type MachineNode } from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
 import { AlarmView } from './AlarmView';
 import { MachineOverview } from './MachineOverview';
@@ -180,7 +180,7 @@ export function MachineWorkspace({
   // Total measurement points the machine template defines (e.g. RAV's Motor
   // component lists 6) — the "expected" denominator for the coverage indicator
   // shown across the Rack/Overview/Alarm/Trend sub-tabs.
-  const expectedPoints = useMemo(() => machine.components.reduce((sum, c) => sum + c.points.length, 0), [machine.components]);
+  const expectedPoints = useMemo(() => Math.max(expectedPointsForTemplate(machine.template), machine.components.reduce((sum, c) => sum + c.points.length, 0)), [machine.components, machine.template]);
 
   // The whole design lives on a fixed 1600×900 logical stage that gets
   // uniformly scaled to fit the available canvas. All trail/box/machine
@@ -282,7 +282,9 @@ export function MachineWorkspace({
         <RackOccupancyView devices={devices} cards={cards} mappedChannels={mappedChannels} expectedPoints={expectedPoints} />
       )}
 
-      {isActual && actualTab === 'overview' && <MachineOverview mappedChannels={mappedChannels} expectedPoints={expectedPoints} />}
+      {isActual && actualTab === 'overview' && (
+        <MachineOverview mappedChannels={mappedChannels} devices={devices} cards={cards} live={live} expectedPoints={expectedPoints} />
+      )}
 
       {isActual && actualTab === 'alarm' && (
         <AlarmView mappedChannels={mappedChannels} machineId={machine.id} expectedPoints={expectedPoints} />

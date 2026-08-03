@@ -29,17 +29,15 @@ type TemplatePoint = {
 };
 
 const TEMPLATE_POINTS: TemplatePoint[] = [
-  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'left', anchor: { x: 405, y: 218 }, boxEnd: { x: 255, y: 124 }, bend: { x: 415, y: 124 } },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'left', anchor: { x: 126, y: 357 }, boxEnd: { x: 255, y: 294 }, bend: { x: 355, y: 294 } },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 126, y: 403 }, boxEnd: { x: 255, y: 464 }, bend: { x: 355, y: 464 } },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'left', anchor: { x: 405, y: 542 }, boxEnd: { x: 255, y: 634 }, bend: { x: 410, y: 634 } },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 218 }, boxEnd: { x: 1185, y: 79 }, bend: { x: 1035, y: 79 } },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 328 }, boxEnd: { x: 1185, y: 184 }, bend: { x: 1040, y: 184 } },
-  { code: 'T2', label: 'Process Card CH2', side: 'right', anchor: { x: 840, y: 318 }, boxEnd: { x: 1185, y: 289 }, bend: { x: 1045, y: 289 } },
-  { code: 'V2', label: 'RAV-01 DE Vibration V', side: 'right', anchor: { x: 1165, y: 380 }, boxEnd: { x: 1185, y: 394 } },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 720, y: 432 }, boxEnd: { x: 1185, y: 499 }, bend: { x: 1045, y: 499 } },
-  { code: 'T1', label: 'RAV-01 Rotor Bearing Temp', side: 'right', anchor: { x: 700, y: 522 }, boxEnd: { x: 1185, y: 604 }, bend: { x: 1040, y: 604 } },
-  { code: 'V1', label: 'RAV-01 DE Vibration H', side: 'right', anchor: { x: 635, y: 542 }, boxEnd: { x: 1185, y: 709 }, bend: { x: 1035, y: 709 } },
+  { code: 'C1', label: 'Motor Current', side: 'left', anchor: { x: 405, y: 218 }, boxEnd: { x: 255, y: 79 }, bend: { x: 415, y: 79 } },
+  { code: 'S1', label: 'Rotor Speed', side: 'left', anchor: { x: 126, y: 357 }, boxEnd: { x: 255, y: 184 }, bend: { x: 355, y: 184 } },
+  { code: 'P1', label: 'Inlet Pressure', side: 'left', anchor: { x: 126, y: 403 }, boxEnd: { x: 255, y: 289 }, bend: { x: 355, y: 289 } },
+  { code: 'P2', label: 'Outlet Pressure', side: 'left', anchor: { x: 405, y: 542 }, boxEnd: { x: 255, y: 394 }, bend: { x: 410, y: 394 } },
+  { code: 'T3', label: 'Material Temperature', side: 'left', anchor: { x: 635, y: 542 }, boxEnd: { x: 255, y: 499 }, bend: { x: 410, y: 499 } },
+  { code: 'V1', label: 'DE Vibration Acceleration RMS', side: 'right', anchor: { x: 635, y: 218 }, boxEnd: { x: 1185, y: 79 }, bend: { x: 1035, y: 79 } },
+  { code: 'V2', label: 'NDE Vibration Acceleration RMS', side: 'right', anchor: { x: 720, y: 328 }, boxEnd: { x: 1185, y: 184 }, bend: { x: 1040, y: 184 } },
+  { code: 'T1', label: 'DE Bearing Temperature', side: 'right', anchor: { x: 720, y: 432 }, boxEnd: { x: 1185, y: 289 }, bend: { x: 1045, y: 289 } },
+  { code: 'T2', label: 'NDE Bearing Temperature', side: 'right', anchor: { x: 700, y: 522 }, boxEnd: { x: 1185, y: 394 }, bend: { x: 1040, y: 394 } },
 ];
 
 function makeId(prefix: string) {

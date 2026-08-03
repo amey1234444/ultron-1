@@ -31,7 +31,7 @@ export function createSeedData(makeId: () => string): {
   const areaNorth: FolderNode = { id: 'seed-folder-north', projectId: plantNorth.id, name: 'Area 1', type: 'Area', code: '', description: '', parentId: null };
   const areaSouth: FolderNode = { id: 'seed-folder-south', projectId: plantSouth.id, name: 'Area 1', type: 'Area', code: '', description: '', parentId: null };
 
-  const ravComponents = markLive(componentsForTemplate('Rotary Airlock Valve', makeId), 'Winding Temperature');
+  const ravComponents = markLive(componentsForTemplate('Rotary Airlock Valve', makeId), 'DE Bearing Temperature');
   const pumpComponents = markLive(componentsForTemplate('Centrifugal Pump', makeId), 'Bearing Temperature');
   const fanComponents = markLive(componentsForTemplate('Fan', makeId));
   const compressorComponents = markLive(componentsForTemplate('Compressor', makeId), 'Discharge Pressure');
@@ -146,7 +146,7 @@ export function createSeedData(makeId: () => string): {
       type: 'Process Card',
       enabled: true,
       config: {
-        channelNames: ['RAV-01 Rotor Bearing Temp', '', '', ''],
+        channelNames: ['RAV-01 DE Bearing Temp', 'RAV-01 NDE Bearing Temp', 'RAV-01 Material Temp', ''],
         inputType: 'RTD 3-wire',
         engineeringMin: '0',
         engineeringMax: '150',
@@ -156,6 +156,62 @@ export function createSeedData(makeId: () => string): {
         filter: '',
         alarmWarning: '65',
         alarmCritical: '78',
+      },
+    },
+    {
+      id: 'seed-card-rav-pressure',
+      deviceId: 'seed-rack-north-1',
+      slot: 3,
+      type: 'Process Card',
+      enabled: true,
+      config: {
+        channelNames: ['RAV-01 Inlet Pressure', 'RAV-01 Outlet Pressure', '', ''],
+        inputType: '4-20 mA',
+        engineeringMin: '0',
+        engineeringMax: '2',
+        unit: 'bar',
+        scaling: '1',
+        offset: '0',
+        filter: '',
+        alarmWarning: '1.2',
+        alarmCritical: '1.6',
+      },
+    },
+    {
+      id: 'seed-card-rav-current',
+      deviceId: 'seed-rack-north-1',
+      slot: 4,
+      type: 'Process Card',
+      enabled: true,
+      config: {
+        channelNames: ['RAV-01 Motor Current', '', '', ''],
+        inputType: '4-20 mA',
+        engineeringMin: '0',
+        engineeringMax: '40',
+        unit: 'A',
+        scaling: '1',
+        offset: '0',
+        filter: '',
+        alarmWarning: '20',
+        alarmCritical: '30',
+      },
+    },
+    {
+      id: 'seed-card-rav-speed',
+      deviceId: 'seed-rack-north-1',
+      slot: 5,
+      type: 'Speed Card',
+      enabled: true,
+      config: {
+        channelNames: ['RAV-01 Rotor Speed', ''],
+        inputType: 'RPM',
+        pulsesPerRevolution: '1',
+        trigger: 'Rising',
+        hysteresis: '1',
+        minSpeed: '0',
+        maxSpeed: '60',
+        alarmWarning: '45',
+        alarmCritical: '55',
       },
     },
     {
