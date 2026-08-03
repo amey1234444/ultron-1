@@ -86,10 +86,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function formatClock(date: Date) {
-  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
-
 function toneColor(tone: Tone) {
   switch (tone) {
     case 'green':
@@ -300,7 +296,7 @@ function HealthGauge({ score, label, compact = false }: { score: number; label: 
   );
 }
 
-function HealthAnalysis({ metrics, updatedAt, compact = false }: { metrics: DashboardMetrics; updatedAt: string; compact?: boolean }) {
+function HealthAnalysis({ metrics, compact = false }: { metrics: DashboardMetrics; compact?: boolean }) {
   const { isDark } = useAppTheme();
   return (
     <View className={sectionClass(isDark)} style={{ flex: 1 }}>
@@ -332,7 +328,6 @@ function HealthAnalysis({ metrics, updatedAt, compact = false }: { metrics: Dash
           <View className={cn('mt-3 rounded-lg px-3 py-2', isDark ? 'bg-white/5' : 'bg-slate-50')}>
             <Text className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Reduced by</Text>
             <Text className={cn('mt-1 font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{metrics.healthContributors.join(', ')}</Text>
-            <Text className={cn('mt-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Calculated {updatedAt}</Text>
           </View>
         )}
       </View>
@@ -1013,7 +1008,6 @@ export function DashboardOverview({
   const plantAutoColors: Record<string, string> = {};
   for (const area of plantAreas) plantAutoColors[area.name] = STATUS_COLORS[area.status];
 
-  const lastUpdate = formatClock(now);
   const firstMachine = machines[0];
   const userName = currentUser?.name || currentUser?.username || 'Admin User';
   const roleLabel = currentUser ? ROLE_LABEL[currentUser.role] : 'Administrator';
@@ -1086,7 +1080,7 @@ export function DashboardOverview({
       case 'health':
         return (
           <View style={{ height: 460 }}>
-            <HealthAnalysis metrics={metrics} updatedAt={lastUpdate} />
+            <HealthAnalysis metrics={metrics} />
           </View>
         );
       case 'alarms':
@@ -1208,10 +1202,6 @@ export function DashboardOverview({
               <Text className={cn('font-body-bold text-xs', metrics.streamHealthy ? 'text-status-success' : 'text-status-warning')}>{metrics.streamHealthy ? 'Stream Healthy' : 'Stream Stale'}</Text>
             </View>
 
-            {!isCompact && (
-              <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Last update: {lastUpdate}</Text>
-            )}
-
             <View className={cn('flex-row items-center gap-2 rounded-lg border px-2 py-1.5', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
               <View className={cn('h-7 w-7 items-center justify-center rounded-full', isDark ? 'bg-white/10' : 'bg-ink-inverse')}>
                 <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-white')}>{userName.slice(0, 2).toUpperCase()}</Text>
@@ -1248,7 +1238,7 @@ export function DashboardOverview({
               </View>
             </View>
             <Pressable onPress={() => openPanel('health')} style={{ flex: isCompact ? undefined : 0.75, height: rowHeights.main + rowHeights.mid + 12 }}>
-              <HealthAnalysis metrics={metrics} updatedAt={lastUpdate} compact />
+              <HealthAnalysis metrics={metrics} compact />
             </Pressable>
             <Pressable onPress={() => openPanel('alarms')} style={{ flex: isCompact ? undefined : 1.35, height: rowHeights.main + rowHeights.mid + 12 }}>
               <LiveAlarmFeed alarms={metrics.alarms} compact />
