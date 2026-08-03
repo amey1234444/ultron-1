@@ -309,6 +309,9 @@ export function AuthField({
           style={
             {
               flex: 1,
+              // Web inputs have an intrinsic width; without this they overflow
+              // the field when two fields share a row.
+              minWidth: 0,
               fontFamily: AUTH_FONT_BODY,
               paddingHorizontal: 14,
               paddingVertical: 10,
