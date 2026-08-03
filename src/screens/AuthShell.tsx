@@ -23,10 +23,16 @@ import { apiFetch } from '../lib/apiClient';
 export const AUTH_FONT_DISPLAY = "'Bebas Neue', 'DM Sans', system-ui, sans-serif";
 export const AUTH_FONT_BODY = "'DM Sans', system-ui, sans-serif";
 
-const BRAND = '#2563eb';
-const INK = '#0f172a';
-const MUTED = '#64748b';
-const LINE = '#e2e8f0';
+export const AUTH_GOLD = '#C9A15C';
+const GOLD = AUTH_GOLD;
+
+// Dark auth palette, matching the landing page's near-black surface.
+const BRAND = '#F5F5F5';
+const SURFACE = '#0A0A0A';
+const FIELD = '#141414';
+const INK = '#F5F5F5';
+const MUTED = '#8A8A8A';
+const LINE = 'rgba(255,255,255,0.14)';
 
 // Rotating claims on the brand panel, mirroring the carousel on the reference
 // split-screen sign-in.
@@ -60,9 +66,9 @@ export function AuthShell({
   const active = BRAND_SLIDES[slide];
 
   return (
-    <View style={{ flex: 1, flexDirection: stacked ? 'column' : 'row', backgroundColor: '#ffffff', minHeight: '100%' }}>
+    <View style={{ flex: 1, flexDirection: stacked ? 'column' : 'row', backgroundColor: SURFACE, minHeight: '100%' }}>
       {/* Form column */}
-      <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+      <View style={{ flex: 1, backgroundColor: SURFACE }}>
         <ScrollView
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{
@@ -105,19 +111,19 @@ export function AuthShell({
       </View>
 
       {/* Brand column */}
-      <View style={{ flex: 1, minHeight: stacked ? 320 : undefined }}>
+      <View style={{ flex: 1, minHeight: stacked ? 320 : undefined, borderLeftWidth: stacked ? 0 : 1, borderTopWidth: stacked ? 1 : 0, borderColor: LINE }}>
         <LinearGradient
-          colors={['#1d4ed8', '#2563eb', '#1e40af']}
+          colors={['#161616', '#0E0E0E', '#000000']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ flex: 1, paddingHorizontal: 40, paddingVertical: 48, justifyContent: 'space-between' }}
         >
           <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 34, letterSpacing: 6, color: '#ffffff' }}>
-            ULTRON <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 20, fontWeight: '600', letterSpacing: 1 }}>Studio</Text>
+            ULTRON <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 20, fontWeight: '600', letterSpacing: 1, color: GOLD }}>Studio</Text>
           </Text>
 
           <View style={{ alignItems: 'center' }}>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, letterSpacing: 4, color: 'rgba(255,255,255,0.72)' }}>{active.kicker}</Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, letterSpacing: 4, color: GOLD }}>{active.kicker}</Text>
             <Text
               style={{
                 fontFamily: AUTH_FONT_DISPLAY,
@@ -144,7 +150,7 @@ export function AuthShell({
                     height: 5,
                     width: index === slide ? 30 : 6,
                     borderRadius: 999,
-                    backgroundColor: index === slide ? '#ffffff' : 'rgba(255,255,255,0.42)',
+                    backgroundColor: index === slide ? GOLD : 'rgba(255,255,255,0.28)',
                   }}
                 />
               ))}
@@ -173,15 +179,15 @@ export function AuthField({
         {hint}
       </View>
       <TextInput
-        placeholderTextColor="#9ca3af"
+        placeholderTextColor="#6B6B6B"
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
         style={
           {
             fontFamily: AUTH_FONT_BODY,
-            backgroundColor: '#ffffff',
+            backgroundColor: FIELD,
             borderWidth: 1,
-            borderColor: focused ? BRAND : LINE,
+            borderColor: focused ? GOLD : LINE,
             borderRadius: 8,
             paddingHorizontal: 14,
             paddingVertical: 11,
@@ -214,9 +220,9 @@ export function AuthButton({ label, submitting, onPress }: { label: string; subm
       }}
     >
       {submitting ? (
-        <ActivityIndicator color="#ffffff" />
+        <ActivityIndicator color={SURFACE} />
       ) : (
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontWeight: '700', fontSize: 15, color: '#ffffff' }}>{label}</Text>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontWeight: '700', fontSize: 15, color: '#0A0A0A' }}>{label}</Text>
       )}
     </Pressable>
   );
@@ -227,7 +233,7 @@ export function AuthAltAction({ prompt, action, onPress }: { prompt: string; act
     <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
       <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, color: MUTED }}>{prompt}</Text>
       <Pressable onPress={onPress}>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '700', color: INK }}>{action}</Text>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '700', color: GOLD }}>{action}</Text>
       </Pressable>
     </View>
   );
@@ -235,8 +241,8 @@ export function AuthAltAction({ prompt, action, onPress }: { prompt: string; act
 
 export function AuthError({ message }: { message: string }) {
   return (
-    <View style={{ marginTop: 16, borderRadius: 8, borderWidth: 1, borderColor: '#fecaca', backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 10 }}>
-      <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#b91c1c' }}>{message}</Text>
+    <View style={{ marginTop: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(248,81,73,0.4)', backgroundColor: 'rgba(248,81,73,0.12)', paddingHorizontal: 12, paddingVertical: 10 }}>
+      <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#F85149' }}>{message}</Text>
     </View>
   );
 }
@@ -307,11 +313,11 @@ export function CaptchaField({ captcha, onSubmitEditing }: { captcha: Captcha; o
               borderRadius: 8,
               borderWidth: 1,
               borderColor: LINE,
-              backgroundColor: '#f8fafc',
+              backgroundColor: '#ffffff',
             }}
           >
             {captcha.loading ? (
-              <ActivityIndicator color={BRAND} />
+              <ActivityIndicator color={GOLD} />
             ) : captcha.svg ? (
               <Image source={{ uri: svgToDataUri(captcha.svg) }} style={{ width: 150, height: 46 }} resizeMode="contain" />
             ) : (
@@ -323,7 +329,7 @@ export function CaptchaField({ captcha, onSubmitEditing }: { captcha: Captcha; o
             accessibilityLabel="Refresh CAPTCHA"
             style={{ borderRadius: 8, borderWidth: 1, borderColor: LINE, paddingHorizontal: 12, paddingVertical: 10 }}
           >
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: BRAND }}>↻ New</Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: GOLD }}>↻ New</Text>
           </Pressable>
         </View>
       </View>

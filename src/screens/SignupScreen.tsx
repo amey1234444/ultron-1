@@ -60,8 +60,8 @@ export default function SignupScreen() {
   if (done) {
     return (
       <AuthShell title="Registration received" subtitle="An administrator will review your request.">
-        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: '#bfdbfe', backgroundColor: '#eff6ff', paddingHorizontal: 14, paddingVertical: 14 }}>
-          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, lineHeight: 22, color: '#1e3a8a' }}>{done}</Text>
+        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: 'rgba(201,161,92,0.4)', backgroundColor: 'rgba(201,161,92,0.1)', paddingHorizontal: 14, paddingVertical: 14 }}>
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, lineHeight: 22, color: '#E8D7B5' }}>{done}</Text>
         </View>
         <AuthButton label="Back to sign in" onPress={() => router.replace('/login')} />
       </AuthShell>

@@ -20,7 +20,14 @@ import type { FolderNode, ProjectNode } from '../../lib/hierarchy';
 import type { LiveState } from '../../lib/liveTelemetry';
 import type { MachineNode } from '../../lib/machines';
 import type { CardNode } from '../../lib/rack';
+import {
+  DEFAULT_PLANT_OVERVIEW,
+  normalizePlantOverview,
+  type PlantOverviewConfig,
+} from '../../lib/plantOverview';
+import { apiFetch } from '../../src/lib/apiClient';
 import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
+import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
   projects: ProjectNode[];
@@ -248,16 +255,22 @@ function HealthGauge({ score, label, compact = false }: { score: number; label: 
   const cy = size / 2 + (compact ? 12 : 16);
   const radius = size / 2 - stroke / 2 - 6;
   // Half-ring gauge (180° sweep) as in the reference dashboard.
-  const sweep = Math.PI * radius;
   const value = clamp(score, 0, 100);
   const angle = 180 + (value / 100) * 180;
-  const needleX = cx + (radius + stroke / 2 + 4) * Math.cos((Math.PI * angle) / 180);
-  const needleY = cy + (radius + stroke / 2 + 4) * Math.sin((Math.PI * angle) / 180);
+  // Tick marking the current score, drawn just outside the ring so it never
+  // crosses the score text in the middle.
+  const tickInner = radius - stroke / 2 - 1;
+  const tickOuter = radius + stroke / 2 + 1;
+  const tickX1 = cx + tickInner * Math.cos((Math.PI * angle) / 180);
+  const tickY1 = cy + tickInner * Math.sin((Math.PI * angle) / 180);
+  const tickX2 = cx + tickOuter * Math.cos((Math.PI * angle) / 180);
+  const tickY2 = cy + tickOuter * Math.sin((Math.PI * angle) / 180);
+  // Green at the healthy end, ramping to red — matching the reference gauge.
   const bands = [
-    { color: '#ef4444', from: 0, to: 0.28 },
-    { color: '#f59e0b', from: 0.28, to: 0.55 },
-    { color: '#facc15', from: 0.55, to: 0.72 },
-    { color: '#22c55e', from: 0.72, to: 1 },
+    { color: '#22c55e', from: 0, to: 0.62 },
+    { color: '#facc15', from: 0.62, to: 0.78 },
+    { color: '#f59e0b', from: 0.78, to: 0.9 },
+    { color: '#ef4444', from: 0.9, to: 1 },
   ];
   const arc = (from: number, to: number) => {
     const a0 = 180 + from * 180;
@@ -271,20 +284,18 @@ function HealthGauge({ score, label, compact = false }: { score: number; label: 
     <Svg width={size} height={compact ? size * 0.72 : size * 0.74} viewBox={`0 0 ${size} ${size * 0.78}`}>
       <Path d={arc(0, 1)} fill="none" stroke="#e5e7eb" strokeWidth={stroke} strokeLinecap="round" />
       {bands.map((band) => (
-        <Path key={band.color} d={arc(band.from, band.to)} fill="none" stroke={band.color} strokeWidth={stroke} opacity={value / 100 >= band.from ? 1 : 0.28} />
+        <Path key={band.color} d={arc(band.from, band.to)} fill="none" stroke={band.color} strokeWidth={stroke} />
       ))}
-      <Line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="#111827" strokeWidth={3} strokeLinecap="round" />
-      <Circle cx={cx} cy={cy} r={4} fill="#111827" />
-      <SvgText x={cx} y={cy - (compact ? 16 : 22)} textAnchor="middle" fontSize={compact ? 30 : 38} fontWeight="700" fill="#111827">
+      <Line x1={tickX1} y1={tickY1} x2={tickX2} y2={tickY2} stroke="#111827" strokeWidth={2.5} strokeLinecap="round" />
+      <SvgText x={cx - (compact ? 6 : 8)} y={cy - (compact ? 14 : 18)} textAnchor="middle" fontSize={compact ? 30 : 38} fontWeight="700" fill="#111827">
         {value}
       </SvgText>
-      <SvgText x={cx + (compact ? 30 : 38)} y={cy - (compact ? 16 : 22)} fontSize={compact ? 10 : 12} fill="#475569">
+      <SvgText x={cx + (compact ? 18 : 24)} y={cy - (compact ? 14 : 18)} fontSize={compact ? 10 : 12} fill="#475569">
         /100
       </SvgText>
-      <SvgText x={cx} y={cy - (compact ? 2 : 4)} textAnchor="middle" fontSize={compact ? 12 : 14} fontWeight="700" fill={toneColorForScore}>
+      <SvgText x={cx} y={cy + (compact ? 4 : 4)} textAnchor="middle" fontSize={compact ? 12 : 14} fontWeight="700" fill={toneColorForScore}>
         {label}
       </SvgText>
-      <SvgText x={0} y={0} opacity={0}>{String(sweep)}</SvgText>
     </Svg>
   );
 }
@@ -471,13 +482,36 @@ function DonutChart({ segments, total, size = 150 }: { segments: { label: string
   );
 }
 
-function PlantMapPanel({ areas, compact = false }: { areas: PlantArea[]; compact?: boolean }) {
+function PlantMapPanel({
+  areas,
+  compact = false,
+  imageScale = 100,
+  canEdit = false,
+  onEdit,
+}: {
+  areas: PlantArea[];
+  compact?: boolean;
+  imageScale?: number;
+  canEdit?: boolean;
+  onEdit?: () => void;
+}) {
   const { isDark } = useAppTheme();
+  const imageInset = (100 - imageScale) / 2;
   return (
     <View className={sectionClass(isDark)}>
       <View className={cn('flex-row items-center justify-between border-b', compact ? 'px-3 py-2' : 'px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
         <Text className={cn('font-body-bold', compact ? 'text-xs' : 'text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Plant Overview</Text>
-        <View className={cn('flex-row', compact ? 'gap-3' : 'gap-4')}>
+        <View className={cn('flex-row items-center', compact ? 'gap-3' : 'gap-4')}>
+          {canEdit && onEdit ? (
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              className={cn('flex-row items-center gap-1 rounded-md border px-2 py-1', isDark ? 'border-line-dark' : 'border-line-light')}
+            >
+              <MaterialCommunityIcons name="pencil-outline" size={12} color="#C9A15C" />
+              <Text className="font-body-medium text-[10px] text-accent">Edit map</Text>
+            </Pressable>
+          ) : null}
           {(['healthy', 'warning', 'critical', 'offline'] as const).map((status) => (
             <View key={status} className="flex-row items-center gap-1">
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: STATUS_COLORS[status] }} />
@@ -499,24 +533,36 @@ function PlantMapPanel({ areas, compact = false }: { areas: PlantArea[]; compact
         <Image
           source={{ uri: PLANT_OVERVIEW_IMAGE_URI }}
           resizeMode="contain"
-          style={{ position: 'absolute', left: 46, right: 22, top: 12, bottom: 6, opacity: isDark ? 0.86 : 0.98 }}
+          style={{
+            position: 'absolute',
+            left: `${imageInset}%`,
+            right: `${imageInset}%`,
+            top: `${imageInset}%`,
+            bottom: `${imageInset}%`,
+            opacity: isDark ? 0.86 : 0.98,
+          }}
         />
         <Svg width="100%" height="100%" viewBox="0 0 640 330" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
           {areas.map((area) => {
             const color = STATUS_COLORS[area.status];
-            const labelX = area.x < 160 ? area.x - 18 : area.x > 460 ? area.x - 128 : area.x - 54;
-            const labelY = area.y < 110 ? area.y - 46 : area.y + 18;
+            const boxW = compact ? 118 : 132;
+            const boxH = compact ? 40 : 46;
+            const labelX = clamp(area.labelX, 4, 640 - boxW - 4);
+            const labelY = clamp(area.labelY, 4, 330 - boxH - 4);
+            // Anchor the leader line on whichever edge of the callout faces the pin.
+            const anchorX = clamp(area.x, labelX, labelX + boxW);
+            const anchorY = area.y > labelY + boxH ? labelY + boxH : area.y < labelY ? labelY : area.y;
             return (
-              <G key={area.name}>
-                <Line x1={area.x} y1={area.y} x2={labelX + 68} y2={labelY + 34} stroke={color} strokeWidth={2} />
-                <Circle cx={area.x} cy={area.y} r={11} fill={`${color}22`} stroke={color} strokeWidth={2} />
-                <Circle cx={area.x} cy={area.y} r={5} fill={color} stroke="#ffffff" strokeWidth={2} />
-                <Rect x={labelX} y={labelY} width={compact ? 122 : 136} height={compact ? 42 : 48} rx={8} fill="#ffffff" opacity={0.96} stroke="#dbe3ec" />
-                <SvgText x={labelX + 10} y={labelY + 17} fontSize={compact ? 9 : 11} fontWeight="700" fill="#111827">
+              <G key={area.id}>
+                <Line x1={area.x} y1={area.y} x2={anchorX} y2={anchorY} stroke={color} strokeWidth={1.6} />
+                <Circle cx={area.x} cy={area.y} r={10} fill={`${color}22`} stroke={color} strokeWidth={1.8} />
+                <Circle cx={area.x} cy={area.y} r={4.5} fill={color} stroke="#ffffff" strokeWidth={2} />
+                <Rect x={labelX} y={labelY} width={boxW} height={boxH} rx={7} fill="#ffffff" opacity={0.97} stroke="#dbe3ec" />
+                <SvgText x={labelX + 10} y={labelY + (compact ? 16 : 18)} fontSize={compact ? 9 : 10.5} fontWeight="700" fill="#111827">
                   {area.name}
                 </SvgText>
-                <Circle cx={labelX + 11} cy={labelY + (compact ? 29 : 33)} r={3.5} fill={color} />
-                <SvgText x={labelX + 21} y={labelY + (compact ? 32 : 36)} fontSize={compact ? 8 : 10} fill="#334155">
+                <Circle cx={labelX + 13} cy={labelY + (compact ? 29 : 33)} r={3.2} fill={color} />
+                <SvgText x={labelX + 21} y={labelY + (compact ? 32 : 36)} fontSize={compact ? 8 : 9.5} fill="#334155">
                   {area.status === 'healthy' ? 'Healthy' : area.status === 'warning' ? 'Warning' : area.status === 'critical' ? 'Critical' : 'Offline'}
                 </SvgText>
               </G>
@@ -842,7 +888,51 @@ export function DashboardOverview({
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
   const [activePanel, setActivePanel] = useState<DetailPanel | null>(null);
   const [activeKpiIndex, setActiveKpiIndex] = useState<number | null>(null);
+  const [plantConfig, setPlantConfig] = useState<PlantOverviewConfig>(DEFAULT_PLANT_OVERVIEW);
+  const [plantEditorOpen, setPlantEditorOpen] = useState(false);
+  const [plantSaving, setPlantSaving] = useState(false);
+  const [plantError, setPlantError] = useState<string | null>(null);
   const isCompact = width > 0 && width < 1100;
+  const canEditPlant = currentUser?.role === 'super_admin';
+
+  // The plant overview layout is shared: super admins save it, everyone else
+  // renders whatever was saved.
+  useEffect(() => {
+    let cancelled = false;
+    void apiFetch('/api/studio/plant-overview')
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = (await response.json()) as { config?: unknown };
+        if (!cancelled) setPlantConfig(normalizePlantOverview(data.config));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const savePlantConfig = async (config: PlantOverviewConfig) => {
+    setPlantSaving(true);
+    setPlantError(null);
+    try {
+      const response = await apiFetch('/api/studio/plant-overview', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { config?: unknown; error?: string };
+      if (!response.ok) {
+        setPlantError(data.error ?? 'Could not save the plant overview.');
+        return;
+      }
+      setPlantConfig(normalizePlantOverview(data.config ?? config));
+      setPlantEditorOpen(false);
+    } catch {
+      setPlantError('Could not reach the server.');
+    } finally {
+      setPlantSaving(false);
+    }
+  };
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -904,6 +994,24 @@ export function DashboardOverview({
     { label: 'Acknowledge', value: metrics.ackCount, color: '#64748b' },
   ];
   const severityTotal = severitySegments.reduce((sum, segment) => sum + segment.value, 0);
+
+  // Saved tags drive the map; `auto` tags borrow the live status of the area
+  // with the same name so the layout stays fixed while colours stay live.
+  const plantAreas: PlantArea[] = plantConfig.tags.map((tag) => {
+    const derived = metrics.areas.find((area) => area.name === tag.name);
+    return {
+      id: tag.id,
+      name: tag.name,
+      x: tag.x,
+      y: tag.y,
+      labelX: tag.labelX,
+      labelY: tag.labelY,
+      status: tag.status === 'auto' ? derived?.status ?? 'healthy' : tag.status,
+      count: derived?.count ?? 0,
+    };
+  });
+  const plantAutoColors: Record<string, string> = {};
+  for (const area of plantAreas) plantAutoColors[area.name] = STATUS_COLORS[area.status];
 
   const lastUpdate = formatClock(now);
   const firstMachine = machines[0];
@@ -972,7 +1080,7 @@ export function DashboardOverview({
       case 'plant':
         return (
           <View style={{ height: 420 }}>
-            <PlantMapPanel areas={metrics.areas} />
+            <PlantMapPanel areas={plantAreas} imageScale={plantConfig.imageScale} canEdit={canEditPlant} onEdit={() => setPlantEditorOpen(true)} />
           </View>
         );
       case 'health':
@@ -1128,7 +1236,7 @@ export function DashboardOverview({
           <View className={cn('gap-3', isCompact ? 'flex-col' : 'flex-row')} style={{ width: '100%' }}>
             <View style={{ flex: isCompact ? undefined : 1.9, height: rowHeights.main + rowHeights.mid + 12 }} className="gap-3">
               <Pressable onPress={() => openPanel('plant')} style={{ height: rowHeights.main }}>
-                <PlantMapPanel areas={metrics.areas} compact />
+                <PlantMapPanel areas={plantAreas} imageScale={plantConfig.imageScale} compact canEdit={canEditPlant} onEdit={() => setPlantEditorOpen(true)} />
               </Pressable>
               <View className="flex-row gap-3" style={{ height: rowHeights.mid }}>
                 <Pressable onPress={() => openPanel('system')} className="flex-1">
@@ -1212,6 +1320,20 @@ export function DashboardOverview({
 
       <DashboardDetailModal visible={activePanel !== null} title={activePanel ? detailTitles[activePanel] : ''} onClose={closePanel} compactPanel={activePanel === 'kpis' && activeKpiIndex !== null}>
         {renderDetail()}
+      </DashboardDetailModal>
+
+      <DashboardDetailModal visible={plantEditorOpen} title="Edit Plant Overview" onClose={() => setPlantEditorOpen(false)}>
+        {plantEditorOpen ? (
+        <PlantOverviewEditor
+          initialConfig={plantConfig}
+          imageUri={PLANT_OVERVIEW_IMAGE_URI}
+          autoColors={plantAutoColors}
+          saving={plantSaving}
+          error={plantError}
+          onCancel={() => setPlantEditorOpen(false)}
+          onSave={(config) => void savePlantConfig(config)}
+        />
+        ) : null}
       </DashboardDetailModal>
     </View>
   );

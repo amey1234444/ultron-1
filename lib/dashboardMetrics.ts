@@ -58,9 +58,14 @@ export type Insight = {
 };
 
 export type PlantArea = {
+  id: string;
   name: string;
+  // Pin coordinates and the top-left corner of its callout label, both in the
+  // plant map's 640x330 viewBox.
   x: number;
   y: number;
+  labelX: number;
+  labelY: number;
   status: 'healthy' | 'warning' | 'critical' | 'offline';
   count: number;
 };
@@ -128,17 +133,17 @@ const DEMO_INSIGHTS: Insight[] = [
 ];
 
 const DEMO_AREAS: PlantArea[] = [
-  { name: 'Compressor Area', x: 143, y: 62, status: 'healthy', count: 18 },
-  { name: 'Boiler Area', x: 392, y: 92, status: 'warning', count: 10 },
-  { name: 'Turbine Hall', x: 535, y: 156, status: 'healthy', count: 12 },
-  { name: 'Utility Area', x: 92, y: 278, status: 'healthy', count: 8 },
-  { name: 'Process Pump Line', x: 300, y: 313, status: 'warning', count: 9 },
-  { name: 'Rotary Airlock', x: 489, y: 315, status: 'healthy', count: 3 },
+  { id: 'compressor', name: 'Compressor Area', x: 250, y: 104, labelX: 78, labelY: 8, status: 'healthy', count: 18 },
+  { id: 'boiler', name: 'Boiler Area', x: 478, y: 104, labelX: 350, labelY: 10, status: 'warning', count: 10 },
+  { id: 'turbine', name: 'Turbine Hall', x: 540, y: 152, labelX: 494, labelY: 70, status: 'healthy', count: 12 },
+  { id: 'utility', name: 'Utility Area', x: 214, y: 226, labelX: 38, labelY: 186, status: 'healthy', count: 8 },
+  { id: 'pump', name: 'Process Pump Line', x: 366, y: 240, labelX: 172, labelY: 250, status: 'warning', count: 9 },
+  { id: 'airlock', name: 'Rotary Airlock', x: 470, y: 234, labelX: 452, labelY: 254, status: 'healthy', count: 3 },
 ];
 
 // Fixed marker slots on the plant illustration; real areas are laid out into
 // them in hierarchy order so the map keeps its composition with any plant.
-const AREA_SLOTS = DEMO_AREAS.map(({ x, y }) => ({ x, y }));
+const AREA_SLOTS = DEMO_AREAS.map(({ x, y, labelX, labelY }) => ({ x, y, labelX, labelY }));
 
 const ACTIVE_MAX_AGE_MS = 5_000;
 const STREAM_STALE_MS = 30_000;
@@ -431,6 +436,7 @@ export function buildDashboardMetrics({
     const critical = folderRows.some((row) => row.risk === 'High');
     const warning = folderRows.some((row) => row.risk === 'Medium');
     return {
+      id: folder.id,
       name: folder.name,
       ...AREA_SLOTS[index],
       status: critical ? 'critical' : warning ? 'warning' : 'healthy',
