@@ -8,6 +8,7 @@ import {
   ScrollView,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
   type TextInputProps,
   type ViewStyle,
@@ -21,60 +22,175 @@ import { apiFetch } from '../lib/apiClient';
 // bundled fonts untouched.
 export const AUTH_FONT_DISPLAY = "'Bebas Neue', 'DM Sans', system-ui, sans-serif";
 export const AUTH_FONT_BODY = "'DM Sans', system-ui, sans-serif";
-const GOLD = '#C9A15C';
 
-export function AuthShell({ subtitle, children }: { subtitle: string; children: ReactNode }) {
-  const glass = {
-    backgroundColor: 'rgba(18,18,18,0.66)',
-    backdropFilter: 'blur(22px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(22px) saturate(160%)',
-  } as unknown as ViewStyle;
+const BRAND = '#2563eb';
+const INK = '#0f172a';
+const MUTED = '#64748b';
+const LINE = '#e2e8f0';
+
+// Rotating claims on the brand panel, mirroring the carousel on the reference
+// split-screen sign-in.
+const BRAND_SLIDES = [
+  { kicker: 'BUILT FOR', headline: 'ROTATING\nEQUIPMENT', caption: 'VIBRATION · TEMPERATURE · SPEED' },
+  { kicker: 'STREAMING AT', headline: '10 Hz', caption: 'EDGE GATEWAY TO BROWSER' },
+  { kicker: 'PREDICTS', headline: 'FAILURES', caption: 'BEFORE THEY STOP THE LINE' },
+  { kicker: 'SCALES TO', headline: '1,600+', caption: 'CHANNELS PER PLANT' },
+];
+
+export function AuthShell({
+  title,
+  subtitle,
+  children,
+  footer,
+}: {
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+  footer?: ReactNode;
+}) {
+  const { width } = useWindowDimensions();
+  const stacked = width > 0 && width < 900;
+  const [slide, setSlide] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => setSlide((value) => (value + 1) % BRAND_SLIDES.length), 4000);
+    return () => clearInterval(id);
+  }, []);
+
+  const active = BRAND_SLIDES[slide];
 
   return (
-    <ScrollView
-      className="flex-1"
-      keyboardShouldPersistTaps="handled"
-      contentContainerStyle={{ minHeight: '100%', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingVertical: 20, backgroundColor: '#0A0A0A' }}
-    >
-      {/* Ambient glows built from soft box-shadows (no blur filter needed). */}
-      <View
-        pointerEvents="none"
-        style={{ position: 'absolute', top: 90, left: 120, width: 1, height: 1, boxShadow: '0 0 240px 150px rgba(201,161,92,0.16)' } as unknown as ViewStyle}
-      />
-      <View
-        pointerEvents="none"
-        style={{ position: 'absolute', bottom: 80, right: 130, width: 1, height: 1, boxShadow: '0 0 260px 160px rgba(88,166,255,0.13)' } as unknown as ViewStyle}
-      />
+    <View style={{ flex: 1, flexDirection: stacked ? 'column' : 'row', backgroundColor: '#ffffff', minHeight: '100%' }}>
+      {/* Form column */}
+      <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: 'center',
+            paddingHorizontal: stacked ? 24 : 56,
+            paddingVertical: 48,
+          }}
+        >
+          <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
+            <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 30, letterSpacing: 6, color: INK }}>ULTRON</Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, letterSpacing: 1.6, color: MUTED, marginTop: 2 }}>
+              ASSET MONITORING
+            </Text>
 
-      <View
-        className="w-full max-w-sm overflow-hidden rounded-2xl border p-5"
-        style={[{ borderColor: 'rgba(255,255,255,0.10)', boxShadow: '0 30px 90px rgba(0,0,0,0.55)' } as unknown as ViewStyle, glass]}
-      >
-        <LinearGradient
-          colors={[GOLD, '#F0D9A8']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 0 }}
-          style={{ height: 3, width: 38, borderRadius: 999, marginBottom: 10 }}
-        />
-        <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 30, letterSpacing: 5, color: '#F5F5F5', lineHeight: 32 }}>ULTRON</Text>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#8A8A8A', marginTop: 4 }}>{subtitle}</Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 30, fontWeight: '700', color: INK, marginTop: 44 }}>{title}</Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, color: MUTED, marginTop: 6 }}>{subtitle}</Text>
 
-        <View style={{ marginTop: 12 }}>{children}</View>
+            <View style={{ marginTop: 24 }}>{children}</View>
+
+            {footer ? <View style={{ marginTop: 24 }}>{footer}</View> : null}
+          </View>
+        </ScrollView>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            paddingHorizontal: stacked ? 24 : 48,
+            paddingBottom: 20,
+            paddingTop: 8,
+          }}
+        >
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED }}>
+            © {new Date().getFullYear()} ULTRON. All rights reserved.
+          </Text>
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED }}>Legal</Text>
+        </View>
       </View>
-    </ScrollView>
+
+      {/* Brand column */}
+      <View style={{ flex: 1, minHeight: stacked ? 320 : undefined }}>
+        <LinearGradient
+          colors={['#1d4ed8', '#2563eb', '#1e40af']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={{ flex: 1, paddingHorizontal: 40, paddingVertical: 48, justifyContent: 'space-between' }}
+        >
+          <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 34, letterSpacing: 6, color: '#ffffff' }}>
+            ULTRON <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 20, fontWeight: '600', letterSpacing: 1 }}>Studio</Text>
+          </Text>
+
+          <View style={{ alignItems: 'center' }}>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, letterSpacing: 4, color: 'rgba(255,255,255,0.72)' }}>{active.kicker}</Text>
+            <Text
+              style={{
+                fontFamily: AUTH_FONT_DISPLAY,
+                fontSize: 66,
+                lineHeight: 68,
+                letterSpacing: 2,
+                color: '#ffffff',
+                textAlign: 'center',
+                marginTop: 14,
+              }}
+            >
+              {active.headline}
+            </Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, letterSpacing: 3, color: 'rgba(255,255,255,0.72)', marginTop: 18 }}>
+              {active.caption}
+            </Text>
+
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 30 }}>
+              {BRAND_SLIDES.map((item, index) => (
+                <Pressable
+                  key={item.headline}
+                  onPress={() => setSlide(index)}
+                  style={{
+                    height: 5,
+                    width: index === slide ? 30 : 6,
+                    borderRadius: 999,
+                    backgroundColor: index === slide ? '#ffffff' : 'rgba(255,255,255,0.42)',
+                  }}
+                />
+              ))}
+            </View>
+          </View>
+
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
+            Crafted for teams that keep industrial plants running.
+          </Text>
+        </LinearGradient>
+      </View>
+    </View>
   );
 }
 
-export function AuthField({ label, ...props }: { label: string } & TextInputProps) {
+export function AuthField({
+  label,
+  hint,
+  ...props
+}: { label: string; hint?: ReactNode } & TextInputProps) {
+  const [focused, setFocused] = useState(false);
   return (
-    <View className="mt-2 gap-0.5">
-      <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-[10px] uppercase tracking-wider text-ink-muted">
-        {label}
-      </Text>
+    <View style={{ marginTop: 16 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '600', color: INK }}>{label}</Text>
+        {hint}
+      </View>
       <TextInput
-        placeholderTextColor="#5A5A5A"
-        style={{ fontFamily: AUTH_FONT_BODY, backgroundColor: 'rgba(255,255,255,0.03)' }}
-        className="rounded-lg border border-line-dark px-3.5 py-2 text-[14px] text-ink"
+        placeholderTextColor="#9ca3af"
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={
+          {
+            fontFamily: AUTH_FONT_BODY,
+            backgroundColor: '#ffffff',
+            borderWidth: 1,
+            borderColor: focused ? BRAND : LINE,
+            borderRadius: 8,
+            paddingHorizontal: 14,
+            paddingVertical: 11,
+            marginTop: 8,
+            fontSize: 15,
+            color: INK,
+            outlineStyle: 'none',
+          } as unknown as ViewStyle
+        }
         {...props}
       />
     </View>
@@ -85,18 +201,43 @@ export function AuthButton({ label, submitting, onPress }: { label: string; subm
   return (
     <Pressable
       onPress={submitting ? undefined : onPress}
+      accessibilityRole="button"
       accessibilityState={{ disabled: !!submitting }}
-      className={`mt-4 items-center rounded-lg px-4 py-2.5 ${submitting ? 'opacity-60' : ''}`}
-      style={{ backgroundColor: '#F5F5F5' }}
+      style={{
+        marginTop: 24,
+        alignItems: 'center',
+        justifyContent: 'center',
+        height: 46,
+        borderRadius: 8,
+        backgroundColor: BRAND,
+        opacity: submitting ? 0.65 : 1,
+      }}
     >
       {submitting ? (
-        <ActivityIndicator color="#0A0A0A" />
+        <ActivityIndicator color="#ffffff" />
       ) : (
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontWeight: '700', letterSpacing: 0.3 }} className="text-sm text-ink-inverse">
-          {label}
-        </Text>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontWeight: '700', fontSize: 15, color: '#ffffff' }}>{label}</Text>
       )}
     </Pressable>
+  );
+}
+
+export function AuthAltAction({ prompt, action, onPress }: { prompt: string; action: string; onPress: () => void }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
+      <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, color: MUTED }}>{prompt}</Text>
+      <Pressable onPress={onPress}>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '700', color: INK }}>{action}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+export function AuthError({ message }: { message: string }) {
+  return (
+    <View style={{ marginTop: 16, borderRadius: 8, borderWidth: 1, borderColor: '#fecaca', backgroundColor: '#fef2f2', paddingHorizontal: 12, paddingVertical: 10 }}>
+      <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#b91c1c' }}>{message}</Text>
+    </View>
   );
 }
 
@@ -152,26 +293,37 @@ export function useCaptcha(): Captcha {
 export function CaptchaField({ captcha, onSubmitEditing }: { captcha: Captcha; onSubmitEditing?: () => void }) {
   return (
     <>
-      <View className="mt-2 gap-0.5">
-        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-[10px] uppercase tracking-wider text-ink-muted">
-          CAPTCHA
-        </Text>
-        <View className="flex-row flex-wrap items-center gap-2">
-          <View className="h-[46px] w-[150px] max-w-full items-center justify-center overflow-hidden rounded-lg border border-line-dark bg-surface-dark">
+      <View style={{ marginTop: 16 }}>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '600', color: INK }}>Security check</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 8 }}>
+          <View
+            style={{
+              height: 46,
+              width: 150,
+              maxWidth: '100%',
+              alignItems: 'center',
+              justifyContent: 'center',
+              overflow: 'hidden',
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: LINE,
+              backgroundColor: '#f8fafc',
+            }}
+          >
             {captcha.loading ? (
-              <ActivityIndicator color="#C9A15C" />
+              <ActivityIndicator color={BRAND} />
             ) : captcha.svg ? (
               <Image source={{ uri: svgToDataUri(captcha.svg) }} style={{ width: 150, height: 46 }} resizeMode="contain" />
             ) : (
-              <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
-                Unavailable
-              </Text>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED }}>Unavailable</Text>
             )}
           </View>
-          <Pressable onPress={() => void captcha.reload()} accessibilityLabel="Refresh CAPTCHA" className="rounded-lg border border-line-dark px-2.5 py-1.5">
-            <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-accent">
-              ↻ New
-            </Text>
+          <Pressable
+            onPress={() => void captcha.reload()}
+            accessibilityLabel="Refresh CAPTCHA"
+            style={{ borderRadius: 8, borderWidth: 1, borderColor: LINE, paddingHorizontal: 12, paddingVertical: 10 }}
+          >
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: BRAND }}>↻ New</Text>
           </Pressable>
         </View>
       </View>

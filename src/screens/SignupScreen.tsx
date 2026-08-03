@@ -1,9 +1,9 @@
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { AUTH_FONT_BODY, AuthButton, AuthField, AuthShell, CaptchaField, useCaptcha } from './AuthShell';
+import { AUTH_FONT_BODY, AuthAltAction, AuthButton, AuthError, AuthField, AuthShell, CaptchaField, useCaptcha } from './AuthShell';
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -35,7 +35,7 @@ export default function SignupScreen() {
       return;
     }
     if (!captcha.answer.trim()) {
-      setError('Please solve the CAPTCHA.');
+      setError('Please solve the security check.');
       return;
     }
     setSubmitting(true);
@@ -59,19 +59,21 @@ export default function SignupScreen() {
 
   if (done) {
     return (
-      <AuthShell subtitle="Registration received">
-        <View className="mt-2 rounded-xl border border-accent/40 bg-accent-soft px-4 py-4">
-          <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-sm leading-6 text-ink">
-            {done}
-          </Text>
+      <AuthShell title="Registration received" subtitle="An administrator will review your request.">
+        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: '#bfdbfe', backgroundColor: '#eff6ff', paddingHorizontal: 14, paddingVertical: 14 }}>
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, lineHeight: 22, color: '#1e3a8a' }}>{done}</Text>
         </View>
-        <AuthButton label="Back to Sign In" onPress={() => router.replace('/login')} />
+        <AuthButton label="Back to sign in" onPress={() => router.replace('/login')} />
       </AuthShell>
     );
   }
 
   return (
-    <AuthShell subtitle="Create your account">
+    <AuthShell
+      title="Create your account"
+      subtitle="Set up access to the ULTRON monitoring console."
+      footer={<AuthAltAction prompt="Already have an account?" action="Sign in" onPress={() => router.push('/login')} />}
+    >
       <AuthField label="Username" value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="jdoe" />
       <AuthField label="Full name" value={name} onChangeText={setName} placeholder="Jane Doe" />
       <AuthField
@@ -80,36 +82,15 @@ export default function SignupScreen() {
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
-        placeholder="jane@company.com"
+        placeholder="name@company.com"
       />
-      <AuthField
-        label="Password"
-        value={password}
-        onChangeText={setPassword}
-        secureTextEntry
-        placeholder="min 8 chars"
-      />
+      <AuthField label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 8 characters" />
 
       <CaptchaField captcha={captcha} onSubmitEditing={onSubmit} />
 
-      {error ? (
-        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="mt-3 text-sm text-status-critical">
-          {error}
-        </Text>
-      ) : null}
+      {error ? <AuthError message={error} /> : null}
 
-      <AuthButton label="Create Account" submitting={submitting} onPress={onSubmit} />
-
-      <View className="mt-3 flex-row items-center gap-1">
-        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
-          Already have an account?
-        </Text>
-        <Pressable onPress={() => router.push('/login')}>
-          <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-accent">
-            Sign in
-          </Text>
-        </Pressable>
-      </View>
+      <AuthButton label="Create account" submitting={submitting} onPress={onSubmit} />
     </AuthShell>
   );
 }
