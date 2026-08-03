@@ -9,6 +9,7 @@ import {
   AuthButton,
   AuthError,
   AuthField,
+  AuthFieldRow,
   AuthPasswordField,
   AuthShell,
   CaptchaField,
@@ -127,54 +128,57 @@ export default function SignupScreen() {
       subtitle="Set up access to the ULTRON monitoring console. A super admin approves every new account."
       footer={<AuthAltAction prompt="Already have an account?" action="Sign in" onPress={() => router.push('/login')} />}
     >
-      <AuthField
-        label="Username"
-        value={username}
-        onChangeText={(text) => {
-          setUsername(text);
-          clearError('username');
-        }}
-        autoCapitalize="none"
-        autoComplete="username"
-        placeholder="jdoe"
-        error={fieldErrors.username}
-      />
-      <AuthField
-        label="Full name"
-        value={name}
-        onChangeText={(text) => {
-          setName(text);
-          clearError('name');
-        }}
-        autoComplete="name"
-        placeholder="Jane Doe"
-        error={fieldErrors.name}
-      />
-      <AuthField
-        label="Work email"
-        value={email}
-        onChangeText={(text) => {
-          setEmail(text);
-          clearError('email');
-        }}
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        placeholder="name@company.com"
-        error={fieldErrors.email}
-        helper="Used for approval notices and reputation validation."
-      />
-      <AuthPasswordField
-        label="Password"
-        value={password}
-        onChangeText={(text) => {
-          setPassword(text);
-          clearError('password');
-        }}
-        autoComplete="new-password"
-        placeholder="At least 8 characters"
-        error={fieldErrors.password}
-      />
+      <AuthFieldRow>
+        <AuthField
+          label="Username"
+          value={username}
+          onChangeText={(text) => {
+            setUsername(text);
+            clearError('username');
+          }}
+          autoCapitalize="none"
+          autoComplete="username"
+          placeholder="jdoe"
+          error={fieldErrors.username}
+        />
+        <AuthField
+          label="Full name"
+          value={name}
+          onChangeText={(text) => {
+            setName(text);
+            clearError('name');
+          }}
+          autoComplete="name"
+          placeholder="Jane Doe"
+          error={fieldErrors.name}
+        />
+      </AuthFieldRow>
+      <AuthFieldRow>
+        <AuthField
+          label="Work email"
+          value={email}
+          onChangeText={(text) => {
+            setEmail(text);
+            clearError('email');
+          }}
+          autoCapitalize="none"
+          autoComplete="email"
+          keyboardType="email-address"
+          placeholder="name@company.com"
+          error={fieldErrors.email}
+        />
+        <AuthPasswordField
+          label="Password"
+          value={password}
+          onChangeText={(text) => {
+            setPassword(text);
+            clearError('password');
+          }}
+          autoComplete="new-password"
+          placeholder="At least 8 characters"
+          error={fieldErrors.password}
+        />
+      </AuthFieldRow>
       <PasswordStrength password={password} />
 
       <CaptchaField
