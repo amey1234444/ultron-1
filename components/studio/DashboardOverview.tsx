@@ -20,7 +20,14 @@ import type { FolderNode, ProjectNode } from '../../lib/hierarchy';
 import type { LiveState } from '../../lib/liveTelemetry';
 import type { MachineNode } from '../../lib/machines';
 import type { CardNode } from '../../lib/rack';
+import {
+  DEFAULT_PLANT_OVERVIEW,
+  normalizePlantOverview,
+  type PlantOverviewConfig,
+} from '../../lib/plantOverview';
+import { apiFetch } from '../../src/lib/apiClient';
 import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
+import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
   projects: ProjectNode[];
@@ -475,13 +482,36 @@ function DonutChart({ segments, total, size = 150 }: { segments: { label: string
   );
 }
 
-function PlantMapPanel({ areas, compact = false }: { areas: PlantArea[]; compact?: boolean }) {
+function PlantMapPanel({
+  areas,
+  compact = false,
+  imageScale = 100,
+  canEdit = false,
+  onEdit,
+}: {
+  areas: PlantArea[];
+  compact?: boolean;
+  imageScale?: number;
+  canEdit?: boolean;
+  onEdit?: () => void;
+}) {
   const { isDark } = useAppTheme();
+  const imageInset = (100 - imageScale) / 2;
   return (
     <View className={sectionClass(isDark)}>
       <View className={cn('flex-row items-center justify-between border-b', compact ? 'px-3 py-2' : 'px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
         <Text className={cn('font-body-bold', compact ? 'text-xs' : 'text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>Plant Overview</Text>
-        <View className={cn('flex-row', compact ? 'gap-3' : 'gap-4')}>
+        <View className={cn('flex-row items-center', compact ? 'gap-3' : 'gap-4')}>
+          {canEdit && onEdit ? (
+            <Pressable
+              onPress={onEdit}
+              accessibilityRole="button"
+              className={cn('flex-row items-center gap-1 rounded-md border px-2 py-1', isDark ? 'border-line-dark' : 'border-line-light')}
+            >
+              <MaterialCommunityIcons name="pencil-outline" size={12} color="#C9A15C" />
+              <Text className="font-body-medium text-[10px] text-accent">Edit map</Text>
+            </Pressable>
+          ) : null}
           {(['healthy', 'warning', 'critical', 'offline'] as const).map((status) => (
             <View key={status} className="flex-row items-center gap-1">
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: STATUS_COLORS[status] }} />
@@ -503,7 +533,14 @@ function PlantMapPanel({ areas, compact = false }: { areas: PlantArea[]; compact
         <Image
           source={{ uri: PLANT_OVERVIEW_IMAGE_URI }}
           resizeMode="contain"
-          style={{ position: 'absolute', left: 46, right: 22, top: 12, bottom: 6, opacity: isDark ? 0.86 : 0.98 }}
+          style={{
+            position: 'absolute',
+            left: `${imageInset}%`,
+            right: `${imageInset}%`,
+            top: `${imageInset}%`,
+            bottom: `${imageInset}%`,
+            opacity: isDark ? 0.86 : 0.98,
+          }}
         />
         <Svg width="100%" height="100%" viewBox="0 0 640 330" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
           {areas.map((area) => {
@@ -851,7 +888,51 @@ export function DashboardOverview({
   const [timeRange, setTimeRange] = useState('Last 24 Hours');
   const [activePanel, setActivePanel] = useState<DetailPanel | null>(null);
   const [activeKpiIndex, setActiveKpiIndex] = useState<number | null>(null);
+  const [plantConfig, setPlantConfig] = useState<PlantOverviewConfig>(DEFAULT_PLANT_OVERVIEW);
+  const [plantEditorOpen, setPlantEditorOpen] = useState(false);
+  const [plantSaving, setPlantSaving] = useState(false);
+  const [plantError, setPlantError] = useState<string | null>(null);
   const isCompact = width > 0 && width < 1100;
+  const canEditPlant = currentUser?.role === 'super_admin';
+
+  // The plant overview layout is shared: super admins save it, everyone else
+  // renders whatever was saved.
+  useEffect(() => {
+    let cancelled = false;
+    void apiFetch('/api/studio/plant-overview')
+      .then(async (response) => {
+        if (!response.ok) return;
+        const data = (await response.json()) as { config?: unknown };
+        if (!cancelled) setPlantConfig(normalizePlantOverview(data.config));
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const savePlantConfig = async (config: PlantOverviewConfig) => {
+    setPlantSaving(true);
+    setPlantError(null);
+    try {
+      const response = await apiFetch('/api/studio/plant-overview', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config }),
+      });
+      const data = (await response.json().catch(() => ({}))) as { config?: unknown; error?: string };
+      if (!response.ok) {
+        setPlantError(data.error ?? 'Could not save the plant overview.');
+        return;
+      }
+      setPlantConfig(normalizePlantOverview(data.config ?? config));
+      setPlantEditorOpen(false);
+    } catch {
+      setPlantError('Could not reach the server.');
+    } finally {
+      setPlantSaving(false);
+    }
+  };
 
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), 1000);
@@ -913,6 +994,24 @@ export function DashboardOverview({
     { label: 'Acknowledge', value: metrics.ackCount, color: '#64748b' },
   ];
   const severityTotal = severitySegments.reduce((sum, segment) => sum + segment.value, 0);
+
+  // Saved tags drive the map; `auto` tags borrow the live status of the area
+  // with the same name so the layout stays fixed while colours stay live.
+  const plantAreas: PlantArea[] = plantConfig.tags.map((tag) => {
+    const derived = metrics.areas.find((area) => area.name === tag.name);
+    return {
+      id: tag.id,
+      name: tag.name,
+      x: tag.x,
+      y: tag.y,
+      labelX: tag.labelX,
+      labelY: tag.labelY,
+      status: tag.status === 'auto' ? derived?.status ?? 'healthy' : tag.status,
+      count: derived?.count ?? 0,
+    };
+  });
+  const plantAutoColors: Record<string, string> = {};
+  for (const area of plantAreas) plantAutoColors[area.name] = STATUS_COLORS[area.status];
 
   const lastUpdate = formatClock(now);
   const firstMachine = machines[0];
@@ -981,7 +1080,7 @@ export function DashboardOverview({
       case 'plant':
         return (
           <View style={{ height: 420 }}>
-            <PlantMapPanel areas={metrics.areas} />
+            <PlantMapPanel areas={plantAreas} imageScale={plantConfig.imageScale} canEdit={canEditPlant} onEdit={() => setPlantEditorOpen(true)} />
           </View>
         );
       case 'health':
@@ -1137,7 +1236,7 @@ export function DashboardOverview({
           <View className={cn('gap-3', isCompact ? 'flex-col' : 'flex-row')} style={{ width: '100%' }}>
             <View style={{ flex: isCompact ? undefined : 1.9, height: rowHeights.main + rowHeights.mid + 12 }} className="gap-3">
               <Pressable onPress={() => openPanel('plant')} style={{ height: rowHeights.main }}>
-                <PlantMapPanel areas={metrics.areas} compact />
+                <PlantMapPanel areas={plantAreas} imageScale={plantConfig.imageScale} compact canEdit={canEditPlant} onEdit={() => setPlantEditorOpen(true)} />
               </Pressable>
               <View className="flex-row gap-3" style={{ height: rowHeights.mid }}>
                 <Pressable onPress={() => openPanel('system')} className="flex-1">
@@ -1221,6 +1320,20 @@ export function DashboardOverview({
 
       <DashboardDetailModal visible={activePanel !== null} title={activePanel ? detailTitles[activePanel] : ''} onClose={closePanel} compactPanel={activePanel === 'kpis' && activeKpiIndex !== null}>
         {renderDetail()}
+      </DashboardDetailModal>
+
+      <DashboardDetailModal visible={plantEditorOpen} title="Edit Plant Overview" onClose={() => setPlantEditorOpen(false)}>
+        {plantEditorOpen ? (
+        <PlantOverviewEditor
+          initialConfig={plantConfig}
+          imageUri={PLANT_OVERVIEW_IMAGE_URI}
+          autoColors={plantAutoColors}
+          saving={plantSaving}
+          error={plantError}
+          onCancel={() => setPlantEditorOpen(false)}
+          onSave={(config) => void savePlantConfig(config)}
+        />
+        ) : null}
       </DashboardDetailModal>
     </View>
   );
