@@ -248,16 +248,22 @@ function HealthGauge({ score, label, compact = false }: { score: number; label: 
   const cy = size / 2 + (compact ? 12 : 16);
   const radius = size / 2 - stroke / 2 - 6;
   // Half-ring gauge (180° sweep) as in the reference dashboard.
-  const sweep = Math.PI * radius;
   const value = clamp(score, 0, 100);
   const angle = 180 + (value / 100) * 180;
-  const needleX = cx + (radius + stroke / 2 + 4) * Math.cos((Math.PI * angle) / 180);
-  const needleY = cy + (radius + stroke / 2 + 4) * Math.sin((Math.PI * angle) / 180);
+  // Tick marking the current score, drawn just outside the ring so it never
+  // crosses the score text in the middle.
+  const tickInner = radius - stroke / 2 - 1;
+  const tickOuter = radius + stroke / 2 + 1;
+  const tickX1 = cx + tickInner * Math.cos((Math.PI * angle) / 180);
+  const tickY1 = cy + tickInner * Math.sin((Math.PI * angle) / 180);
+  const tickX2 = cx + tickOuter * Math.cos((Math.PI * angle) / 180);
+  const tickY2 = cy + tickOuter * Math.sin((Math.PI * angle) / 180);
+  // Green at the healthy end, ramping to red — matching the reference gauge.
   const bands = [
-    { color: '#ef4444', from: 0, to: 0.28 },
-    { color: '#f59e0b', from: 0.28, to: 0.55 },
-    { color: '#facc15', from: 0.55, to: 0.72 },
-    { color: '#22c55e', from: 0.72, to: 1 },
+    { color: '#22c55e', from: 0, to: 0.62 },
+    { color: '#facc15', from: 0.62, to: 0.78 },
+    { color: '#f59e0b', from: 0.78, to: 0.9 },
+    { color: '#ef4444', from: 0.9, to: 1 },
   ];
   const arc = (from: number, to: number) => {
     const a0 = 180 + from * 180;
@@ -271,20 +277,18 @@ function HealthGauge({ score, label, compact = false }: { score: number; label: 
     <Svg width={size} height={compact ? size * 0.72 : size * 0.74} viewBox={`0 0 ${size} ${size * 0.78}`}>
       <Path d={arc(0, 1)} fill="none" stroke="#e5e7eb" strokeWidth={stroke} strokeLinecap="round" />
       {bands.map((band) => (
-        <Path key={band.color} d={arc(band.from, band.to)} fill="none" stroke={band.color} strokeWidth={stroke} opacity={value / 100 >= band.from ? 1 : 0.28} />
+        <Path key={band.color} d={arc(band.from, band.to)} fill="none" stroke={band.color} strokeWidth={stroke} />
       ))}
-      <Line x1={cx} y1={cy} x2={needleX} y2={needleY} stroke="#111827" strokeWidth={3} strokeLinecap="round" />
-      <Circle cx={cx} cy={cy} r={4} fill="#111827" />
-      <SvgText x={cx} y={cy - (compact ? 16 : 22)} textAnchor="middle" fontSize={compact ? 30 : 38} fontWeight="700" fill="#111827">
+      <Line x1={tickX1} y1={tickY1} x2={tickX2} y2={tickY2} stroke="#111827" strokeWidth={2.5} strokeLinecap="round" />
+      <SvgText x={cx - (compact ? 6 : 8)} y={cy - (compact ? 14 : 18)} textAnchor="middle" fontSize={compact ? 30 : 38} fontWeight="700" fill="#111827">
         {value}
       </SvgText>
-      <SvgText x={cx + (compact ? 30 : 38)} y={cy - (compact ? 16 : 22)} fontSize={compact ? 10 : 12} fill="#475569">
+      <SvgText x={cx + (compact ? 18 : 24)} y={cy - (compact ? 14 : 18)} fontSize={compact ? 10 : 12} fill="#475569">
         /100
       </SvgText>
-      <SvgText x={cx} y={cy - (compact ? 2 : 4)} textAnchor="middle" fontSize={compact ? 12 : 14} fontWeight="700" fill={toneColorForScore}>
+      <SvgText x={cx} y={cy + (compact ? 4 : 4)} textAnchor="middle" fontSize={compact ? 12 : 14} fontWeight="700" fill={toneColorForScore}>
         {label}
       </SvgText>
-      <SvgText x={0} y={0} opacity={0}>{String(sweep)}</SvgText>
     </Svg>
   );
 }
@@ -504,19 +508,24 @@ function PlantMapPanel({ areas, compact = false }: { areas: PlantArea[]; compact
         <Svg width="100%" height="100%" viewBox="0 0 640 330" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
           {areas.map((area) => {
             const color = STATUS_COLORS[area.status];
-            const labelX = area.x < 160 ? area.x - 18 : area.x > 460 ? area.x - 128 : area.x - 54;
-            const labelY = area.y < 110 ? area.y - 46 : area.y + 18;
+            const boxW = compact ? 118 : 132;
+            const boxH = compact ? 40 : 46;
+            const labelX = clamp(area.labelX, 4, 640 - boxW - 4);
+            const labelY = clamp(area.labelY, 4, 330 - boxH - 4);
+            // Anchor the leader line on whichever edge of the callout faces the pin.
+            const anchorX = clamp(area.x, labelX, labelX + boxW);
+            const anchorY = area.y > labelY + boxH ? labelY + boxH : area.y < labelY ? labelY : area.y;
             return (
-              <G key={area.name}>
-                <Line x1={area.x} y1={area.y} x2={labelX + 68} y2={labelY + 34} stroke={color} strokeWidth={2} />
-                <Circle cx={area.x} cy={area.y} r={11} fill={`${color}22`} stroke={color} strokeWidth={2} />
-                <Circle cx={area.x} cy={area.y} r={5} fill={color} stroke="#ffffff" strokeWidth={2} />
-                <Rect x={labelX} y={labelY} width={compact ? 122 : 136} height={compact ? 42 : 48} rx={8} fill="#ffffff" opacity={0.96} stroke="#dbe3ec" />
-                <SvgText x={labelX + 10} y={labelY + 17} fontSize={compact ? 9 : 11} fontWeight="700" fill="#111827">
+              <G key={area.id}>
+                <Line x1={area.x} y1={area.y} x2={anchorX} y2={anchorY} stroke={color} strokeWidth={1.6} />
+                <Circle cx={area.x} cy={area.y} r={10} fill={`${color}22`} stroke={color} strokeWidth={1.8} />
+                <Circle cx={area.x} cy={area.y} r={4.5} fill={color} stroke="#ffffff" strokeWidth={2} />
+                <Rect x={labelX} y={labelY} width={boxW} height={boxH} rx={7} fill="#ffffff" opacity={0.97} stroke="#dbe3ec" />
+                <SvgText x={labelX + 10} y={labelY + (compact ? 16 : 18)} fontSize={compact ? 9 : 10.5} fontWeight="700" fill="#111827">
                   {area.name}
                 </SvgText>
-                <Circle cx={labelX + 11} cy={labelY + (compact ? 29 : 33)} r={3.5} fill={color} />
-                <SvgText x={labelX + 21} y={labelY + (compact ? 32 : 36)} fontSize={compact ? 8 : 10} fill="#334155">
+                <Circle cx={labelX + 13} cy={labelY + (compact ? 29 : 33)} r={3.2} fill={color} />
+                <SvgText x={labelX + 21} y={labelY + (compact ? 32 : 36)} fontSize={compact ? 8 : 9.5} fill="#334155">
                   {area.status === 'healthy' ? 'Healthy' : area.status === 'warning' ? 'Warning' : area.status === 'critical' ? 'Critical' : 'Offline'}
                 </SvgText>
               </G>
