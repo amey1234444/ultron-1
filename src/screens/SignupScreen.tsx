@@ -3,7 +3,29 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { AUTH_FONT_BODY, AuthAltAction, AuthButton, AuthError, AuthField, AuthShell, CaptchaField, useCaptcha } from './AuthShell';
+import {
+  AUTH_FONT_BODY,
+  AuthAltAction,
+  AuthButton,
+  AuthError,
+  AuthField,
+  AuthPasswordField,
+  AuthShell,
+  CaptchaField,
+  PasswordStrength,
+  passwordScore,
+  useCaptcha,
+} from './AuthShell';
+
+type FieldErrors = {
+  username?: string;
+  name?: string;
+  email?: string;
+  password?: string;
+  captcha?: string;
+};
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupScreen() {
   const router = useRouter();
@@ -13,6 +35,7 @@ export default function SignupScreen() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const captcha = useCaptcha();
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -24,20 +47,28 @@ export default function SignupScreen() {
     }
   }, [loading, user, router]);
 
+  const clearError = (key: keyof FieldErrors) => {
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: undefined } : prev));
+  };
+
+  const validate = (): FieldErrors => {
+    const errors: FieldErrors = {};
+    if (username.trim().length < 3) errors.username = 'Pick a username with at least 3 characters.';
+    else if (!/^[A-Za-z0-9._-]+$/.test(username.trim())) errors.username = 'Use letters, numbers, dots, dashes or underscores only.';
+    if (!name.trim()) errors.name = 'Enter your full name.';
+    if (!EMAIL_PATTERN.test(email.trim())) errors.email = 'Enter a valid work email address.';
+    if (password.length < 8) errors.password = 'Use at least 8 characters.';
+    else if (passwordScore(password).score < 3) errors.password = 'Add a number, a symbol or mixed case to strengthen this password.';
+    if (!captcha.answer.trim()) errors.captcha = 'Solve the security check to continue.';
+    return errors;
+  };
+
   const onSubmit = async () => {
     setError(null);
-    if (!email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      setError('Enter a valid email address.');
-      return;
-    }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.');
-      return;
-    }
-    if (!captcha.answer.trim()) {
-      setError('Please solve the security check.');
-      return;
-    }
+    const errors = validate();
+    setFieldErrors(errors);
+    if (Object.keys(errors).length > 0) return;
+
     setSubmitting(true);
     try {
       const result = await signup({
@@ -59,9 +90,30 @@ export default function SignupScreen() {
 
   if (done) {
     return (
-      <AuthShell title="Registration received" subtitle="An administrator will review your request.">
-        <View style={{ borderRadius: 8, borderWidth: 1, borderColor: 'rgba(201,161,92,0.4)', backgroundColor: 'rgba(201,161,92,0.1)', paddingHorizontal: 14, paddingVertical: 14 }}>
+      <AuthShell badge="REQUEST RECEIVED" title="Registration received" subtitle="An administrator will review your request.">
+        <View
+          style={{
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: 'rgba(201,161,92,0.4)',
+            backgroundColor: 'rgba(201,161,92,0.1)',
+            paddingHorizontal: 14,
+            paddingVertical: 14,
+          }}
+        >
           <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, lineHeight: 22, color: '#E8D7B5' }}>{done}</Text>
+        </View>
+        <View style={{ marginTop: 16, gap: 8 }}>
+          {[
+            'A super admin reviews and approves the account.',
+            'Your email is validated for reputation before access is granted.',
+            'You will be able to sign in as soon as it is approved.',
+          ].map((step, index) => (
+            <View key={step} style={{ flexDirection: 'row', gap: 8 }}>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#C9A15C' }}>{index + 1}.</Text>
+              <Text style={{ flex: 1, fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 20, color: '#8A8A8A' }}>{step}</Text>
+            </View>
+          ))}
         </View>
         <AuthButton label="Back to sign in" onPress={() => router.replace('/login')} />
       </AuthShell>
@@ -70,23 +122,66 @@ export default function SignupScreen() {
 
   return (
     <AuthShell
+      badge="REQUEST ACCESS"
       title="Create your account"
-      subtitle="Set up access to the ULTRON monitoring console."
+      subtitle="Set up access to the ULTRON monitoring console. A super admin approves every new account."
       footer={<AuthAltAction prompt="Already have an account?" action="Sign in" onPress={() => router.push('/login')} />}
     >
-      <AuthField label="Username" value={username} onChangeText={setUsername} autoCapitalize="none" placeholder="jdoe" />
-      <AuthField label="Full name" value={name} onChangeText={setName} placeholder="Jane Doe" />
       <AuthField
-        label="Email"
-        value={email}
-        onChangeText={setEmail}
+        label="Username"
+        value={username}
+        onChangeText={(text) => {
+          setUsername(text);
+          clearError('username');
+        }}
         autoCapitalize="none"
+        autoComplete="username"
+        placeholder="jdoe"
+        error={fieldErrors.username}
+      />
+      <AuthField
+        label="Full name"
+        value={name}
+        onChangeText={(text) => {
+          setName(text);
+          clearError('name');
+        }}
+        autoComplete="name"
+        placeholder="Jane Doe"
+        error={fieldErrors.name}
+      />
+      <AuthField
+        label="Work email"
+        value={email}
+        onChangeText={(text) => {
+          setEmail(text);
+          clearError('email');
+        }}
+        autoCapitalize="none"
+        autoComplete="email"
         keyboardType="email-address"
         placeholder="name@company.com"
+        error={fieldErrors.email}
+        helper="Used for approval notices and reputation validation."
       />
-      <AuthField label="Password" value={password} onChangeText={setPassword} secureTextEntry placeholder="At least 8 characters" />
+      <AuthPasswordField
+        label="Password"
+        value={password}
+        onChangeText={(text) => {
+          setPassword(text);
+          clearError('password');
+        }}
+        autoComplete="new-password"
+        placeholder="At least 8 characters"
+        error={fieldErrors.password}
+      />
+      <PasswordStrength password={password} />
 
-      <CaptchaField captcha={captcha} onSubmitEditing={onSubmit} />
+      <CaptchaField
+        captcha={captcha}
+        error={fieldErrors.captcha}
+        onSubmitEditing={onSubmit}
+      />
 
       {error ? <AuthError message={error} /> : null}
 
