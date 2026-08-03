@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { AUTH_FONT_BODY, AuthButton, AuthField, AuthShell } from './AuthShell';
+import { AUTH_FONT_BODY, AuthAltAction, AuthButton, AuthError, AuthField, AuthShell } from './AuthShell';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -35,13 +35,17 @@ export default function LoginScreen() {
   };
 
   return (
-    <AuthShell subtitle="Sign in to continue">
+    <AuthShell
+      title="Welcome back"
+      subtitle="Sign in to your account to continue."
+      footer={<AuthAltAction prompt="Don't have an account?" action="Create one" onPress={() => router.push('/signup')} />}
+    >
       <AuthField
         label="Username"
         value={username}
         onChangeText={setUsername}
         autoCapitalize="none"
-        placeholder="username"
+        placeholder="name@company.com"
         onSubmitEditing={onSubmit}
       />
       <AuthField
@@ -51,29 +55,22 @@ export default function LoginScreen() {
         secureTextEntry
         placeholder="••••••••"
         onSubmitEditing={onSubmit}
+        hint={
+          <Pressable onPress={() => router.push('/signup')}>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#64748b' }}>Forgot password?</Text>
+          </Pressable>
+        }
       />
-      {error ? (
-        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="mt-4 text-sm text-status-critical">
-          {error}
-        </Text>
-      ) : null}
 
-      <AuthButton label="Sign In" submitting={submitting} onPress={onSubmit} />
+      {error ? <AuthError message={error} /> : null}
 
-      <View className="mt-6 flex-row items-center gap-1">
-        <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-ink-muted">
-          Don&apos;t have an account?
+      <AuthButton label="Sign in" submitting={submitting} onPress={onSubmit} />
+
+      <View style={{ marginTop: 20 }}>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, lineHeight: 20, color: '#94a3b8', textAlign: 'center' }}>
+          Demo accounts — superadmin / admin / user (default passwords in README).
         </Text>
-        <Pressable onPress={() => router.push('/signup')}>
-          <Text style={{ fontFamily: AUTH_FONT_BODY }} className="text-xs text-accent">
-            Create one
-          </Text>
-        </Pressable>
       </View>
-
-      <Text style={{ fontFamily: AUTH_FONT_BODY }} className="mt-4 text-xs leading-5 text-ink-muted">
-        Demo accounts — superadmin / admin / user (default passwords in README).
-      </Text>
     </AuthShell>
   );
 }

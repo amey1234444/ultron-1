@@ -148,6 +148,65 @@ const FEATURES = [
   },
 ];
 
+const PIPELINE = [
+  {
+    step: '01 · CONNECT',
+    title: 'Wire up the gateway',
+    body: 'Racks, cards and channels are described once; the gateway starts publishing measurements over MQTT within minutes.',
+  },
+  {
+    step: '02 · MODEL',
+    title: 'Map the plant',
+    body: 'Projects, areas, machines and devices mirror the physical site so every reading has a home in the hierarchy.',
+  },
+  {
+    step: '03 · MONITOR',
+    title: 'Watch it live',
+    body: 'The console streams state, alarms and quality flags in real time, with thresholds evaluated at the edge.',
+  },
+  {
+    step: '04 · ACT',
+    title: 'Fix before failure',
+    body: 'Health scores and ranked recommendations tell maintenance which asset to touch next, and why.',
+  },
+];
+
+const INDUSTRIES = [
+  { title: 'Cement & mining', body: 'Crushers, mills and kiln drives running 24/7 on bearings that fail expensively.', metric: 'Continuous duty' },
+  { title: 'Power generation', body: 'Turbine and pump trains where vibration signatures are the earliest warning available.', metric: 'Sub-second alarms' },
+  { title: 'Chemical & process', body: 'Compressors and agitators monitored alongside temperature, pressure and flow.', metric: 'Multi-variable' },
+  { title: 'Discrete manufacturing', body: 'Line-side motors and conveyors tracked per shift to protect throughput targets.', metric: 'OEE aware' },
+];
+
+const PROTOCOLS = ['MQTT', 'Modbus TCP', 'Modbus RTU', 'OPC UA', 'REST', 'WebSocket', 'CSV export', 'Webhooks'];
+
+const SECURITY = [
+  'Role-based access with super-admin, admin and user tiers',
+  'Server-side sessions with rate limiting on every auth route',
+  'Admin-approved account provisioning — no open self-service access',
+  'CAPTCHA-gated registration and anti-clickjacking headers',
+  'Edge-first architecture: telemetry leaves the plant on one outbound channel',
+];
+
+const FAQS = [
+  {
+    q: 'Do we need new sensors to get started?',
+    a: 'No. If your equipment already reports over MQTT, Modbus or OPC UA, the gateway can ingest it. New sensors only make the health model sharper.',
+  },
+  {
+    q: 'How is the health score calculated?',
+    a: 'It blends channel quality, alarm and danger threshold breaches, telemetry freshness and gateway availability into a single 0–100 figure, with the biggest detractors listed alongside it.',
+  },
+  {
+    q: 'Can it run without internet access?',
+    a: 'Yes. The gateway and console can be deployed inside the plant network; the cloud console is optional for multi-site rollups.',
+  },
+  {
+    q: 'Who can create accounts?',
+    a: 'Anyone can request one, but a super admin has to approve it before sign-in works. Roles are changeable at any time from the console.',
+  },
+];
+
 const STATS = [
   { value: '10 Hz', label: 'live telemetry' },
   { value: '6-level', label: 'asset hierarchy' },
@@ -230,6 +289,12 @@ export default function HomePage() {
           </a>
           <a href="#dashboard" style={navLink} className="ultron-navlink">
             Dashboard
+          </a>
+          <a href="#platform" style={navLink} className="ultron-navlink">
+            Platform
+          </a>
+          <a href="#industries" style={navLink} className="ultron-navlink">
+            Industries
           </a>
           <a href="#contact" style={navLink} className="ultron-navlink">
             Contact
@@ -486,6 +551,125 @@ export default function HomePage() {
             <MiniChart />
           </div>
         </Reveal>
+      </section>
+
+      {/* How it works */}
+      <section id="how-it-works" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
+        <Reveal>
+          <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 56px' }}>
+            <div style={sectionKicker}>HOW IT WORKS</div>
+            <h2 style={sectionTitle}>From sensor to insight in four steps</h2>
+          </div>
+        </Reveal>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, maxWidth: 1080, margin: '0 auto' }}>
+          {PIPELINE.map((step, i) => (
+            <Reveal key={step.title} delay={i * 90}>
+              <div style={featureCard} className="ultron-card">
+                <div style={{ fontFamily: FONT_MONO, fontSize: 12, letterSpacing: '0.18em', color: GOLD }}>{step.step}</div>
+                <h3 style={{ fontFamily: FONT_HEAD, fontSize: 19, margin: '14px 0 8px' }}>{step.title}</h3>
+                <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{step.body}</p>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Industries */}
+      <section id="industries" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
+        <Reveal>
+          <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 56px' }}>
+            <div style={sectionKicker}>WHO IT&apos;S FOR</div>
+            <h2 style={sectionTitle}>Built for the plants that can&apos;t stop</h2>
+          </div>
+        </Reveal>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18, maxWidth: 1080, margin: '0 auto' }}>
+          {INDUSTRIES.map((industry, i) => (
+            <Reveal key={industry.title} delay={i * 80}>
+              <div style={featureCard} className="ultron-card">
+                <h3 style={{ fontFamily: FONT_HEAD, fontSize: 19, margin: '0 0 8px' }}>{industry.title}</h3>
+                <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{industry.body}</p>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: GREEN, marginTop: 16 }}>{industry.metric}</div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* Integrations + security */}
+      <section id="platform" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
+        <Reveal>
+          <div
+            style={{
+              maxWidth: 1080,
+              margin: '0 auto',
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: 18,
+            }}
+          >
+            <div style={{ ...featureCard, padding: 'clamp(24px, 4vw, 36px)' }}>
+              <div style={sectionKicker}>CONNECTIVITY</div>
+              <h3 style={{ fontFamily: FONT_HEAD, fontSize: 22, margin: '10px 0 18px' }}>Speaks your plant&apos;s protocols</h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {PROTOCOLS.map((protocol) => (
+                  <span
+                    key={protocol}
+                    style={{
+                      fontFamily: FONT_MONO,
+                      fontSize: 12,
+                      color: INK,
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      borderRadius: 999,
+                      padding: '7px 13px',
+                      background: 'rgba(255,255,255,0.03)',
+                    }}
+                  >
+                    {protocol}
+                  </span>
+                ))}
+              </div>
+              <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.7, margin: '20px 0 0' }}>
+                Edge gateways normalise every reading into one measurement model, so a vibration channel on a legacy PLC
+                looks the same as a modern MQTT sensor.
+              </p>
+            </div>
+
+            <div style={{ ...featureCard, padding: 'clamp(24px, 4vw, 36px)' }}>
+              <div style={sectionKicker}>TRUST</div>
+              <h3 style={{ fontFamily: FONT_HEAD, fontSize: 22, margin: '10px 0 18px' }}>Security built for OT networks</h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                {SECURITY.map((item) => (
+                  <div key={item} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
+                      <path d="M20 6L9 17l-5-5" />
+                    </svg>
+                    <span style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6 }}>{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </Reveal>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
+        <Reveal>
+          <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 48px' }}>
+            <div style={sectionKicker}>FAQ</div>
+            <h2 style={sectionTitle}>Questions engineering teams ask us</h2>
+          </div>
+        </Reveal>
+        <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gap: 12 }}>
+          {FAQS.map((faq, i) => (
+            <Reveal key={faq.q} delay={i * 70}>
+              <details style={{ ...featureCard, padding: '18px 22px' }}>
+                <summary style={{ fontFamily: FONT_HEAD, fontSize: 16, color: INK, cursor: 'pointer' }}>{faq.q}</summary>
+                <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.7, margin: '12px 0 0' }}>{faq.a}</p>
+              </details>
+            </Reveal>
+          ))}
+        </div>
       </section>
 
       {/* Footer CTA */}
@@ -853,11 +1037,21 @@ function SiteFooter() {
       ],
     },
     {
+      title: 'Platform',
+      links: [
+        { label: 'How it works', href: '#how-it-works' },
+        { label: 'Integrations', href: '#platform' },
+        { label: 'Security', href: '#platform' },
+        { label: 'Industries', href: '#industries' },
+      ],
+    },
+    {
       title: 'Company',
       links: [
         { label: 'About us', href: '#contact' },
         { label: 'Careers', href: '#contact' },
         { label: 'Blog', href: '#contact' },
+        { label: 'Contact sales', href: '#contact' },
       ],
     },
     {
@@ -865,7 +1059,17 @@ function SiteFooter() {
       links: [
         { label: 'Documentation', href: '#contact' },
         { label: 'API reference', href: '#contact' },
+        { label: 'FAQ', href: '#faq' },
         { label: 'Support', href: '#contact' },
+      ],
+    },
+    {
+      title: 'Legal',
+      links: [
+        { label: 'Privacy policy', href: '#contact' },
+        { label: 'Terms of service', href: '#contact' },
+        { label: 'Security overview', href: '#platform' },
+        { label: 'Data processing', href: '#contact' },
       ],
     },
   ];
@@ -878,7 +1082,7 @@ function SiteFooter() {
           margin: '0 auto',
           padding: 'clamp(48px, 8vw, 72px) clamp(20px, 6vw, 72px) 32px',
           display: 'grid',
-          gridTemplateColumns: 'minmax(240px, 1.4fr) repeat(3, minmax(120px, 1fr))',
+          gridTemplateColumns: 'minmax(240px, 1.6fr) repeat(auto-fit, minmax(130px, 1fr))',
           gap: 40,
         }}
       >
@@ -896,6 +1100,21 @@ function SiteFooter() {
               +1 (800) 555-1234
             </a>
             <span style={{ ...contactLink, color: MUTED }}>San Francisco, CA · Remote-first</span>
+          </div>
+          <div
+            style={{
+              marginTop: 20,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+              borderRadius: 999,
+              border: '1px solid rgba(63,185,80,0.35)',
+              background: 'rgba(63,185,80,0.08)',
+              padding: '6px 12px',
+            }}
+          >
+            <span style={{ width: 7, height: 7, borderRadius: 999, background: GREEN, display: 'inline-block' }} />
+            <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: GREEN }}>All systems operational</span>
           </div>
           <div style={{ marginTop: 22, display: 'flex', gap: 12 }}>
             {SOCIALS.map((s) => (
@@ -952,6 +1171,7 @@ function SiteFooter() {
         }}
       >
         <span style={{ fontFamily: FONT_MONO }}>© {new Date().getFullYear()} ULTRON — Industrial intelligence platform</span>
+        <span style={{ fontFamily: FONT_MONO, fontSize: 12 }}>ISO 27001-aligned · SOC 2 controls · GDPR ready</span>
         <span style={{ display: 'flex', gap: 20 }}>
           <a href="#contact" style={footerLink} className="ultron-navlink">
             Privacy
