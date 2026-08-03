@@ -283,7 +283,15 @@ export function MachineWorkspace({
       )}
 
       {isActual && actualTab === 'overview' && (
-        <MachineOverview mappedChannels={mappedChannels} devices={devices} cards={cards} live={live} expectedPoints={expectedPoints} />
+        <MachineOverview
+          mappedChannels={mappedChannels}
+          devices={devices}
+          cards={cards}
+          live={live}
+          expectedPoints={expectedPoints}
+          machineId={machine.id}
+          machineTemplate={machine.template}
+        />
       )}
 
       {isActual && actualTab === 'alarm' && (
