@@ -4,7 +4,7 @@ import { applyLiveStatus, latestMeasurementForChannel } from '../../lib/liveTele
 import { listChannels, type CardNode } from '../../lib/rack';
 import { ensureSchema, isDbEnabled, query } from './db';
 import { ApiError } from './errors';
-import { getWorkspace, type Layout } from './studio';
+import { getWorkspace, type Layout } from './workspace';
 import { getLiveState } from './telemetry';
 
 type LayoutBox = {

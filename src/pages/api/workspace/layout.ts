@@ -6,7 +6,7 @@ import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
-import { saveMachineLayout, type Layout } from '../../../server/studio';
+import { saveMachineLayout, type Layout } from '../../../server/workspace';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -31,6 +31,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await saveMachineLayout(body.machineId, body.layout);
     return res.status(200).json({ layoutRevision: result.layoutRevision });
   } catch (err) {
-    return sendApiError(res, err, 'api/studio/layout');
+    return sendApiError(res, err, 'api/workspace/layout');
   }
 }

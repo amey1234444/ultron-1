@@ -4,7 +4,7 @@ The analyzer zip did not include a finished React/Next UI. It provided Python do
 
 ## Existing Overview Integration
 
-The Machine -> Overview tab already renders compact analyzer panels from `components/studio/machine/MachineOverview.tsx`:
+The Machine -> Overview tab already renders compact analyzer panels from `components/console/machine/MachineOverview.tsx`:
 
 - Readiness
 - Operating state

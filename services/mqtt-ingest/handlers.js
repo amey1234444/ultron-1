@@ -24,7 +24,7 @@ function stableId(prefix, ...parts) {
   return `${prefix}-${createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 16)}`;
 }
 
-function studioCardType(slot) {
+function cardTypeForSlot(slot) {
   const normalized = [slot?.card_type, slot?.sensor, slot?.unit, slot?.value_with_unit]
     .map((value) => String(value ?? '').trim().toLowerCase())
     .filter(Boolean)
@@ -37,7 +37,7 @@ function studioCardType(slot) {
   return 'Process Card';
 }
 
-function studioCardConfig(type, slot) {
+function cardConfigForSlot(type, slot) {
   const unit = textOrNull(slot.unit) ?? '';
   const sensor = textOrNull(slot.sensor) ?? '';
   const label = sensor || textOrNull(slot.card_type) || `Slot ${slot.slot_number}`;
@@ -231,31 +231,31 @@ async function ensureRack(msg) {
   );
 }
 
-// The studio hierarchy only changes when the rack's card layout or IP changes,
+// The workspace hierarchy only changes when the rack's card layout or IP changes,
 // but telemetry repeats the same layout twice a second. Fingerprint what the
 // sync would write and skip the ~16 statements while it is unchanged.
-const STUDIO_SYNC_REFRESH_MS = 60_000;
-const studioSyncState = new Map();
+const WORKSPACE_SYNC_REFRESH_MS = 60_000;
+const workspaceSyncState = new Map();
 
-function studioSyncFingerprint(msg, slots) {
+function workspaceSyncFingerprint(msg, slots) {
   const connection = msg.payload?.connection && typeof msg.payload.connection === 'object' ? msg.payload.connection : {};
   const ip = textOrNull(connection.current_ip ?? msg.payload?.current_ip) ?? '';
   const layout = slots
     .filter((slot) => Number.isInteger(slot?.slot_number))
-    .map((slot) => [slot.slot_number, studioCardType(slot), JSON.stringify(studioCardConfig(studioCardType(slot), slot))].join(':'))
+    .map((slot) => [slot.slot_number, cardTypeForSlot(slot), JSON.stringify(cardConfigForSlot(cardTypeForSlot(slot), slot))].join(':'))
     .sort()
     .join('|');
   return `${ip}#${layout}`;
 }
 
-async function ensureStudioRackAndSlots(msg, slots = []) {
+async function ensureWorkspaceRackAndSlots(msg, slots = []) {
   if (typeof msg.rack_id !== 'string') return;
 
   const cacheKey = `${msg.gateway_id}|${msg.rack_id}`;
-  const fingerprint = studioSyncFingerprint(msg, slots);
-  const cached = studioSyncState.get(cacheKey);
-  if (cached && cached.fingerprint === fingerprint && Date.now() - cached.syncedAt < STUDIO_SYNC_REFRESH_MS) return;
-  studioSyncState.set(cacheKey, { fingerprint, syncedAt: Date.now() });
+  const fingerprint = workspaceSyncFingerprint(msg, slots);
+  const cached = workspaceSyncState.get(cacheKey);
+  if (cached && cached.fingerprint === fingerprint && Date.now() - cached.syncedAt < WORKSPACE_SYNC_REFRESH_MS) return;
+  workspaceSyncState.set(cacheKey, { fingerprint, syncedAt: Date.now() });
 
   const gateway = await query(
     `SELECT id, project_id
@@ -337,13 +337,13 @@ async function ensureStudioRackAndSlots(msg, slots = []) {
   if (!deviceId) return;
 
   let cardsChanged = 0;
-  const studioSlots = [...slots];
-  if (!studioSlots.some((slot) => Number(slot?.slot_number) === CONTROLLER_SLOT)) {
-    studioSlots.push(CONTROLLER_SLOT_PAYLOAD);
+  const slotsToSync = [...slots];
+  if (!slotsToSync.some((slot) => Number(slot?.slot_number) === CONTROLLER_SLOT)) {
+    slotsToSync.push(CONTROLLER_SLOT_PAYLOAD);
   }
-  for (const slot of studioSlots) {
+  for (const slot of slotsToSync) {
     if (!Number.isInteger(slot?.slot_number) || slot.slot_number < 1) continue;
-    const type = studioCardType(slot);
+    const type = cardTypeForSlot(slot);
     const cardId = stableId('auto-card', msg.gateway_id, msg.rack_id, String(slot.slot_number));
     const card = await query(
       `INSERT INTO studio_cards (id, device_id, slot, type, enabled, config, sort_order)
@@ -357,7 +357,7 @@ async function ensureStudioRackAndSlots(msg, slots = []) {
        WHERE studio_cards.type IS DISTINCT FROM EXCLUDED.type
           OR studio_cards.enabled IS DISTINCT FROM true
           OR studio_cards.config IS DISTINCT FROM EXCLUDED.config`,
-      [cardId, deviceId, slot.slot_number, type, JSON.stringify(studioCardConfig(type, slot))],
+      [cardId, deviceId, slot.slot_number, type, JSON.stringify(cardConfigForSlot(type, slot))],
     );
     cardsChanged += card.rowCount ?? 0;
   }
@@ -639,7 +639,7 @@ export async function handleTopology(msg) {
   for (const rack of racks) {
     const rackMsg = { ...msg, rack_id: rack.rack_id, payload: rack };
     await upsertRack(rackMsg, { status: rack.status ?? 'unknown', dataCurrent: rack.data_current === true });
-    await ensureStudioRackAndSlots(rackMsg);
+    await ensureWorkspaceRackAndSlots(rackMsg);
     await upsertControllerSlot(rackMsg, rack.status === 'connected' && rack.data_current === true);
     activeRackIds.push(rack.rack_id);
   }
@@ -663,7 +663,7 @@ export async function handleRackHealth(msg) {
     return;
   }
   await upsertRack(msg);
-  await ensureStudioRackAndSlots(msg);
+  await ensureWorkspaceRackAndSlots(msg);
   await upsertControllerSlot(msg, msg.payload.data_current === true);
   if (msg.payload.data_current !== true) {
     await query(
@@ -678,7 +678,7 @@ export async function handleRackHealth(msg) {
 export async function handleInventory(msg) {
   await ensureRack(msg);
   const revision = msg.payload.snapshot_revision;
-  await ensureStudioRackAndSlots(msg, Array.isArray(msg.payload.slots) ? msg.payload.slots : []);
+  await ensureWorkspaceRackAndSlots(msg, Array.isArray(msg.payload.slots) ? msg.payload.slots : []);
   for (const slot of msg.payload.slots ?? []) {
     await query(
       `INSERT INTO rack_inventory_slots (
@@ -975,7 +975,7 @@ export async function handleTelemetry(msg) {
   const dataCurrent = msg.payload.telemetry?.data_current === true;
   await upsertRack(msg, { status: 'connected', dataCurrent });
   const slots = (Array.isArray(msg.payload.slots) ? msg.payload.slots : []).filter((slot) => Number.isInteger(slot?.slot_number));
-  await ensureStudioRackAndSlots(msg, slots);
+  await ensureWorkspaceRackAndSlots(msg, slots);
 
   // The controller slot describes the rack link rather than a card, so its row
   // replaces any slot the frame reports at the same number.

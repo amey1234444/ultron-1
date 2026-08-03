@@ -1,5 +1,5 @@
 // Thin Supabase/PostgreSQL access layer. Local development and CI builds can run
-// without DATABASE_URL, but production auth and shared studio persistence fail
+// without DATABASE_URL, but production auth and shared workspace persistence fail
 // closed when it is absent.
 //
 // Use the Supabase pooler DATABASE_URL in production. SSL is enabled
@@ -314,7 +314,7 @@ async function migrate(): Promise<void> {
       ON reputation_queue (email_lc) WHERE state IN ('pending', 'processing');
   `);
 
-  // --- Studio workspace (asset hierarchy + canvas layouts) -----------------
+  // --- Workspace (asset hierarchy + canvas layouts) -----------------
   // The whole hierarchy shown in the left rail is durable and shared across all
   // authenticated users, so an edit by one user is visible to everyone. Deep,
   // template-shaped payloads (a machine's components/points, a card's channel

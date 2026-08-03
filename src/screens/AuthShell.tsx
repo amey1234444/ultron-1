@@ -18,7 +18,7 @@ import { apiFetch } from '../lib/apiClient';
 
 // Auth pages share the landing page's typography (Bebas Neue display + DM Sans
 // body, loaded via Google Fonts in _document.tsx). These are applied inline so
-// only the auth + home surfaces adopt the new look — the studio keeps its own
+// only the auth + home surfaces adopt the new look — the console keeps its own
 // bundled fonts untouched.
 export const AUTH_FONT_DISPLAY = "'Bebas Neue', 'DM Sans', system-ui, sans-serif";
 export const AUTH_FONT_BODY = "'DM Sans', system-ui, sans-serif";

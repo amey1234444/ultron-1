@@ -1,6 +1,6 @@
 # ULTRON
 
-Industrial HMI / asset-hierarchy studio. The UI is built with React Native components
+Industrial HMI / asset-hierarchy console. The UI is built with React Native components
 and runs on **two targets from one codebase**:
 
 - **Expo** (iOS / Android / Expo web) — unchanged (`npm start`).
@@ -20,7 +20,7 @@ npm run typecheck  # tsc against tsconfig.next.json
 ### Architecture
 
 - `src/pages/` — Next.js Pages Router (web routes + `src/pages/api/*` auth/user APIs).
-- `src/screens/` — web screens (`LoginScreen`, `StudioScreen`, `UsersScreen`), rendered
+- `src/screens/` — web screens (`LoginScreen`, `ConsoleScreen`, `UsersScreen`), rendered
   client-side (`ssr: false`) since they use `react-native-web`.
 - `app/`, `components/`, `lib/`, `hooks/` — the shared React Native tree, reused as-is.
 - `babel.config.js` branches on the Babel caller so Metro (Expo) and Next each get the
@@ -34,8 +34,8 @@ Three role levels, ranked `super_admin > admin > user`:
 
 | Role          | Capabilities                                                        |
 | ------------- | ------------------------------------------------------------------- |
-| `user`        | Access the studio.                                                  |
-| `admin`       | Access the studio + view the user directory.                        |
+| `user`        | Access the console.                                                  |
+| `admin`       | Access the console + view the user directory.                        |
 | `super_admin` | Everything, **plus add / edit / remove any user** at `/admin/users`.|
 
 Sessions use opaque random `httpOnly` cookies. Only a SHA-256 token hash is

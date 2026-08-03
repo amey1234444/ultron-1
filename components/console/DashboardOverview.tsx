@@ -899,7 +899,7 @@ export function DashboardOverview({
   // renders whatever was saved.
   useEffect(() => {
     let cancelled = false;
-    void apiFetch('/api/studio/plant-overview')
+    void apiFetch('/api/workspace/plant-overview')
       .then(async (response) => {
         if (!response.ok) return;
         const data = (await response.json()) as { config?: unknown };
@@ -915,7 +915,7 @@ export function DashboardOverview({
     setPlantSaving(true);
     setPlantError(null);
     try {
-      const response = await apiFetch('/api/studio/plant-overview', {
+      const response = await apiFetch('/api/workspace/plant-overview', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config }),
