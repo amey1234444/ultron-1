@@ -1,3 +1,4 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -485,7 +486,136 @@ function ReputationPanel({
   );
 }
 
+// --- dashboard building blocks --------------------------------------------
+
+type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
+type StatTone = 'neutral' | 'success' | 'warning' | 'critical' | 'accent';
+
+const STAT_COLOUR: Record<StatTone, string> = {
+  neutral: '#8A8A8A',
+  success: '#3FB950',
+  warning: '#F2A93B',
+  critical: '#EF4444',
+  accent: '#C9A15C',
+};
+
+function StatCard({
+  label,
+  value,
+  hint,
+  tone,
+  icon,
+  onPress,
+}: {
+  label: string;
+  value: string | number;
+  hint: string;
+  tone: StatTone;
+  icon: IconName;
+  onPress?: () => void;
+}) {
+  const colour = STAT_COLOUR[tone];
+  const body = (
+    <View className="min-w-[168px] flex-1 gap-2 rounded-2xl border border-line-dark bg-surface-darkpanel px-4 py-3.5">
+      <View className="flex-row items-center gap-2">
+        <View className="h-8 w-8 items-center justify-center rounded-full" style={{ backgroundColor: `${colour}1F` }}>
+          <MaterialCommunityIcons name={icon} size={17} color={colour} />
+        </View>
+        <Text className="flex-1 font-body-medium text-[10px] uppercase tracking-[1.4px] text-ink-muted">{label}</Text>
+      </View>
+      <Text style={{ color: colour }} className="font-body-bold text-2xl">
+        {value}
+      </Text>
+      <Text className="font-body text-[10px] text-ink-muted">{hint}</Text>
+    </View>
+  );
+  if (!onPress) return body;
+  return (
+    <Pressable onPress={onPress} className="min-w-[168px] flex-1" accessibilityRole="button">
+      {body}
+    </Pressable>
+  );
+}
+
+function ToolbarButton({
+  label,
+  onPress,
+  count,
+  tone = 'neutral',
+  icon,
+}: {
+  label: string;
+  onPress: () => void;
+  count?: number;
+  tone?: StatTone;
+  icon: IconName;
+}) {
+  const alerting = (count ?? 0) > 0;
+  const colour = alerting ? STAT_COLOUR[tone === 'neutral' ? 'critical' : tone] : '#F5F5F5';
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className={`flex-row items-center gap-2 rounded-full border px-3.5 py-2 ${
+        alerting ? 'border-status-critical bg-status-critical/10' : 'border-line-dark bg-surface-darkpanel'
+      }`}
+    >
+      <MaterialCommunityIcons name={icon} size={15} color={colour} />
+      <Text style={{ color: colour }} className="font-body-medium text-xs">
+        {label}
+      </Text>
+      {alerting ? (
+        <View className="min-w-[18px] items-center rounded-full bg-status-critical px-1.5 py-0.5">
+          <Text className="font-body-bold text-[10px] text-ink-inverse">{count! > 99 ? '99+' : count}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}
+
+function FilterChip({ label, active, onPress, count }: { label: string; active: boolean; onPress: () => void; count?: number }) {
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      className={`rounded-full border px-3 py-1.5 ${active ? 'border-accent bg-accent-soft' : 'border-line-dark'}`}
+    >
+      <Text className={`font-body-medium text-[11px] ${active ? 'text-accent' : 'text-ink-muted'}`}>
+        {label}
+        {count === undefined ? '' : ` ${count}`}
+      </Text>
+    </Pressable>
+  );
+}
+
+function RoleDistribution({ users }: { users: PublicUser[] }) {
+  const total = Math.max(1, users.length);
+  return (
+    <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
+      <Text className="font-body-medium text-[11px] uppercase tracking-[1.6px] text-ink-muted">Role distribution</Text>
+      <View className="mt-3 gap-2.5">
+        {ROLES.map((role) => {
+          const count = users.filter((u) => u.role === role).length;
+          return (
+            <View key={role} className="gap-1">
+              <View className="flex-row items-center justify-between">
+                <Text className="font-body text-xs text-ink">{ROLE_LABEL[role]}</Text>
+                <Text className="font-mono text-[11px] text-ink-muted">{count}</Text>
+              </View>
+              <View className="h-1.5 overflow-hidden rounded-full bg-surface-dark">
+                <View className="h-1.5 rounded-full bg-accent" style={{ width: `${(count / total) * 100}%` }} />
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 // --- main screen -----------------------------------------------------------
+
+type StatusFilter = 'all' | UserStatus;
 
 function UsersScreenInner() {
   const router = useRouter();
@@ -497,7 +627,12 @@ function UsersScreenInner() {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [showForm, setShowForm] = useState(false);
   const [now, setNow] = useState(() => Date.now());
+
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
 
   const [alerts, setAlerts] = useState<SecurityAlert[]>([]);
   const [alertsUnack, setAlertsUnack] = useState(0);
@@ -510,6 +645,7 @@ function UsersScreenInner() {
   const [rejectedLoading, setRejectedLoading] = useState(true);
   const [rejectedBusy, setRejectedBusy] = useState(false);
   const [showRejected, setShowRejected] = useState(false);
+  const [showLimits, setShowLimits] = useState(false);
   // Users with an in-flight manual reputation re-check (keyed by user id).
   const [recheckBusy, setRecheckBusy] = useState<Record<string, boolean>>({});
 
@@ -576,39 +712,33 @@ function UsersScreenInner() {
     }
   }, []);
 
-  const overrideRejected = useCallback(
-    async (id: string) => {
-      setRejectedBusy(true);
-      try {
-        const res = await apiFetch('/api/reputation/rejected', { method: 'POST', body: JSON.stringify({ id }) });
-        const data = await res.json();
-        if (res.ok) {
-          setRepRecords(data.records as ReputationEntry[]);
-          setRepBarred(Number(data.barred) || 0);
-        }
-      } finally {
-        setRejectedBusy(false);
+  const overrideRejected = useCallback(async (id: string) => {
+    setRejectedBusy(true);
+    try {
+      const res = await apiFetch('/api/reputation/rejected', { method: 'POST', body: JSON.stringify({ id }) });
+      const data = await res.json();
+      if (res.ok) {
+        setRepRecords(data.records as ReputationEntry[]);
+        setRepBarred(Number(data.barred) || 0);
       }
-    },
-    [],
-  );
+    } finally {
+      setRejectedBusy(false);
+    }
+  }, []);
 
-  const deleteRejected = useCallback(
-    async (id: string) => {
-      setRejectedBusy(true);
-      try {
-        const res = await apiFetch('/api/reputation/rejected', { method: 'DELETE', body: JSON.stringify({ id }) });
-        const data = await res.json();
-        if (res.ok) {
-          setRepRecords(data.records as ReputationEntry[]);
-          setRepBarred(Number(data.barred) || 0);
-        }
-      } finally {
-        setRejectedBusy(false);
+  const deleteRejected = useCallback(async (id: string) => {
+    setRejectedBusy(true);
+    try {
+      const res = await apiFetch('/api/reputation/rejected', { method: 'DELETE', body: JSON.stringify({ id }) });
+      const data = await res.json();
+      if (res.ok) {
+        setRepRecords(data.records as ReputationEntry[]);
+        setRepBarred(Number(data.barred) || 0);
       }
-    },
-    [],
-  );
+    } finally {
+      setRejectedBusy(false);
+    }
+  }, []);
 
   // Manual super-admin re-check: enqueue this user's email and drain the
   // rate-limited queue, then refresh the directory + records with the verdict.
@@ -679,10 +809,12 @@ function UsersScreenInner() {
   const resetForm = () => {
     setEditingId(null);
     setForm(EMPTY_FORM);
+    setShowForm(false);
   };
 
   const startEdit = (u: PublicUser) => {
     setEditingId(u.id);
+    setShowForm(true);
     setForm({
       username: u.username,
       name: u.name,
@@ -769,61 +901,230 @@ function UsersScreenInner() {
     }
   };
 
-  // Pending accounts float to the top so approvals are impossible to miss.
-  const sorted = [...users].sort((a, b) => {
-    const rank = (s: UserStatus) => (s === 'pending' ? 0 : s === 'active' ? 1 : 2);
-    return rank(a.status) - rank(b.status);
-  });
-  const pendingCount = users.filter((u) => u.status === 'pending').length;
+  const pendingUsers = users.filter((u) => u.status === 'pending');
+  const pendingCount = pendingUsers.length;
+  const onlineCount = users.filter((u) => isOnline(u, now)).length;
+  const disabledCount = users.filter((u) => u.status === 'disabled').length;
+  const untrustedCount = users.filter((u) => !isTrustable(u.reputationStatus, u.reputationScore)).length;
 
-  return (
-    <View className="flex-1 bg-surface-dark">
-      <View className="flex-row flex-wrap items-center justify-between gap-2 border-b border-line-dark px-4 py-3">
-        <Text className="font-heading-medium text-lg text-ink">User Management</Text>
-        <View className="flex-row flex-wrap items-center gap-2">
-          <Pressable
-            onPress={() => {
-              setShowAlarms((s) => !s);
-              void loadAlerts();
-            }}
-            className={`flex-row items-center gap-2 rounded-lg border px-3 py-1.5 ${
-              alertsUnack > 0 ? 'border-status-critical bg-status-critical/10' : 'border-line-dark'
-            }`}
-          >
-            <Text className={`font-body-medium text-xs ${alertsUnack > 0 ? 'text-status-critical' : 'text-ink'}`}>
-              User Alarms
-            </Text>
-            {alertsUnack > 0 ? (
-              <View className="min-w-[18px] items-center rounded-full bg-status-critical px-1.5 py-0.5">
-                <Text className="font-body-bold text-[10px] text-ink-inverse">{alertsUnack > 99 ? '99+' : alertsUnack}</Text>
+  // Pending accounts float to the top so approvals are impossible to miss.
+  const filtered = users
+    .filter((u) => (statusFilter === 'all' ? true : u.status === statusFilter))
+    .filter((u) => (roleFilter === 'all' ? true : u.role === roleFilter))
+    .filter((u) => {
+      const q = query.trim().toLowerCase();
+      if (!q) return true;
+      return `${u.name} ${u.username} ${u.email}`.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      const rank = (s: UserStatus) => (s === 'pending' ? 0 : s === 'active' ? 1 : 2);
+      return rank(a.status) - rank(b.status) || a.name.localeCompare(b.name);
+    });
+
+  const userRow = (u: PublicUser, i: number) => (
+    <View key={u.id} className={i > 0 ? 'border-t border-line-dark' : ''}>
+      <View className="flex-row flex-wrap items-center justify-between gap-3 px-4 py-3">
+        <View className="min-w-[220px] flex-1 flex-row items-start gap-3">
+          <View className="h-9 w-9 items-center justify-center rounded-full bg-accent-soft">
+            <Text className="font-body-bold text-xs text-accent">{(u.name || u.username).slice(0, 2).toUpperCase()}</Text>
+          </View>
+          <View className="min-w-0 flex-1">
+            <View className="flex-row flex-wrap items-center gap-2">
+              <Text className="font-body-bold text-sm text-ink">{u.name}</Text>
+              <View className="rounded-full bg-accent-soft px-2 py-0.5">
+                <Text className="font-body-medium text-[11px] uppercase tracking-wide text-accent">{ROLE_LABEL[u.role]}</Text>
               </View>
-            ) : null}
+              <AccountStatusBadge status={u.status} />
+              <ReputationBadge status={u.reputationStatus} score={u.reputationScore} />
+              {me?.id === u.id ? <Text className="font-body text-[11px] text-ink-muted">(you)</Text> : null}
+              {userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE) ? (
+                <View className="rounded-full border border-line-dark px-2 py-0.5">
+                  <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Schema Access</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text className="mt-0.5 font-body text-xs text-ink-muted">
+              @{u.username}
+              {u.email ? ` · ${u.email}` : ''}
+            </Text>
+            <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
+              <StatusPill user={u} now={now} />
+              <Text className="font-body text-[11px] text-ink-muted">Last login: {timeAgo(u.lastLoginAt, now)}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View className="flex-row flex-wrap gap-2">
+          {u.status === 'pending' ? (
+            <Pressable
+              onPress={busy ? undefined : () => setStatus(u, 'active')}
+              className="rounded-lg border border-status-success px-3 py-1.5"
+            >
+              <Text className="font-body-medium text-xs text-status-success">Approve</Text>
+            </Pressable>
+          ) : null}
+          {u.status === 'active' && me?.id !== u.id ? (
+            <Pressable
+              onPress={busy ? undefined : () => setStatus(u, 'disabled')}
+              className="rounded-lg border border-status-warning px-3 py-1.5"
+            >
+              <Text className="font-body-medium text-xs text-status-warning">Suspend</Text>
+            </Pressable>
+          ) : null}
+          {u.status === 'disabled' ? (
+            <Pressable
+              onPress={busy ? undefined : () => setStatus(u, 'active')}
+              className="rounded-lg border border-status-success px-3 py-1.5"
+            >
+              <Text className="font-body-medium text-xs text-status-success">Reactivate</Text>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => void toggleReputation(u.id)} className="rounded-lg border border-line-dark px-3 py-1.5">
+            <Text className="font-body-medium text-xs text-ink">{repOpen === u.id ? 'Hide reputation' : 'Reputation'}</Text>
+          </Pressable>
+          {u.email && (u.reputationStatus === 'unknown' || recheckBusy[u.id]) ? (
+            <Pressable
+              onPress={recheckBusy[u.id] ? undefined : () => void recheckReputation(u.id)}
+              className={`rounded-lg border border-accent px-3 py-1.5 ${recheckBusy[u.id] ? 'opacity-60' : ''}`}
+            >
+              <Text className="font-body-medium text-xs text-accent">{recheckBusy[u.id] ? 'Validating…' : 'Re-check'}</Text>
+            </Pressable>
+          ) : null}
+          <Pressable onPress={() => startEdit(u)} className="rounded-lg border border-line-dark px-3 py-1.5">
+            <Text className="font-body-medium text-xs text-ink">Edit</Text>
           </Pressable>
           <Pressable
-            onPress={() => {
-              setShowRejected((s) => !s);
-              void loadRejected();
-            }}
-            className={`flex-row items-center gap-2 rounded-lg border px-3 py-1.5 ${
-              repBarred > 0 ? 'border-status-critical bg-status-critical/10' : 'border-line-dark'
-            }`}
+            onPress={busy || me?.id === u.id ? undefined : () => remove(u)}
+            className={`rounded-lg border border-status-critical px-3 py-1.5 ${me?.id === u.id ? 'opacity-40' : ''}`}
           >
-            <Text className={`font-body-medium text-xs ${repBarred > 0 ? 'text-status-critical' : 'text-ink'}`}>
-              Email Reputation
-            </Text>
-            {repBarred > 0 ? (
-              <View className="min-w-[18px] items-center rounded-full bg-status-critical px-1.5 py-0.5">
-                <Text className="font-body-bold text-[10px] text-ink-inverse">{repBarred > 99 ? '99+' : repBarred}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-          <Pressable onPress={() => router.push('/')} className="rounded-lg border border-line-dark px-3 py-1.5">
-            <Text className="font-body-medium text-xs text-ink">Back to Studio</Text>
+            <Text className="font-body-medium text-xs text-status-critical">Delete</Text>
           </Pressable>
         </View>
       </View>
 
-      <ScrollView contentContainerClassName="p-4 gap-6" className="flex-1">
+      {repOpen === u.id ? (
+        <View className="px-4 pb-3">
+          <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">
+            Reputation: {reputationBadge(u.reputationStatus, u.reputationScore).label}
+            {u.reputationScore !== null ? ` · score ${u.reputationScore}` : ''}
+            {u.reputationCheckedAt ? ` · checked ${timeAgo(u.reputationCheckedAt, now)}` : ''}
+            {u.reputationStatus === 'acceptable'
+              ? isTrustable(u.reputationStatus, u.reputationScore)
+                ? ` · trusted (> ${TRUST_MIN_SCORE})`
+                : ` · not trusted (≤ ${TRUST_MIN_SCORE})`
+              : ''}
+          </Text>
+          {(() => {
+            const rep = repDetail[u.id] as { data?: unknown } | undefined;
+            const d = rep?.data as { unavailable?: boolean; detail?: string } | null | undefined;
+            if (!d || typeof d !== 'object' || !d.unavailable) return null;
+            return (
+              <Text className="mt-1 font-body text-[11px] text-status-warning">
+                Validation did not complete{d.detail ? `: ${d.detail}` : '.'}
+              </Text>
+            );
+          })()}
+          <ScrollView horizontal className="mt-2 max-h-64 rounded-lg border border-line-dark bg-surface-dark">
+            <Text className="p-3 font-mono text-[11px] text-ink-muted">
+              {(() => {
+                const rep = repDetail[u.id] as { data?: unknown } | undefined;
+                if (!(u.id in repDetail)) return 'Loading…';
+                return rep?.data ? JSON.stringify(rep.data, null, 2) : 'No stored API response for this user.';
+              })()}
+            </Text>
+          </ScrollView>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  return (
+    <View className="flex-1 bg-surface-dark">
+      <View className="flex-row flex-wrap items-center justify-between gap-3 border-b border-line-dark px-5 py-4">
+        <View className="min-w-[220px]">
+          <Text className="font-heading-medium text-xl text-ink">User Management</Text>
+          <Text className="mt-0.5 font-body text-xs text-ink-muted">
+            Directory, approvals, email reputation and abuse protection for this deployment.
+          </Text>
+        </View>
+        <View className="flex-row flex-wrap items-center gap-2">
+          <ToolbarButton
+            icon="account-plus-outline"
+            label={showForm && !editingId ? 'Close form' : 'Add user'}
+            onPress={() => {
+              setEditingId(null);
+              setForm(EMPTY_FORM);
+              setShowForm((s) => !s || !!editingId);
+            }}
+          />
+          <ToolbarButton
+            icon="bell-alert-outline"
+            label="User Alarms"
+            count={alertsUnack}
+            onPress={() => {
+              setShowAlarms((s) => !s);
+              void loadAlerts();
+            }}
+          />
+          <ToolbarButton
+            icon="email-alert-outline"
+            label="Email Reputation"
+            count={repBarred}
+            onPress={() => {
+              setShowRejected((s) => !s);
+              void loadRejected();
+            }}
+          />
+          <ToolbarButton icon="speedometer-slow" label="Rate limits" onPress={() => setShowLimits((s) => !s)} />
+          <ToolbarButton icon="refresh" label="Refresh" onPress={() => void load()} />
+          <ToolbarButton icon="arrow-left" label="Back to Console" onPress={() => router.push('/')} />
+        </View>
+      </View>
+
+      <ScrollView contentContainerClassName="p-5 gap-4" className="flex-1">
+        <View className="flex-row flex-wrap gap-3">
+          <StatCard icon="account-group-outline" label="Total users" value={users.length} hint="Accounts in the directory" tone="accent" />
+          <StatCard icon="access-point" label="Online now" value={onlineCount} hint="Seen in the last few minutes" tone="success" />
+          <StatCard
+            icon="account-clock-outline"
+            label="Pending approval"
+            value={pendingCount}
+            hint={pendingCount > 0 ? 'Tap to review the queue' : 'Nothing waiting'}
+            tone={pendingCount > 0 ? 'warning' : 'neutral'}
+            onPress={() => setStatusFilter(pendingCount > 0 ? 'pending' : 'all')}
+          />
+          <StatCard
+            icon="account-off-outline"
+            label="Suspended"
+            value={disabledCount}
+            hint="Disabled accounts"
+            tone={disabledCount > 0 ? 'warning' : 'neutral'}
+            onPress={() => setStatusFilter('disabled')}
+          />
+          <StatCard
+            icon="shield-alert-outline"
+            label="Unread alarms"
+            value={alertsUnack}
+            hint="Duplicate signups & rate limits"
+            tone={alertsUnack > 0 ? 'critical' : 'neutral'}
+            onPress={() => {
+              setShowAlarms(true);
+              void loadAlerts();
+            }}
+          />
+          <StatCard
+            icon="email-off-outline"
+            label="Barred emails"
+            value={repBarred}
+            hint={`${untrustedCount} account${untrustedCount === 1 ? '' : 's'} not fully trusted`}
+            tone={repBarred > 0 ? 'critical' : 'neutral'}
+            onPress={() => {
+              setShowRejected(true);
+              void loadRejected();
+            }}
+          />
+        </View>
+
         {showAlarms ? (
           <SecurityAlertsPanel
             alerts={alerts}
@@ -850,220 +1151,219 @@ function UsersScreenInner() {
           />
         ) : null}
 
-        {pendingCount > 0 ? (
-          <View className="rounded-xl border border-status-warning/50 bg-status-warning/10 px-4 py-3">
-            <Text className="font-body-medium text-sm text-status-warning">
-              {pendingCount} account{pendingCount === 1 ? '' : 's'} awaiting your approval.
-            </Text>
-          </View>
-        ) : null}
+        {showForm ? (
+          <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
+            <Text className="font-body-bold text-sm text-ink">{editingId ? 'Edit User' : 'Add User'}</Text>
+            <View className="mt-4 flex-row flex-wrap gap-3">
+              <Field
+                label="Username"
+                value={form.username}
+                onChangeText={(t) => setForm((f) => ({ ...f, username: t }))}
+                placeholder="jdoe"
+              />
+              <Field label="Name" value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} placeholder="Jane Doe" />
+              <Field
+                label="Email"
+                value={form.email}
+                onChangeText={(t) => setForm((f) => ({ ...f, email: t }))}
+                placeholder="jane@company.com"
+              />
+              <Field
+                label={editingId ? 'New Password (optional)' : 'Password'}
+                value={form.password}
+                onChangeText={(t) => setForm((f) => ({ ...f, password: t }))}
+                placeholder="min 8 chars"
+                secureTextEntry
+              />
+            </View>
 
-        <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
-          <Text className="font-body-bold text-sm text-ink">{editingId ? 'Edit User' : 'Add User'}</Text>
-          <View className="mt-4 flex-row flex-wrap gap-3">
-            <Field
-              label="Username"
-              value={form.username}
-              onChangeText={(t) => setForm((f) => ({ ...f, username: t }))}
-              placeholder="jdoe"
-            />
-            <Field label="Name" value={form.name} onChangeText={(t) => setForm((f) => ({ ...f, name: t }))} placeholder="Jane Doe" />
-            <Field
-              label="Email"
-              value={form.email}
-              onChangeText={(t) => setForm((f) => ({ ...f, email: t }))}
-              placeholder="jane@company.com"
-            />
-            <Field
-              label={editingId ? 'New Password (optional)' : 'Password'}
-              value={form.password}
-              onChangeText={(t) => setForm((f) => ({ ...f, password: t }))}
-              placeholder="min 8 chars"
-              secureTextEntry
-            />
-          </View>
+            <View className="mt-4 gap-1.5">
+              <Text className="font-body-medium text-xs uppercase tracking-wide text-ink-muted">Role</Text>
+              <RoleChips
+                value={form.role}
+                onChange={(r) =>
+                  setForm((f) => ({
+                    ...f,
+                    role: r,
+                    canEditDeleteSchema: r === 'super_admin' ? true : f.canEditDeleteSchema,
+                  }))
+                }
+              />
+            </View>
 
-          <View className="mt-4 gap-1.5">
-            <Text className="font-body-medium text-xs uppercase tracking-wide text-ink-muted">Role</Text>
-            <RoleChips
-              value={form.role}
-              onChange={(r) =>
-                setForm((f) => ({
-                  ...f,
-                  role: r,
-                  canEditDeleteSchema: r === 'super_admin' ? true : f.canEditDeleteSchema,
-                }))
-              }
-            />
-          </View>
+            <View className="mt-4 gap-1.5">
+              <Text className="font-body-medium text-xs uppercase tracking-wide text-ink-muted">Access</Text>
+              <Pressable
+                onPress={
+                  form.role === 'super_admin'
+                    ? undefined
+                    : () => setForm((f) => ({ ...f, canEditDeleteSchema: !f.canEditDeleteSchema }))
+                }
+                accessibilityState={{ disabled: form.role === 'super_admin' }}
+                className={`flex-row items-center gap-2 self-start rounded-lg border px-3 py-2 ${
+                  hasSchemaAccessInForm ? 'border-accent bg-accent-soft' : 'border-line-dark'
+                }`}
+              >
+                <View className={`h-3.5 w-3.5 rounded border ${hasSchemaAccessInForm ? 'border-accent bg-accent' : 'border-ink-muted'}`} />
+                <Text className={`font-body-medium text-xs ${hasSchemaAccessInForm ? 'text-accent' : 'text-ink-muted'}`}>
+                  Edit or delete hierarchy and rack schema
+                </Text>
+              </Pressable>
+            </View>
 
-          <View className="mt-4 gap-1.5">
-            <Text className="font-body-medium text-xs uppercase tracking-wide text-ink-muted">Access</Text>
-            <Pressable
-              onPress={
-                form.role === 'super_admin'
-                  ? undefined
-                  : () => setForm((f) => ({ ...f, canEditDeleteSchema: !f.canEditDeleteSchema }))
-              }
-              accessibilityState={{ disabled: form.role === 'super_admin' }}
-              className={`flex-row items-center gap-2 self-start rounded-lg border px-3 py-2 ${
-                hasSchemaAccessInForm ? 'border-accent bg-accent-soft' : 'border-line-dark'
-              }`}
-            >
-              <View className={`h-3.5 w-3.5 rounded border ${hasSchemaAccessInForm ? 'border-accent bg-accent' : 'border-ink-muted'}`} />
-              <Text className={`font-body-medium text-xs ${hasSchemaAccessInForm ? 'text-accent' : 'text-ink-muted'}`}>
-                Edit or delete hierarchy and rack schema
-              </Text>
-            </Pressable>
-          </View>
+            {editingId ? <Text className="mt-3 font-body text-xs text-ink-muted">Username cannot be changed.</Text> : null}
 
-          {editingId ? <Text className="mt-3 font-body text-xs text-ink-muted">Username cannot be changed.</Text> : null}
+            {error ? <Text className="mt-3 font-body text-sm text-status-critical">{error}</Text> : null}
 
-          {error ? <Text className="mt-3 font-body text-sm text-status-critical">{error}</Text> : null}
-
-          <View className="mt-4 flex-row flex-wrap gap-2">
-            <Pressable
-              onPress={busy ? undefined : submit}
-              className={`items-center rounded-xl bg-ink px-4 py-2.5 ${busy ? 'opacity-50' : ''}`}
-            >
-              <Text className="font-body-bold text-sm text-ink-inverse">{editingId ? 'Save Changes' : 'Create User'}</Text>
-            </Pressable>
-            {editingId ? (
+            <View className="mt-4 flex-row flex-wrap gap-2">
+              <Pressable
+                onPress={busy ? undefined : submit}
+                className={`items-center rounded-xl bg-ink px-4 py-2.5 ${busy ? 'opacity-50' : ''}`}
+              >
+                <Text className="font-body-bold text-sm text-ink-inverse">{editingId ? 'Save Changes' : 'Create User'}</Text>
+              </Pressable>
               <Pressable onPress={resetForm} className="items-center rounded-xl border border-line-dark px-4 py-2.5">
                 <Text className="font-body-medium text-sm text-ink">Cancel</Text>
               </Pressable>
-            ) : null}
+            </View>
+          </View>
+        ) : error ? (
+          <Text className="font-body text-sm text-status-critical">{error}</Text>
+        ) : null}
+
+        <View className="flex-row flex-wrap gap-4">
+          <View className="min-w-[520px] flex-1 gap-3">
+            <View className="rounded-2xl border border-line-dark bg-surface-darkpanel">
+              <View className="gap-3 border-b border-line-dark px-4 py-3">
+                <View className="flex-row flex-wrap items-center justify-between gap-3">
+                  <Text className="font-body-bold text-sm text-ink">Directory</Text>
+                  <TextInput
+                    value={query}
+                    onChangeText={setQuery}
+                    placeholder="Search name, username or email"
+                    placeholderTextColor="#5A5A5A"
+                    autoCapitalize="none"
+                    className="min-w-[220px] flex-1 rounded-xl border border-line-dark bg-surface-dark px-3 py-2 font-body text-sm text-ink"
+                  />
+                </View>
+                <View className="flex-row flex-wrap gap-2">
+                  <FilterChip label="All" active={statusFilter === 'all'} onPress={() => setStatusFilter('all')} count={users.length} />
+                  <FilterChip
+                    label="Pending"
+                    active={statusFilter === 'pending'}
+                    onPress={() => setStatusFilter('pending')}
+                    count={pendingCount}
+                  />
+                  <FilterChip
+                    label="Active"
+                    active={statusFilter === 'active'}
+                    onPress={() => setStatusFilter('active')}
+                    count={users.filter((u) => u.status === 'active').length}
+                  />
+                  <FilterChip
+                    label="Suspended"
+                    active={statusFilter === 'disabled'}
+                    onPress={() => setStatusFilter('disabled')}
+                    count={disabledCount}
+                  />
+                  <View className="w-2" />
+                  <FilterChip label="Any role" active={roleFilter === 'all'} onPress={() => setRoleFilter('all')} />
+                  {ROLES.map((role) => (
+                    <FilterChip
+                      key={role}
+                      label={ROLE_LABEL[role]}
+                      active={roleFilter === role}
+                      onPress={() => setRoleFilter(role)}
+                      count={users.filter((u) => u.role === role).length}
+                    />
+                  ))}
+                </View>
+              </View>
+
+              {loading ? (
+                <View className="items-center py-10">
+                  <ActivityIndicator color="#F5F5F5" />
+                </View>
+              ) : filtered.length === 0 ? (
+                <Text className="px-4 py-8 font-body text-sm text-ink-muted">No users match the current filters.</Text>
+              ) : (
+                filtered.map(userRow)
+              )}
+            </View>
+          </View>
+
+          <View className="min-w-[280px] gap-3" style={{ maxWidth: 340 }}>
+            <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
+              <Text className="font-body-medium text-[11px] uppercase tracking-[1.6px] text-ink-muted">Approval queue</Text>
+              {pendingCount === 0 ? (
+                <Text className="mt-2 font-body text-xs text-ink-muted">No accounts are awaiting approval.</Text>
+              ) : (
+                <View className="mt-2.5 gap-2.5">
+                  {pendingUsers.map((u) => (
+                    <View key={u.id} className="gap-1.5 rounded-xl border border-status-warning/40 bg-status-warning/5 px-3 py-2.5">
+                      <Text className="font-body-medium text-xs text-ink">{u.name}</Text>
+                      <Text className="font-body text-[10px] text-ink-muted">
+                        @{u.username}
+                        {u.email ? ` · ${u.email}` : ''}
+                      </Text>
+                      <ReputationBadge status={u.reputationStatus} score={u.reputationScore} />
+                      <View className="flex-row flex-wrap gap-2">
+                        <Pressable
+                          onPress={busy ? undefined : () => setStatus(u, 'active')}
+                          className="rounded-lg border border-status-success px-2.5 py-1"
+                        >
+                          <Text className="font-body-medium text-[11px] text-status-success">Approve</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={busy ? undefined : () => remove(u)}
+                          className="rounded-lg border border-status-critical px-2.5 py-1"
+                        >
+                          <Text className="font-body-medium text-[11px] text-status-critical">Reject</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <RoleDistribution users={users} />
+
+            <View className="rounded-2xl border border-line-dark bg-surface-darkpanel p-4">
+              <Text className="font-body-medium text-[11px] uppercase tracking-[1.6px] text-ink-muted">Latest alarms</Text>
+              {alerts.length === 0 ? (
+                <Text className="mt-2 font-body text-xs text-ink-muted">No security alarms. All clear.</Text>
+              ) : (
+                <View className="mt-2.5 gap-2.5">
+                  {alerts.slice(0, 4).map((a) => (
+                    <View key={a.id} className="flex-row gap-2">
+                      <View className={`mt-1 h-1.5 w-1.5 rounded-full ${a.acknowledged ? 'bg-ink-muted' : 'bg-status-critical'}`} />
+                      <View className="min-w-0 flex-1">
+                        <Text numberOfLines={2} className="font-body-medium text-[11px] text-ink">
+                          {alertTitle(a)}
+                        </Text>
+                        <Text className="font-body text-[10px] text-ink-muted">
+                          {a.email || a.ip || 'unknown source'} · {timeAgo(a.createdAt, now)}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                  <Pressable
+                    onPress={() => {
+                      setShowAlarms(true);
+                      void loadAlerts();
+                    }}
+                    className="self-start rounded-lg border border-line-dark px-3 py-1.5"
+                  >
+                    <Text className="font-body-medium text-[11px] text-ink">Open alarms</Text>
+                  </Pressable>
+                </View>
+              )}
+            </View>
           </View>
         </View>
 
-        <View className="rounded-2xl border border-line-dark bg-surface-darkpanel">
-          {loading ? (
-            <View className="items-center py-10">
-              <ActivityIndicator color="#F5F5F5" />
-            </View>
-          ) : (
-            sorted.map((u, i) => (
-              <View key={u.id} className={i > 0 ? 'border-t border-line-dark' : ''}>
-                <View className="flex-row flex-wrap items-center justify-between gap-3 px-4 py-3">
-                  <View className="min-w-[160px] flex-1">
-                    <View className="flex-row flex-wrap items-center gap-2">
-                      <Text className="font-body-bold text-sm text-ink">{u.name}</Text>
-                      <View className="rounded-full bg-accent-soft px-2 py-0.5">
-                        <Text className="font-body-medium text-[11px] uppercase tracking-wide text-accent">{ROLE_LABEL[u.role]}</Text>
-                      </View>
-                      <AccountStatusBadge status={u.status} />
-                      <ReputationBadge status={u.reputationStatus} score={u.reputationScore} />
-                      {me?.id === u.id ? <Text className="font-body text-[11px] text-ink-muted">(you)</Text> : null}
-                      {userHasPermission(u, USER_PERMISSIONS.SCHEMA_EDIT_DELETE) ? (
-                        <View className="rounded-full border border-line-dark px-2 py-0.5">
-                          <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">Schema Access</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text className="mt-0.5 font-body text-xs text-ink-muted">
-                      @{u.username}
-                      {u.email ? ` · ${u.email}` : ''}
-                    </Text>
-                    <View className="mt-1.5 flex-row flex-wrap items-center gap-3">
-                      <StatusPill user={u} now={now} />
-                      <Text className="font-body text-[11px] text-ink-muted">Last login: {timeAgo(u.lastLoginAt, now)}</Text>
-                    </View>
-                  </View>
-
-                  <View className="flex-row flex-wrap gap-2">
-                    {u.status === 'pending' ? (
-                      <Pressable
-                        onPress={busy ? undefined : () => setStatus(u, 'active')}
-                        className="rounded-lg border border-status-success px-3 py-1.5"
-                      >
-                        <Text className="font-body-medium text-xs text-status-success">Approve</Text>
-                      </Pressable>
-                    ) : null}
-                    {u.status === 'active' && me?.id !== u.id ? (
-                      <Pressable
-                        onPress={busy ? undefined : () => setStatus(u, 'disabled')}
-                        className="rounded-lg border border-status-warning px-3 py-1.5"
-                      >
-                        <Text className="font-body-medium text-xs text-status-warning">Suspend</Text>
-                      </Pressable>
-                    ) : null}
-                    {u.status === 'disabled' ? (
-                      <Pressable
-                        onPress={busy ? undefined : () => setStatus(u, 'active')}
-                        className="rounded-lg border border-status-success px-3 py-1.5"
-                      >
-                        <Text className="font-body-medium text-xs text-status-success">Reactivate</Text>
-                      </Pressable>
-                    ) : null}
-                    <Pressable
-                      onPress={() => void toggleReputation(u.id)}
-                      className="rounded-lg border border-line-dark px-3 py-1.5"
-                    >
-                      <Text className="font-body-medium text-xs text-ink">
-                        {repOpen === u.id ? 'Hide reputation' : 'Reputation'}
-                      </Text>
-                    </Pressable>
-                    {u.email && (u.reputationStatus === 'unknown' || recheckBusy[u.id]) ? (
-                      <Pressable
-                        onPress={recheckBusy[u.id] ? undefined : () => void recheckReputation(u.id)}
-                        className={`rounded-lg border border-accent px-3 py-1.5 ${recheckBusy[u.id] ? 'opacity-60' : ''}`}
-                      >
-                        <Text className="font-body-medium text-xs text-accent">
-                          {recheckBusy[u.id] ? 'Validating…' : 'Re-check'}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                    <Pressable onPress={() => startEdit(u)} className="rounded-lg border border-line-dark px-3 py-1.5">
-                      <Text className="font-body-medium text-xs text-ink">Edit</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={busy || me?.id === u.id ? undefined : () => remove(u)}
-                      className={`rounded-lg border border-status-critical px-3 py-1.5 ${me?.id === u.id ? 'opacity-40' : ''}`}
-                    >
-                      <Text className="font-body-medium text-xs text-status-critical">Delete</Text>
-                    </Pressable>
-                  </View>
-                </View>
-
-                {repOpen === u.id ? (
-                  <View className="px-4 pb-3">
-                    <Text className="font-body-medium text-[11px] uppercase tracking-wide text-ink-muted">
-                      Reputation: {reputationBadge(u.reputationStatus, u.reputationScore).label}
-                      {u.reputationScore !== null ? ` · score ${u.reputationScore}` : ''}
-                      {u.reputationCheckedAt ? ` · checked ${timeAgo(u.reputationCheckedAt, now)}` : ''}
-                      {u.reputationStatus === 'acceptable'
-                        ? isTrustable(u.reputationStatus, u.reputationScore)
-                          ? ` · trusted (> ${TRUST_MIN_SCORE})`
-                          : ` · not trusted (≤ ${TRUST_MIN_SCORE})`
-                        : ''}
-                    </Text>
-                    {(() => {
-                      const rep = repDetail[u.id] as { data?: unknown } | undefined;
-                      const d = rep?.data as { unavailable?: boolean; detail?: string } | null | undefined;
-                      if (!d || typeof d !== 'object' || !d.unavailable) return null;
-                      return (
-                        <Text className="mt-1 font-body text-[11px] text-status-warning">
-                          Validation did not complete{d.detail ? `: ${d.detail}` : '.'}
-                        </Text>
-                      );
-                    })()}
-                    <ScrollView horizontal className="mt-2 max-h-64 rounded-lg border border-line-dark bg-surface-dark">
-                      <Text className="p-3 font-mono text-[11px] text-ink-muted">
-                        {(() => {
-                          const rep = repDetail[u.id] as { data?: unknown } | undefined;
-                          if (!(u.id in repDetail)) return 'Loading…';
-                          return rep?.data ? JSON.stringify(rep.data, null, 2) : 'No stored API response for this user.';
-                        })()}
-                      </Text>
-                    </ScrollView>
-                  </View>
-                ) : null}
-              </View>
-            ))
-          )}
-        </View>
-
-        <RateLimitsPanel />
+        {showLimits ? <RateLimitsPanel /> : null}
       </ScrollView>
     </View>
   );
