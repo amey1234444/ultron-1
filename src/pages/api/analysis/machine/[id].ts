@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { getAnalysisUiBundle, runMachineAnalysis } from '../../../../server/analysis';
+import { OverviewAnalysisError, parseOverviewAnalysis } from '../../../../../lib/analysis/overviewSnapshot';
+import { getAnalysisUiBundle, getOverviewHistory, persistOverviewAnalysis, runMachineAnalysis } from '../../../../server/analysis';
 import { isDbEnabled } from '../../../../server/db';
 import { sendApiError } from '../../../../server/errors';
 import { guardRequest } from '../../../../server/security';
@@ -20,9 +21,28 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const bundle = await getAnalysisUiBundle(machineId);
       return res.status(200).json(bundle);
     }
+    // The Overview tab calculates the analysis in the browser from the mapped
+    // live signals and posts it here to be saved. Without a body the server
+    // still recomputes from durable state (cron/back-office callers).
     if (req.method === 'POST') {
-      const analysis = await runMachineAnalysis(machineId);
-      return res.status(200).json({ analysis });
+      const body = typeof req.body === 'string' && req.body ? (JSON.parse(req.body) as unknown) : req.body;
+      const isClientAnalysis =
+        typeof body === 'object' && body !== null && 'deepAnalysis' in (body as Record<string, unknown>);
+      if (!isClientAnalysis) {
+        const analysis = await runMachineAnalysis(machineId);
+        return res.status(200).json({ analysis });
+      }
+      try {
+        const input = parseOverviewAnalysis(body);
+        const saved = await persistOverviewAnalysis(machineId, input);
+        const overview = await getOverviewHistory(machineId);
+        return res.status(200).json({ ...saved, overview });
+      } catch (err) {
+        if (err instanceof OverviewAnalysisError || err instanceof SyntaxError) {
+          return res.status(400).json({ error: err.message });
+        }
+        throw err;
+      }
     }
 
     res.setHeader('Allow', 'GET, POST');

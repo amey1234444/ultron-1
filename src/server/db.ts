@@ -1,5 +1,5 @@
 // Thin Supabase/PostgreSQL access layer. Local development and CI builds can run
-// without DATABASE_URL, but production auth and shared studio persistence fail
+// without DATABASE_URL, but production auth and shared workspace persistence fail
 // closed when it is absent.
 //
 // Use the Supabase pooler DATABASE_URL in production. SSL is enabled
@@ -314,7 +314,7 @@ async function migrate(): Promise<void> {
       ON reputation_queue (email_lc) WHERE state IN ('pending', 'processing');
   `);
 
-  // --- Studio workspace (asset hierarchy + canvas layouts) -----------------
+  // --- Workspace (asset hierarchy + canvas layouts) -----------------
   // The whole hierarchy shown in the left rail is durable and shared across all
   // authenticated users, so an edit by one user is visible to everyone. Deep,
   // template-shaped payloads (a machine's components/points, a card's channel
@@ -829,4 +829,36 @@ async function migrate(): Promise<void> {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS analysis_maintenance_cases_machine ON analysis_maintenance_cases (machine_id, status, updated_at DESC);`);
+
+  // Overview analysis computed in the browser from the mapped live signals and
+  // posted back for durable history. These rows drive the health/vibration/RPM
+  // trends and the activity feed on the machine Overview tab.
+  await query(`
+    CREATE TABLE IF NOT EXISTS analysis_overview_snapshots (
+      id                    BIGSERIAL PRIMARY KEY,
+      machine_id            TEXT NOT NULL,
+      machine_template      TEXT NOT NULL DEFAULT '',
+      generated_at          TIMESTAMPTZ NOT NULL DEFAULT now(),
+      readiness_percent     INT NOT NULL DEFAULT 0,
+      readiness_label       TEXT NOT NULL DEFAULT '',
+      condition_score       INT NOT NULL DEFAULT 0,
+      condition_label       TEXT NOT NULL DEFAULT '',
+      operating_state       TEXT NOT NULL DEFAULT 'unknown',
+      state_confidence      INT NOT NULL DEFAULT 0,
+      mapped_count          INT NOT NULL DEFAULT 0,
+      expected_points       INT NOT NULL DEFAULT 0,
+      live_count            INT NOT NULL DEFAULT 0,
+      vibration_spread      DOUBLE PRECISION,
+      rpm_deviation_percent DOUBLE PRECISION,
+      temperature_delta     DOUBLE PRECISION,
+      pressure_differential DOUBLE PRECISION,
+      priority_finding      TEXT NOT NULL DEFAULT '',
+      source                TEXT NOT NULL DEFAULT 'frontend',
+      payload               JSONB NOT NULL DEFAULT '{}'::jsonb
+    );
+  `);
+  await query(
+    `CREATE INDEX IF NOT EXISTS analysis_overview_snapshots_machine_recent
+       ON analysis_overview_snapshots (machine_id, generated_at DESC);`,
+  );
 }

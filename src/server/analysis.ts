@@ -1,10 +1,11 @@
+import type { OverviewAnalysisInput, OverviewHistoryPoint } from '../../lib/analysis/overviewSnapshot';
 import { analyzeRotaryAirlock, type AnalysisReading, type AnalysisSignalCode, type RotaryAirlockAnalysisResult } from '../../lib/analysis/rotaryAirlockAnalyzer';
 import type { DeviceNode } from '../../lib/devices';
 import { applyLiveStatus, latestMeasurementForChannel } from '../../lib/liveTelemetry';
 import { listChannels, type CardNode } from '../../lib/rack';
 import { ensureSchema, isDbEnabled, query } from './db';
 import { ApiError } from './errors';
-import { getWorkspace, type Layout } from './studio';
+import { getWorkspace, type Layout } from './workspace';
 import { getLiveState } from './telemetry';
 
 type LayoutBox = {
@@ -162,6 +163,108 @@ export async function persistAnalysisSnapshot(machineId: string, machineTemplate
   return snapshotId;
 }
 
+// Stores an Overview analysis that was calculated in the browser: the deep
+// analyzer result lands in the same durable tables as a server-side run, plus a
+// row of the Overview's own readiness/condition metrics for the trend charts.
+export async function persistOverviewAnalysis(
+  machineId: string,
+  input: OverviewAnalysisInput,
+): Promise<{ snapshotId: number; overviewId: string }> {
+  if (!isDbEnabled()) throw new ApiError(503, 'DATABASE_URL is required for durable analysis.');
+  await ensureSchema();
+  const workspace = await getWorkspace();
+  const machine = workspace?.machines.find((candidate) => candidate.id === machineId);
+  if (!machine) throw new ApiError(404, 'Machine not found.');
+
+  const snapshotId = await persistAnalysisSnapshot(machine.id, machine.template, input.deepAnalysis);
+  const overview = await query<{ id: string }>(
+    `INSERT INTO analysis_overview_snapshots
+       (machine_id, machine_template, generated_at, readiness_percent, readiness_label,
+        condition_score, condition_label, operating_state, state_confidence, mapped_count,
+        expected_points, live_count, vibration_spread, rpm_deviation_percent, temperature_delta,
+        pressure_differential, priority_finding, source, payload)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,'frontend',$18::jsonb)
+     RETURNING id`,
+    [
+      machine.id,
+      machine.template,
+      input.generatedAt,
+      input.readinessPercent,
+      input.readinessLabel,
+      input.conditionScore,
+      input.conditionLabel,
+      input.operatingState,
+      input.stateConfidence,
+      input.mappedCount,
+      input.expectedPoints,
+      input.liveCount,
+      input.vibrationSpread,
+      input.rpmDeviationPercent,
+      input.temperatureDelta,
+      input.pressureDifferential,
+      input.priorityFinding,
+      JSON.stringify({
+        blockers: input.blockers,
+        weakSignals: input.weakSignals,
+        findings: input.findings,
+        topEvidence: input.topEvidence,
+      }),
+    ],
+  );
+  return { snapshotId, overviewId: String(overview.rows[0]?.id ?? '') };
+}
+
+type OverviewRow = {
+  id: string;
+  generated_at: string | Date;
+  readiness_percent: number;
+  condition_score: number;
+  condition_label: string;
+  operating_state: string;
+  live_count: number;
+  mapped_count: number;
+  vibration_spread: number | null;
+  rpm_deviation_percent: number | null;
+  temperature_delta: number | null;
+  pressure_differential: number | null;
+  priority_finding: string;
+};
+
+function toHistoryPoint(row: OverviewRow): OverviewHistoryPoint {
+  return {
+    id: String(row.id),
+    generatedAt: new Date(row.generated_at).toISOString(),
+    readinessPercent: Number(row.readiness_percent),
+    conditionScore: Number(row.condition_score),
+    conditionLabel: row.condition_label,
+    operatingState: row.operating_state,
+    liveCount: Number(row.live_count),
+    mappedCount: Number(row.mapped_count),
+    vibrationSpread: row.vibration_spread === null ? null : Number(row.vibration_spread),
+    rpmDeviationPercent: row.rpm_deviation_percent === null ? null : Number(row.rpm_deviation_percent),
+    temperatureDelta: row.temperature_delta === null ? null : Number(row.temperature_delta),
+    pressureDifferential: row.pressure_differential === null ? null : Number(row.pressure_differential),
+    priorityFinding: row.priority_finding,
+  };
+}
+
+export async function getOverviewHistory(machineId: string, limit = 120): Promise<OverviewHistoryPoint[]> {
+  if (!isDbEnabled()) return [];
+  await ensureSchema();
+  const rows = await query<OverviewRow>(
+    `SELECT id, generated_at, readiness_percent, condition_score, condition_label, operating_state,
+            live_count, mapped_count, vibration_spread, rpm_deviation_percent, temperature_delta,
+            pressure_differential, priority_finding
+     FROM analysis_overview_snapshots
+     WHERE machine_id = $1
+     ORDER BY generated_at DESC
+     LIMIT $2`,
+    [machineId, Math.min(500, Math.max(1, limit))],
+  );
+  // Oldest first so the trend charts read left-to-right.
+  return rows.rows.map(toHistoryPoint).reverse();
+}
+
 export async function getLatestAnalysisSnapshot(machineId: string): Promise<RotaryAirlockAnalysisResult | null> {
   if (!isDbEnabled()) return null;
   await ensureSchema();
@@ -177,10 +280,11 @@ export async function getAnalysisUiBundle(machineId: string): Promise<{
   snapshots: unknown[];
   episodes: unknown[];
   cases: unknown[];
+  overview: OverviewHistoryPoint[];
 }> {
-  if (!isDbEnabled()) return { latest: null, snapshots: [], episodes: [], cases: [] };
+  if (!isDbEnabled()) return { latest: null, snapshots: [], episodes: [], cases: [], overview: [] };
   await ensureSchema();
-  const [snapshots, episodes, cases] = await Promise.all([
+  const [snapshots, episodes, cases, overview] = await Promise.all([
     query(
       `SELECT id, generated_at, readiness_score, operating_state, anomaly_state,
               anomaly_severity, condition_title, maintenance_priority, payload
@@ -207,7 +311,8 @@ export async function getAnalysisUiBundle(machineId: string): Promise<{
        LIMIT 50`,
       [machineId],
     ),
+    getOverviewHistory(machineId),
   ]);
   const latest = (snapshots.rows[0] as { payload?: RotaryAirlockAnalysisResult } | undefined)?.payload ?? null;
-  return { latest, snapshots: snapshots.rows, episodes: episodes.rows, cases: cases.rows };
+  return { latest, snapshots: snapshots.rows, episodes: episodes.rows, cases: cases.rows, overview };
 }

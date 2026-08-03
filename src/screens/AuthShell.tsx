@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -18,21 +18,27 @@ import { apiFetch } from '../lib/apiClient';
 
 // Auth pages share the landing page's typography (Bebas Neue display + DM Sans
 // body, loaded via Google Fonts in _document.tsx). These are applied inline so
-// only the auth + home surfaces adopt the new look — the studio keeps its own
+// only the auth + home surfaces adopt the new look — the console keeps its own
 // bundled fonts untouched.
 export const AUTH_FONT_DISPLAY = "'Bebas Neue', 'DM Sans', system-ui, sans-serif";
 export const AUTH_FONT_BODY = "'DM Sans', system-ui, sans-serif";
 
 export const AUTH_GOLD = '#C9A15C';
 const GOLD = AUTH_GOLD;
+const GOLD_SOFT = 'rgba(201,161,92,0.14)';
 
 // Dark auth palette, matching the landing page's near-black surface.
 const BRAND = '#F5F5F5';
-const SURFACE = '#0A0A0A';
-const FIELD = '#141414';
+const SURFACE = '#08090B';
+const PANEL = '#0E1013';
+const FIELD = '#131518';
 const INK = '#F5F5F5';
 const MUTED = '#8A8A8A';
-const LINE = 'rgba(255,255,255,0.14)';
+const FAINT = '#5F6266';
+const LINE = 'rgba(255,255,255,0.10)';
+const LINE_STRONG = 'rgba(255,255,255,0.18)';
+const DANGER = '#F85149';
+const SUCCESS = '#3FB950';
 
 // Rotating claims on the brand panel, mirroring the carousel on the reference
 // split-screen sign-in.
@@ -43,16 +49,24 @@ const BRAND_SLIDES = [
   { kicker: 'SCALES TO', headline: '1,600+', caption: 'CHANNELS PER PLANT' },
 ];
 
+const BRAND_PROOF = [
+  { value: '24/7', label: 'Edge ingest' },
+  { value: '<1s', label: 'Alarm latency' },
+  { value: '99.9%', label: 'Stream uptime' },
+];
+
 export function AuthShell({
   title,
   subtitle,
   children,
   footer,
+  badge,
 }: {
   title: string;
   subtitle: string;
   children: ReactNode;
   footer?: ReactNode;
+  badge?: string;
 }) {
   const { width } = useWindowDimensions();
   const stacked = width > 0 && width < 900;
@@ -74,22 +88,82 @@ export function AuthShell({
           contentContainerStyle={{
             flexGrow: 1,
             justifyContent: 'center',
-            paddingHorizontal: stacked ? 24 : 56,
-            paddingVertical: 48,
+            paddingHorizontal: stacked ? 20 : 56,
+            paddingVertical: 44,
           }}
         >
-          <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
-            <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 30, letterSpacing: 6, color: INK }}>ULTRON</Text>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, letterSpacing: 1.6, color: MUTED, marginTop: 2 }}>
-              ASSET MONITORING
-            </Text>
+          <View style={{ width: '100%', maxWidth: 432, alignSelf: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View
+                style={{
+                  height: 40,
+                  width: 40,
+                  borderRadius: 12,
+                  borderWidth: 1,
+                  borderColor: 'rgba(201,161,92,0.45)',
+                  backgroundColor: GOLD_SOFT,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 22, color: GOLD }}>U</Text>
+              </View>
+              <View>
+                <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 28, letterSpacing: 6, color: INK }}>ULTRON</Text>
+                <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.8, color: MUTED, marginTop: -2 }}>
+                  ASSET MONITORING
+                </Text>
+              </View>
+            </View>
 
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 30, fontWeight: '700', color: INK, marginTop: 44 }}>{title}</Text>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, color: MUTED, marginTop: 6 }}>{subtitle}</Text>
+            <View
+              style={{
+                marginTop: 32,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: LINE,
+                backgroundColor: PANEL,
+                paddingHorizontal: stacked ? 20 : 30,
+                paddingVertical: 30,
+              }}
+            >
+              {badge ? (
+                <View
+                  style={{
+                    alignSelf: 'flex-start',
+                    borderRadius: 999,
+                    borderWidth: 1,
+                    borderColor: 'rgba(201,161,92,0.4)',
+                    backgroundColor: GOLD_SOFT,
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    marginBottom: 16,
+                  }}
+                >
+                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.2, color: GOLD }}>{badge}</Text>
+                </View>
+              ) : null}
 
-            <View style={{ marginTop: 24 }}>{children}</View>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 27, fontWeight: '700', color: INK, letterSpacing: -0.4 }}>
+                {title}
+              </Text>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, lineHeight: 21, color: MUTED, marginTop: 8 }}>{subtitle}</Text>
 
-            {footer ? <View style={{ marginTop: 24 }}>{footer}</View> : null}
+              <View style={{ marginTop: 20 }}>{children}</View>
+
+              {footer ? (
+                <View style={{ marginTop: 24, borderTopWidth: 1, borderTopColor: LINE, paddingTop: 18 }}>{footer}</View>
+              ) : null}
+            </View>
+
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 20, justifyContent: 'center' }}>
+              {['Encrypted session cookies', 'Role-based access', 'Admin-approved accounts'].map((item) => (
+                <View key={item} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: SUCCESS }}>✓</Text>
+                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>{item}</Text>
+                </View>
+              ))}
+            </View>
           </View>
         </ScrollView>
 
@@ -98,29 +172,30 @@ export function AuthShell({
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingHorizontal: stacked ? 24 : 48,
+            paddingHorizontal: stacked ? 20 : 48,
             paddingBottom: 20,
             paddingTop: 8,
           }}
         >
-          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED }}>
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>
             © {new Date().getFullYear()} ULTRON. All rights reserved.
           </Text>
-          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED }}>Legal</Text>
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>Legal</Text>
         </View>
       </View>
 
       {/* Brand column */}
-      <View style={{ flex: 1, minHeight: stacked ? 320 : undefined, borderLeftWidth: stacked ? 0 : 1, borderTopWidth: stacked ? 1 : 0, borderColor: LINE }}>
+      <View style={{ flex: 1, minHeight: stacked ? 340 : undefined, borderLeftWidth: stacked ? 0 : 1, borderTopWidth: stacked ? 1 : 0, borderColor: LINE }}>
         <LinearGradient
-          colors={['#161616', '#0E0E0E', '#000000']}
+          colors={['#17181B', '#0D0E10', '#000000']}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ flex: 1, paddingHorizontal: 40, paddingVertical: 48, justifyContent: 'space-between' }}
         >
-          <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 34, letterSpacing: 6, color: '#ffffff' }}>
-            ULTRON <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 20, fontWeight: '600', letterSpacing: 1, color: GOLD }}>Studio</Text>
-          </Text>
+          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
+            <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 34, letterSpacing: 6, color: '#ffffff' }}>ULTRON</Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '600', letterSpacing: 3, color: GOLD }}>CONSOLE</Text>
+          </View>
 
           <View style={{ alignItems: 'center' }}>
             <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, letterSpacing: 4, color: GOLD }}>{active.kicker}</Text>
@@ -146,6 +221,8 @@ export function AuthShell({
                 <Pressable
                   key={item.headline}
                   onPress={() => setSlide(index)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Show highlight ${index + 1}`}
                   style={{
                     height: 5,
                     width: index === slide ? 30 : 6,
@@ -157,9 +234,21 @@ export function AuthShell({
             </View>
           </View>
 
-          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
-            Crafted for teams that keep industrial plants running.
-          </Text>
+          <View style={{ gap: 22 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+              {BRAND_PROOF.map((item) => (
+                <View key={item.label} style={{ flex: 1, alignItems: 'center' }}>
+                  <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 26, letterSpacing: 1, color: '#ffffff' }}>{item.value}</Text>
+                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.4, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
+                    {item.label.toUpperCase()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
+              Crafted for teams that keep industrial plants running.
+            </Text>
+          </View>
         </LinearGradient>
       </View>
     </View>
@@ -169,60 +258,181 @@ export function AuthShell({
 export function AuthField({
   label,
   hint,
+  error,
+  helper,
+  adornment,
   ...props
-}: { label: string; hint?: ReactNode } & TextInputProps) {
+}: {
+  label: string;
+  hint?: ReactNode;
+  error?: string | null;
+  helper?: string;
+  adornment?: ReactNode;
+} & TextInputProps) {
   const [focused, setFocused] = useState(false);
+  const borderColor = error ? DANGER : focused ? GOLD : LINE_STRONG;
   return (
     <View style={{ marginTop: 16 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '600', color: INK }}>{label}</Text>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '600', letterSpacing: 0.3, color: INK }}>{label}</Text>
         {hint}
       </View>
-      <TextInput
-        placeholderTextColor="#6B6B6B"
-        onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
-        style={
-          {
-            fontFamily: AUTH_FONT_BODY,
-            backgroundColor: FIELD,
-            borderWidth: 1,
-            borderColor: focused ? GOLD : LINE,
-            borderRadius: 8,
-            paddingHorizontal: 14,
-            paddingVertical: 11,
-            marginTop: 8,
-            fontSize: 15,
-            color: INK,
-            outlineStyle: 'none',
-          } as unknown as ViewStyle
-        }
-        {...props}
-      />
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: FIELD,
+          borderWidth: 1,
+          borderColor,
+          borderRadius: 10,
+          marginTop: 8,
+          paddingRight: adornment ? 6 : 0,
+          ...(focused && !error ? { boxShadow: `0 0 0 3px ${GOLD_SOFT}` } : null),
+        } as ViewStyle}
+      >
+        <TextInput
+          placeholderTextColor="#63666B"
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          accessibilityLabel={label}
+          style={
+            {
+              flex: 1,
+              fontFamily: AUTH_FONT_BODY,
+              paddingHorizontal: 14,
+              paddingVertical: 12,
+              fontSize: 15,
+              color: INK,
+              backgroundColor: 'transparent',
+              borderWidth: 0,
+              outlineStyle: 'none',
+            } as unknown as ViewStyle
+          }
+          {...props}
+        />
+        {adornment}
+      </View>
+      {error ? (
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: DANGER, marginTop: 6 }}>{error}</Text>
+      ) : helper ? (
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT, marginTop: 6 }}>{helper}</Text>
+      ) : null}
     </View>
   );
 }
 
-export function AuthButton({ label, submitting, onPress }: { label: string; submitting?: boolean; onPress: () => void }) {
+// Password input with a reveal toggle, so long generated passwords can be
+// checked before submitting.
+export function AuthPasswordField({
+  label,
+  ...props
+}: { label: string; hint?: ReactNode; error?: string | null; helper?: string } & TextInputProps) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <AuthField
+      label={label}
+      secureTextEntry={!visible}
+      autoCapitalize="none"
+      autoComplete="off"
+      adornment={
+        <Pressable
+          onPress={() => setVisible((value) => !value)}
+          accessibilityRole="button"
+          accessibilityLabel={visible ? 'Hide password' : 'Show password'}
+          style={{ paddingHorizontal: 10, paddingVertical: 8 }}
+        >
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, fontWeight: '600', color: GOLD }}>{visible ? 'Hide' : 'Show'}</Text>
+        </Pressable>
+      }
+      {...props}
+    />
+  );
+}
+
+export type PasswordScore = { score: number; label: string; color: string; suggestions: string[] };
+
+export function passwordScore(password: string): PasswordScore {
+  const checks = [
+    { pass: password.length >= 8, tip: 'at least 8 characters' },
+    { pass: password.length >= 12, tip: '12+ characters is stronger' },
+    { pass: /[A-Z]/.test(password) && /[a-z]/.test(password), tip: 'mixed upper and lower case' },
+    { pass: /\d/.test(password), tip: 'a number' },
+    { pass: /[^A-Za-z0-9]/.test(password), tip: 'a symbol' },
+  ];
+  const score = checks.filter((check) => check.pass).length;
+  const label = score <= 1 ? 'Weak' : score <= 2 ? 'Fair' : score <= 4 ? 'Good' : 'Strong';
+  const color = score <= 1 ? DANGER : score <= 2 ? '#F2A93B' : score <= 4 ? '#58A6FF' : SUCCESS;
+  return { score, label, color, suggestions: checks.filter((check) => !check.pass).map((check) => check.tip) };
+}
+
+export function PasswordStrength({ password }: { password: string }) {
+  const strength = useMemo(() => passwordScore(password), [password]);
+  if (!password) return null;
+  return (
+    <View style={{ marginTop: 10, gap: 6 }}>
+      <View style={{ flexDirection: 'row', gap: 5 }}>
+        {[0, 1, 2, 3, 4].map((index) => (
+          <View
+            key={index}
+            style={{
+              flex: 1,
+              height: 4,
+              borderRadius: 999,
+              backgroundColor: index < strength.score ? strength.color : 'rgba(255,255,255,0.10)',
+            }}
+          />
+        ))}
+      </View>
+      <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: strength.color }}>
+        {strength.label}
+        {strength.suggestions.length > 0 ? (
+          <Text style={{ color: FAINT }}> · add {strength.suggestions.slice(0, 2).join(', ')}</Text>
+        ) : null}
+      </Text>
+    </View>
+  );
+}
+
+export function AuthButton({
+  label,
+  submitting,
+  disabled,
+  onPress,
+  variant = 'primary',
+}: {
+  label: string;
+  submitting?: boolean;
+  disabled?: boolean;
+  onPress: () => void;
+  variant?: 'primary' | 'ghost';
+}) {
+  const [hovered, setHovered] = useState(false);
+  const inert = !!submitting || !!disabled;
+  const primary = variant === 'primary';
   return (
     <Pressable
-      onPress={submitting ? undefined : onPress}
+      onPress={inert ? undefined : onPress}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
       accessibilityRole="button"
-      accessibilityState={{ disabled: !!submitting }}
+      accessibilityState={{ disabled: inert, busy: !!submitting }}
       style={{
         marginTop: 24,
         alignItems: 'center',
         justifyContent: 'center',
-        height: 46,
-        borderRadius: 8,
-        backgroundColor: BRAND,
-        opacity: submitting ? 0.65 : 1,
-      }}
+        height: 48,
+        borderRadius: 10,
+        borderWidth: primary ? 0 : 1,
+        borderColor: LINE_STRONG,
+        backgroundColor: primary ? (hovered && !inert ? '#ffffff' : BRAND) : 'transparent',
+        opacity: inert ? 0.55 : 1,
+        ...(primary && hovered && !inert ? { boxShadow: '0 8px 24px rgba(245,245,245,0.16)' } : null),
+      } as ViewStyle}
     >
       {submitting ? (
-        <ActivityIndicator color={SURFACE} />
+        <ActivityIndicator color={primary ? SURFACE : INK} />
       ) : (
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontWeight: '700', fontSize: 15, color: '#0A0A0A' }}>{label}</Text>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontWeight: '700', fontSize: 15, color: primary ? '#0A0A0A' : INK }}>{label}</Text>
       )}
     </Pressable>
   );
@@ -232,7 +442,7 @@ export function AuthAltAction({ prompt, action, onPress }: { prompt: string; act
   return (
     <View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 6 }}>
       <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, color: MUTED }}>{prompt}</Text>
-      <Pressable onPress={onPress}>
+      <Pressable onPress={onPress} accessibilityRole="link">
         <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '700', color: GOLD }}>{action}</Text>
       </Pressable>
     </View>
@@ -241,8 +451,39 @@ export function AuthAltAction({ prompt, action, onPress }: { prompt: string; act
 
 export function AuthError({ message }: { message: string }) {
   return (
-    <View style={{ marginTop: 16, borderRadius: 8, borderWidth: 1, borderColor: 'rgba(248,81,73,0.4)', backgroundColor: 'rgba(248,81,73,0.12)', paddingHorizontal: 12, paddingVertical: 10 }}>
-      <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#F85149' }}>{message}</Text>
+    <View
+      style={{
+        marginTop: 16,
+        flexDirection: 'row',
+        gap: 10,
+        borderRadius: 10,
+        borderWidth: 1,
+        borderColor: 'rgba(248,81,73,0.4)',
+        backgroundColor: 'rgba(248,81,73,0.12)',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+      }}
+    >
+      <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: DANGER }}>!</Text>
+      <Text style={{ flex: 1, fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 19, color: DANGER }}>{message}</Text>
+    </View>
+  );
+}
+
+// Collapsible block for the demo credentials, so the sign-in form stays clean
+// but the seeded accounts are still one tap away.
+export function AuthDisclosure({ label, children }: { label: string; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={{ marginTop: 18 }}>
+      <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED, textAlign: 'center' }}>
+          {open ? '▴' : '▾'} {label}
+        </Text>
+      </Pressable>
+      {open ? (
+        <View style={{ marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: LINE, backgroundColor: FIELD, padding: 12 }}>{children}</View>
+      ) : null}
     </View>
   );
 }
@@ -296,11 +537,19 @@ export function useCaptcha(): Captcha {
   return { answer, setAnswer, token, svg, loading, reload };
 }
 
-export function CaptchaField({ captcha, onSubmitEditing }: { captcha: Captcha; onSubmitEditing?: () => void }) {
+export function CaptchaField({
+  captcha,
+  error,
+  onSubmitEditing,
+}: {
+  captcha: Captcha;
+  error?: string | null;
+  onSubmitEditing?: () => void;
+}) {
   return (
     <>
       <View style={{ marginTop: 16 }}>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, fontWeight: '600', color: INK }}>Security check</Text>
+        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '600', letterSpacing: 0.3, color: INK }}>Security check</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 8 }}>
           <View
             style={{
@@ -310,9 +559,9 @@ export function CaptchaField({ captcha, onSubmitEditing }: { captcha: Captcha; o
               alignItems: 'center',
               justifyContent: 'center',
               overflow: 'hidden',
-              borderRadius: 8,
+              borderRadius: 10,
               borderWidth: 1,
-              borderColor: LINE,
+              borderColor: LINE_STRONG,
               backgroundColor: '#ffffff',
             }}
           >
@@ -326,8 +575,9 @@ export function CaptchaField({ captcha, onSubmitEditing }: { captcha: Captcha; o
           </View>
           <Pressable
             onPress={() => void captcha.reload()}
+            accessibilityRole="button"
             accessibilityLabel="Refresh CAPTCHA"
-            style={{ borderRadius: 8, borderWidth: 1, borderColor: LINE, paddingHorizontal: 12, paddingVertical: 10 }}
+            style={{ borderRadius: 10, borderWidth: 1, borderColor: LINE_STRONG, paddingHorizontal: 12, paddingVertical: 11 }}
           >
             <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: GOLD }}>↻ New</Text>
           </Pressable>
@@ -339,6 +589,7 @@ export function CaptchaField({ captcha, onSubmitEditing }: { captcha: Captcha; o
         onChangeText={captcha.setAnswer}
         autoCapitalize="characters"
         placeholder="e.g. AB3KP"
+        error={error}
         onSubmitEditing={onSubmitEditing}
       />
     </>

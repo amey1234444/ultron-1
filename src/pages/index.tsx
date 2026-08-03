@@ -1,9 +1,9 @@
 import dynamic from 'next/dynamic';
 
-// The studio uses react-native-web + client-only state (random seed data), so it
+// The console uses react-native-web + client-only state (random seed data), so it
 // renders on the client to avoid SSR/hydration mismatches.
-const StudioScreen = dynamic(() => import('../screens/StudioScreen'), { ssr: false });
+const ConsoleScreen = dynamic(() => import('../screens/ConsoleScreen'), { ssr: false });
 
 export default function IndexPage() {
-  return <StudioScreen />;
+  return <ConsoleScreen />;
 }

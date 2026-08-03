@@ -1,5 +1,5 @@
 // Live gateway/rack state from the MQTT ingestion pipeline (/api/live/state).
-// A studio device is "live" when its permanent Script ID maps to a bound
+// A workspace device is "live" when its permanent Script ID maps to a bound
 // gateway. The displayed IP follows the gateway's current_ip so an accepted
 // gateway IP change is visible immediately. A gateway that reports an IP that
 // is already configured on another gateway/rack is an invalid request: the

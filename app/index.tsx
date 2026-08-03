@@ -3,31 +3,31 @@ import { Platform, Text, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 
-import { ActionButton } from '../components/studio/ActionButton';
-import { AddDeviceDialog, type NewDevice } from '../components/studio/AddDeviceDialog';
-import { AssignProjectDialog } from '../components/studio/AssignProjectDialog';
-import { ConfirmDialog } from '../components/studio/ConfirmDialog';
-import { ContextMenu, type ContextMenuState, type ContextMenuTarget } from '../components/studio/ContextMenu';
-import { CreateFolderDialog, type NewFolder } from '../components/studio/CreateFolderDialog';
-import { CreateProjectDialog, type NewProject } from '../components/studio/CreateProjectDialog';
-import { DashboardOverview } from '../components/studio/DashboardOverview';
-import { DeviceDetail } from '../components/studio/DeviceDetail';
-import { DeviceMenu, type DeviceMenuState } from '../components/studio/DeviceMenu';
-import { DevicesTable } from '../components/studio/DevicesTable';
-import { EmptyState } from '../components/studio/EmptyState';
-import { GatewayDetail } from '../components/studio/GatewayDetail';
-import { HierarchyContents } from '../components/studio/HierarchyContents';
-import { LeftPanel } from '../components/studio/LeftPanel';
-import { AddMachineDialog, type NewMachine } from '../components/studio/machine/AddMachineDialog';
-import { MachineWorkspace } from '../components/studio/machine/MachineWorkspace';
-import { MoveDialog } from '../components/studio/MoveDialog';
-import { PanelToggle } from '../components/studio/PanelToggle';
-import { RenameDialog } from '../components/studio/RenameDialog';
-import { RackDetail } from '../components/studio/rack/RackDetail';
-import { TopBar } from '../components/studio/TopBar';
+import { ActionButton } from '../components/console/ActionButton';
+import { AddDeviceDialog, type NewDevice } from '../components/console/AddDeviceDialog';
+import { AssignProjectDialog } from '../components/console/AssignProjectDialog';
+import { ConfirmDialog } from '../components/console/ConfirmDialog';
+import { ContextMenu, type ContextMenuState, type ContextMenuTarget } from '../components/console/ContextMenu';
+import { CreateFolderDialog, type NewFolder } from '../components/console/CreateFolderDialog';
+import { CreateProjectDialog, type NewProject } from '../components/console/CreateProjectDialog';
+import { DashboardOverview } from '../components/console/DashboardOverview';
+import { DeviceDetail } from '../components/console/DeviceDetail';
+import { DeviceMenu, type DeviceMenuState } from '../components/console/DeviceMenu';
+import { DevicesTable } from '../components/console/DevicesTable';
+import { EmptyState } from '../components/console/EmptyState';
+import { GatewayDetail } from '../components/console/GatewayDetail';
+import { HierarchyContents } from '../components/console/HierarchyContents';
+import { LeftPanel } from '../components/console/LeftPanel';
+import { AddMachineDialog, type NewMachine } from '../components/console/machine/AddMachineDialog';
+import { MachineWorkspace } from '../components/console/machine/MachineWorkspace';
+import { MoveDialog } from '../components/console/MoveDialog';
+import { PanelToggle } from '../components/console/PanelToggle';
+import { RenameDialog } from '../components/console/RenameDialog';
+import { RackDetail } from '../components/console/rack/RackDetail';
+import { TopBar } from '../components/console/TopBar';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
-import { useStudioStore } from '../hooks/useStudioStore';
+import { useWorkspaceStore } from '../hooks/useWorkspaceStore';
 import { cn } from '../lib/cn';
 import { composeIp, defaultRealGatewayId, deviceWithGatewayConnectionState, hostOctetFor, ipPrefixFor, racksForGateway, type DeviceNode } from '../lib/devices';
 import { applyLiveStatus } from '../lib/liveTelemetry';
@@ -232,7 +232,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     getTemplateLayout,
     saveLayout,
     saveTemplateLayout,
-  } = useStudioStore();
+  } = useWorkspaceStore();
 
   // Real gateway/rack connectivity from the MQTT ingestion pipeline overlays
   // the stored device statuses, so the devices strip shows Online the moment a

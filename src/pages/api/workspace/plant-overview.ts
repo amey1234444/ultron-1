@@ -35,6 +35,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', 'GET, PUT');
     return res.status(405).json({ error: 'Method not allowed.' });
   } catch (err) {
-    return sendApiError(res, err, 'api/studio/plant-overview');
+    return sendApiError(res, err, 'api/workspace/plant-overview');
   }
 }

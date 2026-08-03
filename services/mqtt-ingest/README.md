@@ -41,10 +41,10 @@ Requires Node 20+. The service creates its own tables (idempotent) from
 ## Binding rules
 
 - Permanent identity: `gateway_id + rack_id` (`UNIQUE(gateway_id, rack_id)`).
-- `gateway_ip` is mandatory verification metadata. When a known Studio
-  `real_gateway_id` reports a new IP, the service updates the Studio Gateway IP,
+- `gateway_ip` is mandatory verification metadata. When a known workspace
+  `real_gateway_id` reports a new IP, the service updates the workspace Gateway IP,
   records it in `gateway_ip_history`, and continues processing the message.
-- If that reported gateway IP is already configured on any other active Studio
+- If that reported gateway IP is already configured on any other active workspace
   rack or gateway, the message is quarantined as an IP conflict before live
   gateway, rack, inventory, telemetry, or event state can update.
 - Unknown `gateway_id`s are quarantined and do not update live gateway, rack,
@@ -53,7 +53,7 @@ Requires Node 20+. The service creates its own tables (idempotent) from
 
 ## Frontend liveness
 
-The devices strip goes **Online** when a studio device's Script ID matches a
+The devices strip goes **Online** when a workspace device's Script ID matches a
 bound gateway and that gateway reported within `STALE_AFTER_S` (default 15 s).
 The displayed Gateway IP follows the bound gateway's `current_ip`. Latest
 values come from `measurement_latest`. Racks go **Online** only when that rack

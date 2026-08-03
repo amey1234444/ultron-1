@@ -6,7 +6,7 @@ import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
-import { getWorkspace, replaceHierarchy, type HierarchyInput } from '../../../server/studio';
+import { getWorkspace, replaceHierarchy, type HierarchyInput } from '../../../server/workspace';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -43,6 +43,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.setHeader('Allow', 'GET, PUT');
     return res.status(405).json({ error: 'Method not allowed.' });
   } catch (err) {
-    return sendApiError(res, err, 'api/studio/state');
+    return sendApiError(res, err, 'api/workspace/state');
   }
 }

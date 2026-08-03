@@ -6,7 +6,7 @@ import { cn } from '../../../lib/cn';
 import { useAuth } from '../../context/AuthContext';
 import { canManageUsers, ROLE_LABEL } from '../../lib/roles';
 
-// Account block pinned to the bottom of the studio's left sidebar: who's signed
+// Account block pinned to the bottom of the console's left sidebar: who's signed
 // in, their role, and the Manage Users / Sign Out actions. Theme-aware so it
 // blends into the light or dark sidebar it sits in.
 export function AccountBar() {

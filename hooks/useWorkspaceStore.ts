@@ -7,7 +7,7 @@ import type { MachineNode } from '../lib/machines';
 import type { CardNode } from '../lib/rack';
 import { createSeedData } from '../lib/seedData';
 import { apiFetch } from '../src/lib/apiClient';
-import type { SavedLayout } from '../components/studio/machine/TrailBoard';
+import type { SavedLayout } from '../components/console/machine/TrailBoard';
 
 function makeId() {
   return Math.random().toString(36).slice(2, 10);
@@ -23,7 +23,7 @@ type Hierarchy = {
   cards: CardNode[];
 };
 
-export type StudioStore = Hierarchy & {
+export type WorkspaceStore = Hierarchy & {
   ready: boolean;
   persisted: boolean;
   setProjects: Dispatch<SetStateAction<ProjectNode[]>>;
@@ -44,7 +44,7 @@ const POLL_INTERVAL_MS = 5000;
 // workspace, persists edits back, and polls so other users' changes appear.
 // Off the web target (Expo native) or without a database it degrades to purely
 // local seed state, so those environments keep working unchanged.
-export function useStudioStore(): StudioStore {
+export function useWorkspaceStore(): WorkspaceStore {
   const [projects, setProjectsRaw] = useState<ProjectNode[]>(SEED.projects);
   const [folders, setFoldersRaw] = useState<FolderNode[]>(SEED.folders);
   const [machines, setMachinesRaw] = useState<MachineNode[]>(SEED.machines);
@@ -86,7 +86,7 @@ export function useStudioStore(): StudioStore {
   const flushHierarchy = useCallback(async (retry = false) => {
     if (!persistedRef.current) return;
     try {
-      const res = await apiFetch('/api/studio/state', {
+      const res = await apiFetch('/api/workspace/state', {
         method: 'PUT',
         body: JSON.stringify({ data: latest.current, baseRevision: hierRev.current }),
       });
@@ -133,7 +133,7 @@ export function useStudioStore(): StudioStore {
     if (!persistedRef.current) return;
     void (async () => {
       try {
-        const res = await apiFetch('/api/studio/layout', {
+        const res = await apiFetch('/api/workspace/layout', {
           method: 'PUT',
           body: JSON.stringify({ machineId, layout }),
         });
@@ -152,7 +152,7 @@ export function useStudioStore(): StudioStore {
     if (!persistedRef.current) return;
     void (async () => {
       try {
-        const res = await apiFetch('/api/studio/template', {
+        const res = await apiFetch('/api/workspace/template', {
           method: 'PUT',
           body: JSON.stringify({ machineTemplate, layout }),
         });
@@ -175,7 +175,7 @@ export function useStudioStore(): StudioStore {
     let cancelled = false;
     (async () => {
       try {
-        const res = await apiFetch('/api/studio/state');
+        const res = await apiFetch('/api/workspace/state');
         if (!cancelled && res.ok) {
           const json = (await res.json()) as { persisted?: boolean; workspace?: Parameters<typeof applyWorkspace>[0] | null };
           if (json.persisted && json.workspace) {
@@ -201,14 +201,14 @@ export function useStudioStore(): StudioStore {
     const tick = async () => {
       if (!persistedRef.current) return;
       try {
-        const res = await apiFetch('/api/studio/revisions');
+        const res = await apiFetch('/api/workspace/revisions');
         if (!res.ok) return;
         const rev = (await res.json()) as { hierRevision?: number; layoutRevision?: number };
         const hierChanged = typeof rev.hierRevision === 'number' && rev.hierRevision !== hierRev.current;
         const layoutChanged = typeof rev.layoutRevision === 'number' && rev.layoutRevision !== layoutRev.current;
         if (!hierChanged && !layoutChanged) return;
         if (hierChanged && hierDirty.current) return; // don't overwrite unsaved edits
-        const full = await apiFetch('/api/studio/state');
+        const full = await apiFetch('/api/workspace/state');
         if (!full.ok || stopped) return;
         const json = (await full.json()) as { workspace?: Parameters<typeof applyWorkspace>[0] | null };
         if (json.workspace && !hierDirty.current) applyWorkspace(json.workspace);

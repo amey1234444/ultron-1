@@ -4,10 +4,10 @@ import { isDbEnabled } from '../../../server/db';
 import { sendApiError } from '../../../server/errors';
 import { guardRequest } from '../../../server/security';
 import { getSessionUser } from '../../../server/session';
-import { getRevisions } from '../../../server/studio';
+import { getRevisions } from '../../../server/workspace';
 
 // Cheap poll target: clients hit this on an interval and only refetch the full
-// /studio/state when a revision changed (someone else edited the workspace).
+// /workspace/state when a revision changed (someone else edited the workspace).
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     if (guardRequest(req, res)) return;
@@ -17,6 +17,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const revisions = await getRevisions();
     return res.status(200).json({ persisted: true, ...revisions });
   } catch (err) {
-    return sendApiError(res, err, 'api/studio/revisions');
+    return sendApiError(res, err, 'api/workspace/revisions');
   }
 }

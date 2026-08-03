@@ -5,7 +5,7 @@ import { AccountBar } from '../components/web/AccountBar';
 import { AuthGate } from '../components/web/AuthGate';
 import { useAuth } from '../context/AuthContext';
 
-export default function StudioScreen() {
+export default function ConsoleScreen() {
   const { user } = useAuth();
 
   return (

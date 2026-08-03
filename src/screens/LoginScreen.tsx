@@ -3,13 +3,29 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
-import { AUTH_FONT_BODY, AuthAltAction, AuthButton, AuthError, AuthField, AuthShell } from './AuthShell';
+import {
+  AUTH_FONT_BODY,
+  AuthAltAction,
+  AuthButton,
+  AuthDisclosure,
+  AuthError,
+  AuthField,
+  AuthPasswordField,
+  AuthShell,
+} from './AuthShell';
+
+const DEMO_ACCOUNTS = [
+  { username: 'superadmin', role: 'Super admin — full access, user management' },
+  { username: 'admin', role: 'Admin — console plus the user directory' },
+  { username: 'user', role: 'User — read-only console access' },
+];
 
 export default function LoginScreen() {
   const router = useRouter();
   const { user, loading, login } = useAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,7 +37,13 @@ export default function LoginScreen() {
   }, [loading, user, router]);
 
   const onSubmit = async () => {
+    const errors: { username?: string; password?: string } = {};
+    if (!username.trim()) errors.username = 'Enter your username or email.';
+    if (!password) errors.password = 'Enter your password.';
+    setFieldErrors(errors);
     setError(null);
+    if (Object.keys(errors).length > 0) return;
+
     setSubmitting(true);
     try {
       await login(username.trim(), password);
@@ -36,28 +58,38 @@ export default function LoginScreen() {
 
   return (
     <AuthShell
+      badge="SECURE SIGN-IN"
       title="Welcome back"
-      subtitle="Sign in to your account to continue."
-      footer={<AuthAltAction prompt="Don't have an account?" action="Create one" onPress={() => router.push('/signup')} />}
+      subtitle="Sign in to monitor plant health, alarms and live telemetry."
+      footer={<AuthAltAction prompt="Don't have an account?" action="Request access" onPress={() => router.push('/signup')} />}
     >
       <AuthField
-        label="Username"
+        label="Username or email"
         value={username}
-        onChangeText={setUsername}
+        onChangeText={(text) => {
+          setUsername(text);
+          if (fieldErrors.username) setFieldErrors((prev) => ({ ...prev, username: undefined }));
+        }}
         autoCapitalize="none"
+        autoComplete="username"
         placeholder="name@company.com"
+        error={fieldErrors.username}
         onSubmitEditing={onSubmit}
       />
-      <AuthField
+      <AuthPasswordField
         label="Password"
         value={password}
-        onChangeText={setPassword}
-        secureTextEntry
+        onChangeText={(text) => {
+          setPassword(text);
+          if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+        }}
         placeholder="••••••••"
+        autoComplete="current-password"
+        error={fieldErrors.password}
         onSubmitEditing={onSubmit}
         hint={
-          <Pressable onPress={() => router.push('/signup')}>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#64748b' }}>Forgot password?</Text>
+          <Pressable onPress={() => router.push('/signup')} accessibilityRole="link">
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#8A8A8A' }}>Forgot password?</Text>
           </Pressable>
         }
       />
@@ -66,11 +98,24 @@ export default function LoginScreen() {
 
       <AuthButton label="Sign in" submitting={submitting} onPress={onSubmit} />
 
-      <View style={{ marginTop: 20 }}>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, lineHeight: 20, color: '#94a3b8', textAlign: 'center' }}>
-          Demo accounts — superadmin / admin / user (default passwords in README).
-        </Text>
-      </View>
+      <AuthDisclosure label="Demo accounts">
+        <View style={{ gap: 8 }}>
+          {DEMO_ACCOUNTS.map((account) => (
+            <Pressable
+              key={account.username}
+              onPress={() => setUsername(account.username)}
+              accessibilityRole="button"
+              accessibilityLabel={`Use the ${account.username} demo account`}
+            >
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '700', color: '#C9A15C' }}>{account.username}</Text>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: '#8A8A8A' }}>{account.role}</Text>
+            </Pressable>
+          ))}
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: '#5F6266' }}>
+            Tap a username to fill the form. Default passwords are listed in the README.
+          </Text>
+        </View>
+      </AuthDisclosure>
     </AuthShell>
   );
 }

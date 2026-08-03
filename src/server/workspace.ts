@@ -1,4 +1,4 @@
-// Durable, shared "studio" workspace: the asset hierarchy shown in the left rail
+// Durable, shared workspace: the asset hierarchy shown in the left rail
 // (projects -> folders -> machines, plus devices and their rack cards) and the
 // per-machine canvas layouts. All authenticated users read and write the same
 // rows, so an edit made by one user becomes visible to everyone else (clients
@@ -39,7 +39,7 @@ export type HierarchyInput = {
   cards: CardNode[];
 };
 
-const globalRef = globalThis as unknown as { __ultronStudioSeeded?: boolean };
+const globalRef = globalThis as unknown as { __ultronWorkspaceSeeded?: boolean };
 
 function makeId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -54,14 +54,14 @@ function numericValue(value: unknown, fallback: number): number {
 // survives redeploys/restarts.
 async function ready(): Promise<void> {
   await ensureSchema();
-  if (globalRef.__ultronStudioSeeded) return;
+  if (globalRef.__ultronWorkspaceSeeded) return;
   const meta = await query<{ seeded: boolean }>('SELECT seeded FROM studio_meta WHERE id = 1');
   if (meta.rows[0]?.seeded) {
-    globalRef.__ultronStudioSeeded = true;
+    globalRef.__ultronWorkspaceSeeded = true;
     return;
   }
   await seedWorkspace();
-  globalRef.__ultronStudioSeeded = true;
+  globalRef.__ultronWorkspaceSeeded = true;
 }
 
 async function seedWorkspace(): Promise<void> {

@@ -1,7 +1,7 @@
 // Persistence for the dashboard's Plant Overview layout. Super admins save one
 // shared configuration; every other user reads it. Stored in Postgres when
 // DATABASE_URL is set, otherwise held in memory for the process so local dev
-// and CI still behave (matching the fallback used by the rest of the studio).
+// and CI still behave (matching the fallback used by the rest of the console).
 
 import {
   DEFAULT_PLANT_OVERVIEW,

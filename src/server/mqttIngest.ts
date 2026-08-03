@@ -57,7 +57,7 @@ function stableId(prefix: string, ...parts: string[]): string {
   return `${prefix}-${createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 16)}`;
 }
 
-function studioCardType(slot: Record<string, unknown>): 'Vibration Card' | 'Process Card' | 'Speed Card' | 'Communication Controller' {
+function cardTypeForSlot(slot: Record<string, unknown>): 'Vibration Card' | 'Process Card' | 'Speed Card' | 'Communication Controller' {
   const normalized = [slot.card_type, slot.sensor, slot.unit, slot.value_with_unit]
     .map((value) => String(value ?? '').trim().toLowerCase())
     .filter(Boolean)
@@ -70,7 +70,7 @@ function studioCardType(slot: Record<string, unknown>): 'Vibration Card' | 'Proc
   return 'Process Card';
 }
 
-function studioCardConfig(type: ReturnType<typeof studioCardType>, slot: Record<string, unknown>): Record<string, unknown> {
+function cardConfigForSlot(type: ReturnType<typeof cardTypeForSlot>, slot: Record<string, unknown>): Record<string, unknown> {
   const unit = stringValue(slot.unit) ?? '';
   const sensor = stringValue(slot.sensor) ?? '';
   const label = sensor || stringValue(slot.card_type) || `Slot ${slot.slot_number}`;
@@ -262,7 +262,7 @@ async function ensureRack(msg: MqttEnvelope): Promise<void> {
   );
 }
 
-async function ensureStudioRackAndSlots(msg: MqttEnvelope, slots: Record<string, unknown>[] = []): Promise<void> {
+async function ensureWorkspaceRackAndSlots(msg: MqttEnvelope, slots: Record<string, unknown>[] = []): Promise<void> {
   if (!msg.rack_id) return;
   const gateway = await query<{ id: string; project_id: string | null }>(
     `SELECT id, project_id
@@ -344,13 +344,13 @@ async function ensureStudioRackAndSlots(msg: MqttEnvelope, slots: Record<string,
   if (!deviceId) return;
 
   let cardsChanged = 0;
-  const studioSlots = [...slots];
-  if (!studioSlots.some((slot) => Number(slot.slot_number) === CONTROLLER_SLOT)) {
-    studioSlots.push(CONTROLLER_SLOT_PAYLOAD);
+  const slotsToSync = [...slots];
+  if (!slotsToSync.some((slot) => Number(slot.slot_number) === CONTROLLER_SLOT)) {
+    slotsToSync.push(CONTROLLER_SLOT_PAYLOAD);
   }
-  for (const slot of studioSlots) {
+  for (const slot of slotsToSync) {
     if (!Number.isInteger(slot.slot_number) || Number(slot.slot_number) < 1) continue;
-    const type = studioCardType(slot);
+    const type = cardTypeForSlot(slot);
     const card = await query(
       `INSERT INTO studio_cards (id, device_id, slot, type, enabled, config, sort_order)
        VALUES ($1,$2,$3,$4,true,$5::jsonb,
@@ -368,7 +368,7 @@ async function ensureStudioRackAndSlots(msg: MqttEnvelope, slots: Record<string,
         deviceId,
         slot.slot_number,
         type,
-        JSON.stringify(studioCardConfig(type, slot)),
+        JSON.stringify(cardConfigForSlot(type, slot)),
       ],
     );
     cardsChanged += card.rowCount ?? 0;
@@ -581,7 +581,7 @@ async function handleTopology(msg: MqttEnvelope): Promise<void> {
     if (!rackId) continue;
     const rackMsg = { ...msg, rack_id: rackId, payload: rack };
     await upsertRack(rackMsg, { status: stringValue(rack.status) ?? 'unknown', dataCurrent: rack.data_current === true });
-    await ensureStudioRackAndSlots(rackMsg);
+    await ensureWorkspaceRackAndSlots(rackMsg);
     await upsertControllerSlot(rackMsg, rack.status === 'connected' && rack.data_current === true);
     activeRackIds.push(rackId);
   }
@@ -597,7 +597,7 @@ async function handleTopology(msg: MqttEnvelope): Promise<void> {
 async function handleRackHealth(msg: MqttEnvelope): Promise<void> {
   if (!(await rackAllows(msg))) return;
   await upsertRack(msg);
-  await ensureStudioRackAndSlots(msg);
+  await ensureWorkspaceRackAndSlots(msg);
   await upsertControllerSlot(msg, msg.payload.data_current === true);
   if (msg.payload.data_current !== true) {
     await query(`UPDATE rack_slot_latest SET live = false, measurement_valid = false, updated_at = now() WHERE gateway_id = $1 AND rack_id = $2`, [msg.gateway_id, msg.rack_id]);
@@ -609,7 +609,7 @@ async function handleInventory(msg: MqttEnvelope): Promise<void> {
   await ensureRack(msg);
   const revision = Number(msg.payload.snapshot_revision);
   const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots.map(objectValue).filter(Boolean) as Record<string, unknown>[] : [];
-  await ensureStudioRackAndSlots(msg, slots);
+  await ensureWorkspaceRackAndSlots(msg, slots);
   for (const slot of slots) {
     await query(
       `INSERT INTO rack_inventory_slots (
@@ -723,7 +723,7 @@ async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
   if (!(await rackAllows(msg))) return 0;
   await upsertRack(msg, { status: 'connected', dataCurrent: objectValue(msg.payload.telemetry)?.data_current === true });
   const slots = Array.isArray(msg.payload.slots) ? msg.payload.slots.map(objectValue).filter(Boolean) as Record<string, unknown>[] : [];
-  await ensureStudioRackAndSlots(msg, slots);
+  await ensureWorkspaceRackAndSlots(msg, slots);
   for (const slot of slots) {
     await query(
       `INSERT INTO rack_inventory_slots (
