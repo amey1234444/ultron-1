@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
 import styles from './UltronHero.module.css';
@@ -67,17 +68,74 @@ const navigation: NavItem[] = [
 const platformFeatures: { icon: IconName; title: string; subtitle: string }[] = [
   { icon: 'telemetry', title: 'Real-time Telemetry', subtitle: '<200ms latency' },
   { icon: 'ai', title: 'AI-Powered Insights', subtitle: 'Predict failures early' },
-  { icon: 'cloud', title: 'Edge to Cloud', subtitle: 'Secure & scalable' },
-  { icon: 'clock', title: '99.9% Uptime', subtitle: 'Enterprise grade' },
+  { icon: 'cloud', title: 'Edge to Cloud', subtitle: 'Secure & Scalable' },
+  { icon: 'clock', title: '99.9% Uptime', subtitle: 'Enterprise Grade' },
 ];
 
 const heroBenefits: { icon: IconName; title: string; subtitle: string }[] = [
-  { icon: 'shield', title: 'Secure by Design', subtitle: 'End-to-end encryption' },
   { icon: 'chart', title: 'AI Predictive', subtitle: 'Smart anomaly detection' },
   { icon: 'clock', title: 'Real-time Alerts', subtitle: 'Instant notifications' },
+  { icon: 'shield', title: 'Secure by Design', subtitle: 'End-to-end encryption' },
 ];
 
-const partners = ['VEDANTA', 'TATA STEEL', 'HINDALCO', 'JSW', 'SAIL', 'HINDUSTAN ZINC'];
+// Customer wall. `mark` is an original monochrome glyph drawn for this page —
+// swap in an official brand SVG at the same path once one is licensed.
+const partners: { name: string; mark: ReactNode }[] = [
+  {
+    name: 'Vedanta',
+    mark: (
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M6 7l10 18L26 7" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
+        <path d="M13 7l3 5.4L19 7" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    name: 'Tata Steel',
+    mark: (
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="2.2" />
+        <path d="M6 16h20" stroke="currentColor" strokeWidth="2.2" />
+        <path d="M16 6c4 5 4 15 0 20-4-5-4-15 0-20Z" stroke="currentColor" strokeWidth="2.2" />
+      </svg>
+    ),
+  },
+  {
+    name: 'Hindalco',
+    mark: (
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="2.2" />
+        <path d="M16 6c6 3 6 15 0 20-6-5-6-17 0-20Z" fill="currentColor" opacity="0.55" />
+      </svg>
+    ),
+  },
+  {
+    name: 'JSW',
+    mark: (
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M5 9l7 14 4-8 4 8 7-14" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+  {
+    name: 'SAIL',
+    mark: (
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 5l11 11-11 11L5 16 16 5Z" stroke="currentColor" strokeWidth="2.2" />
+        <path d="M16 11l5 5-5 5-5-5 5-5Z" fill="currentColor" opacity="0.6" />
+      </svg>
+    ),
+  },
+  {
+    name: 'Hindustan Zinc',
+    mark: (
+      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M16 4l10 6v12l-10 6-10-6V10l10-6Z" stroke="currentColor" strokeWidth="2.2" />
+        <path d="M12 12h8l-8 8h8" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
+      </svg>
+    ),
+  },
+];
 
 function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const properties = {
@@ -169,7 +227,7 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   }
 }
 
-export default function UltronHero() {
+export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode }) {
   const { user } = useAuth();
   const consoleHref = user ? '/' : '/login';
 
@@ -179,7 +237,6 @@ export default function UltronHero() {
         <div className={styles.headerContent}>
           <Link href="/home" className={styles.brand} aria-label="ULTRON home">
             <span className={styles.brandName}>ULTRON</span>
-            <span className={styles.brandTagline}>MACHINE HEALTH, IN REAL TIME</span>
           </Link>
 
           <nav className={styles.navigation} aria-label="Primary navigation">
@@ -241,6 +298,7 @@ export default function UltronHero() {
       </div>
 
       <div className={styles.backgroundScene} aria-hidden="true" />
+      <div className={styles.backgroundGrade} aria-hidden="true" />
       <div className={styles.backgroundPattern} aria-hidden="true" />
 
       <div className={styles.heroContent}>
@@ -294,25 +352,20 @@ export default function UltronHero() {
           </div>
         </div>
 
-        {/* Console render — the industrial platform scene. Shown as a
-            right-anchored backdrop layer on desktop (see the stylesheet) and
-            inline underneath the copy on narrow screens. */}
-        <div className={styles.heroVisual}>
-          <img
-            src="/images/ultron-hero-console.png"
-            alt="ULTRON console showing live machine health metrics above an instrumented plant platform"
-            width={1672}
-            height={941}
-            fetchPriority="high"
-          />
-        </div>
+        {/* Wide viewports get the console render as a right-anchored backdrop
+            (see `.backgroundScene`). Below that the render is dropped entirely
+            and this column carries the animated live dashboard instead. */}
+        <div className={styles.heroVisual}>{narrowVisual}</div>
       </div>
 
       <div className={styles.partnerBar}>
         <span className={styles.partnerHeading}>TRUSTED BY INDUSTRY LEADERS</span>
 
         {partners.map((partner) => (
-          <span key={partner}>{partner}</span>
+          <span className={styles.partnerLogo} key={partner.name}>
+            {partner.mark}
+            {partner.name}
+          </span>
         ))}
       </div>
 

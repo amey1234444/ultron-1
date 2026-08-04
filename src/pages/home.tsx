@@ -11,10 +11,12 @@ import {
 import UltronHero from '../components/hero/UltronHero';
 import { useAuth } from '../context/AuthContext';
 
-const GOLD = '#C9A15C';
-const BG = '#0A0A0A';
-const INK = '#F5F5F5';
-const MUTED = '#8A8A8A';
+// Graded to match the hero plate: warmer near-black, brighter gold, and a
+// slightly warm grey so the page reads as one lighting setup.
+const GOLD = '#DFAE63';
+const BG = '#07080B';
+const INK = '#F7F6F2';
+const MUTED = '#93938E';
 const BLUE = '#58A6FF';
 const GREEN = '#3FB950';
 
@@ -25,7 +27,7 @@ const FONT_DISPLAY = "'Bebas Neue', 'Space Grotesk', SpaceGrotesk_600SemiBold, s
 const FONT_HEAD = "'Sora', 'Space Grotesk', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
 const FONT_BODY = "'Sora', 'DM Sans', Inter_400Regular, system-ui, sans-serif";
 const FONT_MED = "'Sora', 'DM Sans', Inter_500Medium, system-ui, sans-serif";
-const FONT_MONO = 'IBMPlexMono_400Regular, ui-monospace, monospace';
+const FONT_MONO = "'IBM Plex Mono', IBMPlexMono_400Regular, ui-monospace, monospace";
 
 // Fades a block up into place the first time it scrolls into view.
 function Reveal({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: CSSProperties }) {
@@ -222,7 +224,9 @@ export default function HomePage() {
     <div style={{ background: BG, color: INK, minHeight: '100vh', fontFamily: FONT_BODY, overflowX: 'hidden' }}>
       <style>{keyframes}</style>
 
-      <UltronHero />
+      {/* Narrow viewports drop the hero render and stream the live dashboard in
+          its place instead. */}
+      <UltronHero narrowVisual={<LiveDashboard />} />
 
       {/* Live console — the streaming product dashboard. */}
       <section id="dashboard" style={{ padding: 'clamp(56px, 9vw, 104px) clamp(20px, 6vw, 72px) 0', scrollMarginTop: 90 }}>
@@ -549,7 +553,10 @@ function LiveDashboard() {
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 0 }}>
+      <div
+        className="ultron-live-grid"
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 0 }}
+      >
         {/* main chart column */}
         <div style={{ padding: 18, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
@@ -1046,5 +1053,11 @@ const keyframes = `
 .ultron-social:hover { color: ${GOLD} !important; border-color: rgba(201,161,92,0.5) !important; transform: translateY(-2px); }
 @media (max-width: 720px) {
   header nav a[href^="#"] { display: none; }
+}
+/* The live console stacks below phone width so the KPI rail keeps its numbers
+   readable instead of squeezing into a sliver. */
+@media (max-width: 620px) {
+  .ultron-live-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .ultron-live-grid > div:first-child { border-right: none !important; }
 }
 `;

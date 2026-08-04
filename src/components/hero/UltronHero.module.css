@@ -1,9 +1,9 @@
 .hero {
-  --background: #050b11;
-  --gold: #e5b25f;
-  --gold-light: #f2ce88;
-  --text: #f5f4f0;
-  --gold-border: rgba(225, 171, 84, 0.36);
+  --background: #07080b;
+  --gold: #e8b465;
+  --gold-light: #f6d693;
+  --text: #f7f6f2;
+  --gold-border: rgba(230, 178, 92, 0.42);
 
   position: relative;
   min-height: 100svh;
@@ -46,18 +46,14 @@
   text-decoration: none;
 }
 
+/* Matches the wordmark the landing page used before this hero: condensed
+   display face, wide tracking, no emblem. */
 .brandName {
-  font-size: 25px;
-  font-weight: 900;
+  font-family: 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
+  font-size: 26px;
+  font-weight: 400;
   line-height: 1;
-  letter-spacing: 0.31em;
-}
-
-.brandTagline {
-  color: #bfc3c3;
-  font-size: 7px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.28em;
 }
 
 .navigation {
@@ -268,6 +264,18 @@
   background-repeat: no-repeat;
   background-size: contain;
   background-position: right center;
+  /* Neutral grade only — the render keeps its own lighting, no colour wash. */
+  filter: contrast(1.04);
+}
+
+/* Depth only: darkens the very top and bottom of the plate so the header and
+   partner bar sit on a clean field. No tint. */
+.backgroundGrade {
+  position: absolute;
+  z-index: -4;
+  inset: 158px 0 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(7, 8, 11, 0.34) 0%, rgba(7, 8, 11, 0) 26%, rgba(6, 7, 10, 0.52) 100%);
 }
 
 /* Fades the render's left edge into the copy column so the headline always sits
@@ -278,10 +286,10 @@
   inset: 0;
   background: linear-gradient(
     90deg,
-    rgba(5, 8, 13, 0.97) 0%,
-    rgba(5, 8, 13, 0.86) 26%,
-    rgba(5, 8, 13, 0.28) 44%,
-    rgba(5, 8, 13, 0) 58%
+    rgba(7, 8, 11, 0.9) 0%,
+    rgba(7, 8, 11, 0.7) 27%,
+    rgba(7, 8, 11, 0.2) 45%,
+    rgba(7, 8, 11, 0) 58%
   );
 }
 
@@ -485,20 +493,16 @@
 /* Hero visual                                      */
 /* ------------------------------------------------ */
 
-/* On desktop the render is painted by .backgroundScene, so the inline copy is
-   hidden and this column only reserves space for it. */
+/* On wide viewports the render is painted by .backgroundScene, so this column
+   only reserves space for it and its contents stay hidden. */
 .heroVisual {
   position: relative;
   z-index: 6;
   min-height: 560px;
 }
 
-.heroVisual img {
+.heroVisual > * {
   display: none;
-  width: 100%;
-  height: auto;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 18px;
 }
 
 /* ------------------------------------------------ */
@@ -532,12 +536,27 @@
   letter-spacing: 0.22em;
 }
 
-.partnerBar > span:not(.partnerHeading) {
-  color: #91979a;
-  font-size: 17px;
-  font-weight: 900;
-  text-align: center;
-  letter-spacing: -0.04em;
+.partnerLogo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  color: #9aa1a6;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+  transition: color 180ms ease;
+}
+
+.partnerLogo svg {
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+.partnerLogo:hover {
+  color: var(--gold-light);
 }
 
 /* ------------------------------------------------ */
@@ -639,16 +658,18 @@
     max-width: 720px;
   }
 
+  /* Narrow viewports drop the render entirely and get the animated live
+     dashboard in the visual column instead. */
   .backgroundScene {
     display: none;
   }
 
   .heroVisual {
     min-height: 0;
-    margin-top: 30px;
+    margin-top: 34px;
   }
 
-  .heroVisual img {
+  .heroVisual > * {
     display: block;
   }
 
@@ -676,11 +697,7 @@
   }
 
   .brandName {
-    font-size: 20px;
-  }
-
-  .brandTagline {
-    font-size: 5.8px;
+    font-size: 21px;
   }
 
   .signInButton {
@@ -745,8 +762,14 @@
     gap: 19px;
   }
 
-  .partnerBar > span:not(.partnerHeading) {
-    font-size: 13px;
+  .partnerLogo {
+    gap: 7px;
+    font-size: 12px;
+  }
+
+  .partnerLogo svg {
+    width: 20px;
+    height: 20px;
   }
 
   .chatButton {
