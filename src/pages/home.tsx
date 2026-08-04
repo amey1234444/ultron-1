@@ -8,12 +8,15 @@ import {
   type ReactNode,
 } from 'react';
 
+import UltronHero from '../components/hero/UltronHero';
 import { useAuth } from '../context/AuthContext';
 
-const GOLD = '#C9A15C';
-const BG = '#0A0A0A';
-const INK = '#F5F5F5';
-const MUTED = '#8A8A8A';
+// Graded to match the hero plate: warmer near-black, brighter gold, and a
+// slightly warm grey so the page reads as one lighting setup.
+const GOLD = '#DFAE63';
+const BG = '#07080B';
+const INK = '#F7F6F2';
+const MUTED = '#93938E';
 const BLUE = '#58A6FF';
 const GREEN = '#3FB950';
 
@@ -24,7 +27,7 @@ const FONT_DISPLAY = "'Bebas Neue', 'Space Grotesk', SpaceGrotesk_600SemiBold, s
 const FONT_HEAD = "'Sora', 'Space Grotesk', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
 const FONT_BODY = "'Sora', 'DM Sans', Inter_400Regular, system-ui, sans-serif";
 const FONT_MED = "'Sora', 'DM Sans', Inter_500Medium, system-ui, sans-serif";
-const FONT_MONO = 'IBMPlexMono_400Regular, ui-monospace, monospace';
+const FONT_MONO = "'IBM Plex Mono', IBMPlexMono_400Regular, ui-monospace, monospace";
 
 // Fades a block up into place the first time it scrolls into view.
 function Reveal({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: CSSProperties }) {
@@ -217,253 +220,27 @@ const STATS = [
 export default function HomePage() {
   const { user } = useAuth();
   const consoleHref = user ? '/' : '/login';
-  const consoleLabel = user ? 'Open console' : 'Sign in';
-  const [pointer, setPointer] = useState({ x: 50, y: 34 });
-  const handleHeroMove = (event: ReactMouseEvent<HTMLElement>) => {
-    const rect = event.currentTarget.getBoundingClientRect();
-    setPointer({
-      x: ((event.clientX - rect.left) / rect.width) * 100,
-      y: ((event.clientY - rect.top) / rect.height) * 100,
-    });
-  };
-
-  // Scroll-driven perspective on the hero dashboard — it starts tilted back
-  // (like Gigaton's product hero) and straightens as you scroll into the page.
-  const [scrollProgress, setScrollProgress] = useState(0);
-  // Whether the page has scrolled past the top — drives the oswarteck-style nav
-  // that starts transparent and condenses into a frosted-glass bar on scroll.
-  const [scrolled, setScrolled] = useState(false);
-  useEffect(() => {
-    const onScroll = () => {
-      const p = Math.min(1, window.scrollY / 520);
-      setScrollProgress(p);
-      setScrolled(window.scrollY > 24);
-    };
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-  const tilt = 20 * (1 - scrollProgress);
-  const lift = 40 * (1 - scrollProgress);
-  const pointerTiltX = (pointer.y - 50) * 0.04;
-  const pointerTiltY = (50 - pointer.x) * 0.04;
-  const pointerShiftX = (pointer.x - 50) * 0.18;
-  const pointerShiftY = (pointer.y - 50) * 0.18;
-
   return (
     <div style={{ background: BG, color: INK, minHeight: '100vh', fontFamily: FONT_BODY, overflowX: 'hidden' }}>
       <style>{keyframes}</style>
 
-      {/* Nav */}
-      <header
-        style={{
-          position: 'sticky',
-          top: 0,
-          zIndex: 50,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          padding: scrolled ? '11px clamp(20px, 6vw, 72px)' : '18px clamp(20px, 6vw, 72px)',
-          // Glassy from the very top: a lighter, more transparent frosted panel at
-          // rest that condenses into a denser frosted bar once you scroll.
-          backdropFilter: scrolled ? 'blur(22px) saturate(180%)' : 'blur(14px) saturate(150%)',
-          WebkitBackdropFilter: scrolled ? 'blur(22px) saturate(180%)' : 'blur(14px) saturate(150%)',
-          background: scrolled
-            ? 'linear-gradient(180deg, rgba(20,20,20,0.78), rgba(10,10,10,0.52))'
-            : 'linear-gradient(180deg, rgba(255,255,255,0.12), rgba(255,255,255,0.03) 55%, rgba(201,161,92,0.06))',
-          borderBottom: `1px solid ${scrolled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.10)'}`,
-          // A bright hairline top highlight + soft glow gives the glass a glossy,
-          // reflective sheen even at rest (when the near-black hero sits behind it);
-          // the drop shadow deepens on scroll to lift the bar off the page.
-          boxShadow: scrolled
-            ? '0 1px 0 rgba(255,255,255,0.08) inset, 0 8px 30px rgba(0,0,0,0.32)'
-            : '0 1px 0 rgba(255,255,255,0.14) inset, 0 -1px 0 rgba(201,161,92,0.10) inset, 0 6px 24px rgba(0,0,0,0.18)',
-          transition:
-            'padding 0.35s cubic-bezier(0.22,1,0.36,1), background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease',
-        }}
-      >
-        <span style={{ fontFamily: FONT_DISPLAY, fontSize: 26, letterSpacing: '0.28em' }}>ULTRON</span>
-        <nav style={{ display: 'flex', alignItems: 'center', gap: 28 }}>
-          <a href="#features" style={navLink} className="ultron-navlink">
-            Features
-          </a>
-          <a href="#dashboard" style={navLink} className="ultron-navlink">
-            Dashboard
-          </a>
-          <a href="#platform" style={navLink} className="ultron-navlink">
-            Platform
-          </a>
-          <a href="#industries" style={navLink} className="ultron-navlink">
-            Industries
-          </a>
-          <a href="#contact" style={navLink} className="ultron-navlink">
-            Contact
-          </a>
-          <Link
-            href={consoleHref}
-            style={{
-              fontFamily: FONT_MED,
-              fontSize: 14,
-              color: BG,
-              background: INK,
-              padding: '9px 18px',
-              borderRadius: 10,
-              textDecoration: 'none',
-            }}
-          >
-            {consoleLabel}
-          </Link>
-        </nav>
-      </header>
+      {/* Narrow viewports drop the hero render and stream the live dashboard in
+          its place instead. */}
+      <UltronHero narrowVisual={<LiveDashboard />} />
 
-      {/* Hero */}
-      <section
-        onMouseMove={handleHeroMove}
-        onMouseLeave={() => setPointer({ x: 50, y: 34 })}
-        style={{
-          position: 'relative',
-          padding: 'clamp(64px, 10vw, 130px) clamp(20px, 6vw, 72px) clamp(24px, 4vw, 48px)',
-          textAlign: 'center',
-          overflow: 'hidden',
-        }}
-      >
-        {/* animated backdrop */}
-        <div aria-hidden style={{ ...heroGrid, backgroundPosition: `${pointerShiftX}px ${pointerShiftY}px` }} />
-        <div
-          aria-hidden
-          style={{
-            ...heroSpotlight,
-            background: `radial-gradient(circle at ${pointer.x}% ${pointer.y}%, rgba(201,161,92,0.28), rgba(88,166,255,0.13) 32%, transparent 64%)`,
-          }}
-        />
-        <div
-          aria-hidden
-          style={{
-            ...orb,
-            top: '-140px',
-            left: '-120px',
-            background: 'rgba(201,161,92,0.22)',
-            transform: `translate3d(${pointerShiftX}px, ${pointerShiftY}px, 0)`,
-          }}
-        />
-        <div
-          aria-hidden
-          style={{
-            ...orb,
-            bottom: '-160px',
-            right: '-120px',
-            background: 'rgba(88,166,255,0.16)',
-            animationDelay: '3s',
-            transform: `translate3d(${-pointerShiftX}px, ${-pointerShiftY}px, 0)`,
-          }}
-        />
-
-        <div style={{ position: 'relative', maxWidth: 920, margin: '0 auto' }}>
-          <div
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              padding: '6px 14px',
-              borderRadius: 999,
-              border: '1px solid rgba(201,161,92,0.4)',
-              color: GOLD,
-              fontFamily: FONT_MONO,
-              fontSize: 12,
-              letterSpacing: '0.14em',
-              opacity: 0,
-              animation: 'fadeUp 0.8s ease 0.05s forwards',
-            }}
-          >
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: GOLD, animation: 'pulse 2s infinite' }} />
-            INDUSTRIAL IOT · PREDICTIVE MAINTENANCE
+      {/* Live console — the streaming product dashboard. */}
+      <section id="dashboard" style={{ padding: 'clamp(56px, 9vw, 104px) clamp(20px, 6vw, 72px) 0', scrollMarginTop: 90 }}>
+        <Reveal>
+          <div style={{ textAlign: 'center', maxWidth: 720, margin: '0 auto 44px' }}>
+            <div style={sectionKicker}>LIVE CONSOLE</div>
+            <h2 style={sectionTitle}>Streaming telemetry, exactly as operators see it</h2>
           </div>
-
-          <h1
-            style={{
-              fontFamily: FONT_DISPLAY,
-              fontSize: 'clamp(48px, 8vw, 96px)',
-              lineHeight: 0.98,
-              margin: '26px 0 0',
-              letterSpacing: '0.01em',
-              opacity: 0,
-              animation: 'fadeUp 0.9s cubic-bezier(0.22,1,0.36,1) 0.15s forwards',
-            }}
-          >
-            Machine health,{' '}
-            <span
-              style={{
-                background: `linear-gradient(110deg, ${GOLD}, #F0D9A8, ${GOLD})`,
-                backgroundSize: '200% auto',
-                WebkitBackgroundClip: 'text',
-                backgroundClip: 'text',
-                color: 'transparent',
-                animation: 'shimmer 5s linear infinite',
-              }}
-            >
-              in real time
-            </span>
-          </h1>
-
-          <p
-            style={{
-              maxWidth: 620,
-              margin: '22px auto 0',
-              fontSize: 'clamp(16px, 2vw, 19px)',
-              lineHeight: 1.6,
-              color: MUTED,
-              opacity: 0,
-              animation: 'fadeUp 0.9s ease 0.3s forwards',
-            }}
-          >
-            ULTRON turns raw sensor telemetry into live dashboards and AI-driven failure prediction — so you fix machines
-            before they break, not after.
-          </p>
-
-          <div
-            style={{
-              display: 'flex',
-              gap: 14,
-              justifyContent: 'center',
-              flexWrap: 'wrap',
-              marginTop: 36,
-              opacity: 0,
-              animation: 'fadeUp 0.9s ease 0.45s forwards',
-            }}
-          >
-            <Link href={consoleHref} style={{ ...ctaPrimary }}>
-              {user ? 'Open console →' : 'Launch console →'}
-            </Link>
-            <a href="#dashboard" style={{ ...ctaGhost }}>
-              See it live
-            </a>
-          </div>
-        </div>
-
-        {/* Animated live dashboard — the Gigaton-style product hero. Tilts back
-            in 3D and straightens on scroll. */}
-        <div
-          id="dashboard"
-          style={{
-            perspective: 1600,
-            maxWidth: 1080,
-            margin: '56px auto 0',
-            opacity: 0,
-            animation: 'fadeUp 1s ease 0.6s forwards',
-            scrollMarginTop: 90,
-          }}
-        >
-          <div
-            style={{
-              transform: `rotateX(${tilt + pointerTiltX}deg) rotateY(${pointerTiltY}deg) translateY(${lift}px)`,
-              transformStyle: 'preserve-3d',
-              transition: 'transform 0.15s linear',
-              willChange: 'transform',
-            }}
-          >
+        </Reveal>
+        <Reveal delay={90}>
+          <div style={{ maxWidth: 1080, margin: '0 auto' }}>
             <LiveDashboard />
           </div>
-        </div>
+        </Reveal>
       </section>
 
       {/* Stats */}
@@ -776,7 +553,10 @@ function LiveDashboard() {
         </span>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 0 }}>
+      <div
+        className="ultron-live-grid"
+        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 0 }}
+      >
         {/* main chart column */}
         <div style={{ padding: 18, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
@@ -1185,14 +965,6 @@ function SiteFooter() {
   );
 }
 
-const navLink: CSSProperties = {
-  fontFamily: FONT_MED,
-  fontSize: 14,
-  color: MUTED,
-  textDecoration: 'none',
-  transition: 'color 0.2s ease',
-};
-
 const footerLink: CSSProperties = {
   fontFamily: FONT_BODY,
   fontSize: 14,
@@ -1221,35 +993,6 @@ const socialBtn: CSSProperties = {
   transition: 'color 0.2s ease, border-color 0.2s ease, transform 0.2s ease',
 };
 
-const orb: CSSProperties = {
-  position: 'absolute',
-  width: 380,
-  height: 380,
-  borderRadius: '50%',
-  filter: 'blur(90px)',
-  animation: 'float 9s ease-in-out infinite',
-  pointerEvents: 'none',
-};
-
-const heroGrid: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  backgroundImage:
-    'linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px)',
-  backgroundSize: '48px 48px',
-  maskImage: 'radial-gradient(circle at 50% 30%, black, transparent 72%)',
-  WebkitMaskImage: 'radial-gradient(circle at 50% 30%, black, transparent 72%)',
-  pointerEvents: 'none',
-};
-
-const heroSpotlight: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  opacity: 0.9,
-  transition: 'background 0.18s ease-out',
-  pointerEvents: 'none',
-};
-
 const ctaPrimary: CSSProperties = {
   fontFamily: FONT_MED,
   fontSize: 15,
@@ -1259,16 +1002,6 @@ const ctaPrimary: CSSProperties = {
   borderRadius: 12,
   textDecoration: 'none',
   boxShadow: '0 10px 40px rgba(245,245,245,0.12)',
-};
-
-const ctaGhost: CSSProperties = {
-  fontFamily: FONT_MED,
-  fontSize: 15,
-  color: INK,
-  padding: '13px 26px',
-  borderRadius: 12,
-  textDecoration: 'none',
-  border: '1px solid rgba(255,255,255,0.18)',
 };
 
 const sectionKicker: CSSProperties = {
@@ -1320,5 +1053,11 @@ const keyframes = `
 .ultron-social:hover { color: ${GOLD} !important; border-color: rgba(201,161,92,0.5) !important; transform: translateY(-2px); }
 @media (max-width: 720px) {
   header nav a[href^="#"] { display: none; }
+}
+/* The live console stacks below phone width so the KPI rail keeps its numbers
+   readable instead of squeezing into a sliver. */
+@media (max-width: 620px) {
+  .ultron-live-grid { grid-template-columns: minmax(0, 1fr) !important; }
+  .ultron-live-grid > div:first-child { border-right: none !important; }
 }
 `;
