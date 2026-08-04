@@ -9,6 +9,7 @@ import { loadLocal } from '../../../lib/localPersist';
 import { expectedPointsForTemplate, type MachineComponent, type MachineNode } from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
 import { AlarmView } from './AlarmView';
+import { AnalysisView } from './AnalysisView';
 import { MachineOverview } from './MachineOverview';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
@@ -38,7 +39,7 @@ type MachineWorkspaceProps = {
   // parent uses this to hide the hierarchy sidebar while it's active.
   onModeChange?: (mode: WorkspaceMode) => void;
 };
-type ActualTab = 'machine' | 'rack' | 'overview' | 'alarm' | 'trend';
+type ActualTab = 'machine' | 'rack' | 'overview' | 'analysis' | 'alarm' | 'trend';
 
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
@@ -249,6 +250,7 @@ export function MachineWorkspace({
       <ActualSubTab label="Machine" active={actualTab === 'machine'} onPress={() => setActualTab('machine')} />
       <ActualSubTab label="Rack" active={actualTab === 'rack'} onPress={() => setActualTab('rack')} />
       <ActualSubTab label="Overview" active={actualTab === 'overview'} onPress={() => setActualTab('overview')} />
+      <ActualSubTab label="Analysis" active={actualTab === 'analysis'} onPress={() => setActualTab('analysis')} />
       <ActualSubTab label="Alarm" active={actualTab === 'alarm'} onPress={() => setActualTab('alarm')} />
       <ActualSubTab label="Trend" active={actualTab === 'trend'} onPress={() => setActualTab('trend')} />
     </ScrollView>
@@ -284,6 +286,18 @@ export function MachineWorkspace({
 
       {isActual && actualTab === 'overview' && (
         <MachineOverview
+          mappedChannels={mappedChannels}
+          devices={devices}
+          cards={cards}
+          live={live}
+          expectedPoints={expectedPoints}
+          machineId={machine.id}
+          machineTemplate={machine.template}
+        />
+      )}
+
+      {isActual && actualTab === 'analysis' && (
+        <AnalysisView
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}

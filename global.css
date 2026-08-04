@@ -3,16 +3,21 @@
 @tailwind utilities;
 
 
+html {
+  scroll-behavior: smooth;
+  min-width: 320px;
+}
+
+html,
+body {
+  background: #07080b;
+}
+
 /* Prevent subpixel color fringing on bold text over dark backgrounds (web only). */
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-}
-
-html {
-  scroll-behavior: smooth;
-  min-width: 320px;
 }
 
 button {
