@@ -1,0 +1,758 @@
+.hero {
+  --background: #050b11;
+  --gold: #e5b25f;
+  --gold-light: #f2ce88;
+  --text: #f5f4f0;
+  --gold-border: rgba(225, 171, 84, 0.36);
+
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--text);
+  background: var(--background);
+  font-family: 'Sora', 'DM Sans', system-ui, sans-serif;
+}
+
+/* ------------------------------------------------ */
+/* Header — text-only ULTRON wordmark, no emblem     */
+/* ------------------------------------------------ */
+
+.header {
+  position: relative;
+  z-index: 30;
+  height: 82px;
+  border-bottom: 1px solid var(--gold-border);
+  background: linear-gradient(180deg, rgba(8, 14, 19, 0.99), rgba(5, 10, 15, 0.96));
+  backdrop-filter: blur(18px);
+}
+
+.headerContent {
+  width: min(1540px, calc(100% - 64px));
+  height: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 255px 1fr auto;
+  align-items: center;
+  gap: 36px;
+}
+
+.brand {
+  width: max-content;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: #fff;
+  text-decoration: none;
+}
+
+.brandName {
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.31em;
+}
+
+.brandTagline {
+  color: #bfc3c3;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(18px, 2.1vw, 40px);
+}
+
+.navigationItem {
+  position: relative;
+}
+
+.navigationLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 0;
+  color: #efefec;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 180ms ease;
+}
+
+.navigationLink:hover,
+.navigationLink:focus-visible {
+  color: var(--gold-light);
+}
+
+.navigationMenu {
+  position: absolute;
+  top: calc(100% + 14px);
+  left: -18px;
+  z-index: 5;
+  min-width: 220px;
+  display: grid;
+  padding: 8px;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(-6px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(9, 15, 20, 0.97);
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(18px);
+  transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
+}
+
+.navigationItem:hover .navigationMenu,
+.navigationItem:focus-within .navigationMenu {
+  visibility: visible;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.navigationMenu a {
+  padding: 9px 12px;
+  color: #c8ccce;
+  border-radius: 9px;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 160ms ease, background 160ms ease;
+}
+
+.navigationMenu a:hover,
+.navigationMenu a:focus-visible {
+  color: var(--gold-light);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.signInButton,
+.requestDemoButton {
+  height: 47px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.signInButton {
+  min-width: 112px;
+  color: #fff;
+  border: 1px solid rgba(224, 169, 79, 0.74);
+  background: rgba(6, 11, 16, 0.6);
+}
+
+.signInButton:hover {
+  background: rgba(224, 169, 79, 0.12);
+}
+
+.requestDemoButton {
+  min-width: 172px;
+  gap: 12px;
+  color: #17130c;
+  background: linear-gradient(180deg, #f4d28f 0%, #dfa952 100%);
+  box-shadow: 0 12px 35px rgba(212, 152, 60, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+.requestDemoButton:hover,
+.primaryButton:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 18px 44px rgba(212, 152, 60, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* ------------------------------------------------ */
+/* Feature strip                                    */
+/* ------------------------------------------------ */
+
+.featureStrip {
+  position: relative;
+  z-index: 25;
+  min-height: 76px;
+  border-bottom: 1px solid var(--gold-border);
+  background: linear-gradient(90deg, rgba(13, 20, 26, 0.97), rgba(14, 19, 24, 0.9), rgba(11, 17, 22, 0.97));
+  backdrop-filter: blur(16px);
+}
+
+.featureStripContent {
+  width: min(1540px, calc(100% - 64px));
+  min-height: 76px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(170px, 1fr)) auto;
+  align-items: center;
+  gap: 22px;
+}
+
+.platformFeature {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 13px;
+}
+
+.platformFeatureIcon {
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+}
+
+.platformFeatureText strong,
+.platformFeatureText small {
+  display: block;
+}
+
+.platformFeatureText strong {
+  margin-bottom: 3px;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.platformFeatureText small {
+  color: #9da4aa;
+  font-size: 12px;
+}
+
+.featureDivider {
+  width: 1px;
+  height: 38px;
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.systemStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  padding: 11px 18px;
+  color: #d4d8d8;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 13px;
+}
+
+.systemStatusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4ae17c;
+  box-shadow: 0 0 14px rgba(74, 225, 124, 0.7);
+}
+
+/* ------------------------------------------------ */
+/* Background — right-anchored console render        */
+/* ------------------------------------------------ */
+
+.backgroundScene {
+  position: absolute;
+  z-index: -5;
+  inset: 158px 0 0;
+  /* `contain` + right anchoring keeps the whole platform scene in frame at any
+     viewport ratio; the render's own edges are near-black, so it melts into the
+     hero background instead of showing a seam. */
+  background-image: url('/images/ultron-hero-console.png');
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-position: right center;
+}
+
+/* Fades the render's left edge into the copy column so the headline always sits
+   on a clean field. */
+.backgroundScene::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    rgba(5, 8, 13, 0.97) 0%,
+    rgba(5, 8, 13, 0.86) 26%,
+    rgba(5, 8, 13, 0.28) 44%,
+    rgba(5, 8, 13, 0) 58%
+  );
+}
+
+.backgroundPattern {
+  position: absolute;
+  z-index: -3;
+  inset: 158px 0 0;
+  pointer-events: none;
+  opacity: 0.1;
+  background-image: radial-gradient(circle at 18% 22%, rgba(227, 170, 78, 0.36) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 74% 66%, rgba(227, 170, 78, 0.22) 0 1px, transparent 1.4px);
+  background-size: 130px 130px, 190px 190px;
+}
+
+/* ------------------------------------------------ */
+/* Hero content                                     */
+/* ------------------------------------------------ */
+
+.heroContent {
+  width: min(1540px, calc(100% - 64px));
+  min-height: 650px;
+  margin: 0 auto;
+  padding: 64px 0 112px;
+  display: grid;
+  grid-template-columns: minmax(510px, 0.85fr) minmax(650px, 1.15fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.heroCopy {
+  position: relative;
+  z-index: 8;
+  max-width: 670px;
+}
+
+.eyebrow {
+  width: max-content;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 31px;
+  padding: 10px 17px;
+  color: var(--gold-light);
+  border: 1px solid var(--gold-border);
+  border-radius: 999px;
+  background: rgba(7, 13, 17, 0.6);
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.eyebrowDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 13px rgba(229, 180, 94, 0.92);
+}
+
+.eyebrowSeparator {
+  opacity: 0.8;
+}
+
+.heroCopy h1 {
+  max-width: 660px;
+  margin: 0;
+  color: #f8f8f5;
+  font-family: 'Anton', 'Bebas Neue', Impact, 'Arial Narrow Bold', sans-serif;
+  font-size: clamp(68px, 5vw, 96px);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: 0.012em;
+  text-transform: uppercase;
+  text-shadow: 0 5px 28px rgba(0, 0, 0, 0.34);
+}
+
+.heroCopy h1 span {
+  display: block;
+  margin-top: 15px;
+  color: transparent;
+  background: linear-gradient(180deg, #f2cc82 0%, #d69b43 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.headingDecoration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 68px;
+  height: 10px;
+  margin: 25px 0 20px;
+}
+
+.headingDecoration::before {
+  content: '';
+  width: 51px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
+.headingDecoration span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.heroCopy > p {
+  max-width: 590px;
+  margin: 0;
+  color: #c4c7c9;
+  font-size: 18px;
+  line-height: 1.62;
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 25px;
+}
+
+.primaryButton,
+.secondaryButton {
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+}
+
+.primaryButton {
+  min-width: 205px;
+  color: #18130c;
+  background: linear-gradient(180deg, #f5d38f, #dda64e);
+  box-shadow: 0 14px 35px rgba(211, 150, 55, 0.21);
+}
+
+.secondaryButton {
+  min-width: 178px;
+  color: #f1f2ef;
+  border: 1px solid rgba(225, 167, 75, 0.72);
+  background: rgba(5, 10, 15, 0.58);
+}
+
+.secondaryButton:hover {
+  background: rgba(225, 167, 75, 0.12);
+  transform: translateY(-2px);
+}
+
+.benefits {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  margin-top: 31px;
+}
+
+.benefit {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--gold-light);
+}
+
+.benefit strong,
+.benefit small {
+  display: block;
+  white-space: nowrap;
+}
+
+.benefit strong {
+  color: #e7e7e4;
+  font-size: 12px;
+}
+
+.benefit small {
+  margin-top: 3px;
+  color: #949ba0;
+  font-size: 10px;
+}
+
+.benefitDivider {
+  width: 1px;
+  height: 37px;
+  margin-left: 4px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ------------------------------------------------ */
+/* Hero visual                                      */
+/* ------------------------------------------------ */
+
+/* On desktop the render is painted by .backgroundScene, so the inline copy is
+   hidden and this column only reserves space for it. */
+.heroVisual {
+  position: relative;
+  z-index: 6;
+  min-height: 560px;
+}
+
+.heroVisual img {
+  display: none;
+  width: 100%;
+  height: auto;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 18px;
+}
+
+/* ------------------------------------------------ */
+/* Partners                                         */
+/* ------------------------------------------------ */
+
+.partnerBar {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: 18px;
+  width: min(1380px, calc(100% - 180px));
+  min-height: 79px;
+  padding: 0 28px;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: 230px repeat(6, 1fr);
+  align-items: center;
+  gap: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 17px;
+  background: rgba(10, 16, 21, 0.88);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px);
+}
+
+.partnerHeading {
+  color: #b0b0ad;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+.partnerBar > span:not(.partnerHeading) {
+  color: #91979a;
+  font-size: 17px;
+  font-weight: 900;
+  text-align: center;
+  letter-spacing: -0.04em;
+}
+
+/* ------------------------------------------------ */
+/* Chat button                                      */
+/* ------------------------------------------------ */
+
+.chatButton {
+  position: absolute;
+  z-index: 40;
+  right: 38px;
+  bottom: 37px;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  color: #17130c;
+  border-radius: 50%;
+  background: linear-gradient(180deg, #f2ca7e, #dda44c);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
+  transition: transform 180ms ease;
+}
+
+.chatButton:hover {
+  transform: translateY(-3px);
+}
+
+/* ------------------------------------------------ */
+/* Responsive                                       */
+/* ------------------------------------------------ */
+
+@media (max-width: 1280px) {
+  .headerContent,
+  .featureStripContent,
+  .heroContent {
+    width: min(1180px, calc(100% - 40px));
+  }
+
+  .headerContent {
+    grid-template-columns: 210px 1fr auto;
+    gap: 18px;
+  }
+
+  .navigation {
+    gap: 20px;
+  }
+
+  .requestDemoButton {
+    min-width: 145px;
+  }
+
+  .heroContent {
+    grid-template-columns: 0.88fr 1.12fr;
+  }
+
+  .heroCopy h1 {
+    font-size: clamp(60px, 5.5vw, 79px);
+  }
+
+  .partnerBar {
+    width: calc(100% - 80px);
+  }
+}
+
+@media (max-width: 1050px) {
+  .header {
+    height: auto;
+  }
+
+  .headerContent {
+    min-height: 76px;
+    grid-template-columns: 1fr auto;
+  }
+
+  .navigation {
+    display: none;
+  }
+
+  .featureStripContent {
+    padding: 14px 0;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .systemStatus {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .platformFeature:nth-child(even) .featureDivider {
+    display: none;
+  }
+
+  .heroContent {
+    padding-top: 54px;
+    padding-bottom: 150px;
+    grid-template-columns: 1fr;
+  }
+
+  .heroCopy {
+    max-width: 720px;
+  }
+
+  .backgroundScene {
+    display: none;
+  }
+
+  .heroVisual {
+    min-height: 0;
+    margin-top: 30px;
+  }
+
+  .heroVisual img {
+    display: block;
+  }
+
+  .partnerBar {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: calc(100% - 40px);
+    margin: -105px auto 18px;
+    padding: 22px;
+    transform: none;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .partnerHeading {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .headerContent,
+  .heroContent {
+    width: calc(100% - 28px);
+  }
+
+  .brandName {
+    font-size: 20px;
+  }
+
+  .brandTagline {
+    font-size: 5.8px;
+  }
+
+  .signInButton {
+    display: none;
+  }
+
+  .requestDemoButton {
+    min-width: 130px;
+    height: 43px;
+    font-size: 13px;
+  }
+
+  .featureStrip {
+    display: none;
+  }
+
+  .backgroundPattern {
+    inset: 76px 0 0;
+  }
+
+  .heroContent {
+    min-height: auto;
+    padding: 56px 0 130px;
+  }
+
+  .eyebrow {
+    margin-bottom: 23px;
+    font-size: 9px;
+    line-height: 1.35;
+    letter-spacing: 0.13em;
+  }
+
+  .heroCopy h1 {
+    font-size: clamp(49px, 16vw, 70px);
+  }
+
+  .heroCopy > p {
+    font-size: 15px;
+  }
+
+  .heroActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+
+  .benefits {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .benefitDivider {
+    display: none;
+  }
+
+  .partnerBar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 19px;
+  }
+
+  .partnerBar > span:not(.partnerHeading) {
+    font-size: 13px;
+  }
+
+  .chatButton {
+    right: 20px;
+    bottom: 22px;
+    width: 49px;
+    height: 49px;
+  }
+}
