@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, StyleProp, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -47,9 +47,9 @@ const KIND_LABEL: Record<LiveKindLetter, string> = {
 };
 
 type AlarmLevel = 'critical' | 'warning' | 'normal';
-type Tone = 'critical' | 'warning' | 'live' | 'info' | 'muted';
+export type Tone = 'critical' | 'warning' | 'live' | 'info' | 'muted';
 type SampleMap = Record<string, number>;
-type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
+export type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 type SignalValue = {
   mapped: MappedChannel;
@@ -58,7 +58,7 @@ type SignalValue = {
   position: number;
 };
 
-type Finding = {
+export type Finding = {
   title: string;
   urgency: 'Critical' | 'High' | 'Medium' | 'Low';
   confidence: number;
@@ -95,7 +95,7 @@ type MachineAnalysis = {
   topChannels: SignalValue[];
 };
 
-const TONE_COLOUR: Record<Tone, string> = {
+export const TONE_COLOUR: Record<Tone, string> = {
   critical: CRITICAL_COLOUR,
   warning: WARNING_COLOUR,
   live: LIVE_COLOUR,
@@ -491,7 +491,15 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
 
 // --- presentation ----------------------------------------------------------
 
-function Panel({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Panel({
+  children,
+  className,
+  style,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  style?: StyleProp<ViewStyle>;
+}) {
   const { isDark } = useAppTheme();
   return (
     <View
@@ -500,13 +508,14 @@ function Panel({ children, className }: { children: React.ReactNode; className?:
         isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel',
         className,
       )}
+      style={style}
     >
       {children}
     </View>
   );
 }
 
-function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
+export function SectionTitle({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   return (
@@ -523,7 +532,7 @@ function SectionTitle({ title, action, onAction }: { title: string; action?: str
   );
 }
 
-function StatusPanel({
+export function StatusPanel({
   title,
   value,
   detail,
@@ -787,7 +796,7 @@ function SampleCollector({ mapped, onSample }: { mapped: MappedChannel; onSample
   return null;
 }
 
-function BulletList({ title, items, tone, emptyLabel }: { title: string; items: string[]; tone: Tone; emptyLabel: string }) {
+export function BulletList({ title, items, tone, emptyLabel }: { title: string; items: string[]; tone: Tone; emptyLabel: string }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
@@ -819,7 +828,7 @@ function BulletList({ title, items, tone, emptyLabel }: { title: string; items: 
   );
 }
 
-function FindingPanel({ finding }: { finding: Finding }) {
+export function FindingPanel({ finding }: { finding: Finding }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
@@ -855,7 +864,7 @@ function FindingPanel({ finding }: { finding: Finding }) {
   );
 }
 
-function DeepAnalyzerPanel({ analysis }: { analysis: RotaryAirlockAnalysisResult }) {
+export function DeepAnalyzerPanel({ analysis }: { analysis: RotaryAirlockAnalysisResult }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
