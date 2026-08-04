@@ -169,7 +169,7 @@
   background-image: url('/images/ultron-hero-console.png');
   background-repeat: no-repeat;
   background-size: contain;
-  background-position: right center;
+  background-position: right top;
   /* Neutral grade only — the render keeps its own lighting, no colour wash. */
   filter: contrast(1.04);
 }
@@ -218,7 +218,7 @@
   width: min(1540px, calc(100% - 64px));
   min-height: 650px;
   margin: 0 auto;
-  padding: 64px 0 112px;
+  padding: 36px 0 112px;
   display: grid;
   grid-template-columns: minmax(510px, 0.85fr) minmax(650px, 1.15fr);
   align-items: center;
@@ -466,30 +466,6 @@
 }
 
 /* ------------------------------------------------ */
-/* Chat button                                      */
-/* ------------------------------------------------ */
-
-.chatButton {
-  position: absolute;
-  z-index: 40;
-  right: 38px;
-  bottom: 37px;
-  width: 56px;
-  height: 56px;
-  display: grid;
-  place-items: center;
-  color: #17130c;
-  border-radius: 50%;
-  background: linear-gradient(180deg, #f2ca7e, #dda44c);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
-  transition: transform 180ms ease;
-}
-
-.chatButton:hover {
-  transform: translateY(-3px);
-}
-
-/* ------------------------------------------------ */
 /* Responsive                                       */
 /* ------------------------------------------------ */
 
@@ -536,7 +512,7 @@
   }
 
   .heroContent {
-    padding-top: 54px;
+    padding-top: 36px;
     padding-bottom: 150px;
     grid-template-columns: 1fr;
   }
@@ -599,7 +575,7 @@
 
   .heroContent {
     min-height: auto;
-    padding: 56px 0 130px;
+    padding: 40px 0 130px;
   }
 
   .eyebrow {
@@ -651,10 +627,4 @@
     height: 20px;
   }
 
-  .chatButton {
-    right: 20px;
-    bottom: 22px;
-    width: 49px;
-    height: 49px;
-  }
 }

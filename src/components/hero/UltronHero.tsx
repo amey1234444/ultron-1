@@ -13,8 +13,7 @@ type IconName =
   | 'cloud'
   | 'clock'
   | 'shield'
-  | 'chart'
-  | 'chat';
+  | 'chart';
 
 type NavItem = {
   label: string;
@@ -211,12 +210,6 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
           <path d="m9.5 12.5 2.5 2.5 2.5-2.5" />
         </svg>
       );
-    case 'chat':
-      return (
-        <svg {...properties}>
-          <path d="M20 14.5A2.5 2.5 0 0 1 17.5 17H8l-4 3.5V6.5A2.5 2.5 0 0 1 6.5 4h11A2.5 2.5 0 0 1 20 6.5Z" />
-        </svg>
-      );
   }
 }
 
@@ -332,10 +325,6 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
           </span>
         ))}
       </div>
-
-      <a href="#contact" className={styles.chatButton} aria-label="Talk to us">
-        <Icon name="chat" size={24} />
-      </a>
     </section>
   );
 }
