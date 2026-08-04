@@ -1,0 +1,1263 @@
+.hero {
+  --background: #050b11;
+  --gold: #e5b25f;
+  --gold-light: #f2ce88;
+  --text: #f5f4f0;
+  --muted: #a7adb2;
+  --gold-border: rgba(225, 171, 84, 0.36);
+  --soft-border: rgba(255, 255, 255, 0.08);
+
+  position: relative;
+  min-height: 100svh;
+  overflow: hidden;
+  isolation: isolate;
+  color: var(--text);
+  background: var(--background);
+}
+
+/* ------------------------------------------------ */
+/* Header                                           */
+/* ------------------------------------------------ */
+
+.header {
+  position: relative;
+  z-index: 30;
+  height: 82px;
+  border-bottom: 1px solid var(--gold-border);
+  background:
+    linear-gradient(
+      180deg,
+      rgba(8, 14, 19, 0.99),
+      rgba(5, 10, 15, 0.96)
+    );
+  backdrop-filter: blur(18px);
+}
+
+.headerContent {
+  width: min(1540px, calc(100% - 64px));
+  height: 100%;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 255px 1fr auto;
+  align-items: center;
+  gap: 36px;
+}
+
+/* Text-only ULTRON logo. No gold U emblem. */
+
+.brand {
+  width: max-content;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: white;
+  text-decoration: none;
+}
+
+.brandName {
+  font-size: 25px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.31em;
+}
+
+.brandTagline {
+  color: #bfc3c3;
+  font-size: 7px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+.navigation {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(22px, 2.4vw, 46px);
+}
+
+.navigationLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #efefec;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  transition:
+    color 180ms ease,
+    transform 180ms ease;
+}
+
+.navigationLink:hover {
+  color: var(--gold-light);
+  transform: translateY(-1px);
+}
+
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.themeButton,
+.signInButton,
+.requestDemoButton {
+  height: 47px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.themeButton {
+  width: 47px;
+  padding: 0;
+  color: #e7e9e7;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.signInButton {
+  min-width: 112px;
+  color: white;
+  border: 1px solid rgba(224, 169, 79, 0.74);
+  background: rgba(6, 11, 16, 0.6);
+}
+
+.requestDemoButton {
+  min-width: 172px;
+  gap: 12px;
+  color: #17130c;
+  background:
+    linear-gradient(
+      180deg,
+      #f4d28f 0%,
+      #dfa952 100%
+    );
+  box-shadow:
+    0 12px 35px rgba(212, 152, 60, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+}
+
+/* ------------------------------------------------ */
+/* Feature strip                                    */
+/* ------------------------------------------------ */
+
+.featureStrip {
+  position: relative;
+  z-index: 25;
+  min-height: 76px;
+  border-bottom: 1px solid var(--gold-border);
+  background:
+    linear-gradient(
+      90deg,
+      rgba(13, 20, 26, 0.97),
+      rgba(14, 19, 24, 0.9),
+      rgba(11, 17, 22, 0.97)
+    );
+  backdrop-filter: blur(16px);
+}
+
+.featureStripContent {
+  width: min(1540px, calc(100% - 64px));
+  min-height: 76px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(170px, 1fr))
+    auto;
+  align-items: center;
+  gap: 22px;
+}
+
+.platformFeature {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 13px;
+}
+
+.platformFeatureIcon {
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+}
+
+.platformFeatureText strong,
+.platformFeatureText small {
+  display: block;
+}
+
+.platformFeatureText strong {
+  margin-bottom: 3px;
+  font-size: 14px;
+  line-height: 1.1;
+}
+
+.platformFeatureText small {
+  color: #9da4aa;
+  font-size: 12px;
+}
+
+.featureDivider {
+  width: 1px;
+  height: 38px;
+  margin-left: auto;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.systemStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+  padding: 11px 18px;
+  color: #d4d8d8;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 13px;
+}
+
+.systemStatusDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #4ae17c;
+  box-shadow: 0 0 14px rgba(74, 225, 124, 0.7);
+}
+
+/* ------------------------------------------------ */
+/* Background                                       */
+/* ------------------------------------------------ */
+
+.backgroundImage {
+  position: absolute;
+  z-index: -5;
+  inset: 158px 0 0;
+
+  background-image:
+    linear-gradient(
+      90deg,
+      rgba(2, 8, 13, 0.96) 0%,
+      rgba(2, 8, 13, 0.82) 35%,
+      rgba(2, 8, 13, 0.37) 68%,
+      rgba(2, 8, 13, 0.54) 100%
+    ),
+    linear-gradient(
+      180deg,
+      rgba(4, 10, 15, 0.1) 0%,
+      rgba(3, 8, 12, 0.3) 58%,
+      rgba(3, 8, 12, 0.86) 100%
+    ),
+    url("/images/ultron-hero-bg.png");
+
+  background-size: cover;
+  background-position: center;
+  filter: saturate(0.78) contrast(1.08);
+}
+
+.backgroundPattern {
+  position: absolute;
+  z-index: -3;
+  inset: 158px 0 0;
+  pointer-events: none;
+  opacity: 0.14;
+  background-image:
+    radial-gradient(
+      circle at 18% 22%,
+      rgba(227, 170, 78, 0.36) 0 1px,
+      transparent 1.6px
+    ),
+    radial-gradient(
+      circle at 74% 66%,
+      rgba(227, 170, 78, 0.22) 0 1px,
+      transparent 1.4px
+    );
+  background-size:
+    130px 130px,
+    190px 190px;
+}
+
+/* ------------------------------------------------ */
+/* Hero content                                     */
+/* ------------------------------------------------ */
+
+.heroContent {
+  width: min(1540px, calc(100% - 64px));
+  min-height: 650px;
+  margin: 0 auto;
+  padding: 64px 0 112px;
+  display: grid;
+  grid-template-columns:
+    minmax(510px, 0.85fr)
+    minmax(650px, 1.15fr);
+  align-items: center;
+  gap: 18px;
+}
+
+.heroCopy {
+  position: relative;
+  z-index: 8;
+  max-width: 670px;
+}
+
+.eyebrow {
+  width: max-content;
+  max-width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin-bottom: 31px;
+  padding: 10px 17px;
+  color: var(--gold-light);
+  border: 1px solid var(--gold-border);
+  border-radius: 999px;
+  background: rgba(7, 13, 17, 0.6);
+  font-family: "Courier New", monospace;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.eyebrowDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 13px rgba(229, 180, 94, 0.92);
+}
+
+.eyebrowSeparator {
+  opacity: 0.8;
+}
+
+.heroCopy h1 {
+  max-width: 660px;
+  margin: 0;
+  color: #f8f8f5;
+  font-family:
+    Impact,
+    Haettenschweiler,
+    "Arial Narrow Bold",
+    sans-serif;
+  font-size: clamp(68px, 5vw, 96px);
+  font-weight: 900;
+  line-height: 0.98;
+  letter-spacing: 0.012em;
+  text-transform: uppercase;
+  text-shadow: 0 5px 28px rgba(0, 0, 0, 0.34);
+}
+
+.heroCopy h1 span {
+  display: block;
+  margin-top: 15px;
+  color: transparent;
+  background:
+    linear-gradient(
+      180deg,
+      #f2cc82 0%,
+      #d69b43 100%
+    );
+  background-clip: text;
+  -webkit-background-clip: text;
+}
+
+.headingDecoration {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 68px;
+  height: 10px;
+  margin: 25px 0 20px;
+}
+
+.headingDecoration::before {
+  content: "";
+  width: 51px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--gold);
+}
+
+.headingDecoration span {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--gold);
+}
+
+.heroCopy > p {
+  max-width: 590px;
+  margin: 0;
+  color: #c4c7c9;
+  font-size: 18px;
+  line-height: 1.62;
+}
+
+.heroActions {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  margin-top: 25px;
+}
+
+.primaryButton,
+.secondaryButton {
+  height: 58px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.primaryButton {
+  min-width: 205px;
+  color: #18130c;
+  background:
+    linear-gradient(
+      180deg,
+      #f5d38f,
+      #dda64e
+    );
+  box-shadow: 0 14px 35px rgba(211, 150, 55, 0.21);
+}
+
+.secondaryButton {
+  min-width: 178px;
+  color: #f1f2ef;
+  border: 1px solid rgba(225, 167, 75, 0.72);
+  background: rgba(5, 10, 15, 0.58);
+}
+
+.benefits {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  margin-top: 31px;
+}
+
+.benefit {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  color: var(--gold-light);
+}
+
+.benefit strong,
+.benefit small {
+  display: block;
+  white-space: nowrap;
+}
+
+.benefit strong {
+  color: #e7e7e4;
+  font-size: 12px;
+}
+
+.benefit small {
+  margin-top: 3px;
+  color: #949ba0;
+  font-size: 10px;
+}
+
+.benefitDivider {
+  width: 1px;
+  height: 37px;
+  margin-left: 4px;
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ------------------------------------------------ */
+/* Dashboard presentation                           */
+/* ------------------------------------------------ */
+
+.dashboardPresentation {
+  position: relative;
+  z-index: 7;
+  min-height: 570px;
+  perspective: 1700px;
+  transform: translateX(22px);
+}
+
+.dashboardGlow {
+  position: absolute;
+  top: 18%;
+  right: 7%;
+  width: 72%;
+  height: 50%;
+  border-radius: 50%;
+  background: rgba(197, 142, 54, 0.14);
+  filter: blur(80px);
+}
+
+.dashboardScreen {
+  position: absolute;
+  z-index: 5;
+  top: 15px;
+  right: 2px;
+  width: min(720px, 92%);
+  min-height: 432px;
+  padding: 20px;
+  border: 1px solid rgba(210, 215, 220, 0.28);
+  border-radius: 23px;
+  background:
+    linear-gradient(
+      155deg,
+      rgba(13, 20, 27, 0.98),
+      rgba(5, 9, 13, 0.99)
+    );
+  box-shadow:
+    0 40px 80px rgba(0, 0, 0, 0.58),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transform:
+    rotateY(-8deg)
+    rotateX(1deg)
+    rotateZ(-1deg);
+  transform-origin: center;
+}
+
+.dashboardToolbar,
+.dashboardTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dashboardToolbar {
+  height: 31px;
+  padding-bottom: 11px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.dashboardLogo {
+  color: #f4f1e9;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.22em;
+}
+
+.dashboardIcons {
+  display: flex;
+  align-items: center;
+  gap: 17px;
+  color: #a5a9aa;
+}
+
+.dashboardTitleRow {
+  margin: 16px 0 14px;
+}
+
+.dashboardTitleRow h2 {
+  margin: 0;
+  color: #f0f0ec;
+  font-size: 14px;
+}
+
+.dashboardTitleRow button {
+  height: 33px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 11px;
+  color: #aeb2b3;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.metricsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 11px;
+}
+
+.metricCard {
+  min-height: 91px;
+  padding: 14px 13px 11px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 10px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(19, 27, 34, 0.95),
+      rgba(10, 15, 20, 0.95)
+    );
+}
+
+.metricLabel {
+  display: block;
+  color: #a3a8aa;
+  font-size: 10px;
+}
+
+.metricCard strong {
+  display: block;
+  margin: 8px 0 4px;
+  color: #f1eee7;
+  font-size: 25px;
+  line-height: 1;
+}
+
+.metricStatusHealthy,
+.metricStatusCritical {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+}
+
+.metricStatusHealthy {
+  color: #59d77b;
+}
+
+.metricStatusCritical {
+  color: #ff635e;
+}
+
+.dashboardCharts {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: 1.12fr 0.88fr;
+  gap: 12px;
+}
+
+.chartPanel,
+.mapPanel {
+  min-height: 210px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 11px;
+  background:
+    linear-gradient(
+      145deg,
+      rgba(15, 22, 28, 0.97),
+      rgba(8, 13, 18, 0.97)
+    );
+}
+
+.panelHeading {
+  margin-bottom: 10px;
+  color: #bec1c1;
+  font-size: 11px;
+}
+
+.healthChart {
+  position: relative;
+  height: 158px;
+  overflow: hidden;
+}
+
+.chartGrid {
+  position: absolute;
+  inset: 3px 0 20px;
+  background-image:
+    linear-gradient(
+      rgba(255, 255, 255, 0.055) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px
+    );
+  background-size:
+    100% 34px,
+    68px 100%;
+}
+
+.healthChart svg {
+  position: absolute;
+  inset: 4px 0 20px;
+  width: 100%;
+  height: calc(100% - 24px);
+  overflow: visible;
+}
+
+.healthArea {
+  fill: url("#health-area");
+}
+
+.healthLine {
+  fill: none;
+  stroke: #e9b660;
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 5px rgba(233, 182, 96, 0.5));
+}
+
+.healthPoint {
+  fill: #f5cf82;
+  filter: drop-shadow(0 0 7px #eab55e);
+}
+
+.chartTimes {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  justify-content: space-between;
+  color: #6f777c;
+  font-size: 7px;
+}
+
+.machineMap {
+  position: relative;
+  height: 158px;
+  overflow: hidden;
+  border-radius: 7px;
+  background:
+    radial-gradient(
+      circle at center,
+      rgba(118, 127, 132, 0.09),
+      transparent 58%
+    ),
+    #0a0f14;
+  transform: perspective(500px) rotateX(42deg);
+}
+
+.machineMapGrid {
+  position: absolute;
+  inset: -20%;
+  background-image:
+    linear-gradient(
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.05) 1px,
+      transparent 1px
+    );
+  background-size: 28px 28px;
+  transform: rotate(8deg);
+}
+
+.mapNode {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+}
+
+.nodeOne {
+  left: 27%;
+  top: 52%;
+}
+
+.nodeTwo {
+  left: 45%;
+  top: 30%;
+}
+
+.nodeThree {
+  left: 60%;
+  top: 47%;
+}
+
+.nodeFour {
+  left: 72%;
+  top: 64%;
+}
+
+.nodeFive {
+  left: 82%;
+  top: 29%;
+}
+
+.nodeHealthy {
+  background: #40d06c;
+  box-shadow: 0 0 15px #40d06c;
+}
+
+.nodeWarning {
+  background: #eca936;
+  box-shadow: 0 0 15px #eca936;
+}
+
+.nodeCritical {
+  background: #ff514a;
+  box-shadow: 0 0 15px #ff514a;
+}
+
+/* ------------------------------------------------ */
+/* CSS-generated industrial machinery               */
+/* ------------------------------------------------ */
+
+.machineryPlatform {
+  position: absolute;
+  z-index: 8;
+  right: -20px;
+  bottom: 7px;
+  width: 750px;
+  height: 205px;
+  filter: drop-shadow(0 30px 24px rgba(0, 0, 0, 0.7));
+  transform:
+    perspective(900px)
+    rotateX(56deg)
+    rotateZ(-2deg);
+}
+
+.platformBase {
+  position: absolute;
+  inset: 30px 0 10px;
+  border: 2px solid rgba(222, 164, 71, 0.83);
+  clip-path:
+    polygon(
+      13% 0,
+      92% 0,
+      100% 58%,
+      85% 100%,
+      6% 100%,
+      0 45%
+    );
+  background:
+    linear-gradient(
+      180deg,
+      rgba(28, 31, 31, 0.98),
+      rgba(5, 8, 10, 0.98)
+    );
+  box-shadow:
+    inset 0 0 28px rgba(227, 171, 82, 0.08),
+    0 0 24px rgba(228, 171, 78, 0.12);
+}
+
+.motor {
+  position: absolute;
+  z-index: 2;
+  bottom: 58px;
+  width: 148px;
+  height: 76px;
+  border: 1px solid rgba(190, 154, 96, 0.42);
+  border-radius: 20px 23px 13px 13px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #161b1e 0 8px,
+      #20272a 8px 13px
+    );
+  box-shadow:
+    inset 0 11px 12px rgba(255, 255, 255, 0.035),
+    0 15px 18px rgba(0, 0, 0, 0.45);
+}
+
+.motor::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  right: -20px;
+  width: 58px;
+  height: 70px;
+  border: 1px solid rgba(200, 164, 101, 0.42);
+  border-radius: 50%;
+  background:
+    radial-gradient(
+      circle,
+      #333b3d 0 20%,
+      #151a1d 21% 58%,
+      #090c0e 59%
+    );
+}
+
+.motor::after {
+  content: "";
+  position: absolute;
+  top: -33px;
+  left: 12px;
+  width: 25px;
+  height: 38px;
+  border-radius: 7px 7px 2px 2px;
+  background:
+    linear-gradient(
+      90deg,
+      #12171a,
+      #343b3d,
+      #15191c
+    );
+}
+
+.motor span {
+  position: absolute;
+  left: 17px;
+  width: 78px;
+  height: 5px;
+  border-radius: 5px;
+  background: #080b0d;
+}
+
+.motor span:nth-child(1) {
+  top: 18px;
+}
+
+.motor span:nth-child(2) {
+  top: 35px;
+}
+
+.motor span:nth-child(3) {
+  top: 52px;
+}
+
+.motorOne {
+  left: 85px;
+}
+
+.motorTwo {
+  left: 315px;
+  transform: scale(1.08);
+}
+
+.motorThree {
+  right: 80px;
+  transform: scale(0.9);
+}
+
+.platformPipe {
+  position: absolute;
+  z-index: 4;
+  top: 40px;
+  right: 95px;
+  width: 280px;
+  height: 22px;
+  border: 1px solid rgba(186, 146, 88, 0.42);
+  border-radius: 999px;
+  background:
+    linear-gradient(
+      180deg,
+      #242b2d,
+      #090d0f
+    );
+}
+
+/* ------------------------------------------------ */
+/* Partners                                         */
+/* ------------------------------------------------ */
+
+.partnerBar {
+  position: absolute;
+  z-index: 20;
+  left: 50%;
+  bottom: 18px;
+  width: min(1380px, calc(100% - 180px));
+  min-height: 79px;
+  padding: 0 28px;
+  transform: translateX(-50%);
+  display: grid;
+  grid-template-columns: 230px repeat(6, 1fr);
+  align-items: center;
+  gap: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.055);
+  border-radius: 17px;
+  background: rgba(10, 16, 21, 0.88);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(16px);
+}
+
+.partnerHeading {
+  color: #b0b0ad;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+}
+
+.partnerBar > span:not(.partnerHeading) {
+  color: #91979a;
+  font-size: 17px;
+  font-weight: 900;
+  text-align: center;
+  letter-spacing: -0.04em;
+}
+
+/* ------------------------------------------------ */
+/* Chat button                                      */
+/* ------------------------------------------------ */
+
+.chatButton {
+  position: absolute;
+  z-index: 40;
+  right: 38px;
+  bottom: 37px;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background:
+    linear-gradient(
+      180deg,
+      #f2ca7e,
+      #dda44c
+    );
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.34);
+}
+
+.chatButton span {
+  position: absolute;
+  top: 18px;
+  left: 18px;
+  width: 21px;
+  height: 16px;
+  border-radius: 4px;
+  background: white;
+}
+
+.chatButton span::after {
+  content: "";
+  position: absolute;
+  bottom: -4px;
+  left: 3px;
+  width: 6px;
+  height: 6px;
+  background: white;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+/* ------------------------------------------------ */
+/* Responsive                                       */
+/* ------------------------------------------------ */
+
+@media (max-width: 1280px) {
+  .headerContent,
+  .featureStripContent,
+  .heroContent {
+    width: min(1180px, calc(100% - 40px));
+  }
+
+  .headerContent {
+    grid-template-columns: 210px 1fr auto;
+    gap: 18px;
+  }
+
+  .navigation {
+    gap: 20px;
+  }
+
+  .requestDemoButton {
+    min-width: 145px;
+  }
+
+  .heroContent {
+    grid-template-columns: 0.88fr 1.12fr;
+  }
+
+  .heroCopy h1 {
+    font-size: clamp(60px, 5.5vw, 79px);
+  }
+
+  .dashboardPresentation {
+    transform: none;
+  }
+
+  .machineryPlatform {
+    width: 650px;
+  }
+
+  .partnerBar {
+    width: calc(100% - 80px);
+  }
+}
+
+@media (max-width: 1050px) {
+  .header {
+    height: auto;
+  }
+
+  .headerContent {
+    min-height: 76px;
+    grid-template-columns: 1fr auto;
+  }
+
+  .navigation {
+    display: none;
+  }
+
+  .featureStripContent {
+    padding: 14px 0;
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .systemStatus {
+    grid-column: 1 / -1;
+    justify-self: center;
+  }
+
+  .platformFeature:nth-child(even) .featureDivider {
+    display: none;
+  }
+
+  .heroContent {
+    padding-top: 54px;
+    padding-bottom: 150px;
+    grid-template-columns: 1fr;
+  }
+
+  .heroCopy {
+    max-width: 720px;
+  }
+
+  .dashboardPresentation {
+    min-height: 610px;
+    margin-top: 22px;
+  }
+
+  .dashboardScreen {
+    right: auto;
+    left: 50%;
+    width: min(760px, 96%);
+    transform:
+      translateX(-50%)
+      rotateY(-5deg);
+  }
+
+  .machineryPlatform {
+    right: auto;
+    left: 50%;
+    transform:
+      translateX(-50%)
+      perspective(900px)
+      rotateX(56deg)
+      rotateZ(-2deg);
+  }
+
+  .partnerBar {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    width: calc(100% - 40px);
+    margin: -105px auto 18px;
+    padding: 22px;
+    transform: none;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .partnerHeading {
+    grid-column: 1 / -1;
+    text-align: center;
+  }
+}
+
+@media (max-width: 720px) {
+  .headerContent,
+  .heroContent {
+    width: calc(100% - 28px);
+  }
+
+  .brandName {
+    font-size: 20px;
+  }
+
+  .brandTagline {
+    font-size: 5.8px;
+  }
+
+  .themeButton,
+  .signInButton {
+    display: none;
+  }
+
+  .requestDemoButton {
+    min-width: 130px;
+    height: 43px;
+    font-size: 13px;
+  }
+
+  .featureStrip {
+    display: none;
+  }
+
+  .backgroundImage,
+  .backgroundPattern {
+    inset: 76px 0 0;
+  }
+
+  .heroContent {
+    min-height: auto;
+    padding: 56px 0 130px;
+  }
+
+  .eyebrow {
+    margin-bottom: 23px;
+    font-size: 9px;
+    line-height: 1.35;
+    letter-spacing: 0.13em;
+  }
+
+  .heroCopy h1 {
+    font-size: clamp(49px, 16vw, 70px);
+  }
+
+  .heroCopy > p {
+    font-size: 15px;
+  }
+
+  .heroActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .primaryButton,
+  .secondaryButton {
+    width: 100%;
+  }
+
+  .benefits {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .benefitDivider {
+    display: none;
+  }
+
+  .dashboardPresentation {
+    min-height: 460px;
+  }
+
+  .dashboardScreen {
+    top: 35px;
+    left: 15px;
+    width: 720px;
+    transform: scale(0.58);
+    transform-origin: top left;
+  }
+
+  .machineryPlatform {
+    bottom: -11px;
+    left: -50px;
+    width: 690px;
+    transform:
+      scale(0.61)
+      perspective(900px)
+      rotateX(56deg);
+    transform-origin: left bottom;
+  }
+
+  .partnerBar {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 19px;
+  }
+
+  .partnerBar > span:not(.partnerHeading) {
+    font-size: 13px;
+  }
+
+  .chatButton {
+    right: 20px;
+    bottom: 22px;
+    width: 49px;
+    height: 49px;
+  }
+
+  .chatButton span {
+    top: 15px;
+    left: 14px;
+  }
+}
