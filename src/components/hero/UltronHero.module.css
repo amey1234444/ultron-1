@@ -21,10 +21,10 @@
 .header {
   position: relative;
   z-index: 30;
-  height: 82px;
+  height: 62px;
   border-bottom: 1px solid var(--gold-border);
-  background: linear-gradient(180deg, rgba(8, 14, 19, 0.99), rgba(5, 10, 15, 0.96));
-  backdrop-filter: blur(18px);
+  background: rgba(5, 10, 15, 0.94);
+  backdrop-filter: blur(14px);
 }
 
 .headerContent {
@@ -32,9 +32,9 @@
   height: 100%;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 255px 1fr auto;
+  grid-template-columns: 210px 1fr auto;
   align-items: center;
-  gap: 36px;
+  gap: 24px;
 }
 
 .brand {
@@ -50,7 +50,7 @@
    display face, wide tracking, no emblem. */
 .brandName {
   font-family: 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
-  font-size: 26px;
+  font-size: 23px;
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0.28em;
@@ -60,7 +60,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(18px, 2.1vw, 40px);
+  gap: clamp(16px, 1.7vw, 30px);
 }
 
 .navigationItem {
@@ -71,10 +71,10 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 6px 0;
+  padding: 4px 0;
   color: #efefec;
-  font-size: 15px;
-  font-weight: 600;
+  font-size: 14px;
+  font-weight: 500;
   text-decoration: none;
   transition: color 180ms ease;
 }
@@ -128,23 +128,19 @@
 .headerActions {
   display: flex;
   align-items: center;
-  gap: 14px;
-}
-
-.signInButton,
-.requestDemoButton {
-  height: 47px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 12px;
-  font-weight: 700;
-  text-decoration: none;
-  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
 .signInButton {
-  min-width: 112px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
+  min-width: 92px;
   color: #fff;
   border: 1px solid rgba(224, 169, 79, 0.74);
   background: rgba(6, 11, 16, 0.6);
@@ -154,99 +150,9 @@
   background: rgba(224, 169, 79, 0.12);
 }
 
-.requestDemoButton {
-  min-width: 172px;
-  gap: 12px;
-  color: #17130c;
-  background: linear-gradient(180deg, #f4d28f 0%, #dfa952 100%);
-  box-shadow: 0 12px 35px rgba(212, 152, 60, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-.requestDemoButton:hover,
 .primaryButton:hover {
   transform: translateY(-2px);
   box-shadow: 0 18px 44px rgba(212, 152, 60, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-}
-
-/* ------------------------------------------------ */
-/* Feature strip                                    */
-/* ------------------------------------------------ */
-
-.featureStrip {
-  position: relative;
-  z-index: 25;
-  min-height: 76px;
-  border-bottom: 1px solid var(--gold-border);
-  background: linear-gradient(90deg, rgba(13, 20, 26, 0.97), rgba(14, 19, 24, 0.9), rgba(11, 17, 22, 0.97));
-  backdrop-filter: blur(16px);
-}
-
-.featureStripContent {
-  width: min(1540px, calc(100% - 64px));
-  min-height: 76px;
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: repeat(4, minmax(170px, 1fr)) auto;
-  align-items: center;
-  gap: 22px;
-}
-
-.platformFeature {
-  min-width: 0;
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 13px;
-}
-
-.platformFeatureIcon {
-  display: grid;
-  place-items: center;
-  color: var(--gold);
-}
-
-.platformFeatureText strong,
-.platformFeatureText small {
-  display: block;
-}
-
-.platformFeatureText strong {
-  margin-bottom: 3px;
-  font-size: 14px;
-  line-height: 1.1;
-}
-
-.platformFeatureText small {
-  color: #9da4aa;
-  font-size: 12px;
-}
-
-.featureDivider {
-  width: 1px;
-  height: 38px;
-  margin-left: auto;
-  background: rgba(255, 255, 255, 0.12);
-}
-
-.systemStatus {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-  padding: 11px 18px;
-  color: #d4d8d8;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.025);
-  font-size: 13px;
-}
-
-.systemStatusDot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: #4ae17c;
-  box-shadow: 0 0 14px rgba(74, 225, 124, 0.7);
 }
 
 /* ------------------------------------------------ */
@@ -256,7 +162,7 @@
 .backgroundScene {
   position: absolute;
   z-index: -5;
-  inset: 158px 0 0;
+  inset: 62px 0 0;
   /* `contain` + right anchoring keeps the whole platform scene in frame at any
      viewport ratio; the render's own edges are near-black, so it melts into the
      hero background instead of showing a seam. */
@@ -273,7 +179,7 @@
 .backgroundGrade {
   position: absolute;
   z-index: -4;
-  inset: 158px 0 0;
+  inset: 62px 0 0;
   pointer-events: none;
   background: linear-gradient(180deg, rgba(7, 8, 11, 0.34) 0%, rgba(7, 8, 11, 0) 26%, rgba(6, 7, 10, 0.52) 100%);
 }
@@ -296,7 +202,7 @@
 .backgroundPattern {
   position: absolute;
   z-index: -3;
-  inset: 158px 0 0;
+  inset: 62px 0 0;
   pointer-events: none;
   opacity: 0.1;
   background-image: radial-gradient(circle at 18% 22%, rgba(227, 170, 78, 0.36) 0 1px, transparent 1.6px),
@@ -589,22 +495,17 @@
 
 @media (max-width: 1280px) {
   .headerContent,
-  .featureStripContent,
   .heroContent {
     width: min(1180px, calc(100% - 40px));
   }
 
   .headerContent {
-    grid-template-columns: 210px 1fr auto;
+    grid-template-columns: 190px 1fr auto;
     gap: 18px;
   }
 
   .navigation {
     gap: 20px;
-  }
-
-  .requestDemoButton {
-    min-width: 145px;
   }
 
   .heroContent {
@@ -626,25 +527,11 @@
   }
 
   .headerContent {
-    min-height: 76px;
+    min-height: 62px;
     grid-template-columns: 1fr auto;
   }
 
   .navigation {
-    display: none;
-  }
-
-  .featureStripContent {
-    padding: 14px 0;
-    grid-template-columns: repeat(2, 1fr);
-  }
-
-  .systemStatus {
-    grid-column: 1 / -1;
-    justify-self: center;
-  }
-
-  .platformFeature:nth-child(even) .featureDivider {
     display: none;
   }
 
@@ -701,21 +588,13 @@
   }
 
   .signInButton {
-    display: none;
-  }
-
-  .requestDemoButton {
-    min-width: 130px;
-    height: 43px;
+    min-width: 78px;
+    height: 34px;
     font-size: 13px;
   }
 
-  .featureStrip {
-    display: none;
-  }
-
   .backgroundPattern {
-    inset: 76px 0 0;
+    inset: 62px 0 0;
   }
 
   .heroContent {

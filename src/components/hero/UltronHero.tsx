@@ -65,13 +65,6 @@ const navigation: NavItem[] = [
   { label: 'Contact', href: '#contact' },
 ];
 
-const platformFeatures: { icon: IconName; title: string; subtitle: string }[] = [
-  { icon: 'telemetry', title: 'Real-time Telemetry', subtitle: '<200ms latency' },
-  { icon: 'ai', title: 'AI-Powered Insights', subtitle: 'Predict failures early' },
-  { icon: 'cloud', title: 'Edge to Cloud', subtitle: 'Secure & Scalable' },
-  { icon: 'clock', title: '99.9% Uptime', subtitle: 'Enterprise Grade' },
-];
-
 const heroBenefits: { icon: IconName; title: string; subtitle: string }[] = [
   { icon: 'chart', title: 'AI Predictive', subtitle: 'Smart anomaly detection' },
   { icon: 'clock', title: 'Real-time Alerts', subtitle: 'Instant notifications' },
@@ -264,38 +257,9 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
             <Link href={consoleHref} className={styles.signInButton}>
               {user ? 'Console' : 'Sign in'}
             </Link>
-
-            <a href="#contact" className={styles.requestDemoButton}>
-              Request Demo
-              <Icon name="arrow" size={18} />
-            </a>
           </div>
         </div>
       </header>
-
-      <div className={styles.featureStrip}>
-        <div className={styles.featureStripContent}>
-          {platformFeatures.map((feature, index) => (
-            <div className={styles.platformFeature} key={feature.title}>
-              <span className={styles.platformFeatureIcon}>
-                <Icon name={feature.icon} size={23} />
-              </span>
-
-              <span className={styles.platformFeatureText}>
-                <strong>{feature.title}</strong>
-                <small>{feature.subtitle}</small>
-              </span>
-
-              {index < platformFeatures.length - 1 && <span className={styles.featureDivider} />}
-            </div>
-          ))}
-
-          <div className={styles.systemStatus}>
-            <span className={styles.systemStatusDot} />
-            All Systems Operational
-          </div>
-        </div>
-      </div>
 
       <div className={styles.backgroundScene} aria-hidden="true" />
       <div className={styles.backgroundGrade} aria-hidden="true" />
