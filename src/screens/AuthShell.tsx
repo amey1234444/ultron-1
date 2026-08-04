@@ -11,6 +11,7 @@ import {
   useWindowDimensions,
   View,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 
@@ -320,7 +321,7 @@ export function AuthField({
               backgroundColor: 'transparent',
               borderWidth: 0,
               outlineStyle: 'none',
-            } as unknown as ViewStyle
+            } as unknown as TextStyle
           }
           {...props}
         />

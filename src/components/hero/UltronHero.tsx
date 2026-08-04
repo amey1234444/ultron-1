@@ -1,190 +1,146 @@
-import Link from 'next/link';
-import type { ReactNode } from 'react';
-
-import { useAuth } from '../../context/AuthContext';
-import styles from './UltronHero.module.css';
+import Link from "next/link";
+import styles from "./UltronHero.module.css";
 
 type IconName =
-  | 'arrow'
-  | 'chevron'
-  | 'play'
-  | 'telemetry'
-  | 'ai'
-  | 'cloud'
-  | 'clock'
-  | 'shield'
-  | 'chart';
+  | "arrow"
+  | "chevron"
+  | "moon"
+  | "play"
+  | "telemetry"
+  | "ai"
+  | "cloud"
+  | "clock"
+  | "shield"
+  | "chart"
+  | "search"
+  | "bell"
+  | "settings";
 
-type NavItem = {
-  label: string;
-  href: string;
-  menu?: { label: string; href: string }[];
-};
-
-// Anchors resolve to the sections that already exist further down the landing
-// page; `/login` and `/` are the real auth + console routes.
-const navigation: NavItem[] = [
-  {
-    label: 'Features',
-    href: '#features',
-    menu: [
-      { label: 'Predictive maintenance', href: '#features' },
-      { label: 'Real-time trends', href: '#features' },
-      { label: 'Asset hierarchy', href: '#features' },
-    ],
-  },
-  { label: 'Dashboard', href: '#dashboard' },
-  {
-    label: 'Platform',
-    href: '#platform',
-    menu: [
-      { label: 'How it works', href: '#how-it-works' },
-      { label: 'Connectivity', href: '#platform' },
-      { label: 'Security', href: '#platform' },
-    ],
-  },
-  {
-    label: 'Industries',
-    href: '#industries',
-    menu: [
-      { label: 'Cement & mining', href: '#industries' },
-      { label: 'Power generation', href: '#industries' },
-      { label: 'Chemical & process', href: '#industries' },
-    ],
-  },
-  {
-    label: 'Resources',
-    href: '#faq',
-    menu: [
-      { label: 'FAQ', href: '#faq' },
-      { label: 'Live dashboard', href: '#dashboard' },
-      { label: 'Contact sales', href: '#contact' },
-    ],
-  },
-  { label: 'Contact', href: '#contact' },
+const navigation = [
+  { label: "Features", href: "#features", dropdown: true },
+  { label: "Dashboard", href: "#dashboard" },
+  { label: "Platform", href: "#platform", dropdown: true },
+  { label: "Industries", href: "#industries", dropdown: true },
+  { label: "Resources", href: "#resources", dropdown: true },
+  { label: "Contact", href: "#contact" },
 ];
 
-const heroBenefits: { icon: IconName; title: string; subtitle: string }[] = [
-  { icon: 'chart', title: 'AI Predictive', subtitle: 'Smart anomaly detection' },
-  { icon: 'clock', title: 'Real-time Alerts', subtitle: 'Instant notifications' },
-  { icon: 'shield', title: 'Secure by Design', subtitle: 'End-to-end encryption' },
-];
-
-// Customer wall. `mark` is an original monochrome glyph drawn for this page —
-// swap in an official brand SVG at the same path once one is licensed.
-const partners: { name: string; mark: ReactNode }[] = [
+const platformFeatures = [
   {
-    name: 'Vedanta',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M6 7l10 18L26 7" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-        <path d="M13 7l3 5.4L19 7" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-      </svg>
-    ),
+    icon: "telemetry" as IconName,
+    title: "Real-time Telemetry",
+    subtitle: "<200ms latency",
   },
   {
-    name: 'Tata Steel',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M6 16h20" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M16 6c4 5 4 15 0 20-4-5-4-15 0-20Z" stroke="currentColor" strokeWidth="2.2" />
-      </svg>
-    ),
+    icon: "ai" as IconName,
+    title: "AI-Powered Insights",
+    subtitle: "Predict failures early",
   },
   {
-    name: 'Hindalco',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M16 6c6 3 6 15 0 20-6-5-6-17 0-20Z" fill="currentColor" opacity="0.55" />
-      </svg>
-    ),
+    icon: "cloud" as IconName,
+    title: "Edge to Cloud",
+    subtitle: "Secure & scalable",
   },
   {
-    name: 'JSW',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M5 9l7 14 4-8 4 8 7-14" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    name: 'SAIL',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M16 5l11 11-11 11L5 16 16 5Z" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M16 11l5 5-5 5-5-5 5-5Z" fill="currentColor" opacity="0.6" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Hindustan Zinc',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M16 4l10 6v12l-10 6-10-6V10l10-6Z" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M12 12h8l-8 8h8" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-      </svg>
-    ),
+    icon: "clock" as IconName,
+    title: "99.9% Uptime",
+    subtitle: "Enterprise grade",
   },
 ];
 
-function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
+const heroBenefits = [
+  {
+    icon: "shield" as IconName,
+    title: "Secure by Design",
+    subtitle: "End-to-end encryption",
+  },
+  {
+    icon: "chart" as IconName,
+    title: "AI Predictive",
+    subtitle: "Smart anomaly detection",
+  },
+  {
+    icon: "clock" as IconName,
+    title: "Real-time Alerts",
+    subtitle: "Instant notifications",
+  },
+];
+
+function Icon({
+  name,
+  size = 22,
+}: {
+  name: IconName;
+  size?: number;
+}) {
   const properties = {
     width: size,
     height: size,
-    viewBox: '0 0 24 24',
-    fill: 'none',
-    stroke: 'currentColor',
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
     strokeWidth: 1.7,
-    strokeLinecap: 'round' as const,
-    strokeLinejoin: 'round' as const,
-    'aria-hidden': true,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    "aria-hidden": true,
   };
 
   switch (name) {
-    case 'arrow':
+    case "arrow":
       return (
         <svg {...properties}>
           <path d="M5 12h14" />
           <path d="m14 7 5 5-5 5" />
         </svg>
       );
-    case 'chevron':
+
+    case "chevron":
       return (
         <svg {...properties}>
           <path d="m8 10 4 4 4-4" />
         </svg>
       );
-    case 'play':
+
+    case "moon":
+      return (
+        <svg {...properties}>
+          <path d="M20.5 15.1A8.5 8.5 0 0 1 8.9 3.5a8.5 8.5 0 1 0 11.6 11.6Z" />
+        </svg>
+      );
+
+    case "play":
       return (
         <svg {...properties}>
           <circle cx="12" cy="12" r="9" />
           <path d="m10 8 6 4-6 4Z" />
         </svg>
       );
-    case 'shield':
+
+    case "shield":
       return (
         <svg {...properties}>
           <path d="M12 3 5 6v5c0 4.8 2.8 8.1 7 10 4.2-1.9 7-5.2 7-10V6l-7-3Z" />
           <path d="m9.2 12 1.8 1.8 3.8-4" />
         </svg>
       );
-    case 'chart':
+
+    case "chart":
       return (
         <svg {...properties}>
           <rect x="3.5" y="3.5" width="17" height="17" rx="2" />
           <path d="m7 15 3-3 3 2 4-5" />
         </svg>
       );
-    case 'clock':
+
+    case "clock":
       return (
         <svg {...properties}>
           <circle cx="12" cy="12" r="8.5" />
           <path d="M12 7v5l3 2" />
         </svg>
       );
-    case 'telemetry':
+
+    case "telemetry":
       return (
         <svg {...properties}>
           <path d="M12 3v7" />
@@ -193,7 +149,8 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
           <path d="M9 16h6" />
         </svg>
       );
-    case 'ai':
+
+    case "ai":
       return (
         <svg {...properties}>
           <rect x="5" y="5" width="14" height="14" rx="3" />
@@ -202,7 +159,8 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
           <path d="m9 14 2-5 2 5 2-5" />
         </svg>
       );
-    case 'cloud':
+
+    case "cloud":
       return (
         <svg {...properties}>
           <path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 11.5 3.3 3.3 0 0 0 7 18Z" />
@@ -210,52 +168,331 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
           <path d="m9.5 12.5 2.5 2.5 2.5-2.5" />
         </svg>
       );
+
+    case "search":
+      return (
+        <svg {...properties}>
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="m16 16 4 4" />
+        </svg>
+      );
+
+    case "bell":
+      return (
+        <svg {...properties}>
+          <path d="M18 9a6 6 0 1 0-12 0c0 6-3 7-3 7h18s-3-1-3-7" />
+          <path d="M10 20h4" />
+        </svg>
+      );
+
+    case "settings":
+      return (
+        <svg {...properties}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3" />
+          <path d="m5.3 5.3 2.1 2.1M16.6 16.6l2.1 2.1" />
+          <path d="m18.7 5.3-2.1 2.1M7.4 16.6l-2.1 2.1" />
+        </svg>
+      );
   }
 }
 
-export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode }) {
-  const { user } = useAuth();
-  const consoleHref = user ? '/' : '/login';
+function DashboardMetric({
+  label,
+  value,
+  status,
+  trend,
+  critical = false,
+}: {
+  label: string;
+  value: string;
+  status: string;
+  trend: string;
+  critical?: boolean;
+}) {
+  return (
+    <article className={styles.metricCard}>
+      <span className={styles.metricLabel}>{label}</span>
+      <strong>{value}</strong>
 
+      <div
+        className={
+          critical ? styles.metricStatusCritical : styles.metricStatusHealthy
+        }
+      >
+        <span>{status}</span>
+        <span>{trend}</span>
+      </div>
+    </article>
+  );
+}
+
+function DashboardPresentation() {
+  return (
+    <div className={styles.dashboardPresentation} id="dashboard">
+      <div className={styles.dashboardGlow} />
+
+      <div className={styles.dashboardScreen}>
+        <div className={styles.dashboardToolbar}>
+          <div className={styles.dashboardLogo}>ULTRON</div>
+
+          <div className={styles.dashboardIcons}>
+            <Icon name="search" size={15} />
+            <Icon name="bell" size={15} />
+            <Icon name="settings" size={15} />
+          </div>
+        </div>
+
+        <div className={styles.dashboardTitleRow}>
+          <h2>Overview</h2>
+
+          <button type="button">
+            Last 24 hours
+            <Icon name="chevron" size={14} />
+          </button>
+        </div>
+
+        <div className={styles.metricsGrid}>
+          <DashboardMetric
+            label="Machines"
+            value="128"
+            status="Active"
+            trend="↑ 6%"
+          />
+
+          <DashboardMetric
+            label="Health Score"
+            value="96%"
+            status="Excellent"
+            trend="↑ 4%"
+          />
+
+          <DashboardMetric
+            label="Active Alarms"
+            value="2"
+            status="Critical"
+            trend="↓ 1"
+            critical
+          />
+
+          <DashboardMetric
+            label="MTBF"
+            value="512h"
+            status="Improving"
+            trend="↑ 8%"
+          />
+        </div>
+
+        <div className={styles.dashboardCharts}>
+          <article className={styles.chartPanel}>
+            <div className={styles.panelHeading}>Health Trend</div>
+
+            <div className={styles.healthChart}>
+              <div className={styles.chartGrid} />
+
+              <svg
+                viewBox="0 0 420 180"
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                <defs>
+                  <linearGradient
+                    id="health-area"
+                    x1="0"
+                    x2="0"
+                    y1="0"
+                    y2="1"
+                  >
+                    <stop
+                      offset="0%"
+                      stopColor="#e8b55f"
+                      stopOpacity=".3"
+                    />
+                    <stop
+                      offset="100%"
+                      stopColor="#e8b55f"
+                      stopOpacity="0"
+                    />
+                  </linearGradient>
+                </defs>
+
+                <path
+                  className={styles.healthArea}
+                  d="
+                    M0 136
+                    C40 103 67 112 92 83
+                    C117 55 147 114 178 92
+                    C208 69 227 39 258 63
+                    C292 89 314 93 342 58
+                    C368 25 391 40 420 12
+                    L420 180
+                    L0 180
+                    Z
+                  "
+                />
+
+                <path
+                  className={styles.healthLine}
+                  d="
+                    M0 136
+                    C40 103 67 112 92 83
+                    C117 55 147 114 178 92
+                    C208 69 227 39 258 63
+                    C292 89 314 93 342 58
+                    C368 25 391 40 420 12
+                  "
+                />
+
+                <circle
+                  className={styles.healthPoint}
+                  cx="420"
+                  cy="12"
+                  r="5"
+                />
+              </svg>
+
+              <div className={styles.chartTimes}>
+                <span>00:00</span>
+                <span>06:00</span>
+                <span>12:00</span>
+                <span>18:00</span>
+                <span>24:00</span>
+              </div>
+            </div>
+          </article>
+
+          <article className={styles.mapPanel}>
+            <div className={styles.panelHeading}>Machine Map</div>
+
+            <div className={styles.machineMap}>
+              <div className={styles.machineMapGrid} />
+
+              <span
+                className={`${styles.mapNode} ${styles.nodeOne} ${styles.nodeHealthy}`}
+              />
+              <span
+                className={`${styles.mapNode} ${styles.nodeTwo} ${styles.nodeHealthy}`}
+              />
+              <span
+                className={`${styles.mapNode} ${styles.nodeThree} ${styles.nodeWarning}`}
+              />
+              <span
+                className={`${styles.mapNode} ${styles.nodeFour} ${styles.nodeCritical}`}
+              />
+              <span
+                className={`${styles.mapNode} ${styles.nodeFive} ${styles.nodeCritical}`}
+              />
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <div className={styles.machineryPlatform} aria-hidden="true">
+        <div className={styles.platformBase} />
+
+        <div className={`${styles.motor} ${styles.motorOne}`}>
+          <span />
+          <span />
+          <span />
+        </div>
+
+        <div className={`${styles.motor} ${styles.motorTwo}`}>
+          <span />
+          <span />
+          <span />
+        </div>
+
+        <div className={`${styles.motor} ${styles.motorThree}`}>
+          <span />
+          <span />
+          <span />
+        </div>
+
+        <div className={styles.platformPipe} />
+      </div>
+    </div>
+  );
+}
+
+export default function UltronHero() {
   return (
     <section className={styles.hero}>
       <header className={styles.header}>
         <div className={styles.headerContent}>
-          <Link href="/home" className={styles.brand} aria-label="ULTRON home">
+          <Link href="/" className={styles.brand} aria-label="ULTRON home">
             <span className={styles.brandName}>ULTRON</span>
+            <span className={styles.brandTagline}>
+              MACHINE HEALTH, IN REAL TIME
+            </span>
           </Link>
 
           <nav className={styles.navigation} aria-label="Primary navigation">
             {navigation.map((item) => (
-              <div className={styles.navigationItem} key={item.label}>
-                <a href={item.href} className={styles.navigationLink}>
-                  {item.label}
-                  {item.menu && <Icon name="chevron" size={14} />}
-                </a>
+              <Link
+                key={item.label}
+                href={item.href}
+                className={styles.navigationLink}
+              >
+                {item.label}
 
-                {item.menu && (
-                  <div className={styles.navigationMenu}>
-                    {item.menu.map((entry) => (
-                      <a key={entry.label} href={entry.href}>
-                        {entry.label}
-                      </a>
-                    ))}
-                  </div>
+                {item.dropdown && (
+                  <Icon name="chevron" size={14} />
                 )}
-              </div>
+              </Link>
             ))}
           </nav>
 
           <div className={styles.headerActions}>
-            <Link href={consoleHref} className={styles.signInButton}>
-              {user ? 'Console' : 'Sign in'}
+            <button
+              type="button"
+              className={styles.themeButton}
+              aria-label="Toggle appearance"
+            >
+              <Icon name="moon" size={20} />
+            </button>
+
+            <Link href="/login" className={styles.signInButton}>
+              Sign in
+            </Link>
+
+            <Link
+              href="/signup"
+              className={styles.requestDemoButton}
+            >
+              Request Demo
+              <Icon name="arrow" size={18} />
             </Link>
           </div>
         </div>
       </header>
 
-      <div className={styles.backgroundScene} aria-hidden="true" />
-      <div className={styles.backgroundGrade} aria-hidden="true" />
+      <div className={styles.featureStrip}>
+        <div className={styles.featureStripContent}>
+          {platformFeatures.map((feature, index) => (
+            <div className={styles.platformFeature} key={feature.title}>
+              <span className={styles.platformFeatureIcon}>
+                <Icon name={feature.icon} size={23} />
+              </span>
+
+              <span className={styles.platformFeatureText}>
+                <strong>{feature.title}</strong>
+                <small>{feature.subtitle}</small>
+              </span>
+
+              {index < platformFeatures.length - 1 && (
+                <span className={styles.featureDivider} />
+              )}
+            </div>
+          ))}
+
+          <div className={styles.systemStatus}>
+            <span className={styles.systemStatusDot} />
+            All Systems Operational
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.backgroundImage} aria-hidden="true" />
       <div className={styles.backgroundPattern} aria-hidden="true" />
 
       <div className={styles.heroContent}>
@@ -272,25 +509,26 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
             <span>IN REAL TIME</span>
           </h1>
 
-          <div className={styles.headingDecoration} aria-hidden="true">
+          <div className={styles.headingDecoration}>
             <span />
           </div>
 
           <p>
-            ULTRON turns raw sensor telemetry into live dashboards and AI-driven failure prediction — so you fix machines
-            before they break, not after.
+            ULTRON turns raw sensor telemetry into live dashboards and
+            AI-driven failure prediction—so you fix machines before they
+            break, not after.
           </p>
 
           <div className={styles.heroActions}>
-            <Link href={consoleHref} className={styles.primaryButton}>
-              {user ? 'Open console' : 'Launch console'}
+            <Link href="/" className={styles.primaryButton}>
+              Launch console
               <Icon name="arrow" size={20} />
             </Link>
 
-            <a href="#dashboard" className={styles.secondaryButton}>
+            <Link href="#dashboard" className={styles.secondaryButton}>
               <Icon name="play" size={21} />
               See it live
-            </a>
+            </Link>
           </div>
 
           <div className={styles.benefits}>
@@ -303,28 +541,37 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
                   <small>{benefit.subtitle}</small>
                 </span>
 
-                {index < heroBenefits.length - 1 && <span className={styles.benefitDivider} />}
+                {index < heroBenefits.length - 1 && (
+                  <span className={styles.benefitDivider} />
+                )}
               </div>
             ))}
           </div>
         </div>
 
-        {/* Wide viewports get the console render as a right-anchored backdrop
-            (see `.backgroundScene`). Below that the render is dropped entirely
-            and this column carries the animated live dashboard instead. */}
-        <div className={styles.heroVisual}>{narrowVisual}</div>
+        <DashboardPresentation />
       </div>
 
       <div className={styles.partnerBar}>
-        <span className={styles.partnerHeading}>TRUSTED BY INDUSTRY LEADERS</span>
+        <span className={styles.partnerHeading}>
+          TRUSTED BY INDUSTRY LEADERS
+        </span>
 
-        {partners.map((partner) => (
-          <span className={styles.partnerLogo} key={partner.name}>
-            {partner.mark}
-            {partner.name}
-          </span>
-        ))}
+        <span>VEDANTA</span>
+        <span>TATA STEEL</span>
+        <span>HINDALCO</span>
+        <span>JSW</span>
+        <span>SAIL</span>
+        <span>HINDUSTAN ZINC</span>
       </div>
+
+      <button
+        type="button"
+        className={styles.chatButton}
+        aria-label="Open support chat"
+      >
+        <span />
+      </button>
     </section>
   );
 }
