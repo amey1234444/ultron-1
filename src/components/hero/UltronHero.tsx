@@ -73,65 +73,6 @@ const heroBenefits: { icon: IconName; title: string; subtitle: string }[] = [
   { icon: 'shield', title: 'Secure by Design', subtitle: 'End-to-end encryption' },
 ];
 
-// Customer wall. `mark` is an original monochrome glyph drawn for this page —
-// swap in an official brand SVG at the same path once one is licensed.
-const partners: { name: string; mark: ReactNode }[] = [
-  {
-    name: 'Vedanta',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M6 7l10 18L26 7" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-        <path d="M13 7l3 5.4L19 7" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Tata Steel',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M6 16h20" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M16 6c4 5 4 15 0 20-4-5-4-15 0-20Z" stroke="currentColor" strokeWidth="2.2" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Hindalco',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <circle cx="16" cy="16" r="10" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M16 6c6 3 6 15 0 20-6-5-6-17 0-20Z" fill="currentColor" opacity="0.55" />
-      </svg>
-    ),
-  },
-  {
-    name: 'JSW',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M5 9l7 14 4-8 4 8 7-14" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    name: 'SAIL',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M16 5l11 11-11 11L5 16 16 5Z" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M16 11l5 5-5 5-5-5 5-5Z" fill="currentColor" opacity="0.6" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Hindustan Zinc',
-    mark: (
-      <svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-        <path d="M16 4l10 6v12l-10 6-10-6V10l10-6Z" stroke="currentColor" strokeWidth="2.2" />
-        <path d="M12 12h8l-8 8h8" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-];
-
 function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
   const properties = {
     width: size,
@@ -266,7 +207,7 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
           <div className={styles.eyebrow}>
             <span className={styles.eyebrowDot} />
             INDUSTRIAL IOT
-            <span className={styles.eyebrowSeparator}>·</span>
+            <span className={styles.eyebrowSeparator}>-</span>
             PREDICTIVE MAINTENANCE
           </div>
 
@@ -280,7 +221,7 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
           </div>
 
           <p>
-            ULTRON turns raw sensor telemetry into live dashboards and AI-driven failure prediction — so you fix machines
+            ULTRON turns raw sensor telemetry into live dashboards and AI-driven failure prediction - so you fix machines
             before they break, not after.
           </p>
 
@@ -318,16 +259,6 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
         <div className={styles.heroVisual}>{narrowVisual}</div>
       </div>
 
-      <div className={styles.partnerBar}>
-        <span className={styles.partnerHeading}>TRUSTED BY INDUSTRY LEADERS</span>
-
-        {partners.map((partner) => (
-          <span className={styles.partnerLogo} key={partner.name}>
-            {partner.mark}
-            {partner.name}
-          </span>
-        ))}
-      </div>
     </section>
   );
 }
