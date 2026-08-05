@@ -14,7 +14,10 @@ type IconName =
   | 'cloud'
   | 'clock'
   | 'shield'
-  | 'chart';
+  | 'chart'
+  | 'search'
+  | 'menu'
+  | 'login';
 
 type NavItem = {
   label: string;
@@ -25,44 +28,9 @@ type NavItem = {
 // Anchors resolve to the sections that already exist further down the landing
 // page; `/login` and `/` are the real auth + console routes.
 const navigation: NavItem[] = [
-  {
-    label: 'Features',
-    href: '#features',
-    menu: [
-      { label: 'Predictive maintenance', href: '#features' },
-      { label: 'Real-time trends', href: '#features' },
-      { label: 'Asset hierarchy', href: '#features' },
-    ],
-  },
-  { label: 'Dashboard', href: '#dashboard' },
-  {
-    label: 'Platform',
-    href: '#platform',
-    menu: [
-      { label: 'How it works', href: '#how-it-works' },
-      { label: 'Connectivity', href: '#platform' },
-      { label: 'Security', href: '#platform' },
-    ],
-  },
-  {
-    label: 'Industries',
-    href: '#industries',
-    menu: [
-      { label: 'Cement & mining', href: '#industries' },
-      { label: 'Power generation', href: '#industries' },
-      { label: 'Chemical & process', href: '#industries' },
-    ],
-  },
-  {
-    label: 'Resources',
-    href: '#faq',
-    menu: [
-      { label: 'FAQ', href: '#faq' },
-      { label: 'Live dashboard', href: '#dashboard' },
-      { label: 'Contact sales', href: '#contact' },
-    ],
-  },
-  { label: 'Contact', href: '#contact' },
+  { label: 'Mission', href: '#features' },
+  { label: 'Careers', href: '#contact' },
+  { label: 'Elixir', href: '#platform' },
 ];
 
 const LOGO_DARK_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
@@ -154,6 +122,29 @@ function Icon({ name, size = 22 }: { name: IconName; size?: number }) {
           <path d="m9.5 12.5 2.5 2.5 2.5-2.5" />
         </svg>
       );
+    case 'search':
+      return (
+        <svg {...properties}>
+          <circle cx="10.5" cy="10.5" r="5.5" />
+          <path d="m15 15 4 4" />
+        </svg>
+      );
+    case 'menu':
+      return (
+        <svg {...properties}>
+          <path d="M5 7h14" />
+          <path d="M5 12h14" />
+          <path d="M5 17h14" />
+        </svg>
+      );
+    case 'login':
+      return (
+        <svg {...properties}>
+          <path d="M14 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3" />
+          <path d="M10 8l4 4-4 4" />
+          <path d="M14 12H4" />
+        </svg>
+      );
   }
 }
 
@@ -191,8 +182,18 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
           </nav>
 
           <div className={styles.headerActions}>
+            <div className={styles.utilityActions} aria-hidden="true">
+              <span className={styles.utilityButton}>
+                <Icon name="search" size={18} />
+              </span>
+              <span className={styles.utilityDivider} />
+              <span className={styles.utilityButton}>
+                <Icon name="menu" size={18} />
+              </span>
+            </div>
             <Link href={consoleHref} className={styles.signInButton}>
-              {user ? 'Console' : 'Sign in'}
+              <Icon name="login" size={16} />
+              <span>{user ? 'Console' : 'Sign in'}</span>
             </Link>
           </div>
         </div>

@@ -21,71 +21,71 @@
 
 .header {
   position: fixed;
-  top: 0;
+  top: 14px;
   right: 0;
   left: 0;
   z-index: 100;
-  height: 62px;
+  height: 66px;
   overflow: visible;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
-  background: linear-gradient(180deg, rgba(28, 35, 42, 0.72), rgba(7, 11, 16, 0.5));
-  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.34), inset 0 1px 0 rgba(255, 255, 255, 0.16);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  pointer-events: none;
 }
 
 .header::before {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  content: '';
-  background:
-    linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent),
-    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.13), transparent 42%);
-  opacity: 0.74;
+  display: none;
 }
 
 .header::after {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  height: 1px;
-  pointer-events: none;
-  content: '';
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  display: none;
 }
 
 .headerContent {
   position: relative;
   z-index: 1;
-  width: min(1540px, calc(100% - 64px));
+  width: min(830px, calc(100% - 36px));
   height: 100%;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 210px 1fr auto;
+  grid-template-columns: 174px 1fr auto;
   align-items: center;
-  gap: 24px;
+  gap: 28px;
+  padding: 0 12px 0 20px;
+  pointer-events: auto;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(225, 232, 238, 0.82), rgba(164, 176, 186, 0.7));
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(29, 40, 50, 0.14);
+  backdrop-filter: blur(22px) saturate(160%);
+  -webkit-backdrop-filter: blur(22px) saturate(160%);
 }
 
 .brand {
-  width: max-content;
+  width: 160px;
+  height: 42px;
   display: flex;
   align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(255, 255, 255, 0.75);
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(242, 246, 249, 0.88), rgba(205, 214, 222, 0.78));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 8px 18px rgba(24, 36, 45, 0.12);
   text-decoration: none;
 }
 
 .brandLogo {
   display: block;
-  width: 118px;
+  width: 112px;
   height: auto;
+  filter: brightness(0.08);
 }
 
 .navigation {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: clamp(8px, 1vw, 16px);
+  gap: 32px;
 }
 
 .navigationItem {
@@ -96,27 +96,28 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 8px 11px;
-  color: #efefec;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  font-size: 14px;
-  font-weight: 500;
+  padding: 7px 0;
+  color: #171a1d;
+  border: 0;
+  border-radius: 0;
+  font-family: 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
+  font-size: 20px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
   text-decoration: none;
-  transition: color 180ms ease, background 180ms ease, border-color 180ms ease, box-shadow 180ms ease;
+  text-transform: uppercase;
+  transition: color 180ms ease, opacity 180ms ease;
 }
 
 .navigationLink:hover,
 .navigationLink:focus-visible {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14);
+  color: #000;
+  opacity: 0.72;
 }
 
 .navigationMenu {
   position: absolute;
-  top: calc(100% + 14px);
+  top: calc(100% + 18px);
   left: -18px;
   z-index: 5;
   min-width: 220px;
@@ -127,9 +128,10 @@
   transform: translateY(-6px);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
-  background: linear-gradient(180deg, rgba(20, 27, 33, 0.95), rgba(8, 13, 18, 0.92));
-  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(229, 235, 240, 0.92), rgba(168, 180, 190, 0.88));
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.5);
   backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
   transition: opacity 180ms ease, transform 180ms ease, visibility 180ms ease;
 }
 
@@ -142,7 +144,7 @@
 
 .navigationMenu a {
   padding: 9px 12px;
-  color: #c8ccce;
+  color: #1a1d20;
   border-radius: 9px;
   font-size: 14px;
   text-decoration: none;
@@ -151,36 +153,70 @@
 
 .navigationMenu a:hover,
 .navigationMenu a:focus-visible {
-  color: var(--gold-light);
-  background: rgba(255, 255, 255, 0.05);
+  color: #000;
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .headerActions {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
-.signInButton {
-  height: 38px;
+.utilityActions {
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  border-radius: 999px;
+  color: #1f2428;
+  background: linear-gradient(180deg, rgba(241, 246, 249, 0.76), rgba(203, 212, 219, 0.66));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
+}
+
+.utilityButton {
+  width: 27px;
+  height: 32px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 10px;
-  font-size: 14px;
+}
+
+.utilityDivider {
+  width: 1px;
+  height: 22px;
+  background: rgba(33, 38, 42, 0.24);
+}
+
+.signInButton {
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 17px;
+  border-radius: 999px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.32em;
   text-decoration: none;
+  text-transform: uppercase;
   transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease, border-color 180ms ease;
-  min-width: 92px;
-  color: #fff;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  min-width: 134px;
+  color: #202428;
+  border: 1px solid rgba(255, 255, 255, 0.68);
+  background: linear-gradient(180deg, rgba(241, 246, 249, 0.76), rgba(203, 212, 219, 0.66));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.64);
 }
 
 .signInButton:hover {
-  border-color: rgba(255, 255, 255, 0.22);
-  background: rgba(255, 255, 255, 0.13);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+  border-color: rgba(255, 255, 255, 0.84);
+  background: linear-gradient(180deg, rgba(250, 253, 255, 0.9), rgba(214, 223, 230, 0.78));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.76);
 }
 
 .primaryButton:hover {
@@ -338,6 +374,13 @@
   transition: transform 180ms ease, box-shadow 180ms ease, background 180ms ease;
 }
 
+.primaryButton *,
+.secondaryButton *,
+.benefit * {
+  background: transparent;
+  box-shadow: none;
+}
+
 .primaryButton {
   min-width: 205px;
   color: #18130c;
@@ -348,12 +391,15 @@
 .secondaryButton {
   min-width: 178px;
   color: #f1f2ef;
-  border: 1px solid rgba(225, 167, 75, 0.72);
-  background: rgba(5, 10, 15, 0.58);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.04);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px) saturate(140%);
+  -webkit-backdrop-filter: blur(12px) saturate(140%);
 }
 
 .secondaryButton:hover {
-  background: rgba(225, 167, 75, 0.12);
+  background: rgba(255, 255, 255, 0.09);
   transform: translateY(-2px);
 }
 
@@ -377,6 +423,7 @@
 .benefit small {
   display: block;
   white-space: nowrap;
+  background: transparent;
 }
 
 .benefit strong {
@@ -418,13 +465,16 @@
 /* ------------------------------------------------ */
 
 @media (max-width: 1280px) {
-  .headerContent,
   .heroContent {
     width: min(1180px, calc(100% - 40px));
   }
 
   .headerContent {
-    grid-template-columns: 190px 1fr auto;
+    width: min(830px, calc(100% - 36px));
+  }
+
+  .headerContent {
+    grid-template-columns: 174px 1fr auto;
     gap: 18px;
   }
 
@@ -493,10 +543,31 @@
     width: 108px;
   }
 
+  .headerContent {
+    grid-template-columns: 128px auto;
+    gap: 10px;
+    padding: 0 10px 0 12px;
+  }
+
+  .brand {
+    width: 124px;
+    height: 40px;
+  }
+
+  .utilityActions {
+    display: none;
+  }
+
   .signInButton {
-    min-width: 78px;
-    height: 34px;
-    font-size: 13px;
+    min-width: 44px;
+    height: 40px;
+    padding: 0 13px;
+    font-size: 11px;
+    letter-spacing: 0;
+  }
+
+  .signInButton span {
+    display: none;
   }
 
   .backgroundPattern {
