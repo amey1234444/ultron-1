@@ -13,25 +13,33 @@ module.exports = {
     extend: {
       colors: {
         surface: {
-          dark: '#0A0A0A',
-          darkpanel: '#131313',
-          light: '#FAFAFA',
+          // `bg-surface` is the console's dark canvas.
+          DEFAULT: '#08090C',
+          dark: '#08090C',
+          darkpanel: '#111318',
+          // Slightly lifted panel used by the console dashboard cards.
+          card: '#14161C',
+          light: '#F6F6F4',
           lightpanel: '#FFFFFF',
         },
         ink: {
-          DEFAULT: '#F5F5F5',
-          muted: '#8A8A8A',
-          inverse: '#0A0A0A',
-          'inverse-muted': '#6B6B6B',
+          DEFAULT: '#F7F6F2',
+          muted: '#8B8D93',
+          inverse: '#0A0B0D',
+          'inverse-muted': '#6B6F76',
         },
         line: {
           dark: 'rgba(255,255,255,0.08)',
-          light: '#E5E5E5',
+          light: '#E6E5E1',
         },
         status: {
-          success: '#3FB950',
-          warning: '#F2A93B',
-          critical: '#EF4444',
+          success: '#2FA35A',
+          warning: '#D9962B',
+          critical: '#D64545',
+          danger: '#D64545',
+        },
+        primary: {
+          blue: '#2F6FED',
         },
         accent: {
           DEFAULT: '#C9A15C',
@@ -40,6 +48,10 @@ module.exports = {
         },
       },
       fontFamily: {
+        // Native builds resolve the bundled TTF families; the web build swaps in
+        // the Google faces (Anton / Bebas Neue / DM Sans / JetBrains Mono) via
+        // the overrides at the bottom of global.css.
+        display: ['SpaceGrotesk_600SemiBold'],
         wordmark: ['SpaceGrotesk_600SemiBold'],
         heading: ['SpaceGrotesk_500Medium'],
         'heading-medium': ['SpaceGrotesk_600SemiBold'],

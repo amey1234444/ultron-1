@@ -49,18 +49,27 @@ const ZOOM_STEP = 0.1;
 // itself rather than the padded box around it.
 const RAV_PADDING = 32;
 
+// Segmented control: one bordered track with the selected tab filled, so the
+// Machine/Rack/Overview/Analysis/Alarm/Trend switch reads as a single instrument
+// rather than six loose pills.
 function ActualSubTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
       className={cn(
-        'rounded-full border px-3 py-1 ',
-        active ? (isDark ? 'border-ink bg-ink' : 'border-ink-inverse bg-ink-inverse') : lineClass,
+        'rounded-full px-3.5 py-1.5',
+        active && (isDark ? 'bg-ink' : 'bg-ink-inverse'),
       )}
     >
-      <Text className={cn('font-body-medium text-[11px]', active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+      <Text
+        className={cn(
+          'font-mono text-[10px] uppercase tracking-[0.16em]',
+          active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
+        )}
+      >
         {label}
       </Text>
     </Pressable>
@@ -235,8 +244,10 @@ export function MachineWorkspace({
 
   const nameBlock = (
     <View>
-      <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{machine.name}</Text>
-      <Text className={cn('font-body text-xs', mutedClass)}>{machine.template}</Text>
+      <Text className={cn('font-heading text-2xl uppercase tracking-[0.05em]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+        {machine.name}
+      </Text>
+      <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.2em]', mutedClass)}>{machine.template}</Text>
     </View>
   );
 
@@ -244,15 +255,22 @@ export function MachineWorkspace({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ alignItems: 'center', gap: 8, paddingVertical: 2 }}
+      contentContainerStyle={{ alignItems: 'center', paddingVertical: 2 }}
       style={{ flexGrow: 0, flexShrink: 1, marginLeft: 'auto' }}
     >
-      <ActualSubTab label="Machine" active={actualTab === 'machine'} onPress={() => setActualTab('machine')} />
-      <ActualSubTab label="Rack" active={actualTab === 'rack'} onPress={() => setActualTab('rack')} />
-      <ActualSubTab label="Overview" active={actualTab === 'overview'} onPress={() => setActualTab('overview')} />
-      <ActualSubTab label="Analysis" active={actualTab === 'analysis'} onPress={() => setActualTab('analysis')} />
-      <ActualSubTab label="Alarm" active={actualTab === 'alarm'} onPress={() => setActualTab('alarm')} />
-      <ActualSubTab label="Trend" active={actualTab === 'trend'} onPress={() => setActualTab('trend')} />
+      <View
+        className={cn(
+          'flex-row items-center gap-1 rounded-full border p-1',
+          isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white',
+        )}
+      >
+        <ActualSubTab label="Machine" active={actualTab === 'machine'} onPress={() => setActualTab('machine')} />
+        <ActualSubTab label="Rack" active={actualTab === 'rack'} onPress={() => setActualTab('rack')} />
+        <ActualSubTab label="Overview" active={actualTab === 'overview'} onPress={() => setActualTab('overview')} />
+        <ActualSubTab label="Analysis" active={actualTab === 'analysis'} onPress={() => setActualTab('analysis')} />
+        <ActualSubTab label="Alarm" active={actualTab === 'alarm'} onPress={() => setActualTab('alarm')} />
+        <ActualSubTab label="Trend" active={actualTab === 'trend'} onPress={() => setActualTab('trend')} />
+      </View>
     </ScrollView>
   );
 

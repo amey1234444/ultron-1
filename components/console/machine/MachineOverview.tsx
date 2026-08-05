@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleProp, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
 
+import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { OverviewAnalysisInput, OverviewHistoryPoint } from '../../../lib/analysis/overviewSnapshot';
 import { analyzeRotaryAirlock, type AnalysisReading, type AnalysisSignalCode, type RotaryAirlockAnalysisResult } from '../../../lib/analysis/rotaryAirlockAnalyzer';
@@ -508,7 +509,15 @@ export function Panel({
         isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel',
         className,
       )}
-      style={style}
+      style={[
+        {
+          shadowColor: '#000',
+          shadowOpacity: isDark ? 0.3 : 0.05,
+          shadowRadius: 20,
+          shadowOffset: { width: 0, height: 10 },
+        },
+        style,
+      ]}
     >
       {children}
     </View>
@@ -520,10 +529,13 @@ export function SectionTitle({ title, action, onAction }: { title: string; actio
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   return (
     <View className="flex-row items-center justify-between">
-      <Text className={cn('font-body-medium text-[11px] uppercase tracking-[1.6px]', mutedClass)}>{title}</Text>
+      <View className="flex-row items-center gap-2">
+        <View style={{ width: 14, height: 1.5, backgroundColor: ACCENT_COLOUR, opacity: 0.9 }} />
+        <Text className={cn('font-mono text-[10px] uppercase tracking-[0.2em]', mutedClass)}>{title}</Text>
+      </View>
       {action && onAction ? (
         <Pressable onPress={onAction} accessibilityRole="button">
-          <Text style={{ color: ACCENT_COLOUR }} className="font-body-medium text-[11px]">
+          <Text style={{ color: ACCENT_COLOUR }} className="font-mono text-[10px] uppercase tracking-[0.14em]">
             {action}
           </Text>
         </Pressable>
@@ -568,7 +580,7 @@ export function StatusPanel({
           </Text>
         ) : null}
       </View>
-      <Text style={{ color: colour }} className="font-body-bold text-lg leading-6">
+      <Text style={{ color: colour }} className="font-display text-[26px] leading-8">
         {value}
       </Text>
       <Text className={cn('font-body text-[11px] leading-4', mutedClass)}>{detail}</Text>
@@ -588,7 +600,7 @@ function MetricTile({ label, value, detail, tone, icon }: { label: string; value
         <MaterialCommunityIcons name={icon} size={15} color={colour} />
         <Text className={cn('flex-1 font-body-medium text-[10px] uppercase tracking-[1.4px]', mutedClass)}>{label}</Text>
       </View>
-      <Text style={{ color: colour }} className="font-body-bold text-xl">
+      <Text style={{ color: colour }} className="font-display text-[28px] leading-9">
         {value}
       </Text>
       <Text className={cn('font-body text-[10px]', mutedClass)}>{detail}</Text>
@@ -1209,13 +1221,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
   );
 
   if (mappedChannels.length === 0) {
-    return (
-      <View className="flex-1 items-center justify-center px-6">
-        <Text className={cn('font-body text-sm italic', mutedClass)}>
-          No rack channels are mapped to this machine yet - link a box to a channel in Design mode.
-        </Text>
-      </View>
-    );
+    return <EmptyState title="No mapped channels" description="The overview reads saved rack mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
   const saveLabel =
@@ -1264,7 +1270,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
       <View className="flex-row flex-wrap items-end justify-between gap-3">
         <View className="min-w-0 flex-1 gap-1">
           <View className="flex-row items-center gap-2">
-            <Text className={cn('font-body-bold text-2xl', textClass)}>Machine analysis</Text>
+            <Text className={cn('font-heading text-3xl uppercase tracking-[0.04em]', textClass)}>Machine analysis</Text>
             <MaterialCommunityIcons name="shimmer" size={17} color={ACCENT_COLOUR} />
           </View>
           <Text className={cn('font-body text-xs leading-5', mutedClass)}>

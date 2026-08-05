@@ -10,25 +10,25 @@ import {
 
 import logoDark from '../../assets/brand/logo-dark.png';
 import UltronHero from '../components/hero/UltronHero';
+import SiteNav from '../components/web/SiteNav';
 import { useAuth } from '../context/AuthContext';
+import { COLOR, FONT, MAX_WIDTH, SHADOW } from '../lib/premiumTheme';
 
-// Graded to match the hero plate: warmer near-black, brighter gold, and a
-// slightly warm grey so the page reads as one lighting setup.
-const GOLD = '#DFAE63';
-const BG = '#07080B';
-const INK = '#F7F6F2';
-const MUTED = '#93938E';
-const BLUE = '#58A6FF';
-const GREEN = '#3FB950';
+const GOLD = COLOR.gold;
+const BG = COLOR.bg;
+const INK = COLOR.ink;
+const MUTED = COLOR.inkMuted;
+const BLUE = COLOR.blue;
+const GREEN = COLOR.green;
 
-// Landing-page typography — DM Sans for body/headings and Bebas Neue as the
-// tall condensed display face, mirroring oswarteck.com. Loaded via Google Fonts
-// in _document.tsx (falls back to the bundled faces / system fonts).
-const FONT_DISPLAY = "'Bebas Neue', 'Space Grotesk', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
-const FONT_HEAD = "'Sora', 'Space Grotesk', SpaceGrotesk_600SemiBold, system-ui, sans-serif";
-const FONT_BODY = "'Sora', 'DM Sans', Inter_400Regular, system-ui, sans-serif";
-const FONT_MED = "'Sora', 'DM Sans', Inter_500Medium, system-ui, sans-serif";
-const FONT_MONO = "'IBM Plex Mono', IBMPlexMono_400Regular, ui-monospace, monospace";
+// Anton carries the headlines, Bebas Neue the subheads and figures, DM Sans the
+// running copy and JetBrains Mono every micro-label — the same four-face system
+// used across the console.
+const FONT_DISPLAY = FONT.display;
+const FONT_HEAD = FONT.heading;
+const FONT_BODY = FONT.body;
+const FONT_MED = FONT.body;
+const FONT_MONO = FONT.mono;
 const LOGO_DARK_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
 
 // Fades a block up into place the first time it scrolls into view.
@@ -108,6 +108,53 @@ function TiltCard({
       }}
     >
       {children}
+    </div>
+  );
+}
+
+// Numbered mono eyebrow + Anton headline, the section-header pattern used all
+// the way down the page.
+function SectionHead({
+  index,
+  kicker,
+  title,
+  lead,
+  align = 'center',
+}: {
+  index: string;
+  kicker: string;
+  title: ReactNode;
+  lead?: string;
+  align?: 'center' | 'left';
+}) {
+  const centered = align === 'center';
+  return (
+    <div
+      style={{
+        textAlign: align,
+        maxWidth: centered ? 780 : 560,
+        margin: centered ? '0 auto 56px' : '0 0 32px',
+      }}
+    >
+      <div style={{ ...sectionKicker, justifyContent: centered ? 'center' : 'flex-start' }}>
+        <span style={{ color: 'rgba(247,246,242,0.35)' }}>/{index}</span>
+        {kicker}
+      </div>
+      <h2 style={{ ...sectionTitle, textAlign: align }}>{title}</h2>
+      {lead && (
+        <p
+          style={{
+            fontFamily: FONT_BODY,
+            color: MUTED,
+            fontSize: 16.5,
+            lineHeight: 1.7,
+            margin: centered ? '18px auto 0' : '18px 0 0',
+            maxWidth: 620,
+          }}
+        >
+          {lead}
+        </p>
+      )}
     </div>
   );
 }
@@ -223,8 +270,10 @@ export default function HomePage() {
   const { user } = useAuth();
   const consoleHref = user ? '/' : '/login';
   return (
-    <div style={{ background: BG, color: INK, minHeight: '100vh', fontFamily: FONT_BODY, overflowX: 'hidden' }}>
+    <div style={{ background: BG, color: INK, minHeight: '100vh', fontFamily: FONT_BODY }}>
       <style>{keyframes}</style>
+
+      <SiteNav />
 
       {/* Narrow viewports drop the hero render and stream the live dashboard in
           its place instead. */}
@@ -233,10 +282,12 @@ export default function HomePage() {
       {/* Live console — the streaming product dashboard. */}
       <section id="dashboard" style={{ padding: 'clamp(56px, 9vw, 104px) clamp(20px, 6vw, 72px) 0', scrollMarginTop: 90 }}>
         <Reveal>
-          <div style={{ textAlign: 'center', maxWidth: 720, margin: '0 auto 44px' }}>
-            <div style={sectionKicker}>LIVE CONSOLE</div>
-            <h2 style={sectionTitle}>Streaming telemetry, exactly as operators see it</h2>
-          </div>
+          <SectionHead
+            index="01"
+            kicker="Live console"
+            title="Streaming telemetry, exactly as operators see it"
+            lead="One screen for the plant floor: normalised channels, a live health score and the alarms that matter, refreshed sub-second."
+          />
         </Reveal>
         <Reveal delay={90}>
           <div style={{ maxWidth: 1080, margin: '0 auto' }}>
@@ -262,9 +313,20 @@ export default function HomePage() {
             }}
           >
             {STATS.map((s) => (
-              <div key={s.label} style={{ background: '#0E0E0E', padding: '26px 20px', textAlign: 'center' }}>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 40, color: GOLD }}>{s.value}</div>
-                <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: MUTED, marginTop: 6, letterSpacing: '0.08em' }}>
+              <div key={s.label} style={{ background: '#0B0D11', padding: '32px 20px', textAlign: 'center' }}>
+                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 'clamp(38px, 4.4vw, 54px)', lineHeight: 1, color: GOLD }}>
+                  {s.value}
+                </div>
+                <div
+                  style={{
+                    fontFamily: FONT_MONO,
+                    fontSize: 10.5,
+                    color: MUTED,
+                    marginTop: 12,
+                    letterSpacing: '0.2em',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   {s.label}
                 </div>
               </div>
@@ -276,15 +338,18 @@ export default function HomePage() {
       {/* Features */}
       <section id="features" style={{ padding: 'clamp(80px, 12vw, 140px) clamp(20px, 6vw, 72px)', scrollMarginTop: 70 }}>
         <Reveal>
-          <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 56px' }}>
-            <div style={sectionKicker}>WHAT IT DOES</div>
-            <h2 style={sectionTitle}>Everything you need to monitor rotating equipment</h2>
-          </div>
+          <SectionHead
+            index="02"
+            kicker="What it does"
+            title="Everything you need to monitor rotating equipment"
+          />
         </Reveal>
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+            // 300px keeps the four cards balanced: 2×2 on laptops, one row on
+            // wide displays — never a 3+1 orphan.
+            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: 18,
             maxWidth: 1080,
             margin: '0 auto',
@@ -294,7 +359,7 @@ export default function HomePage() {
             <Reveal key={f.title} delay={i * 90}>
               <div style={featureCard} className="ultron-card">
                 <div style={featureIcon}>{f.icon}</div>
-                <h3 style={{ fontFamily: FONT_HEAD, fontSize: 20, margin: '18px 0 8px' }}>{f.title}</h3>
+                <h3 style={cardTitle}>{f.title}</h3>
                 <p style={{ color: MUTED, fontSize: 15, lineHeight: 1.6, margin: 0 }}>{f.body}</p>
               </div>
             </Reveal>
@@ -320,9 +385,8 @@ export default function HomePage() {
             }}
           >
             <div>
-              <div style={sectionKicker}>LIVE TRENDS</div>
-              <h2 style={{ ...sectionTitle, textAlign: 'left' }}>Every channel, one smooth chart</h2>
-              <p style={{ color: MUTED, fontSize: 16, lineHeight: 1.7 }}>
+              <SectionHead index="03" kicker="Live trends" title="Every channel, one smooth chart" align="left" />
+              <p style={{ fontFamily: FONT_BODY, color: MUTED, fontSize: 16, lineHeight: 1.7, margin: 0 }}>
                 Overlay temperature, vibration, pressure and more on a single normalised graph. Filter by measurement
                 type from a dropdown, and toggle any series on or off straight from the legend.
               </p>
@@ -335,17 +399,14 @@ export default function HomePage() {
       {/* How it works */}
       <section id="how-it-works" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
         <Reveal>
-          <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 56px' }}>
-            <div style={sectionKicker}>HOW IT WORKS</div>
-            <h2 style={sectionTitle}>From sensor to insight in four steps</h2>
-          </div>
+          <SectionHead index="04" kicker="How it works" title="From sensor to insight in four steps" />
         </Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, maxWidth: 1080, margin: '0 auto' }}>
           {PIPELINE.map((step, i) => (
             <Reveal key={step.title} delay={i * 90}>
               <div style={featureCard} className="ultron-card">
-                <div style={{ fontFamily: FONT_MONO, fontSize: 12, letterSpacing: '0.18em', color: GOLD }}>{step.step}</div>
-                <h3 style={{ fontFamily: FONT_HEAD, fontSize: 19, margin: '14px 0 8px' }}>{step.title}</h3>
+                <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: '0.2em', color: GOLD }}>{step.step}</div>
+                <h3 style={cardTitle}>{step.title}</h3>
                 <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{step.body}</p>
               </div>
             </Reveal>
@@ -356,16 +417,13 @@ export default function HomePage() {
       {/* Industries */}
       <section id="industries" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
         <Reveal>
-          <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 56px' }}>
-            <div style={sectionKicker}>WHO IT&apos;S FOR</div>
-            <h2 style={sectionTitle}>Built for the plants that can&apos;t stop</h2>
-          </div>
+          <SectionHead index="05" kicker="Who it's for" title={<>Built for the plants that can&apos;t stop</>} />
         </Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18, maxWidth: 1080, margin: '0 auto' }}>
           {INDUSTRIES.map((industry, i) => (
             <Reveal key={industry.title} delay={i * 80}>
               <div style={featureCard} className="ultron-card">
-                <h3 style={{ fontFamily: FONT_HEAD, fontSize: 19, margin: '0 0 8px' }}>{industry.title}</h3>
+                <h3 style={{ ...cardTitle, marginTop: 0 }}>{industry.title}</h3>
                 <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{industry.body}</p>
                 <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: GREEN, marginTop: 16 }}>{industry.metric}</div>
               </div>
@@ -387,8 +445,11 @@ export default function HomePage() {
             }}
           >
             <div style={{ ...featureCard, padding: 'clamp(24px, 4vw, 36px)' }}>
-              <div style={sectionKicker}>CONNECTIVITY</div>
-              <h3 style={{ fontFamily: FONT_HEAD, fontSize: 22, margin: '10px 0 18px' }}>Speaks your plant&apos;s protocols</h3>
+              <div style={sectionKicker}>
+                <span style={{ color: 'rgba(247,246,242,0.35)' }}>/06</span>
+                Connectivity
+              </div>
+              <h3 style={cardTitle}>Speaks your plant&apos;s protocols</h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {PROTOCOLS.map((protocol) => (
                   <span
@@ -414,8 +475,11 @@ export default function HomePage() {
             </div>
 
             <div style={{ ...featureCard, padding: 'clamp(24px, 4vw, 36px)' }}>
-              <div style={sectionKicker}>TRUST</div>
-              <h3 style={{ fontFamily: FONT_HEAD, fontSize: 22, margin: '10px 0 18px' }}>Security built for OT networks</h3>
+              <div style={sectionKicker}>
+                <span style={{ color: 'rgba(247,246,242,0.35)' }}>/07</span>
+                Trust
+              </div>
+              <h3 style={cardTitle}>Security built for OT networks</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 {SECURITY.map((item) => (
                   <div key={item} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -434,16 +498,24 @@ export default function HomePage() {
       {/* FAQ */}
       <section id="faq" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
         <Reveal>
-          <div style={{ textAlign: 'center', maxWidth: 700, margin: '0 auto 48px' }}>
-            <div style={sectionKicker}>FAQ</div>
-            <h2 style={sectionTitle}>Questions engineering teams ask us</h2>
-          </div>
+          <SectionHead index="08" kicker="FAQ" title="Questions engineering teams ask us" />
         </Reveal>
         <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gap: 12 }}>
           {FAQS.map((faq, i) => (
             <Reveal key={faq.q} delay={i * 70}>
-              <details style={{ ...featureCard, padding: '18px 22px' }}>
-                <summary style={{ fontFamily: FONT_HEAD, fontSize: 16, color: INK, cursor: 'pointer' }}>{faq.q}</summary>
+              <details style={{ ...featureCard, padding: '20px 24px' }}>
+                <summary
+                  style={{
+                    fontFamily: FONT_HEAD,
+                    fontSize: 21,
+                    letterSpacing: '0.03em',
+                    textTransform: 'uppercase',
+                    color: INK,
+                    cursor: 'pointer',
+                  }}
+                >
+                  {faq.q}
+                </summary>
                 <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.7, margin: '12px 0 0' }}>{faq.a}</p>
               </details>
             </Reveal>
@@ -451,16 +523,80 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Footer CTA */}
-      <section style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(70px, 10vw, 120px)', textAlign: 'center' }}>
+      {/* Contact / closing CTA */}
+      <section
+        id="contact"
+        style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 90 }}
+      >
         <Reveal>
-          <h2 style={{ fontFamily: FONT_DISPLAY, fontSize: 'clamp(34px, 5.5vw, 60px)', letterSpacing: '0.01em' }}>
-            Ready to see your machines think?
-          </h2>
-          <div style={{ marginTop: 28 }}>
-            <Link href={consoleHref} style={ctaPrimary}>
-              {user ? 'Open console →' : 'Get started →'}
-            </Link>
+          <div
+            style={{
+              maxWidth: MAX_WIDTH,
+              margin: '0 auto',
+              padding: 'clamp(36px, 6vw, 76px)',
+              borderRadius: 26,
+              border: '1px solid rgba(255,255,255,0.09)',
+              background:
+                'radial-gradient(110% 130% at 100% 0%, rgba(223,174,99,0.16), transparent 58%), linear-gradient(180deg, #0F1116, #0A0B0F)',
+              boxShadow: SHADOW.card,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+              gap: 'clamp(28px, 5vw, 64px)',
+              alignItems: 'center',
+            }}
+          >
+            <div>
+              <div style={sectionKicker}>
+                <span style={{ color: 'rgba(247,246,242,0.35)' }}>/09</span>
+                Get in touch
+              </div>
+              <h2 style={{ ...sectionTitle, textAlign: 'left' }}>
+                Ready to see your
+                <br />
+                machines think?
+              </h2>
+              <p style={{ fontFamily: FONT_BODY, color: MUTED, fontSize: 16.5, lineHeight: 1.7, margin: '20px 0 32px', maxWidth: 460 }}>
+                Book a walkthrough with an engineer, or sign in and stream your first channel today. Deployment on your
+                network or ours.
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                <Link href={consoleHref} style={ctaPrimary}>
+                  {user ? 'Open console' : 'Get started'}
+                  <span aria-hidden="true">&rarr;</span>
+                </Link>
+                <a href="mailto:hello@ultron.io" style={ctaGhost} className="ultron-ghost">
+                  Talk to an engineer
+                </a>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gap: 1, background: 'rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden' }}>
+              {[
+                { label: 'Email', value: 'hello@ultron.io', href: 'mailto:hello@ultron.io' },
+                { label: 'Phone', value: '+1 (800) 555-1234', href: 'tel:+18005551234' },
+                { label: 'Studio', value: 'San Francisco, CA · Remote-first' },
+                { label: 'Response time', value: 'Under one business day' },
+              ].map((row) => (
+                <div key={row.label} style={{ background: '#0B0D11', padding: '20px 22px' }}>
+                  <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, letterSpacing: '0.2em', color: MUTED, textTransform: 'uppercase' }}>
+                    {row.label}
+                  </div>
+                  {row.href ? (
+                    <a
+                      href={row.href}
+                      className="ultron-navlink"
+                      style={{ fontFamily: FONT_HEAD, fontSize: 23, letterSpacing: '0.03em', color: INK, textDecoration: 'none', display: 'inline-block', marginTop: 8 }}
+                    >
+                      {row.value}
+                    </a>
+                  ) : (
+                    <div style={{ fontFamily: FONT_HEAD, fontSize: 23, letterSpacing: '0.03em', color: INK, marginTop: 8 }}>
+                      {row.value}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </Reveal>
       </section>
@@ -827,37 +963,20 @@ function SiteFooter() {
         { label: 'Industries', href: '#industries' },
       ],
     },
+    // Only destinations that exist: page sections, the console, or a real
+    // mailbox — the footer never links to a page the site does not have.
     {
       title: 'Company',
       links: [
-        { label: 'About us', href: '#contact' },
-        { label: 'Careers', href: '#contact' },
-        { label: 'Blog', href: '#contact' },
-        { label: 'Contact sales', href: '#contact' },
-      ],
-    },
-    {
-      title: 'Resources',
-      links: [
-        { label: 'Documentation', href: '#contact' },
-        { label: 'API reference', href: '#contact' },
         { label: 'FAQ', href: '#faq' },
-        { label: 'Support', href: '#contact' },
-      ],
-    },
-    {
-      title: 'Legal',
-      links: [
-        { label: 'Privacy policy', href: '#contact' },
-        { label: 'Terms of service', href: '#contact' },
-        { label: 'Security overview', href: '#platform' },
-        { label: 'Data processing', href: '#contact' },
+        { label: 'Contact sales', href: 'mailto:hello@ultron.io' },
+        { label: 'Request access', href: '/signup' },
       ],
     },
   ];
 
   return (
-    <footer id="contact" style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#080808', scrollMarginTop: 70 }}>
+    <footer style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#06070A' }}>
       <div
         style={{
           maxWidth: 1200,
@@ -920,7 +1039,18 @@ function SiteFooter() {
 
         {cols.map((col) => (
           <div key={col.title}>
-            <div style={{ fontFamily: FONT_MED, fontSize: 13, color: INK, marginBottom: 16 }}>{col.title}</div>
+            <div
+              style={{
+                fontFamily: FONT_MONO,
+                fontSize: 10.5,
+                letterSpacing: '0.2em',
+                textTransform: 'uppercase',
+                color: 'rgba(247,246,242,0.5)',
+                marginBottom: 16,
+              }}
+            >
+              {col.title}
+            </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {col.links.map((l) =>
                 l.href.startsWith('#') || l.href.startsWith('/') ? (
@@ -996,49 +1126,89 @@ const socialBtn: CSSProperties = {
 };
 
 const ctaPrimary: CSSProperties = {
-  fontFamily: FONT_MED,
-  fontSize: 15,
-  color: BG,
-  background: INK,
-  padding: '13px 26px',
-  borderRadius: 12,
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 10,
+  fontFamily: FONT_MONO,
+  fontSize: 12,
+  fontWeight: 600,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+  color: '#17130B',
+  background: 'linear-gradient(180deg, #F0C684, #D2A058)',
+  border: '1px solid rgba(223,174,99,0.9)',
+  padding: '16px 28px',
+  borderRadius: 999,
   textDecoration: 'none',
-  boxShadow: '0 10px 40px rgba(245,245,245,0.12)',
+  boxShadow: SHADOW.gold,
+};
+
+const ctaGhost: CSSProperties = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: 10,
+  fontFamily: FONT_MONO,
+  fontSize: 12,
+  letterSpacing: '0.16em',
+  textTransform: 'uppercase',
+  color: INK,
+  border: '1px solid rgba(255,255,255,0.18)',
+  padding: '16px 28px',
+  borderRadius: 999,
+  textDecoration: 'none',
+  transition: 'border-color 0.25s ease, background 0.25s ease',
 };
 
 const sectionKicker: CSSProperties = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 10,
   fontFamily: FONT_MONO,
-  fontSize: 12,
-  letterSpacing: '0.18em',
+  fontSize: 11,
+  letterSpacing: '0.2em',
+  textTransform: 'uppercase',
   color: GOLD,
-  marginBottom: 14,
+  marginBottom: 18,
 };
 
 const sectionTitle: CSSProperties = {
   fontFamily: FONT_DISPLAY,
-  fontSize: 'clamp(30px, 4.5vw, 46px)',
-  lineHeight: 1.05,
+  fontSize: 'clamp(34px, 5vw, 62px)',
+  fontWeight: 400,
+  lineHeight: 0.98,
   letterSpacing: '0.01em',
+  textTransform: 'uppercase',
   margin: 0,
+};
+
+const cardTitle: CSSProperties = {
+  fontFamily: FONT_HEAD,
+  fontSize: 25,
+  fontWeight: 400,
+  letterSpacing: '0.03em',
+  textTransform: 'uppercase',
+  margin: '14px 0 10px',
 };
 
 const featureCard: CSSProperties = {
   height: '100%',
-  padding: 26,
-  borderRadius: 18,
-  background: '#0E0E0E',
+  padding: 28,
+  borderRadius: 20,
+  background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012))',
   border: '1px solid rgba(255,255,255,0.08)',
-  transition: 'transform 0.3s ease, border-color 0.3s ease',
+  boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
+  transition: 'transform 0.35s cubic-bezier(0.22,1,0.36,1), border-color 0.3s ease, box-shadow 0.3s ease',
 };
 
 const featureIcon: CSSProperties = {
-  width: 46,
-  height: 46,
+  width: 48,
+  height: 48,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
-  borderRadius: 12,
-  background: 'rgba(201,161,92,0.14)',
+  borderRadius: 14,
+  border: '1px solid rgba(223,174,99,0.28)',
+  background: 'rgba(223,174,99,0.1)',
 };
 
 const keyframes = `
@@ -1053,6 +1223,9 @@ const keyframes = `
 .ultron-navlink:hover { color: ${INK} !important; }
 .ultron-navlink:hover::after { width: 100%; }
 .ultron-social:hover { color: ${GOLD} !important; border-color: rgba(201,161,92,0.5) !important; transform: translateY(-2px); }
+.ultron-ghost:hover { border-color: rgba(223,174,99,0.55) !important; background: rgba(223,174,99,0.08) !important; }
+details summary::-webkit-details-marker { display: none; }
+details summary { list-style: none; }
 @media (max-width: 720px) {
   header nav a[href^="#"] { display: none; }
 }

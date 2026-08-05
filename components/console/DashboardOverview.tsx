@@ -179,21 +179,34 @@ function KpiCard({
       onPress={onPress}
       accessibilityRole={onPress ? 'button' : undefined}
       className={cn(
-        'h-full min-w-0 flex-1 overflow-hidden rounded-xl border',
-        compact ? 'px-2.5 py-2' : 'min-w-[170px] p-3',
+        'h-full min-w-0 flex-1 overflow-hidden rounded-2xl border',
+        compact ? 'px-3 py-2.5' : 'min-w-[170px] p-3.5',
         isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white',
       )}
+      style={{
+        shadowColor: '#000',
+        shadowOpacity: isDark ? 0.32 : 0.05,
+        shadowRadius: 18,
+        shadowOffset: { width: 0, height: 8 },
+      }}
     >
       <View className="flex-row items-center gap-2">
         <View className={cn(compact ? 'h-6 w-6' : 'h-8 w-8', 'items-center justify-center rounded-lg')} style={{ backgroundColor: `${color}16` }}>
           <MaterialCommunityIcons name={icon} size={compact ? 14 : 18} color={color} />
         </View>
-        <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body-medium', compact ? 'text-[10px]' : 'text-[12px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+        <Text
+          numberOfLines={1}
+          className={cn(
+            'min-w-0 flex-1 font-mono uppercase',
+            compact ? 'text-[8.5px] tracking-[0.16em]' : 'text-[9.5px] tracking-[0.18em]',
+            isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
+          )}
+        >
           {label}
         </Text>
       </View>
-      <View className={cn('flex-row items-end gap-1', compact ? 'mt-1' : 'mt-2')}>
-        <Text className={cn('font-display', compact ? 'text-[20px] leading-6' : 'text-2xl', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
+      <View className={cn('flex-row items-end gap-1', compact ? 'mt-1.5' : 'mt-2.5')}>
+        <Text className={cn('font-display', compact ? 'text-[24px] leading-7' : 'text-[30px] leading-9', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
         {unit ? (
           <Text numberOfLines={1} className={cn('pb-1 font-body-medium', compact ? 'text-[10px]' : 'text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit}</Text>
         ) : null}
@@ -223,7 +236,7 @@ function KpiCard({
 }
 
 function sectionClass(isDark: boolean) {
-  return cn('h-full overflow-hidden rounded-xl border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white');
+  return cn('h-full overflow-hidden rounded-2xl border', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white');
 }
 
 function SectionHeader({ icon, title, subtitle, action, compact = false }: { icon?: IconName; title: string; subtitle?: string; action?: string; compact?: boolean }) {
@@ -233,18 +246,35 @@ function SectionHeader({ icon, title, subtitle, action, compact = false }: { ico
       <View className="min-w-0 flex-1 flex-row items-center gap-2">
         {icon && <MaterialCommunityIcons name={icon} size={compact ? 14 : 16} color={isDark ? '#F5F5F5' : '#111827'} />}
         <View className="min-w-0 flex-1">
-          <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-xs' : 'text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
+          <Text
+            numberOfLines={1}
+            className={cn(
+              'font-heading uppercase tracking-[0.08em]',
+              compact ? 'text-[13px]' : 'text-[15px]',
+              isDark ? 'text-ink' : 'text-ink-inverse',
+            )}
+          >
+            {title}
+          </Text>
           {subtitle ? (
             <Text numberOfLines={1} className={cn('font-body', compact ? 'text-[9px]' : 'text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{subtitle}</Text>
           ) : null}
         </View>
       </View>
-      {action && <Text numberOfLines={1} className={cn('font-body-medium text-primary-blue', compact ? 'text-[10px]' : 'text-[11px]')}>{action}</Text>}
+      {action && (
+        <Text
+          numberOfLines={1}
+          className={cn('font-mono uppercase tracking-[0.14em] text-accent', compact ? 'text-[9px]' : 'text-[10px]')}
+        >
+          {action}
+        </Text>
+      )}
     </View>
   );
 }
 
 function HealthGauge({ score, label, compact = false }: { score: number; label: string; compact?: boolean }) {
+  const { isDark } = useAppTheme();
   const size = compact ? 172 : 196;
   const stroke = compact ? 15 : 18;
   const cx = size / 2;
@@ -275,21 +305,24 @@ function HealthGauge({ score, label, compact = false }: { score: number; label: 
     const p1 = { x: cx + radius * Math.cos((Math.PI * a1) / 180), y: cy + radius * Math.sin((Math.PI * a1) / 180) };
     return `M ${p0.x} ${p0.y} A ${radius} ${radius} 0 0 1 ${p1.x} ${p1.y}`;
   };
-  const toneColorForScore = value >= 85 ? '#16a34a' : value >= 70 ? '#16a34a' : value >= 50 ? '#d97706' : '#dc2626';
+  const trackColour = isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb';
+  const inkColour = isDark ? '#F7F6F2' : '#111827';
+  const mutedColour = isDark ? '#93938E' : '#475569';
+  const toneColour = value >= 70 ? (isDark ? '#3FB950' : '#16a34a') : value >= 50 ? '#d97706' : '#dc2626';
   return (
     <Svg width={size} height={compact ? size * 0.72 : size * 0.74} viewBox={`0 0 ${size} ${size * 0.78}`}>
-      <Path d={arc(0, 1)} fill="none" stroke="#e5e7eb" strokeWidth={stroke} strokeLinecap="round" />
+      <Path d={arc(0, 1)} fill="none" stroke={trackColour} strokeWidth={stroke} strokeLinecap="round" />
       {bands.map((band) => (
         <Path key={band.color} d={arc(band.from, band.to)} fill="none" stroke={band.color} strokeWidth={stroke} />
       ))}
-      <Line x1={tickX1} y1={tickY1} x2={tickX2} y2={tickY2} stroke="#111827" strokeWidth={2.5} strokeLinecap="round" />
-      <SvgText x={cx - (compact ? 6 : 8)} y={cy - (compact ? 14 : 18)} textAnchor="middle" fontSize={compact ? 30 : 38} fontWeight="700" fill="#111827">
+      <Line x1={tickX1} y1={tickY1} x2={tickX2} y2={tickY2} stroke={inkColour} strokeWidth={2.5} strokeLinecap="round" />
+      <SvgText x={cx - (compact ? 6 : 8)} y={cy - (compact ? 14 : 18)} textAnchor="middle" fontSize={compact ? 30 : 38} fontWeight="700" fill={inkColour}>
         {value}
       </SvgText>
-      <SvgText x={cx + (compact ? 18 : 24)} y={cy - (compact ? 14 : 18)} fontSize={compact ? 10 : 12} fill="#475569">
+      <SvgText x={cx + (compact ? 18 : 24)} y={cy - (compact ? 14 : 18)} fontSize={compact ? 10 : 12} fill={mutedColour}>
         /100
       </SvgText>
-      <SvgText x={cx} y={cy + (compact ? 4 : 4)} textAnchor="middle" fontSize={compact ? 12 : 14} fontWeight="700" fill={toneColorForScore}>
+      <SvgText x={cx} y={cy + (compact ? 4 : 4)} textAnchor="middle" fontSize={compact ? 12 : 14} fontWeight="700" fill={toneColour}>
         {label}
       </SvgText>
     </Svg>
@@ -350,6 +383,8 @@ function TrendLine({
   fill?: boolean;
   maxValue?: number;
 }) {
+  const { isDark } = useAppTheme();
+  const gridColour = isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0';
   const width = 520;
   const pad = 26;
   const series = values.length > 1 ? values : [values[0] ?? 0, values[0] ?? 0];
@@ -372,7 +407,7 @@ function TrendLine({
         const y = height - pad - (tick / 100) * (height - pad * 2);
         return (
           <G key={tick}>
-            <Line x1={pad} x2={width - pad} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="3 5" strokeWidth={1} />
+            <Line x1={pad} x2={width - pad} y1={y} y2={y} stroke={gridColour} strokeDasharray="3 5" strokeWidth={1} />
             <SvgText x={pad - 8} y={y + 3} fontSize={9} fill="#94a3b8" textAnchor="end">
               {Math.round((tick / 100) * max)}
             </SvgText>
@@ -387,7 +422,7 @@ function TrendLine({
       ))}
       {lastPoint && (
         <G>
-          <Circle cx={lastPoint.x} cy={lastPoint.y} r={4.5} fill={color} stroke="#fff" strokeWidth={2} />
+          <Circle cx={lastPoint.x} cy={lastPoint.y} r={4.5} fill={color} stroke={isDark ? '#0E1014' : '#fff'} strokeWidth={2} />
           <SvgText x={lastPoint.x - 6} y={lastPoint.y - 10} fill={color} fontWeight="700" fontSize={11} textAnchor="end">
             {Math.round(last)}
           </SvgText>
@@ -398,6 +433,7 @@ function TrendLine({
 }
 
 function StackedBars({ labels, critical, warning, info, height = 170 }: { labels: string[]; critical: number[]; warning: number[]; info: number[]; height?: number }) {
+  const { isDark } = useAppTheme();
   const width = 520;
   const baseY = height - 30;
   const top = 16;
@@ -411,7 +447,7 @@ function StackedBars({ labels, critical, warning, info, height = 170 }: { labels
         const y = baseY - ratio * usable;
         return (
           <G key={ratio}>
-            <Line x1={34} x2={width - 20} y1={y} y2={y} stroke="#e2e8f0" strokeDasharray="3 5" />
+            <Line x1={34} x2={width - 20} y1={y} y2={y} stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0'} strokeDasharray="3 5" />
             <SvgText x={28} y={y + 3} fontSize={9} fill="#94a3b8" textAnchor="end">
               {Math.round(ratio * max)}
             </SvgText>
@@ -439,6 +475,7 @@ function StackedBars({ labels, critical, warning, info, height = 170 }: { labels
 }
 
 function DonutChart({ segments, total, size = 150 }: { segments: { label: string; value: number; color: string }[]; total: number; size?: number }) {
+  const { isDark } = useAppTheme();
   const scale = size / 150;
   const radius = 46 * scale;
   const circumference = 2 * Math.PI * radius;
@@ -446,7 +483,14 @@ function DonutChart({ segments, total, size = 150 }: { segments: { label: string
   let offset = 0;
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Circle cx={size / 2} cy={size / 2} r={radius} stroke="#e5e7eb" strokeWidth={17 * scale} fill="none" />
+      <Circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'}
+        strokeWidth={17 * scale}
+        fill="none"
+      />
       {segments.map((segment) => {
         const length = (segment.value / sum) * circumference;
         const item = (
@@ -467,10 +511,17 @@ function DonutChart({ segments, total, size = 150 }: { segments: { label: string
         offset += length;
         return item;
       })}
-      <SvgText x={size / 2} y={size / 2 - 2} textAnchor="middle" fontSize={22 * scale} fontWeight="700" fill="#111827">
+      <SvgText
+        x={size / 2}
+        y={size / 2 - 2}
+        textAnchor="middle"
+        fontSize={22 * scale}
+        fontWeight="700"
+        fill={isDark ? '#F7F6F2' : '#111827'}
+      >
         {total}
       </SvgText>
-      <SvgText x={size / 2} y={size / 2 + 15 * scale} textAnchor="middle" fontSize={11 * scale} fill="#64748b">
+      <SvgText x={size / 2} y={size / 2 + 15 * scale} textAnchor="middle" fontSize={11 * scale} fill={isDark ? '#93938E' : '#64748b'}>
         Total
       </SvgText>
     </Svg>
@@ -797,32 +848,47 @@ function InsightsPanel({ insights, compact = false }: { insights: Insight[]; com
   );
 }
 
-function QuickActions({ onOpenDevices, onOpenCanvas, compact = false }: { onOpenDevices: () => void; onOpenCanvas: () => void; compact?: boolean }) {
+function QuickActions({
+  onOpenDevices,
+  onOpenCanvas,
+  onOpenPanel,
+  compact = false,
+}: {
+  onOpenDevices: () => void;
+  onOpenCanvas: () => void;
+  onOpenPanel: (panel: DetailPanel) => void;
+  compact?: boolean;
+}) {
   const { isDark } = useAppTheme();
-  const actions = [
-    ['bell-alert-outline', 'View Critical Alarms'],
-    ['lan-disconnect', 'Offline Devices'],
-    ['wrench-clock-outline', 'Maintenance Due'],
-    ['file-chart-outline', 'Open Reports'],
-    ['vector-polyline', 'Open Canvas'],
-    ['magnify', 'Asset Search'],
-  ] as const;
+  // Every shortcut resolves to a real destination: the devices table, the
+  // machine canvas, or the matching dashboard detail panel.
+  const actions: { icon: IconName; label: string; onPress: () => void; tone?: string }[] = [
+    { icon: 'bell-alert-outline', label: 'View Critical Alarms', onPress: () => onOpenPanel('alarms'), tone: '#ef4444' },
+    { icon: 'lan-disconnect', label: 'Offline Devices', onPress: onOpenDevices },
+    { icon: 'wrench-clock-outline', label: 'Maintenance Due', onPress: () => onOpenPanel('machines') },
+    { icon: 'file-chart-outline', label: 'Open Reports', onPress: () => onOpenPanel('insights') },
+    { icon: 'vector-polyline', label: 'Open Canvas', onPress: onOpenCanvas, tone: '#2563eb' },
+    { icon: 'magnify', label: 'Asset Search', onPress: onOpenDevices },
+  ];
   return (
     <View className={sectionClass(isDark)}>
       <SectionHeader icon="cursor-default-click-outline" title="Quick Actions / Shortcuts" compact={compact} />
       <View className={cn('flex-1 flex-row flex-wrap content-start', compact ? 'gap-2 p-2.5' : 'gap-2 p-3')}>
-        {actions.map(([icon, label]) => (
+        {actions.map((action) => (
           <Pressable
-            key={label}
-            onPress={label === 'Offline Devices' ? onOpenDevices : label === 'Open Canvas' ? onOpenCanvas : undefined}
+            key={action.label}
+            onPress={action.onPress}
+            accessibilityRole="button"
             className={cn(
-              'flex-row items-center gap-2 rounded-lg border px-3',
+              'flex-row items-center gap-2 rounded-xl border px-3',
               compact ? 'h-[42px] min-w-[120px] basis-[30%] flex-1' : 'h-[46px] min-w-[150px] flex-1',
               isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white',
             )}
           >
-            <MaterialCommunityIcons name={icon} size={16} color={label.includes('Critical') ? '#ef4444' : label === 'Open Canvas' ? '#2563eb' : isDark ? '#F5F5F5' : '#111827'} />
-            <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body-medium text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{label}</Text>
+            <MaterialCommunityIcons name={action.icon} size={16} color={action.tone ?? (isDark ? '#F5F5F5' : '#111827')} />
+            <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body-medium text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              {action.label}
+            </Text>
           </Pressable>
         ))}
       </View>
@@ -853,7 +919,7 @@ function DashboardDetailModal({
       <View className="flex-1 items-center justify-center bg-black/45 p-4">
         <View className={cn('overflow-hidden rounded-xl border shadow-2xl', isDark ? 'border-line-dark bg-surface' : 'border-line-light bg-white')} style={{ width: modalWidth, maxHeight: modalHeight }}>
           <View className={cn('flex-row items-center justify-between border-b px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
-            <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
+            <Text className={cn('font-heading text-lg uppercase tracking-[0.06em]', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
             <Pressable onPress={onClose} className={cn('rounded-lg border px-3 py-1.5', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-slate-50')}>
               <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Close</Text>
             </Pressable>
@@ -1151,7 +1217,11 @@ export function DashboardOverview({
       case 'actions':
         return (
           <View style={{ height: 220 }}>
-            <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} />
+            <QuickActions
+              onOpenDevices={onOpenDevices}
+              onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)}
+              onOpenPanel={openPanel}
+            />
           </View>
         );
       default:
@@ -1167,24 +1237,31 @@ export function DashboardOverview({
         <View className="gap-3" style={{ flexGrow: 1, width: '100%' }}>
           {/* Top bar */}
           <View className="flex-row flex-wrap items-center gap-2">
-            <Pressable className={cn('h-10 min-w-[190px] flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <Pressable
+              onPress={() => openPanel('plant')}
+              accessibilityRole="button"
+              className={cn('h-10 min-w-[190px] flex-row items-center gap-2 rounded-xl border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
+            >
               <MaterialCommunityIcons name="office-building-marker-outline" size={17} color={isDark ? '#F5F5F5' : '#111827'} />
-              <Text numberOfLines={1} className={cn('flex-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{metrics.plantName}</Text>
+              <Text numberOfLines={1} className={cn('flex-1 font-heading text-[15px] uppercase tracking-[0.06em]', isDark ? 'text-ink' : 'text-ink-inverse')}>{metrics.plantName}</Text>
               <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
             </Pressable>
 
-            <View className={cn('h-10 min-w-[240px] flex-1 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
+            <Pressable
+              onPress={onOpenDevices}
+              accessibilityRole="button"
+              className={cn('h-10 min-w-[240px] flex-1 flex-row items-center gap-2 rounded-xl border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
+            >
               <MaterialCommunityIcons name="magnify" size={17} color={isDark ? '#999' : '#64748b'} />
-              <Text numberOfLines={1} className={cn('flex-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Search assets, tags, gateways, racks...</Text>
-              {!isCompact && <Text className={cn('rounded bg-slate-100 px-2 py-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>⌘ K</Text>}
-            </View>
+              <Text numberOfLines={1} className={cn('flex-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Browse assets, tags, gateways and racks</Text>
+            </Pressable>
 
             <Pressable
               onPress={() => setTimeRange((value) => (value === 'Last Hour' ? 'Last 24 Hours' : value === 'Last 24 Hours' ? 'Last 7 Days' : value === 'Last 7 Days' ? 'Custom' : 'Last Hour'))}
               className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}
             >
               <MaterialCommunityIcons name="calendar-clock" size={16} color={isDark ? '#F5F5F5' : '#111827'} />
-              <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>{timeRange}</Text>
+              <Text className={cn('font-mono text-[10px] uppercase tracking-[0.14em]', isDark ? 'text-ink' : 'text-ink-inverse')}>{timeRange}</Text>
               <MaterialCommunityIcons name="chevron-down" size={17} color={isDark ? '#999' : '#64748b'} />
             </Pressable>
 
@@ -1194,12 +1271,12 @@ export function DashboardOverview({
 
             <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
               <View className={cn('h-2 w-2 rounded-full', metrics.streamHealthy ? 'bg-status-success' : 'bg-status-warning')} />
-              <Text className={cn('font-body-bold text-xs', metrics.streamHealthy ? 'text-status-success' : 'text-status-warning')}>LIVE</Text>
+              <Text className={cn('font-mono text-[10px] uppercase tracking-[0.2em]', metrics.streamHealthy ? 'text-status-success' : 'text-status-warning')}>Live</Text>
             </View>
 
             <View className={cn('h-10 flex-row items-center gap-2 rounded-lg border px-3', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
               <MaterialCommunityIcons name={metrics.streamHealthy ? 'access-point-check' : 'access-point-off'} size={16} color={metrics.streamHealthy ? '#16a34a' : '#f59e0b'} />
-              <Text className={cn('font-body-bold text-xs', metrics.streamHealthy ? 'text-status-success' : 'text-status-warning')}>{metrics.streamHealthy ? 'Stream Healthy' : 'Stream Stale'}</Text>
+              <Text className={cn('font-mono text-[10px] uppercase tracking-[0.14em]', metrics.streamHealthy ? 'text-status-success' : 'text-status-warning')}>{metrics.streamHealthy ? 'Stream healthy' : 'Stream stale'}</Text>
             </View>
 
             <View className={cn('flex-row items-center gap-2 rounded-lg border px-2 py-1.5', isDark ? 'border-line-dark bg-surface-card' : 'border-line-light bg-white')}>
@@ -1302,7 +1379,12 @@ export function DashboardOverview({
               <InsightsPanel insights={metrics.insights} compact />
             </Pressable>
             <Pressable onPress={() => openPanel('actions')} style={{ flex: isCompact ? undefined : 0.9, height: rowHeights.bottom }}>
-              <QuickActions onOpenDevices={onOpenDevices} onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)} compact />
+              <QuickActions
+                onOpenDevices={onOpenDevices}
+                onOpenCanvas={() => firstMachine && onOpenMachine(firstMachine.id)}
+                onOpenPanel={openPanel}
+                compact
+              />
             </Pressable>
           </View>
         </View>

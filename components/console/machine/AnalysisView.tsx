@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
+import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import {
   analyzeRotaryAirlock,
@@ -199,8 +200,8 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
   return (
     <Panel className="gap-3" style={{ borderLeftWidth: 3, borderLeftColor: colour }}>
       <View className="flex-row flex-wrap items-center justify-between gap-2">
-        <Text className={cn('font-body-bold text-sm', textClass)}>{diagnosis.title}</Text>
-        <Text style={{ color: colour }} className="font-body-bold text-[11px] uppercase tracking-wider">
+        <Text className={cn('font-heading text-lg uppercase tracking-[0.05em]', textClass)}>{diagnosis.title}</Text>
+        <Text style={{ color: colour }} className="font-mono text-[10px] uppercase tracking-[0.16em]">
           {formatUrgency(diagnosis.urgency)} · {Math.round(diagnosis.confidence * 100)}%
         </Text>
       </View>
@@ -283,13 +284,7 @@ export function AnalysisView({
   }, [mappedChannels, devices, cards, live, demoValues]);
 
   if (mappedChannels.length === 0) {
-    return (
-      <View className="flex-1 items-center justify-center px-6">
-        <Text className={cn('font-body text-sm italic', mutedClass)}>
-          No rack channels are mapped to this machine yet — link a box to a channel in Design mode.
-        </Text>
-      </View>
-    );
+    return <EmptyState title="No mapped channels" description="Analysis needs saved rack mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
   const conditionTone: Tone =
@@ -307,7 +302,7 @@ export function AnalysisView({
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 16 }}>
       <View className="min-w-0 flex-1 gap-1">
-        <Text className={cn('font-body-bold text-2xl', textClass)}>Analysis layer</Text>
+        <Text className={cn('font-heading text-3xl uppercase tracking-[0.04em]', textClass)}>Analysis layer</Text>
         <Text className={cn('font-body text-xs leading-5', mutedClass)}>
           Computed from saved rack mappings and live signals using the rotary-airlock analysis model.
           {expectedPoints ? ` ${mappedChannels.length} of ${expectedPoints} expected points mapped.` : ` ${mappedChannels.length} mapped channels.`}

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 
+import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter, useLiveHistory } from './liveValue';
@@ -230,13 +231,7 @@ export function TrendView({ mappedChannels, machineId, expectedPoints }: TrendVi
   );
 
   if (mappedChannels.length === 0) {
-    return (
-      <View className="flex-1 items-center justify-center px-6">
-        <Text className={cn('font-body text-sm italic', mutedClass)}>
-          No rack channels are mapped to this machine yet — link a box to a channel in Design mode.
-        </Text>
-      </View>
-    );
+    return <EmptyState title="No mapped channels" description="Trends plot saved rack mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
   // When a single kind is selected every series shares one real band, so the
