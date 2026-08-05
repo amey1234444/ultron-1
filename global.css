@@ -13,9 +13,65 @@ body {
   background: #07080b;
 }
 
+/* Horizontal clipping belongs on the document: setting `overflow-x` on a page
+   wrapper would turn that wrapper into the scroll container, which breaks the
+   fixed site nav's scroll state and anchor scroll offsets. */
+body {
+  overflow-x: hidden;
+}
+
 /* Prevent subpixel color fringing on bold text over dark backgrounds (web only). */
 body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Web typography                                                            */
+/*                                                                           */
+/* The console is a react-native-web tree, so its type comes from the         */
+/* nativewind font utilities. Native builds keep the bundled TTF families     */
+/* declared in tailwind.config.js; on the web these overrides map the same    */
+/* utilities onto the display system used across the site — Anton for hero    */
+/* numerals, Bebas Neue for headings, DM Sans for UI text and JetBrains Mono  */
+/* for engineering values. Loaded from Google Fonts in _document.tsx.         */
+/* ------------------------------------------------------------------------- */
+
+:root {
+  --font-display: 'Anton', 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
+  --font-heading: 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'DM Sans', 'Sora', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+.font-display {
+  font-family: var(--font-display) !important;
+  letter-spacing: 0.01em;
+}
+
+.font-wordmark,
+.font-heading,
+.font-heading-medium {
+  font-family: var(--font-heading) !important;
+  letter-spacing: 0.02em;
+}
+
+.font-body,
+.font-body-medium,
+.font-body-bold {
+  font-family: var(--font-body) !important;
+}
+
+.font-body-medium {
+  font-weight: 500 !important;
+}
+
+.font-body-bold {
+  font-weight: 600 !important;
+}
+
+.font-mono {
+  font-family: var(--font-mono) !important;
+  font-variant-numeric: tabular-nums;
 }

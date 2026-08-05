@@ -22,13 +22,13 @@ import { apiFetch } from '../lib/apiClient';
 // bundled fonts untouched.
 export const AUTH_FONT_DISPLAY = "'Bebas Neue', 'DM Sans', system-ui, sans-serif";
 export const AUTH_FONT_BODY = "'DM Sans', system-ui, sans-serif";
+export const AUTH_FONT_MONO = "'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace";
 
 export const AUTH_GOLD = '#C9A15C';
 const GOLD = AUTH_GOLD;
 const GOLD_SOFT = 'rgba(201,161,92,0.14)';
 
 // Dark auth palette, matching the landing page's near-black surface.
-const BRAND = '#F5F5F5';
 const SURFACE = '#08090B';
 const PANEL = '#0E1013';
 const FIELD = '#131518';
@@ -99,7 +99,7 @@ export function AuthShell({
           <View style={{ width: '100%', maxWidth: 432, alignSelf: 'center' }}>
             <View style={{ alignItems: 'center', gap: 6 }}>
               <Image source={LOGO_DARK} style={{ height: 30, width: 30 * LOGO_ASPECT }} resizeMode="contain" accessibilityLabel="ULTRON" />
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.8, color: MUTED }}>
+              <Text style={{ fontFamily: AUTH_FONT_MONO, fontSize: 10, letterSpacing: 3.4, color: MUTED }}>
                 ASSET MONITORING
               </Text>
             </View>
@@ -113,7 +113,8 @@ export function AuthShell({
                 backgroundColor: PANEL,
                 paddingHorizontal: compact ? 18 : 24,
                 paddingVertical: 22,
-              }}
+                boxShadow: '0 30px 80px rgba(0,0,0,0.55)',
+              } as ViewStyle}
             >
               {badge ? (
                 <View
@@ -128,11 +129,20 @@ export function AuthShell({
                     marginBottom: 12,
                   }}
                 >
-                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.2, color: GOLD }}>{badge}</Text>
+                  <Text style={{ fontFamily: AUTH_FONT_MONO, fontSize: 9.5, letterSpacing: 2, color: GOLD }}>{badge}</Text>
                 </View>
               ) : null}
 
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 24, fontWeight: '700', color: INK, letterSpacing: -0.4 }}>
+              <Text
+                style={{
+                  fontFamily: AUTH_FONT_DISPLAY,
+                  fontSize: 36,
+                  lineHeight: 38,
+                  color: INK,
+                  letterSpacing: 1,
+                  textTransform: 'uppercase',
+                }}
+              >
                 {title}
               </Text>
               <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 19, color: MUTED, marginTop: 6 }}>{subtitle}</Text>
@@ -194,7 +204,9 @@ export function AuthField({
   return (
     <View style={{ marginTop: 12 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '600', letterSpacing: 0.3, color: INK }}>{label}</Text>
+        <Text style={{ fontFamily: AUTH_FONT_MONO, fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', color: MUTED }}>
+          {label}
+        </Text>
         {hint}
       </View>
       <View
@@ -345,17 +357,28 @@ export function AuthButton({
         justifyContent: 'center',
         height: 46,
         borderRadius: 10,
-        borderWidth: primary ? 0 : 1,
-        borderColor: LINE_STRONG,
-        backgroundColor: primary ? (hovered && !inert ? '#ffffff' : BRAND) : 'transparent',
+        borderWidth: 1,
+        borderColor: primary ? 'rgba(201,161,92,0.9)' : LINE_STRONG,
+        backgroundColor: primary ? (hovered && !inert ? '#F0C684' : GOLD) : 'transparent',
         opacity: inert ? 0.55 : 1,
-        ...(primary && hovered && !inert ? { boxShadow: '0 8px 24px rgba(245,245,245,0.16)' } : null),
+        ...(primary && !inert ? { boxShadow: '0 14px 34px rgba(201,161,92,0.26)' } : null),
       } as ViewStyle}
     >
       {submitting ? (
         <ActivityIndicator color={primary ? SURFACE : INK} />
       ) : (
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontWeight: '700', fontSize: 15, color: primary ? '#0A0A0A' : INK }}>{label}</Text>
+        <Text
+          style={{
+            fontFamily: AUTH_FONT_MONO,
+            fontWeight: '600',
+            fontSize: 12,
+            letterSpacing: 2,
+            textTransform: 'uppercase',
+            color: primary ? '#17130B' : INK,
+          }}
+        >
+          {label}
+        </Text>
       )}
     </Pressable>
   );
@@ -472,7 +495,9 @@ export function CaptchaField({
   return (
     <>
       <View style={{ marginTop: 12 }}>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '600', letterSpacing: 0.3, color: INK }}>Security check</Text>
+        <Text style={{ fontFamily: AUTH_FONT_MONO, fontSize: 10, letterSpacing: 1.8, textTransform: 'uppercase', color: MUTED }}>
+          Security check
+        </Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 8 }}>
           <View
             style={{

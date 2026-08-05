@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
+import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
@@ -160,13 +161,7 @@ export function AlarmView({ mappedChannels, machineId, expectedPoints }: AlarmVi
   }, [statuses, storageKey]);
 
   if (mappedChannels.length === 0) {
-    return (
-      <View className="flex-1 items-center justify-center px-6">
-        <Text className={cn('font-body text-sm italic', mutedClass)}>
-          No rack channels are mapped to this machine yet — link a box to a channel in Design mode.
-        </Text>
-      </View>
-    );
+    return <EmptyState title="No mapped channels" description="Alarms evaluate saved rack mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
   const statusOf = (id: string): AckStatus => statuses[id] ?? 'normal';

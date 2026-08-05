@@ -32,7 +32,7 @@ function LiveClock({ muted, ink }: { muted: string; ink: string }) {
   }, []);
   return (
     <View className="flex-row items-center gap-1.5">
-      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wide', muted)}>Live</Text>
+      <Text className={cn('font-mono text-[9px] uppercase tracking-[0.2em]', muted)}>Live</Text>
       <Text className={cn('font-mono text-xs tabular-nums', ink)}>{formatClock(now)}</Text>
     </View>
   );
@@ -130,7 +130,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
           {active.length}
           <Text className={mutedClass}>/{total}</Text>
         </Text>
-        {!compact && <Text className={cn('font-body-medium text-[11px]', mutedClass)}>IPs</Text>}
+        {!compact && <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.18em]', mutedClass)}>IPs</Text>}
         <Text className={cn('text-[9px]', mutedClass)}>v</Text>
       </Pressable>
 
@@ -155,7 +155,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
             ]}
           >
             <View className={cn('flex-row items-center justify-between border-b px-3 py-2', lineClass)}>
-              <Text className={cn('font-body-bold text-[11px] uppercase tracking-wider', inkClass)}>Connections</Text>
+              <Text className={cn('font-mono text-[10px] uppercase tracking-[0.2em]', inkClass)}>Connections</Text>
               <Text className={cn('font-body-medium text-[11px]', mutedClass)}>
                 {active.length} of {total} active
               </Text>
@@ -230,11 +230,15 @@ export function TopBar({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   const glassStyle = {
-    backgroundColor: isDark ? 'rgba(10,10,10,0.55)' : 'rgba(250,250,250,0.6)',
-    backdropFilter: 'blur(16px) saturate(160%)',
-    WebkitBackdropFilter: 'blur(16px) saturate(160%)',
+    backgroundColor: isDark ? 'rgba(8,9,12,0.72)' : 'rgba(252,252,251,0.78)',
+    backdropFilter: 'blur(20px) saturate(170%)',
+    WebkitBackdropFilter: 'blur(20px) saturate(170%)',
     borderBottomWidth: 1,
     borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(10,10,10,0.08)',
+    shadowColor: '#000',
+    shadowOpacity: isDark ? 0.4 : 0.08,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
   } as unknown as ViewStyle;
 
   const hasAlarms = alarmCount > 0;
@@ -242,7 +246,7 @@ export function TopBar({
 
   return (
     <View
-      className="relative z-10 flex-row flex-wrap items-center justify-between gap-y-2 px-4 py-2"
+      className="relative z-10 flex-row flex-wrap items-center justify-between gap-y-2 px-5 py-3"
       style={glassStyle}
     >
       <View className="flex-row items-center gap-3">
@@ -253,6 +257,14 @@ export function TopBar({
             resizeMode="contain"
           />
         </Pressable>
+        {!isMid && (
+          <>
+            <Divider color={dividerColor} />
+            <Text className={cn('font-mono text-[9px] uppercase tracking-[0.22em]', mutedClass)}>
+              Industrial intelligence console
+            </Text>
+          </>
+        )}
       </View>
 
       <View className="flex-row flex-wrap items-center justify-end gap-3">
@@ -279,7 +291,9 @@ export function TopBar({
                   backgroundColor: configureMode ? '#C9A15C' : isDark ? '#5A5A5A' : '#9A9A9A',
                 }}
               />
-              <Text className={cn('font-body-medium text-[11px]', configureMode ? 'text-accent' : mutedClass)}>Configure</Text>
+              <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.18em]', configureMode ? 'text-accent' : mutedClass)}>
+                Configure
+              </Text>
             </Pressable>
 
             {showDividers && <Divider color={dividerColor} />}
@@ -292,7 +306,7 @@ export function TopBar({
 
         <View className="flex-row items-center gap-1.5">
           <View className={cn('h-2 w-2 rounded-full', hasAlarms ? 'bg-status-critical' : 'bg-ink-muted')} />
-          <Text className={cn('font-body-medium text-[11px]', hasAlarms ? 'text-status-critical' : mutedClass)}>
+          <Text className={cn('font-mono text-[10px] uppercase tracking-[0.16em]', hasAlarms ? 'text-status-critical' : mutedClass)}>
             {alarmCount}
             {!isMid ? ` ${alarmCount === 1 ? 'Alarm' : 'Alarms'}` : ''}
           </Text>

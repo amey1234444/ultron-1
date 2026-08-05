@@ -1,5 +1,6 @@
 import { ScrollView, Text, View } from 'react-native';
 
+import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
@@ -95,13 +96,7 @@ export function RackOccupancyView({ devices, cards, mappedChannels, expectedPoin
   const rackIds = Array.from(new Set(mappedChannels.map((m) => m.channel.rackId)));
 
   if (rackIds.length === 0) {
-    return (
-      <View className="flex-1 items-center justify-center px-6">
-        <Text className={cn('font-body text-sm italic', mutedClass)}>
-          No rack channels are mapped to this machine yet — link a box to a channel in Design mode.
-        </Text>
-      </View>
-    );
+    return <EmptyState title="No racks mapped" description="Rack occupancy follows saved mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
   return (
