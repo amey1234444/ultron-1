@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Children, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -60,9 +60,18 @@ function ScrollColumn({ children, paddingHorizontal }: { children: ReactNode; pa
   );
 }
 
-// Auth forms use one vertical column on both sign-in and sign-up.
+// Signup pairs fields on wider screens to keep the form short, while narrow
+// screens stay stacked and easy to type into.
 export function AuthFieldRow({ children }: { children: ReactNode }) {
-  return <View>{children}</View>;
+  const { width } = useWindowDimensions();
+  const stacked = width > 0 && width < 620;
+  return (
+    <View style={{ flexDirection: stacked ? 'column' : 'row', gap: stacked ? 0 : 14 }}>
+      {Children.map(children, (child) => (
+        <View style={{ flex: 1, minWidth: 0 }}>{child}</View>
+      ))}
+    </View>
+  );
 }
 
 export function AuthShell({
