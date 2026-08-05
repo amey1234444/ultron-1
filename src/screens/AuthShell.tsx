@@ -1,6 +1,5 @@
-import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
-import { Children, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -18,7 +17,7 @@ import { apiFetch } from '../lib/apiClient';
 
 // Auth pages share the landing page's typography (Bebas Neue display + DM Sans
 // body, loaded via Google Fonts in _document.tsx). These are applied inline so
-// only the auth + home surfaces adopt the new look — the console keeps its own
+// only the auth + home surfaces adopt the new look - the console keeps its own
 // bundled fonts untouched.
 export const AUTH_FONT_DISPLAY = "'Bebas Neue', 'DM Sans', system-ui, sans-serif";
 export const AUTH_FONT_BODY = "'DM Sans', system-ui, sans-serif";
@@ -40,27 +39,9 @@ const LINE_STRONG = 'rgba(255,255,255,0.18)';
 const DANGER = '#F85149';
 const SUCCESS = '#3FB950';
 
-const BRAND_STATEMENT = {
-  kicker: 'BUILT FOR ROTATING EQUIPMENT',
-  headline: 'PREDICT\nFAILURES',
-  caption: 'BEFORE THEY STOP THE LINE',
-};
-
-const BRAND_CAPABILITIES = [
-  'Vibration, temperature, speed, current and pressure on one canvas',
-  'Edge gateway to browser at 10 Hz, with alarm evidence ranked for you',
-  'Scales to 1,600+ channels per plant',
-];
-
-const BRAND_PROOF = [
-  { value: '24/7', label: 'Edge ingest' },
-  { value: '<1s', label: 'Alarm latency' },
-  { value: '99.9%', label: 'Stream uptime' },
-];
-
 // Both auth pages must fit a single viewport. Below this height the shell falls
 // back to a scroll container so short windows stay usable.
-const MIN_FIT_HEIGHT = 720;
+const MIN_FIT_HEIGHT = 640;
 
 function FitColumn({ children, paddingHorizontal }: { children: ReactNode; paddingHorizontal: number }) {
   return <View style={{ flex: 1, justifyContent: 'center', paddingHorizontal, paddingVertical: 20 }}>{children}</View>;
@@ -77,9 +58,9 @@ function ScrollColumn({ children, paddingHorizontal }: { children: ReactNode; pa
   );
 }
 
-// Two fields on one line, so the sign-up form stays inside a single viewport.
+// Auth forms use one vertical column on both sign-in and sign-up.
 export function AuthFieldRow({ children }: { children: ReactNode }) {
-  return <View style={{ flexDirection: 'row', gap: 14 }}>{Children.map(children, (child) => <View style={{ flex: 1 }}>{child}</View>)}</View>;
+  return <View>{children}</View>;
 }
 
 export function AuthShell({
@@ -96,19 +77,16 @@ export function AuthShell({
   badge?: string;
 }) {
   const { width, height } = useWindowDimensions();
-  const stacked = width > 0 && width < 900;
-  // Stacked (narrow) layouts and short windows scroll; the wide layout is sized
-  // to fit one screen.
-  const fits = !stacked && height >= MIN_FIT_HEIGHT;
+  const compact = width > 0 && width < 560;
+  const fits = height >= MIN_FIT_HEIGHT;
   const Column = fits ? FitColumn : ScrollColumn;
 
   return (
-    <View style={{ flex: 1, flexDirection: stacked ? 'column' : 'row', backgroundColor: SURFACE, height: fits ? '100%' : undefined, minHeight: '100%' }}>
-      {/* Form column */}
-      <View style={{ flex: 1, backgroundColor: SURFACE, overflow: 'hidden' }}>
-        <Column paddingHorizontal={stacked ? 20 : 52}>
+    <View style={{ flex: 1, backgroundColor: SURFACE, height: fits ? '100%' : undefined, minHeight: '100%' }}>
+      <View style={{ flex: 1, backgroundColor: SURFACE }}>
+        <Column paddingHorizontal={compact ? 18 : 28}>
           <View style={{ width: '100%', maxWidth: 432, alignSelf: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
               <View
                 style={{
                   height: 38,
@@ -133,13 +111,13 @@ export function AuthShell({
 
             <View
               style={{
-                marginTop: 18,
+                marginTop: 16,
                 borderRadius: 20,
                 borderWidth: 1,
                 borderColor: LINE,
                 backgroundColor: PANEL,
-                paddingHorizontal: stacked ? 20 : 28,
-                paddingVertical: 24,
+                paddingHorizontal: compact ? 18 : 24,
+                paddingVertical: 22,
               }}
             >
               {badge ? (
@@ -164,7 +142,7 @@ export function AuthShell({
               </Text>
               <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 19, color: MUTED, marginTop: 6 }}>{subtitle}</Text>
 
-              <View style={{ marginTop: 12 }}>{children}</View>
+              <View style={{ marginTop: 10 }}>{children}</View>
 
               {footer ? (
                 <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: LINE, paddingTop: 14 }}>{footer}</View>
@@ -174,7 +152,7 @@ export function AuthShell({
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 14, justifyContent: 'center' }}>
               {['Encrypted session cookies', 'Role-based access', 'Admin-approved accounts'].map((item) => (
                 <View key={item} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: SUCCESS }}>✓</Text>
+                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: SUCCESS }}>OK</Text>
                   <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>{item}</Text>
                 </View>
               ))}
@@ -187,80 +165,16 @@ export function AuthShell({
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
-            paddingHorizontal: stacked ? 20 : 48,
+            paddingHorizontal: compact ? 20 : 32,
             paddingBottom: 14,
             paddingTop: 6,
           }}
         >
           <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>
-            © {new Date().getFullYear()} ULTRON. All rights reserved.
+            (c) {new Date().getFullYear()} ULTRON. All rights reserved.
           </Text>
           <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>Legal</Text>
         </View>
-      </View>
-
-      {/* Brand column */}
-      <View style={{ flex: 1, minHeight: stacked ? 340 : undefined, borderLeftWidth: stacked ? 0 : 1, borderTopWidth: stacked ? 1 : 0, borderColor: LINE }}>
-        <LinearGradient
-          colors={['#17181B', '#0D0E10', '#000000']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={{ flex: 1, paddingHorizontal: 40, paddingVertical: 36, justifyContent: 'space-between' }}
-        >
-          <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 10 }}>
-            <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 32, letterSpacing: 6, color: '#ffffff' }}>ULTRON</Text>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '600', letterSpacing: 3, color: GOLD }}>CONSOLE</Text>
-          </View>
-
-          <View style={{ alignItems: 'center' }}>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, letterSpacing: 4, color: GOLD, textAlign: 'center' }}>
-              {BRAND_STATEMENT.kicker}
-            </Text>
-            <Text
-              style={{
-                fontFamily: AUTH_FONT_DISPLAY,
-                fontSize: 58,
-                lineHeight: 60,
-                letterSpacing: 2,
-                color: '#ffffff',
-                textAlign: 'center',
-                marginTop: 12,
-              }}
-            >
-              {BRAND_STATEMENT.headline}
-            </Text>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, letterSpacing: 3, color: 'rgba(255,255,255,0.72)', marginTop: 14 }}>
-              {BRAND_STATEMENT.caption}
-            </Text>
-
-            <View style={{ gap: 8, marginTop: 26, maxWidth: 360 }}>
-              {BRAND_CAPABILITIES.map((item) => (
-                <View key={item} style={{ flexDirection: 'row', gap: 8 }}>
-                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: GOLD }}>—</Text>
-                  <Text style={{ flex: 1, fontFamily: AUTH_FONT_BODY, fontSize: 12, lineHeight: 18, color: 'rgba(255,255,255,0.68)' }}>
-                    {item}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          <View style={{ gap: 18 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-              {BRAND_PROOF.map((item) => (
-                <View key={item.label} style={{ flex: 1, alignItems: 'center' }}>
-                  <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 26, letterSpacing: 1, color: '#ffffff' }}>{item.value}</Text>
-                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.4, color: 'rgba(255,255,255,0.55)', marginTop: 2 }}>
-                    {item.label.toUpperCase()}
-                  </Text>
-                </View>
-              ))}
-            </View>
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
-              Crafted for teams that keep industrial plants running.
-            </Text>
-          </View>
-        </LinearGradient>
       </View>
     </View>
   );
@@ -400,7 +314,7 @@ export function PasswordStrength({ password }: { password: string }) {
       <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: strength.color }}>
         {strength.label}
         {strength.suggestions.length > 0 ? (
-          <Text style={{ color: FAINT }}> · add {strength.suggestions.slice(0, 2).join(', ')}</Text>
+          <Text style={{ color: FAINT }}> - add {strength.suggestions.slice(0, 2).join(', ')}</Text>
         ) : null}
       </Text>
     </View>
@@ -492,7 +406,7 @@ export function AuthDisclosure({ label, children }: { label: string; children: R
     <View style={{ marginTop: 14 }}>
       <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
         <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED, textAlign: 'center' }}>
-          {open ? '▴' : '▾'} {label}
+          {open ? 'Less' : 'More'} {label}
         </Text>
       </Pressable>
       {open ? (
@@ -567,8 +481,8 @@ export function CaptchaField({
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginTop: 8 }}>
           <View
             style={{
-              height: 46,
-              width: 150,
+              height: 56,
+              width: 160,
               maxWidth: '100%',
               alignItems: 'center',
               justifyContent: 'center',
@@ -576,13 +490,13 @@ export function CaptchaField({
               borderRadius: 10,
               borderWidth: 1,
               borderColor: LINE_STRONG,
-              backgroundColor: '#ffffff',
+              backgroundColor: '#0E0E0E',
             }}
           >
             {captcha.loading ? (
               <ActivityIndicator color={GOLD} />
             ) : captcha.svg ? (
-              <Image source={{ uri: svgToDataUri(captcha.svg) }} style={{ width: 150, height: 46 }} resizeMode="contain" />
+              <Image source={{ uri: svgToDataUri(captcha.svg) }} style={{ width: '100%', height: '100%' }} resizeMode="stretch" />
             ) : (
               <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED }}>Unavailable</Text>
             )}
@@ -591,9 +505,17 @@ export function CaptchaField({
             onPress={() => void captcha.reload()}
             accessibilityRole="button"
             accessibilityLabel="Refresh CAPTCHA"
-            style={{ borderRadius: 10, borderWidth: 1, borderColor: LINE_STRONG, paddingHorizontal: 12, paddingVertical: 11 }}
+            style={{
+              minHeight: 56,
+              justifyContent: 'center',
+              borderRadius: 10,
+              borderWidth: 1,
+              borderColor: LINE_STRONG,
+              paddingHorizontal: 14,
+              paddingVertical: 11,
+            }}
           >
-            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: GOLD }}>↻ New</Text>
+            <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: GOLD }}>New</Text>
           </Pressable>
         </View>
       </View>
