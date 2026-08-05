@@ -204,13 +204,6 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
 
       <div className={styles.heroContent}>
         <div className={styles.heroCopy}>
-          <div className={styles.eyebrow}>
-            <span className={styles.eyebrowDot} />
-            INDUSTRIAL IOT
-            <span className={styles.eyebrowSeparator}>-</span>
-            PREDICTIVE MAINTENANCE
-          </div>
-
           <h1>
             MACHINE HEALTH,
             <span>IN REAL TIME</span>
