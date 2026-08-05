@@ -13,6 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { LOGO_DARK } from '../../lib/brandLogos';
 import { apiFetch } from '../lib/apiClient';
 
 // Auth pages share the landing page's typography (Bebas Neue display + DM Sans
@@ -38,6 +39,7 @@ const LINE = 'rgba(255,255,255,0.10)';
 const LINE_STRONG = 'rgba(255,255,255,0.18)';
 const DANGER = '#F85149';
 const SUCCESS = '#3FB950';
+const LOGO_ASPECT = 284 / 77;
 
 // Both auth pages must fit a single viewport. Below this height the shell falls
 // back to a scroll container so short windows stay usable.
@@ -86,27 +88,11 @@ export function AuthShell({
       <View style={{ flex: 1, backgroundColor: SURFACE }}>
         <Column paddingHorizontal={compact ? 18 : 28}>
           <View style={{ width: '100%', maxWidth: 432, alignSelf: 'center' }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
-              <View
-                style={{
-                  height: 38,
-                  width: 38,
-                  borderRadius: 12,
-                  borderWidth: 1,
-                  borderColor: 'rgba(201,161,92,0.45)',
-                  backgroundColor: GOLD_SOFT,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 21, color: GOLD }}>U</Text>
-              </View>
-              <View>
-                <Text style={{ fontFamily: AUTH_FONT_DISPLAY, fontSize: 26, letterSpacing: 6, color: INK }}>ULTRON</Text>
-                <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.8, color: MUTED, marginTop: -2 }}>
-                  ASSET MONITORING
-                </Text>
-              </View>
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <Image source={LOGO_DARK} style={{ height: 30, width: 30 * LOGO_ASPECT }} resizeMode="contain" accessibilityLabel="ULTRON" />
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 11, letterSpacing: 1.8, color: MUTED }}>
+                ASSET MONITORING
+              </Text>
             </View>
 
             <View

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
+import logoDark from '../../../assets/brand/logo-dark.png';
 import { useAuth } from '../../context/AuthContext';
 import styles from './UltronHero.module.css';
 
@@ -63,6 +64,8 @@ const navigation: NavItem[] = [
   },
   { label: 'Contact', href: '#contact' },
 ];
+
+const LOGO_DARK_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
 
 const heroBenefits: { icon: IconName; title: string; subtitle: string }[] = [
   { icon: 'chart', title: 'AI Predictive', subtitle: 'Smart anomaly detection' },
@@ -222,7 +225,7 @@ export default function UltronHero({ narrowVisual }: { narrowVisual?: ReactNode 
       <header className={styles.header}>
         <div className={styles.headerContent}>
           <Link href="/home" className={styles.brand} aria-label="ULTRON home">
-            <span className={styles.brandName}>ULTRON</span>
+            <img src={LOGO_DARK_SRC} alt="ULTRON" className={styles.brandLogo} />
           </Link>
 
           <nav className={styles.navigation} aria-label="Primary navigation">

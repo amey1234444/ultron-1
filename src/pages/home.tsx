@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 
+import logoDark from '../../assets/brand/logo-dark.png';
 import UltronHero from '../components/hero/UltronHero';
 import { useAuth } from '../context/AuthContext';
 
@@ -28,6 +29,7 @@ const FONT_HEAD = "'Sora', 'Space Grotesk', SpaceGrotesk_600SemiBold, system-ui,
 const FONT_BODY = "'Sora', 'DM Sans', Inter_400Regular, system-ui, sans-serif";
 const FONT_MED = "'Sora', 'DM Sans', Inter_500Medium, system-ui, sans-serif";
 const FONT_MONO = "'IBM Plex Mono', IBMPlexMono_400Regular, ui-monospace, monospace";
+const LOGO_DARK_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
 
 // Fades a block up into place the first time it scrolls into view.
 function Reveal({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: CSSProperties }) {
@@ -868,7 +870,7 @@ function SiteFooter() {
       >
         {/* brand + contact */}
         <div>
-          <span style={{ fontFamily: FONT_DISPLAY, fontSize: 28, letterSpacing: '0.22em', color: INK }}>ULTRON</span>
+          <img src={LOGO_DARK_SRC} alt="ULTRON" style={{ display: 'block', width: 136, height: 'auto' }} />
           <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.7, margin: '16px 0 0', maxWidth: 300 }}>
             Industrial intelligence platform for real-time monitoring and predictive maintenance of rotating equipment.
           </p>
