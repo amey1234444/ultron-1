@@ -1,0 +1,317 @@
+/* Shared landing-page primitives: reveals, section headers, cards, buttons and
+   the marquee. Everything here is transform/opacity only so the page stays on
+   the compositor while scrolling. */
+
+/* --------------------------------------------------------------------- */
+/* Reveal                                                                */
+/* --------------------------------------------------------------------- */
+
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition: opacity 760ms var(--u-ease), transform 760ms var(--u-ease);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.revealShown {
+  opacity: 1;
+  transform: none;
+  /* Dropped once the element has landed — a permanent `will-change` on dozens
+     of blocks costs more memory than the animation saves. */
+  will-change: auto;
+}
+
+/* --------------------------------------------------------------------- */
+/* Masked word-by-word headline                                          */
+/* --------------------------------------------------------------------- */
+
+.split {
+  display: block;
+}
+
+.word {
+  display: inline-block;
+  overflow: hidden;
+  /* Descenders (g, y, p) would be clipped by the mask without this padding,
+     which the negative margin then removes from the line box again. */
+  padding-bottom: 0.16em;
+  margin-bottom: -0.16em;
+  vertical-align: bottom;
+}
+
+.wordInner {
+  display: inline-block;
+  transform: translate3d(0, 105%, 0);
+  opacity: 0;
+  transition: transform 900ms var(--u-ease), opacity 700ms ease;
+  transition-delay: var(--word-delay, 0ms);
+}
+
+.splitShown .wordInner {
+  transform: none;
+  opacity: 1;
+}
+
+.accent {
+  background: linear-gradient(96deg, var(--u-violet-soft) 0%, #c3b6ff 42%, var(--u-cyan) 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+/* --------------------------------------------------------------------- */
+/* Section scaffolding                                                   */
+/* --------------------------------------------------------------------- */
+
+.section {
+  position: relative;
+  padding: clamp(84px, 11vw, 152px) var(--u-gutter);
+}
+
+.sectionInner {
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-violet-soft);
+}
+
+.eyebrowRule {
+  width: 22px;
+  height: 1px;
+  background: linear-gradient(90deg, var(--u-violet-soft), transparent);
+}
+
+.head {
+  max-width: 720px;
+  margin: 0 0 clamp(40px, 5vw, 64px);
+}
+
+.headCenter {
+  margin-left: auto;
+  margin-right: auto;
+  text-align: center;
+}
+
+.headCenter .eyebrowRule {
+  display: none;
+}
+
+.title {
+  margin: 18px 0 0;
+  font-family: var(--u-font-sans);
+  font-size: clamp(32px, 4.4vw, 52px);
+  font-weight: 600;
+  /* Tight optical tracking is what separates this from a default Inter block —
+     it scales with size, so it is set in em, not px. */
+  letter-spacing: -0.033em;
+  line-height: 1.06;
+  color: var(--u-ink);
+  text-wrap: balance;
+}
+
+.lead {
+  margin: 20px 0 0;
+  max-width: 560px;
+  font-size: 17px;
+  line-height: 1.62;
+  color: var(--u-ink-2);
+  text-wrap: pretty;
+}
+
+.headCenter .lead {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* --------------------------------------------------------------------- */
+/* Spotlight card                                                        */
+/* --------------------------------------------------------------------- */
+
+.card {
+  position: relative;
+  height: 100%;
+  padding: 26px;
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius-card);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.008));
+  overflow: hidden;
+  isolation: isolate;
+  transition: border-color 400ms var(--u-ease), transform 500ms var(--u-ease);
+}
+
+/* Cursor-tracked highlight. `--mx`/`--my` are written by the pointer handler;
+   when the pointer has never entered, `--spot` holds the layer at zero opacity
+   so there is no stray glow on touch devices. */
+.card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  z-index: -1;
+  border-radius: inherit;
+  background: radial-gradient(
+    380px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(110, 91, 242, 0.16),
+    transparent 68%
+  );
+  opacity: var(--spot, 0);
+  transition: opacity 420ms ease;
+  pointer-events: none;
+}
+
+/* Hairline that lights up under the cursor, giving the border itself a source
+   of light rather than a uniform hover colour. */
+.card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  padding: 1px;
+  border-radius: inherit;
+  background: radial-gradient(
+    300px circle at var(--mx, 50%) var(--my, 50%),
+    rgba(156, 140, 255, 0.55),
+    transparent 60%
+  );
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  opacity: var(--spot, 0);
+  transition: opacity 420ms ease;
+  pointer-events: none;
+}
+
+.cardLift:hover {
+  transform: translateY(-3px);
+}
+
+.cardTitle {
+  margin: 0 0 8px;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.016em;
+  color: var(--u-ink);
+}
+
+.cardBody {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--u-ink-2);
+}
+
+/* --------------------------------------------------------------------- */
+/* Buttons                                                               */
+/* --------------------------------------------------------------------- */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 11px;
+  font-family: var(--u-font-sans);
+  font-size: 14.5px;
+  font-weight: 550;
+  letter-spacing: -0.008em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform 260ms var(--u-ease), box-shadow 260ms var(--u-ease), background 220ms ease,
+    border-color 220ms ease, color 220ms ease;
+}
+
+.btnPrimary {
+  border: 1px solid rgba(156, 140, 255, 0.6);
+  background: linear-gradient(180deg, #7d6cf5, #5d49e0);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 12px 30px rgba(110, 91, 242, 0.34);
+}
+
+.btnPrimary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.26) inset, 0 18px 42px rgba(110, 91, 242, 0.46);
+}
+
+.btnGhost {
+  border: 1px solid var(--u-line-strong);
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--u-ink);
+}
+
+.btnGhost:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.055);
+  transform: translateY(-1px);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+/* Arrow nudges on hover — the smallest possible affordance that the control
+   goes somewhere. */
+.btn svg {
+  transition: transform 300ms var(--u-ease);
+}
+
+.btn:hover svg {
+  transform: translateX(3px);
+}
+
+/* --------------------------------------------------------------------- */
+/* Marquee                                                               */
+/* --------------------------------------------------------------------- */
+
+.marquee {
+  position: relative;
+  overflow: hidden;
+  /* Both edges fade into the background so items enter and leave rather than
+     being cut off by the viewport. */
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+}
+
+.marqueeTrack {
+  display: flex;
+  width: max-content;
+  animation: marqueeScroll var(--marquee-duration, 42s) linear infinite;
+}
+
+/* The track holds two identical copies of the row, so translating by exactly
+   -50% lands the second copy where the first started — a seamless loop. */
+@keyframes marqueeScroll {
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.marquee:hover .marqueeTrack {
+  animation-play-state: paused;
+}
+
+.marqueeGroup {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marqueeTrack {
+    animation: none;
+  }
+}

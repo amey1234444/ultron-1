@@ -1,64 +1,68 @@
-// Shared design tokens for the public (non-console) pages.
+// Design tokens for the public (non-console) pages.
 //
-// The visual system mirrors the OSWAR/teck house style: an editorial condensed
-// display face over generous whitespace, tabular mono micro-labels, hairline
-// borders and a single warm metallic accent. Every marketing surface imports
-// from here so the landing page, auth screens and future pages cannot drift.
+// The landing surface is styled almost entirely through CSS modules reading the
+// `--u-*` custom properties declared in global.css. This module mirrors that
+// palette for the places that genuinely need values in JS — SVG `stroke`/`fill`
+// attributes and canvas-style computed colours in the product visuals, which
+// cannot take a CSS variable through a React prop reliably.
+//
+// Keep the two in sync: global.css is the source of truth, this is the mirror.
 
 export const COLOR = {
-  /** Page background — warm near-black so gold reads as metal, not yellow. */
-  bg: '#07080B',
-  /** Slightly lifted panel background. */
-  panel: '#0E1014',
+  /** Page background — near-black with a faint cool cast. */
+  bg: '#08090B',
+  bgSoft: '#0B0C10',
+  /** Panel background. */
+  panel: '#0E1015',
   /** Second-level panel, used for nested cards and inputs. */
-  panelRaised: '#14161C',
-  ink: '#F7F6F2',
-  inkMuted: '#93938E',
-  inkFaint: '#61636A',
-  line: 'rgba(255,255,255,0.09)',
-  lineStrong: 'rgba(255,255,255,0.16)',
-  gold: '#DFAE63',
-  goldDim: '#8A6C3A',
-  goldSoft: 'rgba(223,174,99,0.12)',
+  panelRaised: '#13151B',
+
+  ink: '#F4F5F7',
+  inkMuted: '#A6ACB8',
+  inkFaint: '#6E7480',
+
+  line: 'rgba(255,255,255,0.07)',
+  lineStrong: 'rgba(255,255,255,0.13)',
+
+  /** Brand light. Used for glow, active state and the primary CTA. */
+  violet: '#6E5BF2',
+  violetSoft: '#9C8CFF',
+  /** Secondary highlight. */
+  cyan: '#35D6C6',
+  /** Telemetry / alarm signal, shared with the console and the hero render. */
+  amber: '#E8B465',
   green: '#3FB950',
+  red: '#F0563F',
   blue: '#58A6FF',
-  red: '#EF4444',
 } as const;
 
 export const FONT = {
-  /** Anton — the tall condensed face used for hero and section headlines. */
-  display: "'Anton', 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif",
-  /** Bebas Neue — subheads, nav links, buttons, KPI values. */
-  heading: "'Bebas Neue', 'Space Grotesk', system-ui, sans-serif",
-  body: "'DM Sans', 'Sora', Inter_400Regular, system-ui, sans-serif",
-  /** JetBrains Mono — eyebrows, engineering values, metadata. */
-  mono: "'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace",
+  /** Inter carries both display and UI text; weight and tracking separate them. */
+  display: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  heading: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  body: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif",
+  /** Eyebrows, engineering values, metadata. */
+  mono: "'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace",
 } as const;
 
 export const RADIUS = {
-  card: 20,
-  panel: 16,
+  card: 18,
+  panel: 24,
   control: 12,
   pill: 999,
 } as const;
 
 export const SHADOW = {
-  card: '0 26px 70px rgba(0,0,0,0.45)',
-  float: '0 30px 90px rgba(0,0,0,0.55)',
-  gold: '0 18px 44px rgba(223,174,99,0.22)',
+  card: '0 24px 60px rgba(0,0,0,0.5)',
+  float: '0 40px 110px rgba(0,0,0,0.62)',
+  violet: '0 18px 44px rgba(110,91,242,0.34)',
 } as const;
 
-/** Wide-tracked uppercase mono eyebrow shared by every section header. */
-export const EYEBROW = {
-  fontFamily: FONT.mono,
-  fontSize: 11,
-  letterSpacing: '0.2em',
-  textTransform: 'uppercase' as const,
-  color: COLOR.gold,
-};
+/** The one easing every landing transition uses. */
+export const EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
 /** Standard horizontal page gutter. */
-export const GUTTER = 'clamp(20px, 5vw, 72px)';
+export const GUTTER = 'clamp(20px, 5vw, 64px)';
 
-/** Max content width — matches the reference site's roomy 1200px column. */
+/** Max content width. */
 export const MAX_WIDTH = 1200;

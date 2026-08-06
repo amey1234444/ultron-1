@@ -1,6 +1,8 @@
-/* Premium site navigation.
-   Rests transparent over the hero, then condenses into a blurred dark bar with a
-   hairline rule once the page scrolls. */
+/* Site navigation.
+   Sits transparent over the hero, then condenses into a blurred bar with a
+   hairline once the page scrolls. A sliding pill marks the section that
+   currently owns the viewport, and a progress rail on the bottom edge tracks
+   how far down the page you are. */
 
 .shell {
   position: fixed;
@@ -8,112 +10,137 @@
   right: 0;
   left: 0;
   z-index: 200;
-  transition: background 320ms ease, backdrop-filter 320ms ease, border-color 320ms ease, box-shadow 320ms ease;
   border-bottom: 1px solid transparent;
+  transition: background 340ms var(--u-ease), border-color 340ms var(--u-ease),
+    backdrop-filter 340ms var(--u-ease);
 }
 
 .scrolled {
-  background: rgba(7, 8, 11, 0.82);
-  border-bottom-color: rgba(255, 255, 255, 0.09);
-  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.42);
-  backdrop-filter: blur(18px) saturate(150%);
-  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  background: rgba(8, 9, 11, 0.72);
+  border-bottom-color: var(--u-line);
+  -webkit-backdrop-filter: blur(20px) saturate(170%);
+  backdrop-filter: blur(20px) saturate(170%);
 }
 
 .inner {
-  max-width: 1280px;
-  height: 74px;
+  position: relative;
+  max-width: 1240px;
+  height: 68px;
   margin: 0 auto;
-  padding: 0 clamp(18px, 5vw, 56px);
+  padding: 0 clamp(18px, 5vw, 40px);
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 24px;
+  transition: height 340ms var(--u-ease);
 }
 
 .scrolled .inner {
-  height: 64px;
-  transition: height 320ms ease;
+  height: 60px;
 }
+
+/* --------------------------------- brand --------------------------------- */
 
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
-  text-decoration: none;
+  gap: 11px;
   flex-shrink: 0;
+  text-decoration: none;
+  border-radius: 8px;
 }
 
 .brandLogo {
   display: block;
-  width: 122px;
+  width: 104px;
   height: auto;
+  transition: opacity 220ms ease;
+}
+
+.brand:hover .brandLogo {
+  opacity: 0.82;
 }
 
 .brandDivider {
   width: 1px;
-  height: 22px;
-  background: rgba(255, 255, 255, 0.16);
+  height: 18px;
+  background: var(--u-line-strong);
 }
 
 .brandTag {
-  font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 9.5px;
-  line-height: 1.3;
-  letter-spacing: 0.22em;
+  font-family: var(--u-font-mono);
+  font-size: 9px;
+  line-height: 1.35;
+  letter-spacing: 0.19em;
   text-transform: uppercase;
-  color: rgba(247, 246, 242, 0.5);
+  color: var(--u-ink-3);
   white-space: pre-line;
 }
 
+/* ---------------------------------- nav ---------------------------------- */
+
 .nav {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 30px;
+  gap: 2px;
   margin: 0 auto;
+  padding: 3px;
+}
+
+/* The pill is positioned from measurements taken in JS, so it can travel
+   between links of different widths instead of snapping. */
+.indicator {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  height: 32px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  opacity: 0;
+  transform: translate3d(var(--ind-x, 0px), 0, 0);
+  width: var(--ind-w, 0px);
+  transition: transform 460ms var(--u-ease), width 460ms var(--u-ease), opacity 300ms ease;
+  pointer-events: none;
+}
+
+.indicatorOn {
+  opacity: 1;
 }
 
 .link {
   position: relative;
-  padding: 6px 0;
-  color: rgba(247, 246, 242, 0.68);
-  font-family: 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
-  font-size: 17px;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 13px;
+  border-radius: 9px;
+  font-family: var(--u-font-sans);
+  font-size: 14px;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  color: var(--u-ink-2);
   text-decoration: none;
-  transition: color 200ms ease;
-}
-
-.link::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 1px;
-  background: #dfae63;
-  transition: width 300ms cubic-bezier(0.22, 1, 0.36, 1);
+  white-space: nowrap;
+  transition: color 220ms ease;
 }
 
 .link:hover,
 .link:focus-visible {
-  color: #f7f6f2;
-}
-
-.link:hover::after,
-.link:focus-visible::after,
-.linkActive::after {
-  width: 100%;
+  color: var(--u-ink);
 }
 
 .linkActive {
-  color: #f7f6f2;
+  color: var(--u-ink);
 }
+
+/* -------------------------------- actions -------------------------------- */
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
 }
 
@@ -121,58 +148,77 @@
 .cta {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  height: 40px;
-  padding: 0 18px;
-  border-radius: 999px;
-  font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 11px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
+  gap: 7px;
+  height: 36px;
+  padding: 0 15px;
+  border-radius: 10px;
+  font-family: var(--u-font-sans);
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.008em;
   text-decoration: none;
   white-space: nowrap;
-  transition: color 200ms ease, background 200ms ease, border-color 200ms ease, transform 200ms ease,
-    box-shadow 200ms ease;
+  cursor: pointer;
+  transition: color 200ms ease, background 200ms ease, border-color 200ms ease,
+    transform 240ms var(--u-ease), box-shadow 240ms var(--u-ease);
 }
 
 .ghost {
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  color: rgba(247, 246, 242, 0.82);
+  border: 1px solid transparent;
+  color: var(--u-ink-2);
 }
 
 .ghost:hover {
-  border-color: rgba(223, 174, 99, 0.6);
-  color: #f7f6f2;
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--u-ink);
 }
 
 .cta {
-  border: 1px solid #dfae63;
-  background: linear-gradient(180deg, #f0c684, #d2a058);
-  color: #17130b;
-  font-weight: 600;
-  box-shadow: 0 12px 30px rgba(223, 174, 99, 0.22);
+  border: 1px solid rgba(156, 140, 255, 0.55);
+  background: linear-gradient(180deg, #7d6cf5, #5d49e0);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 8px 22px rgba(110, 91, 242, 0.3);
 }
 
 .cta:hover {
   transform: translateY(-1px);
-  box-shadow: 0 16px 38px rgba(223, 174, 99, 0.32);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.24) inset, 0 12px 30px rgba(110, 91, 242, 0.42);
 }
 
 .burger {
   display: none;
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   align-items: center;
   justify-content: center;
   padding: 0;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 999px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 10px;
   background: transparent;
-  color: #f7f6f2;
+  color: var(--u-ink);
   cursor: pointer;
 }
 
-/* --------------------------- mobile sheet --------------------------- */
+/* ------------------------------ progress rail ---------------------------- */
+
+.progress {
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  height: 1.5px;
+  width: 100%;
+  transform-origin: 0 50%;
+  transform: scaleX(var(--read, 0));
+  background: linear-gradient(90deg, var(--u-violet), var(--u-violet-soft) 55%, var(--u-cyan));
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.scrolled .progress {
+  opacity: 1;
+}
+
+/* --------------------------- mobile sheet -------------------------------- */
 
 .sheet {
   position: fixed;
@@ -181,53 +227,81 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 6px;
-  padding: 96px clamp(24px, 8vw, 64px) 48px;
-  background: rgba(7, 8, 11, 0.97);
-  backdrop-filter: blur(22px);
-  -webkit-backdrop-filter: blur(22px);
-  animation: sheetIn 260ms cubic-bezier(0.22, 1, 0.36, 1);
+  padding: 96px clamp(24px, 8vw, 56px) 40px;
+  background: rgba(8, 9, 11, 0.97);
+  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  animation: sheetIn 300ms var(--u-ease);
 }
 
 .sheetLink {
   display: flex;
   align-items: baseline;
   gap: 14px;
-  padding: 14px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
-  color: #f7f6f2;
-  font-family: 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
-  font-size: clamp(30px, 8vw, 46px);
-  line-height: 1;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--u-line);
+  color: var(--u-ink);
+  font-family: var(--u-font-sans);
+  font-size: clamp(26px, 7vw, 38px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
   text-decoration: none;
+  /* Each row is delayed a little further, so the sheet unfolds rather than
+     appearing all at once. */
+  animation: sheetItem 520ms var(--u-ease) both;
+  animation-delay: var(--item-delay, 0ms);
 }
 
 .sheetIndex {
-  font-family: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: var(--u-font-mono);
   font-size: 11px;
-  letter-spacing: 0.18em;
-  color: rgba(223, 174, 99, 0.9);
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: var(--u-violet-soft);
 }
 
 .sheetActions {
-  margin-top: 28px;
+  margin-top: 32px;
   display: flex;
   flex-wrap: wrap;
-  gap: 12px;
+  gap: 10px;
+  animation: sheetItem 520ms var(--u-ease) both;
+  animation-delay: 320ms;
+}
+
+.sheetActions .cta,
+.sheetActions .ghost {
+  height: 44px;
+  padding: 0 20px;
+  font-size: 14.5px;
+}
+
+.sheetActions .ghost {
+  border-color: var(--u-line-strong);
 }
 
 @keyframes sheetIn {
   from {
     opacity: 0;
-    transform: translateY(-12px);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
   }
 }
+
+@keyframes sheetItem {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ------------------------------ responsive ------------------------------- */
 
 @media (max-width: 1040px) {
   .nav {
@@ -238,10 +312,7 @@
     display: inline-flex;
   }
 
-  .brandTag {
-    display: none;
-  }
-
+  .brandTag,
   .brandDivider {
     display: none;
   }
@@ -249,10 +320,18 @@
   .actions .ghost {
     display: none;
   }
+
+  .sheetActions .ghost {
+    display: inline-flex;
+  }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 480px) {
   .actions .cta {
     display: none;
+  }
+
+  .sheetActions .cta {
+    display: inline-flex;
   }
 }

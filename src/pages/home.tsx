@@ -1,236 +1,114 @@
-import Link from 'next/link';
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type MouseEvent as ReactMouseEvent,
-  type ReactNode,
-} from 'react';
+import Head from 'next/head';
+import { useState, type ReactNode } from 'react';
 
-import logoDark from '../../assets/brand/logo-dark.png';
+import Bento from '../components/home/Bento';
+import ContextFlow from '../components/home/ContextFlow';
+import LiveConsole from '../components/home/LiveConsole';
+import SiteFooter from '../components/home/SiteFooter';
+import styles from '../components/home/home.module.css';
+import {
+  Arrow,
+  Button,
+  Eyebrow,
+  Reveal,
+  SectionHead,
+  SpotlightCard,
+  useCountUp,
+  useInView,
+} from '../components/home/primitives';
 import UltronHero from '../components/hero/UltronHero';
 import SiteNav from '../components/web/SiteNav';
 import { useAuth } from '../context/AuthContext';
-import { COLOR, FONT, MAX_WIDTH, SHADOW } from '../lib/premiumTheme';
 
-const GOLD = COLOR.gold;
-const BG = COLOR.bg;
-const INK = COLOR.ink;
-const MUTED = COLOR.inkMuted;
-const BLUE = COLOR.blue;
-const GREEN = COLOR.green;
-
-// Anton carries the headlines, Bebas Neue the subheads and figures, DM Sans the
-// running copy and JetBrains Mono every micro-label — the same four-face system
-// used across the console.
-const FONT_DISPLAY = FONT.display;
-const FONT_HEAD = FONT.heading;
-const FONT_BODY = FONT.body;
-const FONT_MED = FONT.body;
-const FONT_MONO = FONT.mono;
-const LOGO_DARK_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
-
-// Fades a block up into place the first time it scrolls into view.
-function Reveal({ children, delay = 0, style }: { children: ReactNode; delay?: number; style?: CSSProperties }) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const io = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setShown(true);
-          io.disconnect();
-        }
-      },
-      { threshold: 0.15 },
-    );
-    io.observe(el);
-    return () => io.disconnect();
-  }, []);
-  return (
-    <div
-      ref={ref}
-      style={{
-        opacity: shown ? 1 : 0,
-        transform: shown ? 'translateY(0)' : 'translateY(28px)',
-        transition: `opacity 0.7s ease ${delay}ms, transform 0.7s cubic-bezier(0.22,1,0.36,1) ${delay}ms`,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-// Pointer-reactive 3D tilt wrapper. The card leans toward the cursor and, when
-// `grow` is set, scales up on hover — used for the live-dashboard KPI cards.
-function TiltCard({
-  children,
-  grow = false,
-  max = 12,
-  style,
-}: {
-  children: ReactNode;
-  grow?: boolean;
-  max?: number;
-  style?: CSSProperties;
-}) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [tilt, setTilt] = useState({ rx: 0, ry: 0, active: false });
-
-  const onMove = (e: ReactMouseEvent<HTMLDivElement>) => {
-    const el = ref.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    const px = (e.clientX - r.left) / r.width - 0.5;
-    const py = (e.clientY - r.top) / r.height - 0.5;
-    setTilt({ rx: -py * max, ry: px * max, active: true });
-  };
-  const reset = () => setTilt({ rx: 0, ry: 0, active: false });
-
-  const scale = tilt.active && grow ? 1.06 : 1;
-  return (
-    <div
-      ref={ref}
-      onMouseMove={onMove}
-      onMouseLeave={reset}
-      style={{
-        transform: `perspective(700px) rotateX(${tilt.rx}deg) rotateY(${tilt.ry}deg) scale(${scale})`,
-        transformStyle: 'preserve-3d',
-        transition: tilt.active ? 'transform 0.08s linear' : 'transform 0.4s cubic-bezier(0.22,1,0.36,1)',
-        cursor: 'pointer',
-        willChange: 'transform',
-        zIndex: tilt.active ? 2 : 1,
-        ...style,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-// Numbered mono eyebrow + Anton headline, the section-header pattern used all
-// the way down the page.
-function SectionHead({
-  index,
-  kicker,
-  title,
-  lead,
-  align = 'center',
-}: {
-  index: string;
-  kicker: string;
-  title: ReactNode;
-  lead?: string;
-  align?: 'center' | 'left';
-}) {
-  const centered = align === 'center';
-  return (
-    <div
-      style={{
-        textAlign: align,
-        maxWidth: centered ? 780 : 560,
-        margin: centered ? '0 auto 56px' : '0 0 32px',
-      }}
-    >
-      <div style={{ ...sectionKicker, justifyContent: centered ? 'center' : 'flex-start' }}>
-        <span style={{ color: 'rgba(247,246,242,0.35)' }}>/{index}</span>
-        {kicker}
-      </div>
-      <h2 style={{ ...sectionTitle, textAlign: align }}>{title}</h2>
-      {lead && (
-        <p
-          style={{
-            fontFamily: FONT_BODY,
-            color: MUTED,
-            fontSize: 16.5,
-            lineHeight: 1.7,
-            margin: centered ? '18px auto 0' : '18px 0 0',
-            maxWidth: 620,
-          }}
-        >
-          {lead}
-        </p>
-      )}
-    </div>
-  );
-}
-
-function Icon({ paths }: { paths: ReactNode }) {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={GOLD} strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      {paths}
-    </svg>
-  );
-}
-
-const FEATURES = [
-  {
-    icon: <Icon paths={<><path d="M3 12h4l3 8 4-16 3 8h4" /></>} />,
-    title: 'Predictive maintenance',
-    body: 'AI health scores surface failing bearings, misalignment and imbalance before they take a line down.',
-  },
-  {
-    icon: <Icon paths={<><path d="M3 3v18h18" /><path d="M7 14l3-4 4 3 4-7" /></>} />,
-    title: 'Real-time trends',
-    body: 'Every mapped channel streams onto one smooth, comparable chart — filter by type, toggle any series.',
-  },
-  {
-    icon: (
-      <Icon
-        paths={
-          <>
-            <rect x="3" y="3" width="7" height="7" rx="1" />
-            <rect x="14" y="14" width="7" height="7" rx="1" />
-            <path d="M6.5 10v4h11" />
-          </>
-        }
-      />
-    ),
-    title: 'Asset hierarchy',
-    body: 'Model plants, areas, machines and racks in a clean tree that mirrors the way your site is really wired.',
-  },
-  {
-    icon: <Icon paths={<><path d="M12 2l8 4v6c0 5-3.5 8-8 10-4.5-2-8-5-8-10V6z" /><path d="M9 12l2 2 4-4" /></>} />,
-    title: 'Role-based access',
-    body: 'Super-admin, admin and user tiers keep control tight — add, edit and remove any account in seconds.',
-  },
-];
+// ---------------------------------------------------------------------------
+// Content
+// ---------------------------------------------------------------------------
 
 const PIPELINE = [
   {
-    step: '01 · CONNECT',
+    kicker: '01 · Connect',
     title: 'Wire up the gateway',
-    body: 'Racks, cards and channels are described once; the gateway starts publishing measurements over MQTT within minutes.',
+    body: 'Racks, cards and channels are described once. The gateway starts publishing measurements over MQTT within minutes.',
   },
   {
-    step: '02 · MODEL',
+    kicker: '02 · Model',
     title: 'Map the plant',
-    body: 'Projects, areas, machines and devices mirror the physical site so every reading has a home in the hierarchy.',
+    body: 'Projects, areas, machines and devices mirror the physical site, so every reading has a home in the hierarchy.',
   },
   {
-    step: '03 · MONITOR',
+    kicker: '03 · Monitor',
     title: 'Watch it live',
     body: 'The console streams state, alarms and quality flags in real time, with thresholds evaluated at the edge.',
   },
   {
-    step: '04 · ACT',
+    kicker: '04 · Act',
     title: 'Fix before failure',
-    body: 'Health scores and ranked recommendations tell maintenance which asset to touch next, and why.',
+    body: 'Health scores and ranked recommendations tell maintenance which asset to touch next, and exactly why.',
   },
 ];
 
 const INDUSTRIES = [
-  { title: 'Cement & mining', body: 'Crushers, mills and kiln drives running 24/7 on bearings that fail expensively.', metric: 'Continuous duty' },
-  { title: 'Power generation', body: 'Turbine and pump trains where vibration signatures are the earliest warning available.', metric: 'Sub-second alarms' },
-  { title: 'Chemical & process', body: 'Compressors and agitators monitored alongside temperature, pressure and flow.', metric: 'Multi-variable' },
-  { title: 'Discrete manufacturing', body: 'Line-side motors and conveyors tracked per shift to protect throughput targets.', metric: 'OEE aware' },
+  {
+    title: 'Cement & mining',
+    body: 'Crushers, mills and kiln drives running 24/7 on bearings that fail expensively.',
+    metric: 'Continuous duty',
+    icon: (
+      <>
+        <path d="M4 20h16" />
+        <path d="M6 20V9l5-3v14" />
+        <path d="M11 12h7v8" />
+        <path d="M14.5 15.5h.01" />
+      </>
+    ),
+  },
+  {
+    title: 'Power generation',
+    body: 'Turbine and pump trains where the vibration signature is the earliest warning available.',
+    metric: 'Sub-second alarms',
+    icon: (
+      <>
+        <path d="M13 3 5 13.5h6L11 21l8-10.5h-6L13 3Z" />
+      </>
+    ),
+  },
+  {
+    title: 'Chemical & process',
+    body: 'Compressors and agitators monitored alongside temperature, pressure and flow.',
+    metric: 'Multi-variable',
+    icon: (
+      <>
+        <path d="M9 3v6.5L4.5 17A2.5 2.5 0 0 0 6.7 21h10.6a2.5 2.5 0 0 0 2.2-4L15 9.5V3" />
+        <path d="M8 3h8" />
+        <path d="M7 15h10" />
+      </>
+    ),
+  },
+  {
+    title: 'Discrete manufacturing',
+    body: 'Line-side motors and conveyors tracked per shift to protect throughput targets.',
+    metric: 'OEE aware',
+    icon: (
+      <>
+        <rect x="3" y="13" width="18" height="7" rx="2" />
+        <circle cx="8" cy="20" r="1.4" />
+        <circle cx="16" cy="20" r="1.4" />
+        <path d="M7 13V8l4-3 4 3v5" />
+      </>
+    ),
+  },
 ];
 
-const PROTOCOLS = ['MQTT', 'Modbus TCP', 'Modbus RTU', 'OPC UA', 'REST', 'WebSocket', 'CSV export', 'Webhooks'];
+const PROTOCOLS = [
+  'MQTT',
+  'Modbus TCP',
+  'Modbus RTU',
+  'OPC UA',
+  'REST',
+  'WebSocket',
+  'Webhooks',
+  'CSV export',
+  'SNMP traps',
+];
 
 const SECURITY = [
   'Role-based access with super-admin, admin and user tiers',
@@ -240,999 +118,393 @@ const SECURITY = [
   'Edge-first architecture: telemetry leaves the plant on one outbound channel',
 ];
 
+const METRICS = [
+  { value: 10, suffix: ' Hz', label: 'live telemetry' },
+  { value: 6, suffix: '-level', label: 'asset hierarchy' },
+  { value: 3, suffix: '-tier', label: 'access control' },
+  { value: 1, prefix: '<', suffix: 's', label: 'trend refresh' },
+];
+
 const FAQS = [
   {
     q: 'Do we need new sensors to get started?',
-    a: 'No. If your equipment already reports over MQTT, Modbus or OPC UA, the gateway can ingest it. New sensors only make the health model sharper.',
+    a: 'No. If your equipment already reports over MQTT, Modbus or OPC UA, the gateway can ingest it as-is. New sensors only make the health model sharper — they are not a prerequisite for going live.',
   },
   {
     q: 'How is the health score calculated?',
-    a: 'It blends channel quality, alarm and danger threshold breaches, telemetry freshness and gateway availability into a single 0–100 figure, with the biggest detractors listed alongside it.',
+    a: 'It blends channel quality, alarm and danger threshold breaches, telemetry freshness and gateway availability into a single 0–100 figure. The biggest detractors are always listed alongside the number, so the score is auditable rather than a black box.',
   },
   {
     q: 'Can it run without internet access?',
-    a: 'Yes. The gateway and console can be deployed inside the plant network; the cloud console is optional for multi-site rollups.',
+    a: 'Yes. The gateway and console can be deployed entirely inside the plant network. The cloud console is optional and exists for multi-site rollups.',
   },
   {
     q: 'Who can create accounts?',
-    a: 'Anyone can request one, but a super admin has to approve it before sign-in works. Roles are changeable at any time from the console.',
+    a: 'Anyone can request one, but a super admin has to approve it before sign-in works. Roles are changeable at any time from the console, and every change is attributable.',
+  },
+  {
+    q: 'How long does a deployment take?',
+    a: 'A single line with an existing MQTT or Modbus source is typically streaming the same day. Modelling a full site hierarchy is the longer piece of work, and it can happen while data is already flowing.',
   },
 ];
 
-const STATS = [
-  { value: '10 Hz', label: 'live telemetry' },
-  { value: '6-level', label: 'asset hierarchy' },
-  { value: '3-tier', label: 'access control' },
-  { value: '<1s', label: 'trend refresh' },
-];
+// ---------------------------------------------------------------------------
+// Sections
+// ---------------------------------------------------------------------------
+
+function Check() {
+  return (
+    <svg
+      width="11"
+      height="11"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="3.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
+function IndustryIcon({ children }: { children: ReactNode }) {
+  return (
+    <svg
+      width="19"
+      height="19"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.7"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      {children}
+    </svg>
+  );
+}
+
+/** Four numbered steps joined by a rail that sweeps in when the row appears. */
+function Pipeline() {
+  const { ref, inView } = useInView<HTMLDivElement>();
+  return (
+    <div
+      ref={ref}
+      className={`${styles.pipeline} ${inView ? styles.pipelineVisible : ''}`}
+    >
+      <span className={styles.pipelineRail} aria-hidden="true">
+        <span className={styles.pipelineRailFill} />
+      </span>
+      {PIPELINE.map((step, index) => (
+        <Reveal key={step.title} delay={index * 90} className={styles.step}>
+          <span
+            className={styles.stepMarker}
+            style={{ ['--step-delay' as string]: `${300 + index * 260}ms` }}
+          >
+            {String(index + 1).padStart(2, '0')}
+          </span>
+          <span className={styles.stepKicker}>{step.kicker}</span>
+          <h3 className={styles.stepTitle}>{step.title}</h3>
+          <p className={styles.stepBody}>{step.body}</p>
+        </Reveal>
+      ))}
+    </div>
+  );
+}
+
+function Metric({
+  value,
+  prefix,
+  suffix,
+  label,
+  active,
+}: {
+  value: number;
+  prefix?: string;
+  suffix: string;
+  label: string;
+  active: boolean;
+}) {
+  const counted = useCountUp(value, active, 1400);
+  return (
+    <div className={styles.metric}>
+      <div className={styles.metricValue}>
+        {prefix}
+        {Math.round(counted)}
+        {suffix}
+      </div>
+      <div className={styles.metricLabel}>{label}</div>
+    </div>
+  );
+}
+
+function Metrics() {
+  const { ref, inView } = useInView<HTMLDivElement>();
+  return (
+    <div ref={ref} className={styles.metrics}>
+      {METRICS.map((metric) => (
+        <Metric key={metric.label} {...metric} active={inView} />
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Accordion.
+ *
+ * The panel animates on `grid-template-rows: 0fr → 1fr` rather than max-height,
+ * so it opens to the answer's true height — no magic pixel ceiling that clips
+ * longer copy.
+ */
+function Faq() {
+  const [open, setOpen] = useState<number | null>(0);
+  return (
+    <div className={styles.faq}>
+      {FAQS.map((faq, index) => {
+        const isOpen = open === index;
+        return (
+          <Reveal key={faq.q} delay={index * 60}>
+            <div className={`${styles.faqItem} ${isOpen ? styles.faqOpen : ''}`}>
+              <button
+                type="button"
+                className={styles.faqButton}
+                aria-expanded={isOpen}
+                aria-controls={`faq-panel-${index}`}
+                onClick={() => setOpen(isOpen ? null : index)}
+              >
+                {faq.q}
+                <span className={styles.faqSign} aria-hidden="true" />
+              </button>
+              <div className={styles.faqPanel} id={`faq-panel-${index}`} role="region">
+                <div className={styles.faqPanelInner}>
+                  <p className={styles.faqAnswer}>{faq.a}</p>
+                </div>
+              </div>
+            </div>
+          </Reveal>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function HomePage() {
   const { user } = useAuth();
   const consoleHref = user ? '/' : '/login';
+
   return (
-    <div style={{ background: BG, color: INK, minHeight: '100vh', fontFamily: FONT_BODY }}>
-      <style>{keyframes}</style>
+    <div className={styles.page}>
+      <Head>
+        <title>ULTRON — Machine health, in real time</title>
+        <meta
+          name="description"
+          content="ULTRON turns raw sensor telemetry into live dashboards and AI-driven failure prediction for rotating equipment — so your team fixes machines before they break."
+        />
+        <meta name="theme-color" content="#08090B" />
+      </Head>
 
       <SiteNav />
 
-      {/* Narrow viewports drop the hero render and stream the live dashboard in
-          its place instead. */}
-      <UltronHero narrowVisual={<LiveDashboard />} />
+      <UltronHero />
 
-      {/* Live console — the streaming product dashboard. */}
-      <section id="dashboard" style={{ padding: 'clamp(56px, 9vw, 104px) clamp(20px, 6vw, 72px) 0', scrollMarginTop: 90 }}>
-        <Reveal>
+      {/* Pinned, scroll-scrubbed product explainer. Owns the `#product` anchor. */}
+      <ContextFlow />
+
+      {/* Feature bento */}
+      <section id="platform" className={`${styles.section} ${styles.ruled}`}>
+        <div className={styles.inner}>
           <SectionHead
-            index="01"
-            kicker="Live console"
-            title="Streaming telemetry, exactly as operators see it"
-            lead="One screen for the plant floor: normalised channels, a live health score and the alarms that matter, refreshed sub-second."
+            eyebrow="The platform"
+            title="Everything you need to watch rotating equipment"
+            accentFrom={4}
+            lead="Five surfaces that cover the whole loop — from the raw channel arriving at the gateway to the work order that closes it out."
+            align="center"
           />
-        </Reveal>
-        <Reveal delay={90}>
-          <div style={{ maxWidth: 1080, margin: '0 auto' }}>
-            <LiveDashboard />
-          </div>
-        </Reveal>
-      </section>
-
-      {/* Stats */}
-      <section style={{ padding: 'clamp(48px, 8vw, 90px) clamp(20px, 6vw, 72px) 0' }}>
-        <Reveal>
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-              gap: 1,
-              maxWidth: 1000,
-              margin: '0 auto',
-              border: '1px solid rgba(255,255,255,0.08)',
-              borderRadius: 18,
-              overflow: 'hidden',
-              background: 'rgba(255,255,255,0.08)',
-            }}
-          >
-            {STATS.map((s) => (
-              <div key={s.label} style={{ background: '#0B0D11', padding: '32px 20px', textAlign: 'center' }}>
-                <div style={{ fontFamily: FONT_DISPLAY, fontSize: 'clamp(38px, 4.4vw, 54px)', lineHeight: 1, color: GOLD }}>
-                  {s.value}
-                </div>
-                <div
-                  style={{
-                    fontFamily: FONT_MONO,
-                    fontSize: 10.5,
-                    color: MUTED,
-                    marginTop: 12,
-                    letterSpacing: '0.2em',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {s.label}
-                </div>
-              </div>
-            ))}
-          </div>
-        </Reveal>
-      </section>
-
-      {/* Features */}
-      <section id="features" style={{ padding: 'clamp(80px, 12vw, 140px) clamp(20px, 6vw, 72px)', scrollMarginTop: 70 }}>
-        <Reveal>
-          <SectionHead
-            index="02"
-            kicker="What it does"
-            title="Everything you need to monitor rotating equipment"
-          />
-        </Reveal>
-        <div
-          style={{
-            display: 'grid',
-            // 300px keeps the four cards balanced: 2×2 on laptops, one row on
-            // wide displays — never a 3+1 orphan.
-            gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: 18,
-            maxWidth: 1080,
-            margin: '0 auto',
-          }}
-        >
-          {FEATURES.map((f, i) => (
-            <Reveal key={f.title} delay={i * 90}>
-              <div style={featureCard} className="ultron-card">
-                <div style={featureIcon}>{f.icon}</div>
-                <h3 style={cardTitle}>{f.title}</h3>
-                <p style={{ color: MUTED, fontSize: 15, lineHeight: 1.6, margin: 0 }}>{f.body}</p>
-              </div>
-            </Reveal>
-          ))}
+          <Bento />
         </div>
       </section>
 
-      {/* Showcase band */}
-      <section style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)' }}>
-        <Reveal>
-          <div
-            style={{
-              maxWidth: 1080,
-              margin: '0 auto',
-              borderRadius: 24,
-              padding: 'clamp(32px, 6vw, 64px)',
-              background: 'radial-gradient(120% 120% at 0% 0%, rgba(201,161,92,0.14), transparent 55%), #0E0E0E',
-              border: '1px solid rgba(255,255,255,0.08)',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
-              gap: 40,
-              alignItems: 'center',
-            }}
-          >
-            <div>
-              <SectionHead index="03" kicker="Live trends" title="Every channel, one smooth chart" align="left" />
-              <p style={{ fontFamily: FONT_BODY, color: MUTED, fontSize: 16, lineHeight: 1.7, margin: 0 }}>
-                Overlay temperature, vibration, pressure and more on a single normalised graph. Filter by measurement
-                type from a dropdown, and toggle any series on or off straight from the legend.
-              </p>
-            </div>
-            <MiniChart />
-          </div>
-        </Reveal>
+      {/* Live console */}
+      <section id="console" className={styles.section}>
+        <div className={styles.inner}>
+          <SectionHead
+            eyebrow="Live console"
+            title="Streaming telemetry, exactly as operators see it"
+            accentFrom={5}
+            lead="One screen for the plant floor: normalised channels, a live health score and the alarms that matter — refreshed sub-second."
+            align="center"
+          />
+          <LiveConsole />
+        </div>
       </section>
 
-      {/* How it works */}
-      <section id="how-it-works" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
-        <Reveal>
-          <SectionHead index="04" kicker="How it works" title="From sensor to insight in four steps" />
-        </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 18, maxWidth: 1080, margin: '0 auto' }}>
-          {PIPELINE.map((step, i) => (
-            <Reveal key={step.title} delay={i * 90}>
-              <div style={featureCard} className="ultron-card">
-                <div style={{ fontFamily: FONT_MONO, fontSize: 11, letterSpacing: '0.2em', color: GOLD }}>{step.step}</div>
-                <h3 style={cardTitle}>{step.title}</h3>
-                <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{step.body}</p>
-              </div>
-            </Reveal>
-          ))}
+      {/* Metrics band */}
+      <section className={`${styles.section} ${styles.sectionTight}`}>
+        <div className={styles.inner}>
+          <Metrics />
+        </div>
+      </section>
+
+      {/* Pipeline */}
+      <section id="pipeline" className={`${styles.section} ${styles.ruled}`}>
+        <div className={styles.inner}>
+          <SectionHead
+            eyebrow="Deployment"
+            title="From sensor to insight in four steps"
+            accentFrom={5}
+          />
+          <Pipeline />
         </div>
       </section>
 
       {/* Industries */}
-      <section id="industries" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
-        <Reveal>
-          <SectionHead index="05" kicker="Who it's for" title={<>Built for the plants that can&apos;t stop</>} />
-        </Reveal>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 18, maxWidth: 1080, margin: '0 auto' }}>
-          {INDUSTRIES.map((industry, i) => (
-            <Reveal key={industry.title} delay={i * 80}>
-              <div style={featureCard} className="ultron-card">
-                <h3 style={{ ...cardTitle, marginTop: 0 }}>{industry.title}</h3>
-                <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6, margin: 0 }}>{industry.body}</p>
-                <div style={{ fontFamily: FONT_MONO, fontSize: 12, color: GREEN, marginTop: 16 }}>{industry.metric}</div>
-              </div>
-            </Reveal>
-          ))}
+      <section id="industries" className={styles.section}>
+        <div className={styles.inner}>
+          <SectionHead
+            eyebrow="Who it's for"
+            title="Built for the plants that can't stop"
+            accentFrom={4}
+            lead="Sites where an unplanned stop is measured in tonnes, not tickets."
+          />
+          <div className={styles.industries}>
+            {INDUSTRIES.map((industry, index) => (
+              <Reveal key={industry.title} delay={index * 80}>
+                <SpotlightCard className={styles.industry}>
+                  <span className={styles.industryIcon}>
+                    <IndustryIcon>{industry.icon}</IndustryIcon>
+                  </span>
+                  <h3 className={styles.industryTitle}>{industry.title}</h3>
+                  <p className={styles.industryBody}>{industry.body}</p>
+                  <span className={styles.industryMetric}>{industry.metric}</span>
+                </SpotlightCard>
+              </Reveal>
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* Integrations + security */}
-      <section id="platform" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
-        <Reveal>
-          <div
-            style={{
-              maxWidth: 1080,
-              margin: '0 auto',
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: 18,
-            }}
-          >
-            <div style={{ ...featureCard, padding: 'clamp(24px, 4vw, 36px)' }}>
-              <div style={sectionKicker}>
-                <span style={{ color: 'rgba(247,246,242,0.35)' }}>/06</span>
-                Connectivity
-              </div>
-              <h3 style={cardTitle}>Speaks your plant&apos;s protocols</h3>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                {PROTOCOLS.map((protocol) => (
-                  <span
-                    key={protocol}
-                    style={{
-                      fontFamily: FONT_MONO,
-                      fontSize: 12,
-                      color: INK,
-                      border: '1px solid rgba(255,255,255,0.12)',
-                      borderRadius: 999,
-                      padding: '7px 13px',
-                      background: 'rgba(255,255,255,0.03)',
-                    }}
-                  >
-                    {protocol}
-                  </span>
-                ))}
-              </div>
-              <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.7, margin: '20px 0 0' }}>
-                Edge gateways normalise every reading into one measurement model, so a vibration channel on a legacy PLC
-                looks the same as a modern MQTT sensor.
-              </p>
-            </div>
+      {/* Connectivity + security */}
+      <section id="security" className={styles.section}>
+        <div className={styles.inner}>
+          <SectionHead
+            eyebrow="Trust"
+            title="Fits the network you already have"
+            accentFrom={3}
+          />
+          <div className={styles.split}>
+            <Reveal>
+              <SpotlightCard className={styles.panel} lift={false}>
+                <Eyebrow>Connectivity</Eyebrow>
+                <h3 className={styles.panelTitle}>Speaks your plant&apos;s protocols</h3>
+                <div className={styles.chips}>
+                  {PROTOCOLS.map((protocol) => (
+                    <span key={protocol} className={styles.chip}>
+                      {protocol}
+                    </span>
+                  ))}
+                </div>
+                <p className={styles.panelNote}>
+                  Edge gateways normalise every reading into one measurement model, so a vibration
+                  channel on a legacy PLC looks exactly like a modern MQTT sensor by the time it
+                  reaches the console.
+                </p>
+              </SpotlightCard>
+            </Reveal>
 
-            <div style={{ ...featureCard, padding: 'clamp(24px, 4vw, 36px)' }}>
-              <div style={sectionKicker}>
-                <span style={{ color: 'rgba(247,246,242,0.35)' }}>/07</span>
-                Trust
-              </div>
-              <h3 style={cardTitle}>Security built for OT networks</h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {SECURITY.map((item) => (
-                  <div key={item} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={{ marginTop: 2, flexShrink: 0 }}>
-                      <path d="M20 6L9 17l-5-5" />
-                    </svg>
-                    <span style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.6 }}>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <Reveal delay={90}>
+              <SpotlightCard className={styles.panel} lift={false}>
+                <Eyebrow>Security</Eyebrow>
+                <h3 className={styles.panelTitle}>Built for OT networks</h3>
+                <ul className={styles.checks}>
+                  {SECURITY.map((item) => (
+                    <li key={item} className={styles.check}>
+                      <span className={styles.checkMark}>
+                        <Check />
+                      </span>
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </SpotlightCard>
+            </Reveal>
           </div>
-        </Reveal>
+        </div>
       </section>
 
       {/* FAQ */}
-      <section id="faq" style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 70 }}>
-        <Reveal>
-          <SectionHead index="08" kicker="FAQ" title="Questions engineering teams ask us" />
-        </Reveal>
-        <div style={{ maxWidth: 820, margin: '0 auto', display: 'grid', gap: 12 }}>
-          {FAQS.map((faq, i) => (
-            <Reveal key={faq.q} delay={i * 70}>
-              <details style={{ ...featureCard, padding: '20px 24px' }}>
-                <summary
-                  style={{
-                    fontFamily: FONT_HEAD,
-                    fontSize: 21,
-                    letterSpacing: '0.03em',
-                    textTransform: 'uppercase',
-                    color: INK,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {faq.q}
-                </summary>
-                <p style={{ color: MUTED, fontSize: 14.5, lineHeight: 1.7, margin: '12px 0 0' }}>{faq.a}</p>
-              </details>
-            </Reveal>
-          ))}
+      <section id="faq" className={styles.section}>
+        <div className={styles.inner}>
+          <SectionHead
+            eyebrow="FAQ"
+            title="Questions engineering teams ask us"
+            accentFrom={4}
+            align="center"
+          />
+          <Faq />
         </div>
       </section>
 
-      {/* Contact / closing CTA */}
-      <section
-        id="contact"
-        style={{ padding: '0 clamp(20px, 6vw, 72px) clamp(80px, 12vw, 140px)', scrollMarginTop: 90 }}
-      >
-        <Reveal>
-          <div
-            style={{
-              maxWidth: MAX_WIDTH,
-              margin: '0 auto',
-              padding: 'clamp(36px, 6vw, 76px)',
-              borderRadius: 26,
-              border: '1px solid rgba(255,255,255,0.09)',
-              background:
-                'radial-gradient(110% 130% at 100% 0%, rgba(223,174,99,0.16), transparent 58%), linear-gradient(180deg, #0F1116, #0A0B0F)',
-              boxShadow: SHADOW.card,
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-              gap: 'clamp(28px, 5vw, 64px)',
-              alignItems: 'center',
-            }}
-          >
-            <div>
-              <div style={sectionKicker}>
-                <span style={{ color: 'rgba(247,246,242,0.35)' }}>/09</span>
-                Get in touch
-              </div>
-              <h2 style={{ ...sectionTitle, textAlign: 'left' }}>
-                Ready to see your
-                <br />
-                machines think?
-              </h2>
-              <p style={{ fontFamily: FONT_BODY, color: MUTED, fontSize: 16.5, lineHeight: 1.7, margin: '20px 0 32px', maxWidth: 460 }}>
-                Book a walkthrough with an engineer, or sign in and stream your first channel today. Deployment on your
-                network or ours.
-              </p>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
-                <Link href={consoleHref} style={ctaPrimary}>
-                  {user ? 'Open console' : 'Get started'}
-                  <span aria-hidden="true">&rarr;</span>
-                </Link>
-                <a href="mailto:hello@ultron.io" style={ctaGhost} className="ultron-ghost">
-                  Talk to an engineer
-                </a>
-              </div>
-            </div>
-
-            <div style={{ display: 'grid', gap: 1, background: 'rgba(255,255,255,0.08)', borderRadius: 18, overflow: 'hidden' }}>
-              {[
-                { label: 'Email', value: 'hello@ultron.io', href: 'mailto:hello@ultron.io' },
-                { label: 'Phone', value: '+1 (800) 555-1234', href: 'tel:+18005551234' },
-                { label: 'Studio', value: 'San Francisco, CA · Remote-first' },
-                { label: 'Response time', value: 'Under one business day' },
-              ].map((row) => (
-                <div key={row.label} style={{ background: '#0B0D11', padding: '20px 22px' }}>
-                  <div style={{ fontFamily: FONT_MONO, fontSize: 10.5, letterSpacing: '0.2em', color: MUTED, textTransform: 'uppercase' }}>
-                    {row.label}
-                  </div>
-                  {row.href ? (
-                    <a
-                      href={row.href}
-                      className="ultron-navlink"
-                      style={{ fontFamily: FONT_HEAD, fontSize: 23, letterSpacing: '0.03em', color: INK, textDecoration: 'none', display: 'inline-block', marginTop: 8 }}
-                    >
-                      {row.value}
-                    </a>
-                  ) : (
-                    <div style={{ fontFamily: FONT_HEAD, fontSize: 23, letterSpacing: '0.03em', color: INK, marginTop: 8 }}>
-                      {row.value}
-                    </div>
-                  )}
+      {/* Closing CTA */}
+      <section id="contact" className={`${styles.section} ${styles.sectionTight}`}>
+        <div className={styles.inner}>
+          <Reveal>
+            <div className={styles.cta}>
+              <span className={styles.ctaGrid} aria-hidden="true" />
+              <div>
+                <Eyebrow>Get in touch</Eyebrow>
+                <h2 className={styles.ctaTitle}>
+                  Ready to see your
+                  <br />
+                  machines think?
+                </h2>
+                <p className={styles.ctaLead}>
+                  Book a walkthrough with an engineer, or sign in and stream your first channel
+                  today. Deployment on your network or ours.
+                </p>
+                <div className={styles.ctaActions}>
+                  <Button href={consoleHref}>
+                    {user ? 'Open console' : 'Get started'}
+                    <Arrow />
+                  </Button>
+                  <Button href="mailto:hello@ultron.io" variant="ghost">
+                    Talk to an engineer
+                  </Button>
                 </div>
-              ))}
+              </div>
+
+              <div className={styles.contactRows}>
+                {[
+                  { label: 'Email', value: 'hello@ultron.io', href: 'mailto:hello@ultron.io' },
+                  { label: 'Phone', value: '+1 (800) 555-1234', href: 'tel:+18005551234' },
+                  { label: 'Studio', value: 'San Francisco, CA · Remote-first' },
+                  { label: 'Response time', value: 'Under one business day' },
+                ].map((row) => (
+                  <div key={row.label} className={styles.contactRow}>
+                    <div className={styles.contactLabel}>{row.label}</div>
+                    {row.href ? (
+                      <a href={row.href} className={styles.contactValue}>
+                        {row.value}
+                      </a>
+                    ) : (
+                      <div className={styles.contactValue}>{row.value}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </Reveal>
+          </Reveal>
+        </div>
       </section>
 
       <SiteFooter />
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Live, animated product dashboard shown in the hero.
-// ---------------------------------------------------------------------------
-
-const CHART_POINTS = 44;
-
-function LiveDashboard() {
-  // Streaming series that scroll left, plus a couple of live KPI values and a
-  // health gauge — all driven by one interval so the whole panel feels alive.
-  const [series, setSeries] = useState<number[]>(() =>
-    Array.from({ length: CHART_POINTS }, (_, i) => 50 + Math.sin(i / 3) * 18),
-  );
-  const [series2, setSeries2] = useState<number[]>(() =>
-    Array.from({ length: CHART_POINTS }, (_, i) => 40 + Math.cos(i / 4) * 12),
-  );
-  const [vib, setVib] = useState(3.1);
-  const [temp, setTemp] = useState(61);
-  const [rpm, setRpm] = useState(1480);
-  const [health, setHealth] = useState(92);
-  const [tick, setTick] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => {
-      setTick((t) => t + 1);
-      setSeries((prev) => {
-        const next = prev.slice(1);
-        const last = prev[prev.length - 1];
-        next.push(Math.max(10, Math.min(90, last + (Math.random() - 0.5) * 16)));
-        return next;
-      });
-      setSeries2((prev) => {
-        const next = prev.slice(1);
-        const last = prev[prev.length - 1];
-        next.push(Math.max(8, Math.min(80, last + (Math.random() - 0.5) * 12)));
-        return next;
-      });
-      setVib((v) => +(Math.max(1.5, Math.min(6, v + (Math.random() - 0.5) * 0.5)).toFixed(2)));
-      setTemp((t) => Math.round(Math.max(52, Math.min(74, t + (Math.random() - 0.5) * 2))));
-      setRpm((r) => Math.round(Math.max(1440, Math.min(1520, r + (Math.random() - 0.5) * 14))));
-      setHealth((h) => Math.round(Math.max(78, Math.min(99, h + (Math.random() - 0.5) * 3))));
-    }, 1100);
-    return () => clearInterval(id);
-  }, []);
-
-  return (
-    <div
-      style={{
-        borderRadius: 18,
-        overflow: 'hidden',
-        border: '1px solid rgba(255,255,255,0.1)',
-        background: 'linear-gradient(180deg, #101010, #0B0B0B)',
-        boxShadow: '0 40px 120px rgba(0,0,0,0.6), 0 0 0 1px rgba(201,161,92,0.06)',
-      }}
-    >
-      {/* window chrome */}
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '12px 16px',
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
-          background: 'rgba(255,255,255,0.02)',
-        }}
-      >
-        <span style={{ width: 11, height: 11, borderRadius: 999, background: '#EF4444' }} />
-        <span style={{ width: 11, height: 11, borderRadius: 999, background: '#F2A93B' }} />
-        <span style={{ width: 11, height: 11, borderRadius: 999, background: GREEN }} />
-        <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: MUTED, marginLeft: 10 }}>ULTRON · RAV-01 · Live</span>
-        <span
-          style={{
-            marginLeft: 'auto',
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            fontFamily: FONT_MONO,
-            fontSize: 11,
-            color: GREEN,
-          }}
-        >
-          <span style={{ width: 7, height: 7, borderRadius: 999, background: GREEN, animation: 'pulse 1.6s infinite' }} />
-          STREAMING
-        </span>
-      </div>
-
-      <div
-        className="ultron-live-grid"
-        style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)', gap: 0 }}
-      >
-        {/* main chart column */}
-        <div style={{ padding: 18, borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 6 }}>
-            <span style={{ fontFamily: FONT_MED, fontSize: 13, color: INK }}>Vibration &amp; temperature</span>
-            <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: MUTED }}>last 60s</span>
-          </div>
-          <TiltCard max={8}>
-            <StreamChart series={series} series2={series2} />
-          </TiltCard>
-          <div style={{ display: 'flex', gap: 16, marginTop: 12 }}>
-            <Legend color={GOLD} label="Vibration" />
-            <Legend color={BLUE} label="Temperature" />
-          </div>
-
-          {/* animated capacity bars */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginTop: 18 }}>
-            {[0, 1, 2, 3].map((i) => {
-              const pct = 40 + ((Math.sin(tick / 2 + i) + 1) / 2) * 55;
-              return (
-                <div key={i}>
-                  <div style={{ height: 46, display: 'flex', alignItems: 'flex-end', gap: 3 }}>
-                    {[0, 1, 2].map((b) => (
-                      <div
-                        key={b}
-                        style={{
-                          flex: 1,
-                          height: `${Math.max(12, pct - b * 12)}%`,
-                          background: i === 3 ? BLUE : GOLD,
-                          opacity: 0.35 + b * 0.25,
-                          borderRadius: 2,
-                          transition: 'height 0.9s cubic-bezier(0.22,1,0.36,1)',
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <div style={{ fontFamily: FONT_MONO, fontSize: 9, color: MUTED, marginTop: 6, letterSpacing: '0.06em' }}>
-                    CH{i + 1}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* sidebar KPIs + gauge — each card tilts toward the cursor and grows on hover */}
-        <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <TiltCard grow>
-            <Gauge value={health} />
-          </TiltCard>
-          <TiltCard grow>
-            <Kpi label="Vibration" value={`${vib}`} unit="mm/s" tone={vib > 5 ? '#EF4444' : vib > 4 ? GOLD : GREEN} />
-          </TiltCard>
-          <TiltCard grow>
-            <Kpi label="Bearing temp" value={`${temp}`} unit="°C" tone={temp > 70 ? GOLD : GREEN} />
-          </TiltCard>
-          <TiltCard grow>
-            <Kpi label="Shaft speed" value={rpm.toLocaleString()} unit="rpm" tone={INK} />
-          </TiltCard>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StreamChart({ series, series2 }: { series: number[]; series2: number[] }) {
-  const W = 520;
-  const H = 150;
-  const toPath = (data: number[]) =>
-    data
-      .map((v, i) => {
-        const x = (i / (data.length - 1)) * W;
-        const y = H - (v / 100) * H;
-        return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      })
-      .join(' ');
-  const areaPath = `${toPath(series)} L ${W} ${H} L 0 ${H} Z`;
-  return (
-    <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="150" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="ultronArea" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={GOLD} stopOpacity="0.28" />
-          <stop offset="100%" stopColor={GOLD} stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      {[0.25, 0.5, 0.75].map((f) => (
-        <line key={f} x1="0" y1={H * f} x2={W} y2={H * f} stroke="rgba(255,255,255,0.05)" strokeWidth="1" />
-      ))}
-      <path d={areaPath} fill="url(#ultronArea)" style={{ transition: 'all 0.9s ease' }} />
-      <path
-        d={toPath(series2)}
-        fill="none"
-        stroke={BLUE}
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ transition: 'all 0.9s ease', opacity: 0.8 }}
-      />
-      <path
-        d={toPath(series)}
-        fill="none"
-        stroke={GOLD}
-        strokeWidth="2.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        style={{ transition: 'all 0.9s ease' }}
-      />
-    </svg>
-  );
-}
-
-function Gauge({ value }: { value: number }) {
-  const r = 34;
-  const c = 2 * Math.PI * r;
-  const offset = c * (1 - value / 100);
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 14,
-        padding: 14,
-        borderRadius: 12,
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}
-    >
-      <svg width="84" height="84" viewBox="0 0 84 84">
-        <circle cx="42" cy="42" r={r} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="8" />
-        <circle
-          cx="42"
-          cy="42"
-          r={r}
-          fill="none"
-          stroke={value > 90 ? GREEN : value > 82 ? GOLD : '#EF4444'}
-          strokeWidth="8"
-          strokeLinecap="round"
-          strokeDasharray={c}
-          strokeDashoffset={offset}
-          transform="rotate(-90 42 42)"
-          style={{ transition: 'stroke-dashoffset 0.9s cubic-bezier(0.22,1,0.36,1), stroke 0.9s ease' }}
-        />
-        <text x="42" y="46" textAnchor="middle" fontSize="20" fontFamily={FONT_HEAD} fill={INK}>
-          {value}
-        </text>
-      </svg>
-      <div>
-        <div style={{ fontFamily: FONT_MED, fontSize: 13, color: INK }}>Health score</div>
-        <div style={{ fontFamily: FONT_MONO, fontSize: 11, color: MUTED, marginTop: 4 }}>AI · updated live</div>
-      </div>
-    </div>
-  );
-}
-
-function Kpi({ label, value, unit, tone }: { label: string; value: string; unit: string; tone: string }) {
-  return (
-    <div
-      style={{
-        padding: 14,
-        borderRadius: 12,
-        background: 'rgba(255,255,255,0.03)',
-        border: '1px solid rgba(255,255,255,0.06)',
-      }}
-    >
-      <div style={{ fontFamily: FONT_MONO, fontSize: 10, color: MUTED, letterSpacing: '0.08em' }}>{label.toUpperCase()}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginTop: 6 }}>
-        <span style={{ fontFamily: FONT_HEAD, fontSize: 24, color: tone, transition: 'color 0.6s ease' }}>{value}</span>
-        <span style={{ fontFamily: FONT_MONO, fontSize: 11, color: MUTED }}>{unit}</span>
-      </div>
-    </div>
-  );
-}
-
-function Legend({ color, label }: { color: string; label: string }) {
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontFamily: FONT_MONO, fontSize: 11, color: MUTED }}>
-      <span style={{ width: 14, height: 3, borderRadius: 2, background: color }} />
-      {label}
-    </span>
-  );
-}
-
-// A small animated line chart purely for decoration on the showcase band.
-function MiniChart() {
-  const series = [
-    { colour: GOLD, d: 'M0 70 C 40 60, 60 40, 100 44 S 170 30, 220 34 S 300 20, 340 26' },
-    { colour: BLUE, d: 'M0 96 C 50 92, 70 78, 120 82 S 200 70, 250 74 S 310 64, 340 68' },
-    { colour: GREEN, d: 'M0 118 C 45 116, 80 108, 130 110 S 210 104, 260 106 S 320 100, 340 102' },
-  ];
-  return (
-    <div
-      style={{
-        background: '#0A0A0A',
-        border: '1px solid rgba(255,255,255,0.08)',
-        borderRadius: 16,
-        padding: 18,
-      }}
-    >
-      <svg viewBox="0 0 340 150" width="100%" height="180" preserveAspectRatio="none">
-        {[30, 60, 90, 120].map((y) => (
-          <line key={y} x1="0" y1={y} x2="340" y2={y} stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-        ))}
-        {series.map((s, i) => (
-          <path
-            key={s.colour}
-            d={s.d}
-            fill="none"
-            stroke={s.colour}
-            strokeWidth="2.5"
-            strokeLinecap="round"
-            style={{
-              strokeDasharray: 700,
-              strokeDashoffset: 700,
-              animation: `draw 2.4s ease ${i * 0.35}s forwards`,
-            }}
-          />
-        ))}
-      </svg>
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Site footer — company, product, resources, contact + social links.
-// ---------------------------------------------------------------------------
-
-const SOCIALS: { label: string; href: string; icon: ReactNode }[] = [
-  {
-    label: 'LinkedIn',
-    href: 'https://www.linkedin.com/company/ultron-industrial',
-    icon: (
-      <path d="M4.98 3.5A2.5 2.5 0 1 1 0 3.5a2.5 2.5 0 0 1 4.98 0zM0 8.98h4.96V24H0zM8.98 8.98h4.75v2.05h.07c.66-1.25 2.28-2.57 4.69-2.57 5.02 0 5.95 3.3 5.95 7.6V24h-4.96v-6.9c0-1.65-.03-3.77-2.3-3.77-2.3 0-2.65 1.8-2.65 3.65V24H8.98z" />
-    ),
-  },
-  {
-    label: 'X',
-    href: 'https://x.com',
-    icon: (
-      <path d="M18.9 2H22l-7.5 8.6L23.4 22h-6.9l-5.4-7-6.2 7H1.8l8-9.2L1 2h7l4.9 6.5L18.9 2zm-2.4 18h1.9L7.6 4H5.6l10.9 16z" />
-    ),
-  },
-  {
-    label: 'GitHub',
-    href: 'https://github.com',
-    icon: (
-      <path d="M12 .5A11.5 11.5 0 0 0 .5 12a11.5 11.5 0 0 0 7.86 10.92c.58.1.79-.25.79-.56v-2c-3.2.7-3.88-1.37-3.88-1.37-.53-1.34-1.29-1.7-1.29-1.7-1.05-.72.08-.7.08-.7 1.16.08 1.77 1.2 1.77 1.2 1.03 1.77 2.7 1.26 3.36.96.1-.75.4-1.26.73-1.55-2.56-.3-5.26-1.28-5.26-5.7 0-1.26.45-2.3 1.2-3.1-.12-.3-.52-1.48.11-3.08 0 0 .97-.31 3.18 1.18a11 11 0 0 1 5.8 0c2.2-1.5 3.18-1.18 3.18-1.18.63 1.6.23 2.78.11 3.08.75.8 1.2 1.84 1.2 3.1 0 4.43-2.7 5.4-5.28 5.68.42.36.79 1.08.79 2.18v3.23c0 .31.21.67.8.56A11.5 11.5 0 0 0 23.5 12 11.5 11.5 0 0 0 12 .5z" />
-    ),
-  },
-];
-
-function SiteFooter() {
-  const cols: { title: string; links: { label: string; href: string }[] }[] = [
-    {
-      title: 'Product',
-      links: [
-        { label: 'Features', href: '#features' },
-        { label: 'Live dashboard', href: '#dashboard' },
-        { label: 'Console', href: '/login' },
-      ],
-    },
-    {
-      title: 'Platform',
-      links: [
-        { label: 'How it works', href: '#how-it-works' },
-        { label: 'Integrations', href: '#platform' },
-        { label: 'Security', href: '#platform' },
-        { label: 'Industries', href: '#industries' },
-      ],
-    },
-    // Only destinations that exist: page sections, the console, or a real
-    // mailbox — the footer never links to a page the site does not have.
-    {
-      title: 'Company',
-      links: [
-        { label: 'FAQ', href: '#faq' },
-        { label: 'Contact sales', href: 'mailto:hello@ultron.io' },
-        { label: 'Request access', href: '/signup' },
-      ],
-    },
-  ];
-
-  return (
-    <footer style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: '#06070A' }}>
-      <div
-        style={{
-          maxWidth: 1200,
-          margin: '0 auto',
-          padding: 'clamp(48px, 8vw, 72px) clamp(20px, 6vw, 72px) 32px',
-          display: 'grid',
-          gridTemplateColumns: 'minmax(240px, 1.6fr) repeat(auto-fit, minmax(130px, 1fr))',
-          gap: 40,
-        }}
-      >
-        {/* brand + contact */}
-        <div>
-          <img src={LOGO_DARK_SRC} alt="ULTRON" style={{ display: 'block', width: 136, height: 'auto' }} />
-          <p style={{ color: MUTED, fontSize: 14, lineHeight: 1.7, margin: '16px 0 0', maxWidth: 300 }}>
-            Industrial intelligence platform for real-time monitoring and predictive maintenance of rotating equipment.
-          </p>
-          <div style={{ marginTop: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <a href="mailto:hello@ultron.io" style={contactLink} className="ultron-navlink">
-              hello@ultron.io
-            </a>
-            <a href="tel:+18005551234" style={contactLink} className="ultron-navlink">
-              +1 (800) 555-1234
-            </a>
-            <span style={{ ...contactLink, color: MUTED }}>San Francisco, CA · Remote-first</span>
-          </div>
-          <div
-            style={{
-              marginTop: 20,
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 8,
-              borderRadius: 999,
-              border: '1px solid rgba(63,185,80,0.35)',
-              background: 'rgba(63,185,80,0.08)',
-              padding: '6px 12px',
-            }}
-          >
-            <span style={{ width: 7, height: 7, borderRadius: 999, background: GREEN, display: 'inline-block' }} />
-            <span style={{ fontFamily: FONT_MONO, fontSize: 12, color: GREEN }}>All systems operational</span>
-          </div>
-          <div style={{ marginTop: 22, display: 'flex', gap: 12 }}>
-            {SOCIALS.map((s) => (
-              <a
-                key={s.label}
-                href={s.href}
-                target="_blank"
-                rel="noreferrer noopener"
-                aria-label={s.label}
-                title={s.label}
-                className="ultron-social"
-                style={socialBtn}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                  {s.icon}
-                </svg>
-              </a>
-            ))}
-          </div>
-        </div>
-
-        {cols.map((col) => (
-          <div key={col.title}>
-            <div
-              style={{
-                fontFamily: FONT_MONO,
-                fontSize: 10.5,
-                letterSpacing: '0.2em',
-                textTransform: 'uppercase',
-                color: 'rgba(247,246,242,0.5)',
-                marginBottom: 16,
-              }}
-            >
-              {col.title}
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              {col.links.map((l) =>
-                l.href.startsWith('#') || l.href.startsWith('/') ? (
-                  <Link key={l.label} href={l.href} style={footerLink} className="ultron-navlink">
-                    {l.label}
-                  </Link>
-                ) : (
-                  <a key={l.label} href={l.href} style={footerLink} className="ultron-navlink">
-                    {l.label}
-                  </a>
-                ),
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-
-      <div
-        style={{
-          borderTop: '1px solid rgba(255,255,255,0.06)',
-          padding: '20px clamp(20px, 6vw, 72px)',
-          maxWidth: 1200,
-          margin: '0 auto',
-          display: 'flex',
-          justifyContent: 'space-between',
-          flexWrap: 'wrap',
-          gap: 12,
-          color: MUTED,
-          fontSize: 13,
-        }}
-      >
-        <span style={{ fontFamily: FONT_MONO }}>© {new Date().getFullYear()} ULTRON — Industrial intelligence platform</span>
-        <span style={{ fontFamily: FONT_MONO, fontSize: 12 }}>ISO 27001-aligned · SOC 2 controls · GDPR ready</span>
-        <span style={{ display: 'flex', gap: 20 }}>
-          <a href="#contact" style={footerLink} className="ultron-navlink">
-            Privacy
-          </a>
-          <a href="#contact" style={footerLink} className="ultron-navlink">
-            Terms
-          </a>
-        </span>
-      </div>
-    </footer>
-  );
-}
-
-const footerLink: CSSProperties = {
-  fontFamily: FONT_BODY,
-  fontSize: 14,
-  color: MUTED,
-  textDecoration: 'none',
-  transition: 'color 0.2s ease',
-};
-
-const contactLink: CSSProperties = {
-  fontFamily: FONT_MED,
-  fontSize: 14,
-  color: INK,
-  textDecoration: 'none',
-  transition: 'color 0.2s ease',
-};
-
-const socialBtn: CSSProperties = {
-  width: 38,
-  height: 38,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 10,
-  border: '1px solid rgba(255,255,255,0.12)',
-  color: MUTED,
-  transition: 'color 0.2s ease, border-color 0.2s ease, transform 0.2s ease',
-};
-
-const ctaPrimary: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 10,
-  fontFamily: FONT_MONO,
-  fontSize: 12,
-  fontWeight: 600,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  color: '#17130B',
-  background: 'linear-gradient(180deg, #F0C684, #D2A058)',
-  border: '1px solid rgba(223,174,99,0.9)',
-  padding: '16px 28px',
-  borderRadius: 999,
-  textDecoration: 'none',
-  boxShadow: SHADOW.gold,
-};
-
-const ctaGhost: CSSProperties = {
-  display: 'inline-flex',
-  alignItems: 'center',
-  gap: 10,
-  fontFamily: FONT_MONO,
-  fontSize: 12,
-  letterSpacing: '0.16em',
-  textTransform: 'uppercase',
-  color: INK,
-  border: '1px solid rgba(255,255,255,0.18)',
-  padding: '16px 28px',
-  borderRadius: 999,
-  textDecoration: 'none',
-  transition: 'border-color 0.25s ease, background 0.25s ease',
-};
-
-const sectionKicker: CSSProperties = {
-  display: 'flex',
-  alignItems: 'center',
-  gap: 10,
-  fontFamily: FONT_MONO,
-  fontSize: 11,
-  letterSpacing: '0.2em',
-  textTransform: 'uppercase',
-  color: GOLD,
-  marginBottom: 18,
-};
-
-const sectionTitle: CSSProperties = {
-  fontFamily: FONT_DISPLAY,
-  fontSize: 'clamp(34px, 5vw, 62px)',
-  fontWeight: 400,
-  lineHeight: 0.98,
-  letterSpacing: '0.01em',
-  textTransform: 'uppercase',
-  margin: 0,
-};
-
-const cardTitle: CSSProperties = {
-  fontFamily: FONT_HEAD,
-  fontSize: 25,
-  fontWeight: 400,
-  letterSpacing: '0.03em',
-  textTransform: 'uppercase',
-  margin: '14px 0 10px',
-};
-
-const featureCard: CSSProperties = {
-  height: '100%',
-  padding: 28,
-  borderRadius: 20,
-  background: 'linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.012))',
-  border: '1px solid rgba(255,255,255,0.08)',
-  boxShadow: '0 20px 50px rgba(0,0,0,0.35)',
-  transition: 'transform 0.35s cubic-bezier(0.22,1,0.36,1), border-color 0.3s ease, box-shadow 0.3s ease',
-};
-
-const featureIcon: CSSProperties = {
-  width: 48,
-  height: 48,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  borderRadius: 14,
-  border: '1px solid rgba(223,174,99,0.28)',
-  background: 'rgba(223,174,99,0.1)',
-};
-
-const keyframes = `
-@keyframes fadeUp { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes float { 0%,100% { transform: translateY(0) scale(1); } 50% { transform: translateY(30px) scale(1.06); } }
-@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
-@keyframes shimmer { to { background-position: 200% center; } }
-@keyframes draw { to { stroke-dashoffset: 0; } }
-.ultron-card:hover { transform: translateY(-6px); border-color: rgba(201,161,92,0.5) !important; }
-.ultron-navlink { position: relative; }
-.ultron-navlink::after { content: ''; position: absolute; left: 0; bottom: -5px; height: 1.5px; width: 0; background: ${GOLD}; transition: width 0.32s cubic-bezier(0.22,1,0.36,1); }
-.ultron-navlink:hover { color: ${INK} !important; }
-.ultron-navlink:hover::after { width: 100%; }
-.ultron-social:hover { color: ${GOLD} !important; border-color: rgba(201,161,92,0.5) !important; transform: translateY(-2px); }
-.ultron-ghost:hover { border-color: rgba(223,174,99,0.55) !important; background: rgba(223,174,99,0.08) !important; }
-details summary::-webkit-details-marker { display: none; }
-details summary { list-style: none; }
-@media (max-width: 720px) {
-  header nav a[href^="#"] { display: none; }
-}
-/* The live console stacks below phone width so the KPI rail keeps its numbers
-   readable instead of squeezing into a sliver. */
-@media (max-width: 620px) {
-  .ultron-live-grid { grid-template-columns: minmax(0, 1fr) !important; }
-  .ultron-live-grid > div:first-child { border-right: none !important; }
-}
-`;

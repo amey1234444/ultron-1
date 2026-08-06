@@ -1,0 +1,525 @@
+/* Page-level section styling for the landing page. */
+
+.page {
+  background: var(--u-bg);
+  color: var(--u-ink);
+  font-family: var(--u-font-sans);
+  overflow-x: clip;
+}
+
+.section {
+  position: relative;
+  padding: clamp(84px, 11vw, 148px) var(--u-gutter);
+  scroll-margin-top: 80px;
+}
+
+.sectionTight {
+  padding-top: 0;
+}
+
+.inner {
+  position: relative;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+/* A single hairline rule that separates the big bands without a heavy border. */
+.ruled {
+  border-top: 1px solid var(--u-line);
+}
+
+/* ------------------------------------------------------------------ */
+/* Pipeline                                                           */
+/* ------------------------------------------------------------------ */
+
+.pipeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 20px;
+}
+
+/* Rail behind the step markers. The fill sweeps left to right once the row is
+   in view, tying the four steps into one sequence. */
+.pipelineRail {
+  position: absolute;
+  top: 13px;
+  right: 12%;
+  left: 12%;
+  height: 1px;
+  background: var(--u-line);
+  overflow: hidden;
+}
+
+.pipelineRailFill {
+  display: block;
+  height: 100%;
+  transform-origin: 0 50%;
+  transform: scaleX(0);
+  background: linear-gradient(90deg, var(--u-violet-soft), var(--u-cyan));
+  transition: transform 1800ms var(--u-ease) 200ms;
+}
+
+.pipelineVisible .pipelineRailFill {
+  transform: scaleX(1);
+}
+
+.step {
+  position: relative;
+}
+
+.stepMarker {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 27px;
+  height: 27px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 50%;
+  background: var(--u-bg);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--u-ink-3);
+  transition: border-color 600ms var(--u-ease), color 600ms var(--u-ease),
+    box-shadow 600ms var(--u-ease);
+  transition-delay: var(--step-delay, 0ms);
+}
+
+.pipelineVisible .stepMarker {
+  border-color: rgba(156, 140, 255, 0.6);
+  color: var(--u-violet-soft);
+  box-shadow: 0 0 0 4px rgba(156, 140, 255, 0.1);
+}
+
+.stepKicker {
+  display: block;
+  margin-top: 20px;
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-violet-soft);
+}
+
+.stepTitle {
+  margin: 9px 0 0;
+  font-size: 17.5px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--u-ink);
+}
+
+.stepBody {
+  margin: 9px 0 0;
+  font-size: 14.5px;
+  line-height: 1.62;
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Industries                                                         */
+/* ------------------------------------------------------------------ */
+
+.industries {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
+  gap: 14px;
+}
+
+.industry {
+  display: flex;
+  flex-direction: column;
+  min-height: 216px;
+  padding: 24px;
+}
+
+.industryIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(156, 140, 255, 0.24);
+  border-radius: 11px;
+  background: rgba(110, 91, 242, 0.1);
+  color: var(--u-violet-soft);
+}
+
+.industryTitle {
+  margin: 18px 0 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  color: var(--u-ink);
+}
+
+.industryBody {
+  margin: 8px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--u-ink-2);
+}
+
+.industryMetric {
+  margin-top: auto;
+  padding-top: 18px;
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--u-cyan);
+}
+
+/* ------------------------------------------------------------------ */
+/* Platform split — protocols and security                            */
+/* ------------------------------------------------------------------ */
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.panel {
+  padding: clamp(24px, 3.4vw, 34px);
+}
+
+.panelTitle {
+  margin: 14px 0 18px;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.026em;
+  color: var(--u-ink);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.chip {
+  padding: 7px 12px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.022);
+  font-family: var(--u-font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.04em;
+  color: var(--u-ink-2);
+  transition: border-color 240ms ease, color 240ms ease, background 240ms ease,
+    transform 240ms var(--u-ease);
+}
+
+.chip:hover {
+  border-color: rgba(156, 140, 255, 0.45);
+  background: rgba(110, 91, 242, 0.08);
+  color: var(--u-ink);
+  transform: translateY(-1px);
+}
+
+.panelNote {
+  margin: 20px 0 0;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--u-ink-2);
+}
+
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  font-size: 14px;
+  line-height: 1.58;
+  color: var(--u-ink-2);
+}
+
+.checkMark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border-radius: 6px;
+  background: rgba(63, 185, 80, 0.13);
+  color: var(--u-green);
+}
+
+/* ------------------------------------------------------------------ */
+/* Metrics band                                                       */
+/* ------------------------------------------------------------------ */
+
+.metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1px;
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius-panel);
+  background: var(--u-line);
+  overflow: hidden;
+}
+
+.metric {
+  padding: 34px 22px;
+  text-align: center;
+  background: var(--u-bg-soft);
+}
+
+.metricValue {
+  font-size: clamp(34px, 4vw, 46px);
+  font-weight: 600;
+  letter-spacing: -0.042em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(180deg, #fff, #a79aff);
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.metricLabel {
+  margin-top: 13px;
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* FAQ                                                                */
+/* ------------------------------------------------------------------ */
+
+.faq {
+  max-width: 820px;
+  margin: 0 auto;
+  border-top: 1px solid var(--u-line);
+}
+
+.faqItem {
+  border-bottom: 1px solid var(--u-line);
+}
+
+.faqButton {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 22px 4px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 16.5px;
+  font-weight: 550;
+  letter-spacing: -0.018em;
+  color: var(--u-ink);
+  cursor: pointer;
+  transition: color 220ms ease;
+}
+
+.faqButton:hover {
+  color: var(--u-violet-soft);
+}
+
+.faqSign {
+  position: relative;
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--u-ink-3);
+}
+
+/* Plus turning into a minus: the vertical stroke rotates away and fades. */
+.faqSign::before,
+.faqSign::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform 380ms var(--u-ease), opacity 260ms ease;
+}
+
+.faqSign::after {
+  transform: rotate(90deg);
+}
+
+.faqOpen .faqSign {
+  color: var(--u-violet-soft);
+}
+
+.faqOpen .faqSign::after {
+  transform: rotate(0deg);
+  opacity: 0;
+}
+
+.faqPanel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 460ms var(--u-ease);
+}
+
+.faqOpen .faqPanel {
+  grid-template-rows: 1fr;
+}
+
+/* The inner element must be `min-height: 0` and overflow-hidden for the
+   0fr → 1fr row transition to animate rather than jump. */
+.faqPanelInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.faqAnswer {
+  margin: 0;
+  padding: 0 60px 24px 4px;
+  font-size: 15px;
+  line-height: 1.68;
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Closing CTA                                                        */
+/* ------------------------------------------------------------------ */
+
+.cta {
+  position: relative;
+  padding: clamp(40px, 6vw, 76px);
+  border: 1px solid var(--u-line-strong);
+  border-radius: var(--u-radius-panel);
+  background: radial-gradient(120% 150% at 12% 0%, rgba(110, 91, 242, 0.24), transparent 58%),
+    radial-gradient(100% 140% at 92% 100%, rgba(53, 214, 198, 0.14), transparent 56%),
+    linear-gradient(180deg, #101219, #0a0b0f);
+  overflow: hidden;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: clamp(28px, 5vw, 64px);
+  align-items: center;
+}
+
+/* Faint engineering grid inside the panel, fading out to the right. */
+.ctaGrid {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 54px 54px;
+  -webkit-mask-image: linear-gradient(105deg, #000, transparent 68%);
+  mask-image: linear-gradient(105deg, #000, transparent 68%);
+}
+
+.ctaTitle {
+  margin: 16px 0 0;
+  font-size: clamp(30px, 3.8vw, 46px);
+  font-weight: 600;
+  letter-spacing: -0.038em;
+  line-height: 1.04;
+  color: #fff;
+}
+
+.ctaLead {
+  margin: 18px 0 30px;
+  max-width: 440px;
+  font-size: 16px;
+  line-height: 1.64;
+  color: var(--u-ink-2);
+}
+
+.ctaActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+}
+
+.contactRows {
+  display: grid;
+  gap: 1px;
+  border: 1px solid var(--u-line);
+  border-radius: 16px;
+  background: var(--u-line);
+  overflow: hidden;
+}
+
+.contactRow {
+  padding: 17px 19px;
+  background: rgba(10, 11, 15, 0.86);
+  transition: background 260ms ease;
+}
+
+.contactRow:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.contactLabel {
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.contactValue {
+  display: inline-block;
+  margin-top: 7px;
+  font-size: 15px;
+  font-weight: 550;
+  letter-spacing: -0.014em;
+  color: var(--u-ink);
+  text-decoration: none;
+  transition: color 220ms ease;
+}
+
+a.contactValue:hover {
+  color: var(--u-violet-soft);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 900px) {
+  .pipeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 32px 20px;
+  }
+
+  .pipelineRail {
+    display: none;
+  }
+
+  .cta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 560px) {
+  .pipeline {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .faqAnswer {
+    padding-right: 12px;
+  }
+}

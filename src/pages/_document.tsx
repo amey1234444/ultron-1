@@ -10,12 +10,15 @@ export default function Document() {
             keeps the app from rendering inside a frame even if those headers are
             ever stripped by an intermediary or a mis-serving host. */}
         <script src="/anti-clickjack.js" />
-        {/* Landing-page typography: sharp display plus premium UI faces, loaded
-            from Google Fonts for the web pages. */}
+        {/* Typography. Inter carries the landing page (display + UI) with
+            JetBrains Mono for micro-labels; Anton / Bebas Neue / DM Sans stay
+            loaded because the console tree still maps onto them through the
+            font utilities in global.css. Families that were only ever CSS
+            fallbacks (Sora, Space Grotesk, IBM Plex Mono) are not requested. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Sora:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Anton&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
           rel="stylesheet"
         />
       </Head>
@@ -26,9 +29,20 @@ export default function Document() {
           dangerouslySetInnerHTML={{
             __html: `html,body,#__next{height:100%;margin:0;padding:0;}
 #__next{display:flex;flex-direction:column;}
-body{background:#0A0A0A;}`,
+body{background:#08090B;}`,
           }}
         />
+        {/* Landing-page entrance animations start from opacity 0 and are
+            released by an IntersectionObserver. Without scripting that observer
+            never runs, so the content is forced visible instead of staying
+            blank. */}
+        <noscript>
+          <style
+            dangerouslySetInnerHTML={{
+              __html: '[data-reveal]{opacity:1!important;transform:none!important;}',
+            }}
+          />
+        </noscript>
         <Main />
         <NextScript />
       </body>

@@ -10,7 +10,84 @@ html {
 html,
 body {
   min-width: 320px;
-  background: #07080b;
+  background: #08090b;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Landing design tokens                                                     */
+/*                                                                           */
+/* One source of truth for the public pages. The landing CSS modules read     */
+/* these rather than repeating hex values, so a palette change is a single    */
+/* edit here. Prefixed `--u-` to stay clear of the console's own variables.   */
+/* ------------------------------------------------------------------------- */
+
+:root {
+  /* Surfaces — near-black with a faint cool cast so the violet ambient light
+     reads as light rather than as a purple tint on grey. */
+  --u-bg: #08090b;
+  --u-bg-soft: #0b0c10;
+  --u-panel: #0e1015;
+  --u-panel-raised: #13151b;
+
+  /* Hairlines. Borders on this palette have to be barely-there; anything
+     stronger than 0.14 alpha starts to look like a wireframe. */
+  --u-line: rgba(255, 255, 255, 0.07);
+  --u-line-strong: rgba(255, 255, 255, 0.13);
+
+  /* Text ramp: three steps, no more. */
+  --u-ink: #f4f5f7;
+  --u-ink-2: #a6acb8;
+  --u-ink-3: #6e7480;
+
+  /* Accents. Violet is the brand light, cyan the secondary highlight, and
+     amber survives from the old palette as the telemetry/alarm signal — it
+     keeps the product visuals consistent with the console and the render. */
+  --u-violet: #6e5bf2;
+  --u-violet-soft: #9c8cff;
+  --u-cyan: #35d6c6;
+  --u-amber: #e8b465;
+  --u-green: #3fb950;
+  --u-red: #f0563f;
+
+  --u-radius-card: 18px;
+  --u-radius-panel: 24px;
+
+  --u-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --u-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* The single easing used by every landing transition. Consistent motion is
+     most of what makes a page feel built rather than assembled. */
+  --u-ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+  --u-gutter: clamp(20px, 5vw, 64px);
+  --u-max: 1200px;
+}
+
+::selection {
+  background: rgba(110, 91, 242, 0.32);
+  color: #fff;
+}
+
+/* Keyboard focus stays visible everywhere on the landing page; pointer clicks
+   don't draw the ring. */
+:focus-visible {
+  outline: 2px solid var(--u-violet-soft);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Honour the OS "reduce motion" setting globally. Ambient loops and scroll
+   scrubbing are opted out individually in the modules; this collapses the
+   remaining transitions so nothing is left half-animated. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Horizontal clipping belongs on the document: setting `overflow-x` on a page

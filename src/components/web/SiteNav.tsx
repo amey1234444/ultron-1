@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import logoDark from '../../../assets/brand/logo-dark.png';
 import { useAuth } from '../../context/AuthContext';
@@ -10,14 +10,14 @@ const LOGO_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
 // Every entry points at a section that exists on the landing page, so the bar
 // never advertises a destination the site cannot reach.
 export const NAV_SECTIONS = [
+  { label: 'Product', id: 'product' },
   { label: 'Platform', id: 'platform' },
-  { label: 'Live console', id: 'dashboard' },
-  { label: 'How it works', id: 'how-it-works' },
+  { label: 'Live console', id: 'console' },
   { label: 'Industries', id: 'industries' },
   { label: 'Contact', id: 'contact' },
 ] as const;
 
-/** Highlights the nav entry whose section currently owns the viewport. */
+/** Highlights the nav entry whose section currently owns the middle of the viewport. */
 function useActiveSection(): string | null {
   const [active, setActive] = useState<string | null>(null);
 
@@ -34,6 +34,8 @@ function useActiveSection(): string | null {
           .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
         if (visible) setActive(visible.target.id);
       },
+      // A tall band collapsed to the middle of the screen: whichever section
+      // crosses the centre line wins, which matches what the eye is reading.
       { rootMargin: '-45% 0px -45% 0px', threshold: [0, 0.2, 0.5, 1] },
     );
     targets.forEach((target) => observer.observe(target));
@@ -43,14 +45,42 @@ function useActiveSection(): string | null {
   return active;
 }
 
+/** Fraction of the document that has been scrolled past, for the progress rail. */
+function useReadProgress(): number {
+  const [read, setRead] = useState(0);
+
+  useEffect(() => {
+    let frame = 0;
+    const measure = () => {
+      frame = 0;
+      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
+      setRead(scrollable <= 0 ? 0 : Math.min(1, window.scrollY / scrollable));
+    };
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
+  }, []);
+
+  return read;
+}
+
 function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
   const shared = {
-    width: 16,
-    height: 16,
+    width: 15,
+    height: 15,
     viewBox: '0 0 24 24',
     fill: 'none',
     stroke: 'currentColor',
-    strokeWidth: 1.8,
+    strokeWidth: 1.9,
     strokeLinecap: 'round' as const,
     strokeLinejoin: 'round' as const,
     'aria-hidden': true,
@@ -73,15 +103,14 @@ function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
       );
     case 'menu':
       return (
-        <svg {...shared} width={18} height={18}>
-          <path d="M4 7h16" />
-          <path d="M4 12h16" />
-          <path d="M4 17h16" />
+        <svg {...shared} width={17} height={17}>
+          <path d="M4 8h16" />
+          <path d="M4 16h16" />
         </svg>
       );
     case 'close':
       return (
-        <svg {...shared} width={18} height={18}>
+        <svg {...shared} width={17} height={17}>
           <path d="M6 6l12 12" />
           <path d="M18 6L6 18" />
         </svg>
@@ -94,10 +123,33 @@ export default function SiteNav() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const active = useActiveSection();
+  const read = useReadProgress();
   const consoleHref = user ? '/' : '/login';
 
+  // The sliding pill is driven from live measurements rather than CSS, so it
+  // can travel between links of different widths instead of snapping.
+  const navRef = useRef<HTMLElement | null>(null);
+  const linkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const [indicator, setIndicator] = useState<{ x: number; w: number } | null>(null);
+
+  const measureIndicator = useCallback(() => {
+    const nav = navRef.current;
+    const el = active ? linkRefs.current[active] : null;
+    if (!nav || !el) {
+      setIndicator(null);
+      return;
+    }
+    setIndicator({ x: el.offsetLeft - nav.clientLeft, w: el.offsetWidth });
+  }, [active]);
+
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    measureIndicator();
+    window.addEventListener('resize', measureIndicator);
+    return () => window.removeEventListener('resize', measureIndicator);
+  }, [measureIndicator]);
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 16);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
@@ -132,11 +184,22 @@ export default function SiteNav() {
             </span>
           </Link>
 
-          <nav className={styles.nav} aria-label="Primary">
+          <nav className={styles.nav} aria-label="Primary" ref={navRef}>
+            <span
+              className={`${styles.indicator} ${indicator ? styles.indicatorOn : ''}`}
+              aria-hidden="true"
+              style={{
+                ['--ind-x' as string]: `${indicator?.x ?? 0}px`,
+                ['--ind-w' as string]: `${indicator?.w ?? 0}px`,
+              }}
+            />
             {NAV_SECTIONS.map((section) => (
               <a
                 key={section.id}
                 href={`#${section.id}`}
+                ref={(el) => {
+                  linkRefs.current[section.id] = el;
+                }}
                 className={`${styles.link} ${active === section.id ? styles.linkActive : ''}`}
                 aria-current={active === section.id ? 'true' : undefined}
               >
@@ -166,12 +229,24 @@ export default function SiteNav() {
             </button>
           </div>
         </div>
+
+        <span
+          className={styles.progress}
+          aria-hidden="true"
+          style={{ ['--read' as string]: read }}
+        />
       </header>
 
       {open && (
         <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="Menu">
           {NAV_SECTIONS.map((section, index) => (
-            <a key={section.id} href={`#${section.id}`} className={styles.sheetLink} onClick={() => setOpen(false)}>
+            <a
+              key={section.id}
+              href={`#${section.id}`}
+              className={styles.sheetLink}
+              style={{ ['--item-delay' as string]: `${index * 55}ms` }}
+              onClick={() => setOpen(false)}
+            >
               <span className={styles.sheetIndex}>/{String(index + 1).padStart(2, '0')}</span>
               {section.label}
             </a>
