@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, Pressable, ScrollView, Text, View } from 'react-native';
 import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 
@@ -18,20 +18,27 @@ const KIND_LABEL: Record<LiveKindLetter, string> = {
   X: 'Other',
 };
 
-// Distinct hues so overlaid series stay tellable apart; cycled by series index.
+// Overlaid series have to stay tellable apart, but a twelve-hue rainbow fights
+// the console's black-grey-green palette and makes hue meaningless — you cannot
+// tell "red because it is series four" from "red because it is in alarm".
+//
+// So the ramp is built from lightness instead: the first series takes the
+// accent, the rest step down a neutral scale. Alarm colour is then free to mean
+// only one thing. Twelve steps stay distinguishable because consecutive series
+// are never adjacent in the ramp.
 const SERIES_PALETTE = [
-  '#58A6FF',
-  '#3FB950',
-  '#F2A93B',
-  '#EF4444',
-  '#BC8CFF',
-  '#39C5CF',
-  '#F778BA',
-  '#E3B341',
-  '#FF7B72',
-  '#7EE787',
-  '#79C0FF',
-  '#D2A8FF',
+  '#6EF08A',
+  '#F2F2F0',
+  '#3FBF6A',
+  '#A1A3A0',
+  '#8FF0A8',
+  '#C9CCC9',
+  '#2F7A48',
+  '#6B6D6B',
+  '#B8F5C6',
+  '#E3E5E2',
+  '#4FA36A',
+  '#87897F',
 ];
 
 const CHART_HEIGHT = 300;
@@ -187,7 +194,7 @@ export function TrendView({ mappedChannels, machineId, expectedPoints }: TrendVi
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const gridColour = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,10,0.10)';
-  const axisTextColour = isDark ? '#8B949E' : '#6E7781';
+  const axisTextColour = isDark ? '#A1A3A0' : '#6B6D6B';
 
   const [kindFilter, setKindFilter] = useState<'all' | LiveKindLetter>('all');
   const [hidden, setHidden] = useState<Record<string, boolean>>({});

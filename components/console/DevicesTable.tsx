@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
@@ -67,7 +67,7 @@ function HeaderCell({
         <MaterialCommunityIcons
           name={isActive && activeSort?.dir === 'desc' ? 'arrow-down' : 'arrow-up'}
           size={11}
-          color={isDark ? '#8A8A8A' : '#6B6B6B'}
+          color={isDark ? '#A1A3A0' : '#5F625F'}
           style={{ opacity: isActive ? 1 : 0.25 }}
         />
       )}
@@ -188,7 +188,7 @@ function DeviceRow({
           }}
           style={{ width: MENU_WIDTH }}
         >
-          <MaterialCommunityIcons name="dots-vertical" size={16} color={isDark ? '#8A8A8A' : '#6B6B6B'} />
+          <MaterialCommunityIcons name="dots-vertical" size={16} color={isDark ? '#A1A3A0' : '#5F625F'} />
         </Pressable>
       ) : null}
     </Pressable>

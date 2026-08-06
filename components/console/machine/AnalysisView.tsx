@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '../EmptyState';
@@ -200,7 +200,7 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
   return (
     <Panel className="gap-3" style={{ borderLeftWidth: 3, borderLeftColor: colour }}>
       <View className="flex-row flex-wrap items-center justify-between gap-2">
-        <Text className={cn('font-heading text-lg uppercase tracking-[0.05em]', textClass)}>{diagnosis.title}</Text>
+        <Text className={cn('font-body-bold text-lg tracking-[-0.02em]', textClass)}>{diagnosis.title}</Text>
         <Text style={{ color: colour }} className="font-mono text-[10px] uppercase tracking-[0.16em]">
           {formatUrgency(diagnosis.urgency)} · {Math.round(diagnosis.confidence * 100)}%
         </Text>
@@ -302,7 +302,7 @@ export function AnalysisView({
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 16 }}>
       <View className="min-w-0 flex-1 gap-1">
-        <Text className={cn('font-heading text-3xl uppercase tracking-[0.04em]', textClass)}>Analysis layer</Text>
+        <Text className={cn('font-body-bold text-3xl tracking-[-0.03em]', textClass)}>Analysis layer</Text>
         <Text className={cn('font-body text-xs leading-5', mutedClass)}>
           Computed from saved rack mappings and live signals using the rotary-airlock analysis model.
           {expectedPoints ? ` ${mappedChannels.length} of ${expectedPoints} expected points mapped.` : ` ${mappedChannels.length} mapped channels.`}

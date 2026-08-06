@@ -16,29 +16,31 @@ import {
 import { LOGO_DARK } from '../../lib/brandLogos';
 import { apiFetch } from '../lib/apiClient';
 
-// Auth pages share the landing page's typography (Bebas Neue display + DM Sans
-// body, loaded via Google Fonts in _document.tsx). These are applied inline so
-// only the auth + home surfaces adopt the new look - the console keeps its own
-// bundled fonts untouched.
-export const AUTH_FONT_DISPLAY = "'Bebas Neue', 'DM Sans', system-ui, sans-serif";
-export const AUTH_FONT_BODY = "'DM Sans', system-ui, sans-serif";
-export const AUTH_FONT_MONO = "'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace";
+// Auth pages share the landing page's typography — Inter for everything, with
+// JetBrains Mono for micro-labels, loaded via Google Fonts in _document.tsx.
+// These are applied inline because the auth screens are a react-native-web tree
+// that does not pick up the landing page's CSS modules.
+export const AUTH_FONT_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif";
+export const AUTH_FONT_BODY = AUTH_FONT_DISPLAY;
+export const AUTH_FONT_MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace";
 
-export const AUTH_GOLD = '#C9A15C';
+// The single accent, matching `--u-accent` on the landing page and the console.
+// The export name is kept so the auth screens that import it keep working.
+export const AUTH_GOLD = '#6EF08A';
 const GOLD = AUTH_GOLD;
-const GOLD_SOFT = 'rgba(201,161,92,0.14)';
+const GOLD_SOFT = 'rgba(110,240,138,0.12)';
 
 // Dark auth palette, matching the landing page's near-black surface.
-const SURFACE = '#08090B';
-const PANEL = '#0E1013';
-const FIELD = '#131518';
-const INK = '#F5F5F5';
-const MUTED = '#8A8A8A';
-const FAINT = '#5F6266';
-const LINE = 'rgba(255,255,255,0.10)';
-const LINE_STRONG = 'rgba(255,255,255,0.18)';
-const DANGER = '#F85149';
-const SUCCESS = '#3FB950';
+const SURFACE = '#0A0A0A';
+const PANEL = '#131413';
+const FIELD = '#1A1B1A';
+const INK = '#F2F2F0';
+const MUTED = '#A1A3A0';
+const FAINT = '#6B6D6B';
+const LINE = 'rgba(255,255,255,0.09)';
+const LINE_STRONG = 'rgba(255,255,255,0.16)';
+const DANGER = '#F2624A';
+const SUCCESS = '#6EF08A';
 const LOGO_ASPECT = 284 / 77;
 
 // Both auth pages must fit a single viewport. Below this height the shell falls
@@ -122,7 +124,7 @@ export function AuthShell({
                     alignSelf: 'flex-start',
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: 'rgba(201,161,92,0.4)',
+                    borderColor: 'rgba(110,240,138,0.4)',
                     backgroundColor: GOLD_SOFT,
                     paddingHorizontal: 10,
                     paddingVertical: 3,
@@ -133,14 +135,17 @@ export function AuthShell({
                 </View>
               ) : null}
 
+              {/* Sentence case with negative tracking. The wide uppercase this
+                  used to be was tuned for a condensed display face; Inter at
+                  this size needs the opposite treatment. */}
               <Text
                 style={{
                   fontFamily: AUTH_FONT_DISPLAY,
-                  fontSize: 36,
-                  lineHeight: 38,
+                  fontSize: 32,
+                  lineHeight: 35,
+                  fontWeight: '600',
                   color: INK,
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
+                  letterSpacing: -1,
                 }}
               >
                 {title}
@@ -296,7 +301,7 @@ export function passwordScore(password: string): PasswordScore {
   ];
   const score = checks.filter((check) => check.pass).length;
   const label = score <= 1 ? 'Weak' : score <= 2 ? 'Fair' : score <= 4 ? 'Good' : 'Strong';
-  const color = score <= 1 ? DANGER : score <= 2 ? '#F2A93B' : score <= 4 ? '#58A6FF' : SUCCESS;
+  const color = score <= 1 ? DANGER : score <= 2 ? '#E3B341' : score <= 4 ? '#A1A3A0' : SUCCESS;
   return { score, label, color, suggestions: checks.filter((check) => !check.pass).map((check) => check.tip) };
 }
 
@@ -358,10 +363,10 @@ export function AuthButton({
         height: 46,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: primary ? 'rgba(201,161,92,0.9)' : LINE_STRONG,
+        borderColor: primary ? 'rgba(110,240,138,0.9)' : LINE_STRONG,
         backgroundColor: primary ? (hovered && !inert ? '#F0C684' : GOLD) : 'transparent',
         opacity: inert ? 0.55 : 1,
-        ...(primary && !inert ? { boxShadow: '0 14px 34px rgba(201,161,92,0.26)' } : null),
+        ...(primary && !inert ? { boxShadow: '0 14px 34px rgba(110,240,138,0.26)' } : null),
       } as ViewStyle}
     >
       {submitting ? (

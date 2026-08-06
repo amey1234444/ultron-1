@@ -1,4 +1,4 @@
-import type { GestureResponderHandlers } from 'react-native';
+﻿import type { GestureResponderHandlers } from 'react-native';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -6,9 +6,9 @@ import { cn } from '../../../lib/cn';
 import type { TrailStatus } from './AdjustableTrail';
 
 const STATUS_COLOUR: Record<TrailStatus, string> = {
-  normal: '#3FB950',
-  warning: '#F2A93B',
-  critical: '#EF4444',
+  normal: '#6EF08A',
+  warning: '#E3B341',
+  critical: '#F2624A',
   offline: '#737373',
 };
 

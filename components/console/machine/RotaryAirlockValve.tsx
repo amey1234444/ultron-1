@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+﻿import { useMemo } from 'react';
 import {
   View,
   type StyleProp,
@@ -102,13 +102,13 @@ export function RotaryAirlockValve({
 
       fineStroke: isDark
         ? '#444444'
-        : '#8A8A8A',
+        : '#A1A3A0',
 
       muted: isDark
         ? '#9A9A9A'
         : '#666666',
 
-      accent: '#C9A15C',
+      accent: '#6EF08A',
     }),
     [isDark],
   );

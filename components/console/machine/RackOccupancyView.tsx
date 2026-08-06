@@ -1,4 +1,4 @@
-import { ScrollView, Text, View } from 'react-native';
+﻿import { ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -7,9 +7,9 @@ import type { DeviceNode } from '../../../lib/devices';
 import type { CardNode, ChannelRef } from '../../../lib/rack';
 import { LIVE_RANGE_FOR_LETTER, useLiveValue } from './liveValue';
 
-const LIVE_COLOUR = '#3FB950';
-const WARNING_COLOUR = '#F2A93B';
-const CRITICAL_COLOUR = '#EF4444';
+const LIVE_COLOUR = '#6EF08A';
+const WARNING_COLOUR = '#E3B341';
+const CRITICAL_COLOUR = '#F2624A';
 
 // `id` is the mapping's own identity (the box that's linked to this channel),
 // not the channel's — several boxes can legitimately point at the same real

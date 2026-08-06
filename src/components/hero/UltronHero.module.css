@@ -1,13 +1,15 @@
 /* Landing hero.
-   A centred copy column over a layered ambient field (aurora, guide grid, beam,
-   grain), with the product render below on a stage that straightens itself as
-   the page scrolls. Every ambient layer is painted with gradients and moved
-   with transforms — no blur filters on full-bleed elements, which is what
-   normally makes heroes like this drop frames on integrated graphics. */
+   A centred copy column over a layered ambient field, with the plant-overview
+   surface below on a stage that straightens itself as the page scrolls.
+   Black, white and one green: the ambient layers are all achromatic except a
+   single green pool, which is what stops the page reading as a grey wash.
+   Every layer is painted with gradients and moved with transforms — no blur
+   filters on full-bleed elements, which is what normally makes heroes like this
+   drop frames on integrated graphics. */
 
 .hero {
   position: relative;
-  padding: calc(68px + clamp(56px, 9vw, 104px)) var(--u-gutter) 0;
+  padding: calc(68px + clamp(52px, 8vw, 96px)) var(--u-gutter) 0;
   overflow: hidden;
   isolation: isolate;
   color: var(--u-ink);
@@ -33,41 +35,30 @@
   will-change: transform;
 }
 
-/* Brand light, top-left. Drives most of the colour in the upper half. */
-.blobViolet {
-  top: -34vh;
-  left: -8vw;
-  width: 76vw;
-  height: 76vw;
-  max-width: 1120px;
-  max-height: 1120px;
-  background: radial-gradient(circle at 50% 50%, rgba(110, 91, 242, 0.4), rgba(110, 91, 242, 0) 62%);
-  animation: driftA 30s ease-in-out infinite;
-}
-
-/* Cool counterweight on the right, so the field has two temperatures. */
-.blobCyan {
-  top: -18vh;
-  right: -14vw;
-  width: 62vw;
-  height: 62vw;
-  max-width: 900px;
-  max-height: 900px;
-  background: radial-gradient(circle at 50% 50%, rgba(53, 214, 198, 0.17), rgba(53, 214, 198, 0) 64%);
-  animation: driftB 38s ease-in-out infinite;
-}
-
-/* Warm pool under the stage — the render's own lighting is amber, and this is
-   what makes it sit in the page rather than on it. */
-.blobAmber {
-  bottom: -22vh;
+/* The one green light, low and central — it reads as the product glowing
+   through the page rather than as a coloured background. */
+.blobAccent {
+  bottom: -26vh;
   left: 50%;
-  width: 74vw;
-  height: 52vw;
+  width: 92vw;
+  height: 62vw;
+  max-width: 1320px;
+  margin-left: -46vw;
+  background: radial-gradient(ellipse at 50% 50%, rgba(110, 240, 138, 0.16), rgba(110, 240, 138, 0) 62%);
+  animation: driftA 32s ease-in-out infinite;
+}
+
+/* Achromatic lift at the top so the headline is not sitting on flat black. */
+.blobLight {
+  top: -32vh;
+  left: 50%;
+  width: 84vw;
+  height: 84vw;
   max-width: 1180px;
-  margin-left: -37vw;
-  background: radial-gradient(ellipse at 50% 50%, rgba(232, 180, 101, 0.13), rgba(232, 180, 101, 0) 66%);
-  animation: driftC 34s ease-in-out infinite;
+  max-height: 1180px;
+  margin-left: -42vw;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 62%);
+  animation: driftB 40s ease-in-out infinite;
 }
 
 @keyframes driftA {
@@ -76,27 +67,17 @@
     transform: translate3d(0, 0, 0) scale(1);
   }
   50% {
-    transform: translate3d(5%, 5%, 0) scale(1.12);
+    transform: translate3d(0, -4%, 0) scale(1.1);
   }
 }
 
 @keyframes driftB {
   0%,
   100% {
-    transform: translate3d(0, 0, 0) scale(1.06);
-  }
-  50% {
-    transform: translate3d(-6%, 7%, 0) scale(0.94);
-  }
-}
-
-@keyframes driftC {
-  0%,
-  100% {
     transform: translate3d(0, 0, 0) scale(1);
   }
   50% {
-    transform: translate3d(0, -5%, 0) scale(1.1);
+    transform: translate3d(3%, 4%, 0) scale(1.08);
   }
 }
 
@@ -107,33 +88,11 @@
   inset: -1px;
   z-index: -5;
   pointer-events: none;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.032) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.032) 1px, transparent 1px);
-  background-size: 62px 62px;
-  -webkit-mask-image: radial-gradient(120% 78% at 50% 26%, #000 0%, rgba(0, 0, 0, 0.35) 52%, transparent 78%);
-  mask-image: radial-gradient(120% 78% at 50% 26%, #000 0%, rgba(0, 0, 0, 0.35) 52%, transparent 78%);
-}
-
-/* Narrow cone of light falling from behind the nav. */
-.beam {
-  position: absolute;
-  top: -12%;
-  left: 50%;
-  z-index: -5;
-  width: 62vw;
-  height: 70vh;
-  margin-left: -31vw;
-  pointer-events: none;
-  background: conic-gradient(
-    from 180deg at 50% 0%,
-    transparent 0deg,
-    rgba(156, 140, 255, 0.11) 78deg,
-    rgba(156, 140, 255, 0.16) 90deg,
-    rgba(156, 140, 255, 0.11) 102deg,
-    transparent 180deg
-  );
-  -webkit-mask-image: linear-gradient(180deg, #000, transparent 82%);
-  mask-image: linear-gradient(180deg, #000, transparent 82%);
+  background-image: linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 64px 64px;
+  -webkit-mask-image: radial-gradient(118% 76% at 50% 24%, #000 0%, rgba(0, 0, 0, 0.3) 50%, transparent 76%);
+  mask-image: radial-gradient(118% 76% at 50% 24%, #000 0%, rgba(0, 0, 0, 0.3) 50%, transparent 76%);
 }
 
 /* Pointer-tracked bloom. Barely visible on its own; what you notice is that the
@@ -144,8 +103,8 @@
   z-index: -4;
   pointer-events: none;
   background: radial-gradient(
-    460px circle at var(--hx, 50%) var(--hy, 40%),
-    rgba(156, 140, 255, 0.09),
+    440px circle at var(--hx, 50%) var(--hy, 40%),
+    rgba(255, 255, 255, 0.045),
     transparent 70%
   );
   opacity: var(--hover, 0);
@@ -159,7 +118,7 @@
   inset: 0;
   z-index: -3;
   pointer-events: none;
-  opacity: 0.028;
+  opacity: 0.03;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
@@ -178,54 +137,37 @@
 .announce {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  height: 32px;
-  padding: 0 6px 0 12px;
+  gap: 9px;
+  height: 30px;
+  padding: 0 12px;
   border: 1px solid var(--u-line-strong);
   border-radius: 999px;
-  /* The second gradient is a wide highlight that sweeps across the pill; the
-     first keeps the fill readable underneath it. */
-  background: linear-gradient(rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.045)),
-    linear-gradient(
-        100deg,
-        transparent 20%,
-        rgba(156, 140, 255, 0.34) 42%,
-        rgba(53, 214, 198, 0.28) 52%,
-        transparent 74%
-      )
-      0 0 / 260% 100% no-repeat;
+  background: rgba(255, 255, 255, 0.035);
   color: var(--u-ink-2);
   font-size: 12.5px;
   font-weight: 500;
   letter-spacing: -0.006em;
   text-decoration: none;
-  animation: announceIn 800ms var(--u-ease) both, announceSheen 7s linear infinite 900ms;
-  transition: border-color 240ms ease, color 240ms ease;
+  animation: fadeUp 800ms var(--u-ease) both;
+  transition: border-color 240ms ease, color 240ms ease, background 240ms ease;
 }
 
 .announce:hover {
-  border-color: rgba(156, 140, 255, 0.5);
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.06);
   color: var(--u-ink);
 }
 
-.announceTag {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: rgba(110, 91, 242, 0.9);
-  color: #fff;
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+.announceDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--u-accent);
+  box-shadow: 0 0 0 3px rgba(110, 240, 138, 0.16);
 }
 
 .announceChevron {
   display: inline-flex;
-  margin-right: 6px;
   color: var(--u-ink-3);
   transition: transform 300ms var(--u-ease);
 }
@@ -234,36 +176,13 @@
   transform: translateX(3px);
 }
 
-@keyframes announceIn {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 10px, 0);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes announceSheen {
-  0% {
-    background-position: 0 0, -160% 0;
-  }
-  /* The sweep occupies the first third of the loop; the rest is the pause that
-     stops it reading as a loading bar. */
-  34%,
-  100% {
-    background-position: 0 0, 260% 0;
-  }
-}
-
 .title {
   margin: 26px auto 0;
-  max-width: 15ch;
-  font-size: clamp(44px, 7.4vw, 92px);
+  max-width: 16ch;
+  font-size: clamp(46px, 7.6vw, 96px);
   font-weight: 600;
-  letter-spacing: -0.042em;
-  line-height: 0.98;
+  letter-spacing: -0.045em;
+  line-height: 0.97;
   color: #fff;
 }
 
@@ -271,23 +190,13 @@
   display: block;
 }
 
-.sub {
-  margin: 26px auto 0;
-  max-width: 620px;
-  font-size: clamp(16px, 1.4vw, 18.5px);
-  line-height: 1.6;
-  color: var(--u-ink-2);
-  text-wrap: pretty;
-  animation: fadeUp 900ms var(--u-ease) 620ms both;
-}
-
 .ctas {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 12px;
-  margin-top: 34px;
-  animation: fadeUp 900ms var(--u-ease) 740ms both;
+  gap: 11px;
+  margin-top: 36px;
+  animation: fadeUp 900ms var(--u-ease) 560ms both;
 }
 
 .trust {
@@ -295,13 +204,13 @@
   flex-wrap: wrap;
   justify-content: center;
   align-items: center;
-  gap: 10px 18px;
-  margin-top: 26px;
+  gap: 10px 16px;
+  margin-top: 24px;
   font-family: var(--u-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.05em;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
   color: var(--u-ink-3);
-  animation: fadeUp 900ms var(--u-ease) 860ms both;
+  animation: fadeUp 900ms var(--u-ease) 680ms both;
 }
 
 .trustDot {
@@ -323,18 +232,18 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Stage — the product render                                         */
+/* Stage — the plant-overview surface                                 */
 /* ------------------------------------------------------------------ */
 
 .stage {
   position: relative;
-  max-width: 1120px;
-  margin: clamp(52px, 7vw, 88px) auto 0;
+  max-width: 1080px;
+  margin: clamp(48px, 6.5vw, 82px) auto 0;
   /* A deep perspective origin above the element makes the straightening read as
      the plate tipping towards you rather than as a vertical squash. */
   perspective: 2000px;
   perspective-origin: 50% 0%;
-  animation: fadeUp 1100ms var(--u-ease) 980ms both;
+  animation: fadeUp 1100ms var(--u-ease) 800ms both;
 }
 
 .stageInner {
@@ -344,200 +253,13 @@
   will-change: transform;
 }
 
-/* Pool of light the frame appears to be resting in. */
+/* Pool of light the surface appears to be resting in. */
 .stageGlow {
   position: absolute;
-  inset: 6% -10% -18%;
+  inset: 8% -8% -16%;
   z-index: -1;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, rgba(110, 91, 242, 0.3), transparent 68%);
-}
-
-.frame {
-  position: relative;
-  border: 1px solid var(--u-line-strong);
-  border-radius: 16px;
-  background: linear-gradient(180deg, #14161c, #0b0c10);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.07) inset, 0 60px 130px rgba(0, 0, 0, 0.68);
-  overflow: hidden;
-}
-
-.chrome {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  height: 40px;
-  padding: 0 14px;
-  border-bottom: 1px solid var(--u-line);
-  background: rgba(255, 255, 255, 0.022);
-}
-
-.dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.14);
-}
-
-.chromeBar {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  height: 22px;
-  margin: 0 auto;
-  padding: 0 12px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.04);
-  font-family: var(--u-font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  color: var(--u-ink-3);
-}
-
-.chromeLive {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: var(--u-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--u-green);
-}
-
-.livePip {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--u-green);
-  box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.55);
-  animation: pip 2.2s ease-out infinite;
-}
-
-@keyframes pip {
-  0% {
-    box-shadow: 0 0 0 0 rgba(63, 185, 80, 0.5);
-  }
-  70%,
-  100% {
-    box-shadow: 0 0 0 7px rgba(63, 185, 80, 0);
-  }
-}
-
-.shot {
-  position: relative;
-  display: block;
-  width: 100%;
-  height: auto;
-  /* The render is a wide plate; capping the aspect stops it dominating the fold
-     on tall screens. */
-  aspect-ratio: 1670 / 940;
-  object-fit: cover;
-  object-position: center;
-}
-
-/* Slow diagonal reflection travelling across the glass. */
-.sheen {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(104deg, transparent 38%, rgba(255, 255, 255, 0.05) 48%, transparent 58%);
-  background-size: 260% 100%;
-  animation: sheen 9s ease-in-out infinite;
-}
-
-@keyframes sheen {
-  0% {
-    background-position: 180% 0;
-  }
-  55%,
-  100% {
-    background-position: -80% 0;
-  }
-}
-
-/* ---------------------------- floating chips ---------------------------- */
-
-.chip {
-  position: absolute;
-  z-index: 3;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 10px 13px;
-  border: 1px solid var(--u-line-strong);
-  border-radius: 12px;
-  background: rgba(14, 16, 21, 0.78);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
-  backdrop-filter: blur(14px) saturate(160%);
-  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
-  white-space: nowrap;
-  animation: chipIn 760ms var(--u-ease) both, chipFloat 7s ease-in-out infinite;
-  animation-delay: var(--chip-delay, 0ms), calc(var(--chip-delay, 0ms) + 760ms);
-}
-
-.chipLeft {
-  top: 26%;
-  left: clamp(-28px, -2vw, 0px);
-}
-
-.chipRight {
-  top: 52%;
-  right: clamp(-28px, -2vw, 0px);
-}
-
-.chipLower {
-  bottom: 12%;
-  left: 12%;
-}
-
-.chipIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
-  background: var(--chip-tint, rgba(110, 91, 242, 0.16));
-  color: var(--chip-color, var(--u-violet-soft));
-}
-
-.chipLabel {
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
-}
-
-.chipValue {
-  margin-top: 2px;
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  color: var(--u-ink);
-  font-variant-numeric: tabular-nums;
-}
-
-@keyframes chipIn {
-  from {
-    opacity: 0;
-    transform: translate3d(0, 16px, 0) scale(0.94);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes chipFloat {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -9px, 0);
-  }
+  background: radial-gradient(ellipse at 50% 50%, rgba(110, 240, 138, 0.22), transparent 66%);
 }
 
 /* ------------------------------------------------------------------ */
@@ -547,16 +269,16 @@
 .rail {
   position: relative;
   z-index: 2;
-  margin-top: clamp(64px, 8vw, 104px);
-  padding: 26px 0 34px;
+  margin-top: clamp(60px, 7vw, 96px);
+  padding: 24px 0 30px;
   border-top: 1px solid var(--u-line);
 }
 
 .railLabel {
-  margin: 0 0 20px;
+  margin: 0 0 18px;
   text-align: center;
   font-family: var(--u-font-mono);
-  font-size: 10.5px;
+  font-size: 10px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--u-ink-3);
@@ -566,8 +288,8 @@
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  padding: 0 26px;
-  font-size: 15px;
+  padding: 0 24px;
+  font-size: 14.5px;
   font-weight: 500;
   letter-spacing: -0.01em;
   color: var(--u-ink-3);
@@ -579,10 +301,10 @@
 }
 
 .railTick {
-  width: 5px;
-  height: 5px;
+  width: 4px;
+  height: 4px;
   border-radius: 1px;
-  background: rgba(156, 140, 255, 0.5);
+  background: rgba(255, 255, 255, 0.28);
   transform: rotate(45deg);
 }
 
@@ -590,49 +312,21 @@
 /* Responsive                                                         */
 /* ------------------------------------------------------------------ */
 
-@media (max-width: 900px) {
-  .chipLeft,
-  .chipRight {
-    display: none;
-  }
-
-  .chipLower {
-    bottom: 8%;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-}
-
 @media (max-width: 720px) {
   .hero {
-    padding-top: calc(68px + 48px);
+    padding-top: calc(68px + 44px);
   }
 
   .title {
     max-width: 100%;
-    letter-spacing: -0.035em;
-  }
-
-  .chrome {
-    height: 32px;
-  }
-
-  .chromeBar {
-    display: none;
-  }
-
-  .chipLower {
-    display: none;
+    letter-spacing: -0.038em;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   /* Ambient loops and the stage tilt are the two things that read as motion
      sickness on this page; both are removed rather than shortened. */
-  .blob,
-  .sheen,
-  .chip,
-  .announce {
+  .blob {
     animation: none;
   }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -9,9 +9,9 @@ import { Rav01LayoutCanvas } from './Rav01LayoutCanvas';
 import type { MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 
-const LIVE_COLOUR = '#3FB950';
-const WARNING_COLOUR = '#F2A93B';
-const CRITICAL_COLOUR = '#EF4444';
+const LIVE_COLOUR = '#6EF08A';
+const WARNING_COLOUR = '#E3B341';
+const CRITICAL_COLOUR = '#F2624A';
 
 type Level = 'normal' | 'warning' | 'critical';
 const LEVEL_COLOUR: Record<Level, string> = { normal: LIVE_COLOUR, warning: WARNING_COLOUR, critical: CRITICAL_COLOUR };

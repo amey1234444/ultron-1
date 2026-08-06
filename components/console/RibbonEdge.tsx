@@ -1,12 +1,12 @@
-import { LinearGradient } from 'expo-linear-gradient';
+﻿import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import type { DeviceHealth } from '../../lib/devices';
 
 const HEALTH_COLOR: Record<Exclude<DeviceHealth, 'normal'>, string> = {
-  warning: '#F2A93B',
-  critical: '#EF4444',
-  disconnected: '#EF4444',
+  warning: '#E3B341',
+  critical: '#F2624A',
+  disconnected: '#F2624A',
 };
 
 function healthColor(health: DeviceHealth, isDark: boolean): string {

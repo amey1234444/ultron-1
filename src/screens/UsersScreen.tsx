@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from 'next/router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -493,10 +493,10 @@ type StatTone = 'neutral' | 'success' | 'warning' | 'critical' | 'accent';
 
 const STAT_COLOUR: Record<StatTone, string> = {
   neutral: '#8A8A8A',
-  success: '#3FB950',
-  warning: '#F2A93B',
-  critical: '#EF4444',
-  accent: '#C9A15C',
+  success: '#6EF08A',
+  warning: '#E3B341',
+  critical: '#F2624A',
+  accent: '#6EF08A',
 };
 
 function StatCard({

@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+﻿import crypto from 'crypto';
 
 // Self-contained, stateless CAPTCHA. The server renders a distorted SVG of a
 // random code and hands back a signed token = base64(payload).hmac where the
@@ -78,7 +78,7 @@ function rand(min: number, max: number): number {
 function renderSvg(code: string): string {
   const width = 200;
   const height = 70;
-  const colors = ['#C9A15C', '#58A6FF', '#3FB950', '#F2A93B', '#BC8CFF'];
+  const colors = ['#6EF08A', '#A1A3A0', '#6EF08A', '#E3B341', '#C9CCC9'];
 
   const noiseLines = Array.from({ length: 6 }, () => {
     const x1 = rand(0, width);

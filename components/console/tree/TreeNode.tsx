@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+﻿import { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -40,7 +40,7 @@ export function TreeNode({
   const ref = useRef<View>(null);
   const [hovered, setHovered] = useState(false);
 
-  const iconColor = selected ? (isDark ? '#F5F5F5' : '#0A0A0A') : isDark ? '#8A8A8A' : '#6B6B6B';
+  const iconColor = selected ? (isDark ? '#F5F5F5' : '#0A0A0A') : isDark ? '#A1A3A0' : '#5F625F';
   const textColorClass = selected ? (isDark ? 'text-ink' : 'text-ink-inverse') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   // react-native-web's View/Pressable don't reliably forward an `onContextMenu`

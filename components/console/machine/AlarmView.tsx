@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '../EmptyState';
@@ -9,10 +9,10 @@ import type { ChannelRef } from '../../../lib/rack';
 import { useLiveValue } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
-const LIVE_COLOUR = '#3FB950';
-const WARNING_COLOUR = '#F2A93B';
-const CRITICAL_COLOUR = '#EF4444';
-const RETURN_COLOUR = '#C9A15C';
+const LIVE_COLOUR = '#6EF08A';
+const WARNING_COLOUR = '#E3B341';
+const CRITICAL_COLOUR = '#F2624A';
+const RETURN_COLOUR = '#6EF08A';
 
 type AlarmLevel = 'critical' | 'warning' | 'normal';
 // An alarm doesn't just track the live level — it latches, like a real annunciator:

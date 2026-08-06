@@ -1,0 +1,424 @@
+/* Compact plant-overview surface used as the hero's single product visual.
+   It mirrors the console's redesigned overview page — same palette, same type,
+   same control language — so the landing page is showing the real product
+   rather than an illustration of it. */
+
+.frame {
+  position: relative;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 14px;
+  background: linear-gradient(180deg, #131413, #0b0c0b);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 50px 120px rgba(0, 0, 0, 0.72);
+  overflow: hidden;
+  text-align: left;
+}
+
+/* --------------------------------- header -------------------------------- */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--u-line);
+  background: rgba(255, 255, 255, 0.018);
+}
+
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--u-ink);
+}
+
+.markGlyph {
+  width: 15px;
+  height: 15px;
+  border-radius: 4px;
+  background: var(--u-accent);
+}
+
+.select {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 25px;
+  padding: 0 9px;
+  border: 1px solid var(--u-line);
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--u-ink-2);
+}
+
+.selectKey {
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.online {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 9px;
+  border: 1px solid rgba(110, 240, 138, 0.24);
+  border-radius: 999px;
+  background: rgba(110, 240, 138, 0.08);
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--u-accent);
+}
+
+.onlineDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--u-accent);
+  animation: blink 2.4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+/* ---------------------------------- tabs --------------------------------- */
+
+.tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 0 10px;
+  border-bottom: 1px solid var(--u-line);
+}
+
+.tab {
+  position: relative;
+  padding: 10px 11px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  color: var(--u-ink-3);
+}
+
+.tabActive {
+  color: var(--u-ink);
+}
+
+.tabActive::after {
+  content: '';
+  position: absolute;
+  right: 11px;
+  bottom: -1px;
+  left: 11px;
+  height: 1.5px;
+  background: var(--u-accent);
+}
+
+/* ---------------------------------- body --------------------------------- */
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 168px;
+}
+
+.left {
+  border-right: 1px solid var(--u-line);
+}
+
+/* -------------------------------- kpi strip ------------------------------ */
+
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border-bottom: 1px solid var(--u-line);
+}
+
+.kpi {
+  padding: 12px 13px;
+}
+
+.kpi + .kpi {
+  border-left: 1px solid var(--u-line);
+}
+
+.kpiLabel {
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+  line-height: 1.4;
+}
+
+.kpiValue {
+  margin-top: 7px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  font-variant-numeric: tabular-nums;
+  color: var(--u-ink);
+}
+
+.kpiUnit {
+  margin-left: 3px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--u-ink-3);
+}
+
+/* Plan bar: the filled portion is where the asset actually is against target,
+   and the notch is where plan says it should be. */
+.kpiTrack {
+  position: relative;
+  height: 3px;
+  margin-top: 9px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.kpiNotch {
+  position: absolute;
+  top: -2px;
+  width: 1.5px;
+  height: 7px;
+  background: var(--u-ink);
+  opacity: 0.55;
+}
+
+.kpiFill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--tone, var(--u-accent));
+  transform-origin: 0 50%;
+  transition: transform 900ms var(--u-ease);
+}
+
+.kpiPlan {
+  margin-top: 7px;
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.05em;
+  color: var(--u-ink-3);
+}
+
+/* --------------------------------- chart --------------------------------- */
+
+.chartWrap {
+  padding: 13px;
+}
+
+.chartHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.chartTitle {
+  font-size: 11.5px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  color: var(--u-ink);
+}
+
+.chartMeta {
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: 116px;
+}
+
+/* ------------------------- asset performance table ----------------------- */
+
+.assets {
+  border-top: 1px solid var(--u-line);
+}
+
+.assetHead,
+.assetRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 13px;
+}
+
+.assetHead {
+  background: rgba(255, 255, 255, 0.022);
+  border-bottom: 1px solid var(--u-line);
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.assetRow {
+  border-bottom: 1px solid var(--u-line);
+  font-size: 10.5px;
+}
+
+.assetRow:last-child {
+  border-bottom: 0;
+}
+
+.assetName {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 2;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  color: var(--u-ink);
+}
+
+.assetHead .assetName {
+  font-weight: inherit;
+  color: inherit;
+}
+
+.assetDot {
+  width: 5px;
+  height: 5px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+/* Five steps centred on zero: two of under-performance, on plan, two of over. */
+.assetScaleCol {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 62px;
+  flex-shrink: 0;
+}
+
+.assetPip {
+  width: 9px;
+  height: 6px;
+  border-radius: 2px;
+}
+
+.assetNum {
+  width: 42px;
+  flex-shrink: 0;
+  text-align: right;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  color: var(--u-ink);
+}
+
+.assetMuted {
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------- right rail ------------------------------ */
+
+.rail {
+  padding: 12px;
+}
+
+.railTitle {
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.action {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--u-line);
+}
+
+.action:last-child {
+  border-bottom: 0;
+}
+
+.actionTime {
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: var(--u-ink-3);
+}
+
+.actionTitle {
+  margin-top: 4px;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: -0.008em;
+  line-height: 1.35;
+  color: var(--u-ink-2);
+}
+
+.actionTitleLive {
+  color: var(--u-accent);
+}
+
+/* Older entries fade out down the rail — recency without a scrollbar. */
+.actionFaded {
+  opacity: 0.42;
+}
+
+/* ------------------------------- responsive ------------------------------ */
+
+@media (max-width: 780px) {
+  .body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .left {
+    border-right: 0;
+    border-bottom: 1px solid var(--u-line);
+  }
+
+  .kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi:nth-child(3) {
+    border-left: 0;
+  }
+
+  .kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--u-line);
+  }
+}
+
+@media (max-width: 520px) {
+  .tabs,
+  .assets,
+  .rail,
+  .select {
+    display: none;
+  }
+}

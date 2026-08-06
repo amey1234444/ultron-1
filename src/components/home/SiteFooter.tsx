@@ -36,19 +36,9 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
   {
     title: 'Product',
     links: [
-      { label: 'How it works', href: '#product' },
+      { label: 'How it works', href: '#signal' },
       { label: 'Platform', href: '#platform' },
-      { label: 'Live console', href: '#console' },
       { label: 'Open console', href: '/login' },
-    ],
-  },
-  {
-    title: 'Solutions',
-    links: [
-      { label: 'Industries', href: '#industries' },
-      { label: 'Integrations', href: '#security' },
-      { label: 'Security', href: '#security' },
-      { label: 'Pipeline', href: '#pipeline' },
     ],
   },
   {

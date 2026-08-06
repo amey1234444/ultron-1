@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 
@@ -55,7 +55,7 @@ const DEVICE_TYPE_ICON: Record<DeviceType, keyof typeof MaterialCommunityIcons.g
 
 function TypeCard({ type, selected, onPress }: { type: DeviceType; selected: boolean; onPress: () => void }) {
   const { isDark } = useAppTheme();
-  const color = selected ? (isDark ? '#0A0A0A' : '#F5F5F5') : isDark ? '#8A8A8A' : '#6B6B6B';
+  const color = selected ? (isDark ? '#0A0A0A' : '#F5F5F5') : isDark ? '#A1A3A0' : '#5F625F';
 
   return (
     <Pressable
@@ -254,7 +254,7 @@ export function AddDeviceDialog({ visible, editingDevice, gateways = [], initial
               value={hostOctet}
               onChangeText={setHostOctet}
               placeholder="11"
-              placeholderTextColor={isDark ? '#6B6B6B' : '#8A8A8A'}
+              placeholderTextColor={isDark ? '#5F625F' : '#A1A3A0'}
               className={cn(
                 'h-10 flex-1 rounded-lg border px-3 py-2 font-mono text-sm',
                 ipError ? 'border-status-critical' : isDark ? 'border-line-dark' : 'border-line-light',

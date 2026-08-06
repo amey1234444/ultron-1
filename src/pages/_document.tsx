@@ -10,15 +10,16 @@ export default function Document() {
             keeps the app from rendering inside a frame even if those headers are
             ever stripped by an intermediary or a mis-serving host. */}
         <script src="/anti-clickjack.js" />
-        {/* Typography. Inter carries the landing page (display + UI) with
-            JetBrains Mono for micro-labels; Anton / Bebas Neue / DM Sans stay
-            loaded because the console tree still maps onto them through the
-            font utilities in global.css. Families that were only ever CSS
-            fallbacks (Sora, Space Grotesk, IBM Plex Mono) are not requested. */}
+        {/* Typography — two families for the whole product. Inter covers every
+            text role across the landing page and the console (weight and
+            tracking separate display from UI), JetBrains Mono covers
+            engineering values and micro-labels. The display faces this project
+            used to load (Anton, Bebas Neue, DM Sans) have been retired, which
+            also takes three font requests off the critical path. */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=Anton&family=Bebas+Neue&family=JetBrains+Mono:wght@400;500;600&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700&family=JetBrains+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
       </Head>
@@ -29,7 +30,7 @@ export default function Document() {
           dangerouslySetInnerHTML={{
             __html: `html,body,#__next{height:100%;margin:0;padding:0;}
 #__next{display:flex;flex-direction:column;}
-body{background:#08090B;}`,
+body{background:#0A0A0A;}`,
           }}
         />
         {/* Landing-page entrance animations start from opacity 0 and are

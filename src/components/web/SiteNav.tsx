@@ -10,10 +10,9 @@ const LOGO_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
 // Every entry points at a section that exists on the landing page, so the bar
 // never advertises a destination the site cannot reach.
 export const NAV_SECTIONS = [
-  { label: 'Product', id: 'product' },
+  { label: 'How it works', id: 'signal' },
   { label: 'Platform', id: 'platform' },
-  { label: 'Live console', id: 'console' },
-  { label: 'Industries', id: 'industries' },
+  { label: 'FAQ', id: 'faq' },
   { label: 'Contact', id: 'contact' },
 ] as const;
 

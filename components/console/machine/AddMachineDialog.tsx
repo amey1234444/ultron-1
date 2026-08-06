@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -24,7 +24,7 @@ type AddMachineDialogProps = {
 
 function TemplateCard({ template, selected, onPress }: { template: MachineTemplate; selected: boolean; onPress: () => void }) {
   const { isDark } = useAppTheme();
-  const color = selected ? (isDark ? '#0A0A0A' : '#F5F5F5') : isDark ? '#8A8A8A' : '#6B6B6B';
+  const color = selected ? (isDark ? '#0A0A0A' : '#F5F5F5') : isDark ? '#A1A3A0' : '#5F625F';
 
   return (
     <Pressable

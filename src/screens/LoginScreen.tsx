@@ -1,4 +1,4 @@
-import { useRouter } from 'next/router';
+﻿import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
@@ -107,7 +107,7 @@ export default function LoginScreen() {
               accessibilityRole="button"
               accessibilityLabel={`Use the ${account.username} demo account`}
             >
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '700', color: '#C9A15C' }}>{account.username}</Text>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '700', color: '#6EF08A' }}>{account.username}</Text>
               <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: '#8A8A8A' }}>{account.role}</Text>
             </Pressable>
           ))}

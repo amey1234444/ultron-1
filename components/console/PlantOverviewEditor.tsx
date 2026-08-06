@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMemo, useRef, useState } from 'react';
 import { Image, PanResponder, Pressable, ScrollView, Text, TextInput, View, type LayoutChangeEvent } from 'react-native';
 
@@ -16,8 +16,8 @@ import {
 } from '../../lib/plantOverview';
 
 const STATUS_COLORS: Record<Exclude<PlantTagStatus, 'auto'>, string> = {
-  healthy: '#22c55e',
-  warning: '#f59e0b',
+  healthy: '#6EF08A',
+  warning: '#E3B341',
   critical: '#ef4444',
   offline: '#94a3b8',
 };
@@ -163,7 +163,7 @@ export function PlantOverviewEditor({
 
       <View
         onLayout={onMapLayout}
-        className={cn('overflow-hidden rounded-lg border', isDark ? 'border-line-dark bg-slate-950' : 'border-line-light bg-[#f7fbff]')}
+        className={cn('overflow-hidden rounded-lg border', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}
         style={{ height: mapHeight }}
       >
         <Image
@@ -178,7 +178,7 @@ export function PlantOverviewEditor({
           }}
         />
         {config.tags.map((tag) => {
-          const color = tagColor(tag, autoColors[tag.name] ?? '#22c55e');
+          const color = tagColor(tag, autoColors[tag.name] ?? '#6EF08A');
           const isSelected = tag.id === selectedId;
           return (
             <View key={tag.id}>
@@ -205,7 +205,7 @@ export function PlantOverviewEditor({
                     height: LABEL_H * scale,
                     borderRadius: 7,
                     borderWidth: isSelected ? 2 : 1,
-                    borderColor: isSelected ? '#C9A15C' : '#dbe3ec',
+                    borderColor: isSelected ? '#6EF08A' : '#dbe3ec',
                     backgroundColor: '#ffffff',
                     paddingHorizontal: 9 * scale,
                     justifyContent: 'center',
@@ -228,7 +228,7 @@ export function PlantOverviewEditor({
       <View className="flex-row items-center justify-between">
         <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Tags ({config.tags.length})</Text>
         <Pressable onPress={addTag} className={cn('flex-row items-center gap-1 rounded-md border px-2.5 py-1.5', isDark ? 'border-line-dark' : 'border-line-light')}>
-          <MaterialCommunityIcons name="plus" size={14} color="#C9A15C" />
+          <MaterialCommunityIcons name="plus" size={14} color="#6EF08A" />
           <Text className="font-body-medium text-[11px] text-accent">Add tag</Text>
         </Pressable>
       </View>
@@ -269,7 +269,7 @@ export function PlantOverviewEditor({
                   <Pressable
                     key={status}
                     onPress={() => patchTag(tag.id, { status })}
-                    className={cn('rounded px-2 py-1', tag.status === status ? 'bg-accent' : isDark ? 'bg-white/10' : 'bg-slate-100')}
+                    className={cn('rounded px-2 py-1', tag.status === status ? 'bg-accent' : isDark ? 'bg-white/10' : 'bg-black/10')}
                   >
                     <Text className={cn('font-body-medium text-[10px] capitalize', tag.status === status ? 'text-white' : isDark ? 'text-ink' : 'text-ink-inverse')}>{status}</Text>
                   </Pressable>

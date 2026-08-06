@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { FOLDER_TYPES, type FolderType } from '../../lib/hierarchy';
@@ -26,7 +26,7 @@ type CreateFolderDialogProps = {
 
 function TypeChip({ label, selected, onPress }: { label: FolderType; selected: boolean; onPress: () => void }) {
   const { isDark } = useAppTheme();
-  const iconColor = selected ? (isDark ? '#0A0A0A' : '#F5F5F5') : isDark ? '#8A8A8A' : '#6B6B6B';
+  const iconColor = selected ? (isDark ? '#0A0A0A' : '#F5F5F5') : isDark ? '#A1A3A0' : '#5F625F';
 
   return (
     <Pressable

@@ -1,4 +1,4 @@
-import { Text, TextInput, View } from 'react-native';
+﻿import { Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
@@ -26,7 +26,7 @@ export function FormField({ label, required, value, onChangeText, placeholder, m
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={isDark ? '#6B6B6B' : '#8A8A8A'}
+        placeholderTextColor={isDark ? '#5F625F' : '#A1A3A0'}
         multiline={multiline}
         className={cn(
           'rounded-lg border px-3 py-2 font-body text-sm',

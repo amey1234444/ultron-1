@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -244,7 +244,7 @@ export function MachineWorkspace({
 
   const nameBlock = (
     <View>
-      <Text className={cn('font-heading text-2xl uppercase tracking-[0.05em]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+      <Text className={cn('font-body-bold text-2xl tracking-[-0.025em]', isDark ? 'text-ink' : 'text-ink-inverse')}>
         {machine.name}
       </Text>
       <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.2em]', mutedClass)}>{machine.template}</Text>

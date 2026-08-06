@@ -17,7 +17,7 @@
   height: 120%;
   margin-left: -60%;
   pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, rgba(110, 91, 242, 0.12), transparent 62%);
+  background: radial-gradient(ellipse at 50% 50%, rgba(110, 240, 138, 0.12), transparent 62%);
 }
 
 .inner {
@@ -26,7 +26,7 @@
   margin: 0 auto;
   padding: clamp(52px, 7vw, 76px) var(--u-gutter) 32px;
   display: grid;
-  grid-template-columns: minmax(240px, 1.5fr) repeat(3, minmax(120px, 1fr));
+  grid-template-columns: minmax(240px, 1.6fr) repeat(2, minmax(130px, 1fr));
   gap: 40px;
 }
 
@@ -62,7 +62,7 @@
 }
 
 .contactLink:hover {
-  color: var(--u-violet-soft);
+  color: var(--u-accent);
 }
 
 .contactMuted {
@@ -77,20 +77,20 @@
   width: fit-content;
   margin-top: 20px;
   padding: 6px 12px;
-  border: 1px solid rgba(63, 185, 80, 0.28);
+  border: 1px solid rgba(110, 240, 138, 0.28);
   border-radius: 999px;
-  background: rgba(63, 185, 80, 0.07);
+  background: rgba(110, 240, 138, 0.07);
   font-family: var(--u-font-mono);
   font-size: 11px;
   letter-spacing: 0.04em;
-  color: var(--u-green);
+  color: var(--u-accent);
 }
 
 .statusDot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--u-green);
+  background: var(--u-accent);
   animation: blink 2.6s ease-in-out infinite;
 }
 
@@ -125,8 +125,8 @@
 
 .social:hover {
   color: var(--u-ink);
-  border-color: rgba(156, 140, 255, 0.45);
-  background: rgba(110, 91, 242, 0.09);
+  border-color: rgba(110, 240, 138, 0.45);
+  background: rgba(110, 240, 138, 0.09);
   transform: translateY(-2px);
 }
 

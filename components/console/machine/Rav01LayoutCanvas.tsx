@@ -1,4 +1,4 @@
-import React, {
+﻿import React, {
   type ReactNode,
   useMemo,
   useState,
@@ -285,8 +285,8 @@ const RAV01_ARRANGEMENT: PointArrangement[] = [
 
 const TRAIL_COLOURS = {
   normal: '#E5E7EB',
-  warning: '#F2A93B',
-  critical: '#EF4444',
+  warning: '#E3B341',
+  critical: '#F2624A',
   offline: '#737373',
 };
 

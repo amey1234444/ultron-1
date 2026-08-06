@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+﻿import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
@@ -23,14 +23,17 @@ const KIND_LETTER: Record<MeasurementPointKind, LiveKindLetter> = {
   Current: 'C',
 };
 
+// Green is reserved for a point that is actually carrying data. The setup
+// states between "not configured" and "connected" step up through grey, so the
+// list reads as a progress ramp rather than three shades of "done".
 const ACCENT_FOR_STATUS: Record<MeasurementPointStatus, string> = {
-  'Not Configured': '#737373',
-  Configured: '#C9A15C',
-  Mapped: '#C9A15C',
-  Connected: '#3FB950',
-  Disconnected: '#737373',
-  Warning: '#F2A93B',
-  Alarm: '#EF4444',
+  'Not Configured': '#5F625F',
+  Configured: '#87897F',
+  Mapped: '#C9CCC9',
+  Connected: '#6EF08A',
+  Disconnected: '#5F625F',
+  Warning: '#E3B341',
+  Alarm: '#F2624A',
 };
 
 // Stable per-kind sequence within a component's point list, e.g. "P1", "P2" for the

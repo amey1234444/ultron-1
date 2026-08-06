@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -209,7 +209,7 @@ export function MappableBox({
     }),
   ).current;
 
-  const connectorColour = attached ? '#3FB950' : '#C9A15C';
+  const connectorColour = attached ? '#6EF08A' : '#6EF08A';
 
   if (channel) {
     const decimals = LIVE_RANGE_FOR_LETTER[channel.letter].decimals;
@@ -305,7 +305,7 @@ export function MappableBox({
               value={label}
               onChangeText={onLabelChange}
               placeholder="Label this point"
-              placeholderTextColor={isDark ? '#8A8A8A' : '#6B6B6B'}
+              placeholderTextColor={isDark ? '#A1A3A0' : '#5F625F'}
               className={cn('font-body-medium px-2.5 py-2 text-sm', inkClass)}
             />
 
@@ -418,7 +418,7 @@ export function MappableBox({
                     value={channelSearch}
                     onChangeText={setChannelSearch}
                     placeholder="Search active channels"
-                    placeholderTextColor={isDark ? '#8A8A8A' : '#6B6B6B'}
+                    placeholderTextColor={isDark ? '#A1A3A0' : '#5F625F'}
                     className={cn('font-body text-xs', inkClass)}
                   />
                   <Text className={cn('mt-1 font-body text-[10px]', mutedClass)}>

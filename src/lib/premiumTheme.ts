@@ -9,31 +9,29 @@
 // Keep the two in sync: global.css is the source of truth, this is the mirror.
 
 export const COLOR = {
-  /** Page background — near-black with a faint cool cast. */
-  bg: '#08090B',
-  bgSoft: '#0B0C10',
+  /** Page background — true black with the faintest green cast. */
+  bg: '#0A0A0A',
+  bgSoft: '#0F100F',
   /** Panel background. */
-  panel: '#0E1015',
+  panel: '#131413',
   /** Second-level panel, used for nested cards and inputs. */
-  panelRaised: '#13151B',
+  panelRaised: '#1A1B1A',
 
-  ink: '#F4F5F7',
-  inkMuted: '#A6ACB8',
-  inkFaint: '#6E7480',
+  ink: '#F2F2F0',
+  inkMuted: '#A1A3A0',
+  inkFaint: '#6B6D6B',
 
   line: 'rgba(255,255,255,0.07)',
   lineStrong: 'rgba(255,255,255,0.13)',
 
-  /** Brand light. Used for glow, active state and the primary CTA. */
-  violet: '#6E5BF2',
-  violetSoft: '#9C8CFF',
-  /** Secondary highlight. */
-  cyan: '#35D6C6',
-  /** Telemetry / alarm signal, shared with the console and the hero render. */
-  amber: '#E8B465',
-  green: '#3FB950',
-  red: '#F0563F',
-  blue: '#58A6FF',
+  /** The one accent. Live state, active controls, positive movement. */
+  accent: '#6EF08A',
+  accentInk: '#8FF0A8',
+  accentDim: '#2F7A48',
+
+  /** Signals — used only where a reading genuinely warrants a colour. */
+  red: '#F2624A',
+  amber: '#E3B341',
 } as const;
 
 export const FONT = {
@@ -55,7 +53,7 @@ export const RADIUS = {
 export const SHADOW = {
   card: '0 24px 60px rgba(0,0,0,0.5)',
   float: '0 40px 110px rgba(0,0,0,0.62)',
-  violet: '0 18px 44px rgba(110,91,242,0.34)',
+  accent: '0 18px 44px rgba(110,240,138,0.18)',
 } as const;
 
 /** The one easing every landing transition uses. */

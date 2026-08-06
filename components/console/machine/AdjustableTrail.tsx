@@ -14,8 +14,8 @@ export type TrailStatus = 'normal' | 'warning' | 'critical' | 'offline';
 function statusColourFor(status: TrailStatus, isDark: boolean): string {
   if (status === 'normal') return isDark ? '#F5F5F5' : '#1A1A1A';
   const rest: Record<Exclude<TrailStatus, 'normal'>, string> = {
-    warning: '#F2A93B',
-    critical: '#EF4444',
+    warning: '#E3B341',
+    critical: '#F2624A',
     offline: '#737373',
   };
   return rest[status];
@@ -195,8 +195,8 @@ function DraggablePoint({
             height: size + 8,
             borderRadius: isEndpoint ? 20 : 6,
             borderWidth: 1,
-            borderColor: 'rgba(201,161,92,0.45)',
-            backgroundColor: 'rgba(201,161,92,0.10)',
+            borderColor: 'rgba(110,240,138,0.45)',
+            backgroundColor: 'rgba(110,240,138,0.10)',
           }}
         />
       )}
@@ -207,7 +207,7 @@ function DraggablePoint({
           height: isEndpoint ? 18 : 10,
           borderRadius: isEndpoint ? 9 : 3,
           borderWidth: isEndpoint ? 2 : 1,
-          borderColor: isEndpoint ? colour : '#C9A15C',
+          borderColor: isEndpoint ? colour : '#6EF08A',
           backgroundColor: '#0A0A0A',
           alignItems: 'center',
           justifyContent: 'center',
@@ -253,7 +253,7 @@ export function AdjustableTrail({
 }: AdjustableTrailProps) {
   const { isDark } = useAppTheme();
   const statusColour = statusColourFor(status, isDark);
-  const trailColour = selected ? '#C9A15C' : statusColour;
+  const trailColour = selected ? '#6EF08A' : statusColour;
   const showBendMarkers = showControlPoints;
   const showDraggableControls = interactive && showControlPoints;
 
@@ -266,7 +266,7 @@ export function AdjustableTrail({
   return (
     <>
       <Svg pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, width: canvasWidth, height: canvasHeight }}>
-        {selected && <Path d={path} fill="none" stroke="rgba(201,161,92,0.15)" strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />}
+        {selected && <Path d={path} fill="none" stroke="rgba(110,240,138,0.15)" strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />}
 
         <Path d={path} fill="none" stroke={trailColour} strokeWidth={2} strokeDasharray="7 6" strokeLinecap="round" strokeLinejoin="round" />
 

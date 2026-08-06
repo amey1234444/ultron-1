@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+﻿import type { ReactNode } from 'react';
 import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -26,7 +26,7 @@ export function EmptyState({ title, description, eyebrow = 'Nothing here yet', c
         <Text className="font-mono text-[10px] uppercase tracking-[0.24em] text-accent">{eyebrow}</Text>
         <Text
           className={cn(
-            'text-center font-heading text-2xl uppercase tracking-[0.04em]',
+            'text-center font-body-bold text-2xl tracking-[-0.025em]',
             isDark ? 'text-ink' : 'text-ink-inverse',
           )}
         >

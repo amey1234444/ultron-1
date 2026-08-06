@@ -96,8 +96,8 @@ export default function SignupScreen() {
           style={{
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: 'rgba(201,161,92,0.4)',
-            backgroundColor: 'rgba(201,161,92,0.1)',
+            borderColor: 'rgba(110,240,138,0.4)',
+            backgroundColor: 'rgba(110,240,138,0.1)',
             paddingHorizontal: 14,
             paddingVertical: 14,
           }}
@@ -111,7 +111,7 @@ export default function SignupScreen() {
             'You will be able to sign in as soon as it is approved.',
           ].map((step, index) => (
             <View key={step} style={{ flexDirection: 'row', gap: 8 }}>
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#C9A15C' }}>{index + 1}.</Text>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#6EF08A' }}>{index + 1}.</Text>
               <Text style={{ flex: 1, fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 20, color: '#8A8A8A' }}>{step}</Text>
             </View>
           ))}

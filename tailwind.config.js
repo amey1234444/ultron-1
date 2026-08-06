@@ -11,40 +11,44 @@ module.exports = {
   presets: [require('nativewind/preset')],
   theme: {
     extend: {
+      // Console palette. Black, grey and white, with a single light-green
+      // accent reserved for live state and active controls — the same system
+      // the landing page uses (see the `--u-*` tokens in global.css). Keep the
+      // two in sync: a colour that exists here and nowhere there is a drift.
       colors: {
         surface: {
           // `bg-surface` is the console's dark canvas.
-          DEFAULT: '#08090C',
-          dark: '#08090C',
-          darkpanel: '#111318',
+          DEFAULT: '#0A0A0A',
+          dark: '#0A0A0A',
+          darkpanel: '#131413',
           // Slightly lifted panel used by the console dashboard cards.
-          card: '#14161C',
-          light: '#F6F6F4',
+          card: '#1A1B1A',
+          light: '#F7F7F5',
           lightpanel: '#FFFFFF',
         },
         ink: {
-          DEFAULT: '#F7F6F2',
-          muted: '#8B8D93',
-          inverse: '#0A0B0D',
-          'inverse-muted': '#6B6F76',
+          DEFAULT: '#F2F2F0',
+          muted: '#A1A3A0',
+          inverse: '#0A0A0A',
+          'inverse-muted': '#6B6D6B',
         },
         line: {
-          dark: 'rgba(255,255,255,0.08)',
-          light: '#E6E5E1',
+          dark: 'rgba(255,255,255,0.07)',
+          light: '#E7E7E3',
         },
         status: {
-          success: '#2FA35A',
-          warning: '#D9962B',
-          critical: '#D64545',
-          danger: '#D64545',
+          success: '#3FBF6A',
+          warning: '#E3B341',
+          critical: '#F2624A',
+          danger: '#F2624A',
         },
         primary: {
-          blue: '#2F6FED',
+          blue: '#6EF08A',
         },
         accent: {
-          DEFAULT: '#C9A15C',
-          soft: 'rgba(201,161,92,0.14)',
-          dim: '#8A6C3A',
+          DEFAULT: '#6EF08A',
+          soft: 'rgba(110,240,138,0.12)',
+          dim: '#2F7A48',
         },
       },
       fontFamily: {

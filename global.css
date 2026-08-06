@@ -10,7 +10,7 @@ html {
 html,
 body {
   min-width: 320px;
-  background: #08090b;
+  background: #0a0a0a;
 }
 
 /* ------------------------------------------------------------------------- */
@@ -22,12 +22,13 @@ body {
 /* ------------------------------------------------------------------------- */
 
 :root {
-  /* Surfaces — near-black with a faint cool cast so the violet ambient light
-     reads as light rather than as a purple tint on grey. */
-  --u-bg: #08090b;
-  --u-bg-soft: #0b0c10;
-  --u-panel: #0e1015;
-  --u-panel-raised: #13151b;
+  /* Surfaces — true black through to a lifted panel grey. Neutral, with only a
+     trace of green in the base so the accent reads as the light source rather
+     than as a sticker on a cold grey. */
+  --u-bg: #0a0a0a;
+  --u-bg-soft: #0f100f;
+  --u-panel: #131413;
+  --u-panel-raised: #1a1b1a;
 
   /* Hairlines. Borders on this palette have to be barely-there; anything
      stronger than 0.14 alpha starts to look like a wireframe. */
@@ -35,22 +36,23 @@ body {
   --u-line-strong: rgba(255, 255, 255, 0.13);
 
   /* Text ramp: three steps, no more. */
-  --u-ink: #f4f5f7;
-  --u-ink-2: #a6acb8;
-  --u-ink-3: #6e7480;
+  --u-ink: #f2f2f0;
+  --u-ink-2: #a1a3a0;
+  --u-ink-3: #6b6d6b;
 
-  /* Accents. Violet is the brand light, cyan the secondary highlight, and
-     amber survives from the old palette as the telemetry/alarm signal — it
-     keeps the product visuals consistent with the console and the render. */
-  --u-violet: #6e5bf2;
-  --u-violet-soft: #9c8cff;
-  --u-cyan: #35d6c6;
-  --u-amber: #e8b465;
-  --u-green: #3fb950;
-  --u-red: #f0563f;
+  /* One accent. The page is black, white and grey; green is reserved for the
+     things that are alive — live state, active controls, positive deltas. */
+  --u-accent: #6ef08a;
+  --u-accent-ink: #8ff0a8;
+  --u-accent-dim: #2f7a48;
+  --u-accent-soft: rgba(110, 240, 138, 0.12);
 
-  --u-radius-card: 18px;
-  --u-radius-panel: 24px;
+  /* Signals. Used only where a reading genuinely warrants a colour. */
+  --u-red: #f2624a;
+  --u-amber: #e3b341;
+
+  --u-radius-card: 16px;
+  --u-radius-panel: 22px;
 
   --u-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   --u-font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -64,14 +66,14 @@ body {
 }
 
 ::selection {
-  background: rgba(110, 91, 242, 0.32);
+  background: rgba(110, 240, 138, 0.26);
   color: #fff;
 }
 
 /* Keyboard focus stays visible everywhere on the landing page; pointer clicks
    don't draw the ring. */
 :focus-visible {
-  outline: 2px solid var(--u-violet-soft);
+  outline: 2px solid var(--u-accent);
   outline-offset: 3px;
   border-radius: 4px;
 }
@@ -109,35 +111,56 @@ body {
 /*                                                                           */
 /* The console is a react-native-web tree, so its type comes from the         */
 /* nativewind font utilities. Native builds keep the bundled TTF families     */
-/* declared in tailwind.config.js; on the web these overrides map the same    */
-/* utilities onto the display system used across the site — Anton for hero    */
-/* numerals, Bebas Neue for headings, DM Sans for UI text and JetBrains Mono  */
-/* for engineering values. Loaded from Google Fonts in _document.tsx.         */
+/* declared in tailwind.config.js; on the web these overrides map every one   */
+/* of those utilities onto a two-face system — Inter for all text and         */
+/* JetBrains Mono for engineering values and micro-labels. The display faces   */
+/* this project used to carry (Anton, Bebas Neue, DM Sans) are gone: a single */
+/* neutral grotesk across the console and the landing page is what makes the  */
+/* two read as one product. Weight and tracking do the work the extra         */
+/* families used to.                                                         */
 /* ------------------------------------------------------------------------- */
 
 :root {
-  --font-display: 'Anton', 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
-  --font-heading: 'Bebas Neue', 'Space Grotesk', system-ui, sans-serif;
-  --font-body: 'DM Sans', 'Sora', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: var(--u-font-sans);
+  --font-heading: var(--u-font-sans);
+  --font-body: var(--u-font-sans);
+  --font-mono: var(--u-font-mono);
 }
 
+/* Big figures and hero numerals. Inter needs negative tracking at display
+   sizes or it reads loose next to the condensed face it replaced. */
 .font-display {
   font-family: var(--font-display) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.font-wordmark {
+  font-family: var(--font-heading) !important;
+  font-weight: 600 !important;
   letter-spacing: 0.01em;
 }
 
-.font-wordmark,
 .font-heading,
 .font-heading-medium {
   font-family: var(--font-heading) !important;
-  letter-spacing: 0.02em;
+  letter-spacing: -0.018em;
+}
+
+.font-heading {
+  font-weight: 550 !important;
+}
+
+.font-heading-medium {
+  font-weight: 600 !important;
 }
 
 .font-body,
 .font-body-medium,
 .font-body-bold {
   font-family: var(--font-body) !important;
+  letter-spacing: -0.006em;
 }
 
 .font-body-medium {

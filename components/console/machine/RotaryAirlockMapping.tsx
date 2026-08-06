@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   Text,
   View,
@@ -333,17 +333,17 @@ const TRAILS: TrailDefinition[] = [
 ];
 
 const STATUS_COLOURS: Record<CardStatus, string> = {
-  normal: '#3FB950',
-  warning: '#F2A93B',
-  critical: '#EF4444',
+  normal: '#6EF08A',
+  warning: '#E3B341',
+  critical: '#F2624A',
   offline: '#737373',
 };
 
 const TRAIL_COLOURS: Record<TrailTone, string> = {
   neutral: '#E6E6E6',
-  normal: '#3FB950',
-  warning: '#F2A93B',
-  critical: '#EF4444',
+  normal: '#6EF08A',
+  warning: '#E3B341',
+  critical: '#F2624A',
 };
 
 function createRoundedTrailPath(points: Point[], radius = 12) {

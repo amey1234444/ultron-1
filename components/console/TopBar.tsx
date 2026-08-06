@@ -1,4 +1,4 @@
-import { LinearGradient } from 'expo-linear-gradient';
+﻿import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useMemo, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, Text, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
@@ -101,7 +101,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
             width: 7,
             height: 7,
             borderRadius: 4,
-            backgroundColor: isOnline ? '#3FB950' : isDark ? '#5A5A5A' : '#B4B4B4',
+            backgroundColor: isOnline ? '#6EF08A' : isDark ? '#5A5A5A' : '#B4B4B4',
           }}
         />
         <View className="flex-1">
@@ -125,7 +125,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
         onPress={() => setOpen(true)}
         className={cn('flex-row items-center gap-1.5 rounded-full border px-2.5 py-1', lineClass)}
       >
-        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active.length > 0 ? '#3FB950' : isDark ? '#5A5A5A' : '#B4B4B4' }} />
+        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active.length > 0 ? '#6EF08A' : isDark ? '#5A5A5A' : '#B4B4B4' }} />
         <Text className={cn('font-body-medium text-[11px]', inkClass)}>
           {active.length}
           <Text className={mutedClass}>/{total}</Text>
@@ -288,7 +288,7 @@ export function TopBar({
                   width: 7,
                   height: 7,
                   borderRadius: 4,
-                  backgroundColor: configureMode ? '#C9A15C' : isDark ? '#5A5A5A' : '#9A9A9A',
+                  backgroundColor: configureMode ? '#6EF08A' : isDark ? '#5A5A5A' : '#9A9A9A',
                 }}
               />
               <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.18em]', configureMode ? 'text-accent' : mutedClass)}>

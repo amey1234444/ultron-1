@@ -1,4 +1,4 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleProp, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
@@ -15,12 +15,17 @@ import { apiFetch } from '../../../src/lib/apiClient';
 import { LIVE_RANGE_FOR_LETTER, useLiveValue, type LiveKindLetter } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
-const LIVE_COLOUR = '#3FB950';
-const WARNING_COLOUR = '#F2A93B';
-const CRITICAL_COLOUR = '#EF4444';
-const INFO_COLOUR = '#58A6FF';
-const MUTED_COLOUR = '#8B949E';
-const ACCENT_COLOUR = '#C9A15C';
+// Semantic colours for the machine workspace, shared with AnalysisView and
+// AlarmView through TONE_COLOUR below. These mirror the console palette in
+// lib/consoleTheme.ts — green means live/healthy, amber means watch, red means
+// act, and everything else is grey. `info` is deliberately achromatic: it was a
+// blue, which made routine notices compete with real alarms for attention.
+const LIVE_COLOUR = '#6EF08A';
+const WARNING_COLOUR = '#E3B341';
+const CRITICAL_COLOUR = '#F2624A';
+const INFO_COLOUR = '#A1A3A0';
+const MUTED_COLOUR = '#6B6D6B';
+const ACCENT_COLOUR = '#6EF08A';
 
 // How often the browser-side analysis is pushed to the server for durable
 // history. Live values move continuously, so saving every render would flood the
@@ -630,7 +635,7 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
             cx={centre}
             cy={centre}
             r={radius}
-            stroke={isDark ? 'rgba(255,255,255,0.10)' : '#E9EDF3'}
+            stroke={isDark ? 'rgba(255,255,255,0.10)' : '#E7E7E3'}
             strokeWidth={14}
             strokeLinecap="round"
             fill="none"
@@ -651,7 +656,7 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
           <SvgText x={centre} y={centre + 4} textAnchor="middle" fontSize={38} fontWeight="700" fill={isDark ? '#F5F5F5' : '#0A0A0A'}>
             {String(Math.round(score))}
           </SvgText>
-          <SvgText x={centre} y={centre + 26} textAnchor="middle" fontSize={12} fill={isDark ? '#8A8A8A' : '#6B6B6B'}>
+          <SvgText x={centre} y={centre + 26} textAnchor="middle" fontSize={12} fill={isDark ? '#A1A3A0' : '#5F625F'}>
             /100
           </SvgText>
         </Svg>
@@ -689,7 +694,7 @@ function TrendChart({
   const top = max === min ? max + 1 : max;
   const bottom = max === min ? Math.max(0, min - 1) : min;
   const spread = top - bottom || 1;
-  const axis = isDark ? '#8A8A8A' : '#94A3B8';
+  const axis = isDark ? '#A1A3A0' : '#6B6D6B';
 
   const coords = points.map((point, index) => {
     const x = padLeft + (points.length <= 1 ? plotWidth : (index / (points.length - 1)) * plotWidth);
@@ -703,7 +708,7 @@ function TrendChart({
       {[0, 0.5, 1].map((fraction) => {
         const y = 8 + plotHeight * fraction;
         return (
-          <Line key={fraction} x1={padLeft} y1={y} x2={width - 8} y2={y} stroke={isDark ? 'rgba(255,255,255,0.07)' : '#EEF2F7'} strokeWidth={1} />
+          <Line key={fraction} x1={padLeft} y1={y} x2={width - 8} y2={y} stroke={isDark ? 'rgba(255,255,255,0.07)' : '#E7E7E3'} strokeWidth={1} />
         );
       })}
       {[1, 0.5, 0].map((fraction, index) => (
@@ -1256,7 +1261,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
         emptyHint="Saved health snapshots build this trend; the first snapshot is stored automatically."
       />
       <TrendPanel title="Vibration spread trend" points={vibrationTrend} colour={WARNING_COLOUR} emptyHint="No vibration spread has been saved yet." />
-      <TrendPanel title="RPM deviation trend" points={rpmTrend} colour="#A78BFA" suffix="%" emptyHint="No RPM deviation has been saved yet." />
+      <TrendPanel title="RPM deviation trend" points={rpmTrend} colour="#C9CCC9" suffix="%" emptyHint="No RPM deviation has been saved yet." />
       <ActivityFeed history={history} nowMs={nowMs} />
     </View>
   );
@@ -1270,7 +1275,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
       <View className="flex-row flex-wrap items-end justify-between gap-3">
         <View className="min-w-0 flex-1 gap-1">
           <View className="flex-row items-center gap-2">
-            <Text className={cn('font-heading text-3xl uppercase tracking-[0.04em]', textClass)}>Machine analysis</Text>
+            <Text className={cn('font-body-bold text-3xl tracking-[-0.03em]', textClass)}>Machine analysis</Text>
             <MaterialCommunityIcons name="shimmer" size={17} color={ACCENT_COLOUR} />
           </View>
           <Text className={cn('font-body text-xs leading-5', mutedClass)}>

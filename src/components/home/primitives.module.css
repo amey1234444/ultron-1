@@ -53,11 +53,11 @@
   opacity: 1;
 }
 
+/* The second half of a headline, dropped to grey. Two weights of the same
+   colour do the emphasis that a coloured gradient used to — which is the whole
+   point of a black-and-white page: contrast, not hue. */
 .accent {
-  background: linear-gradient(96deg, var(--u-violet-soft) 0%, #c3b6ff 42%, var(--u-cyan) 100%);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
+  color: #7b7e7b;
 }
 
 /* --------------------------------------------------------------------- */
@@ -83,13 +83,13 @@
   font-weight: 500;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--u-violet-soft);
+  color: var(--u-accent);
 }
 
 .eyebrowRule {
   width: 22px;
   height: 1px;
-  background: linear-gradient(90deg, var(--u-violet-soft), transparent);
+  background: linear-gradient(90deg, var(--u-accent), transparent);
 }
 
 .head {
@@ -161,7 +161,7 @@
   border-radius: inherit;
   background: radial-gradient(
     380px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(110, 91, 242, 0.16),
+    rgba(110, 240, 138, 0.16),
     transparent 68%
   );
   opacity: var(--spot, 0);
@@ -180,7 +180,7 @@
   border-radius: inherit;
   background: radial-gradient(
     300px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(156, 140, 255, 0.55),
+    rgba(110, 240, 138, 0.55),
     transparent 60%
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
@@ -235,16 +235,20 @@
     border-color 220ms ease, color 220ms ease;
 }
 
+/* On a black page the highest-contrast control is plain white. Colour is spent
+   on live state elsewhere, not on the buttons. */
 .btnPrimary {
-  border: 1px solid rgba(156, 140, 255, 0.6);
-  background: linear-gradient(180deg, #7d6cf5, #5d49e0);
-  color: #fff;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.22) inset, 0 12px 30px rgba(110, 91, 242, 0.34);
+  border: 1px solid #ffffff;
+  background: #ffffff;
+  color: #0a0a0a;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
 }
 
 .btnPrimary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.26) inset, 0 18px 42px rgba(110, 91, 242, 0.46);
+  background: #e9eae8;
+  border-color: #e9eae8;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
 }
 
 .btnGhost {
