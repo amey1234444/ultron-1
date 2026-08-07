@@ -1,4 +1,4 @@
-/* Pulse — the closing sweep. */
+/* Pulse — the closing sweep and its scan log. */
 
 .section {
   position: relative;
@@ -8,7 +8,7 @@
 
 .inner {
   position: relative;
-  max-width: 880px;
+  max-width: var(--u-max);
   margin: 0 auto;
   text-align: center;
 }
@@ -37,13 +37,67 @@
 }
 
 /* ------------------------------------------------------------------ */
+/* Panel                                                              */
+/* ------------------------------------------------------------------ */
+
+.panel {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(200px, 300px);
+  align-items: center;
+  gap: clamp(20px, 4vw, 56px);
+  margin: clamp(34px, 4.5vw, 56px) auto 0;
+  padding: clamp(20px, 3vw, 34px);
+  border: 1px solid var(--u-line);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.005));
+  text-align: left;
+}
+
+.tick {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 0 solid rgba(255, 255, 255, 0.3);
+  pointer-events: none;
+}
+
+.tl {
+  top: -1px;
+  left: -1px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.tr {
+  top: -1px;
+  right: -1px;
+  border-top-width: 1px;
+  border-right-width: 1px;
+}
+
+.bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom-width: 1px;
+  border-left-width: 1px;
+}
+
+.br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+}
+
+/* ------------------------------------------------------------------ */
 /* Field                                                              */
 /* ------------------------------------------------------------------ */
 
 .stage {
   position: relative;
-  width: min(100%, 560px);
-  margin: clamp(30px, 4vw, 48px) auto 0;
+  width: min(100%, 520px);
+  margin: 0 auto;
 }
 
 .svg {
@@ -52,32 +106,68 @@
   height: auto;
 }
 
-/* Softens the outer edge of the field into the page rather than ending it on a
-   hard circle. */
+/* Softens the outer edge of the field into the panel rather than ending it on
+   a hard circle. */
 .fade {
   position: absolute;
-  inset: -6%;
+  inset: -4%;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 50%, transparent 56%, var(--u-bg) 82%);
+  background: radial-gradient(circle at 50% 50%, transparent 62%, var(--u-bg) 88%);
 }
+
+/* -------------------------------- bezel --------------------------------- */
+
+.bezel {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: spinBack 64s linear infinite;
+}
+
+.bezelTick {
+  stroke: rgba(255, 255, 255, 0.11);
+  stroke-width: 1;
+}
+
+.bezelTickLong {
+  stroke: rgba(255, 255, 255, 0.24);
+  stroke-width: 1;
+}
+
+@keyframes spinBack {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(-360deg);
+  }
+}
+
+/* ------------------------------- hierarchy ------------------------------ */
 
 .ring {
   fill: none;
-  stroke: rgba(255, 255, 255, 0.08);
+  stroke: rgba(255, 255, 255, 0.075);
   stroke-width: 1;
 }
 
 .ringDashed {
   stroke-dasharray: 2 6;
-  stroke: rgba(255, 255, 255, 0.11);
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.ringLabel {
+  fill: var(--u-ink-3);
+  font-family: var(--u-font-mono);
+  font-size: 7px;
+  letter-spacing: 0.2em;
 }
 
 .bearing {
-  stroke: rgba(255, 255, 255, 0.045);
+  stroke: rgba(255, 255, 255, 0.04);
   stroke-width: 1;
 }
 
-/* -- the sweep ------------------------------------------------------ */
+/* -------------------------------- sweep --------------------------------- */
 
 .sweep {
   transform-box: view-box;
@@ -86,12 +176,15 @@
 }
 
 .sweepLine {
-  stroke: rgba(255, 255, 255, 0.55);
+  stroke: rgba(255, 255, 255, 0.6);
   stroke-width: 1.2;
 }
 
+.sweepTip {
+  fill: #ffffff;
+}
+
 .wedge {
-  /* Fill comes from the gradient in the markup; this only carries the opacity. */
   opacity: 0.9;
 }
 
@@ -104,11 +197,11 @@
   }
 }
 
-/* -- assets --------------------------------------------------------- */
+/* -------------------------------- assets -------------------------------- */
 
 /* Resting state is a dim dot; the flash is the sweep passing over it. */
 .asset {
-  fill: rgba(255, 255, 255, 0.28);
+  fill: rgba(255, 255, 255, 0.26);
   animation: assetFlash var(--period, 9s) ease-out infinite;
   animation-delay: var(--delay, 0s);
 }
@@ -124,34 +217,61 @@
   animation-delay: var(--delay, 0s);
 }
 
+/* The tag is only readable in the beat after the sweep passes — the field
+   stays uncluttered, and you still learn what everything is. */
+.assetTag {
+  fill: #ffffff;
+  font-family: var(--u-font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.14em;
+  opacity: 0;
+  animation: tagFlash var(--period, 9s) ease-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
 @keyframes assetFlash {
   0% {
     fill: #ffffff;
   }
-  14% {
-    fill: rgba(255, 255, 255, 0.28);
+  16% {
+    fill: rgba(255, 255, 255, 0.26);
   }
   100% {
-    fill: rgba(255, 255, 255, 0.28);
+    fill: rgba(255, 255, 255, 0.26);
   }
 }
 
 @keyframes assetHalo {
   0% {
-    opacity: 0.6;
+    opacity: 0.62;
     transform: scale(1);
   }
-  18% {
+  20% {
     opacity: 0;
-    transform: scale(5);
+    transform: scale(5.5);
   }
   100% {
     opacity: 0;
-    transform: scale(5);
+    transform: scale(5.5);
   }
 }
 
-/* -- core ----------------------------------------------------------- */
+@keyframes tagFlash {
+  0% {
+    opacity: 0.95;
+  }
+  16% {
+    opacity: 0.32;
+  }
+  30% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* --------------------------------- core --------------------------------- */
 
 .core {
   fill: #ffffff;
@@ -173,8 +293,126 @@
   }
   100% {
     opacity: 0;
-    transform: scale(4.5);
+    transform: scale(5);
   }
+}
+
+/* ------------------------------------------------------------------ */
+/* Scan log                                                           */
+/* ------------------------------------------------------------------ */
+
+.log {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.logHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--u-line);
+  font-family: var(--u-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.logLive {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--u-green);
+}
+
+.logDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--u-green);
+  animation: blink 2.4s ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* The window the marquee runs behind. */
+.logViewport {
+  position: relative;
+  flex: 1;
+  min-height: 232px;
+  overflow: hidden;
+}
+
+.logTrack {
+  animation: logScroll 22s linear infinite;
+}
+
+/* Two identical groups, translated by exactly one group's height, so the loop
+   lands where it started and never visibly restarts. */
+@keyframes logScroll {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(0, -50%, 0);
+  }
+}
+
+.logRow {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 26px;
+  align-items: baseline;
+  gap: 8px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.logAsset {
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--u-ink);
+}
+
+.logChannel {
+  font-size: 11.5px;
+  color: var(--u-ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.logScore {
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  text-align: right;
+  color: var(--u-green);
+}
+
+/* Fades the log into the panel at both ends instead of cutting it. */
+.logMask {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(10, 10, 10, 0.95),
+    transparent 16%,
+    transparent 84%,
+    rgba(10, 10, 10, 0.95)
+  );
 }
 
 /* ------------------------------------------------------------------ */
@@ -184,8 +422,9 @@
 .readout {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  margin: clamp(24px, 3vw, 40px) 0 0;
+  margin: clamp(28px, 3.4vw, 44px) 0 0;
   border-top: 1px solid var(--u-line);
+  text-align: left;
 }
 
 .readoutItem {
@@ -194,6 +433,7 @@
 
 .readoutItem + .readoutItem {
   border-left: 1px solid var(--u-line);
+  padding-left: 20px;
 }
 
 .readoutLabel {
@@ -214,6 +454,20 @@
   color: var(--u-ink);
 }
 
+/* ------------------------------------------------------------------ */
+/* Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 880px) {
+  .panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .logViewport {
+    min-height: 168px;
+  }
+}
+
 @media (max-width: 640px) {
   .readout {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -221,6 +475,7 @@
 
   .readoutItem:nth-child(odd) {
     border-left: 0;
+    padding-left: 8px;
   }
 
   .readoutItem:nth-child(n + 3) {
@@ -232,14 +487,22 @@
 
 @media (prefers-reduced-motion: reduce) {
   .sweep,
+  .bezel,
   .asset,
   .halo,
-  .coreRing {
+  .assetTag,
+  .coreRing,
+  .logTrack,
+  .logDot {
     animation: none;
   }
 
   .halo,
   .coreRing {
     opacity: 0;
+  }
+
+  .assetTag {
+    opacity: 0.5;
   }
 }

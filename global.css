@@ -65,6 +65,17 @@ body {
   --u-blue-soft: rgba(111, 168, 255, 0.1);
   --u-blue-line: rgba(111, 168, 255, 0.42);
 
+  /* Platform accents. Violet and a very light blue, used only inside the
+     capability panels and the pipeline diagram — the two places where a
+     drawing has to distinguish several things at once and grey alone runs
+     out of steps. */
+  --u-violet: #a78bfa;
+  --u-violet-soft: rgba(167, 139, 250, 0.12);
+  --u-violet-line: rgba(167, 139, 250, 0.4);
+  --u-sky: #9fd8ff;
+  --u-sky-soft: rgba(159, 216, 255, 0.12);
+  --u-sky-line: rgba(159, 216, 255, 0.4);
+
   /* Signals. Used only where a reading genuinely warrants a colour. */
   --u-red: #f2624a;
   --u-amber: #e3b341;

@@ -1,91 +1,149 @@
-/* Compact plant-overview surface used as the hero's single product visual.
-   It mirrors the console's redesigned overview page — same palette, same type,
-   same control language — so the landing page is showing the real product
-   rather than an illustration of it. */
+/* The console's plant overview, rendered small.
+
+   Type discipline, because a dashboard lives or dies on it:
+     · asset and metric names  — sans, 12–13px, 500
+     · every number            — mono, tabular figures
+     · every label and unit    — mono, 8–9px, wide tracking, uppercase
+   Nothing in here uses a colour except the tone ramp (green / amber / red) and
+   the light blue that always means "forecast". */
 
 .frame {
   position: relative;
   border: 1px solid var(--u-line-strong);
-  border-radius: 14px;
-  background: linear-gradient(180deg, #131413, #0b0c0b);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset, 0 50px 120px rgba(0, 0, 0, 0.72);
+  border-radius: 16px;
+  background: linear-gradient(180deg, #101011, #0b0b0c);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
   overflow: hidden;
-  text-align: left;
+  font-family: var(--u-font-sans);
+  container-type: inline-size;
 }
 
-/* --------------------------------- header -------------------------------- */
+/* ------------------------------------------------------------------ */
+/* Context bar                                                        */
+/* ------------------------------------------------------------------ */
 
 .bar {
   display: flex;
   align-items: center;
   gap: 10px;
-  height: 44px;
-  padding: 0 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--u-line);
-  background: rgba(255, 255, 255, 0.018);
+  background: rgba(255, 255, 255, 0.015);
 }
 
 .mark {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--u-ink);
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  color: #ffffff;
 }
 
 .markGlyph {
-  width: 15px;
-  height: 15px;
+  width: 13px;
+  height: 13px;
   border-radius: 4px;
-  background: var(--u-accent);
+  background: #ffffff;
 }
 
 .select {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 25px;
-  padding: 0 9px;
+  padding: 5px 9px;
   border: 1px solid var(--u-line);
   border-radius: 7px;
-  background: rgba(255, 255, 255, 0.03);
-  font-size: 11px;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 11.5px;
   font-weight: 500;
-  color: var(--u-ink-2);
+  color: var(--u-ink);
+  white-space: nowrap;
 }
 
 .selectKey {
   font-family: var(--u-font-mono);
-  font-size: 8.5px;
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.caret {
+  width: 0;
+  height: 0;
+  margin-left: 2px;
+  border-left: 3px solid transparent;
+  border-right: 3px solid transparent;
+  border-top: 3.5px solid var(--u-ink-3);
+}
+
+.barRight {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.strategy {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid var(--u-line);
+  border-radius: 7px;
+  font-family: var(--u-font-mono);
+  font-size: 9px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  color: var(--u-ink);
+}
+
+.strategyKey {
   color: var(--u-ink-3);
 }
 
 .online {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  padding: 4px 9px;
+  gap: 7px;
+  padding: 5px 10px;
   border: 1px solid var(--u-green-line);
   border-radius: 999px;
   background: var(--u-green-soft);
   font-family: var(--u-font-mono);
   font-size: 8.5px;
-  letter-spacing: 0.13em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--u-accent);
+  color: var(--u-green);
+  white-space: nowrap;
 }
 
-.onlineDot {
-  width: 5px;
-  height: 5px;
+/* Four gateways, four dots — the count is the status. */
+.onlineDots {
+  display: inline-flex;
+  gap: 3px;
+}
+
+.onlineDots i {
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: var(--u-accent);
-  animation: blink 2.4s ease-in-out infinite;
+  background: var(--u-green);
+  animation: blink 2.6s ease-in-out infinite;
+}
+
+.onlineDots i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.onlineDots i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.onlineDots i:nth-child(4) {
+  animation-delay: 0.6s;
 }
 
 @keyframes blink {
@@ -94,135 +152,185 @@
     opacity: 1;
   }
   50% {
-    opacity: 0.25;
+    opacity: 0.35;
   }
 }
 
-/* ---------------------------------- tabs --------------------------------- */
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 50%;
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.06em;
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Tabs                                                               */
+/* ------------------------------------------------------------------ */
 
 .tabs {
   display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 0 10px;
+  gap: 20px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--u-line);
 }
 
 .tab {
   position: relative;
-  padding: 10px 11px;
-  font-size: 11.5px;
+  padding: 11px 0;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: -0.008em;
+  letter-spacing: -0.01em;
   color: var(--u-ink-3);
+  white-space: nowrap;
 }
 
 .tabActive {
-  color: var(--u-ink);
+  color: #ffffff;
 }
 
 .tabActive::after {
   content: '';
   position: absolute;
-  right: 11px;
+  right: 0;
   bottom: -1px;
-  left: 11px;
+  left: 0;
   height: 1.5px;
-  background: var(--u-accent);
+  background: #ffffff;
 }
 
-/* ---------------------------------- body --------------------------------- */
+/* ------------------------------------------------------------------ */
+/* Body                                                               */
+/* ------------------------------------------------------------------ */
 
 .body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 168px;
+  grid-template-columns: minmax(0, 1fr) 216px;
 }
 
 .left {
-  border-right: 1px solid var(--u-line);
+  min-width: 0;
+  padding: 14px 16px 16px;
 }
 
-/* -------------------------------- kpi strip ------------------------------ */
+/* ------------------------------- KPIs ------------------------------ */
 
 .kpis {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  border-bottom: 1px solid var(--u-line);
+  gap: 1px;
+  border: 1px solid var(--u-line);
+  border-radius: 10px;
+  background: var(--u-line);
+  overflow: hidden;
 }
 
 .kpi {
-  padding: 12px 13px;
+  padding: 11px 12px;
+  background: #0d0d0e;
 }
 
-.kpi + .kpi {
-  border-left: 1px solid var(--u-line);
+.kpiHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .kpiLabel {
   font-family: var(--u-font-mono);
   font-size: 8px;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--u-ink-3);
-  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .kpiValue {
-  margin-top: 7px;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: -0.035em;
+  font-family: var(--u-font-mono);
+  font-size: 17px;
   font-variant-numeric: tabular-nums;
-  color: var(--u-ink);
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  white-space: nowrap;
 }
 
 .kpiUnit {
   margin-left: 3px;
-  font-size: 10px;
-  font-weight: 500;
+  font-size: 8px;
+  letter-spacing: 0.08em;
   color: var(--u-ink-3);
 }
 
-/* Plan bar: the filled portion is where the asset actually is against target,
-   and the notch is where plan says it should be. */
 .kpiTrack {
   position: relative;
-  height: 3px;
-  margin-top: 9px;
+  height: 4px;
+  margin-top: 10px;
   border-radius: 2px;
   background: rgba(255, 255, 255, 0.07);
-}
-
-.kpiNotch {
-  position: absolute;
-  top: -2px;
-  width: 1.5px;
-  height: 7px;
-  background: var(--u-ink);
-  opacity: 0.55;
+  overflow: hidden;
 }
 
 .kpiFill {
   display: block;
+  width: 100%;
   height: 100%;
   border-radius: 2px;
-  background: var(--tone, var(--u-accent));
+  background: rgba(255, 255, 255, 0.75);
   transform-origin: 0 50%;
   transition: transform 900ms var(--u-ease);
 }
 
+.kpiFill.ok {
+  background: var(--u-green);
+}
+
+.kpiFill.warn {
+  background: var(--u-amber);
+}
+
+/* Where plan actually sits, marked on the same track as the reading. */
+.kpiNotch {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1.5px;
+  background: rgba(255, 255, 255, 0.85);
+}
+
 .kpiPlan {
-  margin-top: 7px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
   font-family: var(--u-font-mono);
   font-size: 8px;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
   color: var(--u-ink-3);
 }
 
-/* --------------------------------- chart --------------------------------- */
+.kpiDelta {
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------- chart ----------------------------- */
 
 .chartWrap {
-  padding: 13px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--u-line);
+  border-radius: 10px;
+  background: #0d0d0e;
 }
 
 .chartHead {
@@ -230,47 +338,54 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 10px;
+  flex-wrap: wrap;
 }
 
 .chartTitle {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 550;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.016em;
   color: var(--u-ink);
 }
 
-.chartMeta {
+.chartKeys {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.key {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: var(--u-font-mono);
-  font-size: 8.5px;
-  letter-spacing: 0.11em;
+  font-size: 8px;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--u-ink-3);
 }
 
-.chart {
-  display: block;
-  width: 100%;
-  height: 116px;
+.key i {
+  width: 12px;
+  height: 0;
+  border-top-width: 1.5px;
+  border-top-style: solid;
 }
 
-/* ------------------------- asset performance table ----------------------- */
-
-.assets {
-  border-top: 1px solid var(--u-line);
+.keyMeasured {
+  border-top-color: #ffffff;
 }
 
-.assetHead,
-.assetRow {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 7px 13px;
+.keyLoad {
+  border-top-color: rgba(255, 255, 255, 0.32);
 }
 
-.assetHead {
-  background: rgba(255, 255, 255, 0.022);
-  border-bottom: 1px solid var(--u-line);
+.keyForecast {
+  border-top-style: dashed;
+  border-top-color: var(--u-sky);
+}
+
+.chartMeta {
   font-family: var(--u-font-mono);
   font-size: 8px;
   letter-spacing: 0.14em;
@@ -278,147 +393,365 @@
   color: var(--u-ink-3);
 }
 
-.assetRow {
-  border-bottom: 1px solid var(--u-line);
-  font-size: 10.5px;
+.chartRow {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
 }
 
-.assetRow:last-child {
+/* Red at both ends, green in the middle: the band the channel is allowed to
+   sit in, read against the plot beside it. */
+.scale {
+  width: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    180deg,
+    var(--u-red),
+    var(--u-amber) 18%,
+    var(--u-green) 42%,
+    var(--u-green) 62%,
+    var(--u-amber) 84%,
+    var(--u-red)
+  );
+  opacity: 0.75;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: 132px;
+}
+
+.gridline {
+  stroke: rgba(255, 255, 255, 0.05);
+  stroke-width: 1;
+}
+
+.trend {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* preserveAspectRatio="none" scales the stroke with the box; this keeps the
+     line the same weight regardless of how wide the frame renders. */
+  vector-effect: non-scaling-stroke;
+}
+
+.load {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.forecast {
+  fill: none;
+  stroke: var(--u-sky);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 4;
+  stroke-linecap: round;
+  opacity: 0.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.nowLine {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  vector-effect: non-scaling-stroke;
+}
+
+.chartAxis {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0 0 11px;
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.1em;
+  color: var(--u-ink-3);
+}
+
+.axisNow {
+  position: absolute;
+  left: 68%;
+  color: var(--u-ink-2);
+  text-transform: uppercase;
+}
+
+/* ------------------------------ metrics ---------------------------- */
+
+.metrics {
+  margin-top: 14px;
+  border: 1px solid var(--u-line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.metricHead,
+.metricRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 76px 56px 66px 48px 48px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.metricHead {
+  border-bottom: 1px solid var(--u-line);
+  background: rgba(255, 255, 255, 0.018);
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.metricRow {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.035);
+}
+
+.metricRow:last-child {
   border-bottom: 0;
 }
 
-.assetName {
-  display: flex;
+/* A row that is off plan tints its whole band, so the table can be skimmed
+   without reading a single number. */
+.row_warn {
+  background: rgba(227, 179, 65, 0.05);
+}
+
+.row_bad {
+  background: rgba(242, 98, 74, 0.06);
+}
+
+.metricName {
+  display: inline-flex;
   align-items: center;
-  gap: 7px;
-  flex: 2;
+  gap: 8px;
   min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
+  font-size: 12px;
   font-weight: 500;
-  letter-spacing: -0.008em;
+  letter-spacing: -0.012em;
   color: var(--u-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.assetHead .assetName {
-  font-weight: inherit;
-  color: inherit;
-}
-
-.assetDot {
+.dot {
   width: 5px;
   height: 5px;
   flex-shrink: 0;
   border-radius: 50%;
 }
 
-/* Five steps centred on zero: two of under-performance, on plan, two of over. */
-.assetScaleCol {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  width: 62px;
-  flex-shrink: 0;
+.colDev {
+  display: inline-flex;
+  gap: 3px;
 }
 
-.assetPip {
-  width: 9px;
-  height: 6px;
+.pip {
+  width: 12px;
+  height: 7px;
   border-radius: 2px;
+  background: rgba(255, 255, 255, 0.075);
 }
 
-.assetNum {
-  width: 42px;
-  flex-shrink: 0;
-  text-align: right;
+.pip_ok {
+  background: var(--u-green);
+}
+
+.pip_warn {
+  background: var(--u-amber);
+}
+
+.pip_bad {
+  background: var(--u-red);
+}
+
+.colNum {
   font-family: var(--u-font-mono);
-  font-size: 9.5px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
   color: var(--u-ink);
+  white-space: nowrap;
 }
 
-.assetMuted {
+.metricUnit {
+  margin-left: 2px;
+  font-size: 7.5px;
+  letter-spacing: 0.08em;
   color: var(--u-ink-3);
 }
 
-/* ------------------------------- right rail ------------------------------ */
+.muted {
+  color: var(--u-ink-3);
+}
+
+/* The tone ramp, shared by dots, values and gaps. */
+.ok {
+  color: var(--u-green);
+}
+
+.warn {
+  color: var(--u-amber);
+}
+
+.bad {
+  color: var(--u-red);
+}
+
+.dot.ok {
+  background: var(--u-green);
+}
+
+.dot.warn {
+  background: var(--u-amber);
+}
+
+.dot.bad {
+  background: var(--u-red);
+}
+
+/* ------------------------------------------------------------------ */
+/* Action rail                                                        */
+/* ------------------------------------------------------------------ */
 
 .rail {
-  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  padding: 14px 14px 16px;
+  border-left: 1px solid var(--u-line);
+  background: rgba(255, 255, 255, 0.012);
 }
 
 .railTitle {
   font-family: var(--u-font-mono);
   font-size: 8px;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--u-ink-3);
 }
 
 .action {
-  padding: 9px 0;
-  border-bottom: 1px solid var(--u-line);
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid var(--u-line);
+  border-radius: 9px;
+  background: #0d0d0e;
 }
 
-.action:last-child {
-  border-bottom: 0;
+/* The oldest entries recede rather than being cut off, so the rail reads as a
+   window onto a longer list. */
+.actionFaded {
+  opacity: 0.35;
+}
+
+.actionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .actionTime {
   font-family: var(--u-font-mono);
-  font-size: 8px;
-  letter-spacing: 0.08em;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
   color: var(--u-ink-3);
 }
 
-.actionTitle {
-  margin-top: 4px;
-  font-size: 10.5px;
-  font-weight: 500;
-  letter-spacing: -0.008em;
-  line-height: 1.35;
+.actionTag {
+  padding: 2px 6px;
+  border: 1px solid var(--u-line);
+  border-radius: 4px;
+  font-family: var(--u-font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: var(--u-ink-2);
 }
 
-.actionTitleLive {
-  color: var(--u-accent);
+.actionTitle {
+  margin-top: 7px;
+  font-size: 12px;
+  font-weight: 550;
+  letter-spacing: -0.016em;
+  line-height: 1.35;
+  color: var(--u-ink);
 }
 
-/* Older entries fade out down the rail — recency without a scrollbar. */
-.actionFaded {
-  opacity: 0.42;
+.actionBody {
+  margin-top: 4px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--u-ink-3);
 }
 
-/* ------------------------------- responsive ------------------------------ */
+.version {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--u-line);
+}
 
-@media (max-width: 780px) {
+.versionLabel {
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.versionValue {
+  font-family: var(--u-font-mono);
+  font-size: 14px;
+  color: #ffffff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+/* Container queries rather than viewport ones: this component is scaled inside
+   a perspective stage, so what matters is how wide *it* is, not the window. */
+@container (max-width: 880px) {
   .body {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .left {
-    border-right: 0;
-    border-bottom: 1px solid var(--u-line);
+  .rail {
+    border-left: 0;
+    border-top: 1px solid var(--u-line);
   }
 
   .kpis {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .kpi:nth-child(3) {
-    border-left: 0;
-  }
-
-  .kpi:nth-child(n + 3) {
-    border-top: 1px solid var(--u-line);
-  }
 }
 
-@media (max-width: 520px) {
-  .tabs,
-  .assets,
-  .rail,
-  .select {
+@container (max-width: 620px) {
+  .metricHead,
+  .metricRow {
+    grid-template-columns: minmax(0, 1fr) 62px 52px;
+  }
+
+  .metricHead > .colNum:nth-child(3),
+  .metricHead > .colNum:nth-child(5),
+  .metricRow > .colNum:nth-child(3),
+  .metricRow > .colNum:nth-child(5) {
     display: none;
+  }
+
+  .tabs {
+    overflow-x: auto;
   }
 }

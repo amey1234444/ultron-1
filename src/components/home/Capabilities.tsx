@@ -1,35 +1,38 @@
 // Capabilities — four claims, each with the evidence next to it.
 //
-// One consistent layout for all four rows: a spine down the left with a node
-// per row, the argument in the copy column, and a drafting-panel on the right
-// carrying the artefact that backs it up. The panels are drawn out of hairlines
-// and mono labels rather than screenshots, so they stay legible at any size and
-// never go stale against the real product.
+// The copy column scrolls normally; the panel column is pinned and swaps its
+// contents in place as each block takes the middle of the viewport. That is the
+// whole idea of the section: you move through the argument, and the artefact
+// beside it changes without ever leaving the spot your eye is already on.
 //
-// Colour discipline: the panels are achromatic except for two marks — the live
-// segment in the adaptive lane is green, and the forecast fan in the predictive
-// chart is blue. Those are the site's two rationed colours doing exactly the
-// jobs they are reserved for.
+// Panels are stacked on top of each other and cross-faded rather than mounted
+// and unmounted, so their internal animations are already settled when they
+// come forward and nothing re-lays-out mid-scroll.
+//
+// Colour: the panels are the one place on the site where grey runs out of steps
+// — a chart with four series needs four legible strokes. Violet and a very
+// light blue carry that load here, alongside white and the green that means
+// "live" everywhere else.
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 import styles from './Capabilities.module.css';
-import { SectionHead, useInView } from './primitives';
+import { SectionHead } from './primitives';
 
 /* -------------------------------------------------------------------------- */
 /* Panel chrome                                                               */
 /* -------------------------------------------------------------------------- */
 
-function Panel({ label, children }: { label: string; children: ReactNode }) {
+function PanelFrame({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className={styles.panel}>
+    <>
       {/* Corner ticks — the drafting mark that says "this is a measured area". */}
       {['tl', 'tr', 'bl', 'br'].map((corner) => (
         <span key={corner} className={`${styles.tick} ${styles[corner]}`} aria-hidden="true" />
       ))}
       <div className={styles.panelLabel}>{label}</div>
       <div className={styles.panelBody}>{children}</div>
-    </div>
+    </>
   );
 }
 
@@ -40,6 +43,7 @@ function Panel({ label, children }: { label: string; children: ReactNode }) {
 const LANES = [
   {
     name: 'Kiln controller',
+    tone: 'var(--u-violet)',
     segments: [
       { w: 18, version: 'v8.0.1.82', note: '' },
       { w: 26, version: 'v8.0.1.92', note: 'Plant change · raw mix' },
@@ -49,6 +53,7 @@ const LANES = [
   },
   {
     name: 'Feed optimiser',
+    tone: 'var(--u-sky)',
     segments: [
       { w: 14, version: 'v5.0.0.4', note: '' },
       { w: 46, version: 'v5.0.0.6', note: 'Operating regime shift' },
@@ -57,6 +62,7 @@ const LANES = [
   },
   {
     name: 'Cooler controller',
+    tone: 'rgba(255,255,255,0.62)',
     segments: [
       { w: 30, version: 'v2.4.0.71', note: '' },
       { w: 34, version: 'v2.4.0.77', note: 'Alternative fuel mix' },
@@ -78,6 +84,7 @@ function AdaptiveVisual() {
                 className={styles.segment}
                 style={{
                   ['--w' as string]: `${segment.w}%`,
+                  ['--tone' as string]: lane.tone,
                   ['--delay' as string]: `${laneIndex * 180 + index * 110}ms`,
                 }}
               >
@@ -105,15 +112,15 @@ function AdaptiveVisual() {
 /* -------------------------------------------------------------------------- */
 
 const DRIVERS = [
-  { name: 'Vibration RMS · DE', weight: 31.4 },
-  { name: 'Bearing temperature', weight: 24.8 },
-  { name: 'Load / speed ratio', weight: 18.1 },
-  { name: 'Lubrication interval', weight: 12.6 },
-  { name: 'Ambient drift', weight: 8.4 },
-  { name: 'Harmonic sidebands', weight: 4.7 },
+  { name: 'Vibration RMS · DE', weight: 31.4, tone: 'var(--u-violet)' },
+  { name: 'Bearing temperature', weight: 24.8, tone: 'var(--u-violet)' },
+  { name: 'Load / speed ratio', weight: 18.1, tone: 'var(--u-sky)' },
+  { name: 'Lubrication interval', weight: 12.6, tone: 'var(--u-sky)' },
+  { name: 'Ambient drift', weight: 8.4, tone: 'rgba(255,255,255,0.55)' },
+  { name: 'Harmonic sidebands', weight: 4.7, tone: 'rgba(255,255,255,0.55)' },
 ];
 
-const TICK_COUNT = 22;
+const TICK_COUNT = 20;
 
 function ExplainableVisual() {
   return (
@@ -121,7 +128,7 @@ function ExplainableVisual() {
       {DRIVERS.map((driver, index) => {
         const lit = Math.max(1, Math.round((driver.weight / 32) * TICK_COUNT));
         return (
-          <div key={driver.name} className={styles.driver}>
+          <div key={driver.name} className={styles.driver} style={{ ['--tone' as string]: driver.tone }}>
             <span className={styles.driverName}>{driver.name}</span>
             <span className={styles.driverWeight}>{driver.weight.toFixed(1)}%</span>
             <span className={styles.driverMeter} aria-hidden="true">
@@ -129,7 +136,7 @@ function ExplainableVisual() {
                 <span
                   key={tick}
                   className={`${styles.driverTick} ${tick < lit ? styles.driverTickOn : ''}`}
-                  style={{ ['--delay' as string]: `${index * 90 + tick * 18}ms` }}
+                  style={{ ['--delay' as string]: `${index * 80 + tick * 18}ms` }}
                 />
               ))}
             </span>
@@ -144,13 +151,13 @@ function ExplainableVisual() {
 /* 03 — Predictive: measured now, forecast next                               */
 /* -------------------------------------------------------------------------- */
 
-const CHART = { w: 520, h: 220 };
-const NOW_X = 300;
+const CHART = { w: 520, h: 224 };
+const NOW_X = 296;
 
 /** Measured history — a deterministic wobble, not random, so SSR and client agree. */
 const MEASURED = Array.from({ length: 34 }, (_, i) => {
   const x = (i / 33) * NOW_X;
-  const y = 128 + Math.sin(i / 3.1) * 20 + Math.sin(i / 1.4) * 6 - i * 0.9;
+  const y = 132 + Math.sin(i / 3.1) * 20 + Math.sin(i / 1.4) * 6 - i * 0.9;
   return [x, y] as const;
 });
 
@@ -161,13 +168,12 @@ const MEASURED_PATH = MEASURED.map(([x, y], i) =>
 /** Three forecast branches, spreading as they get further from the last reading. */
 const FORECASTS = [-1, 0, 1].map((spread) => {
   const start = MEASURED[MEASURED.length - 1];
-  const points = Array.from({ length: 18 }, (_, i) => {
+  return Array.from({ length: 18 }, (_, i) => {
     const t = i / 17;
     const x = NOW_X + t * (CHART.w - NOW_X - 12);
-    const y = start[1] - t * 34 + spread * t * t * 30 + Math.sin(i / 2.4 + spread) * 3;
+    const y = start[1] - t * 36 + spread * t * t * 32 + Math.sin(i / 2.4 + spread) * 3;
     return `${i === 0 ? 'M' : 'L'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-  });
-  return points.join(' ');
+  }).join(' ');
 });
 
 function PredictiveVisual() {
@@ -179,18 +185,18 @@ function PredictiveVisual() {
         role="img"
         aria-label="Measured bearing temperature to now, then three forecast branches spreading into the next shift"
       >
-        {[40, 80, 120, 160].map((y) => (
+        {[44, 84, 124, 164].map((y) => (
           <line key={y} className={styles.gridline} x1="0" y1={y} x2={CHART.w} y2={y} />
         ))}
 
         {/* The alarm threshold the forecast is being read against. */}
-        <line className={styles.threshold} x1="0" y1="52" x2={CHART.w} y2="52" />
-        <text className={styles.chartNote} x="4" y="44">
+        <line className={styles.threshold} x1="0" y1="54" x2={CHART.w} y2="54" />
+        <text className={styles.chartNote} x="2" y="46">
           ALARM THRESHOLD
         </text>
 
-        <line className={styles.nowLine} x1={NOW_X} y1="10" x2={NOW_X} y2={CHART.h - 28} />
-        <text className={styles.chartNote} x={NOW_X + 6} y={CHART.h - 32}>
+        <line className={styles.nowLine} x1={NOW_X} y1="12" x2={NOW_X} y2={CHART.h - 30} />
+        <text className={styles.chartNote} x={NOW_X + 6} y={CHART.h - 34}>
           NOW
         </text>
 
@@ -204,7 +210,7 @@ function PredictiveVisual() {
         ))}
 
         <path className={styles.measured} d={MEASURED_PATH} />
-        <circle className={styles.head} cx={NOW_X} cy={MEASURED[MEASURED.length - 1][1]} r="3.5" />
+        <circle className={styles.head} cx={NOW_X} cy={MEASURED[MEASURED.length - 1][1]} r="3.6" />
       </svg>
 
       <div className={styles.legend}>
@@ -295,35 +301,41 @@ const ROWS = [
 ];
 
 /**
- * One capability row.
+ * Which copy block currently owns the middle of the viewport.
  *
- * The in-view flag is owned here rather than delegated to `Reveal` because the
- * panel's internals — bars filling, ticks lighting, paths drawing — all key off
- * the same moment. Running those on a timer from page load would mean the row
- * had finished animating before it was ever on screen.
+ * A band collapsed to roughly the centre line: whichever block crosses it wins.
+ * That matches what a reader is actually looking at far better than "topmost
+ * visible", which flips a beat too early on tall blocks.
  */
-function Row({ row, index }: { row: (typeof ROWS)[number]; index: number }) {
-  const { ref, inView } = useInView<HTMLDivElement>('0px 0px -18% 0px');
+function useActiveBlock(count: number) {
+  const refs = useRef<(HTMLElement | null)[]>([]);
+  const [active, setActive] = useState(0);
 
-  return (
-    <div ref={ref} className={`${styles.row} ${inView ? styles.rowShown : ''}`}>
-      <div className={styles.marker} aria-hidden="true">
-        <span className={styles.node} />
-        <span className={styles.markerIndex}>{String(index + 1).padStart(2, '0')}</span>
-      </div>
+  useEffect(() => {
+    const nodes = refs.current.filter((node): node is HTMLElement => node !== null);
+    if (nodes.length === 0) return;
 
-      <div className={styles.copy}>
-        <span className={styles.tag}>{row.tag}</span>
-        <h3 className={styles.heading}>{row.heading}</h3>
-        <p className={styles.body}>{row.body}</p>
-      </div>
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+        if (!visible) return;
+        const index = nodes.indexOf(visible.target as HTMLElement);
+        if (index >= 0) setActive(index);
+      },
+      { rootMargin: '-46% 0px -46% 0px', threshold: [0, 0.1, 0.5, 1] },
+    );
+    nodes.forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, [count]);
 
-      <Panel label={row.label}>{row.visual}</Panel>
-    </div>
-  );
+  return { refs, active };
 }
 
 export default function Capabilities() {
+  const { refs, active } = useActiveBlock(ROWS.length);
+
   return (
     <section id="platform" className={styles.section}>
       <div className={styles.inner}>
@@ -333,11 +345,56 @@ export default function Capabilities() {
           align="center"
         />
 
-        <div className={styles.rows}>
-          <span className={styles.spine} aria-hidden="true" />
-          {ROWS.map((row, index) => (
-            <Row key={row.tag} row={row} index={index} />
-          ))}
+        <div className={styles.layout}>
+          {/* ---------------------------------------------- copy, scrolling */}
+          <div className={styles.copyCol}>
+            {ROWS.map((row, index) => (
+              <article
+                key={row.tag}
+                ref={(node) => {
+                  refs.current[index] = node;
+                }}
+                className={`${styles.block} ${index === active ? styles.blockActive : ''}`}
+              >
+                <span className={styles.blockRule} aria-hidden="true" />
+                <span className={styles.tag}>{row.tag}</span>
+                <h3 className={styles.heading}>{row.heading}</h3>
+                <p className={styles.body}>{row.body}</p>
+
+                {/* The panel, inlined for narrow screens where nothing pins. */}
+                <div className={styles.inlinePanel}>
+                  <PanelFrame label={row.label}>{row.visual}</PanelFrame>
+                </div>
+              </article>
+            ))}
+          </div>
+
+          {/* --------------------------------------------- panels, pinned */}
+          <div className={styles.panelCol}>
+            <div className={styles.pin}>
+              <div className={styles.panelStack}>
+                {ROWS.map((row, index) => (
+                  <div
+                    key={row.tag}
+                    className={`${styles.panel} ${index === active ? styles.panelOn : ''}`}
+                    aria-hidden={index !== active}
+                  >
+                    <PanelFrame label={row.label}>{row.visual}</PanelFrame>
+                  </div>
+                ))}
+              </div>
+
+              {/* Where you are in the four, and how far there is left to go. */}
+              <div className={styles.steps} aria-hidden="true">
+                {ROWS.map((row, index) => (
+                  <span
+                    key={row.tag}
+                    className={`${styles.step} ${index === active ? styles.stepOn : ''}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </section>

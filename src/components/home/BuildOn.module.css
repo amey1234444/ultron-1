@@ -1,0 +1,181 @@
+/* Build on ULTRON — the developer band, drawn as a drafting sheet. */
+
+.section {
+  position: relative;
+  padding: clamp(72px, 9vw, 128px) var(--u-gutter);
+  border-top: 1px solid var(--u-line);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Dashed construction grid, faded towards the edges so it reads as a sheet
+   rather than as a table. */
+.grid {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: repeating-linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.07) 0 1px,
+      transparent 1px 6px
+    ),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.07) 0 1px, transparent 1px 6px);
+  background-size: 116px 100%, 100% 116px;
+  background-repeat: repeat;
+  -webkit-mask-image: radial-gradient(120% 90% at 50% 50%, #000 30%, transparent 82%);
+  mask-image: radial-gradient(120% 90% at 50% 50%, #000 30%, transparent 82%);
+}
+
+.inner {
+  position: relative;
+  max-width: var(--u-max);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: clamp(28px, 5vw, 64px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Copy                                                               */
+/* ------------------------------------------------------------------ */
+
+/* The framed box the copy sits in — the one solid rectangle on the sheet. */
+.copy {
+  padding: clamp(28px, 4vw, 52px);
+  border: 1px solid var(--u-line-strong);
+  background: rgba(10, 10, 10, 0.72);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition: opacity 760ms var(--u-ease), transform 760ms var(--u-ease);
+}
+
+.shown .copy {
+  opacity: 1;
+  transform: none;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(26px, 3.4vw, 42px);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  line-height: 1.1;
+  color: #ffffff;
+}
+
+.titleMuted {
+  color: var(--u-ink-3);
+}
+
+.body {
+  margin: 20px 0 0;
+  max-width: 44ch;
+  font-size: 15px;
+  line-height: 1.68;
+  color: var(--u-ink-2);
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin-top: 28px;
+  padding: 0 18px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  text-decoration: none;
+  transition: border-color 280ms var(--u-ease), background 280ms var(--u-ease);
+}
+
+.link svg {
+  transition: transform 300ms var(--u-ease);
+}
+
+.link:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.link:hover svg {
+  transform: translateX(3px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Mark                                                               */
+/* ------------------------------------------------------------------ */
+
+.markWrap {
+  position: relative;
+}
+
+.mark {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 60vh;
+}
+
+.guide {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 3 5;
+}
+
+.vertex {
+  fill: rgba(255, 255, 255, 0.34);
+}
+
+/* The beams assemble on entry: they drop the last few pixels into place. */
+.beam {
+  opacity: 0;
+  transform: translate3d(0, -14px, 0);
+  transition: opacity 900ms var(--u-ease), transform 900ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .beam {
+  opacity: 1;
+  transform: none;
+}
+
+.edge {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.5);
+  stroke-width: 1;
+  stroke-linejoin: round;
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 900px) {
+  .inner {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .markWrap {
+    order: -1;
+    max-width: 420px;
+    margin: 0 auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy,
+  .beam {
+    opacity: 1;
+    transform: none;
+  }
+}

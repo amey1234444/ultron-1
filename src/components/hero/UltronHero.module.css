@@ -1,55 +1,35 @@
 /* Landing hero — symmetric about the page axis.
 
-   Palette rule for this file: everything is black, white and grey except the
-   two ends of the horizon arc, which fade to green on the left and blue on the
-   right. Those are the only two colours in the fold, and they carry the same
-   meaning they carry everywhere else on the site — measured now, and predicted.
+   The hero paints its own opaque backdrop on a layer above the page's fixed
+   column rules, so the fold is a clean black field: the only structure in it is
+   the horizon.
 
-   No blur filters on full-bleed elements: the glow around the arc is a soft
-   radial mask, not `filter: blur()`, which is what normally makes a hero like
-   this drop frames on integrated graphics. */
+   Palette rule for this file: black, white and grey, except the limb of the
+   horizon, which warms to green on the left and cools to blue on the right.
+   Those are the only two colours above the fold.
+
+   No blur filters on full-bleed elements — the glow around the rim is a soft
+   radial mask, which is what keeps this from dropping frames on integrated
+   graphics. */
 
 .hero {
   --p: 0;
 
   position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   min-height: 100svh;
-  padding: calc(72px + clamp(56px, 10vh, 120px)) var(--u-gutter) 0;
+  padding: calc(72px + clamp(40px, 8vh, 90px)) var(--u-gutter) clamp(56px, 9vh, 110px);
   overflow: hidden;
   isolation: isolate;
   color: var(--u-ink);
-  background: var(--u-bg);
+  /* Opaque, and stated twice: the page's fixed rules must not read through the
+     fold. */
+  background-color: #090909;
+  background-image: radial-gradient(120% 90% at 50% 8%, #131313 0%, #090909 55%);
   font-family: var(--u-font-sans);
-}
-
-/* ------------------------------------------------------------------ */
-/* Axis                                                               */
-/* ------------------------------------------------------------------ */
-
-.axis {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  z-index: 0;
-  width: 1px;
-  margin-left: -0.5px;
-  pointer-events: none;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.1) 22%, transparent 62%);
-}
-
-/* A single tick where the headline's baseline crosses the axis. */
-.axisTick {
-  position: absolute;
-  top: 22%;
-  left: 50%;
-  width: 5px;
-  height: 5px;
-  margin: -2.5px 0 0 -2.5px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  transform: rotate(45deg);
 }
 
 /* ------------------------------------------------------------------ */
@@ -62,60 +42,79 @@
   max-width: 1000px;
   margin: 0 auto;
   text-align: center;
-  /* Settles back a little as the arc takes over the fold. */
-  transform: translate3d(0, calc(var(--p) * -34px), 0);
-  opacity: calc(1 - var(--p) * 0.75);
+  /* Settles back a little as the horizon takes over the fold. */
+  transform: translate3d(0, calc(var(--p) * -36px), 0);
+  opacity: calc(1 - var(--p) * 0.8);
   will-change: transform, opacity;
 }
 
-.eyebrow {
-  margin: 0;
-  font-size: clamp(14px, 1.5vw, 18px);
-  font-weight: 400;
-  letter-spacing: -0.012em;
-  color: var(--u-ink-3);
-  animation: fadeUp 800ms var(--u-ease) both;
-}
-
 .title {
-  position: relative;
-  display: inline-block;
-  margin: clamp(8px, 1.4vw, 16px) 0 0;
-  font-size: clamp(46px, 9.4vw, 132px);
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  line-height: 0.94;
-  color: #fff;
+  margin: 0;
+  font-size: clamp(52px, 10.5vw, 148px);
+  font-weight: 620;
+  letter-spacing: -0.052em;
+  line-height: 0.92;
+  color: #ffffff;
+  /* A faint bloom off the letterforms. At this size pure white on near-black
+     reads slightly grey without it. */
+  text-shadow: 0 0 60px rgba(255, 255, 255, 0.16);
 }
 
-/* The trademark mark rides the cap height of the last word rather than sitting
-   inside the text flow, so it never affects the headline's optical centring. */
-.tm {
-  position: absolute;
-  top: 0.04em;
-  margin-left: 0.06em;
-  font-size: 0.2em;
-  font-weight: 500;
-  letter-spacing: 0;
-  color: var(--u-ink-2);
+.titleLine {
+  display: block;
 }
 
 .lead {
-  max-width: 46ch;
-  margin: clamp(20px, 2.6vw, 30px) auto 0;
-  font-size: clamp(15px, 1.35vw, 17.5px);
-  line-height: 1.62;
-  color: var(--u-ink-2);
-  animation: fadeUp 900ms var(--u-ease) 520ms both;
+  max-width: 44ch;
+  margin: clamp(24px, 3vw, 34px) auto 0;
+  font-size: clamp(16px, 1.4vw, 19px);
+  font-weight: 400;
+  line-height: 1.6;
+  letter-spacing: -0.012em;
+  /* Deliberately brighter than the body grey used elsewhere: this line sits on
+     the darkest surface on the site and has to hold its own against a 148px
+     headline directly above it. */
+  color: #d6d6d4;
+  animation: fadeUp 900ms var(--u-ease) 560ms both;
 }
 
-.ctas {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 11px;
-  margin-top: clamp(26px, 3vw, 36px);
-  animation: fadeUp 900ms var(--u-ease) 660ms both;
+/* The single call to action. A transparent capsule — the emphasis comes from
+   the hairline and the hover, not from a filled block competing with the
+   headline. */
+.console {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: clamp(30px, 3.4vw, 42px);
+  padding: 0 22px;
+  height: 46px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  text-decoration: none;
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  transition: border-color 300ms var(--u-ease), background 300ms var(--u-ease),
+    box-shadow 300ms var(--u-ease);
+  animation: fadeUp 900ms var(--u-ease) 700ms both;
+}
+
+.console svg {
+  transition: transform 320ms var(--u-ease);
+}
+
+.console:hover {
+  border-color: rgba(255, 255, 255, 0.55);
+  background: rgba(255, 255, 255, 0.07);
+  box-shadow: 0 0 34px rgba(255, 255, 255, 0.09);
+}
+
+.console:hover svg {
+  transform: translateX(3px);
 }
 
 @keyframes fadeUp {
@@ -135,11 +134,11 @@
 
 /* The clip is what turns a full circle into an arc. Doing it here rather than
    with a second mask layer avoids `mask-composite`, which degrades badly on
-   the browsers that do not support it — a failed composite would paint the
-   whole disc instead of its rim. */
+   browsers that do not support it — a failed composite would paint the whole
+   disc instead of its rim. */
 .horizonClip {
   position: absolute;
-  top: 44%;
+  top: 56%;
   right: 0;
   bottom: 0;
   left: 0;
@@ -152,44 +151,49 @@
   position: absolute;
   top: 0;
   left: 50%;
-  width: min(210vw, 2200px);
+  width: min(215vw, 2300px);
   aspect-ratio: 1 / 1;
-  transform: translate3d(-50%, calc(6% - var(--p) * 9%), 0) scale(calc(0.96 + var(--p) * 0.1));
+  transform: translate3d(-50%, calc(6% - var(--p) * 10%), 0) scale(calc(0.96 + var(--p) * 0.1));
   transform-origin: 50% 0%;
-  animation: arcIn 1600ms var(--u-ease) 260ms both;
+  animation: arcIn 1700ms var(--u-ease) 300ms both;
   will-change: transform;
 }
 
-/* The rim itself. `closest-side` makes the radial stop line up with the circle's
-   radius regardless of how wide the element ends up. */
+/* Shared ring geometry. `closest-side` makes the radial stop line up with the
+   circle's radius regardless of how wide the element ends up. */
 .arc,
-.arcGlow {
+.arcGlow,
+.shine {
   position: absolute;
   inset: 0;
   border-radius: 50%;
+}
+
+.arc,
+.arcGlow {
   background: linear-gradient(
     90deg,
-    var(--u-green-line) 0%,
-    rgba(255, 255, 255, 0.16) 20%,
-    rgba(255, 255, 255, 0.95) 44%,
+    rgba(100, 229, 139, 0.75) 0%,
+    rgba(180, 245, 200, 0.35) 14%,
+    rgba(255, 255, 255, 0.3) 30%,
     #ffffff 50%,
-    rgba(255, 255, 255, 0.95) 56%,
-    rgba(255, 255, 255, 0.16) 80%,
-    var(--u-blue-line) 100%
+    rgba(255, 255, 255, 0.3) 70%,
+    rgba(190, 220, 255, 0.35) 86%,
+    rgba(111, 168, 255, 0.7) 100%
   );
 }
 
 .arc {
   -webkit-mask-image: radial-gradient(
     closest-side,
-    transparent calc(100% - 1.6px),
-    #000 calc(100% - 1.1px),
+    transparent calc(100% - 1.8px),
+    #000 calc(100% - 1.2px),
     transparent 100%
   );
   mask-image: radial-gradient(
     closest-side,
-    transparent calc(100% - 1.6px),
-    #000 calc(100% - 1.1px),
+    transparent calc(100% - 1.8px),
+    #000 calc(100% - 1.2px),
     transparent 100%
   );
 }
@@ -197,90 +201,97 @@
 /* Bloom around the rim, made from a soft-stopped ring mask instead of a blur
    filter — same read, a fraction of the paint cost at this size. */
 .arcGlow {
-  opacity: 0.5;
+  opacity: 0.55;
   -webkit-mask-image: radial-gradient(
     closest-side,
-    transparent calc(100% - 46px),
-    rgba(0, 0, 0, 0.45) calc(100% - 8px),
+    transparent calc(100% - 54px),
+    rgba(0, 0, 0, 0.4) calc(100% - 10px),
     rgba(0, 0, 0, 0.9) calc(100% - 1px),
     transparent 100%
   );
   mask-image: radial-gradient(
     closest-side,
-    transparent calc(100% - 46px),
-    rgba(0, 0, 0, 0.45) calc(100% - 8px),
+    transparent calc(100% - 54px),
+    rgba(0, 0, 0, 0.4) calc(100% - 10px),
     rgba(0, 0, 0, 0.9) calc(100% - 1px),
     transparent 100%
   );
 }
 
-/* Light spilling upward off the top of the arc. */
+/* The travelling highlight. A conic wedge on the same ring mask, rotated — so
+   the bright spot runs along the limb the way light does on a real one. */
+.shine {
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg,
+    transparent 46deg,
+    rgba(255, 255, 255, 0.65) 68deg,
+    #ffffff 76deg,
+    rgba(255, 255, 255, 0.65) 84deg,
+    transparent 108deg,
+    transparent 360deg
+  );
+  -webkit-mask-image: radial-gradient(
+    closest-side,
+    transparent calc(100% - 5px),
+    #000 calc(100% - 1px),
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    closest-side,
+    transparent calc(100% - 5px),
+    #000 calc(100% - 1px),
+    transparent 100%
+  );
+  animation: shine 9s linear infinite 1.6s;
+}
+
+@keyframes shine {
+  from {
+    transform: rotate(-40deg);
+  }
+  to {
+    transform: rotate(320deg);
+  }
+}
+
+/* Light spilling upward off the top of the limb. */
 .bloom {
   position: absolute;
-  top: -4%;
+  top: -6%;
   left: 50%;
-  width: min(150vw, 1500px);
-  height: 46%;
-  margin-left: min(-75vw, -750px);
-  background: radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.09), transparent 62%);
+  width: min(160vw, 1700px);
+  height: 52%;
+  margin-left: min(-80vw, -850px);
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.1), transparent 62%);
   opacity: calc(0.5 + var(--p) * 0.5);
+}
+
+/* The warm pool on the left shoulder of the limb — the part that makes the
+   horizon read as a planet rather than as a drawn arc. */
+.limbLight {
+  position: absolute;
+  top: -2%;
+  left: 6%;
+  width: min(60vw, 760px);
+  height: 46%;
+  background: radial-gradient(
+    ellipse at 60% 90%,
+    rgba(140, 240, 175, 0.16),
+    rgba(140, 240, 175, 0.05) 40%,
+    transparent 68%
+  );
+  opacity: calc(0.55 + var(--p) * 0.45);
 }
 
 @keyframes arcIn {
   from {
     opacity: 0;
-    transform: translate3d(-50%, 16%, 0) scale(0.9);
+    transform: translate3d(-50%, 18%, 0) scale(0.9);
   }
   to {
     opacity: 1;
   }
-}
-
-/* ------------------------------------------------------------------ */
-/* Protocol marquee                                                   */
-/* ------------------------------------------------------------------ */
-
-.rail {
-  position: relative;
-  z-index: 3;
-  margin-top: auto;
-  padding: 22px 0 26px;
-  border-top: 1px solid var(--u-line);
-  background: linear-gradient(180deg, transparent, rgba(10, 10, 10, 0.72) 40%);
-}
-
-.railLabel {
-  margin: 0 0 16px;
-  text-align: center;
-  font-family: var(--u-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
-}
-
-.railItem {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  padding: 0 24px;
-  font-size: 14.5px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--u-ink-3);
-  transition: color 260ms ease;
-}
-
-.railItem:hover {
-  color: var(--u-ink-2);
-}
-
-.railTick {
-  width: 4px;
-  height: 4px;
-  border-radius: 1px;
-  background: rgba(255, 255, 255, 0.28);
-  transform: rotate(45deg);
 }
 
 /* ------------------------------------------------------------------ */
@@ -289,24 +300,21 @@
 
 @media (max-width: 720px) {
   .hero {
-    padding-top: calc(64px + 52px);
+    padding-top: calc(64px + 40px);
   }
 
   .title {
-    letter-spacing: -0.038em;
+    letter-spacing: -0.04em;
   }
 
   .horizonClip {
-    top: 52%;
-  }
-
-  .axisTick {
-    display: none;
+    top: 62%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .horizon {
+  .horizon,
+  .shine {
     animation: none;
   }
 

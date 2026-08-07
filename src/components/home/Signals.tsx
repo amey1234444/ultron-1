@@ -34,17 +34,6 @@ const INPUTS = layout([
   'MANUAL',
 ]);
 
-const OUTPUTS = layout([
-  'CONSOLE',
-  'ALERTS',
-  'WORK ORDER',
-  'REPORTS',
-  'WEBHOOK',
-  'EXPORT',
-  'MOBILE',
-  'API',
-]);
-
 /**
  * The radial field.
  *
@@ -170,27 +159,14 @@ function Band({
 
 export default function Signals() {
   return (
-    <>
-      <Band
-        tag="Signals"
-        title="All of the signals,"
-        muted="none of the noise."
-        lead="Every channel on the floor converges on one context — reconciled, quality-flagged and comparable — so the whole plant is legible from a single surface instead of eleven."
-        href="#signal"
-        cta="See the pipeline"
-        field={<RadialField spokes={INPUTS} direction="in" hub="CORE" />}
-      />
-
-      <Band
-        mirrored
-        tag="Actions"
-        title="One decision,"
-        muted="everywhere it matters."
-        lead="What the core concludes goes back out the same way it came in — to the console, the alert channel, the work-order queue and anything else you point it at."
-        href="#platform"
-        cta="See the capabilities"
-        field={<RadialField spokes={OUTPUTS} direction="out" hub="ACT" />}
-      />
-    </>
+    <Band
+      tag="Signals"
+      title="All of the signals,"
+      muted="none of the noise."
+      lead="Every channel on the floor converges on one context — reconciled, quality-flagged and comparable — so the whole plant is legible from a single surface instead of eleven."
+      href="#signal"
+      cta="See the pipeline"
+      field={<RadialField spokes={INPUTS} direction="in" hub="CORE" />}
+    />
   );
 }

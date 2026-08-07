@@ -8,6 +8,7 @@
 
 import Link from 'next/link';
 import {
+  Fragment,
   useCallback,
   useEffect,
   useRef,
@@ -248,17 +249,22 @@ export function SplitText({
       aria-label={text}
     >
       {words.map((word, index) => (
-        <span key={`${word}-${index}`} className={styles.word} aria-hidden="true">
-          <span
-            className={`${styles.wordInner} ${
-              accentFrom !== undefined && index >= accentFrom ? styles.accent : ''
-            }`}
-            style={{ ['--word-delay' as string]: `${delay + index * step}ms` }}
-          >
-            {word}
+        // The separating space sits *outside* the masked word. Inside it, the
+        // `overflow: hidden` that clips the wipe also collapses the space, and
+        // the headline renders with its words run together.
+        <Fragment key={`${word}-${index}`}>
+          <span className={styles.word} aria-hidden="true">
+            <span
+              className={`${styles.wordInner} ${
+                accentFrom !== undefined && index >= accentFrom ? styles.accent : ''
+              }`}
+              style={{ ['--word-delay' as string]: `${delay + index * step}ms` }}
+            >
+              {word}
+            </span>
           </span>
           {index < words.length - 1 ? ' ' : null}
-        </span>
+        </Fragment>
       ))}
     </span>
   );
