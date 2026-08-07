@@ -105,7 +105,7 @@
   position: absolute;
   inset: 18%;
   pointer-events: none;
-  background: radial-gradient(circle at 50% 50%, rgba(110, 240, 138, 0.14), transparent 68%);
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.07), transparent 68%);
 }
 
 .svg {
@@ -178,12 +178,12 @@
 
 .hub {
   fill: #0d0e0d;
-  stroke: rgba(110, 240, 138, 0.5);
+  stroke: rgba(255, 255, 255, 0.34);
   stroke-width: 1.4;
 }
 
 .hubHalo {
-  fill: rgba(110, 240, 138, 0.1);
+  fill: rgba(255, 255, 255, 0.045);
   transform-origin: 50% 50%;
   animation: halo 3.2s ease-in-out infinite;
 }
@@ -322,9 +322,9 @@
   width: 34px;
   height: 34px;
   margin-top: -17px;
-  border: 1px solid rgba(110, 240, 138, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 9px;
-  background: rgba(110, 240, 138, 0.08);
+  background: rgba(255, 255, 255, 0.05);
 }
 
 /* -- motif 2: request rows under a scanning head ------------------------ */
@@ -350,7 +350,7 @@
   left: 0;
   width: 100%;
   height: 34px;
-  background: linear-gradient(180deg, transparent, rgba(110, 240, 138, 0.16), transparent);
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.14), transparent);
   animation: scan 3.4s ease-in-out infinite;
 }
 
@@ -384,7 +384,7 @@
   width: 24px;
   height: 24px;
   margin: -12px 0 0 -12px;
-  border: 1px solid rgba(110, 240, 138, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.34);
   border-radius: 50%;
   animation: ripple 3s ease-out infinite;
   animation-delay: var(--delay, 0s);

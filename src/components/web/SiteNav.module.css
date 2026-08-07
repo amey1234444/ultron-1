@@ -1,8 +1,8 @@
 /* Site navigation.
-   Sits transparent over the hero, then condenses into a blurred bar with a
-   hairline once the page scrolls. A sliding pill marks the section that
-   currently owns the viewport, and a progress rail on the bottom edge tracks
-   how far down the page you are. */
+   Transparent over the fold, condensing into a blurred bar with a hairline once
+   the page moves. Brand and links group left, account actions right — nothing
+   in the bar animates on scroll except the surface itself, which is what keeps
+   it feeling fixed rather than fidgety. */
 
 .shell {
   position: fixed;
@@ -11,31 +11,25 @@
   left: 0;
   z-index: 200;
   border-bottom: 1px solid transparent;
-  transition: background 340ms var(--u-ease), border-color 340ms var(--u-ease),
-    backdrop-filter 340ms var(--u-ease);
+  transition: background 320ms var(--u-ease), border-color 320ms var(--u-ease);
 }
 
 .scrolled {
-  background: rgba(8, 9, 11, 0.72);
+  background: rgba(9, 9, 10, 0.76);
   border-bottom-color: var(--u-line);
-  -webkit-backdrop-filter: blur(20px) saturate(170%);
-  backdrop-filter: blur(20px) saturate(170%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  backdrop-filter: blur(18px) saturate(150%);
 }
 
 .inner {
   position: relative;
-  max-width: 1240px;
-  height: 68px;
+  max-width: 1320px;
+  height: 64px;
   margin: 0 auto;
-  padding: 0 clamp(18px, 5vw, 40px);
+  padding: 0 clamp(18px, 4vw, 34px);
   display: flex;
   align-items: center;
-  gap: 24px;
-  transition: height 340ms var(--u-ease);
-}
-
-.scrolled .inner {
-  height: 60px;
+  gap: clamp(14px, 3vw, 34px);
 }
 
 /* --------------------------------- brand --------------------------------- */
@@ -43,7 +37,6 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 11px;
   flex-shrink: 0;
   text-decoration: none;
   border-radius: 8px;
@@ -51,88 +44,135 @@
 
 .brandLogo {
   display: block;
-  width: 104px;
+  width: 98px;
   height: auto;
   transition: opacity 220ms ease;
 }
 
 .brand:hover .brandLogo {
-  opacity: 0.82;
-}
-
-.brandDivider {
-  width: 1px;
-  height: 18px;
-  background: var(--u-line-strong);
-}
-
-.brandTag {
-  font-family: var(--u-font-mono);
-  font-size: 9px;
-  line-height: 1.35;
-  letter-spacing: 0.19em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
-  white-space: pre-line;
+  opacity: 0.78;
 }
 
 /* ---------------------------------- nav ---------------------------------- */
 
 .nav {
-  position: relative;
   display: flex;
   align-items: center;
   gap: 2px;
-  margin: 0 auto;
-  padding: 3px;
+  margin-right: auto;
 }
 
-/* The pill is positioned from measurements taken in JS, so it can travel
-   between links of different widths instead of snapping. */
-.indicator {
-  position: absolute;
-  top: 3px;
-  left: 0;
-  height: 32px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  opacity: 0;
-  transform: translate3d(var(--ind-x, 0px), 0, 0);
-  width: var(--ind-w, 0px);
-  transition: transform 460ms var(--u-ease), width 460ms var(--u-ease), opacity 300ms ease;
-  pointer-events: none;
-}
-
-.indicatorOn {
-  opacity: 1;
+.group {
+  position: relative;
 }
 
 .link {
-  position: relative;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
-  height: 32px;
-  padding: 0 13px;
-  border-radius: 9px;
+  gap: 5px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 8px;
   font-family: var(--u-font-sans);
   font-size: 14px;
   font-weight: 500;
-  letter-spacing: -0.008em;
+  letter-spacing: -0.01em;
   color: var(--u-ink-2);
   text-decoration: none;
   white-space: nowrap;
-  transition: color 220ms ease;
+  transition: color 200ms ease, background 200ms ease;
+}
+
+.linkButton {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
 }
 
 .link:hover,
-.link:focus-visible {
+.link:focus-visible,
+.linkOpen {
   color: var(--u-ink);
+  background: rgba(255, 255, 255, 0.045);
 }
 
 .linkActive {
   color: var(--u-ink);
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--u-ink-3);
+  transition: transform 280ms var(--u-ease), color 200ms ease;
+}
+
+.linkOpen .chevron {
+  transform: rotate(180deg);
+  color: var(--u-ink-2);
+}
+
+/* -------------------------------- dropdown ------------------------------- */
+
+/* The panel keeps its box in the layout at all times and animates opacity and
+   lift, so opening it never reflows the bar. `visibility` is what stops a
+   closed panel from swallowing clicks. */
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 268px;
+  padding: 6px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 14px;
+  background: rgba(14, 14, 15, 0.96);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(0, -6px, 0);
+  transition: opacity 200ms ease, transform 260ms var(--u-ease), visibility 0s linear 260ms;
+}
+
+.panelOpen {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 200ms ease, transform 260ms var(--u-ease), visibility 0s;
+}
+
+.panelInner {
+  display: flex;
+  flex-direction: column;
+}
+
+.panelItem {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 9px;
+  text-decoration: none;
+  transition: background 200ms ease;
+}
+
+.panelItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.panelItemLabel {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  color: var(--u-ink);
+}
+
+.panelItemHint {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--u-ink-3);
 }
 
 /* -------------------------------- actions -------------------------------- */
@@ -149,74 +189,53 @@
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 36px;
+  height: 34px;
   padding: 0 15px;
-  border-radius: 10px;
+  border-radius: 9px;
   font-family: var(--u-font-sans);
   font-size: 13.5px;
   font-weight: 550;
-  letter-spacing: -0.008em;
+  letter-spacing: -0.01em;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  transition: color 200ms ease, background 200ms ease, border-color 200ms ease,
-    transform 240ms var(--u-ease), box-shadow 240ms var(--u-ease);
+  transition: color 200ms ease, background 200ms ease, border-color 200ms ease;
 }
 
 .ghost {
-  border: 1px solid transparent;
-  color: var(--u-ink-2);
-}
-
-.ghost:hover {
-  background: rgba(255, 255, 255, 0.055);
+  border: 1px solid var(--u-line-strong);
+  background: rgba(255, 255, 255, 0.02);
   color: var(--u-ink);
 }
 
+.ghost:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
 .cta {
-  border: 1px solid #ffffff;
-  background: #ffffff;
-  color: #0a0a0a;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1b1b1c;
+  color: #ffffff;
 }
 
 .cta:hover {
-  transform: translateY(-1px);
-  background: #e9eae8;
-  border-color: #e9eae8;
-  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  background: #262627;
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .burger {
   display: none;
-  width: 36px;
-  height: 36px;
+  width: 34px;
+  height: 34px;
   align-items: center;
   justify-content: center;
   padding: 0;
   border: 1px solid var(--u-line-strong);
-  border-radius: 10px;
+  border-radius: 9px;
   background: transparent;
   color: var(--u-ink);
   cursor: pointer;
-}
-
-/* ------------------------------ progress rail ---------------------------- */
-
-.progress {
-  position: absolute;
-  bottom: -1px;
-  left: 0;
-  height: 1.5px;
-  width: 100%;
-  transform-origin: 0 50%;
-  transform: scaleX(var(--read, 0));
-  background: linear-gradient(90deg, var(--u-accent), var(--u-accent) 55%, var(--u-accent-ink));
-  opacity: 0;
-  transition: opacity 300ms ease;
-}
-
-.scrolled .progress {
-  opacity: 1;
 }
 
 /* --------------------------- mobile sheet -------------------------------- */
@@ -228,29 +247,30 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 96px clamp(24px, 8vw, 56px) 40px;
-  background: rgba(8, 9, 11, 0.97);
+  padding: 92px clamp(24px, 8vw, 56px) 40px;
+  background: rgba(9, 9, 10, 0.98);
   -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
-  animation: sheetIn 300ms var(--u-ease);
+  animation: sheetIn 280ms var(--u-ease);
+  overflow-y: auto;
 }
 
 .sheetLink {
   display: flex;
   align-items: baseline;
   gap: 14px;
-  padding: 16px 0;
+  padding: 14px 0;
   border-bottom: 1px solid var(--u-line);
   color: var(--u-ink);
   font-family: var(--u-font-sans);
-  font-size: clamp(26px, 7vw, 38px);
+  font-size: clamp(22px, 6vw, 32px);
   font-weight: 600;
   letter-spacing: -0.03em;
   line-height: 1.1;
   text-decoration: none;
   /* Each row is delayed a little further, so the sheet unfolds rather than
      appearing all at once. */
-  animation: sheetItem 520ms var(--u-ease) both;
+  animation: sheetItem 500ms var(--u-ease) both;
   animation-delay: var(--item-delay, 0ms);
 }
 
@@ -259,16 +279,16 @@
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.16em;
-  color: var(--u-accent);
+  color: var(--u-ink-3);
 }
 
 .sheetActions {
-  margin-top: 32px;
+  margin-top: 30px;
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
-  animation: sheetItem 520ms var(--u-ease) both;
-  animation-delay: 320ms;
+  animation: sheetItem 500ms var(--u-ease) both;
+  animation-delay: 300ms;
 }
 
 .sheetActions .cta,
@@ -276,10 +296,6 @@
   height: 44px;
   padding: 0 20px;
   font-size: 14.5px;
-}
-
-.sheetActions .ghost {
-  border-color: var(--u-line-strong);
 }
 
 @keyframes sheetIn {
@@ -304,30 +320,21 @@
 
 /* ------------------------------ responsive ------------------------------- */
 
-@media (max-width: 1040px) {
+@media (max-width: 940px) {
   .nav {
     display: none;
+  }
+
+  .actions {
+    margin-left: auto;
   }
 
   .burger {
     display: inline-flex;
   }
-
-  .brandTag,
-  .brandDivider {
-    display: none;
-  }
-
-  .actions .ghost {
-    display: none;
-  }
-
-  .sheetActions .ghost {
-    display: inline-flex;
-  }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
   .actions .cta {
     display: none;
   }

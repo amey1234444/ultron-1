@@ -161,7 +161,7 @@
   border-radius: inherit;
   background: radial-gradient(
     380px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(110, 240, 138, 0.16),
+    rgba(255, 255, 255, 0.12),
     transparent 68%
   );
   opacity: var(--spot, 0);
@@ -180,7 +180,7 @@
   border-radius: inherit;
   background: radial-gradient(
     300px circle at var(--mx, 50%) var(--my, 50%),
-    rgba(110, 240, 138, 0.55),
+    rgba(255, 255, 255, 0.5),
     transparent 60%
   );
   -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);

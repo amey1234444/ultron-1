@@ -1,0 +1,110 @@
+/* FAQ accordion. */
+
+.faq {
+  max-width: 840px;
+  margin: 0 auto;
+  border-top: 1px solid var(--u-line);
+}
+
+.item {
+  border-bottom: 1px solid var(--u-line);
+}
+
+.button {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  width: 100%;
+  padding: 22px 4px;
+  border: 0;
+  background: none;
+  text-align: left;
+  font-family: inherit;
+  font-size: 16.5px;
+  font-weight: 550;
+  letter-spacing: -0.018em;
+  color: var(--u-ink);
+  cursor: pointer;
+  transition: color 220ms ease;
+}
+
+.button:hover {
+  color: #fff;
+}
+
+.index {
+  flex-shrink: 0;
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--u-ink-3);
+}
+
+.sign {
+  position: relative;
+  align-self: center;
+  width: 13px;
+  height: 13px;
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--u-ink-3);
+}
+
+/* Plus turning into a minus: the vertical stroke rotates away and fades. */
+.sign::before,
+.sign::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 100%;
+  height: 1.5px;
+  border-radius: 2px;
+  background: currentColor;
+  transition: transform 380ms var(--u-ease), opacity 260ms ease;
+}
+
+.sign::after {
+  transform: rotate(90deg);
+}
+
+.itemOpen .sign {
+  color: var(--u-ink);
+}
+
+.itemOpen .sign::after {
+  transform: rotate(0deg);
+  opacity: 0;
+}
+
+.panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 460ms var(--u-ease);
+}
+
+.itemOpen .panel {
+  grid-template-rows: 1fr;
+}
+
+/* The inner element must be `min-height: 0` and overflow-hidden for the
+   0fr → 1fr row transition to animate rather than jump. */
+.panelInner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.answer {
+  margin: 0;
+  padding: 0 60px 24px 30px;
+  font-size: 15px;
+  line-height: 1.68;
+  color: var(--u-ink-2);
+}
+
+@media (max-width: 560px) {
+  .answer {
+    padding: 0 12px 24px 0;
+  }
+}

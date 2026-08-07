@@ -1,0 +1,638 @@
+/* Capability rows — spine, copy column, drafting panel.
+
+   Every animated property in this file is transform or opacity, and all of it
+   is gated on `.rowShown`, which the row applies when it scrolls into view. */
+
+.section {
+  position: relative;
+  padding: clamp(84px, 11vw, 148px) var(--u-gutter);
+  border-top: 1px solid var(--u-line);
+  scroll-margin-top: 76px;
+}
+
+.inner {
+  position: relative;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Spine                                                              */
+/* ------------------------------------------------------------------ */
+
+.rows {
+  position: relative;
+  margin-top: clamp(48px, 6vw, 84px);
+}
+
+/* The continuous line the four nodes hang off. Faded at both ends so it reads
+   as a section of a longer run rather than as a bracket. */
+.spine {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 15px;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--u-line-strong) 6%, var(--u-line-strong) 94%, transparent);
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 0.92fr) minmax(0, 1.08fr);
+  align-items: start;
+  gap: clamp(24px, 4vw, 56px);
+  padding: clamp(40px, 5.5vw, 74px) 0;
+}
+
+.row + .row {
+  border-top: 1px solid var(--u-line);
+}
+
+/* ------------------------------------------------------------------ */
+/* Marker                                                             */
+/* ------------------------------------------------------------------ */
+
+.marker {
+  position: relative;
+  padding-top: 4px;
+}
+
+.node {
+  position: absolute;
+  top: 6px;
+  left: 11px;
+  width: 9px;
+  height: 9px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 50%;
+  background: var(--u-bg);
+  transition: border-color 600ms var(--u-ease), box-shadow 600ms var(--u-ease);
+}
+
+.rowShown .node {
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+
+.markerIndex {
+  display: block;
+  margin-left: 34px;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Copy                                                               */
+/* ------------------------------------------------------------------ */
+
+.copy {
+  opacity: 0;
+  transform: translate3d(0, 20px, 0);
+  transition: opacity 720ms var(--u-ease), transform 720ms var(--u-ease);
+}
+
+.rowShown .copy {
+  opacity: 1;
+  transform: none;
+}
+
+.tag {
+  display: inline-block;
+  padding: 5px 10px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 6px;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--u-ink-2);
+}
+
+.heading {
+  margin: 20px 0 0;
+  font-size: clamp(21px, 2.15vw, 27px);
+  font-weight: 550;
+  letter-spacing: -0.028em;
+  line-height: 1.24;
+  color: var(--u-ink);
+  text-wrap: balance;
+}
+
+.body {
+  margin: 16px 0 0;
+  max-width: 46ch;
+  font-size: 15px;
+  line-height: 1.68;
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Panel                                                              */
+/* ------------------------------------------------------------------ */
+
+.panel {
+  position: relative;
+  padding: 16px;
+  border: 1px solid var(--u-line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006));
+  opacity: 0;
+  transform: translate3d(0, 24px, 0);
+  transition: opacity 820ms var(--u-ease) 120ms, transform 820ms var(--u-ease) 120ms;
+}
+
+.rowShown .panel {
+  opacity: 1;
+  transform: none;
+}
+
+/* Corner ticks sit outside the border, straddling the corner. */
+.tick {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  border: 0 solid rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+
+.tl {
+  top: -1px;
+  left: -1px;
+  border-top-width: 1px;
+  border-left-width: 1px;
+}
+
+.tr {
+  top: -1px;
+  right: -1px;
+  border-top-width: 1px;
+  border-right-width: 1px;
+}
+
+.bl {
+  bottom: -1px;
+  left: -1px;
+  border-bottom-width: 1px;
+  border-left-width: 1px;
+}
+
+.br {
+  bottom: -1px;
+  right: -1px;
+  border-bottom-width: 1px;
+  border-right-width: 1px;
+}
+
+.panelLabel {
+  display: inline-block;
+  padding: 5px 9px;
+  border: 1px solid var(--u-line);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.03);
+  font-family: var(--u-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.panelBody {
+  margin-top: 18px;
+}
+
+/* ------------------------------------------------------------------ */
+/* 01 — adaptive lanes                                                */
+/* ------------------------------------------------------------------ */
+
+.lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lane {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+}
+
+.laneName {
+  padding-top: 1px;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--u-ink-2);
+}
+
+.laneTrack {
+  display: flex;
+  gap: 3px;
+  min-height: 40px;
+}
+
+.segment {
+  flex: 0 0 var(--w);
+  min-width: 0;
+}
+
+.segmentBar {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.22);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 700ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+/* The one live segment per lane. Green here means exactly what it means
+   everywhere else on the site: this is the version running right now. */
+.segmentLive {
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.25), var(--u-green));
+}
+
+.rowShown .segmentBar {
+  transform: scaleX(1);
+}
+
+.segmentVersion {
+  display: block;
+  margin-top: 7px;
+  padding-left: 6px;
+  border-left: 1px solid var(--u-line-strong);
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.04em;
+  color: var(--u-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.segmentNote {
+  display: block;
+  margin-top: 3px;
+  padding-left: 7px;
+  font-size: 9px;
+  line-height: 1.35;
+  color: var(--u-ink-3);
+}
+
+.laneAxis {
+  display: flex;
+  justify-content: space-between;
+  margin: 6px 0 0 104px;
+  padding-top: 10px;
+  border-top: 1px solid var(--u-line);
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* 02 — explainable drivers                                           */
+/* ------------------------------------------------------------------ */
+
+.drivers {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.driver {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 46px minmax(90px, 130px);
+  align-items: center;
+  gap: 12px;
+  padding: 8px 2px;
+  border-bottom: 1px solid var(--u-line);
+}
+
+.driver:last-child {
+  border-bottom: 0;
+}
+
+.driverName {
+  font-size: 12.5px;
+  letter-spacing: -0.012em;
+  color: var(--u-ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.driverWeight {
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  text-align: right;
+  color: var(--u-ink);
+}
+
+.driverMeter {
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+}
+
+.driverTick {
+  width: 2px;
+  height: 11px;
+  border-radius: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transition: opacity 320ms ease, transform 320ms var(--u-ease), background 320ms ease;
+  transition-delay: var(--delay, 0ms);
+}
+
+.rowShown .driverTick {
+  opacity: 1;
+  transform: none;
+}
+
+.rowShown .driverTickOn {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+/* ------------------------------------------------------------------ */
+/* 03 — predictive chart                                              */
+/* ------------------------------------------------------------------ */
+
+.chartWrap {
+  position: relative;
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.gridline {
+  stroke: rgba(255, 255, 255, 0.045);
+  stroke-width: 1;
+}
+
+.threshold {
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.nowLine {
+  stroke: rgba(255, 255, 255, 0.22);
+  stroke-width: 1;
+}
+
+.chartNote {
+  fill: var(--u-ink-3);
+  font-family: var(--u-font-mono);
+  font-size: 7.5px;
+  letter-spacing: 0.14em;
+}
+
+/* Measured history draws itself left to right on entry. */
+.measured {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  transition: stroke-dashoffset 1400ms var(--u-ease);
+}
+
+.rowShown .measured {
+  stroke-dashoffset: 0;
+}
+
+/* The forecast fan. Blue and dashed — the site's only "this has not happened
+   yet" colour, against the solid white of what has actually been measured. */
+.forecast {
+  fill: none;
+  stroke: var(--u-blue);
+  stroke-width: 1.2;
+  stroke-dasharray: 2.5 3.5;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 700ms ease;
+  transition-delay: var(--delay, 0ms);
+}
+
+.rowShown .forecast {
+  opacity: 0.75;
+}
+
+.head {
+  fill: #ffffff;
+  opacity: 0;
+  transition: opacity 400ms ease 1200ms;
+}
+
+.rowShown .head {
+  opacity: 1;
+}
+
+.legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--u-line);
+  font-family: var(--u-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.legendSwatch {
+  width: 16px;
+  height: 0;
+  border-top-width: 1.5px;
+  border-top-style: solid;
+}
+
+.legendMeasured {
+  border-top-color: #ffffff;
+}
+
+.legendForecast {
+  border-top-style: dashed;
+  border-top-color: var(--u-blue);
+}
+
+/* ------------------------------------------------------------------ */
+/* 04 — flexible strategies                                           */
+/* ------------------------------------------------------------------ */
+
+.strategies {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.strategy {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 26px 10px 12px;
+  border: 1px solid var(--u-line);
+  border-radius: 11px;
+  text-align: center;
+  transition: border-color 500ms var(--u-ease), background 500ms var(--u-ease);
+}
+
+.strategyActive {
+  border-color: rgba(255, 255, 255, 0.26);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.strategyBadge {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 3px 8px;
+  border: 1px solid var(--u-green-line);
+  border-radius: 999px;
+  background: var(--u-green-soft);
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-green);
+}
+
+.strategyName {
+  font-size: 16px;
+  font-weight: 550;
+  letter-spacing: -0.022em;
+  color: var(--u-ink-3);
+  transition: color 500ms ease;
+}
+
+.strategyActive .strategyName {
+  color: var(--u-ink);
+}
+
+.strategyCaption {
+  margin-top: 4px;
+  font-size: 10.5px;
+  color: var(--u-ink-3);
+}
+
+.gauge {
+  display: block;
+  width: 100%;
+  max-width: 118px;
+  height: auto;
+  margin-top: 12px;
+}
+
+.gaugeArc {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+  stroke-dasharray: 2 4;
+}
+
+.gaugeNeedle {
+  stroke: rgba(255, 255, 255, 0.4);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  transform: rotate(0deg);
+  transition: transform 900ms var(--u-ease) 200ms, stroke 500ms ease;
+}
+
+.rowShown .gaugeNeedle {
+  transform: rotate(var(--angle, 0deg));
+}
+
+.strategyActive .gaugeNeedle {
+  stroke: #ffffff;
+}
+
+.gaugePivot {
+  fill: rgba(255, 255, 255, 0.45);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 980px) {
+  .row {
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .panel {
+    grid-column: 2;
+  }
+
+  .spine {
+    left: 9px;
+  }
+
+  .node {
+    left: 5px;
+  }
+
+  .markerIndex {
+    margin-left: 24px;
+  }
+}
+
+@media (max-width: 620px) {
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 22px;
+  }
+
+  .panel {
+    grid-column: 1;
+  }
+
+  .spine,
+  .node {
+    display: none;
+  }
+
+  .markerIndex {
+    margin-left: 0;
+  }
+
+  .lane {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .laneAxis {
+    margin-left: 0;
+  }
+
+  .driver {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .driverMeter {
+    display: none;
+  }
+}

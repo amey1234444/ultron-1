@@ -28,7 +28,7 @@ export const AUTH_FONT_MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, m
 // The export name is kept so the auth screens that import it keep working.
 export const AUTH_GOLD = '#6EF08A';
 const GOLD = AUTH_GOLD;
-const GOLD_SOFT = 'rgba(110,240,138,0.12)';
+const GOLD_SOFT = 'rgba(255,255,255,0.10)';
 
 // Dark auth palette, matching the landing page's near-black surface.
 const SURFACE = '#0A0A0A';
@@ -124,7 +124,7 @@ export function AuthShell({
                     alignSelf: 'flex-start',
                     borderRadius: 999,
                     borderWidth: 1,
-                    borderColor: 'rgba(110,240,138,0.4)',
+                    borderColor: 'rgba(255,255,255,0.30)',
                     backgroundColor: GOLD_SOFT,
                     paddingHorizontal: 10,
                     paddingVertical: 3,
@@ -363,10 +363,10 @@ export function AuthButton({
         height: 46,
         borderRadius: 10,
         borderWidth: 1,
-        borderColor: primary ? 'rgba(110,240,138,0.9)' : LINE_STRONG,
+        borderColor: primary ? 'rgba(255,255,255,0.92)' : LINE_STRONG,
         backgroundColor: primary ? (hovered && !inert ? '#F0C684' : GOLD) : 'transparent',
         opacity: inert ? 0.55 : 1,
-        ...(primary && !inert ? { boxShadow: '0 14px 34px rgba(110,240,138,0.26)' } : null),
+        ...(primary && !inert ? { boxShadow: '0 14px 34px rgba(0,0,0,0.45)' } : null),
       } as ViewStyle}
     >
       {submitting ? (

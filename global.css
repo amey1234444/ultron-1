@@ -22,30 +22,48 @@ body {
 /* ------------------------------------------------------------------------- */
 
 :root {
-  /* Surfaces — true black through to a lifted panel grey. Neutral, with only a
-     trace of green in the base so the accent reads as the light source rather
-     than as a sticker on a cold grey. */
+  /* Surfaces — true black through to a lifted panel grey. Fully achromatic:
+     there is no hue anywhere in the base ramp, which is what lets the two
+     rationed colours read as information rather than as decoration. */
   --u-bg: #0a0a0a;
-  --u-bg-soft: #0f100f;
-  --u-panel: #131413;
-  --u-panel-raised: #1a1b1a;
+  --u-bg-soft: #0e0e0f;
+  --u-panel: #121213;
+  --u-panel-raised: #191919;
 
   /* Hairlines. Borders on this palette have to be barely-there; anything
      stronger than 0.14 alpha starts to look like a wireframe. */
   --u-line: rgba(255, 255, 255, 0.07);
-  --u-line-strong: rgba(255, 255, 255, 0.13);
+  --u-line-strong: rgba(255, 255, 255, 0.14);
+  /* The background architecture — the column rules that run behind the whole
+     page. Deliberately fainter than a border: it should register as structure
+     you feel rather than as lines you read. */
+  --u-rule: rgba(255, 255, 255, 0.042);
+  --u-rule-strong: rgba(255, 255, 255, 0.07);
 
   /* Text ramp: three steps, no more. */
-  --u-ink: #f2f2f0;
-  --u-ink-2: #a1a3a0;
-  --u-ink-3: #6b6d6b;
+  --u-ink: #f4f4f2;
+  --u-ink-2: #9c9c9a;
+  --u-ink-3: #6a6a68;
 
-  /* One accent. The page is black, white and grey; green is reserved for the
-     things that are alive — live state, active controls, positive deltas. */
-  --u-accent: #6ef08a;
-  --u-accent-ink: #8ff0a8;
-  --u-accent-dim: #2f7a48;
-  --u-accent-soft: rgba(110, 240, 138, 0.12);
+  /* "Accent" here means brighter, not more colourful. Hovers, active states and
+     emphasis all resolve to white — the page is black, white and grey. */
+  --u-accent: #ffffff;
+  --u-accent-ink: #ffffff;
+  --u-accent-dim: rgba(255, 255, 255, 0.42);
+  --u-accent-soft: rgba(255, 255, 255, 0.08);
+
+  /* The two rationed colours. Each one owns exactly one meaning and appears in
+     single-digit places across the whole site:
+       green — live / healthy / measured now
+       blue  — predicted / forecast / not yet real
+     If a new element wants colour and does not mean one of those two things,
+     it gets white. */
+  --u-green: #64e58b;
+  --u-green-soft: rgba(100, 229, 139, 0.1);
+  --u-green-line: rgba(100, 229, 139, 0.42);
+  --u-blue: #6fa8ff;
+  --u-blue-soft: rgba(111, 168, 255, 0.1);
+  --u-blue-line: rgba(111, 168, 255, 0.42);
 
   /* Signals. Used only where a reading genuinely warrants a colour. */
   --u-red: #f2624a;
@@ -66,7 +84,7 @@ body {
 }
 
 ::selection {
-  background: rgba(110, 240, 138, 0.26);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
 }
 

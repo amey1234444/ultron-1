@@ -1,235 +1,171 @@
-/* Site footer. */
+/* Site footer — four blocks on one hairline, and a wordmark behind them. */
 
 .footer {
   position: relative;
   border-top: 1px solid var(--u-line);
-  background: #06070a;
+  background: var(--u-bg);
   overflow: hidden;
-}
-
-/* Faint violet wash rising from the bottom edge, so the page closes on light
-   rather than fading to flat black. */
-.footerGlow {
-  position: absolute;
-  bottom: -60%;
-  left: 50%;
-  width: 120%;
-  height: 120%;
-  margin-left: -60%;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, rgba(110, 240, 138, 0.12), transparent 62%);
+  isolation: isolate;
 }
 
 .inner {
   position: relative;
+  z-index: 1;
   max-width: var(--u-max);
   margin: 0 auto;
-  padding: clamp(52px, 7vw, 76px) var(--u-gutter) 32px;
+  padding: clamp(56px, 7vw, 84px) var(--u-gutter) clamp(48px, 6vw, 72px);
   display: grid;
-  grid-template-columns: minmax(240px, 1.6fr) repeat(2, minmax(130px, 1fr));
-  gap: 40px;
+  grid-template-columns: minmax(160px, 1.2fr) repeat(2, minmax(120px, 1fr)) minmax(180px, 1fr);
+  gap: 40px clamp(24px, 4vw, 56px);
+  align-items: start;
+}
+
+.brand {
+  display: inline-block;
+  text-decoration: none;
 }
 
 .brandLogo {
   display: block;
-  width: 118px;
+  width: 106px;
   height: auto;
+  transition: opacity 220ms ease;
 }
 
-.brandBlurb {
-  margin: 16px 0 0;
-  max-width: 292px;
-  font-size: 14px;
-  line-height: 1.66;
-  color: var(--u-ink-2);
+.brand:hover .brandLogo {
+  opacity: 0.78;
 }
 
-.contact {
-  margin-top: 20px;
+/* --------------------------------- links --------------------------------- */
+
+.col {
   display: flex;
   flex-direction: column;
-  gap: 7px;
-}
-
-.contactLink {
-  font-size: 14px;
-  font-weight: 500;
-  letter-spacing: -0.01em;
-  color: var(--u-ink);
-  text-decoration: none;
-  transition: color 220ms ease;
-  width: fit-content;
-}
-
-.contactLink:hover {
-  color: var(--u-accent);
-}
-
-.contactMuted {
-  font-size: 14px;
-  color: var(--u-ink-3);
-}
-
-.statusBadge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  margin-top: 20px;
-  padding: 6px 12px;
-  border: 1px solid rgba(110, 240, 138, 0.28);
-  border-radius: 999px;
-  background: rgba(110, 240, 138, 0.07);
-  font-family: var(--u-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-  color: var(--u-accent);
-}
-
-.statusDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--u-accent);
-  animation: blink 2.6s ease-in-out infinite;
-}
-
-@keyframes blink {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.35;
-  }
-}
-
-.socials {
-  margin-top: 22px;
-  display: flex;
-  gap: 9px;
-}
-
-.social {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid var(--u-line-strong);
-  border-radius: 10px;
-  color: var(--u-ink-3);
-  transition: color 220ms ease, border-color 220ms ease, transform 240ms var(--u-ease),
-    background 220ms ease;
-}
-
-.social:hover {
-  color: var(--u-ink);
-  border-color: rgba(110, 240, 138, 0.45);
-  background: rgba(110, 240, 138, 0.09);
-  transform: translateY(-2px);
+  gap: 12px;
 }
 
 .colTitle {
-  margin: 0 0 15px;
+  margin: 0 0 2px;
   font-family: var(--u-font-mono);
-  font-size: 10px;
+  font-size: 9.5px;
+  font-weight: 500;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--u-ink-3);
 }
 
-.colLinks {
-  display: flex;
-  flex-direction: column;
-  gap: 11px;
-}
-
 .colLink {
   width: fit-content;
   font-size: 14px;
+  letter-spacing: -0.01em;
   color: var(--u-ink-2);
-  text-decoration: none;
-  transition: color 220ms ease, transform 240ms var(--u-ease);
-}
-
-.colLink:hover {
-  color: var(--u-ink);
-  transform: translateX(2px);
-}
-
-/* -------------------------------- wordmark ------------------------------- */
-
-/* Oversized wordmark bleeding off the bottom edge — the page signs its name on
-   the way out. Purely decorative, so it is hidden from assistive tech. */
-.wordmark {
-  position: relative;
-  max-width: var(--u-max);
-  margin: 0 auto;
-  padding: 0 var(--u-gutter);
-  overflow: hidden;
-  pointer-events: none;
-  user-select: none;
-}
-
-.wordmarkText {
-  display: block;
-  margin: 0 0 -0.22em;
-  font-size: clamp(72px, 17vw, 230px);
-  font-weight: 700;
-  letter-spacing: -0.05em;
-  line-height: 0.82;
-  text-align: center;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.075), rgba(255, 255, 255, 0));
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-}
-
-.legal {
-  position: relative;
-  max-width: var(--u-max);
-  margin: 0 auto;
-  padding: 20px var(--u-gutter) 26px;
-  border-top: 1px solid var(--u-line);
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px 24px;
-  font-family: var(--u-font-mono);
-  font-size: 11.5px;
-  color: var(--u-ink-3);
-}
-
-.legalLinks {
-  display: flex;
-  gap: 20px;
-}
-
-.legalLink {
-  color: var(--u-ink-3);
   text-decoration: none;
   transition: color 220ms ease;
 }
 
-.legalLink:hover {
+.colLink:hover {
   color: var(--u-ink);
 }
 
-@media (max-width: 860px) {
+/* -------------------------------- address -------------------------------- */
+
+.address {
+  font-size: 14px;
+  font-style: normal;
+  line-height: 1.72;
+  color: var(--u-ink-2);
+}
+
+.addressLink {
+  color: var(--u-ink);
+  text-decoration: none;
+  transition: opacity 220ms ease;
+}
+
+.addressLink:hover {
+  opacity: 0.7;
+}
+
+/* ---------------------------------- base --------------------------------- */
+
+.base {
+  position: relative;
+  z-index: 1;
+  max-width: var(--u-max);
+  margin: 0 auto;
+  padding: 0 var(--u-gutter) clamp(40px, 5vw, 64px);
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex-shrink: 0;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 50%;
+  color: var(--u-ink-2);
+  transition: color 220ms ease, border-color 220ms ease;
+}
+
+.social:hover {
+  color: var(--u-ink);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.legal {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+/* -------------------------------- wordmark ------------------------------- */
+
+/* Oversized and cropped by the footer's own bottom edge. Sits behind the
+   content on z-index 0 and is never read aloud. */
+.wordmark {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 0;
+  padding: 0 var(--u-gutter);
+  margin-bottom: -0.24em;
+  font-size: clamp(80px, 19vw, 260px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 0.8;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.028);
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* ------------------------------- responsive ------------------------------ */
+
+@media (max-width: 900px) {
   .inner {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 36px;
   }
 }
 
 @media (max-width: 520px) {
   .inner {
     grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
   }
 
-  .legal {
-    justify-content: flex-start;
+  .base {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
   }
 }

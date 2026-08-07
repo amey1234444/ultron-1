@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import logoDark from '../../../assets/brand/logo-dark.png';
 import { useAuth } from '../../context/AuthContext';
@@ -7,72 +8,33 @@ import styles from './SiteNav.module.css';
 
 const LOGO_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
 
-// Every entry points at a section that exists on the landing page, so the bar
-// never advertises a destination the site cannot reach.
-export const NAV_SECTIONS = [
-  { label: 'How it works', id: 'signal' },
-  { label: 'Platform', id: 'platform' },
-  { label: 'FAQ', id: 'faq' },
-  { label: 'Contact', id: 'contact' },
-] as const;
+type NavItem =
+  | { label: string; href: string }
+  | { label: string; items: { label: string; href: string; hint: string }[] };
 
-/** Highlights the nav entry whose section currently owns the middle of the viewport. */
-function useActiveSection(): string | null {
-  const [active, setActive] = useState<string | null>(null);
+// Every destination in here resolves to something the site actually has: a real
+// page, or a section id that exists on the landing page. The bar never
+// advertises a route that 404s or an anchor that scrolls nowhere.
+const NAV: NavItem[] = [
+  {
+    label: 'Platform',
+    items: [
+      { label: 'How it works', href: '/#signal', hint: 'Noise to a decision, in three moves' },
+      { label: 'Capabilities', href: '/#platform', hint: 'Adaptive, explainable, predictive' },
+      { label: 'Outcomes', href: '/#results', hint: 'What changes after cutover' },
+    ],
+  },
+  {
+    label: 'Company',
+    items: [
+      { label: 'About', href: '/about', hint: 'Why we built it this way' },
+      { label: 'FAQ', href: '/about#faq', hint: 'What evaluators ask us' },
+    ],
+  },
+  { label: 'Contact', href: '/contact' },
+];
 
-  useEffect(() => {
-    const targets = NAV_SECTIONS.map((section) => document.getElementById(section.id)).filter(
-      (element): element is HTMLElement => element !== null,
-    );
-    if (targets.length === 0) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (visible) setActive(visible.target.id);
-      },
-      // A tall band collapsed to the middle of the screen: whichever section
-      // crosses the centre line wins, which matches what the eye is reading.
-      { rootMargin: '-45% 0px -45% 0px', threshold: [0, 0.2, 0.5, 1] },
-    );
-    targets.forEach((target) => observer.observe(target));
-    return () => observer.disconnect();
-  }, []);
-
-  return active;
-}
-
-/** Fraction of the document that has been scrolled past, for the progress rail. */
-function useReadProgress(): number {
-  const [read, setRead] = useState(0);
-
-  useEffect(() => {
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const scrollable = document.documentElement.scrollHeight - window.innerHeight;
-      setRead(scrollable <= 0 ? 0 : Math.min(1, window.scrollY / scrollable));
-    };
-    const onScroll = () => {
-      if (frame) return;
-      frame = requestAnimationFrame(measure);
-    };
-    measure();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('resize', onScroll);
-    return () => {
-      if (frame) cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('resize', onScroll);
-    };
-  }, []);
-
-  return read;
-}
-
-function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
+function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' | 'chevron' }) {
   const shared = {
     width: 15,
     height: 15,
@@ -100,6 +62,12 @@ function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
           <path d="M14 12H4" />
         </svg>
       );
+    case 'chevron':
+      return (
+        <svg {...shared} width={13} height={13} strokeWidth={2.2}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      );
     case 'menu':
       return (
         <svg {...shared} width={17} height={17}>
@@ -117,45 +85,96 @@ function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
   }
 }
 
+/**
+ * A top-level entry that owns a panel.
+ *
+ * Opens on hover for pointers and on click for everything else, and closes on
+ * Escape or on focus leaving the group — so the panel is reachable by keyboard
+ * without the hover intent trapping anyone inside it.
+ */
+function NavGroup({
+  label,
+  items,
+  onNavigate,
+}: {
+  label: string;
+  items: { label: string; href: string; hint: string }[];
+  onNavigate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const groupRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  return (
+    <div
+      ref={groupRef}
+      className={styles.group}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onBlur={(event) => {
+        if (!groupRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className={`${styles.link} ${styles.linkButton} ${open ? styles.linkOpen : ''}`}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {label}
+        <span className={styles.chevron}>
+          <Icon name="chevron" />
+        </span>
+      </button>
+
+      <div className={`${styles.panel} ${open ? styles.panelOpen : ''}`} id={panelId}>
+        <div className={styles.panelInner}>
+          {items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={styles.panelItem}
+              onClick={() => {
+                setOpen(false);
+                onNavigate();
+              }}
+            >
+              <span className={styles.panelItemLabel}>{item.label}</span>
+              <span className={styles.panelItemHint}>{item.hint}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function SiteNav() {
   const { user } = useAuth();
+  const router = useRouter();
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
-  const active = useActiveSection();
-  const read = useReadProgress();
   const consoleHref = user ? '/' : '/login';
 
-  // The sliding pill is driven from live measurements rather than CSS, so it
-  // can travel between links of different widths instead of snapping.
-  const navRef = useRef<HTMLElement | null>(null);
-  const linkRefs = useRef<Record<string, HTMLAnchorElement | null>>({});
-  const [indicator, setIndicator] = useState<{ x: number; w: number } | null>(null);
-
-  const measureIndicator = useCallback(() => {
-    const nav = navRef.current;
-    const el = active ? linkRefs.current[active] : null;
-    if (!nav || !el) {
-      setIndicator(null);
-      return;
-    }
-    setIndicator({ x: el.offsetLeft - nav.clientLeft, w: el.offsetWidth });
-  }, [active]);
-
   useEffect(() => {
-    measureIndicator();
-    window.addEventListener('resize', measureIndicator);
-    return () => window.removeEventListener('resize', measureIndicator);
-  }, [measureIndicator]);
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 16);
+    const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
   // A locked page behind the mobile sheet keeps the sheet from scrolling the
-  // landing page underneath it.
+  // page underneath it.
   useEffect(() => {
     document.body.style.overflow = open ? 'hidden' : '';
     return () => {
@@ -171,51 +190,41 @@ export default function SiteNav() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const close = () => setOpen(false);
+  const isCurrent = (href: string) => router.pathname === href.split('#')[0];
+
   return (
     <>
       <header className={`${styles.shell} ${scrolled || open ? styles.scrolled : ''}`}>
         <div className={styles.inner}>
-          <Link href="/home" className={styles.brand} aria-label="ULTRON home">
+          <Link href="/home" className={styles.brand} aria-label="ULTRON home" onClick={close}>
             <img src={LOGO_SRC} alt="ULTRON" className={styles.brandLogo} />
-            <span className={styles.brandDivider} aria-hidden="true" />
-            <span className={styles.brandTag}>
-              Industrial{'\n'}Intelligence
-            </span>
           </Link>
 
-          <nav className={styles.nav} aria-label="Primary" ref={navRef}>
-            <span
-              className={`${styles.indicator} ${indicator ? styles.indicatorOn : ''}`}
-              aria-hidden="true"
-              style={{
-                ['--ind-x' as string]: `${indicator?.x ?? 0}px`,
-                ['--ind-w' as string]: `${indicator?.w ?? 0}px`,
-              }}
-            />
-            {NAV_SECTIONS.map((section) => (
-              <a
-                key={section.id}
-                href={`#${section.id}`}
-                ref={(el) => {
-                  linkRefs.current[section.id] = el;
-                }}
-                className={`${styles.link} ${active === section.id ? styles.linkActive : ''}`}
-                aria-current={active === section.id ? 'true' : undefined}
-              >
-                {section.label}
-              </a>
-            ))}
+          <nav className={styles.nav} aria-label="Primary">
+            {NAV.map((item) =>
+              'items' in item ? (
+                <NavGroup key={item.label} label={item.label} items={item.items} onNavigate={close} />
+              ) : (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`${styles.link} ${isCurrent(item.href) ? styles.linkActive : ''}`}
+                  aria-current={isCurrent(item.href) ? 'page' : undefined}
+                >
+                  {item.label}
+                </Link>
+              ),
+            )}
           </nav>
 
           <div className={styles.actions}>
-            {!user && (
-              <Link href="/signup" className={styles.ghost}>
-                Request access
-              </Link>
-            )}
-            <Link href={consoleHref} className={styles.cta}>
+            <Link href={consoleHref} className={styles.ghost}>
+              {user ? 'Console' : 'Sign in'}
+            </Link>
+            <Link href={user ? '/' : '/signup'} className={styles.cta}>
+              {user ? 'Open console' : 'Request access'}
               <Icon name={user ? 'arrow' : 'login'} />
-              {user ? 'Open console' : 'Sign in'}
             </Link>
             <button
               type="button"
@@ -228,35 +237,29 @@ export default function SiteNav() {
             </button>
           </div>
         </div>
-
-        <span
-          className={styles.progress}
-          aria-hidden="true"
-          style={{ ['--read' as string]: read }}
-        />
       </header>
 
       {open && (
         <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="Menu">
-          {NAV_SECTIONS.map((section, index) => (
-            <a
-              key={section.id}
-              href={`#${section.id}`}
+          {NAV.flatMap((item) => ('items' in item ? item.items : [item])).map((item, index) => (
+            <Link
+              key={item.href}
+              href={item.href}
               className={styles.sheetLink}
-              style={{ ['--item-delay' as string]: `${index * 55}ms` }}
-              onClick={() => setOpen(false)}
+              style={{ ['--item-delay' as string]: `${index * 50}ms` }}
+              onClick={close}
             >
               <span className={styles.sheetIndex}>/{String(index + 1).padStart(2, '0')}</span>
-              {section.label}
-            </a>
+              {item.label}
+            </Link>
           ))}
           <div className={styles.sheetActions}>
-            <Link href={consoleHref} className={styles.cta} onClick={() => setOpen(false)}>
+            <Link href={consoleHref} className={styles.cta} onClick={close}>
               <Icon name={user ? 'arrow' : 'login'} />
               {user ? 'Open console' : 'Sign in'}
             </Link>
             {!user && (
-              <Link href="/signup" className={styles.ghost} onClick={() => setOpen(false)}>
+              <Link href="/signup" className={styles.ghost} onClick={close}>
                 Request access
               </Link>
             )}

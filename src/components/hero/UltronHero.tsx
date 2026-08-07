@@ -1,6 +1,17 @@
-import { useCallback, useEffect, useRef } from 'react';
+// Landing hero.
+//
+// Everything is built on the page's centre axis: eyebrow, headline, lead and
+// buttons are all centred on it, and the horizon arc underneath is a circle
+// whose centre sits on the same line. The symmetry is the composition — there
+// is no second column and no imagery competing with the sentence.
+//
+// The only motion is scroll-driven: the arc rises and opens as you move down
+// the fold while the copy settles back. Values are written straight onto the
+// node as custom properties rather than through React state, because this runs
+// on every scroll frame and a re-render per frame is what it must not do.
 
-import PlantPreview from '../home/PlantPreview';
+import { useEffect, useRef } from 'react';
+
 import { Arrow, Button, Marquee, SplitText, clamp01, useReducedMotion } from '../home/primitives';
 import styles from './UltronHero.module.css';
 
@@ -15,33 +26,24 @@ const PROTOCOLS = [
   'CSV export',
 ];
 
-/**
- * Straightens the product plate as the page scrolls.
- *
- * The stage starts tipped back and lifts to flat over roughly the first
- * three-quarters of a viewport, which is the window in which a visitor is still
- * looking at the fold. Values are written straight onto the node as custom
- * properties instead of through React state — this runs on every scroll frame,
- * and a re-render per frame is exactly what it must not do.
- */
-function useStageScrub(reduced: boolean) {
-  const ref = useRef<HTMLDivElement | null>(null);
+/** Scrubs the hero's custom properties against scroll position over one fold. */
+function useHeroScrub(reduced: boolean) {
+  const ref = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     if (reduced) {
-      el.style.setProperty('--tilt', '0deg');
-      el.style.setProperty('--zoom', '1');
+      el.style.setProperty('--p', '0');
       return;
     }
 
     let frame = 0;
     const apply = () => {
       frame = 0;
-      const progress = clamp01(window.scrollY / (window.innerHeight * 0.75));
-      el.style.setProperty('--tilt', `${(1 - progress) * 12}deg`);
-      el.style.setProperty('--zoom', `${0.95 + progress * 0.05}`);
+      // One viewport of travel is the whole budget — past that the hero is off
+      // screen and further scrubbing is invisible work.
+      el.style.setProperty('--p', clamp01(window.scrollY / window.innerHeight).toFixed(4));
     };
     const onScroll = () => {
       if (frame) return;
@@ -63,79 +65,50 @@ function useStageScrub(reduced: boolean) {
 
 export default function UltronHero() {
   const reduced = useReducedMotion();
-  const stageRef = useStageScrub(reduced);
-  const heroRef = useRef<HTMLElement | null>(null);
-
-  const onPointerMove = useCallback((event: React.PointerEvent<HTMLElement>) => {
-    const el = heroRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    el.style.setProperty('--hx', `${((event.clientX - rect.left) / rect.width) * 100}%`);
-    el.style.setProperty('--hy', `${((event.clientY - rect.top) / rect.height) * 100}%`);
-    el.style.setProperty('--hover', '1');
-  }, []);
-
-  const onPointerLeave = useCallback(() => {
-    heroRef.current?.style.setProperty('--hover', '0');
-  }, []);
+  const heroRef = useHeroScrub(reduced);
 
   return (
-    <section
-      className={styles.hero}
-      ref={heroRef}
-      onPointerMove={onPointerMove}
-      onPointerLeave={onPointerLeave}
-    >
-      <div className={styles.ambient} aria-hidden="true">
-        <span className={`${styles.blob} ${styles.blobLight}`} />
-        <span className={`${styles.blob} ${styles.blobAccent}`} />
-      </div>
-      <div className={styles.grid} aria-hidden="true" />
-      <div className={styles.cursorGlow} aria-hidden="true" />
-      <div className={styles.grain} aria-hidden="true" />
+    <section className={styles.hero} ref={heroRef}>
+      {/* The axis the whole composition is mirrored about, drawn so the
+          symmetry is stated rather than merely implied. */}
+      <span className={styles.axis} aria-hidden="true">
+        <span className={styles.axisTick} />
+      </span>
 
       <div className={styles.inner}>
-        <a className={styles.announce} href="#signal">
-          <span className={styles.announceDot} aria-hidden="true" />
-          AI health scoring on every mapped channel
-          <span className={styles.announceChevron} aria-hidden="true">
-            <Arrow size={13} />
-          </span>
-        </a>
+        <p className={styles.eyebrow}>The only plant platform with</p>
 
         <h1 className={styles.title}>
-          <span className={styles.titleLine}>
-            <SplitText text="Machine health," step={70} />
-          </span>
-          <span className={styles.titleLine}>
-            <SplitText text="in real time" accentFrom={0} delay={210} step={70} />
+          <SplitText text="Total Plant Context" step={90} />
+          <span className={styles.tm} aria-hidden="true">
+            ™
           </span>
         </h1>
+
+        <p className={styles.lead}>
+          Every channel on your floor, reconciled into one live model — and the single instruction
+          that follows from it.
+        </p>
 
         <div className={styles.ctas}>
           <Button href="/login">
             Open the console
             <Arrow />
           </Button>
-          <Button href="#signal" variant="ghost">
+          <Button href="/#platform" variant="ghost">
             See how it works
           </Button>
         </div>
+      </div>
 
-        <div className={styles.trust}>
-          <span>No new sensors required</span>
-          <span className={styles.trustDot} aria-hidden="true" />
-          <span>Deploys on your network</span>
-          <span className={styles.trustDot} aria-hidden="true" />
-          <span>Sub-second alarms</span>
+      {/* Horizon. A ring mask on a very large circle, clipped to its top slice —
+          the arc is a real circle centred on the page axis, not a drawn curve. */}
+      <div className={styles.horizonClip} aria-hidden="true">
+        <div className={styles.horizon}>
+          <span className={styles.arcGlow} />
+          <span className={styles.arc} />
         </div>
-
-        <div className={styles.stage}>
-          <div className={styles.stageInner} ref={stageRef}>
-            <div className={styles.stageGlow} aria-hidden="true" />
-            <PlantPreview />
-          </div>
-        </div>
+        <span className={styles.bloom} />
       </div>
 
       <div className={styles.rail}>

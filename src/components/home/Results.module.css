@@ -1,0 +1,365 @@
+/* Results — dimension rail and the two governing specifications. */
+
+.section {
+  position: relative;
+  padding: clamp(84px, 11vw, 148px) var(--u-gutter);
+  border-top: 1px solid var(--u-line);
+  scroll-margin-top: 76px;
+}
+
+.inner {
+  position: relative;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Dimension rail                                                     */
+/* ------------------------------------------------------------------ */
+
+.figure {
+  margin-top: clamp(48px, 6vw, 78px);
+}
+
+.plot {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  /* Each figure sits directly above its own node on the rail. */
+  justify-content: flex-end;
+}
+
+.value {
+  display: flex;
+  align-items: baseline;
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  color: #fff;
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  transition: opacity 700ms var(--u-ease), transform 700ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.figureShown .value {
+  opacity: 1;
+  transform: none;
+}
+
+.valueNumber {
+  font-size: clamp(30px, 4.6vw, 58px);
+  font-variant-numeric: tabular-nums;
+}
+
+.valueUnit {
+  font-size: clamp(15px, 1.9vw, 23px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--u-ink-2);
+}
+
+/* The drop-line from the figure down to the baseline. Grows downward, which is
+   what makes the whole band read as being drawn rather than faded in. */
+.drop {
+  width: 1px;
+  height: 34px;
+  margin-top: 14px;
+  background: linear-gradient(180deg, transparent, var(--u-line-strong));
+  transform: scaleY(0);
+  transform-origin: 50% 0;
+  transition: transform 620ms var(--u-ease);
+  transition-delay: calc(var(--delay, 0ms) + 120ms);
+}
+
+.figureShown .drop {
+  transform: scaleY(1);
+}
+
+.node {
+  width: 7px;
+  height: 7px;
+  margin-bottom: -4px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background: var(--u-bg);
+  transform: rotate(45deg) scale(0);
+  transition: transform 480ms var(--u-ease);
+  transition-delay: calc(var(--delay, 0ms) + 400ms);
+}
+
+.figureShown .node {
+  transform: rotate(45deg) scale(1);
+}
+
+.railWrap {
+  position: relative;
+  height: 1px;
+}
+
+.rail {
+  position: absolute;
+  inset: 0;
+  background: var(--u-line-strong);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 1100ms var(--u-ease) 120ms;
+}
+
+.figureShown .rail {
+  transform: scaleX(1);
+}
+
+/* Ruler graduations hanging off the baseline, at a finer pitch than the marks —
+   the detail that turns a divider into a scale. */
+.railTicks {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 5px;
+  background-image: linear-gradient(90deg, var(--u-line-strong) 1px, transparent 1px);
+  background-size: calc(100% / 32) 100%;
+  opacity: 0;
+  transition: opacity 700ms ease 900ms;
+}
+
+.figureShown .railTicks {
+  opacity: 1;
+}
+
+.captions {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 22px;
+}
+
+.caption {
+  margin: 0;
+  padding: 0 clamp(8px, 1.6vw, 22px);
+  text-align: center;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--u-ink-3);
+  text-wrap: balance;
+  opacity: 0;
+  transition: opacity 700ms ease;
+  transition-delay: var(--delay, 0ms);
+}
+
+.figureShown .caption {
+  opacity: 1;
+}
+
+/* ------------------------------------------------------------------ */
+/* The two specifications                                             */
+/* ------------------------------------------------------------------ */
+
+.specs {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: clamp(64px, 8vw, 104px);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius-panel);
+  overflow: hidden;
+}
+
+/* The divider is the page axis continuing through the panel, which is why the
+   two specs are mirrored either side of it rather than stacked. */
+.specsAxis {
+  position: absolute;
+  top: 12%;
+  bottom: 12%;
+  left: 50%;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, var(--u-line-strong), transparent);
+}
+
+.spec {
+  padding: clamp(28px, 4vw, 48px) clamp(22px, 3.4vw, 44px);
+  text-align: center;
+}
+
+.specLabel {
+  display: inline-block;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.specValue {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  margin-top: 14px;
+  font-size: clamp(46px, 6.4vw, 82px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.specLt {
+  margin-right: 0.06em;
+  font-size: 0.52em;
+  font-weight: 500;
+  color: var(--u-ink-2);
+}
+
+.specUnit {
+  margin-left: 0.08em;
+  font-size: 0.34em;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  color: var(--u-ink-2);
+}
+
+.specBody {
+  max-width: 34ch;
+  margin: 16px auto 0;
+  font-size: 13.5px;
+  line-height: 1.62;
+  color: var(--u-ink-2);
+}
+
+/* -- sampling comb ------------------------------------------------- */
+
+.comb {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 5px;
+  height: 34px;
+  margin-top: 26px;
+  padding-bottom: 1px;
+  border-bottom: 1px solid var(--u-line);
+}
+
+.combTick {
+  width: 1px;
+  height: 100%;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.55));
+  animation: combPulse 1.6s var(--u-ease) infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes combPulse {
+  0%,
+  100% {
+    transform: scaleY(0.34);
+    opacity: 0.35;
+  }
+  40% {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+/* -- latency bar --------------------------------------------------- */
+
+.latency {
+  margin-top: 26px;
+}
+
+.latencyTrack {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.07);
+  overflow: hidden;
+}
+
+/* Fills to a fraction of the second, then resets — the point being that it
+   never reaches the right-hand end of the scale. */
+.latencyFill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.3), #ffffff);
+  transform-origin: 0 50%;
+  animation: latencyFill 2.8s var(--u-ease) infinite;
+}
+
+@keyframes latencyFill {
+  0% {
+    transform: scaleX(0);
+    opacity: 0.4;
+  }
+  36% {
+    transform: scaleX(0.62);
+    opacity: 1;
+  }
+  76% {
+    transform: scaleX(0.62);
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(0.62);
+    opacity: 0;
+  }
+}
+
+.latencyScale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 860px) {
+  .plot,
+  .captions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .captions {
+    gap: 18px 0;
+  }
+
+  /* With two figures per row the single baseline no longer describes them all,
+     so the rail steps back to a plain divider. */
+  .railTicks {
+    display: none;
+  }
+
+  .specs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .specsAxis {
+    top: auto;
+    right: 12%;
+    bottom: 50%;
+    left: 12%;
+    width: auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--u-line-strong), transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combTick,
+  .latencyFill {
+    animation: none;
+  }
+
+  .latencyFill {
+    transform: scaleX(0.62);
+  }
+}

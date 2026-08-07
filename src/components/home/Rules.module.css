@@ -1,0 +1,56 @@
+/* Fixed column rules behind the page. */
+
+.rules {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  /* The rules fade out at the very top and bottom so they never collide with
+     the nav bar's hairline or the footer's top border. */
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 9%, #000 92%, transparent);
+  mask-image: linear-gradient(180deg, transparent, #000 9%, #000 92%, transparent);
+}
+
+.track {
+  display: flex;
+  justify-content: space-between;
+  width: min(var(--u-max), calc(100% - var(--u-gutter) * 2));
+  height: 100%;
+  margin: 0 auto;
+}
+
+.rule {
+  width: 1px;
+  height: 100%;
+  background: var(--u-rule);
+}
+
+.ruleAxis {
+  background: var(--u-rule-strong);
+}
+
+.ruleBleed {
+  position: absolute;
+  top: 0;
+  opacity: 0.55;
+}
+
+.ruleLeft {
+  left: max(12px, calc(var(--u-gutter) * 0.34));
+}
+
+.ruleRight {
+  right: max(12px, calc(var(--u-gutter) * 0.34));
+}
+
+/* On narrow screens the measure collapses to roughly the text column, and five
+   rules inside it turns into hatching. Two is enough to keep the structure. */
+@media (max-width: 760px) {
+  .track > .rule:nth-child(even) {
+    display: none;
+  }
+
+  .ruleBleed {
+    display: none;
+  }
+}

@@ -1,16 +1,28 @@
-/* Page-level section styling for the landing page. */
+/* Shared chrome for the public pages — the page shell, the section rhythm, the
+   inner-page hero, and the contact block.
+   Imported by /home, /about and /contact so all three share one measure and one
+   vertical rhythm; anything specific to a single section lives in that
+   section's own module. */
 
 .page {
+  position: relative;
   background: var(--u-bg);
   color: var(--u-ink);
   font-family: var(--u-font-sans);
   overflow-x: clip;
 }
 
+/* Everything above the fixed column rules. Without this the rules would paint
+   over the content instead of behind it. */
+.content {
+  position: relative;
+  z-index: 1;
+}
+
 .section {
   position: relative;
   padding: clamp(84px, 11vw, 148px) var(--u-gutter);
-  scroll-margin-top: 80px;
+  scroll-margin-top: 76px;
 }
 
 .sectionTight {
@@ -29,216 +41,118 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Metrics band                                                       */
+/* Inner-page hero (about, contact)                                   */
 /* ------------------------------------------------------------------ */
 
-.metrics {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  gap: 1px;
-  border: 1px solid var(--u-line);
-  border-radius: var(--u-radius-panel);
-  background: var(--u-line);
-  overflow: hidden;
-}
-
-.metric {
-  padding: 34px 22px;
+/* Centred on the same axis the landing hero uses, so moving between pages
+   never shifts the eye off the middle of the page. */
+.pageHead {
+  position: relative;
+  padding: calc(64px + clamp(64px, 11vh, 132px)) var(--u-gutter) clamp(48px, 6vw, 76px);
   text-align: center;
-  background: var(--u-bg-soft);
 }
 
-.metricValue {
-  font-size: clamp(34px, 4vw, 46px);
-  font-weight: 600;
-  letter-spacing: -0.042em;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  background: linear-gradient(180deg, #ffffff, #8a8d8a);
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
+.pageHeadInner {
+  position: relative;
+  max-width: 780px;
+  margin: 0 auto;
 }
 
-.metricLabel {
-  margin-top: 13px;
+.pageEyebrow {
+  margin: 0;
   font-family: var(--u-font-mono);
   font-size: 10px;
-  letter-spacing: 0.18em;
+  letter-spacing: 0.24em;
   text-transform: uppercase;
   color: var(--u-ink-3);
 }
 
-/* ------------------------------------------------------------------ */
-/* FAQ                                                                */
-/* ------------------------------------------------------------------ */
-
-.faq {
-  max-width: 820px;
-  margin: 0 auto;
-  border-top: 1px solid var(--u-line);
-}
-
-.faqItem {
-  border-bottom: 1px solid var(--u-line);
-}
-
-.faqButton {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  width: 100%;
-  padding: 22px 4px;
-  border: 0;
-  background: none;
-  text-align: left;
-  font-family: inherit;
-  font-size: 16.5px;
-  font-weight: 550;
-  letter-spacing: -0.018em;
-  color: var(--u-ink);
-  cursor: pointer;
-  transition: color 220ms ease;
-}
-
-.faqButton:hover {
-  color: var(--u-accent);
-}
-
-.faqSign {
-  position: relative;
-  width: 13px;
-  height: 13px;
-  margin-left: auto;
-  flex-shrink: 0;
-  color: var(--u-ink-3);
-}
-
-/* Plus turning into a minus: the vertical stroke rotates away and fades. */
-.faqSign::before,
-.faqSign::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 0;
-  width: 100%;
-  height: 1.5px;
-  border-radius: 2px;
-  background: currentColor;
-  transition: transform 380ms var(--u-ease), opacity 260ms ease;
-}
-
-.faqSign::after {
-  transform: rotate(90deg);
-}
-
-.faqOpen .faqSign {
-  color: var(--u-accent);
-}
-
-.faqOpen .faqSign::after {
-  transform: rotate(0deg);
-  opacity: 0;
-}
-
-.faqPanel {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 460ms var(--u-ease);
-}
-
-.faqOpen .faqPanel {
-  grid-template-rows: 1fr;
-}
-
-/* The inner element must be `min-height: 0` and overflow-hidden for the
-   0fr → 1fr row transition to animate rather than jump. */
-.faqPanelInner {
-  min-height: 0;
-  overflow: hidden;
-}
-
-.faqAnswer {
-  margin: 0;
-  padding: 0 60px 24px 4px;
-  font-size: 15px;
-  line-height: 1.68;
-  color: var(--u-ink-2);
-}
-
-/* ------------------------------------------------------------------ */
-/* Closing CTA                                                        */
-/* ------------------------------------------------------------------ */
-
-.cta {
-  position: relative;
-  padding: clamp(40px, 6vw, 76px);
-  border: 1px solid var(--u-line-strong);
-  border-radius: var(--u-radius-panel);
-  background: radial-gradient(120% 150% at 12% 0%, rgba(110, 240, 138, 0.24), transparent 58%),
-    radial-gradient(100% 140% at 92% 100%, rgba(110, 240, 138, 0.14), transparent 56%),
-    linear-gradient(180deg, #101219, #0a0b0f);
-  overflow: hidden;
-  isolation: isolate;
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  gap: clamp(28px, 5vw, 64px);
-  align-items: center;
-}
-
-/* Faint engineering grid inside the panel, fading out to the right. */
-.ctaGrid {
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
-  background-size: 54px 54px;
-  -webkit-mask-image: linear-gradient(105deg, #000, transparent 68%);
-  mask-image: linear-gradient(105deg, #000, transparent 68%);
-}
-
-.ctaTitle {
-  margin: 16px 0 0;
-  font-size: clamp(30px, 3.8vw, 46px);
+.pageTitle {
+  margin: 20px 0 0;
+  font-size: clamp(38px, 6.4vw, 78px);
   font-weight: 600;
-  letter-spacing: -0.038em;
-  line-height: 1.04;
+  letter-spacing: -0.046em;
+  line-height: 1;
   color: #fff;
 }
 
-.ctaLead {
-  margin: 18px 0 30px;
-  max-width: 440px;
-  font-size: 16px;
-  line-height: 1.64;
+.pageLead {
+  max-width: 56ch;
+  margin: clamp(20px, 2.4vw, 28px) auto 0;
+  font-size: clamp(15px, 1.3vw, 17px);
+  line-height: 1.66;
   color: var(--u-ink-2);
 }
 
-.ctaActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 11px;
+/* A short rule under the hero, centred — the axis made visible at the point the
+   page changes from title to content. */
+.pageRule {
+  display: block;
+  width: 1px;
+  height: clamp(40px, 6vw, 72px);
+  margin: clamp(32px, 4vw, 48px) auto 0;
+  background: linear-gradient(180deg, var(--u-line-strong), transparent);
 }
 
-.contactRows {
+/* ------------------------------------------------------------------ */
+/* Contact                                                            */
+/* ------------------------------------------------------------------ */
+
+.contact {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 1px;
   border: 1px solid var(--u-line);
-  border-radius: 16px;
+  border-radius: var(--u-radius-panel);
   background: var(--u-line);
   overflow: hidden;
 }
 
-.contactRow {
-  padding: 17px 19px;
-  background: rgba(10, 11, 15, 0.86);
-  transition: background 260ms ease;
+.contactPanel {
+  padding: clamp(28px, 4vw, 48px);
+  background: var(--u-bg-soft);
 }
 
-.contactRow:hover {
-  background: rgba(255, 255, 255, 0.035);
+.contactHeading {
+  margin: 0;
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.032em;
+  line-height: 1.16;
+  color: #fff;
+}
+
+.contactBody {
+  margin: 16px 0 0;
+  font-size: 15px;
+  line-height: 1.66;
+  color: var(--u-ink-2);
+}
+
+.contactActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 26px;
+}
+
+/* Detail rows — label above value, stacked on hairlines. */
+.contactRows {
+  display: grid;
+}
+
+.contactRow {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--u-line);
+}
+
+.contactRow:first-child {
+  padding-top: 0;
+}
+
+.contactRow:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .contactLabel {
@@ -252,16 +166,133 @@
 .contactValue {
   display: inline-block;
   margin-top: 7px;
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 550;
   letter-spacing: -0.014em;
   color: var(--u-ink);
   text-decoration: none;
-  transition: color 220ms ease;
+  transition: opacity 220ms ease;
 }
 
 a.contactValue:hover {
-  color: var(--u-accent);
+  opacity: 0.7;
+}
+
+/* Numbered "what happens next" list. The counter is the only decoration. */
+.steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.step {
+  position: relative;
+  counter-increment: step;
+  padding: 0 0 22px 40px;
+  border-left: 1px solid var(--u-line);
+  margin-left: 9px;
+}
+
+.step:last-child {
+  padding-bottom: 0;
+  border-left-color: transparent;
+}
+
+.step::before {
+  content: counter(step, decimal-leading-zero);
+  position: absolute;
+  top: -3px;
+  left: -10px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 50%;
+  background: var(--u-bg-soft);
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  color: var(--u-ink-3);
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 550;
+  letter-spacing: -0.016em;
+  color: var(--u-ink);
+}
+
+.stepBody {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Principles (about)                                                 */
+/* ------------------------------------------------------------------ */
+
+.principles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: clamp(40px, 5vw, 64px);
+  border-top: 1px solid var(--u-line);
+  border-bottom: 1px solid var(--u-line);
+  background: var(--u-line);
+}
+
+.principle {
+  padding: clamp(26px, 3vw, 38px) clamp(20px, 2.4vw, 30px);
+  background: var(--u-bg);
+}
+
+.principleIndex {
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  color: var(--u-ink-3);
+}
+
+.principleTitle {
+  margin: 16px 0 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.026em;
+  color: var(--u-ink);
+}
+
+.principleBody {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.66;
+  color: var(--u-ink-2);
+}
+
+/* Long-form prose column for the about page. */
+.prose {
+  max-width: 64ch;
+  margin: 0 auto;
+}
+
+.prose p {
+  margin: 0 0 20px;
+  font-size: 16px;
+  line-height: 1.74;
+  color: var(--u-ink-2);
+}
+
+.prose p:last-child {
+  margin-bottom: 0;
+}
+
+.prose strong {
+  font-weight: 550;
+  color: var(--u-ink);
 }
 
 /* ------------------------------------------------------------------ */
@@ -269,13 +300,11 @@ a.contactValue:hover {
 /* ------------------------------------------------------------------ */
 
 @media (max-width: 900px) {
-  .cta {
+  .contact {
     grid-template-columns: minmax(0, 1fr);
   }
-}
 
-@media (max-width: 560px) {
-  .faqAnswer {
-    padding-right: 12px;
+  .principles {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

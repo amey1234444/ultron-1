@@ -7,7 +7,7 @@
 // happen to sit next to each other.
 
 import styles from './Signals.module.css';
-import { Arrow, Reveal, SpotlightCard } from './primitives';
+import { Arrow, Reveal } from './primitives';
 
 const VIEW = 400;
 const CENTER = VIEW / 2;
@@ -168,58 +168,6 @@ function Band({
   );
 }
 
-const TILES = [
-  {
-    kicker: 'Edge',
-    title: 'Gateway ingest',
-    body: 'Racks, cards and channels described once. Everything on the floor arrives normalised on one outbound connection.',
-    stage: (
-      <>
-        <div className={styles.wire} />
-        {[0, 1, 2].map((i) => (
-          <div
-            key={i}
-            className={styles.packet}
-            style={{
-              ['--delay' as string]: `${i * 0.85}s`,
-              ['--travel' as string]: 'calc(100% - 34px)',
-            }}
-          />
-        ))}
-        <div className={styles.sink} />
-      </>
-    ),
-  },
-  {
-    kicker: 'Interface',
-    title: 'REST & WebSocket',
-    body: 'Read any channel, any window, any asset. The same API the console runs on, with no privileged back door.',
-    stage: (
-      <>
-        <div className={styles.rows}>
-          {['100%', '72%', '88%', '56%'].map((w) => (
-            <div key={w} className={styles.row} style={{ ['--w' as string]: w }} />
-          ))}
-        </div>
-        <div className={styles.scan} />
-      </>
-    ),
-  },
-  {
-    kicker: 'Downstream',
-    title: 'Webhooks & MCP',
-    body: 'Push a breach into the systems your team already lives in — or let an agent query the plant directly over MCP.',
-    stage: (
-      <>
-        {[0, 1, 2].map((i) => (
-          <div key={i} className={styles.ripple} style={{ ['--delay' as string]: `${i}s` }} />
-        ))}
-        <div className={styles.emitter} />
-      </>
-    ),
-  },
-];
-
 export default function Signals() {
   return (
     <>
@@ -240,26 +188,9 @@ export default function Signals() {
         muted="everywhere it matters."
         lead="What the core concludes goes back out the same way it came in — to the console, the alert channel, the work-order queue and anything else you point it at."
         href="#platform"
-        cta="See the integrations"
+        cta="See the capabilities"
         field={<RadialField spokes={OUTPUTS} direction="out" hub="ACT" />}
       />
-
-      <div className={styles.tryptich} id="platform">
-        {TILES.map((tile, index) => (
-          <Reveal key={tile.title} delay={index * 90}>
-            <SpotlightCard className={styles.tile}>
-              <div className={styles.tileStage} aria-hidden="true">
-                {tile.stage}
-              </div>
-              <div className={styles.tileCopy}>
-                <span className={styles.tileKicker}>{tile.kicker}</span>
-                <h3 className={styles.tileTitle}>{tile.title}</h3>
-                <p className={styles.tileBody}>{tile.body}</p>
-              </div>
-            </SpotlightCard>
-          </Reveal>
-        ))}
-      </div>
     </>
   );
 }

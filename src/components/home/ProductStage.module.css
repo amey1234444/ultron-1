@@ -1,0 +1,27 @@
+.section {
+  position: relative;
+  padding: 0 var(--u-gutter) clamp(72px, 9vw, 120px);
+}
+
+.stage {
+  position: relative;
+  max-width: 1080px;
+  margin: 0 auto;
+  /* A deep perspective origin above the element makes the straightening read as
+     the plate tipping towards you rather than as a vertical squash. */
+  perspective: 2200px;
+  perspective-origin: 50% 0%;
+}
+
+.plate {
+  position: relative;
+  transform: rotateX(var(--tilt, 0deg)) scale(var(--zoom, 1));
+  transform-origin: 50% 0%;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .plate {
+    transform: none;
+  }
+}

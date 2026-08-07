@@ -1,0 +1,245 @@
+/* Pulse — the closing sweep. */
+
+.section {
+  position: relative;
+  padding: clamp(84px, 11vw, 148px) var(--u-gutter) clamp(64px, 8vw, 110px);
+  border-top: 1px solid var(--u-line);
+}
+
+.inner {
+  position: relative;
+  max-width: 880px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.title {
+  margin: 18px 0 0;
+  font-size: clamp(26px, 3.6vw, 44px);
+  font-weight: 600;
+  letter-spacing: -0.038em;
+  line-height: 1.14;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.titleMuted {
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* Field                                                              */
+/* ------------------------------------------------------------------ */
+
+.stage {
+  position: relative;
+  width: min(100%, 560px);
+  margin: clamp(30px, 4vw, 48px) auto 0;
+}
+
+.svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Softens the outer edge of the field into the page rather than ending it on a
+   hard circle. */
+.fade {
+  position: absolute;
+  inset: -6%;
+  pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, transparent 56%, var(--u-bg) 82%);
+}
+
+.ring {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.08);
+  stroke-width: 1;
+}
+
+.ringDashed {
+  stroke-dasharray: 2 6;
+  stroke: rgba(255, 255, 255, 0.11);
+}
+
+.bearing {
+  stroke: rgba(255, 255, 255, 0.045);
+  stroke-width: 1;
+}
+
+/* -- the sweep ------------------------------------------------------ */
+
+.sweep {
+  transform-box: view-box;
+  transform-origin: 50% 50%;
+  animation: spin var(--period, 9s) linear infinite;
+}
+
+.sweepLine {
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1.2;
+}
+
+.wedge {
+  /* Fill comes from the gradient in the markup; this only carries the opacity. */
+  opacity: 0.9;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* -- assets --------------------------------------------------------- */
+
+/* Resting state is a dim dot; the flash is the sweep passing over it. */
+.asset {
+  fill: rgba(255, 255, 255, 0.28);
+  animation: assetFlash var(--period, 9s) ease-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+.halo {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: assetHalo var(--period, 9s) ease-out infinite;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes assetFlash {
+  0% {
+    fill: #ffffff;
+  }
+  14% {
+    fill: rgba(255, 255, 255, 0.28);
+  }
+  100% {
+    fill: rgba(255, 255, 255, 0.28);
+  }
+}
+
+@keyframes assetHalo {
+  0% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  18% {
+    opacity: 0;
+    transform: scale(5);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(5);
+  }
+}
+
+/* -- core ----------------------------------------------------------- */
+
+.core {
+  fill: #ffffff;
+}
+
+.coreRing {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+  animation: coreRing var(--period, 3s) ease-out infinite;
+}
+
+@keyframes coreRing {
+  0% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(4.5);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Readout                                                            */
+/* ------------------------------------------------------------------ */
+
+.readout {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: clamp(24px, 3vw, 40px) 0 0;
+  border-top: 1px solid var(--u-line);
+}
+
+.readoutItem {
+  padding: 20px 8px 0;
+}
+
+.readoutItem + .readoutItem {
+  border-left: 1px solid var(--u-line);
+}
+
+.readoutLabel {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.readoutValue {
+  margin: 8px 0 0;
+  font-size: 20px;
+  font-weight: 550;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  color: var(--u-ink);
+}
+
+@media (max-width: 640px) {
+  .readout {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .readoutItem:nth-child(odd) {
+    border-left: 0;
+  }
+
+  .readoutItem:nth-child(n + 3) {
+    margin-top: 18px;
+    padding-top: 18px;
+    border-top: 1px solid var(--u-line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sweep,
+  .asset,
+  .halo,
+  .coreRing {
+    animation: none;
+  }
+
+  .halo,
+  .coreRing {
+    opacity: 0;
+  }
+}

@@ -1,15 +1,22 @@
-/* Landing hero.
-   A centred copy column over a layered ambient field, with the plant-overview
-   surface below on a stage that straightens itself as the page scrolls.
-   Black, white and one green: the ambient layers are all achromatic except a
-   single green pool, which is what stops the page reading as a grey wash.
-   Every layer is painted with gradients and moved with transforms — no blur
-   filters on full-bleed elements, which is what normally makes heroes like this
-   drop frames on integrated graphics. */
+/* Landing hero — symmetric about the page axis.
+
+   Palette rule for this file: everything is black, white and grey except the
+   two ends of the horizon arc, which fade to green on the left and blue on the
+   right. Those are the only two colours in the fold, and they carry the same
+   meaning they carry everywhere else on the site — measured now, and predicted.
+
+   No blur filters on full-bleed elements: the glow around the arc is a soft
+   radial mask, not `filter: blur()`, which is what normally makes a hero like
+   this drop frames on integrated graphics. */
 
 .hero {
+  --p: 0;
+
   position: relative;
-  padding: calc(68px + clamp(52px, 8vw, 96px)) var(--u-gutter) 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100svh;
+  padding: calc(72px + clamp(56px, 10vh, 120px)) var(--u-gutter) 0;
   overflow: hidden;
   isolation: isolate;
   color: var(--u-ink);
@@ -18,108 +25,31 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Ambient layers                                                     */
+/* Axis                                                               */
 /* ------------------------------------------------------------------ */
 
-.ambient {
+.axis {
   position: absolute;
-  inset: 0;
-  z-index: -6;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-.blob {
-  position: absolute;
-  border-radius: 50%;
-  will-change: transform;
-}
-
-/* The one green light, low and central — it reads as the product glowing
-   through the page rather than as a coloured background. */
-.blobAccent {
-  bottom: -26vh;
+  top: 0;
+  bottom: 0;
   left: 50%;
-  width: 92vw;
-  height: 62vw;
-  max-width: 1320px;
-  margin-left: -46vw;
-  background: radial-gradient(ellipse at 50% 50%, rgba(110, 240, 138, 0.16), rgba(110, 240, 138, 0) 62%);
-  animation: driftA 32s ease-in-out infinite;
+  z-index: 0;
+  width: 1px;
+  margin-left: -0.5px;
+  pointer-events: none;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.1) 22%, transparent 62%);
 }
 
-/* Achromatic lift at the top so the headline is not sitting on flat black. */
-.blobLight {
-  top: -32vh;
+/* A single tick where the headline's baseline crosses the axis. */
+.axisTick {
+  position: absolute;
+  top: 22%;
   left: 50%;
-  width: 84vw;
-  height: 84vw;
-  max-width: 1180px;
-  max-height: 1180px;
-  margin-left: -42vw;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.055), rgba(255, 255, 255, 0) 62%);
-  animation: driftB 40s ease-in-out infinite;
-}
-
-@keyframes driftA {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(0, -4%, 0) scale(1.1);
-  }
-}
-
-@keyframes driftB {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  50% {
-    transform: translate3d(3%, 4%, 0) scale(1.08);
-  }
-}
-
-/* Fine engineering grid, faded out towards the edges so it reads as texture
-   rather than as a table. */
-.grid {
-  position: absolute;
-  inset: -1px;
-  z-index: -5;
-  pointer-events: none;
-  background-image: linear-gradient(rgba(255, 255, 255, 0.028) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
-  background-size: 64px 64px;
-  -webkit-mask-image: radial-gradient(118% 76% at 50% 24%, #000 0%, rgba(0, 0, 0, 0.3) 50%, transparent 76%);
-  mask-image: radial-gradient(118% 76% at 50% 24%, #000 0%, rgba(0, 0, 0, 0.3) 50%, transparent 76%);
-}
-
-/* Pointer-tracked bloom. Barely visible on its own; what you notice is that the
-   background responds at all. */
-.cursorGlow {
-  position: absolute;
-  inset: 0;
-  z-index: -4;
-  pointer-events: none;
-  background: radial-gradient(
-    440px circle at var(--hx, 50%) var(--hy, 40%),
-    rgba(255, 255, 255, 0.045),
-    transparent 70%
-  );
-  opacity: var(--hover, 0);
-  transition: opacity 600ms ease;
-}
-
-/* Grain. An inline SVG turbulence keeps this a few hundred bytes and, being a
-   data URI, satisfies the `img-src 'self' data:` policy. */
-.grain {
-  position: absolute;
-  inset: 0;
-  z-index: -3;
-  pointer-events: none;
-  opacity: 0.03;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transform: rotate(45deg);
 }
 
 /* ------------------------------------------------------------------ */
@@ -128,66 +58,55 @@
 
 .inner {
   position: relative;
-  z-index: 2;
-  max-width: 1180px;
+  z-index: 3;
+  max-width: 1000px;
   margin: 0 auto;
   text-align: center;
+  /* Settles back a little as the arc takes over the fold. */
+  transform: translate3d(0, calc(var(--p) * -34px), 0);
+  opacity: calc(1 - var(--p) * 0.75);
+  will-change: transform, opacity;
 }
 
-.announce {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  height: 30px;
-  padding: 0 12px;
-  border: 1px solid var(--u-line-strong);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.035);
-  color: var(--u-ink-2);
-  font-size: 12.5px;
-  font-weight: 500;
-  letter-spacing: -0.006em;
-  text-decoration: none;
-  animation: fadeUp 800ms var(--u-ease) both;
-  transition: border-color 240ms ease, color 240ms ease, background 240ms ease;
-}
-
-.announce:hover {
-  border-color: rgba(255, 255, 255, 0.26);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--u-ink);
-}
-
-.announceDot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--u-accent);
-  box-shadow: 0 0 0 3px rgba(110, 240, 138, 0.16);
-}
-
-.announceChevron {
-  display: inline-flex;
+.eyebrow {
+  margin: 0;
+  font-size: clamp(14px, 1.5vw, 18px);
+  font-weight: 400;
+  letter-spacing: -0.012em;
   color: var(--u-ink-3);
-  transition: transform 300ms var(--u-ease);
-}
-
-.announce:hover .announceChevron {
-  transform: translateX(3px);
+  animation: fadeUp 800ms var(--u-ease) both;
 }
 
 .title {
-  margin: 26px auto 0;
-  max-width: 16ch;
-  font-size: clamp(46px, 7.6vw, 96px);
+  position: relative;
+  display: inline-block;
+  margin: clamp(8px, 1.4vw, 16px) 0 0;
+  font-size: clamp(46px, 9.4vw, 132px);
   font-weight: 600;
-  letter-spacing: -0.045em;
-  line-height: 0.97;
+  letter-spacing: -0.05em;
+  line-height: 0.94;
   color: #fff;
 }
 
-.titleLine {
-  display: block;
+/* The trademark mark rides the cap height of the last word rather than sitting
+   inside the text flow, so it never affects the headline's optical centring. */
+.tm {
+  position: absolute;
+  top: 0.04em;
+  margin-left: 0.06em;
+  font-size: 0.2em;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--u-ink-2);
+}
+
+.lead {
+  max-width: 46ch;
+  margin: clamp(20px, 2.6vw, 30px) auto 0;
+  font-size: clamp(15px, 1.35vw, 17.5px);
+  line-height: 1.62;
+  color: var(--u-ink-2);
+  animation: fadeUp 900ms var(--u-ease) 520ms both;
 }
 
 .ctas {
@@ -195,29 +114,8 @@
   flex-wrap: wrap;
   justify-content: center;
   gap: 11px;
-  margin-top: 36px;
-  animation: fadeUp 900ms var(--u-ease) 560ms both;
-}
-
-.trust {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 10px 16px;
-  margin-top: 24px;
-  font-family: var(--u-font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  color: var(--u-ink-3);
-  animation: fadeUp 900ms var(--u-ease) 680ms both;
-}
-
-.trustDot {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--u-ink-3);
+  margin-top: clamp(26px, 3vw, 36px);
+  animation: fadeUp 900ms var(--u-ease) 660ms both;
 }
 
 @keyframes fadeUp {
@@ -232,34 +130,110 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Stage — the plant-overview surface                                 */
+/* Horizon                                                            */
 /* ------------------------------------------------------------------ */
 
-.stage {
-  position: relative;
-  max-width: 1080px;
-  margin: clamp(48px, 6.5vw, 82px) auto 0;
-  /* A deep perspective origin above the element makes the straightening read as
-     the plate tipping towards you rather than as a vertical squash. */
-  perspective: 2000px;
-  perspective-origin: 50% 0%;
-  animation: fadeUp 1100ms var(--u-ease) 800ms both;
+/* The clip is what turns a full circle into an arc. Doing it here rather than
+   with a second mask layer avoids `mask-composite`, which degrades badly on
+   the browsers that do not support it — a failed composite would paint the
+   whole disc instead of its rim. */
+.horizonClip {
+  position: absolute;
+  top: 44%;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.stageInner {
-  position: relative;
-  transform: rotateX(var(--tilt, 0deg)) scale(var(--zoom, 1));
+.horizon {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: min(210vw, 2200px);
+  aspect-ratio: 1 / 1;
+  transform: translate3d(-50%, calc(6% - var(--p) * 9%), 0) scale(calc(0.96 + var(--p) * 0.1));
   transform-origin: 50% 0%;
+  animation: arcIn 1600ms var(--u-ease) 260ms both;
   will-change: transform;
 }
 
-/* Pool of light the surface appears to be resting in. */
-.stageGlow {
+/* The rim itself. `closest-side` makes the radial stop line up with the circle's
+   radius regardless of how wide the element ends up. */
+.arc,
+.arcGlow {
   position: absolute;
-  inset: 8% -8% -16%;
-  z-index: -1;
-  pointer-events: none;
-  background: radial-gradient(ellipse at 50% 50%, rgba(110, 240, 138, 0.22), transparent 66%);
+  inset: 0;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    var(--u-green-line) 0%,
+    rgba(255, 255, 255, 0.16) 20%,
+    rgba(255, 255, 255, 0.95) 44%,
+    #ffffff 50%,
+    rgba(255, 255, 255, 0.95) 56%,
+    rgba(255, 255, 255, 0.16) 80%,
+    var(--u-blue-line) 100%
+  );
+}
+
+.arc {
+  -webkit-mask-image: radial-gradient(
+    closest-side,
+    transparent calc(100% - 1.6px),
+    #000 calc(100% - 1.1px),
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    closest-side,
+    transparent calc(100% - 1.6px),
+    #000 calc(100% - 1.1px),
+    transparent 100%
+  );
+}
+
+/* Bloom around the rim, made from a soft-stopped ring mask instead of a blur
+   filter — same read, a fraction of the paint cost at this size. */
+.arcGlow {
+  opacity: 0.5;
+  -webkit-mask-image: radial-gradient(
+    closest-side,
+    transparent calc(100% - 46px),
+    rgba(0, 0, 0, 0.45) calc(100% - 8px),
+    rgba(0, 0, 0, 0.9) calc(100% - 1px),
+    transparent 100%
+  );
+  mask-image: radial-gradient(
+    closest-side,
+    transparent calc(100% - 46px),
+    rgba(0, 0, 0, 0.45) calc(100% - 8px),
+    rgba(0, 0, 0, 0.9) calc(100% - 1px),
+    transparent 100%
+  );
+}
+
+/* Light spilling upward off the top of the arc. */
+.bloom {
+  position: absolute;
+  top: -4%;
+  left: 50%;
+  width: min(150vw, 1500px);
+  height: 46%;
+  margin-left: min(-75vw, -750px);
+  background: radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.09), transparent 62%);
+  opacity: calc(0.5 + var(--p) * 0.5);
+}
+
+@keyframes arcIn {
+  from {
+    opacity: 0;
+    transform: translate3d(-50%, 16%, 0) scale(0.9);
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ------------------------------------------------------------------ */
@@ -268,14 +242,15 @@
 
 .rail {
   position: relative;
-  z-index: 2;
-  margin-top: clamp(60px, 7vw, 96px);
-  padding: 24px 0 30px;
+  z-index: 3;
+  margin-top: auto;
+  padding: 22px 0 26px;
   border-top: 1px solid var(--u-line);
+  background: linear-gradient(180deg, transparent, rgba(10, 10, 10, 0.72) 40%);
 }
 
 .railLabel {
-  margin: 0 0 18px;
+  margin: 0 0 16px;
   text-align: center;
   font-family: var(--u-font-mono);
   font-size: 10px;
@@ -314,23 +289,29 @@
 
 @media (max-width: 720px) {
   .hero {
-    padding-top: calc(68px + 44px);
+    padding-top: calc(64px + 52px);
   }
 
   .title {
-    max-width: 100%;
     letter-spacing: -0.038em;
+  }
+
+  .horizonClip {
+    top: 52%;
+  }
+
+  .axisTick {
+    display: none;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* Ambient loops and the stage tilt are the two things that read as motion
-     sickness on this page; both are removed rather than shortened. */
-  .blob {
+  .horizon {
     animation: none;
   }
 
-  .stageInner {
+  .inner {
     transform: none;
+    opacity: 1;
   }
 }

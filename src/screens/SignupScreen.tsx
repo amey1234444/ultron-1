@@ -96,8 +96,8 @@ export default function SignupScreen() {
           style={{
             borderRadius: 12,
             borderWidth: 1,
-            borderColor: 'rgba(110,240,138,0.4)',
-            backgroundColor: 'rgba(110,240,138,0.1)',
+            borderColor: 'rgba(255,255,255,0.30)',
+            backgroundColor: 'rgba(255,255,255,0.06)',
             paddingHorizontal: 14,
             paddingVertical: 14,
           }}
