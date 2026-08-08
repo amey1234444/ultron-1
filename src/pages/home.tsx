@@ -2,12 +2,12 @@ import Head from 'next/head';
 
 import BuildOn from '../components/home/BuildOn';
 import Capabilities from '../components/home/Capabilities';
-import Pipeline from '../components/home/Pipeline';
+import CaseStudy from '../components/home/CaseStudy';
+import Industries from '../components/home/Industries';
 import ProductStage from '../components/home/ProductStage';
-import Pulse from '../components/home/Pulse';
 import Results from '../components/home/Results';
 import Rules from '../components/home/Rules';
-import Signals from '../components/home/Signals';
+import Singularity from '../components/home/Singularity';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import UltronHero from '../components/hero/UltronHero';
@@ -34,18 +34,14 @@ export default function HomePage() {
         {/* The console surface, straightening as it comes into view. */}
         <ProductStage />
 
-        {/* Pinned sensor → broker → backend → console chain. Owns `#signal`. */}
-        <Pipeline />
-
-        {/* Everything on the floor converging on one context. */}
-        <section className={`${styles.section} ${styles.ruled}`}>
-          <div className={styles.inner}>
-            <Signals />
-          </div>
-        </section>
-
         {/* Owns `#platform` — scrolling copy against a pinned panel. */}
         <Capabilities />
+
+        {/* Owns `#industries` — the five materials, as specimens. */}
+        <Industries />
+
+        {/* The flagship deployment, stated as a result rather than a story. */}
+        <CaseStudy />
 
         {/* Owns `#results` — the dimension rail and the two specifications. */}
         <Results />
@@ -53,8 +49,8 @@ export default function HomePage() {
         {/* The developer band. */}
         <BuildOn />
 
-        {/* Closing sweep. The FAQ that used to sit here now lives on /about. */}
-        <Pulse />
+        {/* The closer: everything collapses to one point, and you go through it. */}
+        <Singularity />
 
         <SiteFooter />
       </div>

@@ -1,0 +1,294 @@
+/* The one light panel on the site.
+
+   Everything in here is scoped to this file and uses its own ink ramp rather
+   than the global `--u-ink-*` tokens, which are all tuned for white-on-black and
+   would be unreadable inverted. */
+
+.section {
+  position: relative;
+  padding: clamp(60px, 8vw, 110px) var(--u-gutter);
+}
+
+.inner {
+  position: relative;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+.panel {
+  --ink: #101011;
+  --ink-2: #4a4a4c;
+  --ink-3: #77777a;
+  --rule: rgba(16, 16, 17, 0.12);
+
+  position: relative;
+  padding: clamp(28px, 4.4vw, 60px);
+  border-radius: clamp(18px, 2.4vw, 30px);
+  background: linear-gradient(168deg, #efefec 0%, #e4e4e0 100%);
+  color: var(--ink);
+  opacity: 0;
+  transform: translate3d(0, 22px, 0);
+  transition: opacity 800ms var(--u-ease), transform 900ms var(--u-ease);
+}
+
+.panelIn {
+  opacity: 1;
+  transform: none;
+}
+
+.top {
+  display: grid;
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+  gap: clamp(28px, 4vw, 64px);
+  align-items: center;
+}
+
+/* ------------------------------------------------------------------ */
+/* Copy                                                               */
+/* ------------------------------------------------------------------ */
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.eyebrowRule {
+  width: 22px;
+  height: 1px;
+  background: rgba(16, 16, 17, 0.28);
+}
+
+.title {
+  margin: clamp(18px, 2vw, 26px) 0 0;
+  font-size: clamp(28px, 3.6vw, 46px);
+  font-weight: 600;
+  letter-spacing: -0.042em;
+  line-height: 1.06;
+  color: var(--ink);
+  text-wrap: balance;
+}
+
+.body {
+  max-width: 46ch;
+  margin: clamp(16px, 1.8vw, 22px) 0 0;
+  font-size: clamp(14px, 1.15vw, 15.5px);
+  line-height: 1.68;
+  color: var(--ink-2);
+}
+
+/* Dark pill on the light panel — the inverse of every other button on the site,
+   which is what keeps it from reading as a foreign element. */
+.cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  margin-top: clamp(22px, 2.6vw, 32px);
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: #101011;
+  color: #f4f4f2;
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.014em;
+  text-decoration: none;
+  transition: gap 260ms var(--u-ease), opacity 220ms ease;
+}
+
+.cta:hover {
+  gap: 13px;
+  opacity: 0.86;
+}
+
+/* ------------------------------------------------------------------ */
+/* Chart                                                              */
+/* ------------------------------------------------------------------ */
+
+.chartWrap {
+  margin: 0;
+}
+
+.chartHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--rule);
+}
+
+.chartTitle {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -0.018em;
+  color: var(--ink);
+}
+
+.chartUnit {
+  font-family: var(--u-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-top: 8px;
+  overflow: visible;
+}
+
+.gridline {
+  stroke: rgba(16, 16, 17, 0.09);
+  stroke-width: 1;
+}
+
+.tickLabel {
+  fill: var(--ink-3);
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  text-anchor: end;
+}
+
+.axisLabel {
+  fill: var(--ink-3);
+  font-family: var(--u-font-mono);
+  font-size: 8.5px;
+  letter-spacing: 0.1em;
+}
+
+/* The band closing is the whole finding, so it gets the only fill. */
+.envelope {
+  fill: rgba(16, 16, 17, 0.1);
+  stroke: none;
+  opacity: 0;
+  transition: opacity 900ms var(--u-ease) 220ms;
+}
+
+.panelIn .envelope {
+  opacity: 1;
+}
+
+.bound {
+  fill: none;
+  stroke: rgba(16, 16, 17, 0.2);
+  stroke-width: 1;
+}
+
+.mean {
+  fill: none;
+  stroke: #101011;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 900;
+  stroke-dashoffset: 900;
+  transition: stroke-dashoffset 1600ms var(--u-ease) 200ms;
+}
+
+.panelIn .mean {
+  stroke-dashoffset: 0;
+}
+
+.cutover {
+  stroke: rgba(16, 16, 17, 0.45);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.cutoverLabel {
+  fill: var(--ink-2);
+  font-family: var(--u-font-mono);
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+
+/* ------------------------------------------------------------------ */
+/* Stats                                                              */
+/* ------------------------------------------------------------------ */
+
+/* Hairline-separated columns rather than four boxes. Boxes would add three more
+   rectangles to a panel that is already a rectangle. */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(18px, 2.4vw, 34px);
+  margin-top: clamp(32px, 4vw, 52px);
+  padding-top: clamp(24px, 3vw, 36px);
+  border-top: 1px solid var(--rule);
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.statValue {
+  display: flex;
+  align-items: baseline;
+  font-size: clamp(34px, 4.6vw, 58px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 0.9;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.statSuffix {
+  font-size: 0.5em;
+  font-weight: 550;
+  letter-spacing: -0.02em;
+}
+
+.statLabel {
+  max-width: 22ch;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                         */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 940px) {
+  .top {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: clamp(22px, 4vw, 34px);
+  }
+}
+
+@media (max-width: 460px) {
+  .stats {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel {
+    opacity: 1;
+    transform: none;
+  }
+
+  .mean {
+    stroke-dashoffset: 0;
+  }
+
+  .envelope {
+    opacity: 1;
+  }
+}

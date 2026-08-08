@@ -1,0 +1,301 @@
+/* The collapse.
+
+   Six custom properties are written by the scroll handler — `--collapse`,
+   `--swirl`, `--hole`, `--disc`, `--dive`, `--reveal`, `--field` — and every
+   rule below is a pure function of them. Nothing in here transitions: the values
+   are already continuous because they are scrubbed, and adding a transition on
+   top would fight the scroll position by a frame or two and feel like lag. */
+
+.section {
+  position: relative;
+  /* The scrub length. Long enough that the four beats each get room, short
+     enough that it never feels like the page has stopped working. */
+  height: 340vh;
+  border-top: 1px solid var(--u-line);
+}
+
+.stage {
+  --collapse: 0;
+  --swirl: 0deg;
+  --hole: 0;
+  --disc: 0;
+  --dive: 0;
+  --reveal: 0;
+  --field: 1;
+
+  position: sticky;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 50%, #101012 0%, #0a0a0a 62%);
+}
+
+/* ------------------------------------------------------------------ */
+/* Field                                                              */
+/* ------------------------------------------------------------------ */
+
+.field {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: var(--field);
+  /* The dive. Cubed in JS, so this multiplier is already accelerating; the
+     translate3d keeps the whole thing on its own layer. */
+  transform: translate3d(0, 0, 0) scale(calc(1 + var(--dive) * 26));
+  will-change: transform, opacity;
+}
+
+.svg {
+  display: block;
+  width: min(112vh, 106vw);
+  height: min(112vh, 106vw);
+  overflow: visible;
+}
+
+.stars {
+  fill: #fff;
+  /* The stars go first, as the field starts to wind up. */
+  opacity: calc(1 - var(--collapse) * 0.85);
+}
+
+/* The whole orbiting system, swirling under the scroll. */
+.system {
+  transform: rotate(var(--swirl));
+  transform-origin: 50% 50%;
+  opacity: calc(1 - var(--collapse) * var(--collapse));
+}
+
+.orbit {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.075);
+  stroke-width: 1;
+  /* Radius is an attribute, so the ring is collapsed with a scale instead —
+     which also keeps it on the compositor. */
+  transform: scale(calc(1 - var(--collapse) * 0.94));
+  transform-origin: 50% 50%;
+}
+
+/* Each body keeps its own orbital period, running on time regardless of scroll.
+   `--spin` staggers the starting bearings so the system never lines up. */
+.orbiter {
+  transform-origin: 50% 50%;
+  animation: revolve var(--period) linear infinite;
+}
+
+@keyframes revolve {
+  from {
+    transform: rotate(var(--spin));
+  }
+  to {
+    transform: rotate(calc(var(--spin) + 360deg));
+  }
+}
+
+/* The arm carries the body out to its orbit radius. Collapsing this one number
+   is what pulls the entire field into the centre. */
+.arm {
+  transform: translate(450px, 450px)
+    translateX(calc(var(--r0) * 1px * (1 - var(--collapse) * 0.97)));
+}
+
+.body {
+  fill: rgba(255, 255, 255, 0.86);
+}
+
+.bodyLive {
+  fill: var(--u-green);
+}
+
+.bodyForecast {
+  fill: var(--u-sky);
+}
+
+.bodyLabel {
+  fill: var(--u-ink-2);
+  font-family: var(--u-font-mono);
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  /* Labels are only legible while the field is open; they go early. */
+  opacity: calc(1 - var(--collapse) * 2.4);
+}
+
+/* ------------------------------------------------------------------ */
+/* Horizon                                                            */
+/* ------------------------------------------------------------------ */
+
+.hole {
+  transform-origin: 50% 50%;
+  opacity: var(--hole);
+}
+
+.halo {
+  transform: scale(calc(0.5 + var(--hole) * 0.6));
+  transform-origin: 50% 50%;
+  opacity: calc(var(--hole) * 0.9);
+}
+
+/* Tilted and squashed, then counter-rotated slowly — an accretion disc read
+   rather than a flat ring. */
+.disc {
+  transform: rotate(-18deg) scale(calc(0.4 + var(--disc) * 0.75));
+  transform-origin: 50% 50%;
+  opacity: var(--disc);
+}
+
+.core {
+  transform: scale(calc(0.24 + var(--hole) * 0.86));
+  transform-origin: 50% 50%;
+}
+
+/* The photon ring — the hard bright edge that makes the void read as a void. */
+.photon {
+  fill: none;
+  stroke: #fff;
+  stroke-width: calc(1.4px + var(--hole) * 1.6px);
+  transform: scale(calc(0.24 + var(--hole) * 0.86));
+  transform-origin: 50% 50%;
+  opacity: calc(var(--hole) * 0.95);
+}
+
+/* ------------------------------------------------------------------ */
+/* The other side                                                     */
+/* ------------------------------------------------------------------ */
+
+.closing {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+  padding: 0 var(--u-gutter);
+  text-align: center;
+  opacity: var(--reveal);
+  /* Arrives from slightly behind, as though it were already through. */
+  transform: translate3d(0, calc((1 - var(--reveal)) * 26px), 0)
+    scale(calc(0.965 + var(--reveal) * 0.035));
+  /* The statement is laid out from the start but invisible for most of the
+     scrub, so it must not be clickable — or focusable — until you are through.
+     The scroll handler adds `.through` once `--reveal` is actually up. */
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.through .closing {
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.title {
+  margin: 20px 0 0;
+  font-size: clamp(30px, 5.4vw, 66px);
+  font-weight: 600;
+  letter-spacing: -0.046em;
+  line-height: 1.04;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.titleMuted {
+  color: var(--u-ink-2);
+}
+
+.lead {
+  max-width: 54ch;
+  margin: clamp(18px, 2.2vw, 26px) auto 0;
+  font-size: clamp(14.5px, 1.2vw, 16.5px);
+  line-height: 1.68;
+  color: var(--u-ink-2);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: clamp(26px, 3vw, 38px);
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 22px;
+  border-radius: 999px;
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  text-decoration: none;
+  transition: gap 260ms var(--u-ease), opacity 220ms ease;
+}
+
+.primary:hover {
+  gap: 13px;
+  opacity: 0.88;
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  padding: 13px 20px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 999px;
+  color: var(--u-ink);
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.014em;
+  text-decoration: none;
+  transition: border-color 240ms ease, background 240ms ease;
+}
+
+.ghost:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ------------------------------------------------------------------ */
+/* Reduced motion                                                     */
+/* ------------------------------------------------------------------ */
+
+/* The scrub is switched off in the component, which pins the properties at the
+   composed final frame. All that is left is to stop the orbital loops and make
+   sure the statement — the only part that carries information — is visible
+   without depending on a scroll handler that no longer runs. */
+@media (prefers-reduced-motion: reduce) {
+  .section {
+    height: auto;
+  }
+
+  .closing {
+    pointer-events: auto;
+    visibility: visible;
+  }
+
+  .stage {
+    position: relative;
+    height: auto;
+    padding: clamp(80px, 12vw, 150px) 0;
+  }
+
+  .field {
+    display: none;
+  }
+
+  .orbiter {
+    animation: none;
+  }
+}

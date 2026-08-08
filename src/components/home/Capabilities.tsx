@@ -303,31 +303,59 @@ const ROWS = [
 /**
  * Which copy block currently owns the middle of the viewport.
  *
- * A band collapsed to roughly the centre line: whichever block crosses it wins.
- * That matches what a reader is actually looking at far better than "topmost
- * visible", which flips a beat too early on tall blocks.
+ * Whichever block's centre sits nearest the viewport's centre line wins. That
+ * is a total order over the blocks, so exactly one is ever active and the
+ * handover happens at the midpoint between two blocks — the panel swaps once,
+ * cleanly, at the moment the next argument takes the centre of the screen.
+ *
+ * This replaced an IntersectionObserver keyed on `intersectionRatio`. Against a
+ * thin band, four blocks a full viewport tall all report tiny, near-equal
+ * ratios, and whichever one happened to fire last won — so the panel flickered
+ * between two states around every boundary.
+ *
+ * The read is a `getBoundingClientRect` per block inside rAF, on a passive
+ * listener: four rects on a frame that is already scrolling costs nothing, and
+ * React is only touched when the winner actually changes.
  */
 function useActiveBlock(count: number) {
   const refs = useRef<(HTMLElement | null)[]>([]);
   const [active, setActive] = useState(0);
 
   useEffect(() => {
-    const nodes = refs.current.filter((node): node is HTMLElement => node !== null);
-    if (nodes.length === 0) return;
+    let frame = 0;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((entry) => entry.isIntersecting)
-          .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
-        if (!visible) return;
-        const index = nodes.indexOf(visible.target as HTMLElement);
-        if (index >= 0) setActive(index);
-      },
-      { rootMargin: '-46% 0px -46% 0px', threshold: [0, 0.1, 0.5, 1] },
-    );
-    nodes.forEach((node) => observer.observe(node));
-    return () => observer.disconnect();
+    const measure = () => {
+      frame = 0;
+      const middle = window.innerHeight / 2;
+      let winner = 0;
+      let shortest = Infinity;
+
+      refs.current.forEach((node, index) => {
+        if (!node) return;
+        const rect = node.getBoundingClientRect();
+        const distance = Math.abs(rect.top + rect.height / 2 - middle);
+        if (distance < shortest) {
+          shortest = distance;
+          winner = index;
+        }
+      });
+
+      setActive((previous) => (previous === winner ? previous : winner));
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('resize', onScroll);
+    };
   }, [count]);
 
   return { refs, active };
