@@ -10,7 +10,7 @@ import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
 import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH, UNLINKED_BOX_WIDTH } from './MappableBox';
-import { createRavDefaultLayout, hasDefaultLayout } from './ravDefaultLayout';
+import { createTemplateDefaultLayout, hasDefaultLayout } from './templateDefaultLayouts';
 
 export type Anchor = { rx: number; ry: number };
 
@@ -61,9 +61,9 @@ type TrailBoardProps = {
   live?: LiveState;
   machineRect: Rect | null;
   machineId: string;
-  // Machines whose template ships a default layout (currently the Rotary
-  // Airlock Valve) get it auto-applied when opened with nothing saved, and a
-  // "⟲ Template" toolbar button to re-apply it on demand.
+  // Machines whose template ships a default layout (Rotary Airlock Valve,
+  // Single Screw Extruder) get it auto-applied when opened with nothing saved,
+  // and a "⟲ Template" toolbar button to re-apply it on demand.
   machineTemplate: string;
   // Positions/scales the board layer exactly like the machine's stage container,
   // so trail/box coordinates (stored in stage units) line up with the machine on
@@ -334,7 +334,7 @@ export function TrailBoard({
     // Generate against the machine's *current* rect (it shrinks/grows with
     // zoom) — endpoints and bends land exactly on the artwork as rendered
     // right now, not where it would sit at 100%.
-    const layout = templateLayout ?? createRavDefaultLayout(pickableChannels, machineRect);
+    const layout = templateLayout ?? createTemplateDefaultLayout(machineTemplate, pickableChannels, machineRect);
     trailsRef.current = layout.trails;
     boxesRef.current = layout.boxes;
     setTrails(layout.trails);

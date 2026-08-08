@@ -7,6 +7,7 @@ export const MACHINE_TEMPLATES = [
   'Compressor',
   'Turbine',
   'Rotary Airlock Valve',
+  'Single Screw Extruder',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -56,10 +57,13 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
   Compressor: [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Compressor' }],
   Turbine: [{ type: 'Custom Component', label: 'Turbine' }, { type: 'Coupling' }, { type: 'Compressor' }],
   'Rotary Airlock Valve': [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Custom Component', label: 'Rotor' }],
+  'Single Screw Extruder': [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Gearbox' }, { type: 'Custom Component', label: 'Screw and Barrel' }],
   'Custom Machine': [],
 };
 
-const RAV_ANALYSIS_COMPONENTS: { type: ComponentType; label: string; points: PointDef[] }[] = [
+type AnalysisComponentDef = { type: ComponentType; label: string; points: PointDef[] };
+
+const RAV_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   {
     type: 'Motor',
     label: 'Drive',
@@ -89,8 +93,55 @@ const RAV_ANALYSIS_COMPONENTS: { type: ComponentType; label: string; points: Poi
   },
 ];
 
+// Single Screw Extruder — the point set the canvas template wires up, in the
+// same order the default layout drops its cards (drive side first, then the
+// barrel/die process points).
+const EXTRUDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
+  {
+    type: 'Motor',
+    label: 'Drive',
+    points: [
+      { label: 'Motor Current', kind: 'Current' },
+      { label: 'Screw Speed', kind: 'Speed' },
+    ],
+  },
+  {
+    type: 'Bearing',
+    label: 'Bearings',
+    points: [
+      { label: 'Motor DE Vibration Acceleration RMS', kind: 'Vibration' },
+      { label: 'Motor NDE Vibration Acceleration RMS', kind: 'Vibration' },
+      { label: 'Thrust Bearing Temperature', kind: 'Temperature' },
+    ],
+  },
+  {
+    type: 'Gearbox',
+    label: 'Gear Box',
+    points: [{ label: 'Gearbox Oil Temperature', kind: 'Temperature' }],
+  },
+  {
+    type: 'Custom Component',
+    label: 'Screw and Barrel',
+    points: [
+      { label: 'Feed Throat Temperature', kind: 'Temperature' },
+      { label: 'Barrel Zone Temperature', kind: 'Temperature' },
+      { label: 'Melt Temperature', kind: 'Temperature' },
+      { label: 'Melt Pressure', kind: 'Pressure' },
+      { label: 'Die Head Pressure', kind: 'Pressure' },
+    ],
+  },
+];
+
+// Templates whose canvas artwork ships a hand-tuned point set; everything else
+// falls back to the generic per-component point labels below.
+const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
+  'Rotary Airlock Valve': RAV_ANALYSIS_COMPONENTS,
+  'Single Screw Extruder': EXTRUDER_ANALYSIS_COMPONENTS,
+};
+
 export function expectedPointsForTemplate(template: MachineTemplate): number {
-  if (template === 'Rotary Airlock Valve') return RAV_ANALYSIS_COMPONENTS.reduce((sum, component) => sum + component.points.length, 0);
+  const analysisComponents = ANALYSIS_COMPONENTS[template];
+  if (analysisComponents) return analysisComponents.reduce((sum, component) => sum + component.points.length, 0);
   return TEMPLATE_COMPONENTS[template].reduce((sum, component) => sum + pointLabels(component.type).length, 0);
 }
 
@@ -143,8 +194,9 @@ function pointLabels(type: ComponentType): PointDef[] {
 }
 
 export function componentsForTemplate(template: MachineTemplate, makeId: () => string): MachineComponent[] {
-  if (template === 'Rotary Airlock Valve') {
-    return RAV_ANALYSIS_COMPONENTS.map((component) => ({
+  const analysisComponents = ANALYSIS_COMPONENTS[template];
+  if (analysisComponents) {
+    return analysisComponents.map((component) => ({
       id: makeId(),
       type: component.type,
       label: component.label,

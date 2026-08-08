@@ -32,12 +32,14 @@ export function createSeedData(makeId: () => string): {
   const areaSouth: FolderNode = { id: 'seed-folder-south', projectId: plantSouth.id, name: 'Area 1', type: 'Area', code: '', description: '', parentId: null };
 
   const ravComponents = markLive(componentsForTemplate('Rotary Airlock Valve', makeId), 'DE Bearing Temperature');
+  const extruderComponents = markLive(componentsForTemplate('Single Screw Extruder', makeId), 'Melt Pressure');
   const pumpComponents = markLive(componentsForTemplate('Centrifugal Pump', makeId), 'Bearing Temperature');
   const fanComponents = markLive(componentsForTemplate('Fan', makeId));
   const compressorComponents = markLive(componentsForTemplate('Compressor', makeId), 'Discharge Pressure');
 
   const machines: MachineNode[] = [
     { id: 'seed-machine-rav', projectId: plantNorth.id, folderId: areaNorth.id, name: 'RAV-01', template: 'Rotary Airlock Valve', components: ravComponents },
+    { id: 'seed-machine-ext', projectId: plantNorth.id, folderId: areaNorth.id, name: 'EXT-01', template: 'Single Screw Extruder', components: extruderComponents },
     { id: 'seed-machine-pump', projectId: plantNorth.id, folderId: areaNorth.id, name: 'PUMP-01', template: 'Centrifugal Pump', components: pumpComponents },
     { id: 'seed-machine-fan', projectId: plantSouth.id, folderId: areaSouth.id, name: 'FAN-01', template: 'Fan', components: fanComponents },
     { id: 'seed-machine-comp', projectId: plantSouth.id, folderId: areaSouth.id, name: 'COMP-01', template: 'Compressor', components: compressorComponents },

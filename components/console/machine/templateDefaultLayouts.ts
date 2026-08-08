@@ -11,6 +11,8 @@ const REFERENCE_CANVAS_H = 820;
 const REFERENCE_STAGE_SCALE = Math.min(STAGE_W / REFERENCE_CANVAS_W, STAGE_H / REFERENCE_CANVAS_H);
 const REFERENCE_STAGE_X = (STAGE_W - REFERENCE_CANVAS_W * REFERENCE_STAGE_SCALE) / 2;
 const REFERENCE_STAGE_Y = (STAGE_H - REFERENCE_CANVAS_H * REFERENCE_STAGE_SCALE) / 2;
+// Both machine artworks share one 1200×760 viewBox, so anchors below are read
+// straight off the SVG drawing and converted to fractions of the machine rect.
 const SVG_W = 1200;
 const SVG_H = 760;
 const BOX_CONNECTOR_GAP = 8;
@@ -28,7 +30,7 @@ type TemplatePoint = {
   bend?: ReferencePoint;
 };
 
-const TEMPLATE_POINTS: TemplatePoint[] = [
+const RAV_TEMPLATE_POINTS: TemplatePoint[] = [
   { code: 'C1', label: 'Motor Current', side: 'left', anchor: { x: 405, y: 218 }, boxEnd: { x: 255, y: 79 }, bend: { x: 415, y: 79 } },
   { code: 'S1', label: 'Rotor Speed', side: 'left', anchor: { x: 126, y: 357 }, boxEnd: { x: 255, y: 184 }, bend: { x: 355, y: 184 } },
   { code: 'P1', label: 'Inlet Pressure', side: 'left', anchor: { x: 126, y: 403 }, boxEnd: { x: 255, y: 289 }, bend: { x: 355, y: 289 } },
@@ -39,6 +41,30 @@ const TEMPLATE_POINTS: TemplatePoint[] = [
   { code: 'T1', label: 'DE Bearing Temperature', side: 'right', anchor: { x: 720, y: 432 }, boxEnd: { x: 1185, y: 289 }, bend: { x: 1045, y: 289 } },
   { code: 'T2', label: 'NDE Bearing Temperature', side: 'right', anchor: { x: 700, y: 522 }, boxEnd: { x: 1185, y: 394 }, bend: { x: 1040, y: 394 } },
 ];
+
+/**
+ * Single Screw Extruder — anchors follow the drive train left to right:
+ * motor → coupling → gear box → thrust end → barrel zones → die.
+ * Left column carries the drive-side points, right column the process points.
+ */
+const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = [
+  { code: 'T2', label: 'Thrust Bearing Temperature', side: 'left', anchor: { x: 392, y: 340 }, boxEnd: { x: 255, y: 79 }, bend: { x: 420, y: 79 } },
+  { code: 'C1', label: 'Motor Current', side: 'left', anchor: { x: 110, y: 468 }, boxEnd: { x: 255, y: 184 }, bend: { x: 330, y: 184 } },
+  { code: 'S1', label: 'Screw Speed', side: 'left', anchor: { x: 241, y: 494 }, boxEnd: { x: 255, y: 289 }, bend: { x: 430, y: 289 } },
+  { code: 'V2', label: 'Motor NDE Vibration Acceleration RMS', side: 'left', anchor: { x: 62, y: 520 }, boxEnd: { x: 255, y: 394 }, bend: { x: 300, y: 394 } },
+  { code: 'V1', label: 'Motor DE Vibration Acceleration RMS', side: 'left', anchor: { x: 198, y: 520 }, boxEnd: { x: 255, y: 499 }, bend: { x: 370, y: 499 } },
+  { code: 'T1', label: 'Gearbox Oil Temperature', side: 'left', anchor: { x: 262, y: 560 }, boxEnd: { x: 255, y: 604 }, bend: { x: 400, y: 604 } },
+  { code: 'T3', label: 'Feed Throat Temperature', side: 'right', anchor: { x: 540, y: 300 }, boxEnd: { x: 1185, y: 79 }, bend: { x: 1060, y: 79 } },
+  { code: 'T4', label: 'Barrel Zone Temperature', side: 'right', anchor: { x: 705, y: 330 }, boxEnd: { x: 1185, y: 184 }, bend: { x: 1105, y: 184 } },
+  { code: 'T5', label: 'Melt Temperature', side: 'right', anchor: { x: 1006, y: 340 }, boxEnd: { x: 1185, y: 289 }, bend: { x: 1160, y: 289 } },
+  { code: 'P2', label: 'Die Head Pressure', side: 'right', anchor: { x: 1084, y: 364 }, boxEnd: { x: 1185, y: 394 }, bend: { x: 1178, y: 394 } },
+  { code: 'P1', label: 'Melt Pressure', side: 'right', anchor: { x: 1006, y: 420 }, boxEnd: { x: 1185, y: 499 }, bend: { x: 1105, y: 499 } },
+];
+
+const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
+  'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
+  'Single Screw Extruder': EXTRUDER_TEMPLATE_POINTS,
+};
 
 function makeId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
@@ -91,10 +117,17 @@ function boxAnchorFor(box: Box, point: ReferencePoint): Anchor {
 }
 
 export function hasDefaultLayout(machineTemplate: string) {
-  return machineTemplate === 'Rotary Airlock Valve';
+  return machineTemplate in TEMPLATE_POINTS_BY_TEMPLATE;
 }
 
-export function createRavDefaultLayout(_channels: ChannelRef[], machineRect?: MachineRect | null): SavedLayout {
+export function createTemplateDefaultLayout(
+  machineTemplate: string,
+  _channels: ChannelRef[],
+  machineRect?: MachineRect | null,
+): SavedLayout {
+  const templatePoints = TEMPLATE_POINTS_BY_TEMPLATE[machineTemplate];
+  if (!templatePoints) return { trails: [], boxes: [] };
+
   const rect = machineRect ?? REFERENCE_MACHINE_RECT;
   const svgToStage = (sx: number, sy: number) => ({
     x: rect.x + (sx / SVG_W) * rect.width,
@@ -104,7 +137,7 @@ export function createRavDefaultLayout(_channels: ChannelRef[], machineRect?: Ma
   const trails: Trail[] = [];
   const boxes: Box[] = [];
 
-  for (const templatePoint of TEMPLATE_POINTS) {
+  for (const templatePoint of templatePoints) {
     const referenceBoxEnd = stageFromReference(templatePoint.boxEnd);
     const box = boxFromEndpoint(referenceBoxEnd, templatePoint.side, templatePoint.label);
     const boxEnd = boxEndpoint(box, templatePoint.side);
