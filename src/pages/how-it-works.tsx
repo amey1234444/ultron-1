@@ -10,6 +10,7 @@
 
 import Head from 'next/head';
 
+import BuildOn from '../components/home/BuildOn';
 import Coverage from '../components/howitworks/Coverage';
 import Pipeline from '../components/home/Pipeline';
 import Rules from '../components/home/Rules';
@@ -55,6 +56,14 @@ export default function HowItWorksPage() {
 
         {/* The unbroken coverage record. Owns `#always-on`. */}
         <Coverage />
+
+        {/* The three interfaces the same data is available over. This was on the
+            landing page, where it was the only section asking the reader to
+            think about wire protocols — a question nobody has yet at that point.
+            Here it is the last thing on the page, and by now it is the obvious
+            one: you have just been shown how a reading is made, so the natural
+            next question is how you get at it yourself. */}
+        <BuildOn />
 
         <SiteFooter />
       </div>

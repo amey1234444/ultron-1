@@ -30,6 +30,13 @@ body {
   --u-panel: #121213;
   --u-panel-raised: #191919;
 
+  /* Band surfaces. The landing page alternates between these so consecutive
+     sections read as separate plates laid on each other rather than as one
+     unbroken black scroll. The step is small on purpose — large enough to see
+     the seam, small enough that no band ever reads as "a grey box". */
+  --u-band-0: #0a0a0a;
+  --u-band-1: #101011;
+
   /* Hairlines. Borders on this palette have to be barely-there; anything
      stronger than 0.14 alpha starts to look like a wireframe. */
   --u-line: rgba(255, 255, 255, 0.07);

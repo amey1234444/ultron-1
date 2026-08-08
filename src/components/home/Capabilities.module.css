@@ -9,7 +9,12 @@
   padding: clamp(84px, 11vw, 148px) var(--u-gutter) clamp(60px, 8vw, 110px);
   border-top: 1px solid var(--u-line);
   scroll-margin-top: 76px;
+  /* Lifted off the page black. This is the longest section on the site and the
+     one you spend the most time inside, so it gets its own plate rather than
+     dissolving into the section above and below it. */
+  background: var(--u-band-1);
 }
+
 
 .inner {
   position: relative;
@@ -18,15 +23,40 @@
 }
 
 .layout {
+  --layout-gap: clamp(32px, 6vw, 88px);
+
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
-  gap: clamp(32px, 6vw, 88px);
+  gap: var(--layout-gap);
   margin-top: clamp(40px, 5vw, 72px);
   /* `align-items` is deliberately left at `stretch`. A sticky element can only
      travel inside its own containing block, so the panel column has to be as
      tall as the copy column beside it — with `start` it collapses to the height
      of one panel and the pin releases after half a viewport, which reads as the
      panel simply scrolling away instead of holding while the argument passes. */
+}
+
+/* The seam between the argument and its evidence, drawn.
+   Not decoration: it lands in the middle of the grid gap, so it marks the exact
+   boundary the layout is built on. The 0.43 is the first column's share of the
+   track space — 0.86 of the 2fr total — which is why the line stays on the
+   boundary at every width instead of drifting off it. */
+.layout::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: calc((100% - var(--layout-gap)) * 0.43 + var(--layout-gap) / 2);
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--u-rule-strong) 10%,
+    var(--u-rule-strong) 90%,
+    transparent
+  );
+  pointer-events: none;
 }
 
 /* ------------------------------------------------------------------ */
@@ -642,6 +672,11 @@
      would cover the copy it belongs to. Panels move inline instead. */
   .layout {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* One column has no seam to mark. */
+  .layout::before {
+    display: none;
   }
 
   .panelCol {

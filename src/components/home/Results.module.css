@@ -5,6 +5,10 @@
   padding: clamp(84px, 11vw, 148px) var(--u-gutter);
   border-top: 1px solid var(--u-line);
   scroll-margin-top: 76px;
+  /* The second lifted plate. It sits directly under the light case-study band,
+     so coming out of that inversion the page steps down to grey before it
+     returns to black for the closer — black, light, grey, black. */
+  background: var(--u-band-1);
 }
 
 .inner {

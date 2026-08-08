@@ -25,11 +25,37 @@
   overflow: hidden;
   isolation: isolate;
   color: var(--u-ink);
-  /* Opaque, and stated twice: the page's fixed rules must not read through the
-     fold. */
-  background-color: #090909;
-  background-image: radial-gradient(120% 90% at 50% 8%, #131313 0%, #090909 55%);
+  /* Flat, and deliberately so. This used to carry a radial wash that lifted the
+     middle of the fold to #131313 — which put a soft grey cloud directly behind
+     the headline and read as a smudge on the glass rather than as depth. The
+     reference does the opposite: a dead-flat black field, and every bit of light
+     in the frame comes from the limb of the horizon. Nothing competes with it. */
+  background-color: #080808;
   font-family: var(--u-font-sans);
+}
+
+/* The column architecture, carried through the fold.
+   The page's own fixed rules stop at the hero because the hero paints over
+   them; drawing them here instead means the fold gets the same structure at a
+   tighter pitch, which is what stops a flat black field from reading as empty.
+   A repeating gradient rather than elements — one paint, no DOM. */
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--u-rule) 0 1px,
+    transparent 1px var(--hero-rule-pitch, 92px)
+  );
+  /* Anchored to the centre so the middle rule lands on the page axis the title
+     is centred on. */
+  background-position: 50% 0;
+  /* Out before the horizon, so the lines never cross the limb. */
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 14%, #000 52%, transparent 74%);
+  mask-image: linear-gradient(180deg, transparent, #000 14%, #000 52%, transparent 74%);
+  pointer-events: none;
 }
 
 /* ------------------------------------------------------------------ */
@@ -55,9 +81,10 @@
   letter-spacing: -0.052em;
   line-height: 0.92;
   color: #ffffff;
-  /* A faint bloom off the letterforms. At this size pure white on near-black
-     reads slightly grey without it. */
-  text-shadow: 0 0 60px rgba(255, 255, 255, 0.16);
+  /* No text-shadow. A 60px white bloom off letterforms this large does not read
+     as a bloom — it reads as a grey halo baked into the background behind the
+     words. Pure white on a flat black field is already the brightest thing on
+     the page and needs no help. */
 }
 
 .titleLine {

@@ -1,0 +1,195 @@
+/* The closing signal band.
+
+   Flat, centred, and mostly empty. The only structure is the tick field and the
+   axis it balances on. */
+
+.section {
+  position: relative;
+  padding: clamp(96px, 13vw, 172px) var(--u-gutter) clamp(88px, 11vw, 148px);
+  border-top: 1px solid var(--u-line);
+  /* The darkest surface on the page after the hero. The band is the last thing
+     before the footer, and dropping the floor here is what makes the three white
+     ticks the brightest marks in the lower half of the page. */
+  background: var(--u-bg);
+}
+
+.inner {
+  position: relative;
+  max-width: 900px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.title {
+  margin: 18px 0 0;
+  font-size: clamp(30px, 5vw, 62px);
+  font-weight: 600;
+  letter-spacing: -0.046em;
+  line-height: 1.04;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.titleMuted {
+  color: var(--u-ink-2);
+}
+
+.lead {
+  max-width: 52ch;
+  margin: clamp(18px, 2.2vw, 26px) auto 0;
+  font-size: clamp(14.5px, 1.2vw, 16.5px);
+  line-height: 1.68;
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* The field                                                          */
+/* ------------------------------------------------------------------ */
+
+.band {
+  position: relative;
+  height: clamp(120px, 15vw, 190px);
+  margin: clamp(46px, 6vw, 78px) auto 0;
+  /* Narrower than the copy measure. A tick field that runs the full width stops
+     reading as an object and starts reading as a border. */
+  max-width: 760px;
+}
+
+.bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.bar {
+  width: 1px;
+  height: var(--h);
+  background: var(--u-rule-strong);
+  /* Grows up off the baseline. */
+  transform: scaleY(0);
+  transform-origin: 50% 100%;
+  transition: transform 620ms var(--u-ease);
+  transition-delay: var(--delay);
+}
+
+/* The three that matter. Brighter, and given a little bloom — this is the one
+   place in the section where anything glows, which is what buys it the
+   attention. */
+.barSignal {
+  width: 1.5px;
+  background: #fff;
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.34);
+}
+
+.bandShown .bar {
+  transform: scaleY(1);
+}
+
+/* The measurement baseline the whole field stands on. */
+.baseline {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--u-line-strong) 22%, var(--u-line-strong) 78%, transparent);
+}
+
+/* The page axis, made visible where the field crosses it. Runs *below* the
+   baseline so it never draws over the centre signal. */
+.axis {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  width: 1px;
+  height: 18px;
+  background: linear-gradient(180deg, var(--u-line-strong), transparent);
+}
+
+/* ------------------------------------------------------------------ */
+/* Actions                                                            */
+/* ------------------------------------------------------------------ */
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: clamp(44px, 5.5vw, 72px);
+}
+
+.primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 13px 22px;
+  border-radius: 999px;
+  background: #fff;
+  color: #0a0a0a;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: -0.014em;
+  text-decoration: none;
+  transition: gap 260ms var(--u-ease), opacity 220ms ease;
+}
+
+.primary:hover {
+  gap: 13px;
+  opacity: 0.88;
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  padding: 13px 20px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 999px;
+  color: var(--u-ink);
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.014em;
+  text-decoration: none;
+  transition: border-color 240ms ease, background 240ms ease;
+}
+
+.ghost:hover {
+  border-color: rgba(255, 255, 255, 0.32);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive / reduced motion                                        */
+/* ------------------------------------------------------------------ */
+
+/* At narrow widths 81 ticks in a 320px box is hatching, not a field. Thinning
+   to every other tick keeps the density readable and keeps the symmetry, since
+   the centre tick has an even index. */
+@media (max-width: 720px) {
+  .band {
+    height: 110px;
+  }
+
+  /* Keeps the odd positions — which are the even 0-based indices, so the centre
+     tick at index 40 survives and the mirror holds. */
+  .bars > .bar:nth-child(even) {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bar {
+    transform: none;
+    transition: none;
+  }
+}
