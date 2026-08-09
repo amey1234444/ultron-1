@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Image, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
@@ -545,76 +545,97 @@ function inflections(values: number[], count = 2): number[] {
   return chosen;
 }
 
+/** Gauge rail for the health axis: the bands the score is judged against. */
+function healthRail(palette: ConsolePalette): GaugeBand[] {
+  return [
+    { from: 0, to: 0.5, color: palette.critical },
+    { from: 0.5, to: 0.7, color: palette.warning },
+    { from: 0.7, to: 1, color: palette.accent },
+  ];
+}
+
+/** Gauge rail for open alarms: few is good, many is not. */
+function alarmRail(palette: ConsolePalette): GaugeBand[] {
+  return [
+    { from: 0, to: 0.35, color: palette.accent },
+    { from: 0.35, to: 0.65, color: palette.warning },
+    { from: 0.65, to: 1, color: palette.critical },
+  ];
+}
+
+/** A gauge rail segment: `from`/`to` are fractions of the axis, low to high. */
+type GaugeBand = { from: number; to: number; color: string };
+
+/** A sparsely sampled reading, plotted as a dot against the right axis. */
+type TrendEvent = { at: number; value: number; pending?: boolean };
+
 /**
- * The plant's trend line, drawn the way a control room reads one.
+ * The plant trend, drawn the way a control room reads one.
  *
- * Everything on it is a question an operator asks of a trend: where is the
- * limit (the dashed threshold), how bad has it been (the dotted extremes), when
- * did the behaviour change (the dotted turns), and where is it heading if
- * nothing changes (the projection past NOW). The projection is a least-squares
- * fit of the recent window widened by the series' own deviation — it is
- * arithmetic on the data in front of you, not a model, and it is drawn dashed
- * and labelled so it is never mistaken for a reading.
+ * Two axes, each with a colour rail beside it showing the bands that axis is
+ * judged against, so a line's position can be read as good or bad without
+ * consulting a legend. A dense measured series on the left axis; sparse lab-style
+ * readings as dots on the right. The NOW rule separates measured from projected
+ * — everything left of it happened, everything right of it is arithmetic on the
+ * recent window, drawn in a different colour so the two are never confused.
  */
 function TrendChart({
   primary,
-  secondary,
+  events,
   height = 200,
+  primaryMin = 0,
   primaryMax = 100,
-  bands,
-  threshold,
-  thresholdLabel = 'Alarm threshold',
+  secondMin = 0,
+  secondMax = 4,
+  leftBands,
+  rightBands,
+  timeLabels,
   project = false,
   color = SERIES_A,
 }: {
   primary: number[];
-  secondary?: number[];
+  events?: TrendEvent[];
   height?: number;
+  primaryMin?: number;
   primaryMax?: number;
-  bands?: { from: number; to: number; color: string }[];
-  threshold?: number;
-  thresholdLabel?: string;
+  secondMin?: number;
+  secondMax?: number;
+  leftBands?: GaugeBand[];
+  rightBands?: GaugeBand[];
+  timeLabels?: string[];
   project?: boolean;
   color?: string;
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
+  const smooth = useSmoothSeries(primary);
 
-  // Eased here rather than by the caller: only this subtree repaints per frame.
-  const smoothPrimary = useSmoothSeries(primary);
-  const smoothSecondary = useSmoothSeries(secondary ?? EMPTY_SERIES);
-
-  const width = 720;
-  const padL = 46;
-  const padR = project ? 178 : secondary ? 46 : 22;
-  const padT = 16;
-  const padB = 26;
+  const width = 1000;
+  const padL = 58;
+  const padR = 58;
+  const padT = 14;
+  const padB = 30;
   const plotW = width - padL - padR;
   const plotH = height - padT - padB;
 
-  const series = smoothPrimary.length > 1 ? smoothPrimary : [smoothPrimary[0] ?? 0, smoothPrimary[0] ?? 0];
-  const max = Math.max(primaryMax, ...series, threshold ?? 0) * 1.06;
-  const xFor = (index: number, length: number) => padL + (index / Math.max(1, length - 1)) * plotW;
-  const yFor = (value: number, scale: number) => padT + plotH - (value / scale) * plotH;
+  const series = smooth.length > 1 ? smooth : [smooth[0] ?? 0, smooth[0] ?? 0];
+  // The measured window occupies the left portion; the projection continues into
+  // the remainder, so NOW always sits at the same place on the frame.
+  const nowRatio = project ? 0.74 : 1;
+  const nowX = padL + plotW * nowRatio;
 
-  const points = series.map((value, index) => ({ x: xFor(index, series.length), y: yFor(value, max) }));
-  const last = points[points.length - 1];
+  const lo = primaryMin;
+  const hi = Math.max(primaryMax, ...series);
+  const yFor = (value: number) => padT + plotH - ((value - lo) / Math.max(1, hi - lo)) * plotH;
+  const xFor = (index: number, count: number) => padL + (index / Math.max(1, count - 1)) * (plotW * nowRatio);
 
-  const lo = Math.min(...series);
-  const hi = Math.max(...series);
-  const turns = inflections(series);
+  const points = series.map((value, index) => ({ x: xFor(index, series.length), y: yFor(value) }));
+  const line = points.map((point) => `${point.x},${point.y}`).join(' ');
 
-  const secondMax = smoothSecondary.length > 0 ? Math.max(1, ...smoothSecondary) * 1.06 : 1;
-  const secondPoints =
-    smoothSecondary.length > 1
-      ? smoothSecondary.map((value, index) => ({ x: xFor(index, smoothSecondary.length), y: yFor(value, secondMax) }))
-      : [];
-
-  // Least-squares slope over the recent window, widened by the deviation of the
-  // same window, extrapolated across the projection gutter.
-  let projection: { mid: string; hiPath: string; loPath: string } | null = null;
-  if (project && last && series.length >= 4) {
-    const window = series.slice(-Math.min(8, series.length));
+  // Projection: least-squares slope over the recent window, continued past NOW.
+  let projected = '';
+  if (project && series.length >= 4) {
+    const window = series.slice(-Math.min(10, series.length));
     const n = window.length;
     const meanX = (n - 1) / 2;
     const meanY = mean(window);
@@ -625,124 +646,102 @@ function TrendChart({
       den += (index - meanX) ** 2;
     });
     const slope = den === 0 ? 0 : num / den;
-    const spreadOut = stddev(window);
-    const stepX = plotW / Math.max(1, series.length - 1);
-    const steps = Math.max(2, Math.round((padR - 24) / stepX));
-    const build = (widen: number) => {
-      const projected: Point[] = [{ x: last.x, y: last.y }];
-      for (let step = 1; step <= steps; step += 1) {
-        const value = clamp(series[series.length - 1] + slope * step + widen * spreadOut * (step / steps), 0, max);
-        projected.push({ x: last.x + step * stepX, y: yFor(value, max) });
-      }
-      return splinePath(projected);
-    };
-    projection = { mid: build(0), hiPath: build(1.1), loPath: build(-1.1) };
+    const step = (plotW * (1 - nowRatio)) / 12;
+    const last = series[series.length - 1];
+    const tail: string[] = [`${nowX},${yFor(last)}`];
+    for (let i = 1; i <= 12; i += 1) {
+      // Damped, so a steep recent slope does not imply the plant keeps that up.
+      const value = clamp(last + slope * i * 0.55, lo, hi);
+      tail.push(`${nowX + i * step},${yFor(value)}`);
+    }
+    projected = tail.join(' ');
   }
 
-  const thresholdY = threshold !== undefined ? yFor(threshold, max) : null;
+  const rightFor = (value: number) => padT + plotH - ((value - secondMin) / Math.max(1, secondMax - secondMin)) * plotH;
+  const gridRatios = [0, 0.25, 0.5, 0.75, 1];
 
   return (
     <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-      {/* The plot frame. A chart floating on the panel has no edges to read
-          values against; a closed box gives every line a place to sit. */}
-      <Rect x={padL} y={padT} width={plotW + (project ? padR - 24 : 0)} height={plotH} fill="none" stroke={palette.line} strokeWidth={1} />
+      {/* Plot frame */}
+      <Rect x={padL} y={padT} width={plotW} height={plotH} fill="none" stroke={palette.line} strokeWidth={1} />
 
-      {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+      {/* Horizontal grid + left scale */}
+      {gridRatios.map((ratio) => {
         const y = padT + plotH - ratio * plotH;
         return (
-          <G key={ratio}>
-            <Line x1={padL} x2={padL + plotW + (project ? padR - 24 : 0)} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} />
-            <SvgText x={padL - 16} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
-              {Math.round(ratio * max)}
+          <G key={`h-${ratio}`}>
+            <Line x1={padL} x2={padL + plotW} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <SvgText x={padL - 20} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
+              {Math.round(lo + ratio * (hi - lo))}
+            </SvgText>
+            <SvgText x={padL + plotW + 20} y={y + 3} fontSize={9} fill={palette.inkFaint}>
+              {(secondMin + ratio * (secondMax - secondMin)).toFixed(1)}
             </SvgText>
           </G>
         );
       })}
 
-      {/* Threshold gauge for the primary axis: the same red/amber/green banding
-          the score is judged by, drawn against the scale it applies to. */}
-      {bands?.map((band) => (
+      {/* Faint vertical grid on the time ticks */}
+      {(timeLabels ?? []).map((label, index, all) => {
+        const x = padL + (index / Math.max(1, all.length - 1)) * plotW;
+        return (
+          <G key={`v-${label}-${index}`}>
+            <Line x1={x} y1={padT} x2={x} y2={padT + plotH} stroke={palette.grid} strokeWidth={1} opacity={0.55} />
+            <SvgText x={x} y={height - 10} fontSize={8.5} fill={palette.inkFaint} textAnchor="middle">
+              {label}
+            </SvgText>
+          </G>
+        );
+      })}
+
+      {/* Colour rails: the bands each axis is judged against, drawn against the
+          scale they apply to. */}
+      {leftBands?.map((band) => (
         <Rect
-          key={`${band.from}-${band.color}`}
-          x={padL - 10}
+          key={`lb-${band.from}-${band.color}`}
+          x={padL - 12}
           y={padT + plotH - band.to * plotH}
-          width={4}
-          height={(band.to - band.from) * plotH}
-          rx={2}
+          width={5}
+          height={Math.max(1, (band.to - band.from) * plotH)}
           fill={band.color}
-          opacity={0.85}
+        />
+      ))}
+      {rightBands?.map((band) => (
+        <Rect
+          key={`rb-${band.from}-${band.color}`}
+          x={padL + plotW + 7}
+          y={padT + plotH - band.to * plotH}
+          width={5}
+          height={Math.max(1, (band.to - band.from) * plotH)}
+          fill={band.color}
         />
       ))}
 
-      {/* Extremes of the window, so the line has a floor and a ceiling to be
-          read against rather than just a shape. */}
-      {hi > lo && (
-        <G>
-          <Line x1={padL} x2={padL + plotW} y1={yFor(hi, max)} y2={yFor(hi, max)} stroke={palette.inkFaint} strokeWidth={1} strokeDasharray="2 4" opacity={0.55} />
-          <SvgText x={padL + plotW - 5} y={yFor(hi, max) - 5} fontSize={8} fill={palette.inkFaint} textAnchor="end">
-            {`PEAK ${Math.round(hi)}`}
-          </SvgText>
-          <Line x1={padL} x2={padL + plotW} y1={yFor(lo, max)} y2={yFor(lo, max)} stroke={palette.inkFaint} strokeWidth={1} strokeDasharray="2 4" opacity={0.55} />
-          <SvgText x={padL + plotW - 5} y={yFor(lo, max) + 11} fontSize={8} fill={palette.inkFaint} textAnchor="end">
-            {`LOW ${Math.round(lo)}`}
-          </SvgText>
-        </G>
-      )}
+      {/* Measured */}
+      <Polyline points={line} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
 
-      {thresholdY !== null && (
-        <G>
-          <Line x1={padL} x2={padL + plotW + (project ? padR - 24 : 0)} y1={thresholdY} y2={thresholdY} stroke={palette.critical} strokeWidth={1} strokeDasharray="6 4" opacity={0.8} />
-          <SvgText x={padL + 6} y={thresholdY - 6} fontSize={8} fill={palette.critical} letterSpacing="1.4">
-            {thresholdLabel.toUpperCase()}
-          </SvgText>
-        </G>
-      )}
+      {/* Projected */}
+      {projected ? (
+        <Polyline points={projected} fill="none" stroke={SERIES_B} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+      ) : null}
 
-      {/* Where the behaviour changed. */}
-      {turns.map((index) => (
-        <G key={`turn-${index}`}>
-          <Line
-            x1={points[index].x}
-            x2={points[index].x}
-            y1={padT}
-            y2={padT + plotH}
-            stroke={palette.inkFaint}
-            strokeWidth={1}
-            strokeDasharray="2 4"
-            opacity={0.7}
-          />
-          <Circle cx={points[index].x} cy={points[index].y} r={2.5} fill={palette.ink} />
-        </G>
+      {/* NOW */}
+      {project ? (
+        <Line x1={nowX} y1={padT} x2={nowX} y2={padT + plotH} stroke={palette.accent} strokeWidth={1.5} />
+      ) : null}
+
+      {/* Sparse readings on the right axis. Pending ones are hollow grey — they
+          are scheduled, not measured, and must not read as data. */}
+      {(events ?? []).map((event, index) => (
+        <Circle
+          key={`ev-${index}`}
+          cx={padL + event.at * plotW}
+          cy={rightFor(event.value)}
+          r={3.5}
+          fill={event.pending ? palette.neutral : palette.ink}
+          opacity={event.pending ? 0.55 : 1}
+        />
       ))}
-
-      {secondPoints.length > 0 && (
-        <>
-          <Path d={splinePath(secondPoints)} fill="none" stroke={SERIES_B} strokeWidth={1.6} strokeLinecap="round" opacity={0.9} />
-          <SvgText x={padL + plotW + 14} y={padT + 8} fontSize={9} fill={palette.inkFaint}>
-            {Math.round(secondMax)}
-          </SvgText>
-        </>
-      )}
-
-      <Path d={splinePath(points)} fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" />
-
-      {projection && (
-        <G>
-          <Path d={projection.hiPath} fill="none" stroke={SERIES_B} strokeWidth={1.2} strokeDasharray="4 4" opacity={0.75} />
-          <Path d={projection.loPath} fill="none" stroke={SERIES_B} strokeWidth={1.2} strokeDasharray="4 4" opacity={0.75} />
-          <Path d={projection.mid} fill="none" stroke={color} strokeWidth={1.4} strokeDasharray="4 4" opacity={0.85} />
-        </G>
-      )}
-
-      {last && (
-        <G>
-          <Line x1={last.x} y1={padT} x2={last.x} y2={padT + plotH} stroke={palette.lineStrong} strokeWidth={1} />
-          <SvgText x={last.x + 5} y={padT + plotH - 6} fontSize={8} fill={palette.inkFaint} letterSpacing="1.4">
-            NOW
-          </SvgText>
-          <Circle cx={last.x} cy={last.y} r={3.5} fill={palette.panel} stroke={color} strokeWidth={2} />
-        </G>
-      )}
     </Svg>
   );
 }
@@ -1572,6 +1571,28 @@ export function DashboardOverview({
       }
     : { labels: DEMO_ALARM_DAYS, ...DEMO_ALARM_BARS };
 
+  // Time ticks across the plotted window, at the sample cadence.
+  const trendTimeLabels = useMemo(() => {
+    const count = 7;
+    const spanMs = Math.max(1, healthTrend.length - 1) * SAMPLE_MS;
+    return Array.from({ length: count }, (_, index) => {
+      const at = new Date(nowMs - spanMs + (index / (count - 1)) * spanMs);
+      return at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    });
+  }, [healthTrend.length, nowMs]);
+
+  // Open alarms as sparse readings on the right axis — the plant's equivalent of
+  // a lab sample: taken at a point in time rather than streamed.
+  const alarmEvents = useMemo(
+    () =>
+      alarmSeries.map((sample, index) => ({
+        at: (index / Math.max(1, alarmSeries.length - 1)) * 0.74,
+        value: sample.critical + sample.warning,
+      })),
+    [alarmSeries],
+  );
+  const alarmAxisMax = Math.max(4, ...alarmEvents.map((event) => event.value));
+
   const severitySegments = useMemo(
     () => [
       { label: 'Critical', value: metrics.criticalCount, color: palette.critical },
@@ -1818,7 +1839,7 @@ export function DashboardOverview({
                     <View className="flex-1">
                       <FillChart
                         render={(h) => (
-                          <TrendChart primary={healthTrend} height={h} bands={healthBands(palette)} threshold={HEALTH_ALERT} thresholdLabel="Alert threshold" />
+                          <TrendChart primary={healthTrend} height={h} leftBands={healthRail(palette)} timeLabels={trendTimeLabels} />
                         )}
                       />
                       <SeriesTable
@@ -1833,7 +1854,7 @@ export function DashboardOverview({
                 <Panel label="Throughput over period" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
                   <View className="flex-1">
                     <FillChart
-                      render={(h) => <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} />}
+                      render={(h) => <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} timeLabels={trendTimeLabels} />}
                     />
                     <SeriesTable
                       rows={[{ color: SERIES_B, name: 'Packets / s', mean: mean(throughputTrend).toFixed(0), spread: stddev(throughputTrend).toFixed(2) }]}
@@ -1860,11 +1881,12 @@ export function DashboardOverview({
                   render={(h) => (
                     <TrendChart
                       primary={healthTrend}
-                      secondary={throughputTrend}
+                      events={alarmEvents}
                       height={h}
-                      bands={healthBands(palette)}
-                      threshold={HEALTH_ALERT}
-                      thresholdLabel="Alert threshold"
+                      leftBands={healthRail(palette)}
+                      rightBands={alarmRail(palette)}
+                      secondMax={alarmAxisMax}
+                      timeLabels={trendTimeLabels}
                       project
                     />
                   )}
@@ -1877,7 +1899,7 @@ export function DashboardOverview({
                 <OpenSection label="Health score" action={<Legend items={[{ color: SERIES_A, label: 'Health score' }]} />}>
                   <FillChart
                     render={(h) => (
-                      <TrendChart primary={healthTrend} height={h} bands={healthBands(palette)} threshold={HEALTH_ALERT} thresholdLabel="Alert threshold" />
+                      <TrendChart primary={healthTrend} height={h} leftBands={healthRail(palette)} timeLabels={trendTimeLabels} />
                     )}
                   />
                 </OpenSection>
@@ -1887,7 +1909,7 @@ export function DashboardOverview({
                 <OpenSection label="Throughput" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
                   <FillChart
                     render={(h) => (
-                      <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} project />
+                      <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} timeLabels={trendTimeLabels} project />
                     )}
                   />
                 </OpenSection>
