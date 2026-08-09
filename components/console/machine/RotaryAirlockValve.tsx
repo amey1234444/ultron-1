@@ -76,37 +76,40 @@ export function RotaryAirlockValve({
 
   const colours = useMemo(
     () => ({
+      // Kept in step with the Single Screw Extruder: both templates share one
+      // stage, so they have to share one set of greys or they read as two
+      // different machines from two different products.
       background: isDark
-        ? '#0A0A0A'
-        : '#FAFAFA',
+        ? '#08090C'
+        : '#F6F6F4',
 
       panel: isDark
-        ? '#131313'
+        ? '#111318'
         : '#FFFFFF',
 
       machine: isDark
-        ? '#171717'
-        : '#EDEDED',
+        ? '#191C22'
+        : '#ECECEA',
 
       machineRaised: isDark
-        ? '#202020'
+        ? '#232730'
         : '#FFFFFF',
 
       machineDeep: isDark
-        ? '#0D0D0D'
-        : '#D8D8D8',
+        ? '#0C0E12'
+        : '#D6D7D4',
 
       machineStroke: isDark
-        ? '#777777'
+        ? '#6E727C'
         : '#414141',
 
       fineStroke: isDark
-        ? '#444444'
+        ? '#3A3E46'
         : '#A1A3A0',
 
       muted: isDark
-        ? '#9A9A9A'
-        : '#666666',
+        ? '#8B8D93'
+        : '#5C6068',
 
       accent: '#3FBF6A',
     }),

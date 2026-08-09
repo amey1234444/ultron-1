@@ -1,24 +1,17 @@
 ﻿import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text } from 'react-native';
 
 import { useAuth } from '../context/AuthContext';
 import {
   AUTH_FONT_BODY,
   AuthAltAction,
   AuthButton,
-  AuthDisclosure,
   AuthError,
   AuthField,
   AuthPasswordField,
   AuthShell,
 } from './AuthShell';
-
-const DEMO_ACCOUNTS = [
-  { username: 'superadmin', role: 'Super admin — full access, user management' },
-  { username: 'admin', role: 'Admin — console plus the user directory' },
-  { username: 'user', role: 'User — read-only console access' },
-];
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -58,7 +51,6 @@ export default function LoginScreen() {
 
   return (
     <AuthShell
-      badge="SECURE SIGN-IN"
       title="Welcome back"
       subtitle="Sign in to monitor plant health, alarms and live telemetry."
       footer={<AuthAltAction prompt="Don't have an account?" action="Request access" onPress={() => router.push('/signup')} />}
@@ -97,25 +89,6 @@ export default function LoginScreen() {
       {error ? <AuthError message={error} /> : null}
 
       <AuthButton label="Sign in" submitting={submitting} onPress={onSubmit} />
-
-      <AuthDisclosure label="Demo accounts">
-        <View style={{ gap: 8 }}>
-          {DEMO_ACCOUNTS.map((account) => (
-            <Pressable
-              key={account.username}
-              onPress={() => setUsername(account.username)}
-              accessibilityRole="button"
-              accessibilityLabel={`Use the ${account.username} demo account`}
-            >
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, fontWeight: '700', color: '#6EF08A' }}>{account.username}</Text>
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: '#8A8A8A' }}>{account.role}</Text>
-            </Pressable>
-          ))}
-          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: '#5F6266' }}>
-            Tap a username to fill the form. Default passwords are listed in the README.
-          </Text>
-        </View>
-      </AuthDisclosure>
     </AuthShell>
   );
 }

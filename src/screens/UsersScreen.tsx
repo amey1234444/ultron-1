@@ -491,12 +491,13 @@ function ReputationPanel({
 type IconName = keyof typeof MaterialCommunityIcons.glyphMap;
 type StatTone = 'neutral' | 'success' | 'warning' | 'critical' | 'accent';
 
+// Same signal set as the console: one green, one amber, one red.
 const STAT_COLOUR: Record<StatTone, string> = {
-  neutral: '#8A8A8A',
-  success: '#6EF08A',
-  warning: '#E3B341',
-  critical: '#F2624A',
-  accent: '#6EF08A',
+  neutral: '#8B8D93',
+  success: '#3FBF6A',
+  warning: '#D9962B',
+  critical: '#D64545',
+  accent: '#3FBF6A',
 };
 
 function StatCard({

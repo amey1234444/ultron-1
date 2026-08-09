@@ -24,9 +24,11 @@ export const AUTH_FONT_DISPLAY = "'Inter', -apple-system, BlinkMacSystemFont, sy
 export const AUTH_FONT_BODY = AUTH_FONT_DISPLAY;
 export const AUTH_FONT_MONO = "'JetBrains Mono', ui-monospace, SFMono-Regular, monospace";
 
-// The single accent, matching `--u-accent` on the landing page and the console.
+// The auth pages are black and white on purpose. They are the first screen of
+// the product and the last place that should be shouting: the only accent is
+// white, and colour is reserved for genuine error states.
 // The export name is kept so the auth screens that import it keep working.
-export const AUTH_GOLD = '#6EF08A';
+export const AUTH_GOLD = '#FFFFFF';
 const GOLD = AUTH_GOLD;
 const GOLD_SOFT = 'rgba(255,255,255,0.10)';
 
@@ -40,7 +42,6 @@ const FAINT = '#6B6D6B';
 const LINE = 'rgba(255,255,255,0.09)';
 const LINE_STRONG = 'rgba(255,255,255,0.16)';
 const DANGER = '#F2624A';
-const SUCCESS = '#6EF08A';
 const LOGO_ASPECT = 284 / 77;
 
 // Both auth pages must fit a single viewport. Below this height the shell falls
@@ -84,7 +85,7 @@ export function AuthShell({
   badge,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   children: ReactNode;
   footer?: ReactNode;
   badge?: string;
@@ -150,22 +151,15 @@ export function AuthShell({
               >
                 {title}
               </Text>
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 19, color: MUTED, marginTop: 6 }}>{subtitle}</Text>
+              {subtitle ? (
+                <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 19, color: MUTED, marginTop: 6 }}>{subtitle}</Text>
+              ) : null}
 
               <View style={{ marginTop: 10 }}>{children}</View>
 
               {footer ? (
                 <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: LINE, paddingTop: 14 }}>{footer}</View>
               ) : null}
-            </View>
-
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 14, justifyContent: 'center' }}>
-              {['Encrypted session cookies', 'Role-based access', 'Admin-approved accounts'].map((item) => (
-                <View key={item} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: SUCCESS }}>OK</Text>
-                  <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>{item}</Text>
-                </View>
-              ))}
             </View>
           </View>
         </Column>
@@ -301,7 +295,9 @@ export function passwordScore(password: string): PasswordScore {
   ];
   const score = checks.filter((check) => check.pass).length;
   const label = score <= 1 ? 'Weak' : score <= 2 ? 'Fair' : score <= 4 ? 'Good' : 'Strong';
-  const color = score <= 1 ? DANGER : score <= 2 ? '#E3B341' : score <= 4 ? '#A1A3A0' : SUCCESS;
+  // Greyscale, brightening as it strengthens: the filled bar count already
+  // carries the reading, so the ramp does not need a second colour language.
+  const color = score <= 1 ? FAINT : score <= 2 ? MUTED : score <= 4 ? '#C9CACD' : INK;
   return { score, label, color, suggestions: checks.filter((check) => !check.pass).map((check) => check.tip) };
 }
 
@@ -364,7 +360,7 @@ export function AuthButton({
         borderRadius: 10,
         borderWidth: 1,
         borderColor: primary ? 'rgba(255,255,255,0.92)' : LINE_STRONG,
-        backgroundColor: primary ? (hovered && !inert ? '#F0C684' : GOLD) : 'transparent',
+        backgroundColor: primary ? (hovered && !inert ? '#E6E6E4' : GOLD) : 'transparent',
         opacity: inert ? 0.55 : 1,
         ...(primary && !inert ? { boxShadow: '0 14px 34px rgba(0,0,0,0.45)' } : null),
       } as ViewStyle}
@@ -379,7 +375,7 @@ export function AuthButton({
             fontSize: 12,
             letterSpacing: 2,
             textTransform: 'uppercase',
-            color: primary ? '#17130B' : INK,
+            color: primary ? '#0A0A0A' : INK,
           }}
         >
           {label}
@@ -417,24 +413,6 @@ export function AuthError({ message }: { message: string }) {
     >
       <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: DANGER }}>!</Text>
       <Text style={{ flex: 1, fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 19, color: DANGER }}>{message}</Text>
-    </View>
-  );
-}
-
-// Collapsible block for the demo credentials, so the sign-in form stays clean
-// but the seeded accounts are still one tap away.
-export function AuthDisclosure({ label, children }: { label: string; children: ReactNode }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <View style={{ marginTop: 14 }}>
-      <Pressable onPress={() => setOpen((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
-        <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: MUTED, textAlign: 'center' }}>
-          {open ? 'Less' : 'More'} {label}
-        </Text>
-      </Pressable>
-      {open ? (
-        <View style={{ marginTop: 10, borderRadius: 10, borderWidth: 1, borderColor: LINE, backgroundColor: FIELD, padding: 12 }}>{children}</View>
-      ) : null}
     </View>
   );
 }

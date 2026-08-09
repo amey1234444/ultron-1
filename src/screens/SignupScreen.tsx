@@ -102,7 +102,7 @@ export default function SignupScreen() {
             paddingVertical: 14,
           }}
         >
-          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, lineHeight: 22, color: '#E8D7B5' }}>{done}</Text>
+          <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 14, lineHeight: 22, color: '#F2F2F0' }}>{done}</Text>
         </View>
         <View style={{ marginTop: 16, gap: 8 }}>
           {[
@@ -111,7 +111,7 @@ export default function SignupScreen() {
             'You will be able to sign in as soon as it is approved.',
           ].map((step, index) => (
             <View key={step} style={{ flexDirection: 'row', gap: 8 }}>
-              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#6EF08A' }}>{index + 1}.</Text>
+              <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#F2F2F0' }}>{index + 1}.</Text>
               <Text style={{ flex: 1, fontFamily: AUTH_FONT_BODY, fontSize: 13, lineHeight: 20, color: '#8A8A8A' }}>{step}</Text>
             </View>
           ))}
@@ -123,9 +123,7 @@ export default function SignupScreen() {
 
   return (
     <AuthShell
-      badge="REQUEST ACCESS"
       title="Create your account"
-      subtitle="Set up access to the ULTRON monitoring console. A super admin approves every new account."
       footer={<AuthAltAction prompt="Already have an account?" action="Sign in" onPress={() => router.push('/login')} />}
     >
       <AuthFieldRow>

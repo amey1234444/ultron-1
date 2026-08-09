@@ -1,9 +1,9 @@
 import { useRouter } from 'next/router';
 import { useEffect, type ReactNode } from 'react';
-import { ActivityIndicator, View } from 'react-native';
 
 import { useAuth } from '../../context/AuthContext';
 import { hasAtLeast, type Role } from '../../lib/roles';
+import { AppLoader } from './AppLoader';
 
 type AuthGateProps = {
   children: ReactNode;
@@ -27,12 +27,10 @@ export function AuthGate({ children, minRole }: AuthGateProps) {
     }
   }, [loading, user, minRole, router]);
 
+  // Covers the whole gap between signing in and the console being ready: the
+  // session check, the redirect, and the first render of a heavy screen.
   if (loading || !user || (minRole && !hasAtLeast(user.role, minRole))) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface-dark">
-        <ActivityIndicator color="#F5F5F5" />
-      </View>
-    );
+    return <AppLoader />;
   }
 
   return <>{children}</>;
