@@ -49,10 +49,10 @@ const ZOOM_STEP = 0.1;
 // component canvas. They share one 1200×760 viewBox and one wrapper, so the
 // stage geometry (and therefore every saved trail anchor) is identical.
 const ARTWORK_TEMPLATES = new Set<string>(['Rotary Airlock Valve', 'Single Screw Extruder']);
-// That wrapper has a `p-8` (32px) pad between it and the actual SVG artwork;
+// That wrapper has a `p-6` (24px) pad between it and the actual SVG artwork;
 // subtract it so trail anchors line up with the drawing itself rather than the
 // padded box around it.
-const ARTWORK_PADDING = 32;
+const ARTWORK_PADDING = 24;
 
 // Segmented control: one bordered track with the selected tab filled, so the
 // Machine/Rack/Overview/Analysis/Alarm/Trend switch reads as a single instrument
@@ -357,7 +357,7 @@ export function MachineWorkspace({
                       setMachineLayout({ x, y, width, height });
                     }}
                     style={{ transform: [{ scale: zoom }] }}
-                    className={hasTemplateArtwork ? 'w-full max-w-4xl p-8' : 'h-full w-full'}
+                    className={hasTemplateArtwork ? 'w-full max-w-5xl p-6' : 'h-full w-full'}
                   >
                     {machine.template === 'Rotary Airlock Valve' ? (
                       <RotaryAirlockValve />

@@ -367,3 +367,58 @@
     transform: scaleX(0.62);
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Survey field                                                        */
+/*                                                                     */
+/* A drawing sheet under the figures rather than a flat grey plate.     */
+/* Two grids at a 1:4 ratio give a fine graticule with a heavier rule   */
+/* every fourth column, which is how a real measurement sheet is ruled  */
+/* — and the mask fades it out before it reaches the type, so it reads  */
+/* as paper the numbers were plotted on rather than as decoration.      */
+/* ------------------------------------------------------------------ */
+.section::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(90deg, var(--u-rule-strong) 0 1px, transparent 1px 100%),
+    repeating-linear-gradient(90deg, var(--u-rule) 0 1px, transparent 1px 100%),
+    repeating-linear-gradient(0deg, var(--u-rule) 0 1px, transparent 1px 100%);
+  background-size: 232px 100%, 58px 100%, 100% 58px;
+  -webkit-mask-image: radial-gradient(130% 82% at 50% 34%, #000 22%, transparent 76%);
+  mask-image: radial-gradient(130% 82% at 50% 34%, #000 22%, transparent 76%);
+}
+
+/* A single lit column travelling across the sheet, at survey pace. The page
+   has enough motion in it; this is slow enough to register as ambient rather
+   than as something asking to be watched. */
+.section::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.028) 46%,
+    rgba(255, 255, 255, 0.05) 50%,
+    rgba(255, 255, 255, 0.028) 54%,
+    transparent 100%
+  );
+  background-size: 46% 100%;
+  background-repeat: no-repeat;
+  -webkit-mask-image: radial-gradient(120% 76% at 50% 36%, #000 18%, transparent 72%);
+  mask-image: radial-gradient(120% 76% at 50% 36%, #000 18%, transparent 72%);
+  animation: resultsSweep 19s linear infinite;
+}
+
+@keyframes resultsSweep {
+  from { background-position: -60% 0; }
+  to   { background-position: 160% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .section::after { animation: none; opacity: 0.5; }
+}

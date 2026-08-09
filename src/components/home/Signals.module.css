@@ -438,3 +438,40 @@
     animation: none;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Datum field                                                         */
+/*                                                                     */
+/* The bands sat on flat black, which left the radial field floating.  */
+/* A set of horizontal datums behind them gives the geometry something */
+/* to be measured against — the same reason a scope has a graticule —   */
+/* with a heavier rule on the band's own centreline so the mirrored     */
+/* pair visibly shares one axis.                                        */
+/* ------------------------------------------------------------------ */
+.band {
+  position: relative;
+  isolation: isolate;
+}
+
+.band::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(0deg, var(--u-rule) 0 1px, transparent 1px 44px),
+    linear-gradient(0deg, var(--u-rule-strong) 0 1px, transparent 1px);
+  background-size: 100% 44px, 100% 100%;
+  background-position: 0 0, 0 50%;
+  background-repeat: repeat, no-repeat;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(90deg, transparent 0%, #000 16%, #000 84%, transparent 100%);
+  opacity: 0.85;
+}
+
+/* A hairline between the two bands, so the pair reads as one instrument
+   stacked rather than as two unrelated blocks. */
+.band + .band {
+  border-top: 1px solid var(--u-line);
+}

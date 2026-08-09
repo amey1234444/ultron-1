@@ -229,7 +229,12 @@ export default function Industries() {
             <article
               key={industry.name}
               className={styles.card}
-              style={{ ['--delay' as string]: `${index * 90}ms` }}
+              style={{
+                ['--delay' as string]: `${index * 90}ms`,
+                // Stagger the measurement pass so the row reads as one
+                // instrument working down the line, not five in lockstep.
+                ['--pass-delay' as string]: `${index * 620}ms`,
+              }}
             >
               <div className={styles.stage}>
                 <Specimen industry={industry} index={index} />

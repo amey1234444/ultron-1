@@ -282,34 +282,15 @@
   }
 }
 
-/* Light spilling upward off the top of the limb. */
-.bloom {
-  position: absolute;
-  top: -6%;
-  left: 50%;
-  width: min(160vw, 1700px);
-  height: 52%;
-  margin-left: min(-80vw, -850px);
-  background: radial-gradient(ellipse at 50% 100%, rgba(255, 255, 255, 0.1), transparent 62%);
-  opacity: calc(0.5 + var(--p) * 0.5);
-}
+/* The upward white bloom off the limb has been removed. Spilling light that
+   far up the frame put a pale wash directly behind the sub-headline, which
+   greyed the copy and read as a smudge rather than as atmosphere. The rim
+   highlight and the warm limb pool below carry the horizon on their own. */
 
-/* The warm pool on the left shoulder of the limb — the part that makes the
-   horizon read as a planet rather than as a drawn arc. */
-.limbLight {
-  position: absolute;
-  top: -2%;
-  left: 6%;
-  width: min(60vw, 760px);
-  height: 46%;
-  background: radial-gradient(
-    ellipse at 60% 90%,
-    rgba(140, 240, 175, 0.16),
-    rgba(140, 240, 175, 0.05) 40%,
-    transparent 68%
-  );
-  opacity: calc(0.55 + var(--p) * 0.45);
-}
+/* The upward bloom and the warm limb pool are both gone. Between them they
+   laid a pale green-white wash across the top of the horizon clip, which is
+   exactly where the sub-headline sits — the copy was reading against a smudge
+   instead of against black. The rim and its inner glow carry the horizon. */
 
 @keyframes arcIn {
   from {

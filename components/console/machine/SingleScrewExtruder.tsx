@@ -38,18 +38,20 @@ type SingleScrewExtruderProps = {
  * Same design canvas as the Rotary Airlock Valve so both machines share one
  * stage geometry — trail anchors are stored as fractions of this viewBox.
  */
-const VIEWBOX_WIDTH = 1200;
-const VIEWBOX_HEIGHT = 760;
+export const EXTRUDER_VIEWBOX_WIDTH = 1200;
+export const EXTRUDER_VIEWBOX_HEIGHT = 760;
+const VIEWBOX_WIDTH = EXTRUDER_VIEWBOX_WIDTH;
+const VIEWBOX_HEIGHT = EXTRUDER_VIEWBOX_HEIGHT;
 
 /* Stage ------------------------------------------------------------------- */
 
 const BARREL_AXIS_Y = 380;
-const BARREL_LEFT = 436;
+const BARREL_LEFT = 478;
 const BARREL_RIGHT = 1000;
 const BARREL_TOP = 338;
 const BARREL_BOTTOM = 422;
 
-const BORE_LEFT = 450;
+const BORE_LEFT = 492;
 const BORE_RIGHT = 986;
 const BORE_TOP = 350;
 const BORE_BOTTOM = 410;
@@ -67,12 +69,21 @@ const THROAT_RIGHT = 540;
 const FEED_END = 0.34;
 const METER_START = 0.72;
 
+/**
+ * The drive train sits on one line.
+ *
+ * Motor shaft, coupling and gearbox input share this centreline so the train
+ * reads as connected rather than as three parts placed near each other.
+ */
+const DRIVE_AXIS_Y = 494;
+
 /** Five heater bands clamped around the barrel. */
 const HEATING_ZONES = [566, 646, 726, 806, 886];
 const HEATING_ZONE_WIDTH = 34;
 const HEATING_ZONE_OVERHANG = 13;
 /** Rail the zone leads run up to. */
 const WIRING_RAIL_Y = 296;
+const ZONE_SENSOR_Y = WIRING_RAIL_Y - 6;
 
 const MOTOR_FINS = Array.from({ length: 9 }, (_, index) => index);
 const COWL_SLOTS = [0, 1, 2, 3, 4];
@@ -84,6 +95,30 @@ const GEARBOX_BOLTS = [
   [404, 580],
 ];
 
+/**
+ * Every point this machine can report, at the spot on the drawing where the
+ * instrument physically sits.
+ *
+ * The default trail layout imports this list, so a card can never attach to a
+ * place the artwork does not actually have an instrument — move a pad here and
+ * the trail that lands on it moves with it.
+ */
+export type ExtruderConnector = { code: string; label: string; x: number; y: number; side: 'left' | 'right' };
+
+export const EXTRUDER_CONNECTORS: ExtruderConnector[] = [
+  { code: 'C1', label: 'Motor Current', side: 'left', x: 135, y: 429 },
+  { code: 'V2', label: 'Motor NDE Vibration Acceleration RMS', side: 'left', x: 64, y: 494 },
+  { code: 'V1', label: 'Motor DE Vibration Acceleration RMS', side: 'left', x: 198, y: 528 },
+  { code: 'S1', label: 'Screw Speed', side: 'left', x: 222, y: 494 },
+  { code: 'T1', label: 'Gearbox Oil Temperature', side: 'left', x: 348, y: 556 },
+  { code: 'T2', label: 'Thrust Bearing Temperature', side: 'left', x: 451, y: 332 },
+  { code: 'T3', label: 'Feed Throat Temperature', side: 'right', x: 540, y: 296 },
+  { code: 'T4', label: 'Barrel Zone Temperature', side: 'right', x: 726, y: ZONE_SENSOR_Y },
+  { code: 'T5', label: 'Melt Temperature', side: 'right', x: 1080, y: 300 },
+  { code: 'P1', label: 'Melt Pressure', side: 'right', x: 960, y: 428 },
+  { code: 'P2', label: 'Die Head Pressure', side: 'right', x: 1052, y: 362 },
+];
+
 const SCREW_FLIGHTS: number[] = [];
 for (let x = BORE_LEFT - FLIGHT_PITCH; x < BORE_RIGHT + FLIGHT_PITCH; x += FLIGHT_PITCH) {
   SCREW_FLIGHTS.push(x);
@@ -92,15 +127,6 @@ for (let x = BORE_LEFT - FLIGHT_PITCH; x < BORE_RIGHT + FLIGHT_PITCH; x += FLIGH
 /** Diagonal section hatching across the cut barrel wall. */
 const HATCH_LINES: number[] = [];
 for (let x = BARREL_LEFT - 60; x < BARREL_RIGHT + 60; x += 9) HATCH_LINES.push(x);
-
-const SECTION_Y = 502;
-const SECTION_BOUNDS = [
-  BORE_LEFT,
-  BORE_LEFT + BORE_SPAN * FEED_END,
-  BORE_LEFT + BORE_SPAN * METER_START,
-  BORE_RIGHT,
-];
-const SECTION_LABELS = ['FEED', 'COMPRESSION', 'METERING'];
 
 /**
  * Root radius along the screw.
@@ -197,7 +223,14 @@ export function SingleScrewExtruder({
    */
   const flightOffset = ((((screwRotation % 360) + 360) % 360) / 360) * FLIGHT_PITCH;
 
-  const partLabel = (x: number, y: number, label: string, size = 13, letterSpacing = 2, anchor: 'start' | 'middle' = 'middle') => (
+  const partLabel = (
+    x: number,
+    y: number,
+    label: string,
+    size = 13,
+    letterSpacing = 2,
+    anchor: 'start' | 'middle' | 'end' = 'middle',
+  ) => (
     <SvgText
       x={x}
       y={y}
@@ -280,16 +313,16 @@ export function SingleScrewExtruder({
 
         {showBackground && <Rect x={0} y={0} width={VIEWBOX_WIDTH} height={VIEWBOX_HEIGHT} fill={colours.panel} />}
 
-        {/* Machine centreline, the way an elevation drawing carries one. */}
+        {/* Process centreline through the barrel */}
         <Line
-          x1={120}
+          x1={150}
           y1={BARREL_AXIS_Y}
           x2={1180}
           y2={BARREL_AXIS_Y}
           stroke={colours.fineStroke}
           strokeWidth={1}
           strokeDasharray="22 6 3 6"
-          opacity={0.45}
+          opacity={0.4}
         />
 
         {/* Process in */}
@@ -307,52 +340,57 @@ export function SingleScrewExtruder({
         </SvgText>
         <Polygon points="508,58 528,58 518,73" fill={colours.accent} />
 
-        {/* Motor */}
-        <Rect x={56} y={470} width={20} height={88} rx={6} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        {COWL_SLOTS.map((index) => (
-          <Line key={`cowl-${index}`} x1={60} y1={482 + index * 14} x2={72} y2={482 + index * 14} stroke={colours.fineStroke} strokeWidth={1.5} />
-        ))}
-        <Rect x={104} y={438} width={62} height={26} rx={4} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        <Line x1={135} y1={438} x2={135} y2={464} stroke={colours.fineStroke} strokeWidth={1} />
-        <Rect x={74} y={462} width={138} height={104} rx={16} fill="url(#extruderMotor)" stroke={colours.machineStroke} strokeWidth={2} />
-        {MOTOR_FINS.map((index) => (
-          <Line key={`fin-${index}`} x1={88} y1={476 + index * 10} x2={198} y2={476 + index * 10} stroke={colours.fineStroke} strokeWidth={1.5} />
-        ))}
-        <Rect x={120} y={500} width={46} height={28} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        <Rect x={80} y={566} width={126} height={14} rx={3} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={2} />
-        <Rect x={94} y={580} width={38} height={20} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
-        <Rect x={154} y={580} width={38} height={20} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
-        <Circle cx={113} cy={590} r={3} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        <Circle cx={173} cy={590} r={3} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        <Rect x={212} y={505} width={30} height={18} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        {partLabel(143, 626, 'MOTOR')}
+        {/* --- Drive train, all on DRIVE_AXIS_Y ------------------------------ */}
 
-        {/* Coupling */}
-        <Rect x={238} y={486} width={40} height={56} rx={6} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        <Rect x={244} y={498} width={12} height={32} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        <Rect x={260} y={498} width={12} height={32} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        <Line x1={258} y1={494} x2={258} y2={534} stroke={colours.fineStroke} strokeWidth={1} />
+        {/* Motor */}
+        <Rect x={54} y={452} width={20} height={84} rx={6} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        {COWL_SLOTS.map((index) => (
+          <Line key={`cowl-${index}`} x1={58} y1={464 + index * 14} x2={70} y2={464 + index * 14} stroke={colours.fineStroke} strokeWidth={1.5} />
+        ))}
+        <Rect x={104} y={416} width={62} height={26} rx={4} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        <Line x1={135} y1={416} x2={135} y2={442} stroke={colours.fineStroke} strokeWidth={1} />
+        <Rect x={74} y={442} width={138} height={104} rx={16} fill="url(#extruderMotor)" stroke={colours.machineStroke} strokeWidth={2} />
+        {MOTOR_FINS.map((index) => (
+          <Line key={`fin-${index}`} x1={88} y1={456 + index * 10} x2={198} y2={456 + index * 10} stroke={colours.fineStroke} strokeWidth={1.5} />
+        ))}
+        <Rect x={120} y={480} width={46} height={28} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
+        <Rect x={80} y={546} width={126} height={14} rx={3} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={2} />
+        <Rect x={94} y={560} width={38} height={20} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
+        <Rect x={154} y={560} width={38} height={20} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
+        <Circle cx={113} cy={570} r={3} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
+        <Circle cx={173} cy={570} r={3} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
+        {partLabel(143, 610, 'MOTOR')}
+
+        {/* Motor shaft into the coupling, and the coupling into the gearbox —
+            one continuous line of drive, not three parts placed near each
+            other. */}
+        <Rect x={212} y={DRIVE_AXIS_Y - 9} width={20} height={18} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
+        <Rect x={232} y={466} width={40} height={56} rx={6} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        <Rect x={238} y={478} width={14} height={32} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
+        <Rect x={254} y={478} width={14} height={32} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
 
         {/* Gear box */}
         <Rect x={272} y={288} width={152} height={312} rx={14} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2.5} />
         <Rect x={286} y={302} width={124} height={284} rx={9} fill="none" stroke={colours.fineStroke} strokeWidth={1} />
-        <Line x1={286} y1={380} x2={410} y2={380} stroke={colours.fineStroke} strokeWidth={1} />
-        <Line x1={286} y1={494} x2={410} y2={494} stroke={colours.fineStroke} strokeWidth={1} />
-        <Circle cx={348} cy={380} r={13} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={2} />
-        <Circle cx={348} cy={380} r={5} fill={colours.machineRaised} stroke={colours.fineStroke} strokeWidth={1} />
-        <Circle cx={348} cy={494} r={10} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={1.5} />
+        {/* Input shaft in at the drive axis, output shaft out at the barrel axis */}
+        <Line x1={286} y1={DRIVE_AXIS_Y} x2={410} y2={DRIVE_AXIS_Y} stroke={colours.fineStroke} strokeWidth={1} />
+        <Line x1={286} y1={BARREL_AXIS_Y} x2={410} y2={BARREL_AXIS_Y} stroke={colours.fineStroke} strokeWidth={1} />
+        <Line x1={348} y1={BARREL_AXIS_Y} x2={348} y2={DRIVE_AXIS_Y} stroke={colours.fineStroke} strokeWidth={1} strokeDasharray="4 4" />
+        <Circle cx={348} cy={BARREL_AXIS_Y} r={13} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={2} />
+        <Circle cx={348} cy={BARREL_AXIS_Y} r={5} fill={colours.machineRaised} stroke={colours.fineStroke} strokeWidth={1} />
+        <Circle cx={348} cy={DRIVE_AXIS_Y} r={10} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={1.5} />
         {GEARBOX_BOLTS.map(([x, y]) => (
           <Circle key={`gearbox-bolt-${x}-${y}`} cx={x} cy={y} r={5.5} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
         ))}
         <Rect x={300} y={320} width={96} height={24} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
         {/* Oil sight glass */}
         <Circle cx={348} cy={556} r={12} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={2} />
-        <Circle cx={348} cy={556} r={6} fill={colours.accent} opacity={0.35} />
+        <Circle cx={348} cy={556} r={6} fill={colours.accent} opacity={0.3} />
         {/* Breather */}
         <Rect x={332} y={268} width={32} height={22} rx={4} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        {partLabel(348, 440, 'GEAR BOX')}
+        {partLabel(348, 432, 'GEAR BOX')}
 
-        {/* Output shaft */}
+        {/* Output shaft, out of the gearbox on the barrel axis */}
         <Rect x={160} y={372} width={112} height={16} rx={3} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
         <Rect x={186} y={362} width={18} height={36} rx={3} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
         {SHAFT_SPLINES.map((index) => (
@@ -360,12 +398,14 @@ export function SingleScrewExtruder({
         ))}
         {partLabel(180, 344, 'OUTPUT SHAFT', 11, 1.6)}
 
-        {/* Thrust bearing housing */}
-        <Rect x={418} y={322} width={22} height={116} rx={4} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        <Circle cx={429} cy={338} r={3.5} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        <Circle cx={429} cy={422} r={3.5} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
+        {/* Thrust housing — one block bridging the gearbox to the barrel, so
+            the drive is visibly continuous into the screw. */}
+        <Rect x={424} y={318} width={54} height={124} rx={5} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        {[[436, 330], [466, 330], [436, 430], [466, 430]].map(([cx, cy]) => (
+          <Circle key={`thrust-${cx}-${cy}`} cx={cx} cy={cy} r={3.5} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
+        ))}
 
-        {/* Barrel */}
+        {/* --- Barrel -------------------------------------------------------- */}
         <Rect
           x={BARREL_LEFT}
           y={BARREL_TOP}
@@ -395,23 +435,19 @@ export function SingleScrewExtruder({
           </G>
         ))}
 
-        {/* End flanges with bolt circles */}
-        {[BARREL_LEFT - 12, BARREL_RIGHT - 10].map((fx) => (
-          <G key={`flange-${fx}`}>
-            <Rect
-              x={fx}
-              y={BARREL_TOP - 12}
-              width={22}
-              height={BARREL_BOTTOM - BARREL_TOP + 24}
-              rx={4}
-              fill="url(#extruderBody)"
-              stroke={colours.machineStroke}
-              strokeWidth={2}
-            />
-            {[BARREL_TOP - 4, BARREL_AXIS_Y, BARREL_BOTTOM + 4].map((cy) => (
-              <Circle key={`${fx}-${cy}`} cx={fx + 11} cy={cy} r={3.5} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-            ))}
-          </G>
+        {/* Discharge flange */}
+        <Rect
+          x={BARREL_RIGHT}
+          y={BARREL_TOP - 12}
+          width={22}
+          height={BARREL_BOTTOM - BARREL_TOP + 24}
+          rx={4}
+          fill="url(#extruderBody)"
+          stroke={colours.machineStroke}
+          strokeWidth={2}
+        />
+        {[BARREL_TOP - 4, BARREL_AXIS_Y, BARREL_BOTTOM + 4].map((cy) => (
+          <Circle key={`flange-bolt-${cy}`} cx={BARREL_RIGHT + 11} cy={cy} r={3.5} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
         ))}
 
         {/* Feed opening cut through the barrel wall */}
@@ -427,7 +463,10 @@ export function SingleScrewExtruder({
         <Line x1={THROAT_LEFT} y1={BARREL_TOP} x2={THROAT_LEFT} y2={BORE_TOP} stroke={colours.fineStroke} strokeWidth={1} />
         <Line x1={THROAT_RIGHT} y1={BARREL_TOP} x2={THROAT_RIGHT} y2={BORE_TOP} stroke={colours.fineStroke} strokeWidth={1} />
 
-        {/* Heater bands, their leads, and the thermocouple each zone reports */}
+        {/* Melt pressure transducer boss, in the wall ahead of the breaker plate */}
+        <Rect x={952} y={BARREL_BOTTOM} width={16} height={12} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
+
+        {/* Heater bands and their leads */}
         <Line x1={560} y1={WIRING_RAIL_Y} x2={892} y2={WIRING_RAIL_Y} stroke={colours.fineStroke} strokeWidth={1} />
         {HEATING_ZONES.map((centre, index) => (
           <G key={`zone-${centre}`}>
@@ -461,11 +500,10 @@ export function SingleScrewExtruder({
             ))}
             <Rect x={centre - 5} y={BARREL_TOP - 25} width={10} height={12} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
             <Line x1={centre} y1={BARREL_TOP - 25} x2={centre} y2={WIRING_RAIL_Y} stroke={colours.fineStroke} strokeWidth={1} />
-            <Circle cx={centre} cy={WIRING_RAIL_Y - 6} r={3.5} fill={colours.panel} stroke={colours.accent} strokeWidth={1.5} />
             {partLabel(centre, 452, `Z${index + 1}`, 10.5, 1.2)}
           </G>
         ))}
-        {partLabel(726, 272, 'HEATING ZONES', 11, 2)}
+        {partLabel(726, 262, 'HEATING', 13, 2)}
 
         {/* Bore cut-away. The accent marks the process channel, the way the
             Rotary Airlock Valve outlines its rotor. */}
@@ -518,57 +556,50 @@ export function SingleScrewExtruder({
             </G>
           ))}
         </G>
-        {partLabel(945, 326, 'BARREL', 11, 1.6)}
-
-        {/* Screw sections: what the tapering root above is actually doing. */}
-        {SECTION_LABELS.map((label, index) => {
-          const a = SECTION_BOUNDS[index];
-          const b = SECTION_BOUNDS[index + 1];
-          return (
-            <G key={label}>
-              <Line x1={a} y1={SECTION_Y} x2={b} y2={SECTION_Y} stroke={colours.fineStroke} strokeWidth={1} />
-              <Line x1={a} y1={SECTION_Y - 5} x2={a} y2={SECTION_Y + 5} stroke={colours.fineStroke} strokeWidth={1} />
-              <Line x1={b} y1={SECTION_Y - 5} x2={b} y2={SECTION_Y + 5} stroke={colours.fineStroke} strokeWidth={1} />
-              {partLabel((a + b) / 2, SECTION_Y + 20, label, 10.5, 1.6)}
-            </G>
-          );
-        })}
-        {partLabel(BORE_RIGHT + 20, SECTION_Y + 4, 'SCREW', 12, 2, 'start')}
+        {partLabel(520, 490, 'BARREL', 13, 2)}
+        {partLabel(880, 490, 'SCREW', 13, 2)}
 
         {/* Feeder */}
-        <Rect x={452} y={66} width={132} height={26} rx={12} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        <Rect x={452} y={66} width={132} height={18} rx={9} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
         <Rect x={458} y={84} width={120} height={112} rx={4} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        <Path d="M 458 196 L 578 196 L 540 258 L 496 258 Z" fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        <Rect x={496} y={252} width={44} height={90} rx={3} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        <Path d="M 458 196 L 578 196 L 540 252 L 496 252 Z" fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        <Rect x={496} y={252} width={44} height={74} rx={3} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
         {/* Mounting flange onto the barrel */}
-        <Rect x={488} y={330} width={60} height={12} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
-        <Path d="M 466 138 Q 518 122 570 138 L 570 194 L 536 254 L 500 254 L 466 194 Z" fill="url(#extruderMaterial)" opacity={0.85} />
-        <Rect x={502} y={252} width={32} height={80} fill="url(#extruderMaterial)" opacity={0.7} />
-        {/* Level sight window */}
-        <Rect x={566} y={104} width={8} height={74} rx={2} fill={colours.machineDeep} stroke={colours.fineStroke} strokeWidth={1} />
-        {partLabel(592, 150, 'FEEDER', 11, 1.6, 'start')}
+        <Rect x={488} y={326} width={60} height={12} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={2} />
+        <Path d="M 466 138 Q 518 122 570 138 L 570 194 L 536 250 L 500 250 L 466 194 Z" fill="url(#extruderMaterial)" opacity={0.85} />
+        <Rect x={502} y={252} width={32} height={74} fill="url(#extruderMaterial)" opacity={0.7} />
+        {partLabel(602, 150, 'FEEDER', 13, 2, 'start')}
 
         {/* Die */}
         <Path
-          d={`M ${BARREL_RIGHT + 12} ${BARREL_TOP - 12} L 1062 350 L 1086 364 L 1122 364 L 1122 396 L 1086 396 L 1062 410 L ${BARREL_RIGHT + 12} ${BARREL_BOTTOM + 12} Z`}
+          d="M 1022 326 L 1072 350 L 1096 364 L 1132 364 L 1132 396 L 1096 396 L 1072 410 L 1022 434 Z"
           fill="url(#extruderBody)"
           stroke={colours.machineStroke}
           strokeWidth={2}
         />
         {/* Breaker plate and screen pack */}
-        <Line x1={1030} y1={344} x2={1030} y2={416} stroke={colours.fineStroke} strokeWidth={1} />
-        <Line x1={1038} y1={346} x2={1038} y2={414} stroke={colours.fineStroke} strokeWidth={1} />
-        {/* The die is heated too, and reports its own temperature */}
-        <Rect x={1064} y={338} width={12} height={12} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
-        <Rect x={1064} y={410} width={12} height={12} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
-        <Line x1={1070} y1={338} x2={1070} y2={306} stroke={colours.fineStroke} strokeWidth={1} />
-        <Circle cx={1070} cy={300} r={3.5} fill={colours.panel} stroke={colours.accent} strokeWidth={1.5} />
-        <Rect x={1120} y={360} width={20} height={40} rx={4} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={2} />
-        <Rect x={1122} y={372} width={16} height={16} rx={2} fill="url(#extruderMaterial)" opacity={0.75} />
-        {partLabel(1080, 452, 'DIE', 11, 1.6)}
+        <Line x1={1040} y1={338} x2={1040} y2={422} stroke={colours.fineStroke} strokeWidth={1} />
+        <Line x1={1048} y1={342} x2={1048} y2={418} stroke={colours.fineStroke} strokeWidth={1} />
+        {/* The die is heated too */}
+        <Rect x={1074} y={360} width={12} height={12} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
+        <Rect x={1074} y={390} width={12} height={12} rx={2} fill="url(#extruderBody)" stroke={colours.machineStroke} strokeWidth={1.5} />
+        <Line x1={1080} y1={360} x2={1080} y2={306} stroke={colours.fineStroke} strokeWidth={1} />
+        <Rect x={1132} y={360} width={20} height={40} rx={4} fill={colours.machineDeep} stroke={colours.machineStroke} strokeWidth={2} />
+        <Rect x={1134} y={372} width={16} height={16} rx={2} fill="url(#extruderMaterial)" opacity={0.75} />
+        {partLabel(1076, 452, 'DIE', 13, 2)}
+
+        {/* Instrument pads. Every card attaches to one of these, and the trail
+            layout reads the same list, so a connection can never point at a
+            place the machine has no instrument. */}
+        {EXTRUDER_CONNECTORS.map((connector) => (
+          <G key={connector.code}>
+            <Circle cx={connector.x} cy={connector.y} r={9} fill={colours.accent} opacity={0.12} />
+            <Circle cx={connector.x} cy={connector.y} r={4.5} fill={colours.panel} stroke={colours.accent} strokeWidth={1.6} />
+          </G>
+        ))}
 
         {/* Process out */}
-        <Polygon points={`1152,${BARREL_AXIS_Y - 10} 1152,${BARREL_AXIS_Y + 10} 1172,${BARREL_AXIS_Y}`} fill={colours.accent} />
+        <Polygon points={`1164,${BARREL_AXIS_Y - 10} 1164,${BARREL_AXIS_Y + 10} 1184,${BARREL_AXIS_Y}`} fill={colours.accent} />
         <SvgText
           x={1064}
           y={552}

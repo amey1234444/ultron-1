@@ -247,3 +247,57 @@
     stroke-dashoffset: 0;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Gauge pass                                                          */
+/*                                                                     */
+/* Each specimen already animates in once and then stops, which left    */
+/* the row inert for as long as it is on screen. A measurement pass     */
+/* runs across each stage on a stagger — a lit band sweeping the        */
+/* specimen, then a caliper line closing on the baseline under it.      */
+/* It is the section's own claim rendered literally: these things are   */
+/* being measured, continuously.                                        */
+/* ------------------------------------------------------------------ */
+.stage::after {
+  content: '';
+  position: absolute;
+  inset: 0 4% 8px;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.05) 40%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.05) 60%,
+    transparent 100%
+  );
+  background-size: 40% 100%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  animation: specimenPass 7.2s ease-in-out infinite;
+  animation-delay: var(--pass-delay, 0ms);
+}
+
+@keyframes specimenPass {
+  0%        { background-position: -45% 0; opacity: 0; }
+  8%        { opacity: 1; }
+  38%       { opacity: 1; }
+  46%, 100% { background-position: 145% 0; opacity: 0; }
+}
+
+/* The baseline reads the pass: it brightens as the band crosses it. */
+.baseline {
+  animation: baselineRead 7.2s ease-in-out infinite;
+  animation-delay: var(--pass-delay, 0ms);
+}
+
+@keyframes baselineRead {
+  0%, 14%   { opacity: 0.55; transform: scaleX(0.94); }
+  26%       { opacity: 1; transform: scaleX(1); }
+  46%, 100% { opacity: 0.55; transform: scaleX(0.94); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage::after { animation: none; opacity: 0; }
+  .baseline { animation: none; opacity: 0.7; transform: none; }
+}

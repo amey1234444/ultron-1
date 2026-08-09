@@ -1,5 +1,6 @@
 import type { ChannelRef } from '../../../lib/rack';
 import { MAPPABLE_BOX_HEIGHT, UNLINKED_BOX_WIDTH } from './MappableBox';
+import { EXTRUDER_CONNECTORS } from './SingleScrewExtruder';
 import type { Anchor, Box, SavedLayout, Trail } from './TrailBoard';
 
 const STAGE_W = 1600;
@@ -43,23 +44,36 @@ const RAV_TEMPLATE_POINTS: TemplatePoint[] = [
 ];
 
 /**
- * Single Screw Extruder — anchors follow the drive train left to right:
- * motor → coupling → gear box → thrust end → barrel zones → die.
- * Left column carries the drive-side points, right column the process points.
+ * Single Screw Extruder — the anchors come from the artwork itself.
+ *
+ * `EXTRUDER_CONNECTORS` is the list of instrument pads the drawing renders, so
+ * importing it here means a trail can only ever land on a pad that exists. The
+ * old copy of these coordinates drifted out of step with the drawing the first
+ * time the machine was redrawn; there is now nothing to keep in step.
  */
-const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = [
-  { code: 'T2', label: 'Thrust Bearing Temperature', side: 'left', anchor: { x: 392, y: 340 }, boxEnd: { x: 255, y: 79 }, bend: { x: 420, y: 79 } },
-  { code: 'C1', label: 'Motor Current', side: 'left', anchor: { x: 110, y: 468 }, boxEnd: { x: 255, y: 184 }, bend: { x: 330, y: 184 } },
-  { code: 'S1', label: 'Screw Speed', side: 'left', anchor: { x: 241, y: 494 }, boxEnd: { x: 255, y: 289 }, bend: { x: 430, y: 289 } },
-  { code: 'V2', label: 'Motor NDE Vibration Acceleration RMS', side: 'left', anchor: { x: 62, y: 520 }, boxEnd: { x: 255, y: 394 }, bend: { x: 300, y: 394 } },
-  { code: 'V1', label: 'Motor DE Vibration Acceleration RMS', side: 'left', anchor: { x: 198, y: 520 }, boxEnd: { x: 255, y: 499 }, bend: { x: 370, y: 499 } },
-  { code: 'T1', label: 'Gearbox Oil Temperature', side: 'left', anchor: { x: 262, y: 560 }, boxEnd: { x: 255, y: 604 }, bend: { x: 400, y: 604 } },
-  { code: 'T3', label: 'Feed Throat Temperature', side: 'right', anchor: { x: 540, y: 300 }, boxEnd: { x: 1185, y: 79 }, bend: { x: 1060, y: 79 } },
-  { code: 'T4', label: 'Barrel Zone Temperature', side: 'right', anchor: { x: 705, y: 330 }, boxEnd: { x: 1185, y: 184 }, bend: { x: 1105, y: 184 } },
-  { code: 'T5', label: 'Melt Temperature', side: 'right', anchor: { x: 1006, y: 340 }, boxEnd: { x: 1185, y: 289 }, bend: { x: 1160, y: 289 } },
-  { code: 'P2', label: 'Die Head Pressure', side: 'right', anchor: { x: 1084, y: 364 }, boxEnd: { x: 1185, y: 394 }, bend: { x: 1178, y: 394 } },
-  { code: 'P1', label: 'Melt Pressure', side: 'right', anchor: { x: 1006, y: 420 }, boxEnd: { x: 1185, y: 499 }, bend: { x: 1105, y: 499 } },
-];
+const EXTRUDER_CARD_SLOT_Y = [79, 184, 289, 394, 499, 604];
+const EXTRUDER_LEFT_COLUMN = 232;
+const EXTRUDER_RIGHT_COLUMN = 1208;
+
+const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = (() => {
+  let leftSlot = 0;
+  let rightSlot = 0;
+  return EXTRUDER_CONNECTORS.map((connector) => {
+    const left = connector.side === 'left';
+    const slotY = EXTRUDER_CARD_SLOT_Y[(left ? leftSlot++ : rightSlot++) % EXTRUDER_CARD_SLOT_Y.length];
+    const column = left ? EXTRUDER_LEFT_COLUMN : EXTRUDER_RIGHT_COLUMN;
+    return {
+      code: connector.code,
+      label: connector.label,
+      side: connector.side,
+      anchor: { x: connector.x, y: connector.y },
+      boxEnd: { x: column, y: slotY },
+      // Bend just outside the card column so trails leave horizontally and
+      // turn once, instead of cutting diagonally across the machine.
+      bend: { x: left ? column + 96 : column - 96, y: slotY },
+    };
+  });
+})();
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,

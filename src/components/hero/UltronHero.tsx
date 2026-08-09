@@ -101,8 +101,6 @@ export default function UltronHero() {
           <span className={styles.arc} />
           <span className={styles.shine} />
         </div>
-        <span className={styles.bloom} />
-        <span className={styles.limbLight} />
       </div>
     </section>
   );
