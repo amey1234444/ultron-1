@@ -333,17 +333,17 @@ const TRAILS: TrailDefinition[] = [
 ];
 
 const STATUS_COLOURS: Record<CardStatus, string> = {
-  normal: '#6EF08A',
-  warning: '#E3B341',
-  critical: '#F2624A',
+  normal: '#3FBF6A',
+  warning: '#D9962B',
+  critical: '#D64545',
   offline: '#737373',
 };
 
 const TRAIL_COLOURS: Record<TrailTone, string> = {
   neutral: '#E6E6E6',
-  normal: '#6EF08A',
-  warning: '#E3B341',
-  critical: '#F2624A',
+  normal: '#3FBF6A',
+  warning: '#D9962B',
+  critical: '#D64545',
 };
 
 function createRoundedTrailPath(points: Point[], radius = 12) {

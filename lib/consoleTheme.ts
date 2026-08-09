@@ -51,55 +51,62 @@ export type ConsolePalette = {
   shadow: string;
 };
 
+// The greys are cool rather than neutral-black: a plant console is looked at
+// for eight hours at a stretch, and a slightly blue near-black sits back behind
+// the data instead of vibrating against it.
+//
+// The green is the one the Online pill on racks and gateways already used. It
+// was the odd one out — the console carried a brighter mint that read as a
+// different state at a glance — so the whole system now speaks with that one.
 const DARK: ConsolePalette = {
-  bg: '#0A0A0A',
-  panel: '#131413',
-  panelRaised: '#1A1B1A',
-  line: 'rgba(255,255,255,0.07)',
-  lineStrong: 'rgba(255,255,255,0.14)',
+  bg: '#08090C',
+  panel: '#111318',
+  panelRaised: '#171A20',
+  line: 'rgba(255,255,255,0.075)',
+  lineStrong: 'rgba(255,255,255,0.15)',
 
-  ink: '#F2F2F0',
-  inkMuted: '#A1A3A0',
-  inkFaint: '#6B6D6B',
+  ink: '#F7F6F2',
+  inkMuted: '#8B8D93',
+  inkFaint: '#62666E',
 
-  accent: '#6EF08A',
-  accentSoft: 'rgba(110,240,138,0.12)',
-  accentDim: '#2F7A48',
+  accent: '#3FBF6A',
+  accentSoft: 'rgba(63,191,106,0.13)',
+  accentDim: '#2A7A48',
 
-  critical: '#F2624A',
-  warning: '#E3B341',
-  neutral: '#7C7F7C',
+  critical: '#D64545',
+  warning: '#D9962B',
+  neutral: '#7A7E86',
 
-  series2: '#C9CCC9',
-  grid: 'rgba(255,255,255,0.06)',
+  series2: '#C3C6CC',
+  grid: 'rgba(255,255,255,0.055)',
   shadow: '#000000',
 };
 
 // Light mode is the same system inverted. The accent is darkened because
-// #6EF08A on white fails contrast for text and thin strokes; the dark variant
+// #3FBF6A on white fails contrast for text and thin strokes; the dark variant
 // reads as the same colour while staying legible.
 const LIGHT: ConsolePalette = {
-  bg: '#F7F7F5',
+  bg: '#F6F6F4',
   panel: '#FFFFFF',
-  panelRaised: '#F2F2EF',
-  line: '#E7E7E3',
-  lineStrong: '#D2D2CC',
+  panelRaised: '#F0F0ED',
+  line: '#E6E5E1',
+  lineStrong: '#D3D2CC',
 
-  ink: '#0A0A0A',
-  inkMuted: '#5F625F',
-  inkFaint: '#8B8E8B',
+  ink: '#0A0B0D',
+  inkMuted: '#5C6068',
+  inkFaint: '#878B92',
 
-  accent: '#14874A',
-  accentSoft: 'rgba(20,135,74,0.1)',
-  accentDim: '#8FD6A9',
+  accent: '#1F8A4C',
+  accentSoft: 'rgba(31,138,76,0.1)',
+  accentDim: '#8FD0A8',
 
-  critical: '#C8402A',
-  warning: '#9A7212',
-  neutral: '#8B8E8B',
+  critical: '#C03A3A',
+  warning: '#A9761B',
+  neutral: '#878B92',
 
-  series2: '#6B6E6B',
-  grid: 'rgba(10,10,10,0.07)',
-  shadow: '#0A0A0A',
+  series2: '#6A6E76',
+  grid: 'rgba(10,11,13,0.07)',
+  shadow: '#0A0B0D',
 };
 
 export function consolePalette(isDark: boolean): ConsolePalette {

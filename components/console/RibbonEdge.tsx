@@ -4,9 +4,9 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import type { DeviceHealth } from '../../lib/devices';
 
 const HEALTH_COLOR: Record<Exclude<DeviceHealth, 'normal'>, string> = {
-  warning: '#E3B341',
-  critical: '#F2624A',
-  disconnected: '#F2624A',
+  warning: '#D9962B',
+  critical: '#D64545',
+  disconnected: '#D64545',
 };
 
 function healthColor(health: DeviceHealth, isDark: boolean): string {

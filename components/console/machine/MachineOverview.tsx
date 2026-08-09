@@ -20,12 +20,12 @@ import type { MappedChannel } from './RackOccupancyView';
 // lib/consoleTheme.ts — green means live/healthy, amber means watch, red means
 // act, and everything else is grey. `info` is deliberately achromatic: it was a
 // blue, which made routine notices compete with real alarms for attention.
-const LIVE_COLOUR = '#6EF08A';
-const WARNING_COLOUR = '#E3B341';
-const CRITICAL_COLOUR = '#F2624A';
+const LIVE_COLOUR = '#3FBF6A';
+const WARNING_COLOUR = '#D9962B';
+const CRITICAL_COLOUR = '#D64545';
 const INFO_COLOUR = '#A1A3A0';
 const MUTED_COLOUR = '#6B6D6B';
-const ACCENT_COLOUR = '#6EF08A';
+const ACCENT_COLOUR = '#3FBF6A';
 
 // How often the browser-side analysis is pushed to the server for durable
 // history. Live values move continuously, so saving every render would flood the

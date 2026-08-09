@@ -18,37 +18,40 @@ module.exports = {
       colors: {
         surface: {
           // `bg-surface` is the console's dark canvas.
-          DEFAULT: '#0A0A0A',
-          dark: '#0A0A0A',
-          darkpanel: '#131413',
+          DEFAULT: '#08090C',
+          dark: '#08090C',
+          darkpanel: '#111318',
           // Slightly lifted panel used by the console dashboard cards.
-          card: '#1A1B1A',
-          light: '#F7F7F5',
+          card: '#171A20',
+          light: '#F6F6F4',
           lightpanel: '#FFFFFF',
         },
         ink: {
-          DEFAULT: '#F2F2F0',
-          muted: '#A1A3A0',
-          inverse: '#0A0A0A',
-          'inverse-muted': '#6B6D6B',
+          DEFAULT: '#F7F6F2',
+          muted: '#8B8D93',
+          inverse: '#0A0B0D',
+          'inverse-muted': '#5C6068',
         },
         line: {
-          dark: 'rgba(255,255,255,0.07)',
-          light: '#E7E7E3',
+          dark: 'rgba(255,255,255,0.075)',
+          light: '#E6E5E1',
         },
+        // One green for the whole product: the Online pill on racks and
+        // gateways set it, so `status.success` and `accent` are the same value
+        // rather than two greens a glance apart.
         status: {
           success: '#3FBF6A',
-          warning: '#E3B341',
-          critical: '#F2624A',
-          danger: '#F2624A',
+          warning: '#D9962B',
+          critical: '#D64545',
+          danger: '#D64545',
         },
         primary: {
-          blue: '#6EF08A',
+          blue: '#3FBF6A',
         },
         accent: {
-          DEFAULT: '#6EF08A',
-          soft: 'rgba(110,240,138,0.12)',
-          dim: '#2F7A48',
+          DEFAULT: '#3FBF6A',
+          soft: 'rgba(63,191,106,0.13)',
+          dim: '#2A7A48',
         },
       },
       fontFamily: {

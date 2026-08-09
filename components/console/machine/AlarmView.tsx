@@ -9,10 +9,10 @@ import type { ChannelRef } from '../../../lib/rack';
 import { useLiveValue } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
-const LIVE_COLOUR = '#6EF08A';
-const WARNING_COLOUR = '#E3B341';
-const CRITICAL_COLOUR = '#F2624A';
-const RETURN_COLOUR = '#6EF08A';
+const LIVE_COLOUR = '#3FBF6A';
+const WARNING_COLOUR = '#D9962B';
+const CRITICAL_COLOUR = '#D64545';
+const RETURN_COLOUR = '#3FBF6A';
 
 type AlarmLevel = 'critical' | 'warning' | 'normal';
 // An alarm doesn't just track the live level — it latches, like a real annunciator:

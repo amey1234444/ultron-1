@@ -108,7 +108,7 @@ export function RotaryAirlockValve({
         ? '#9A9A9A'
         : '#666666',
 
-      accent: '#6EF08A',
+      accent: '#3FBF6A',
     }),
     [isDark],
   );

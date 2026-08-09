@@ -1,5 +1,5 @@
 ﻿import { LinearGradient } from 'expo-linear-gradient';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Modal, Pressable, ScrollView, Text, useWindowDimensions, View, type ViewStyle } from 'react-native';
 
 import { ThemeToggle } from '../ThemeToggle';
@@ -9,7 +9,16 @@ import { cn } from '../../lib/cn';
 import { deviceWithGatewayConnectionState, racksForGateway, type DeviceNode } from '../../lib/devices';
 
 const LOGO_ASPECT = 284 / 77;
-const LOGO_HEIGHT = 24;
+const LOGO_HEIGHT = 19;
+
+/** The three top-level destinations the console opens onto. */
+export type ConsoleView = 'overview' | 'hierarchy' | 'devices';
+
+const VIEWS: { id: ConsoleView; label: string; hint: string }[] = [
+  { id: 'overview', label: 'Plant Overview', hint: 'Operations, performance and history' },
+  { id: 'hierarchy', label: 'Asset Hierarchy', hint: 'Projects, areas and machines' },
+  { id: 'devices', label: 'Devices', hint: 'Gateways, racks and channels' },
+];
 
 type TopBarProps = {
   alarmCount?: number;
@@ -18,6 +27,14 @@ type TopBarProps = {
   configureMode?: boolean;
   onConfigureModeChange?: (enabled: boolean) => void;
   onLogoPress?: () => void;
+  /** Only signed-in operators get the view switcher. */
+  authenticated?: boolean;
+  view?: ConsoleView;
+  onViewChange?: (view: ConsoleView) => void;
+  /** Plants to choose between. Only surfaced while the overview is open. */
+  plants?: { id: string; name: string }[];
+  plantId?: string | null;
+  onPlantChange?: (id: string) => void;
 };
 
 function formatClock(d: Date): string {
@@ -101,7 +118,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
             width: 7,
             height: 7,
             borderRadius: 4,
-            backgroundColor: isOnline ? '#6EF08A' : isDark ? '#5A5A5A' : '#B4B4B4',
+            backgroundColor: isOnline ? '#3FBF6A' : isDark ? '#5A5A5A' : '#B4B4B4',
           }}
         />
         <View className="flex-1">
@@ -125,7 +142,7 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
         onPress={() => setOpen(true)}
         className={cn('flex-row items-center gap-1.5 rounded-full border px-2.5 py-1', lineClass)}
       >
-        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active.length > 0 ? '#6EF08A' : isDark ? '#5A5A5A' : '#B4B4B4' }} />
+        <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active.length > 0 ? '#3FBF6A' : isDark ? '#5A5A5A' : '#B4B4B4' }} />
         <Text className={cn('font-body-medium text-[11px]', inkClass)}>
           {active.length}
           <Text className={mutedClass}>/{total}</Text>
@@ -211,6 +228,104 @@ function ConnectionsMenu({ devices, compact }: { devices: DeviceNode[]; compact:
   );
 }
 
+/**
+ * The switcher that used to be a pill toggle floating over the sidebar.
+ *
+ * It belongs next to the wordmark: which workspace you are in is an
+ * application-level fact, not a property of the tree, and putting it here means
+ * the sidebar can go back to being nothing but the tree. The same control
+ * carries the plant picker, which is why it takes generic options — a second
+ * dropdown that looked different would read as a different kind of choice.
+ */
+function NavSelect<T extends string>({
+  prefix,
+  value,
+  options,
+  onChange,
+  width = 268,
+}: {
+  prefix?: string;
+  value: T;
+  options: { id: T; label: string; hint?: string }[];
+  onChange: (id: T) => void;
+  width?: number;
+}) {
+  const { isDark } = useAppTheme();
+  const triggerRef = useRef<View>(null);
+  const [anchor, setAnchor] = useState<{ left: number; top: number } | null>(null);
+  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
+  const current = options.find((entry) => entry.id === value) ?? options[0];
+  if (!current) return null;
+
+  // Measured rather than hard-coded: the trigger's x moves with the wordmark,
+  // the prefix label and whatever sits before it.
+  const open = () => {
+    triggerRef.current?.measureInWindow?.((x, y, _w, h) => setAnchor({ left: x, top: y + h + 6 }));
+  };
+
+  return (
+    <>
+      <View ref={triggerRef} className="flex-row items-center gap-2">
+        {prefix ? (
+          <Text className={cn('font-mono text-[9px] uppercase tracking-[0.18em]', mutedClass)}>{prefix}</Text>
+        ) : null}
+        <Pressable
+          onPress={open}
+          accessibilityRole="button"
+          accessibilityLabel={`${prefix ?? 'View'}: ${current.label}. Change`}
+          className={cn('flex-row items-center gap-2 rounded-lg border px-2.5 py-1', lineClass)}
+        >
+          <Text className={cn('font-body-medium text-[12px]', inkClass)}>{current.label}</Text>
+          <Text className={cn('text-[8px]', mutedClass)}>▾</Text>
+        </Pressable>
+      </View>
+
+      <Modal visible={anchor !== null} transparent animationType="fade" onRequestClose={() => setAnchor(null)}>
+        <Pressable className="flex-1" onPress={() => setAnchor(null)}>
+          <Pressable
+            onPress={(e) => e.stopPropagation()}
+            className={cn('absolute overflow-hidden rounded-xl border', lineClass)}
+            style={{
+              top: anchor?.top ?? 46,
+              left: anchor?.left ?? 132,
+              width,
+              backgroundColor: isDark ? 'rgba(17,19,24,0.98)' : 'rgba(255,255,255,0.98)',
+              shadowColor: '#000',
+              shadowOpacity: isDark ? 0.42 : 0.14,
+              shadowRadius: 16,
+              shadowOffset: { width: 0, height: 8 },
+              elevation: 8,
+            }}
+          >
+            {options.map((entry) => {
+              const active = entry.id === value;
+              return (
+                <Pressable
+                  key={entry.id}
+                  onPress={() => {
+                    onChange(entry.id);
+                    setAnchor(null);
+                  }}
+                  accessibilityRole="menuitem"
+                  className={cn('flex-row items-center gap-2.5 px-3 py-2.5', active && (isDark ? 'bg-white/[0.06]' : 'bg-black/[0.04]'))}
+                >
+                  <View style={{ width: 3, height: entry.hint ? 22 : 14, borderRadius: 2, backgroundColor: active ? '#3FBF6A' : 'transparent' }} />
+                  <View className="flex-1">
+                    <Text className={cn('font-body-medium text-[12.5px]', inkClass)}>{entry.label}</Text>
+                    {entry.hint ? <Text className={cn('mt-0.5 font-body text-[10.5px]', mutedClass)}>{entry.hint}</Text> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </Pressable>
+        </Pressable>
+      </Modal>
+    </>
+  );
+}
+
 export function TopBar({
   alarmCount = 0,
   devices = [],
@@ -218,6 +333,12 @@ export function TopBar({
   configureMode = false,
   onConfigureModeChange,
   onLogoPress,
+  authenticated = false,
+  view = 'overview',
+  onViewChange,
+  plants = [],
+  plantId = null,
+  onPlantChange,
 }: TopBarProps) {
   const { isDark } = useAppTheme();
   const { width } = useWindowDimensions();
@@ -246,7 +367,7 @@ export function TopBar({
 
   return (
     <View
-      className="relative z-10 flex-row flex-wrap items-center justify-between gap-y-2 px-5 py-3"
+      className="relative z-10 flex-row flex-wrap items-center justify-between gap-y-1.5 px-4 py-1.5"
       style={glassStyle}
     >
       <View className="flex-row items-center gap-3">
@@ -257,14 +378,19 @@ export function TopBar({
             resizeMode="contain"
           />
         </Pressable>
-        {!isMid && (
-          <>
-            <Divider color={dividerColor} />
-            <Text className={cn('font-mono text-[9px] uppercase tracking-[0.22em]', mutedClass)}>
-              Industrial intelligence console
-            </Text>
-          </>
-        )}
+        {authenticated && onViewChange ? <NavSelect value={view} options={VIEWS} onChange={onViewChange} /> : null}
+        {/* The plant picker only means anything inside the overview, so it only
+            exists there — a disabled or irrelevant control in the nav is worse
+            than no control. */}
+        {authenticated && view === 'overview' && plants.length > 0 && onPlantChange ? (
+          <NavSelect
+            prefix="Plant"
+            value={plantId ?? plants[0].id}
+            options={plants.map((plant) => ({ id: plant.id, label: plant.name }))}
+            onChange={onPlantChange}
+            width={240}
+          />
+        ) : null}
       </View>
 
       <View className="flex-row flex-wrap items-center justify-end gap-3">
@@ -288,7 +414,7 @@ export function TopBar({
                   width: 7,
                   height: 7,
                   borderRadius: 4,
-                  backgroundColor: configureMode ? '#6EF08A' : isDark ? '#5A5A5A' : '#9A9A9A',
+                  backgroundColor: configureMode ? '#3FBF6A' : isDark ? '#5A5A5A' : '#9A9A9A',
                 }}
               />
               <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.18em]', configureMode ? 'text-accent' : mutedClass)}>

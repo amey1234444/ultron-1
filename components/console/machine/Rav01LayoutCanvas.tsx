@@ -285,8 +285,8 @@ const RAV01_ARRANGEMENT: PointArrangement[] = [
 
 const TRAIL_COLOURS = {
   normal: '#E5E7EB',
-  warning: '#E3B341',
-  critical: '#F2624A',
+  warning: '#D9962B',
+  critical: '#D64545',
   offline: '#737373',
 };
 

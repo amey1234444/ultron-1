@@ -27,7 +27,7 @@ const KIND_LABEL: Record<LiveKindLetter, string> = {
 // only one thing. Twelve steps stay distinguishable because consecutive series
 // are never adjacent in the ramp.
 const SERIES_PALETTE = [
-  '#6EF08A',
+  '#3FBF6A',
   '#F2F2F0',
   '#3FBF6A',
   '#A1A3A0',

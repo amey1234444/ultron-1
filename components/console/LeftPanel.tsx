@@ -1,21 +1,17 @@
 import { useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
-import { displayIpFor, racksForGateway, type DeviceNode } from '../../lib/devices';
+import { racksForGateway, type DeviceNode } from '../../lib/devices';
 import type { FolderNode, ProjectNode, SelectedNode } from '../../lib/hierarchy';
 import type { MachineNode } from '../../lib/machines';
 import { PERMISSIONS } from '../../lib/permissions';
 import type { ContextMenuTarget } from './ContextMenu';
-import { SectionLabel } from './SectionLabel';
 import { TreeNode } from './tree/TreeNode';
 
 type LeftPanelProps = {
   collapsed: boolean;
-  // Lets the Hierarchy/Devices toggle drive the panel's own collapse state:
-  // picking Devices collapses the tree out of the way (there's nothing to
-  // browse under it), picking Hierarchy brings the panel back.
   onCollapsedChange: (collapsed: boolean) => void;
   selected: SelectedNode;
   onSelect: (node: SelectedNode) => void;
@@ -189,18 +185,6 @@ export function LeftPanel({
 }: LeftPanelProps) {
   const { isDark } = useAppTheme();
   const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
-  const [query, setQuery] = useState('');
-
-  const q = query.trim().toLowerCase();
-  const searching = q.length > 0;
-  const matchedProjects = searching ? projects.filter((p) => p.name.toLowerCase().includes(q)) : [];
-  const matchedFolders = searching ? folders.filter((f) => f.name.toLowerCase().includes(q)) : [];
-  const matchedMachines = searching ? machines.filter((m) => m.name.toLowerCase().includes(q)) : [];
-  const matchedDevices = searching
-    ? devices.filter((d) => [d.name, d.type, displayIpFor(d), d.model].join(' ').toLowerCase().includes(q))
-    : [];
-  const matchCount = matchedProjects.length + matchedFolders.length + matchedMachines.length;
-  const deviceMatchCount = matchedDevices.length;
   const gateways = devices.filter((d) => d.type === 'Gateway' && !d.archived);
 
   const toggleExpand = (id: string) => {
@@ -212,50 +196,13 @@ export function LeftPanel({
     });
   };
 
-  const firstProjectId = projects[0]?.id;
+  // Which tree the panel shows follows the selection the top-bar view switcher
+  // sets — the panel no longer carries a switcher of its own.
   const activeTab: 'hierarchy' | 'devices' = selected.kind === 'devices' || selected.kind === 'device' ? 'devices' : 'hierarchy';
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
 
-  const goHierarchy = () => {
-    onSelect(firstProjectId ? { kind: 'project', id: firstProjectId } : { kind: 'none' });
-    onCollapsedChange(false);
-  };
-  const goDevices = () => {
-    onSelect({ kind: 'devices' });
-    onCollapsedChange(false);
-  };
-
   return (
     <>
-      {/* Floats above the collapsible tree, in the same spot whether the panel
-          is expanded or collapsed — picking Devices collapses the (now empty)
-          tree area out of the way without losing the way back to Hierarchy. */}
-      <View pointerEvents="box-none" className="absolute left-3 top-4 flex-row items-center gap-2" style={{ zIndex: 20 }}>
-        <View className={cn('flex-row rounded-full border p-0.5', lineClass, isDark ? 'bg-surface-dark' : 'bg-surface-light')}>
-          <Pressable
-            onPress={goHierarchy}
-            className={cn('rounded-full px-2.5 py-1', activeTab === 'hierarchy' && (isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel'))}
-          >
-            <SectionLabel active={activeTab === 'hierarchy'}>Hierarchy</SectionLabel>
-          </Pressable>
-          <Pressable
-            onPress={goDevices}
-            className={cn('rounded-full px-2.5 py-1', activeTab === 'devices' && (isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel'))}
-          >
-            <SectionLabel active={activeTab === 'devices'}>Devices</SectionLabel>
-          </Pressable>
-        </View>
-        {!collapsed && activeTab === 'hierarchy' && canConfigure && onCreateProject && (
-          <Pressable
-            onPress={onCreateProject}
-            testID={`permission:${PERMISSIONS.PROJECT_CREATE}`}
-            className={cn('h-4 w-4 items-center justify-center rounded', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
-          >
-            <Text className={cn('font-body-medium text-xs leading-none', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>+</Text>
-          </Pressable>
-        )}
-      </View>
-
       {collapsed ? (
         <Pressable
           onPress={() => onCollapsedChange(false)}
@@ -269,75 +216,29 @@ export function LeftPanel({
         >
           <ScrollView
             className="flex-1"
-            contentContainerStyle={{ paddingTop: 56, paddingBottom: 16 }}
+            contentContainerStyle={{ paddingTop: 12, paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
           >
           {activeTab === 'hierarchy' && (
             <View className="mb-5">
-              <View className="mb-3 px-3">
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search hierarchy…"
-                  placeholderTextColor={isDark ? '#5A5A5A' : '#9A9A9A'}
-                  className={cn(
-                    'rounded-lg border px-3 py-2 font-body text-[13px]',
-                    isDark ? 'border-line-dark bg-surface-darkpanel text-ink' : 'border-line-light bg-surface-lightpanel text-ink-inverse',
-                  )}
-                />
-              </View>
-
-              {searching ? (
-                matchCount === 0 ? (
-                  <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    No matches for “{query.trim()}”
+              {canConfigure && onCreateProject ? (
+                <View className="mb-1 flex-row items-center justify-between px-3 py-1">
+                  <Text className={cn('font-mono text-[9px] uppercase tracking-[0.18em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                    Hierarchy
                   </Text>
-                ) : (
-                  <>
-                    {matchedProjects.map((project) => (
-                      <TreeNode
-                        key={`s-p-${project.id}`}
-                        label={project.name}
-                        depth={0}
-                        kind="project"
-                        selected={selected.kind === 'project' && selected.id === project.id}
-                        onPress={() => onSelect({ kind: 'project', id: project.id })}
-                        onOpenMenu={canConfigure && onOpenMenu ? (x, y) => onOpenMenu(x, y, { kind: 'project', id: project.id }, false) : undefined}
-                        testID={`tree-node:project:${project.id}`}
-                      />
-                    ))}
-                    {matchedFolders.map((folder) => (
-                      <TreeNode
-                        key={`s-f-${folder.id}`}
-                        label={folder.name}
-                        depth={0}
-                        kind="folder"
-                        folderType={folder.type}
-                        selected={selected.kind === 'folder' && selected.id === folder.id}
-                        onPress={() => onSelect({ kind: 'folder', id: folder.id })}
-                        onOpenMenu={canConfigure && onOpenMenu ? (x, y) => onOpenMenu(x, y, { kind: 'folder', id: folder.id, projectId: folder.projectId }, true) : undefined}
-                        testID={`tree-node:folder:${folder.id}`}
-                      />
-                    ))}
-                    {matchedMachines.map((machine) => (
-                      <TreeNode
-                        key={`s-m-${machine.id}`}
-                        label={machine.name}
-                        depth={0}
-                        kind="machine"
-                        selected={selected.kind === 'machine' && selected.id === machine.id}
-                        onPress={() => onSelect({ kind: 'machine', id: machine.id })}
-                        onOpenMenu={
-                          canConfigure && onOpenMenu
-                            ? (x, y) => onOpenMenu(x, y, { kind: 'machine', id: machine.id, folderId: machine.folderId, projectId: machine.projectId }, false)
-                            : undefined
-                        }
-                        testID={`tree-node:machine:${machine.id}`}
-                      />
-                    ))}
-                  </>
-                )
-              ) : projects.length === 0 ? (
+                  <Pressable
+                    onPress={onCreateProject}
+                    testID={`permission:${PERMISSIONS.PROJECT_CREATE}`}
+                    accessibilityRole="button"
+                    accessibilityLabel="Create project"
+                    className="h-5 w-5 items-center justify-center rounded"
+                  >
+                    <Text className={cn('font-body-medium text-sm leading-none', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>+</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {projects.length === 0 ? (
                 <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
                   No project yet
                 </Text>
@@ -383,39 +284,13 @@ export function LeftPanel({
           )}
           {activeTab === 'devices' && (
             <View className="mb-5">
-              <View className="mb-3 px-3">
-                <TextInput
-                  value={query}
-                  onChangeText={setQuery}
-                  placeholder="Search devices..."
-                  placeholderTextColor={isDark ? '#5A5A5A' : '#9A9A9A'}
-                  className={cn(
-                    'rounded-lg border px-3 py-2 font-body text-[13px]',
-                    isDark ? 'border-line-dark bg-surface-darkpanel text-ink' : 'border-line-light bg-surface-lightpanel text-ink-inverse',
-                  )}
-                />
+              <View className="mb-1 px-3 py-1">
+                <Text className={cn('font-mono text-[9px] uppercase tracking-[0.18em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                  Devices
+                </Text>
               </View>
 
-              {searching ? (
-                deviceMatchCount === 0 ? (
-                  <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    No matches for "{query.trim()}"
-                  </Text>
-                ) : (
-                  matchedDevices.map((device) => (
-                    <TreeNode
-                      key={`s-d-${device.id}`}
-                      label={device.name}
-                      depth={0}
-                      kind="leaf"
-                      selected={selected.kind === 'device' && selected.id === device.id}
-                      onPress={() => onSelect({ kind: 'device', id: device.id })}
-                      onOpenMenu={canConfigure && onOpenDeviceMenu ? (x, y) => onOpenDeviceMenu(x, y, device.id) : undefined}
-                      testID={`tree-node:device:${device.id}`}
-                    />
-                  ))
-                )
-              ) : gateways.length === 0 ? (
+              {gateways.length === 0 ? (
                 <Text className={cn('px-3 font-body text-xs italic', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
                   No gateway yet
                 </Text>

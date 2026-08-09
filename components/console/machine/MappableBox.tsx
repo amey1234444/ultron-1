@@ -209,7 +209,7 @@ export function MappableBox({
     }),
   ).current;
 
-  const connectorColour = attached ? '#6EF08A' : '#6EF08A';
+  const connectorColour = attached ? '#3FBF6A' : '#3FBF6A';
 
   if (channel) {
     const decimals = LIVE_RANGE_FOR_LETTER[channel.letter].decimals;

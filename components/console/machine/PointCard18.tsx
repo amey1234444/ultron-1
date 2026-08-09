@@ -6,9 +6,9 @@ import { cn } from '../../../lib/cn';
 import type { TrailStatus } from './AdjustableTrail';
 
 const STATUS_COLOUR: Record<TrailStatus, string> = {
-  normal: '#6EF08A',
-  warning: '#E3B341',
-  critical: '#F2624A',
+  normal: '#3FBF6A',
+  warning: '#D9962B',
+  critical: '#D64545',
   offline: '#737373',
 };
 

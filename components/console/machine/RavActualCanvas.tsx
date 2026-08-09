@@ -9,9 +9,9 @@ import { Rav01LayoutCanvas } from './Rav01LayoutCanvas';
 import type { MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 
-const LIVE_COLOUR = '#6EF08A';
-const WARNING_COLOUR = '#E3B341';
-const CRITICAL_COLOUR = '#F2624A';
+const LIVE_COLOUR = '#3FBF6A';
+const WARNING_COLOUR = '#D9962B';
+const CRITICAL_COLOUR = '#D64545';
 
 type Level = 'normal' | 'warning' | 'critical';
 const LEVEL_COLOUR: Record<Level, string> = { normal: LIVE_COLOUR, warning: WARNING_COLOUR, critical: CRITICAL_COLOUR };

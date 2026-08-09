@@ -1,9 +1,9 @@
 ﻿export type Status = 'success' | 'warning' | 'critical';
 
 export const STATUS_HEX: Record<Status, string> = {
-  success: '#6EF08A',
-  warning: '#E3B341',
-  critical: '#F2624A',
+  success: '#3FBF6A',
+  warning: '#D9962B',
+  critical: '#D64545',
 };
 
 export const STATUS_BG_CLASS: Record<Status, string> = {

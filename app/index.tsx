@@ -24,7 +24,7 @@ import { MoveDialog } from '../components/console/MoveDialog';
 import { PanelToggle } from '../components/console/PanelToggle';
 import { RenameDialog } from '../components/console/RenameDialog';
 import { RackDetail } from '../components/console/rack/RackDetail';
-import { TopBar } from '../components/console/TopBar';
+import { TopBar, type ConsoleView } from '../components/console/TopBar';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
 import { useWorkspaceStore } from '../hooks/useWorkspaceStore';
@@ -166,6 +166,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const [selected, setSelected] = useState<SelectedNode>(initialSelected);
   const skipNextHistoryPush = useRef(false);
   const [leftCollapsed, setLeftCollapsed] = useState(isNarrow);
+  const [plantId, setPlantId] = useState<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS !== 'web' || typeof window === 'undefined') return;
@@ -745,6 +746,41 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const deleteDeviceInfo = deleteDeviceId ? (storedDevices.find((d) => d.id === deleteDeviceId) ?? devices.find((d) => d.id === deleteDeviceId)) : null;
   const detailTopClearance = leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'machine' || selected.kind === 'device') ? 44 : 0;
 
+  // The top-bar switcher owns the three top-level destinations; the selection
+  // is still the single source of truth, so the control reads back out of it.
+  const consoleView: ConsoleView =
+    selected.kind === 'devices' || selected.kind === 'device'
+      ? 'devices'
+      : selected.kind === 'none'
+        ? 'overview'
+        : 'hierarchy';
+
+  const openView = (view: ConsoleView) => {
+    if (view === 'overview') {
+      setSelected({ kind: 'none' });
+      return;
+    }
+    if (view === 'devices') {
+      setSelected({ kind: 'devices' });
+      return;
+    }
+    const firstProjectId = projects[0]?.id;
+    setSelected(firstProjectId ? { kind: 'project', id: firstProjectId } : { kind: 'none' });
+    setLeftCollapsed(false);
+  };
+
+  // The overview is plant-wide and has no tree to browse, so the sidebar would
+  // only be a column of dead space next to it.
+  const showSidebar = consoleView !== 'overview' && !workspaceCollapsesSidebar;
+
+  // Which plant the overview reports on. Defaults to the first project and
+  // falls back to it if that project disappears.
+  const overviewPlantId = plantId && projects.some((project) => project.id === plantId) ? plantId : (projects[0]?.id ?? null);
+  const overviewProjects = overviewPlantId ? projects.filter((project) => project.id === overviewPlantId) : projects;
+  const overviewFolders = overviewPlantId ? folders.filter((folder) => folder.projectId === overviewPlantId) : folders;
+  const overviewMachines = overviewPlantId ? machines.filter((machine) => machine.projectId === overviewPlantId) : machines;
+  const overviewDevices = overviewPlantId ? devices.filter((device) => !device.projectId || device.projectId === overviewPlantId) : devices;
+
   const renameCurrentName =
     renameTarget?.kind === 'project'
       ? (projects.find((p) => p.id === renameTarget.id)?.name ?? '')
@@ -784,6 +820,12 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         configureMode={configureMode}
         onConfigureModeChange={setConfigureMode}
         onLogoPress={() => setSelected({ kind: 'none' })}
+        authenticated={Boolean(currentUser)}
+        view={consoleView}
+        onViewChange={openView}
+        plants={projects.map((project) => ({ id: project.id, name: project.name }))}
+        plantId={overviewPlantId}
+        onPlantChange={setPlantId}
       />
 
       {ipChangeNotice && (
@@ -825,7 +867,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       )}
 
       <View className="flex-1 flex-row">
-        {!workspaceCollapsesSidebar && (
+        {showSidebar && (
           <>
             <LeftPanel
               collapsed={leftCollapsed}
@@ -956,10 +998,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
             )
           ) : selected.kind === 'none' || projects.length === 0 ? (
             <DashboardOverview
-              projects={projects}
-              folders={folders}
-              machines={machines}
-              devices={devices}
+              projects={overviewProjects}
+              folders={overviewFolders}
+              machines={overviewMachines}
+              devices={overviewDevices}
               cards={visibleCards}
               live={realMode ? liveState : undefined}
               realMode={realMode}

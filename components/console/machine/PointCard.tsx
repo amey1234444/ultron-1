@@ -30,10 +30,10 @@ const ACCENT_FOR_STATUS: Record<MeasurementPointStatus, string> = {
   'Not Configured': '#5F625F',
   Configured: '#87897F',
   Mapped: '#C9CCC9',
-  Connected: '#6EF08A',
+  Connected: '#3FBF6A',
   Disconnected: '#5F625F',
-  Warning: '#E3B341',
-  Alarm: '#F2624A',
+  Warning: '#D9962B',
+  Alarm: '#D64545',
 };
 
 // Stable per-kind sequence within a component's point list, e.g. "P1", "P2" for the

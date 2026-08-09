@@ -14,8 +14,8 @@ export type TrailStatus = 'normal' | 'warning' | 'critical' | 'offline';
 function statusColourFor(status: TrailStatus, isDark: boolean): string {
   if (status === 'normal') return isDark ? '#F5F5F5' : '#1A1A1A';
   const rest: Record<Exclude<TrailStatus, 'normal'>, string> = {
-    warning: '#E3B341',
-    critical: '#F2624A',
+    warning: '#D9962B',
+    critical: '#D64545',
     offline: '#737373',
   };
   return rest[status];
@@ -207,7 +207,7 @@ function DraggablePoint({
           height: isEndpoint ? 18 : 10,
           borderRadius: isEndpoint ? 9 : 3,
           borderWidth: isEndpoint ? 2 : 1,
-          borderColor: isEndpoint ? colour : '#6EF08A',
+          borderColor: isEndpoint ? colour : '#3FBF6A',
           backgroundColor: '#0A0A0A',
           alignItems: 'center',
           justifyContent: 'center',
@@ -253,7 +253,7 @@ export function AdjustableTrail({
 }: AdjustableTrailProps) {
   const { isDark } = useAppTheme();
   const statusColour = statusColourFor(status, isDark);
-  const trailColour = selected ? '#6EF08A' : statusColour;
+  const trailColour = selected ? '#3FBF6A' : statusColour;
   const showBendMarkers = showControlPoints;
   const showDraggableControls = interactive && showControlPoints;
 

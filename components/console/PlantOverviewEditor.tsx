@@ -16,10 +16,10 @@ import {
 } from '../../lib/plantOverview';
 
 const STATUS_COLORS: Record<Exclude<PlantTagStatus, 'auto'>, string> = {
-  healthy: '#6EF08A',
-  warning: '#E3B341',
-  critical: '#ef4444',
-  offline: '#94a3b8',
+  healthy: '#3FBF6A',
+  warning: '#D9962B',
+  critical: '#D64545',
+  offline: '#7A7E86',
 };
 
 const STATUS_OPTIONS: PlantTagStatus[] = ['auto', 'healthy', 'warning', 'critical', 'offline'];
@@ -178,7 +178,7 @@ export function PlantOverviewEditor({
           }}
         />
         {config.tags.map((tag) => {
-          const color = tagColor(tag, autoColors[tag.name] ?? '#6EF08A');
+          const color = tagColor(tag, autoColors[tag.name] ?? '#3FBF6A');
           const isSelected = tag.id === selectedId;
           return (
             <View key={tag.id}>
@@ -205,7 +205,7 @@ export function PlantOverviewEditor({
                     height: LABEL_H * scale,
                     borderRadius: 7,
                     borderWidth: isSelected ? 2 : 1,
-                    borderColor: isSelected ? '#6EF08A' : '#dbe3ec',
+                    borderColor: isSelected ? '#3FBF6A' : '#dbe3ec',
                     backgroundColor: '#ffffff',
                     paddingHorizontal: 9 * scale,
                     justifyContent: 'center',
@@ -228,7 +228,7 @@ export function PlantOverviewEditor({
       <View className="flex-row items-center justify-between">
         <Text className={cn('font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Tags ({config.tags.length})</Text>
         <Pressable onPress={addTag} className={cn('flex-row items-center gap-1 rounded-md border px-2.5 py-1.5', isDark ? 'border-line-dark' : 'border-line-light')}>
-          <MaterialCommunityIcons name="plus" size={14} color="#6EF08A" />
+          <MaterialCommunityIcons name="plus" size={14} color="#3FBF6A" />
           <Text className="font-body-medium text-[11px] text-accent">Add tag</Text>
         </Pressable>
       </View>
@@ -248,7 +248,7 @@ export function PlantOverviewEditor({
                 onChangeText={(value) => patchTag(tag.id, { name: value })}
                 onFocus={() => setSelectedId(tag.id)}
                 placeholder="Tag name"
-                placeholderTextColor="#94a3b8"
+                placeholderTextColor="#7A7E86"
                 style={
                   {
                     flexGrow: 1,
@@ -279,7 +279,7 @@ export function PlantOverviewEditor({
                 pin {tag.x},{tag.y}
               </Text>
               <Pressable onPress={() => removeTag(tag.id)} accessibilityLabel={`Remove ${tag.name}`}>
-                <MaterialCommunityIcons name="trash-can-outline" size={16} color="#ef4444" />
+                <MaterialCommunityIcons name="trash-can-outline" size={16} color="#D64545" />
               </Pressable>
             </View>
           ))}
