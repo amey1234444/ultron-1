@@ -57,12 +57,14 @@ export function ChannelNameFields({
   setChannelName: (index: number, value: string) => void;
   placeholder: (index: number) => string;
 }) {
+  // One channel per card, so the single field is just "Channel Name"; the map is
+  // kept so a card type that ever exposes more than one still renders correctly.
   return (
     <>
       {channelNames.map((name, index) => (
         <FormField
           key={index}
-          label={`Channel ${index + 1} Name`}
+          label={channelNames.length === 1 ? 'Channel Name' : `Channel ${index + 1} Name`}
           required={index === 0}
           value={name}
           onChangeText={(v) => setChannelName(index, v)}

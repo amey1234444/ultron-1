@@ -31,10 +31,12 @@ export function defaultModelFor(type: DeviceType): string {
   return type === 'Gateway' ? 'GW-100' : 'RACK-12-R';
 }
 
-// Rack channel capacity is fixed by spec §6.1 (12 acquisition slots + 2 controller
-// slots); Gateways don't expose channels of their own.
+// Rack channel capacity is fixed by spec §6.1: 12 acquisition slots (+ 2
+// controller slots, which carry no sensor channels) and one channel per card,
+// so a fully populated rack exposes 12 channels. Gateways don't expose channels
+// of their own.
 export function totalChannelsFor(type: DeviceType): number {
-  return type === 'Rack' ? 24 : 0;
+  return type === 'Rack' ? 12 : 0;
 }
 
 // No channel mapping exists yet (spec §9, a later step) — always 0 for now.

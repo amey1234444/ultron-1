@@ -10,10 +10,10 @@
 
 import Head from 'next/head';
 
+import Ambience from '../components/home/Ambience';
 import BuildOn from '../components/home/BuildOn';
 import Coverage from '../components/howitworks/Coverage';
 import Pipeline from '../components/home/Pipeline';
-import Rules from '../components/home/Rules';
 import SignalLoom from '../components/howitworks/SignalLoom';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
@@ -32,7 +32,7 @@ export default function HowItWorksPage() {
       </Head>
 
       <SiteNav />
-      <Rules />
+      <Ambience />
 
       <div className={styles.content}>
         <header className={styles.pageHead}>

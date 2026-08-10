@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { channelCountForCardType, slotKind, type CardNode } from '../../../lib/rack';
+import { channelCountForCardType, channelNamesForCard, slotKind, type CardNode } from '../../../lib/rack';
 import { CardTypeIcon } from './cardIcons';
 
 type CardListViewProps = {
@@ -11,10 +11,7 @@ type CardListViewProps = {
 };
 
 function labelFor(card: CardNode): string {
-  if ('channelNames' in card.config) {
-    const names = card.config.channelNames.filter(Boolean);
-    return names.length > 0 ? names.join(', ') : '—';
-  }
+  if (channelCountForCardType(card.type) > 0) return channelNamesForCard(card)[0]?.trim() || '—';
   if ('controllerName' in card.config) return card.config.controllerName || '—';
   return '—';
 }

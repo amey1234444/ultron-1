@@ -7,8 +7,8 @@
 
 import Head from 'next/head';
 
+import Ambience from '../components/home/Ambience';
 import Faq from '../components/home/Faq';
-import Rules from '../components/home/Rules';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import { Arrow, Button, Reveal, SectionHead } from '../components/home/primitives';
@@ -42,7 +42,7 @@ export default function AboutPage() {
       </Head>
 
       <SiteNav />
-      <Rules />
+      <Ambience />
 
       <div className={styles.content}>
         <header className={styles.pageHead}>

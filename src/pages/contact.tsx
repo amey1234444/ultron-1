@@ -7,7 +7,7 @@
 
 import Head from 'next/head';
 
-import Rules from '../components/home/Rules';
+import Ambience from '../components/home/Ambience';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import { Arrow, Button, Reveal } from '../components/home/primitives';
@@ -51,7 +51,7 @@ export default function ContactPage() {
       </Head>
 
       <SiteNav />
-      <Rules />
+      <Ambience />
 
       <div className={styles.content}>
         <header className={styles.pageHead}>

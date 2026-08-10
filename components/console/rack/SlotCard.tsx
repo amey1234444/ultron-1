@@ -18,7 +18,7 @@ import Svg, {
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { DeviceNode } from '../../../lib/devices';
 import { channelAlarmLevel, channelLiveStatus, latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
-import type { CardNode, CardType } from '../../../lib/rack';
+import { channelCountForCardType, channelNamesForCard, type CardNode, type CardType } from '../../../lib/rack';
 
 type SlotCardProps = {
   slot: number;
@@ -135,9 +135,7 @@ function kindFor(type: CardType): VisualKind {
 }
 
 function pointLabelsFor(card: CardNode): string[] {
-  if ('channelNames' in card.config) {
-    return card.config.channelNames.map((_, index) => `C${index + 1}`);
-  }
+  if (channelCountForCardType(card.type) > 0) return channelNamesForCard(card).map(() => 'CH');
   if ('controllerName' in card.config) return ['DATA'];
   return [card.type];
 }

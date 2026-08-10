@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { channelCountForCardType, slotKind, type CardNode } from '../../../lib/rack';
+import { channelCountForCardType, channelNamesForCard, slotKind, type CardNode } from '../../../lib/rack';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
 import { CardTypeIcon } from './cardIcons';
@@ -28,8 +28,8 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 }
 
 function channelRows(card: CardNode): { label: string; value: string }[] {
-  if ('channelNames' in card.config) {
-    return card.config.channelNames.map((name, index) => ({ label: `Channel ${index + 1}`, value: name || '—' }));
+  if (channelCountForCardType(card.type) > 0) {
+    return channelNamesForCard(card).map((name) => ({ label: 'Channel Name', value: name || '—' }));
   }
   if ('controllerName' in card.config) {
     return [

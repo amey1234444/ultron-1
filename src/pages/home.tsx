@@ -1,11 +1,11 @@
 import Head from 'next/head';
 
+import Ambience from '../components/home/Ambience';
 import Capabilities from '../components/home/Capabilities';
 import CaseStudy from '../components/home/CaseStudy';
 import Industries from '../components/home/Industries';
 import ProductStage from '../components/home/ProductStage';
 import Results from '../components/home/Results';
-import Rules from '../components/home/Rules';
 import SignalBand from '../components/home/SignalBand';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
@@ -25,7 +25,7 @@ export default function HomePage() {
       </Head>
 
       <SiteNav />
-      <Rules />
+      <Ambience />
 
       {/* The section order is also the tonal order. Consecutive bands step
           between black and a lifted grey so the page reads as plates laid on one

@@ -12,7 +12,7 @@ import {
   type ChannelLiveStatus,
   type LiveState,
 } from '../../../lib/liveTelemetry';
-import { channelCountForCardType, type CardNode } from '../../../lib/rack';
+import { channelCountForCardType, channelNamesForCard, type CardNode } from '../../../lib/rack';
 
 type ChannelListViewProps = {
   device: DeviceNode;
@@ -21,10 +21,8 @@ type ChannelListViewProps = {
 };
 
 function channelLabelsFor(card: CardNode): string[] {
-  if ('channelNames' in card.config) {
-    return card.config.channelNames.map((name, index) => name || `${card.type} (unnamed CH${index + 1})`);
-  }
-  return [card.type];
+  if (channelCountForCardType(card.type) === 0) return [card.type];
+  return channelNamesForCard(card).map((name) => name || `${card.type} (unnamed, slot ${card.slot})`);
 }
 
 const STATUS_META: Record<ChannelLiveStatus, { label: string; colour: string }> = {

@@ -3,7 +3,7 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import type { CardConfig, CardType, ControllerConfig, ProcessConfig, SpeedConfig, VibrationConfig } from '../../../lib/rack';
+import { normalizedCardConfig, type CardConfig, type CardType, type ControllerConfig, type ProcessConfig, type SpeedConfig, type VibrationConfig } from '../../../lib/rack';
 import { cardConfigWithSimulation, type SimulatedChannel } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
@@ -24,7 +24,7 @@ type CardConfigPageProps = {
 
 export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, initialSimulation, backLabel = 'Back', onBack, onSave }: CardConfigPageProps) {
   const { isDark } = useAppTheme();
-  const [config, setConfig] = useState<CardConfig>(initialConfig);
+  const [config, setConfig] = useState<CardConfig>(() => normalizedCardConfig(cardType, initialConfig));
   const [enabled, setEnabled] = useState(initialEnabled);
   const [simulation, setSimulation] = useState<SimulatedChannel[] | undefined>(initialSimulation);
 

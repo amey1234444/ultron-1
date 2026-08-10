@@ -96,22 +96,35 @@ export type CardNode = {
   simulation?: SimulatedChannel[];
 };
 
+// One acquisition card carries exactly one measurement channel, so a slot maps
+// one-to-one onto a sensor point: slot 3 is always "the sensor in slot 3", with
+// no channel sub-address to carry through mapping, alarms or analysis.
+// Controllers manage the rack link rather than exposing sensor channels.
 export function channelCountForCardType(type: CardType): number {
-  // Vibration and Speed cards expose 2 physical channels, Process exposes 4;
-  // controllers manage the rack link rather than exposing sensor channels.
-  switch (type) {
-    case 'Vibration Card':
-    case 'Speed Card':
-      return 2;
-    case 'Process Card':
-      return 4;
-    case 'Communication Controller':
-      return 0;
-  }
+  return type === 'Communication Controller' ? 0 : 1;
 }
 
 function emptyChannelNames(type: CardType): string[] {
   return Array.from({ length: channelCountForCardType(type) }, () => '');
+}
+
+// Channel names as stored can disagree with the card's channel count — a card
+// saved when acquisition cards carried 2 or 4 channels, or one whose type was
+// changed since. Everything that renders or enumerates channels goes through
+// here, so a stored extra name can never surface as a phantom channel.
+export function channelNamesForCard(card: CardNode): string[] {
+  const count = channelCountForCardType(card.type);
+  const stored = 'channelNames' in card.config ? card.config.channelNames : [];
+  return Array.from({ length: count }, (_, index) => stored[index] ?? '');
+}
+
+// The same resize applied to a config being edited, so the form renders exactly
+// the fields the card actually has rather than whatever length was stored.
+export function normalizedCardConfig(type: CardType, config: CardConfig): CardConfig {
+  const count = channelCountForCardType(type);
+  if (!('channelNames' in config)) return config;
+  if (config.channelNames.length === count) return config;
+  return { ...config, channelNames: Array.from({ length: count }, (_, index) => config.channelNames[index] ?? '') };
 }
 
 export function emptyConfigFor(type: CardType): CardConfig {
@@ -263,9 +276,7 @@ export function listChannels(devices: DeviceNode[], cards: CardNode[], options: 
     const rackCards = Array.from(cardBySlot.values()).sort((a, b) => a.slot - b.slot);
 
     return rackCards.flatMap((card) => {
-      const names = 'channelNames' in card.config ? card.config.channelNames : [];
-
-      return names.flatMap((name, index) => {
+      return channelNamesForCard(card).flatMap((name, index) => {
         const channelNumber = index + 1;
         if (options.channelIsAvailable && !options.channelIsAvailable(rack, card, channelNumber)) return [];
         const { letter, unit, alarmWarning, alarmCritical } = channelDescriptor(card, index);
@@ -275,7 +286,8 @@ export function listChannels(devices: DeviceNode[], cards: CardNode[], options: 
           rackId: rack.id,
           slot: card.slot,
           deviceName: rack.name,
-          label: name.trim() || `${card.type} CH${channelNumber}`,
+          // One channel per card, so the card's own name is the point name.
+          label: name.trim() || `${card.type} · Slot ${card.slot}`,
           code: `${letter}${letterCounts[letter]}`,
           unit,
           letter,

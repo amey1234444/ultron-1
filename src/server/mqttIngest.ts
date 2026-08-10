@@ -78,7 +78,7 @@ function cardConfigForSlot(type: ReturnType<typeof cardTypeForSlot>, slot: Recor
   const critical = stringValue(slot.danger_value_formatted) ?? '';
   if (type === 'Vibration Card') {
     return {
-      channelNames: [label, ''],
+      channelNames: [label],
       sensorType: sensor,
       sensitivity: '',
       engineeringUnit: unit || 'mm/s',
@@ -91,7 +91,7 @@ function cardConfigForSlot(type: ReturnType<typeof cardTypeForSlot>, slot: Recor
   }
   if (type === 'Speed Card') {
     return {
-      channelNames: [label, ''],
+      channelNames: [label],
       inputType: 'RPM',
       pulsesPerRevolution: '',
       trigger: '',
@@ -106,7 +106,7 @@ function cardConfigForSlot(type: ReturnType<typeof cardTypeForSlot>, slot: Recor
     return { controllerName: label, ip: '', port: '', firmware: '', role: 'Primary', partnerController: '' };
   }
   return {
-    channelNames: [label, '', '', ''],
+    channelNames: [label],
     inputType: sensor.toLowerCase().includes('rtd') ? 'RTD 3-wire' : sensor.toLowerCase().includes('thermocouple') ? 'Thermocouple' : '4-20 mA',
     engineeringMin: '',
     engineeringMax: '',
