@@ -31,7 +31,7 @@ yarn-error.*
 *.pem
 
 # local env files
-.env*.local
+# .env*.local
 
 # typescript
 *.tsbuildinfo
@@ -40,9 +40,9 @@ yarn-error.*
 /ios
 /android
 .vercel
-.env
-.env.*
-!.env.example
+# .env
+# .env.*
+# !.env.example
 .next/
 next-env.d.ts
 /build

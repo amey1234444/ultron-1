@@ -14,6 +14,7 @@ import {
 } from '../../lib/devices';
 import type { ProjectNode } from '../../lib/hierarchy';
 import { activeChannelsForDevice, type LiveState } from '../../lib/liveTelemetry';
+import { isSimulatedDevice } from '../../lib/simulation';
 import { RibbonEdge } from './RibbonEdge';
 
 type DevicesTableProps = {
@@ -142,9 +143,16 @@ function DeviceRow({
       <RibbonEdge health={health} side="left" />
       <RibbonEdge health={health} side="right" />
 
-      <Text style={{ flex: FLEX.name }} numberOfLines={1} className={cn('font-body-medium text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
-        {device.name}
-      </Text>
+      <View style={{ flex: FLEX.name }} className="flex-row items-center gap-2">
+        <Text numberOfLines={1} className={cn('shrink font-body-medium text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
+          {device.name}
+        </Text>
+        {isSimulatedDevice(device) && (
+          <View className="rounded-full border border-accent/50 bg-accent/10 px-1.5 py-px">
+            <Text className="font-mono text-[9px] uppercase tracking-[0.14em] text-accent">Sim</Text>
+          </View>
+        )}
+      </View>
       <Text style={{ flex: FLEX.type }} className={cn('font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
         {device.type}
       </Text>

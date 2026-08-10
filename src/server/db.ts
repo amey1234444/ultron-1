@@ -381,6 +381,8 @@ async function migrate(): Promise<void> {
   await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS real_gateway_id TEXT;`);
   await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS real_rack_id INT;`);
   await query(`ALTER TABLE studio_devices ALTER COLUMN real_rack_id TYPE TEXT USING real_rack_id::TEXT;`);
+  // Simulation Mode: virtual gateways/racks fed by the in-app simulator.
+  await query(`ALTER TABLE studio_devices ADD COLUMN IF NOT EXISTS simulated BOOLEAN NOT NULL DEFAULT false;`);
   await query(`CREATE INDEX IF NOT EXISTS studio_devices_live_gateway ON studio_devices (type, archived, real_gateway_id);`);
   await query(`CREATE INDEX IF NOT EXISTS studio_devices_live_ip ON studio_devices (type, archived, ip);`);
   await query(`
@@ -396,6 +398,8 @@ async function migrate(): Promise<void> {
     );
   `);
   await query(`CREATE INDEX IF NOT EXISTS studio_cards_device ON studio_cards (device_id);`);
+  // Per-channel simulated signal definition; null for a card in a real rack.
+  await query(`ALTER TABLE studio_cards ADD COLUMN IF NOT EXISTS simulation JSONB;`);
   await query(`
     DELETE FROM studio_cards stale
     USING studio_cards keep

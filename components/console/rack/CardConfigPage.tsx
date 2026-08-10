@@ -4,22 +4,27 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { CardConfig, CardType, ControllerConfig, ProcessConfig, SpeedConfig, VibrationConfig } from '../../../lib/rack';
+import { cardConfigWithSimulation, type SimulatedChannel } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { ControllerFields, EnabledToggle, ProcessFields, SpeedFields, VibrationFields } from './CardConfigFields';
+import { SimulationFields } from './SimulationFields';
 
 type CardConfigPageProps = {
   slot: number;
   cardType: CardType;
   initialConfig: CardConfig;
   initialEnabled: boolean;
+  /** Present only for a card in a simulated rack — one entry per channel. */
+  initialSimulation?: SimulatedChannel[];
   onBack: () => void;
-  onSave: (config: CardConfig, enabled: boolean) => void;
+  onSave: (config: CardConfig, enabled: boolean, simulation?: SimulatedChannel[]) => void;
 };
 
-export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, onBack, onSave }: CardConfigPageProps) {
+export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, initialSimulation, onBack, onSave }: CardConfigPageProps) {
   const { isDark } = useAppTheme();
   const [config, setConfig] = useState<CardConfig>(initialConfig);
   const [enabled, setEnabled] = useState(initialEnabled);
+  const [simulation, setSimulation] = useState<SimulatedChannel[] | undefined>(initialSimulation);
 
   const set = <K extends string>(key: K, value: string) => setConfig((prev) => ({ ...prev, [key]: value }));
   const setChannelName = (index: number, value: string) =>
@@ -60,11 +65,24 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
         {cardType === 'Communication Controller' && <ControllerFields config={config as ControllerConfig} set={set} />}
 
         <EnabledToggle enabled={enabled} onChange={setEnabled} />
+
+        {simulation && (
+          <SimulationFields
+            cardType={cardType}
+            channelNames={'channelNames' in config ? config.channelNames : []}
+            channels={simulation}
+            onChange={setSimulation}
+          />
+        )}
       </ScrollView>
 
       <View className={cn('flex-row justify-end gap-3 border-t px-6 py-4', lineClass)}>
         <ActionButton label="Cancel" variant="secondary" onPress={onBack} />
-        <ActionButton label="Save" onPress={() => canSave && onSave(config, enabled)} disabled={!canSave} />
+        <ActionButton
+          label="Save"
+          onPress={() => canSave && onSave(simulation ? cardConfigWithSimulation(cardType, config, simulation) : config, enabled, simulation)}
+          disabled={!canSave}
+        />
       </View>
     </View>
   );

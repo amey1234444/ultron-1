@@ -6,6 +6,7 @@ import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/
 import type { LiveState } from '../../../lib/liveTelemetry';
 import { cn } from '../../../lib/cn';
 import { emptyConfigFor, isCardConfigured, type CardConfig, type CardNode, type CardType } from '../../../lib/rack';
+import { isSimulatedDevice, simulationForCard, type SimulatedChannel } from '../../../lib/simulation';
 import { BackButton } from '../BackButton';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { CardActionsMenu, type CardActionsMenuState } from './CardActionsMenu';
@@ -27,7 +28,7 @@ type RackDetailProps = {
   onBack: () => void;
   backLabel?: string;
   onInstallCard: (slot: number, type: CardType, config: CardConfig, enabled: boolean) => void;
-  onUpdateCard: (cardId: string, config: CardConfig, enabled: boolean) => void;
+  onUpdateCard: (cardId: string, config: CardConfig, enabled: boolean, simulation?: SimulatedChannel[]) => void;
   onRemoveCard: (cardId: string) => void;
   canEditDeleteSchema: boolean;
 };
@@ -80,9 +81,10 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
         cardType={pageCard.type}
         initialConfig={pageCard.config}
         initialEnabled={pageCard.enabled}
+        initialSimulation={isSimulatedDevice(device) ? simulationForCard(pageCard) : undefined}
         onBack={() => setCardPage({ cardId: pageCard.id, view: isCardConfigured(pageCard) ? 'overview' : 'config' as CardPageView })}
-        onSave={(config, enabled) => {
-          onUpdateCard(pageCard.id, config, enabled);
+        onSave={(config, enabled, simulation) => {
+          onUpdateCard(pageCard.id, config, enabled, simulation);
           setCardPage({ cardId: pageCard.id, view: 'overview' });
         }}
       />
@@ -97,7 +99,14 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
 
       <View className="flex-row items-center justify-between px-6 pt-3">
         <View>
-          <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{effectiveDevice.name}</Text>
+          <View className="flex-row items-center gap-2">
+            <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{effectiveDevice.name}</Text>
+            {isSimulatedDevice(effectiveDevice) && (
+              <View className="rounded-full border border-accent/50 bg-accent/10 px-2 py-0.5">
+                <Text className="font-mono text-[10px] uppercase tracking-[0.14em] text-accent">Simulated</Text>
+              </View>
+            )}
+          </View>
           <Text className={cn('mt-1 font-mono text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
             rack_id: {effectiveDevice.realRackId ?? '-'}
           </Text>

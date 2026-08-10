@@ -23,6 +23,7 @@ export type SelectedNode =
   | { kind: 'project'; id: string }
   | { kind: 'folder'; id: string }
   | { kind: 'devices' }
+  | { kind: 'simulation' }
   | { kind: 'device'; id: string }
   | { kind: 'machine'; id: string }
   | { kind: 'none' };

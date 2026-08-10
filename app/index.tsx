@@ -27,10 +27,21 @@ import { RackDetail } from '../components/console/rack/RackDetail';
 import { TopBar, type ConsoleView } from '../components/console/TopBar';
 import { useAppTheme } from '../hooks/useAppTheme';
 import { useLiveTelemetry } from '../hooks/useLiveTelemetry';
+import { mergeLiveStates, useSimulationEngine } from '../hooks/useSimulationEngine';
 import { useWorkspaceStore } from '../hooks/useWorkspaceStore';
 import { cn } from '../lib/cn';
-import { composeIp, defaultRealGatewayId, deviceWithGatewayConnectionState, hostOctetFor, ipPrefixFor, racksForGateway, type DeviceNode } from '../lib/devices';
-import { applyLiveStatus } from '../lib/liveTelemetry';
+import { composeIp, defaultRealGatewayId, deviceWithGatewayConnectionState, hostOctetFor, ipPrefixFor, isValidIp, racksForGateway, type DeviceNode } from '../lib/devices';
+import { applyLiveStatus, EMPTY_LIVE_STATE } from '../lib/liveTelemetry';
+import {
+  cardConfigWithSimulation,
+  defaultSimulationForCard,
+  isSimulatedDevice,
+  nextSimulatedGatewayIp,
+  nextSimulatedRackIp,
+  simulatedGatewayScriptId,
+  type SimulatedChannel,
+} from '../lib/simulation';
+import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
 import {
   duplicateFolderSubtree,
   duplicateProject,
@@ -63,6 +74,8 @@ function selectedToHash(selected: SelectedNode): string {
       return '#home';
     case 'devices':
       return '#devices';
+    case 'simulation':
+      return '#simulation';
     case 'project':
     case 'folder':
     case 'machine':
@@ -75,6 +88,7 @@ function selectedFromHash(hash: string): SelectedNode {
   const normalized = hash.startsWith('#') ? hash.slice(1) : hash;
   if (!normalized || normalized === 'home') return { kind: 'none' };
   if (normalized === 'devices') return { kind: 'devices' };
+  if (normalized === 'simulation') return { kind: 'simulation' };
   const [kind, encodedId = ''] = normalized.split('=');
   const id = decodeURIComponent(encodedId);
   if (!id) return { kind: 'none' };
@@ -239,6 +253,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // the stored device statuses, so the devices strip shows Online the moment a
   // bound gateway starts publishing.
   const liveState = useLiveTelemetry();
+  // Simulation Mode: the in-app virtual gateway. It produces an ordinary
+  // LiveState through the same frame pipeline as real MQTT traffic, so from
+  // here down there is one code path for real and simulated data.
+  const [simulationRunning, setSimulationRunning] = useState(true);
   const [ipChangeNotice, setIpChangeNotice] = useState<{ gatewayName: string; oldIp: string; newIp: string } | null>(null);
   const [ipConflictNotice, setIpConflictNotice] = useState<{
     ip: string;
@@ -255,7 +273,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     for (const device of storedDevices) merged.set(device.id, device);
 
     const seedGateway = DEMO_SEED.devices.find((device) => device.type === 'Gateway');
-    const firstGateway = configuredGateways[0] ?? (seedGateway && merged.has(seedGateway.id) ? seedGateway : undefined);
+    // Demo scaffolding only ever hangs off real hardware: a simulated gateway
+    // must not adopt the seed racks and make them look simulated.
+    const firstGateway =
+      configuredGateways.find((gateway) => !isSimulatedDevice(gateway)) ??
+      (seedGateway && merged.has(seedGateway.id) ? seedGateway : undefined);
     if (!firstGateway) return storedDevices;
     if (!merged.has(firstGateway.id)) merged.set(firstGateway.id, firstGateway);
 
@@ -289,13 +311,41 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     for (const card of cards) merged.set(card.id, card);
     return Array.from(merged.values());
   }, [cards]);
+  const simLive = useSimulationEngine(storedDevices, cards, simulationRunning);
+  const simulationActive = simLive.gateways.length > 0;
+  // One state for every consumer that takes live data. Simulated gateways carry
+  // their own script ids and a reserved IP block, so real and simulated entries
+  // coexist without either shadowing the other.
+  const effectiveLive = useMemo(
+    () => mergeLiveStates(realMode ? liveState : EMPTY_LIVE_STATE, simLive),
+    [liveState, realMode, simLive],
+  );
   const devices = useMemo<DeviceNode[]>(
     () => {
-      if (!realMode) return demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Online' as const }));
-      return applyLiveStatus(demoDevices.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' as const })), liveState);
+      // Simulated devices always take their status from the simulator — that is
+      // the point of Simulation Mode — while everything else keeps the existing
+      // demo/real-mode behaviour.
+      const physical = demoDevices.filter((device) => !isSimulatedDevice(device));
+      const simulated = demoDevices.filter(isSimulatedDevice);
+      const resolvedPhysical = realMode
+        ? applyLiveStatus(physical.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' as const })), liveState)
+        : physical.map((device) => (device.archived ? device : { ...device, status: 'Online' as const }));
+      if (simulated.length === 0) return resolvedPhysical;
+      const resolvedSimulated = applyLiveStatus(
+        simulated.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' as const })),
+        simLive,
+      );
+      const byId = new Map([...resolvedPhysical, ...resolvedSimulated].map((device) => [device.id, device]));
+      // Rebuilt in the original order so the devices list never reshuffles.
+      return demoDevices.map((device) => byId.get(device.id) ?? device);
     },
-    [demoDevices, liveState, realMode],
+    [demoDevices, liveState, realMode, simLive],
   );
+  // Device-scoped views get exactly the pipeline that feeds that device;
+  // plant-wide views get both, and fall back per device where nothing is bound.
+  const liveFor = (device: DeviceNode | undefined) =>
+    device && isSimulatedDevice(device) ? simLive : realMode ? liveState : undefined;
+  const plantLive = realMode || simulationActive ? effectiveLive : undefined;
   const visibleDeviceIds = useMemo(() => new Set(devices.map((device) => device.id)), [devices]);
   const visibleCards = useMemo(
     () => demoCards.filter((card) => visibleDeviceIds.has(card.deviceId)),
@@ -478,6 +528,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   const [addDeviceVisible, setAddDeviceVisible] = useState(false);
   const [addDeviceGatewayId, setAddDeviceGatewayId] = useState<string | null>(null);
+  const [addDeviceSimulated, setAddDeviceSimulated] = useState(false);
   const [editingDeviceId, setEditingDeviceId] = useState<string | null>(null);
   const [deviceMenu, setDeviceMenu] = useState<DeviceMenuState | null>(null);
   const [assignDeviceId, setAssignDeviceId] = useState<string | null>(null);
@@ -602,7 +653,34 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     setDeleteTarget(null);
   };
 
-  const handleSaveDevice = (device: NewDevice) => {
+  // Simulated hardware is addressed automatically inside a reserved block, so
+  // the operator never has to invent an IP for a device that does not exist —
+  // while everything downstream still resolves gateway/rack bindings by IP the
+  // same way it does for real hardware.
+  const withSimulatedAddressing = (device: NewDevice, deviceId: string): NewDevice => {
+    if (!device.simulated) return device;
+    const gateway = device.type === 'Rack' && device.gatewayId ? storedDevices.find((d) => d.id === device.gatewayId) : undefined;
+    const ip = isValidIp(device.ip.trim())
+      ? device.ip.trim()
+      : device.type === 'Gateway'
+        ? nextSimulatedGatewayIp(storedDevices)
+        : gateway
+          ? nextSimulatedRackIp(gateway, storedDevices)
+          : '';
+    return {
+      ...device,
+      ip,
+      port: device.port.trim() || '1883',
+      realGatewayId:
+        device.type === 'Gateway'
+          ? (device.realGatewayId ?? simulatedGatewayScriptId(deviceId))
+          : (gateway?.realGatewayId ?? device.realGatewayId ?? null),
+    };
+  };
+
+  const handleSaveDevice = (incoming: NewDevice) => {
+    const newDeviceId = makeId();
+    const device = withSimulatedAddressing(incoming, editingDeviceId ?? newDeviceId);
     if (editingDeviceId) {
       const previous = storedDevices.find((d) => d.id === editingDeviceId);
       const nextGatewayPrefix = device.type === 'Gateway' ? ipPrefixFor(device.ip) : '';
@@ -638,7 +716,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       setEditingDeviceId(null);
     } else {
       const gateway = device.gatewayId ? storedDevices.find((d) => d.id === device.gatewayId && d.type === 'Gateway') : undefined;
-      const id = makeId();
+      const id = newDeviceId;
       const newDevice: DeviceNode = {
         id,
         projectId: gateway?.projectId ?? null,
@@ -661,6 +739,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     }
     setAddDeviceVisible(false);
     setAddDeviceGatewayId(null);
+    setAddDeviceSimulated(false);
+  };
+
+  const openAddDevice = (options: { gatewayId?: string | null; simulated?: boolean } = {}) => {
+    setAddDeviceGatewayId(options.gatewayId ?? null);
+    setAddDeviceSimulated(options.simulated ?? false);
+    setAddDeviceVisible(true);
   };
 
   const handleTestConnectionFromMenu = (device: DeviceNode) => {
@@ -705,17 +790,28 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   const handleInstallCard = (deviceId: string, slot: number, type: CardType, config: CardConfig, enabled: boolean) => {
+    // A card in a simulated rack arrives with a runnable signal per channel, so
+    // the rack starts publishing as soon as it is populated.
+    const simulated = storedDevices.some((device) => device.id === deviceId && isSimulatedDevice(device));
     setCards((prev) => {
       const existing = prev.find((card) => card.deviceId === deviceId && card.slot === slot);
+      const simulation = simulated
+        ? (existing && existing.type === type ? existing.simulation ?? defaultSimulationForCard(type) : defaultSimulationForCard(type))
+        : undefined;
+      // Units, ranges and limits come straight off the signal definition, so a
+      // freshly installed simulated card is coherent without further editing.
+      const seededConfig = simulation ? cardConfigWithSimulation(type, config, simulation) : config;
       if (existing) {
-        return prev.map((card) => (card.id === existing.id ? { ...card, type, config, enabled } : card)).filter((card) => card.id === existing.id || card.deviceId !== deviceId || card.slot !== slot);
+        return prev
+          .map((card) => (card.id === existing.id ? { ...card, type, config: seededConfig, enabled, simulation } : card))
+          .filter((card) => card.id === existing.id || card.deviceId !== deviceId || card.slot !== slot);
       }
-      return [...prev, { id: makeId(), deviceId, slot, type, config, enabled }];
+      return [...prev, { id: makeId(), deviceId, slot, type, config: seededConfig, enabled, ...(simulation ? { simulation } : {}) }];
     });
   };
 
-  const handleUpdateCard = (cardId: string, config: CardConfig, enabled: boolean) => {
-    setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, config, enabled } : c)));
+  const handleUpdateCard = (cardId: string, config: CardConfig, enabled: boolean, simulation?: SimulatedChannel[]) => {
+    setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, config, enabled, ...(simulation ? { simulation } : {}) } : c)));
   };
 
   const handleRemoveCard = (cardId: string) => {
@@ -749,7 +845,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // The top-bar switcher owns the three top-level destinations; the selection
   // is still the single source of truth, so the control reads back out of it.
   const consoleView: ConsoleView =
-    selected.kind === 'devices' || selected.kind === 'device'
+    selected.kind === 'devices' || selected.kind === 'device' || selected.kind === 'simulation'
       ? 'devices'
       : selected.kind === 'none'
         ? 'overview'
@@ -906,7 +1002,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               machine={selectedMachine}
               devices={devices}
               cards={visibleCards}
-              live={realMode ? liveState : undefined}
+              live={plantLive}
               layout={getLayout(selectedMachine.id)}
               templateLayout={getTemplateLayout(selectedMachine.template)}
               onSaveLayout={saveLayout}
@@ -921,13 +1017,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               gateway={selectedDevice}
               devices={devices}
               projects={projects}
-              live={realMode ? liveState : undefined}
+              live={liveFor(selectedDevice)}
               canConfigure={canEditDeleteSchema}
               onBack={() => setSelected({ kind: 'devices' })}
-              onAddRack={() => {
-                setAddDeviceGatewayId(selectedDevice.id);
-                setAddDeviceVisible(true);
-              }}
+              onAddRack={() => openAddDevice({ gatewayId: selectedDevice.id, simulated: isSimulatedDevice(selectedDevice) })}
               onOpenRack={(id) => setSelected({ kind: 'device', id })}
               onOpenMenu={canEditDeleteSchema ? (x, y, deviceId) => {
                 const device = devices.find((d) => d.id === deviceId);
@@ -939,7 +1032,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               device={selectedDevice}
               devices={devices}
               cards={visibleCards.filter((c) => c.deviceId === selectedDevice.id)}
-              live={realMode ? liveState : undefined}
+              live={liveFor(selectedDevice)}
               canEditDeleteSchema={canEditDeleteSchema}
               backLabel={selectedDevice.gatewayId ? 'Back to Gateway' : 'Back to Devices'}
               onBack={() => {
@@ -951,19 +1044,32 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               onRemoveCard={handleRemoveCard}
             />
           ) : selected.kind === 'device' && selectedDevice ? (
-            <DeviceDetail device={selectedDevice} live={realMode ? liveState : undefined} onBack={() => setSelected({ kind: 'devices' })} />
+            <DeviceDetail device={selectedDevice} live={liveFor(selectedDevice)} onBack={() => setSelected({ kind: 'devices' })} />
+          ) : selected.kind === 'simulation' ? (
+            <SimulationPanel
+              devices={devices}
+              cards={visibleCards}
+              live={simLive}
+              running={simulationRunning}
+              canConfigure={canEditDeleteSchema}
+              onRunningChange={setSimulationRunning}
+              onBack={() => setSelected({ kind: 'devices' })}
+              onAddGateway={() => openAddDevice({ simulated: true })}
+              onAddRack={(gateway) => openAddDevice({ gatewayId: gateway.id, simulated: true })}
+              onOpenRack={(id) => setSelected({ kind: 'device', id })}
+            />
           ) : selected.kind === 'devices' ? (
             gateways.length === 0 ? (
               <EmptyState title="DEVICES" description="No devices added.">
                 {canEditDeleteSchema && (
-                  <ActionButton
-                    label="Add Device"
-                    permission={PERMISSIONS.DEVICE_CREATE}
-                    onPress={() => {
-                      setAddDeviceGatewayId(null);
-                      setAddDeviceVisible(true);
-                    }}
-                  />
+                  <>
+                    <ActionButton
+                      label="Add Device"
+                      permission={PERMISSIONS.DEVICE_CREATE}
+                      onPress={() => openAddDevice()}
+                    />
+                    <ActionButton label="Simulation Mode" variant="secondary" onPress={() => setSelected({ kind: 'simulation' })} />
+                  </>
                 )}
               </EmptyState>
             ) : (
@@ -972,22 +1078,22 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
                     Hierarchy/Devices toggle then sits right over this corner. */}
                 <View className="flex-row items-center justify-between px-6 pt-5" style={leftCollapsed ? { paddingTop: 56 } : undefined}>
                   <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>Devices</Text>
-                  {canEditDeleteSchema && (
+                  <View className="flex-row items-center gap-3">
                     <ActionButton
-                      label="Add Device"
-                      permission={PERMISSIONS.DEVICE_CREATE}
-                      onPress={() => {
-                        setAddDeviceGatewayId(null);
-                        setAddDeviceVisible(true);
-                      }}
+                      label={simulationActive ? `Simulation Mode · ${simulationRunning ? 'Running' : 'Paused'}` : 'Simulation Mode'}
+                      variant="secondary"
+                      onPress={() => setSelected({ kind: 'simulation' })}
                     />
-                  )}
+                    {canEditDeleteSchema && (
+                      <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => openAddDevice()} />
+                    )}
+                  </View>
                 </View>
                 <DevicesTable
                   devices={gateways}
                   allDevices={devices}
                   projects={projects}
-                  live={realMode ? liveState : undefined}
+                  live={plantLive}
                   onOpenDevice={(id) => setSelected({ kind: 'device', id })}
                   onOpenMenu={canEditDeleteSchema ? (x, y, deviceId) => {
                     const device = devices.find((d) => d.id === deviceId);
@@ -1003,8 +1109,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               machines={overviewMachines}
               devices={overviewDevices}
               cards={visibleCards}
-              live={realMode ? liveState : undefined}
-              realMode={realMode}
+              live={plantLive}
+              realMode={realMode || simulationActive}
               currentUser={currentUser}
               onOpenDevices={() => setSelected({ kind: 'devices' })}
               onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
@@ -1124,9 +1230,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         editingDevice={editingDevice}
         gateways={configuredGateways}
         initialGatewayId={addDeviceGatewayId}
+        initialSimulated={addDeviceSimulated}
         onCancel={() => {
           setAddDeviceVisible(false);
           setAddDeviceGatewayId(null);
+          setAddDeviceSimulated(false);
           setEditingDeviceId(null);
         }}
         onCreate={handleSaveDevice}

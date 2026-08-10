@@ -382,6 +382,15 @@ export function gatewayForDevice(device: DeviceNode, live: LiveState): LiveGatew
   return index.gatewayByIp.get(ip);
 }
 
+// Whether this state has anything at all to say about the device — i.e. whether
+// a gateway in it claims the device's address. Views that fall back to demo
+// readings when there is no live pipeline ask per device rather than globally,
+// so a workspace where only some devices are backed by live data (a simulated
+// rack next to demo hardware) leaves the rest on their demo behaviour.
+export function deviceHasLiveBinding(device: DeviceNode, live: LiveState): boolean {
+  return !!gatewayForDevice(device, live);
+}
+
 export function isDeviceLive(device: DeviceNode, live: LiveState): boolean {
   const gateway = gatewayForDevice(device, live);
   if (device.type === 'Rack') {

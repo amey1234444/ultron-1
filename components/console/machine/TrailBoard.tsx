@@ -5,7 +5,7 @@ import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
 import { liveMeasurementKey } from '../../../lib/liveMeasurementBus';
-import { channelHasRecentData, channelLiveStatus, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
+import { channelHasRecentData, channelLiveStatus, deviceHasLiveBinding, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
@@ -183,7 +183,7 @@ export function TrailBoard({
       const rackState = effectiveRack(rack);
       if (rackState.status !== 'Online') return false;
       if (!card.enabled) return false;
-      if (!live || (live.gateways.length === 0 && live.racks.length === 0 && live.slots.length === 0 && live.measurements.length === 0)) return true;
+      if (!live || !deviceHasLiveBinding(rackState, live)) return true;
       return channelLiveStatus(rackState, card, channelNumber, live) === 'active'
         || channelHasRecentData(rackState, card, channelNumber, live);
     },
@@ -219,7 +219,7 @@ export function TrailBoard({
       if (!rack || !card) return false;
       const rackState = effectiveRack(rack);
       if (rackState.status !== 'Online') return false;
-      if (!live) return true;
+      if (!live || !deviceHasLiveBinding(rackState, live)) return true;
       const channelNumber = channelNumberFor(channel);
       return channelLiveStatus(rackState, card, channelNumber, live) === 'active'
         || channelHasRecentData(rackState, card, channelNumber, live);

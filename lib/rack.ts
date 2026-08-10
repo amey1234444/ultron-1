@@ -1,4 +1,7 @@
 import type { DeviceNode } from './devices';
+// Type-only: erased at compile time, so this does not create an import cycle
+// with lib/simulation.ts (which imports card helpers from here).
+import type { SimulatedChannel } from './simulation';
 
 export const CARD_TYPES = ['Vibration Card', 'Process Card', 'Speed Card', 'Communication Controller'] as const;
 export type CardType = (typeof CARD_TYPES)[number];
@@ -86,6 +89,11 @@ export type CardNode = {
   type: CardType;
   enabled: boolean;
   config: CardConfig;
+  // Set only on cards installed in a simulated rack: one entry per channel,
+  // describing the signal the simulator should generate for it. Kept beside
+  // `config` rather than inside it so the card's real configuration schema is
+  // unchanged — see lib/simulation.ts.
+  simulation?: SimulatedChannel[];
 };
 
 export function channelCountForCardType(type: CardType): number {
@@ -201,6 +209,44 @@ function letterAndUnitForCard(card: CardNode): { letter: ChannelRef['letter']; u
   return { letter: 'X', unit: '' };
 }
 
+// A simulated channel declares what it measures outright, so its letter and unit
+// are read off the signal rather than sniffed from the card's single shared unit
+// — which is how a simulated Process Card can carry, say, two temperatures and a
+// pressure and still have each one map correctly.
+function letterForSimulatedKind(kind: SimulatedChannel['kind']): ChannelRef['letter'] {
+  switch (kind) {
+    case 'Vibration':
+      return 'V';
+    case 'RTD / Temperature':
+      return 'T';
+    case 'Speed / RPM':
+      return 'S';
+    case 'Pressure':
+      return 'P';
+    case 'Universal Voltage / Current':
+      return 'C';
+    default:
+      return 'X';
+  }
+}
+
+function channelDescriptor(card: CardNode, index: number): { letter: ChannelRef['letter']; unit: string; alarmWarning?: number; alarmCritical?: number } {
+  const simulated = card.simulation?.[index];
+  if (simulated) {
+    return {
+      letter: letterForSimulatedKind(simulated.kind),
+      unit: simulated.unit,
+      alarmWarning: simulated.alertLimit ?? undefined,
+      alarmCritical: simulated.dangerLimit ?? undefined,
+    };
+  }
+  return {
+    ...letterAndUnitForCard(card),
+    alarmWarning: 'alarmWarning' in card.config ? parsedThreshold(card.config.alarmWarning) : undefined,
+    alarmCritical: 'alarmCritical' in card.config ? parsedThreshold(card.config.alarmCritical) : undefined,
+  };
+}
+
 // Flattens every acquisition-card channel across all racks into a pickable list —
 // used wherever something (e.g. a machine's mapping trail) needs to reference a
 // physical rack channel, independent of that rack's own detail screen.
@@ -218,13 +264,11 @@ export function listChannels(devices: DeviceNode[], cards: CardNode[], options: 
 
     return rackCards.flatMap((card) => {
       const names = 'channelNames' in card.config ? card.config.channelNames : [];
-      const { letter, unit } = letterAndUnitForCard(card);
-      const alarmWarning = 'alarmWarning' in card.config ? parsedThreshold(card.config.alarmWarning) : undefined;
-      const alarmCritical = 'alarmCritical' in card.config ? parsedThreshold(card.config.alarmCritical) : undefined;
 
       return names.flatMap((name, index) => {
         const channelNumber = index + 1;
         if (options.channelIsAvailable && !options.channelIsAvailable(rack, card, channelNumber)) return [];
+        const { letter, unit, alarmWarning, alarmCritical } = channelDescriptor(card, index);
         letterCounts[letter] = (letterCounts[letter] ?? 0) + 1;
         return {
           id: `${rack.id}.S${String(card.slot).padStart(2, '0')}.CH${channelNumber}`,

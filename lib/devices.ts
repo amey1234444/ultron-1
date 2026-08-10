@@ -21,6 +21,10 @@ export type DeviceNode = {
   realGatewayId?: string | null;
   realRackId?: string | number | null;
   archived: boolean;
+  // Simulation Mode: this gateway/rack has no hardware behind it and is fed by
+  // the in-app simulator (lib/simulation.ts). Everything else about the node —
+  // status, channels, machine mapping — behaves identically to real hardware.
+  simulated?: boolean;
 };
 
 export function defaultModelFor(type: DeviceType): string {
