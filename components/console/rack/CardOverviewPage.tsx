@@ -1,13 +1,15 @@
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { channelCountForCardType, slotKind, type CardNode } from '../../../lib/rack';
 import { ActionButton } from '../ActionButton';
+import { BackButton } from '../BackButton';
 import { CardTypeIcon } from './cardIcons';
 
 type CardOverviewPageProps = {
   card: CardNode;
+  backLabel?: string;
   onBack: () => void;
   onEdit: () => void;
   canEditDeleteSchema: boolean;
@@ -42,15 +44,15 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
   return [];
 }
 
-export function CardOverviewPage({ card, onBack, onEdit, canEditDeleteSchema }: CardOverviewPageProps) {
+export function CardOverviewPage({ card, backLabel = 'Back', onBack, onEdit, canEditDeleteSchema }: CardOverviewPageProps) {
   const { isDark } = useAppTheme();
   const inkColor = isDark ? '#F5F5F5' : '#0A0A0A';
 
   return (
     <View className="flex-1">
-      <Pressable onPress={onBack} className="px-6 pt-5">
-        <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>‹ Back</Text>
-      </Pressable>
+      <View className="px-6 pt-5">
+        <BackButton label={backLabel} onPress={onBack} />
+      </View>
 
       <View className="flex-row items-center justify-between px-6 pt-3">
         <View className="flex-row items-center gap-2">

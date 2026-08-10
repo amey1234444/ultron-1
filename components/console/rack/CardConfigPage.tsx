@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { CardConfig, CardType, ControllerConfig, ProcessConfig, SpeedConfig, VibrationConfig } from '../../../lib/rack';
 import { cardConfigWithSimulation, type SimulatedChannel } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
+import { BackButton } from '../BackButton';
 import { ControllerFields, EnabledToggle, ProcessFields, SpeedFields, VibrationFields } from './CardConfigFields';
 import { SimulationFields } from './SimulationFields';
 
@@ -16,11 +17,12 @@ type CardConfigPageProps = {
   initialEnabled: boolean;
   /** Present only for a card in a simulated rack — one entry per channel. */
   initialSimulation?: SimulatedChannel[];
+  backLabel?: string;
   onBack: () => void;
   onSave: (config: CardConfig, enabled: boolean, simulation?: SimulatedChannel[]) => void;
 };
 
-export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, initialSimulation, onBack, onSave }: CardConfigPageProps) {
+export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, initialSimulation, backLabel = 'Back', onBack, onSave }: CardConfigPageProps) {
   const { isDark } = useAppTheme();
   const [config, setConfig] = useState<CardConfig>(initialConfig);
   const [enabled, setEnabled] = useState(initialEnabled);
@@ -49,9 +51,9 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
 
   return (
     <View className="flex-1">
-      <Pressable onPress={onBack} className="px-6 pt-5">
-        <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>‹ Back</Text>
-      </Pressable>
+      <View className="px-6 pt-5">
+        <BackButton label={backLabel} onPress={onBack} />
+      </View>
 
       <View className="px-6 pt-3">
         <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>Configure {cardType}</Text>

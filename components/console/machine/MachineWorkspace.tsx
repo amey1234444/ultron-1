@@ -8,6 +8,7 @@ import type { LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal } from '../../../lib/localPersist';
 import { expectedPointsForTemplate, type MachineComponent, type MachineNode } from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
+import { BackButton } from '../BackButton';
 import { AlarmView } from './AlarmView';
 import { AnalysisView } from './AnalysisView';
 import { MachineOverview } from './MachineOverview';
@@ -33,6 +34,7 @@ type MachineWorkspaceProps = {
   templateLayout?: SavedLayout | null;
   onSaveLayout?: (machineId: string, layout: SavedLayout) => void;
   onSaveTemplate?: (machineTemplate: string, layout: SavedLayout) => void;
+  backLabel?: string;
   onBack: () => void;
   canConfigure?: boolean;
   canSaveTemplate?: boolean;
@@ -132,6 +134,7 @@ export function MachineWorkspace({
   templateLayout,
   onSaveLayout,
   onSaveTemplate,
+  backLabel = 'Back',
   onBack,
   onModeChange,
   canConfigure = false,
@@ -243,10 +246,13 @@ export function MachineWorkspace({
     setSelectedComponentId(component.id);
   };
 
+  // Wrapped so BackButton's `self-start` sizes it to its content instead of
+  // stretching; in Actual View the hierarchy sidebar is hidden entirely, so this
+  // is the only way out of the workspace and needs a real tap target.
   const backButton = (
-    <Pressable onPress={onBack}>
-      <Text className={cn('font-body-medium text-xs', mutedClass)}>‹ Back</Text>
-    </Pressable>
+    <View>
+      <BackButton label={backLabel} onPress={onBack} />
+    </View>
   );
 
   const nameBlock = (

@@ -838,9 +838,18 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const selectedDeviceRaw = selected.kind === 'device' ? devices.find((d) => d.id === selected.id) : undefined;
   const selectedDevice = selectedDeviceRaw ? deviceWithGatewayConnectionState(selectedDeviceRaw, devices) : undefined;
   const selectedMachine = selected.kind === 'machine' ? machines.find((m) => m.id === selected.id) : undefined;
+  // Resolved once so the rack's Back button and its label can never disagree —
+  // a rack whose gateway has gone away returns to Devices and says so.
+  const selectedRackGateway =
+    selectedDevice?.type === 'Rack' && selectedDevice.gatewayId
+      ? devices.find((device) => device.id === selectedDevice.gatewayId && device.type === 'Gateway')
+      : undefined;
   const editingDevice = editingDeviceId ? (storedDevices.find((d) => d.id === editingDeviceId) ?? devices.find((d) => d.id === editingDeviceId)) : null;
   const deleteDeviceInfo = deleteDeviceId ? (storedDevices.find((d) => d.id === deleteDeviceId) ?? devices.find((d) => d.id === deleteDeviceId)) : null;
-  const detailTopClearance = leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'machine' || selected.kind === 'device') ? 44 : 0;
+  const detailTopClearance =
+    leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'machine' || selected.kind === 'device' || selected.kind === 'simulation')
+      ? 44
+      : 0;
 
   // The top-bar switcher owns the three top-level destinations; the selection
   // is still the single source of truth, so the control reads back out of it.
@@ -1007,6 +1016,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               templateLayout={getTemplateLayout(selectedMachine.template)}
               onSaveLayout={saveLayout}
               onSaveTemplate={saveTemplateLayout}
+              backLabel={`Back to ${folders.find((folder) => folder.id === selectedMachine.folderId)?.name ?? 'Folder'}`}
               onBack={() => setSelected({ kind: 'folder', id: selectedMachine.folderId })}
               onModeChange={setMachineWorkspaceMode}
               canConfigure={canEditDeleteSchema}
@@ -1034,11 +1044,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               cards={visibleCards.filter((c) => c.deviceId === selectedDevice.id)}
               live={liveFor(selectedDevice)}
               canEditDeleteSchema={canEditDeleteSchema}
-              backLabel={selectedDevice.gatewayId ? 'Back to Gateway' : 'Back to Devices'}
-              onBack={() => {
-                const gateway = selectedDevice.gatewayId ? devices.find((device) => device.id === selectedDevice.gatewayId && device.type === 'Gateway') : undefined;
-                setSelected(gateway ? { kind: 'device', id: gateway.id } : { kind: 'devices' });
-              }}
+              backLabel={selectedRackGateway ? `Back to ${selectedRackGateway.name}` : 'Back to Devices'}
+              onBack={() => setSelected(selectedRackGateway ? { kind: 'device', id: selectedRackGateway.id } : { kind: 'devices' })}
               onInstallCard={(slot, type, config, enabled) => handleInstallCard(selectedDevice.id, slot, type, config, enabled)}
               onUpdateCard={handleUpdateCard}
               onRemoveCard={handleRemoveCard}

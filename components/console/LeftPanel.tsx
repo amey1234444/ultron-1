@@ -198,7 +198,10 @@ export function LeftPanel({
 
   // Which tree the panel shows follows the selection the top-bar view switcher
   // sets — the panel no longer carries a switcher of its own.
-  const activeTab: 'hierarchy' | 'devices' = selected.kind === 'devices' || selected.kind === 'device' ? 'devices' : 'hierarchy';
+  // Simulation Mode is reached from (and returns to) Devices, so the rail stays
+  // on the devices tree while it is open.
+  const activeTab: 'hierarchy' | 'devices' =
+    selected.kind === 'devices' || selected.kind === 'device' || selected.kind === 'simulation' ? 'devices' : 'hierarchy';
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
 
   return (

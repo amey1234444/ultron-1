@@ -64,6 +64,7 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
       return (
         <CardOverviewPage
           card={pageCard}
+          backLabel={`Back to ${effectiveDevice.name}`}
           onBack={() => setCardPage(null)}
           onEdit={() => setCardPage({ cardId: pageCard.id, view: 'config' })}
           canEditDeleteSchema={canEditDeleteSchema}
@@ -82,7 +83,12 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
         initialConfig={pageCard.config}
         initialEnabled={pageCard.enabled}
         initialSimulation={isSimulatedDevice(device) ? simulationForCard(pageCard) : undefined}
-        onBack={() => setCardPage({ cardId: pageCard.id, view: isCardConfigured(pageCard) ? 'overview' : 'config' as CardPageView })}
+        // A card that has never been configured has no overview to fall back to
+        // (Configure opens the form directly), so leaving the form must return
+        // to the rack — sending it back to 'config' left the page on itself and
+        // made Back and Cancel dead.
+        backLabel={isCardConfigured(pageCard) ? 'Back to Card' : `Back to ${effectiveDevice.name}`}
+        onBack={() => setCardPage(isCardConfigured(pageCard) ? { cardId: pageCard.id, view: 'overview' } : null)}
         onSave={(config, enabled, simulation) => {
           onUpdateCard(pageCard.id, config, enabled, simulation);
           setCardPage({ cardId: pageCard.id, view: 'overview' });
