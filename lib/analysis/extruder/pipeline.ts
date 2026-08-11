@@ -435,11 +435,21 @@ function buildDiagnoses(
  * registered value (TH-CONSISTENCY-RATIO / TH-CONSISTENCY-TEMP), so the number
  * is traceable rather than invented.
  */
+/**
+ * Anomaly severity deliberately does NOT read the constraint status.
+ *
+ * "Is the machine outside its safe envelope" and "has the machine departed from
+ * its healthy reference" are two independent questions, and the whole point of
+ * keeping the constraint layer separate is that an in-limit machine can carry a
+ * developing fault while an out-of-limit machine can be mechanically healthy.
+ * Folding a limit breach into the anomaly score would collapse that distinction
+ * and report a departure the baseline evidence does not support. A breach drives
+ * the maintenance priority and its own alert instead.
+ */
 function buildAnomaly(
   features: FeatureSet,
   candidates: string[],
   assessments: FaultAssessment[],
-  constraintStatus: ConstraintOverall,
   state: StateInference,
 ): AnomalySummary {
   const ratioBand = getThreshold('TH-CONSISTENCY-RATIO').value;
@@ -513,16 +523,13 @@ function buildAnomaly(
       assessment.primary.length + assessment.supporting.length + assessment.weak.length > 0,
   );
 
-  const severity: AnomalySummary['severity'] =
-    constraintStatus === 'VIOLATION'
-      ? 'critical'
-      : strong
-        ? 'high'
-        : candidates.length > 0
-          ? 'medium'
-          : observedButUnresolved || trimmed.length > 0
-            ? 'low'
-            : 'none';
+  const severity: AnomalySummary['severity'] = strong
+    ? 'high'
+    : candidates.length > 0
+      ? 'medium'
+      : observedButUnresolved || trimmed.length > 0
+        ? 'low'
+        : 'none';
   const episodeState: AnomalySummary['state'] =
     severity === 'none' ? 'none' : candidates.length > 0 ? 'active' : 'candidate';
 
@@ -682,7 +689,7 @@ export function analyzeExtruder(input: ExtruderAnalysisInput): ExtruderAnalysisR
   const identity = classifyIdentifiability(candidates);
   const separating = separatingMeasurements(candidates);
   const diagnoses = buildDiagnoses(candidates, assessments, constraintStatus);
-  const anomaly = buildAnomaly(features, candidates, assessments, constraintStatus, state);
+  const anomaly = buildAnomaly(features, candidates, assessments, state);
   const records = baselineRecords(baseline);
   const quality = buildSignalQuality(
     resolved,

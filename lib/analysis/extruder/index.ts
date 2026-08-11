@@ -50,6 +50,6 @@ export {
   TAG_LABELS,
   type ExtruderTag,
 } from './signalMap';
-export { allThresholds, PROCESS_CONSTRAINTS, type Threshold } from './registers';
+export { allThresholds, faultName, PROCESS_CONSTRAINTS, type Threshold } from './registers';
 export { type BaselineValue } from './baseline';
 export { MachineState } from './stateInference';
