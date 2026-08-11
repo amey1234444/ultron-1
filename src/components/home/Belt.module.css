@@ -1,0 +1,65 @@
+/* The belt arcs. See Belt.tsx for the geometry and why the viewBox is
+   deliberately stretched. */
+
+/* As tall as the document, and translated up by exactly the distance scrolled —
+   so the layer is stationary relative to the page while its parent is fixed to
+   the viewport. `--depth` and `--travel` are written by Ambience on each scroll
+   frame; until the first measurement lands this is one viewport tall and sits
+   at the top, which is the correct first frame either way. */
+.belt {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: calc(100vh + var(--travel, 0px));
+  transform: translate3d(0, calc(var(--depth, 0) * var(--travel, 0px) * -1), 0);
+  will-change: transform;
+}
+
+.canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.arc,
+.arcFaint {
+  fill: none;
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* Two weights only. The primary is the curve you are meant to follow; the
+   companions are barely there and exist to give it a family, so it reads as a
+   belt rather than as a single stray line. */
+.arc {
+  stroke: rgba(255, 255, 255, 0.1);
+}
+
+.arcFaint {
+  stroke: rgba(255, 255, 255, 0.05);
+}
+
+/* The one accent mark on the page. Centred on its own coordinate, with a soft
+   halo carried by a shadow rather than a blur filter — a filter on a layer this
+   tall is a full-page repaint on some integrated graphics. */
+.marker {
+  position: absolute;
+  width: 7px;
+  height: 7px;
+  margin: -3.5px 0 0 -3.5px;
+  border-radius: 50%;
+  background: var(--u-green);
+  box-shadow: 0 0 0 4px var(--u-green-soft), 0 0 16px 3px rgba(100, 229, 139, 0.28);
+}
+
+/* Below the tablet breakpoint the arcs' horizontal excursion is wider than the
+   screen, so most of what is left on screen is a near-vertical line competing
+   with the column rules. The curve is a desktop device; on a phone the rules
+   carry the structure on their own. */
+@media (max-width: 760px) {
+  .belt {
+    display: none;
+  }
+}

@@ -109,55 +109,120 @@ function channelNumber(channelId: string): number {
   return match ? Number(match[1]) : 1;
 }
 
-function buildReadings(
+/** A mapped point, plus the card-level alarm state the analyzer deliberately ignores. */
+type PointInput = {
+  reading: ExtruderInputReading;
+  /** The channel's own commissioning alarm state — NOT a model finding. */
+  alarm: 'none' | 'warning' | 'critical';
+  alarmLimit: number | null;
+  observed: number | null;
+  channelUnit: string;
+  reporting: boolean;
+};
+
+/** Where the numbers on screen came from. */
+type DataMode = 'gateway' | 'demo' | 'mixed';
+
+function alarmStateFor(channel: MappedChannel['channel'], value: number | null): {
+  alarm: PointInput['alarm'];
+  alarmLimit: number | null;
+} {
+  if (value === null || !Number.isFinite(value)) return { alarm: 'none', alarmLimit: null };
+  if (channel.alarmCritical !== undefined && value >= channel.alarmCritical) {
+    return { alarm: 'critical', alarmLimit: channel.alarmCritical };
+  }
+  if (channel.alarmWarning !== undefined && value >= channel.alarmWarning) {
+    return { alarm: 'warning', alarmLimit: channel.alarmWarning };
+  }
+  return { alarm: 'none', alarmLimit: channel.alarmCritical ?? channel.alarmWarning ?? null };
+}
+
+/**
+ * Collect one reading per mapped point.
+ *
+ * A mapped channel that is not reporting is submitted with a NULL value, never
+ * with a stand-in number. Substituting a plausible healthy value would
+ * manufacture a clean bill of health for a machine nobody is actually
+ * measuring — the single worst failure this model can have, and the exact
+ * reason the twin reports a missing input as NOT_EVALUATED instead of
+ * defaulting it.
+ *
+ * The simulated operating point is therefore used only when NOTHING is
+ * reporting, i.e. the view is being previewed with no gateway attached at all.
+ * That state is announced in the header rather than left to be inferred.
+ */
+function buildPoints(
   mappedChannels: MappedChannel[],
   devices: DeviceNode[],
   cards: CardNode[],
   live: LiveState | undefined,
   demo: Record<string, number>,
   now: string,
-): ExtruderInputReading[] {
-  return mappedChannels.map((mapped) => {
-    // The box label is what the operator named the instrument, and it already
-    // falls back to the channel label when the box is unnamed. Concatenating the
-    // two would let a card's own wording ("Vibration Card CH1") leak into the
-    // match and resolve a pressure point onto a vibration tag.
+): { points: PointInput[]; mode: DataMode } {
+  // The box label is what the operator named the instrument, and it already
+  // falls back to the channel label when the box is unnamed. Concatenating the
+  // two would let a card's own wording ("Vibration Card CH1") leak into the
+  // match and resolve a pressure point onto a vibration tag.
+  const measured = mappedChannels.map((mapped) => {
     const label = mapped.label.trim();
     const rack = devices.find((device) => device.id === mapped.channel.rackId);
     const card = cards.find(
       (candidate) => candidate.deviceId === mapped.channel.rackId && candidate.slot === mapped.channel.slot,
     );
+    const measurement =
+      rack && card && live ? latestMeasurementForChannel(rack, card, channelNumber(mapped.channel.id), live) : undefined;
+    const value =
+      measurement && measurement.value !== null && measurement.value !== undefined ? measurement.value : null;
+    return { mapped, label, measurement, value };
+  });
 
-    if (rack && card && live) {
-      const measurement = latestMeasurementForChannel(rack, card, channelNumber(mapped.channel.id), live);
-      if (measurement && measurement.value !== null && measurement.value !== undefined) {
-        return {
+  const reportingCount = measured.filter((entry) => entry.value !== null).length;
+  // Nothing anywhere is reporting: this is a dashboard preview, not a machine.
+  const previewing = reportingCount === 0;
+
+  const points = measured.map(({ mapped, label, measurement, value }) => {
+    if (previewing) {
+      const resolution = resolveSignal(label);
+      const tag = resolution.kind === 'mapped' ? resolution.tag : null;
+      const simulated = tag ? (demo[tag] ?? null) : null;
+      return {
+        reading: {
           label,
-          value: measurement.value,
-          unit: measurement.unit || mapped.channel.unit,
-          quality: measurement.quality ?? 'GOOD',
-          valid: measurement.measurementValid ?? true,
-          timestamp: measurement.updatedAt ?? now,
-          source: 'gateway' as const,
-        };
-      }
+          value: simulated,
+          // Canonical unit, so a mis-declared card unit cannot make preview data
+          // look like a fault.
+          unit: tag ? CANONICAL_UNITS[tag] : mapped.channel.unit,
+          quality: 'GOOD',
+          valid: true,
+          timestamp: now,
+          source: 'demo' as const,
+        },
+        ...alarmStateFor(mapped.channel, simulated),
+        observed: simulated,
+        channelUnit: mapped.channel.unit,
+        reporting: false,
+      };
     }
 
-    // No gateway measurement: fall back to the simulated operating point, in the
-    // tag's canonical unit so a mis-declared card unit cannot make demo data
-    // look like a fault.
-    const resolution = resolveSignal(label);
-    const tag = resolution.kind === 'mapped' ? resolution.tag : null;
     return {
-      label,
-      value: tag ? (demo[tag] ?? null) : null,
-      unit: tag ? CANONICAL_UNITS[tag] : mapped.channel.unit,
-      quality: 'GOOD',
-      valid: true,
-      timestamp: now,
-      source: 'demo' as const,
+      reading: {
+        label,
+        value,
+        unit: measurement?.unit || mapped.channel.unit,
+        quality: measurement?.quality ?? 'GOOD',
+        valid: measurement?.measurementValid ?? true,
+        timestamp: measurement?.updatedAt ?? now,
+        source: 'gateway' as const,
+      },
+      ...alarmStateFor(mapped.channel, value),
+      observed: value,
+      channelUnit: mapped.channel.unit,
+      reporting: value !== null,
     };
   });
+
+  const mode: DataMode = previewing ? 'demo' : reportingCount === points.length ? 'gateway' : 'mixed';
+  return { points, mode };
 }
 
 // --------------------------------------------------------------------------------------
@@ -353,10 +418,18 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // no instrumentation hypothesis can ever be raised.
   const historyRef = useRef<Partial<Record<ExtruderTag, (number | null)[]>>>({});
 
-  const analysis = useMemo<ExtruderAnalysisResult>(() => {
+  const { analysis, points, dataMode } = useMemo(() => {
     const now = new Date().toISOString();
-    const readings = buildReadings(mappedChannels, devices, cards, live, demo, now);
-    return analyzeExtruder({ readings, history: historyRef.current, now });
+    const built = buildPoints(mappedChannels, devices, cards, live, demo, now);
+    return {
+      analysis: analyzeExtruder({
+        readings: built.points.map((point) => point.reading),
+        history: historyRef.current,
+        now,
+      }),
+      points: built.points,
+      dataMode: built.mode,
+    };
   }, [mappedChannels, devices, cards, live, demo]);
 
   // Accumulate in an effect rather than inside the memo: mutating a ref during

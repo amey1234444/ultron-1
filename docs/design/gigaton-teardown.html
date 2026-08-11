@@ -1,0 +1,901 @@
+<title>Gigaton teardown — and what Ultron should take from it</title>
+
+<style>
+  /* ---------------------------------------------------------------
+     Deliberately single-theme dark.
+     Every specimen in this document (grain, glow, hairline, chip)
+     only reads on a near-black ground — a light variant would
+     misrepresent the very thing being measured. So the palette is
+     painted explicitly rather than inherited, and holds on either
+     host ground.
+     Palette is Ultron's own --u-* system, lifted from global.css:
+     the analysis is written in the language it argues for.
+     --------------------------------------------------------------- */
+  :root {
+    --bg:          #0a0a0a;
+    --band:        #101011;
+    --panel:       #141416;
+    --panel-2:     #191919;
+    --ink:         #f4f4f2;
+    --ink-2:       #9c9c9a;
+    --ink-3:       #6a6a68;
+    --line:        rgba(255,255,255,0.07);
+    --line-strong: rgba(255,255,255,0.14);
+    --rule:        rgba(255,255,255,0.042);
+
+    /* Ultron's two rationed colours. */
+    --green:       #64e58b;
+    --blue:        #6fa8ff;
+    --amber:       #e3b341;
+    --red:         #f2624a;
+    --violet:      #a78bfa;
+
+    /* Sampled from the Gigaton screenshots — quoted, never adopted. */
+    --gt-lime:     #c6f45e;
+    --gt-green:    #5fd97c;
+    --gt-red:      #d4494a;
+
+    --mono: ui-monospace, "Cascadia Mono", "Segoe UI Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: "Segoe UI Variable Display", "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+
+    --measure: 68ch;
+    --gutter: clamp(20px, 5vw, 56px);
+    --max: 1080px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  .wrap {
+    max-width: var(--max);
+    margin: 0 auto;
+    padding: clamp(48px, 8vw, 96px) var(--gutter) 120px;
+  }
+
+  /* ---- type scale ---------------------------------------------- */
+  h1, h2, h3 { text-wrap: balance; margin: 0; }
+
+  h1 {
+    font-size: clamp(34px, 5.4vw, 58px);
+    font-weight: 640;
+    letter-spacing: -0.038em;
+    line-height: 1.04;
+  }
+
+  h2 {
+    font-size: clamp(23px, 2.9vw, 32px);
+    font-weight: 620;
+    letter-spacing: -0.028em;
+    line-height: 1.14;
+  }
+
+  h3 {
+    font-size: 17.5px;
+    font-weight: 600;
+    letter-spacing: -0.018em;
+    line-height: 1.3;
+  }
+
+  p { margin: 0; max-width: var(--measure); }
+  strong { font-weight: 600; color: var(--ink); }
+
+  a { color: var(--ink); text-decoration-color: var(--line-strong); text-underline-offset: 3px; }
+  a:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; border-radius: 3px; }
+
+  /* The mono micro-label in a low-alpha chip — the single most
+     repeated device in the reference, so this document uses it as
+     its own section marker. Structure encoding content. */
+  .chip {
+    display: inline-block;
+    padding: 4px 9px 3px;
+    border-radius: 5px;
+    background: rgba(255,255,255,0.055);
+    font-family: var(--mono);
+    font-size: 9.5px;
+    font-weight: 500;
+    letter-spacing: 0.185em;
+    text-transform: uppercase;
+    color: var(--ink-2);
+    white-space: nowrap;
+  }
+
+  .chip-green { background: rgba(100,229,139,0.11); color: var(--green); }
+  .chip-blue  { background: rgba(111,168,255,0.11); color: var(--blue); }
+  .chip-amber { background: rgba(227,179,65,0.12); color: var(--amber); }
+
+  .lede {
+    font-size: clamp(17px, 1.7vw, 19.5px);
+    line-height: 1.6;
+    color: var(--ink-2);
+    letter-spacing: -0.011em;
+  }
+
+  .stack   { display: flex; flex-direction: column; gap: 20px; }
+  .stack-s { display: flex; flex-direction: column; gap: 11px; }
+  .stack-l { display: flex; flex-direction: column; gap: 34px; }
+
+  header.doc { display: flex; flex-direction: column; gap: 22px; }
+
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 26px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+
+  /* ---- provenance callout -------------------------------------- */
+  .note {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 18px 20px;
+    border: 1px solid rgba(227,179,65,0.28);
+    border-radius: 12px;
+    background: rgba(227,179,65,0.045);
+  }
+  .note p { font-size: 14.5px; color: var(--ink-2); max-width: none; }
+
+  /* ---- section ------------------------------------------------- */
+  section { padding-top: clamp(48px, 6vw, 76px); }
+  .sec-head { display: flex; flex-direction: column; gap: 14px; margin-bottom: 30px; }
+
+  /* ---- technique entry ----------------------------------------- */
+  .tech {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.92fr);
+    gap: 1px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--line);
+    overflow: hidden;
+  }
+
+  .tech-copy   { padding: clamp(20px, 2.6vw, 30px); background: var(--band); display: flex; flex-direction: column; gap: 13px; }
+  .tech-demo   { padding: clamp(20px, 2.6vw, 30px); background: var(--bg); display: flex; flex-direction: column; gap: 14px; justify-content: center; }
+  .tech-copy p { font-size: 14.5px; color: var(--ink-2); max-width: none; }
+
+  .tech-n {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.16em;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .verdict {
+    display: flex;
+    gap: 9px;
+    align-items: flex-start;
+    margin-top: 3px;
+    padding-top: 13px;
+    border-top: 1px solid var(--line);
+  }
+  .verdict p { font-size: 13.5px; line-height: 1.55; }
+
+  /* ---- spec list ----------------------------------------------- */
+  .spec { display: grid; gap: 0; margin: 2px 0 0; }
+  .spec div {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+  }
+  .spec div:last-child { border-bottom: 0; }
+  .spec dt, .spec span:first-child { color: var(--ink-3); letter-spacing: 0.06em; text-transform: uppercase; font-size: 10px; }
+  .spec span:last-child { color: var(--ink); text-align: right; }
+
+  /* ================= LIVE SPECIMENS ============================== */
+
+  .demo-frame {
+    position: relative;
+    min-height: 132px;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    overflow: hidden;
+    background: #0a0a0a;
+  }
+
+  /* 01 — grain */
+  .sp-grain { position: absolute; inset: 0; background: linear-gradient(150deg, #16181a, #0a0a0a 62%); }
+  .sp-grain::after {
+    content: "";
+    position: absolute; inset: 0;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .sp-split { position: absolute; inset: 0 0 0 50%; background: linear-gradient(150deg, #16181a, #0a0a0a 62%); border-left: 1px solid rgba(255,255,255,0.22); }
+  .sp-tag {
+    position: absolute; bottom: 8px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-3);
+  }
+
+  /* 02 — the soft plume */
+  .sp-plume { position: absolute; inset: 0; }
+  .sp-plume::before {
+    content: "";
+    position: absolute;
+    left: 50%; top: 58%;
+    width: 128%; height: 190%;
+    transform: translate(-50%, -50%);
+    background: radial-gradient(ellipse 50% 50% at 50% 50%,
+      rgba(150,178,160,0.30), rgba(120,150,132,0.10) 42%, transparent 70%);
+  }
+
+  /* 03 — belt curve */
+  .sp-belt { position: absolute; inset: 0; }
+  .sp-belt svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  /* 04 — chip row */
+  .sp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+  /* 05 — weight contrast */
+  .sp-weights { display: flex; flex-direction: column; gap: 14px; }
+  .sp-num { font-size: 52px; line-height: 0.95; letter-spacing: -0.045em; font-variant-numeric: tabular-nums; color: #fff; }
+  .sp-num.light { font-weight: 250; }
+  .sp-num.bold  { font-weight: 700; }
+  .sp-cap { font-family: var(--mono); font-size: 9px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--ink-3); margin-top: 5px; }
+
+  /* 06 — tick bar */
+  .sp-meter { display: grid; grid-template-columns: 1fr auto 96px; gap: 12px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--line); }
+  .sp-meter:last-child { border-bottom: 0; }
+  .sp-meter-l { font-size: 13px; color: var(--ink-2); }
+  .sp-meter-v { font-family: var(--mono); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .ticks { display: flex; gap: 2px; height: 11px; align-items: stretch; }
+  .ticks i { width: 2px; border-radius: 1px; background: currentColor; opacity: 0.9; }
+
+  /* 07 — registration marks */
+  .sp-reg { position: absolute; inset: 0; }
+  .sp-reg .grid {
+    position: absolute; inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(255,255,255,0.05) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255,255,255,0.05) 1px, transparent 1px);
+    background-size: 34px 34px;
+  }
+  .sp-reg .mark { position: absolute; width: 6px; height: 6px; }
+  .sp-reg .dot  { position: absolute; width: 7px; height: 7px; border-radius: 50%; }
+
+  /* 08 — band ladder */
+  .sp-bands { display: grid; }
+  .sp-bands div { padding: 13px 14px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; display: flex; justify-content: space-between; }
+
+  /* 09 — swatches */
+  .swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .sw { background: var(--band); padding: 12px 12px 11px; display: flex; flex-direction: column; gap: 9px; }
+  .sw i { display: block; height: 34px; border-radius: 5px; border: 1px solid rgba(255,255,255,0.09); }
+  .sw b { font-family: var(--mono); font-size: 10.5px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink); text-transform: uppercase; }
+  .sw span { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.08em; color: var(--ink-3); text-transform: uppercase; line-height: 1.4; }
+
+  /* ---- audit table --------------------------------------------- */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; }
+  table { border-collapse: collapse; width: 100%; min-width: 660px; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: top; font-size: 14px; }
+  th {
+    font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--ink-3); font-weight: 500;
+    background: var(--band); white-space: nowrap;
+  }
+  td { color: var(--ink-2); }
+  td:first-child { color: var(--ink); font-weight: 550; }
+  tr:last-child td { border-bottom: 0; }
+
+  .tag { display: inline-block; padding: 2px 7px; border-radius: 4px; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
+  .tag-have { background: rgba(100,229,139,0.12); color: var(--green); }
+  .tag-gap  { background: rgba(111,168,255,0.12); color: var(--blue); }
+  .tag-cut  { background: rgba(227,179,65,0.13); color: var(--amber); }
+
+  /* ---- action list --------------------------------------------- */
+  .actions { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .action { background: var(--band); padding: 18px 20px; display: grid; grid-template-columns: auto minmax(0,1fr); gap: 16px; align-items: start; }
+  .action-n { font-family: var(--mono); font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; padding-top: 2px; }
+  .action p { font-size: 14px; color: var(--ink-2); max-width: none; margin-top: 5px; }
+
+  /* ---- responsive ---------------------------------------------- */
+  @media (max-width: 820px) {
+    .tech { grid-template-columns: minmax(0, 1fr); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+  }
+
+  /* ---- print / save-as-PDF ------------------------------------- */
+  @media print {
+    :root { --bg: #0a0a0a; }
+    body { font-size: 11pt; }
+    .wrap { padding: 0; max-width: none; }
+    section { padding-top: 26px; break-inside: auto; }
+    .tech, .note, .actions, .table-scroll { break-inside: avoid; }
+    h1 { font-size: 30pt; }
+    h2 { font-size: 17pt; }
+    .demo-frame { min-height: 100px; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="doc">
+    <span class="chip">Design teardown &middot; Ultron</span>
+    <h1>What makes Gigaton read as premium &mdash; and what Ultron should actually take from it</h1>
+    <p class="lede">
+      A technique-by-technique breakdown of the reference screenshots, with each device rebuilt
+      as a live specimen rather than shown as a picture. The verdict on each one is specific to
+      the Ultron landing page as it stands today, not generic advice.
+    </p>
+    <div class="meta">
+      <span>Subject &mdash; gigaton.co homepage</span>
+      <span>Target &mdash; /home</span>
+      <span>16 frames reviewed</span>
+    </div>
+  </header>
+
+  <div class="note" style="margin-top: 34px;">
+    <span class="chip chip-amber">Provenance</span>
+    <p>
+      The reference frames arrived as images pasted into the conversation, not as files on disk &mdash;
+      there is nothing to embed, so this document cannot be a PDF <em>of</em> the screenshots.
+      What it does instead is stronger for the purpose: every technique below is <strong>reconstructed in
+      live CSS</strong>, so you can inspect the actual values rather than eyeball a JPEG. Print this page
+      to PDF (Ctrl&nbsp;+&nbsp;P) for the document you asked for.
+    </p>
+  </div>
+
+  <!-- ============================================================ -->
+  <section>
+    <div class="sec-head">
+      <span class="chip">Reading the reference</span>
+      <h2>The premium feeling is subtraction, not addition</h2>
+    </div>
+
+    <div class="stack">
+      <p>
+        The single most important finding, and the one that changes the plan: Gigaton's page is
+        <strong>calmer than Ultron's</strong>. Its polish comes from a small number of devices executed
+        with precision and repeated without variation &mdash; not from a rich ambient field.
+      </p>
+      <p>
+        Behind Gigaton's content there is grain, one very large soft plume of desaturated
+        green&ndash;grey, a faint square grid in a few places, and a set of hairline arcs that connect
+        sections. That is the entire background system. Nothing moves except on scroll.
+      </p>
+      <p>
+        Ultron's <code>Ambience.tsx</code> currently runs, simultaneously and permanently:
+        three drifting aurora glows, a dot mesh on a 34-second loop, five travelling pulses on the
+        column rules, two scrolling telemetry waves, a 17-second scan sweep, grain, and a vignette.
+        It is more technically accomplished than anything on the reference site. It is also the
+        reason the page reads busier and therefore cheaper.
+      </p>
+      <p>
+        <strong>So the work is asymmetric:</strong> take the four structural devices Gigaton has that
+        Ultron lacks, and retire roughly half of the ambient layer that Ultron has and Gigaton
+        deliberately does without.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section>
+    <div class="sec-head">
+      <span class="chip">Colour</span>
+      <h2>Sampled palette</h2>
+      <p style="font-size:14.5px;color:var(--ink-2);">
+        Values read off the frames. The lime is quoted for reference only &mdash; Ultron already owns a
+        green with a defined meaning, and adopting a second one would break the rule that makes the
+        existing system work.
+      </p>
+    </div>
+
+    <div class="swatches">
+      <div class="sw"><i style="background:#0a0a0a;"></i><b>#0A0A0A</b><span>Page ground<br>identical to Ultron</span></div>
+      <div class="sw"><i style="background:#141414;"></i><b>#141414</b><span>Panel</span></div>
+      <div class="sw"><i style="background:#1c1c1c;"></i><b>#1C1C1C</b><span>Stat card</span></div>
+      <div class="sw"><i style="background:#c6f45e;"></i><b>#C6F45E</b><span>Lime CTA<br>do not adopt</span></div>
+      <div class="sw"><i style="background:#5fd97c;"></i><b>#5FD97C</b><span>Series &ldquo;on&rdquo;</span></div>
+      <div class="sw"><i style="background:#d4494a;"></i><b>#D4494A</b><span>Series &ldquo;off&rdquo;</span></div>
+      <div class="sw"><i style="background:#c9c24e;"></i><b>#C9C24E</b><span>Chart hue 1</span></div>
+      <div class="sw"><i style="background:#e8559b;"></i><b>#E8559B</b><span>Chart hue 2</span></div>
+      <div class="sw"><i style="background:#8b7bf0;"></i><b>#8B7BF0</b><span>Chart hue 3</span></div>
+      <div class="sw"><i style="background:#4fd1e8;"></i><b>#4FD1E8</b><span>Chart hue 4</span></div>
+    </div>
+
+    <div class="stack" style="margin-top: 26px;">
+      <p>
+        The discipline worth stealing is not the hues &mdash; it is <strong>where they are allowed to
+        appear</strong>. Those four chart hues occur only inside data panels. The chrome around them
+        (nav, headings, cards, footer) is pure achromatic grey plus the one lime. Colour is a
+        property of data, never of furniture.
+      </p>
+      <p>
+        Ultron already codifies this more strictly than Gigaton does &mdash; green means measured-now,
+        blue means predicted &mdash; and that rule is written into <code>global.css</code>. Keep it.
+        The gap is that Ultron's <em>ambience</em> currently leaks blue, violet and green into the
+        background, which is exactly the furniture the rule says should stay grey.
+      </p>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section>
+    <div class="sec-head">
+      <span class="chip">Techniques</span>
+      <h2>Nine devices, measured</h2>
+    </div>
+
+    <div class="stack-l">
+
+      <!-- 01 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">01</span>
+          <h3>Grain over everything</h3>
+          <p>
+            A fractal-noise layer sits above the gradients across the whole page. It does two jobs:
+            it kills the banding that wide, low-contrast gradients produce on 8-bit panels, and it
+            gives the black a physical tooth so it reads as a surface rather than as an empty
+            buffer.
+          </p>
+          <div class="spec">
+            <div><span>Opacity</span><span>0.04 &ndash; 0.06</span></div>
+            <div><span>Tile</span><span>140&times;140 SVG turbulence</span></div>
+            <div><span>Base frequency</span><span>0.85, 3 octaves</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-green">Already have</span>
+            <p><code>Ambience.module.css</code> ships this at 0.038. Raise slightly to 0.05 once the aurora is calmed &mdash; with less colour behind it, the tooth has to carry more.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="demo-frame">
+            <div class="sp-grain"></div>
+            <div class="sp-split"></div>
+            <span class="sp-tag" style="left:12px;">With grain</span>
+            <span class="sp-tag" style="right:12px;">Without</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 02 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">02</span>
+          <h3>One enormous desaturated plume</h3>
+          <p>
+            Behind the hero headline sits a single radial field, far larger than the viewport and
+            barely coloured &mdash; a green-grey close to neutral, not a saturated glow. Because there is
+            only one and it is almost achromatic, it reads as <em>light in a room</em> rather than as a
+            gradient effect.
+          </p>
+          <div class="spec">
+            <div><span>Count</span><span>1</span></div>
+            <div><span>Size</span><span>~130% viewport width</span></div>
+            <div><span>Peak alpha</span><span>~0.30</span></div>
+            <div><span>Saturation</span><span>very low &mdash; grey-green</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-amber">Replace</span>
+            <p>Ultron runs three saturated drifting glows (blue, violet, green). Collapse to one near-achromatic plume anchored behind the hero. This is the highest-impact single change on the page.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="demo-frame">
+            <div class="sp-plume"></div>
+            <span class="sp-tag" style="left:12px;">Single plume &middot; desaturated &middot; static</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 03 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">03</span>
+          <h3>Hairline belt arcs as connective tissue</h3>
+          <p>
+            The most distinctive structural device on the reference site. Single-pixel arcs with a
+            radius far larger than the viewport sweep between sections, passing behind panels and
+            re-emerging below them. They imply one continuous curve running the length of the page,
+            which is what makes separate sections feel like one machine.
+          </p>
+          <p>
+            In the closing section the same curve carries a solitary green dot sitting exactly on
+            the path &mdash; an orbit marker. It is the only decorative use of the accent on the page and
+            it lands because it is the only one.
+          </p>
+          <div class="spec">
+            <div><span>Stroke</span><span>1px, non-scaling</span></div>
+            <div><span>Colour</span><span>rgba(255,255,255,0.10)</span></div>
+            <div><span>Radius</span><span>2&ndash;4&times; viewport width</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-blue">Gap &mdash; build it</span>
+            <p>Ultron has vertical column rules but nothing horizontal binding the sections. This is the one genuinely new structure to add, and it should replace the scrolling telemetry waves.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="demo-frame">
+            <div class="sp-belt">
+              <svg viewBox="0 0 400 140" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M-40 150 C 90 40, 250 26, 460 74" fill="none" stroke="rgba(255,255,255,0.13)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <path d="M-40 176 C 110 66, 270 52, 460 100" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="1" vector-effect="non-scaling-stroke"/>
+                <circle cx="232" cy="35.5" r="4.5" fill="#64e58b"/>
+              </svg>
+            </div>
+            <span class="sp-tag" style="left:12px;">Belt arc &middot; single accent marker on path</span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 04 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">04</span>
+          <h3>Mono micro-labels in low-alpha chips</h3>
+          <p>
+            The most-repeated device in the whole reference: every panel, chart, card and section is
+            titled by a small uppercase monospace label sitting in a barely-there rounded chip.
+            <code>SELF LEARNING CONTROLLER PERFORMANCE</code>. <code>SPECIFIC FUEL COST ($/t)</code>.
+            <code>EXTRA PROFIT</code>. <code>REASON FOR AI ACTION | 15:40&ndash;16:10</code>.
+          </p>
+          <p>
+            It works because it borrows the vernacular of instrumentation &mdash; these look like labels
+            on a control panel, not like eyebrow text on a marketing page. The chip background is
+            what separates it from an ordinary caption.
+          </p>
+          <div class="spec">
+            <div><span>Size</span><span>9.5 &ndash; 10.5px</span></div>
+            <div><span>Tracking</span><span>0.16 &ndash; 0.20em</span></div>
+            <div><span>Chip fill</span><span>rgba(255,255,255,0.055)</span></div>
+            <div><span>Radius</span><span>5px</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-green">Partly have</span>
+            <p>Ultron uses bare mono eyebrows without the chip. Adding the chip is a two-line change that immediately buys most of the instrument-panel feel.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="sp-chips">
+            <span class="chip">Self learning controller</span>
+            <span class="chip">Extra profit</span>
+            <span class="chip chip-green">All channels live</span>
+            <span class="chip">Specific fuel cost ($/t)</span>
+            <span class="chip chip-blue">Forecast &middot; 6h</span>
+            <span class="chip">Adaptive</span>
+          </div>
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);">Live specimens &mdash; inspect to read values</span>
+        </div>
+      </article>
+
+      <!-- 05 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">05</span>
+          <h3>Weight inversion on the big numerals</h3>
+          <p>
+            A subtle move that does a lot of work. Section headings are set semibold to bold, but the
+            large statistics &mdash; <code>&pound;1.3m</code>, <code>3-5%</code>, <code>10000t</code> &mdash; are set
+            <strong>light</strong>, around 250&ndash;300, at very large sizes.
+          </p>
+          <p>
+            The effect is that the numbers read as engraved measurements rather than as shouted
+            marketing claims. Bold large numerals are what every SaaS template does; light large
+            numerals are what instrument faces and technical drawings do.
+          </p>
+          <div class="spec">
+            <div><span>Numerals</span><span>250 &ndash; 300 weight</span></div>
+            <div><span>Headings</span><span>600 &ndash; 700 weight</span></div>
+            <div><span>Tracking</span><span>-0.04em at display size</span></div>
+            <div><span>Figures</span><span>tabular-nums</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-blue">Gap &mdash; adopt</span>
+            <p>Ultron's <code>.font-display</code> forces <code>font-weight: 600</code> on hero numerals. Add a light display variant for statistics specifically.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="sp-weights">
+            <div>
+              <div class="sp-num light">1.3<span style="font-size:0.46em;letter-spacing:0;">M&#8239;t/yr</span></div>
+              <div class="sp-cap">Light 250 &mdash; reads as measured</div>
+            </div>
+            <div>
+              <div class="sp-num bold">1.3<span style="font-size:0.46em;letter-spacing:0;">M&#8239;t/yr</span></div>
+              <div class="sp-cap">Bold 700 &mdash; reads as claimed</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 06 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">06</span>
+          <h3>Tick-mark bars instead of solid fills</h3>
+          <p>
+            In the explainability panel, attribution percentages are drawn not as filled bars but as
+            a row of discrete 2px vertical ticks. A solid bar reads as a progress indicator; a row of
+            ticks reads as a quantised instrument scale &mdash; an LED meter on a mixing desk.
+          </p>
+          <p>
+            It also solves a real problem: at small sizes a solid bar's rounded end caps make two
+            similar values look identical. Discrete ticks stay countable.
+          </p>
+          <div class="spec">
+            <div><span>Tick</span><span>2px wide, 2px gap</span></div>
+            <div><span>Height</span><span>11px</span></div>
+            <div><span>Colour</span><span>series hue, 0.9 alpha</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-blue">Gap &mdash; adopt</span>
+            <p>Fits Ultron's existing green/blue split exactly: green ticks for measured contribution, blue for predicted. Use in the capabilities panel.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div style="display:flex;flex-direction:column;">
+            <div class="sp-meter">
+              <span class="sp-meter-l">Specific heat consumption</span>
+              <span class="sp-meter-v" style="color:var(--green);">27.9%</span>
+              <span class="ticks" style="color:var(--green);"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="sp-meter">
+              <span class="sp-meter-l">Energy stability</span>
+              <span class="sp-meter-v" style="color:var(--green);">25.7%</span>
+              <span class="ticks" style="color:var(--green);"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="sp-meter">
+              <span class="sp-meter-l">Free lime</span>
+              <span class="sp-meter-v" style="color:var(--blue);">8.9%</span>
+              <span class="ticks" style="color:var(--blue);"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+            </div>
+            <div class="sp-meter">
+              <span class="sp-meter-l">Preheater CO</span>
+              <span class="sp-meter-v" style="color:var(--blue);">1.4%</span>
+              <span class="ticks" style="color:var(--blue);"><i></i></span>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <!-- 07 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">07</span>
+          <h3>Registration marks on specimen cards</h3>
+          <p>
+            The materials cards (cement, steel, glass) carry a faint square grid and small coloured
+            squares pinned at one corner with a matching dot at the opposite corner. They reference
+            CAD registration marks and sample-annotation tags &mdash; the visual language of a materials
+            lab rather than a product grid.
+          </p>
+          <p>
+            Each material gets its own mark colour, which is the only place the extended palette
+            appears outside a chart.
+          </p>
+          <div class="spec">
+            <div><span>Grid</span><span>34px, alpha 0.05</span></div>
+            <div><span>Mark</span><span>6px square, top-left</span></div>
+            <div><span>Dot</span><span>7px circle, bottom-right</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-blue">Gap &mdash; adopt</span>
+            <p>Ultron's <code>Industries.tsx</code> already frames five materials as specimens. The marks are a natural fit and give each material an identity without adding copy.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="demo-frame">
+            <div class="sp-reg">
+              <div class="grid"></div>
+              <span class="mark" style="top:14px;left:14px;background:#6fa8ff;"></span>
+              <span class="dot" style="bottom:14px;right:14px;background:#e3b341;"></span>
+            </div>
+            <span class="sp-tag" style="left:14px;bottom:32px;"><span class="chip">Materials</span></span>
+          </div>
+        </div>
+      </article>
+
+      <!-- 08 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">08</span>
+          <h3>One inversion, placed at the proof</h3>
+          <p>
+            Deep in the page the ground flips to a light grey panel for the customer case study,
+            with black type and a monochrome plant photograph bleeding to the panel edge. Frosted
+            translucent stat cards sit over the photograph.
+          </p>
+          <p>
+            Structurally this is the page's loudest moment, and it is spent on the one section that
+            carries third-party proof. The inversion means the reader physically cannot scroll past
+            it.
+          </p>
+          <div class="spec">
+            <div><span>Panel</span><span>#E8E8E8</span></div>
+            <div><span>Photo</span><span>desaturated, edge-bleed</span></div>
+            <div><span>Stat cards</span><span>white 0.55, blur 14px</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-green">Already have</span>
+            <p><code>CaseStudy.tsx</code> is already the single inversion on the page &mdash; the band comment in <code>home.tsx</code> names it explicitly. Add the frosted stat cards; that part is missing.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="sp-bands">
+            <div style="background:#080808;color:var(--ink-3);"><span>Hero</span><span>#080808</span></div>
+            <div style="background:#0a0a0a;color:var(--ink-3);"><span>Stage</span><span>#0A0A0A</span></div>
+            <div style="background:#101011;color:var(--ink-3);"><span>Platform</span><span>#101011</span></div>
+            <div style="background:#0a0a0a;color:var(--ink-3);"><span>Industries</span><span>#0A0A0A</span></div>
+            <div style="background:#e8e8e8;color:#4a4a4a;"><span>Case study</span><span>#E8E8E8</span></div>
+            <div style="background:#101011;color:var(--ink-3);"><span>Results</span><span>#101011</span></div>
+            <div style="background:#0a0a0a;color:var(--ink-3);"><span>Signals</span><span>#0A0A0A</span></div>
+          </div>
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);">Ultron's existing band ladder &mdash; the inversion is already correctly placed</span>
+        </div>
+      </article>
+
+      <!-- 09 -->
+      <article class="tech">
+        <div class="tech-copy">
+          <span class="tech-n">09</span>
+          <h3>The wordmark as a footer watermark</h3>
+          <p>
+            The footer sets the company name at enormous size in a grey barely separable from the
+            background, with the link columns sitting on top of it. It closes the page with the
+            brand without a logo lockup or a repeated CTA.
+          </p>
+          <div class="spec">
+            <div><span>Size</span><span>~18vw</span></div>
+            <div><span>Colour</span><span>+4% over ground</span></div>
+            <div><span>Position</span><span>baseline-cropped</span></div>
+          </div>
+          <div class="verdict">
+            <span class="chip chip-blue">Gap &mdash; adopt</span>
+            <p>Cheap to add to <code>SiteFooter.tsx</code>, and it gives the page a proper ending instead of trailing off.</p>
+          </div>
+        </div>
+        <div class="tech-demo">
+          <div class="demo-frame" style="display:flex;align-items:flex-end;overflow:hidden;">
+            <span style="font-size:62px;font-weight:700;letter-spacing:-0.05em;color:#151516;line-height:0.78;margin-left:-4px;user-select:none;">ULTRON</span>
+          </div>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section>
+    <div class="sec-head">
+      <span class="chip">Audit</span>
+      <h2>Ultron today, against each device</h2>
+    </div>
+
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>Device</th><th>Status</th><th>Where it lives</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Grain</td><td><span class="tag tag-have">Have</span></td><td>Ambience.module.css</td><td>Raise 0.038 &rarr; 0.05</td></tr>
+          <tr><td>Band ladder</td><td><span class="tag tag-have">Have</span></td><td>home.tsx</td><td>Keep unchanged</td></tr>
+          <tr><td>Light inversion</td><td><span class="tag tag-have">Have</span></td><td>CaseStudy.tsx</td><td>Add frosted stat cards</td></tr>
+          <tr><td>Column rules</td><td><span class="tag tag-have">Have</span></td><td>Rules.tsx</td><td>Keep; fade at section seams</td></tr>
+          <tr><td>Mono eyebrows</td><td><span class="tag tag-have">Have</span></td><td>primitives.tsx</td><td>Wrap in chip background</td></tr>
+          <tr><td>Belt arcs</td><td><span class="tag tag-gap">Gap</span></td><td>&mdash;</td><td>New layer, replaces waves</td></tr>
+          <tr><td>Light numerals</td><td><span class="tag tag-gap">Gap</span></td><td>global.css</td><td>Add display-light variant</td></tr>
+          <tr><td>Tick meters</td><td><span class="tag tag-gap">Gap</span></td><td>&mdash;</td><td>New primitive</td></tr>
+          <tr><td>Registration marks</td><td><span class="tag tag-gap">Gap</span></td><td>Industries.tsx</td><td>Per-material mark colour</td></tr>
+          <tr><td>Footer watermark</td><td><span class="tag tag-gap">Gap</span></td><td>SiteFooter.tsx</td><td>Add oversized wordmark</td></tr>
+          <tr><td>Three aurora glows</td><td><span class="tag tag-cut">Cut</span></td><td>Ambience.module.css</td><td>Collapse to one desaturated plume</td></tr>
+          <tr><td>Telemetry waves</td><td><span class="tag tag-cut">Cut</span></td><td>Ambience.tsx</td><td>Remove &mdash; belt arcs replace them</td></tr>
+          <tr><td>Scan sweep</td><td><span class="tag tag-cut">Cut</span></td><td>Ambience.module.css</td><td>Remove &mdash; no static meaning</td></tr>
+          <tr><td>Column pulses</td><td><span class="tag tag-cut">Cut</span></td><td>Ambience.tsx</td><td>Reduce 5 &rarr; 1, or remove</td></tr>
+          <tr><td>Dot mesh drift</td><td><span class="tag tag-cut">Cut</span></td><td>Ambience.module.css</td><td>Keep mesh, stop the animation</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section>
+    <div class="sec-head">
+      <span class="chip chip-green">Plan</span>
+      <h2>Order of work</h2>
+      <p style="font-size:14.5px;color:var(--ink-2);">
+        Sequenced so the largest perceptual change lands first and each step is independently
+        shippable.
+      </p>
+    </div>
+
+    <div class="actions">
+      <div class="action">
+        <span class="action-n">01</span>
+        <div>
+          <h3>Calm the ambient field</h3>
+          <p>Three glows &rarr; one desaturated plume anchored to the hero. Remove waves, scan and four of five pulses. Freeze the mesh. This alone moves the page furthest toward the reference.</p>
+        </div>
+      </div>
+      <div class="action">
+        <span class="action-n">02</span>
+        <div>
+          <h3>Add the belt arc layer</h3>
+          <p>A single SVG layer of large-radius hairlines binding hero &rarr; stage &rarr; platform &rarr; results, with one green marker on the path in the closing section.</p>
+        </div>
+      </div>
+      <div class="action">
+        <span class="action-n">03</span>
+        <div>
+          <h3>Chip every micro-label</h3>
+          <p>One shared primitive, applied across every section eyebrow and panel title. Highest ratio of perceived polish to lines changed.</p>
+        </div>
+      </div>
+      <div class="action">
+        <span class="action-n">04</span>
+        <div>
+          <h3>Invert numeral weight</h3>
+          <p>Light display variant for statistics; headings stay semibold. Applies to Results and the hero figure.</p>
+        </div>
+      </div>
+      <div class="action">
+        <span class="action-n">05</span>
+        <div>
+          <h3>Build the tick meter and registration marks</h3>
+          <p>Tick meters into the capabilities panel using the green/blue split; per-material marks into the industries specimens.</p>
+        </div>
+      </div>
+      <div class="action">
+        <span class="action-n">06</span>
+        <div>
+          <h3>Close the page</h3>
+          <p>Frosted stat cards over the case-study photograph; oversized wordmark watermark in the footer.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section>
+    <div class="sec-head">
+      <span class="chip chip-amber">Caveat</span>
+      <h2>Where "better than them" actually comes from</h2>
+    </div>
+    <div class="stack">
+      <p>
+        Copying all nine devices would produce a competent Gigaton clone. The thing Ultron has that
+        Gigaton does not is a <strong>colour rule with semantic meaning</strong> &mdash; green is measured,
+        blue is predicted, everything else is grey &mdash; enforced in <code>global.css</code> and already
+        respected across the console.
+      </p>
+      <p>
+        Gigaton's four chart hues are decorative; they distinguish series but carry no meaning you
+        could state. Ultron's two carry a claim about the product: this number is real, that number
+        is a forecast. Applied consistently to the tick meters, the belt marker, the prediction
+        traces and the live pills, that reads as a system rather than a style &mdash; and a system is the
+        thing that cannot be copied off a screenshot.
+      </p>
+      <p>
+        <strong>So the differentiator is not a new effect. It is applying the existing rule harder,
+        while removing the ambient colour that currently violates it.</strong>
+      </p>
+    </div>
+  </section>
+
+</div>
