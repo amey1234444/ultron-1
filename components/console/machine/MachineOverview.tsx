@@ -7,6 +7,7 @@ import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { OverviewAnalysisInput, OverviewHistoryPoint } from '../../../lib/analysis/overviewSnapshot';
 import { analyzeRotaryAirlock, type AnalysisReading, type AnalysisSignalCode, type RotaryAirlockAnalysisResult } from '../../../lib/analysis/rotaryAirlockAnalyzer';
+import type { MachineAnalysisResult } from '../../../lib/analysis/types';
 import { cn } from '../../../lib/cn';
 import { consolePalette } from '../../../lib/consoleTheme';
 import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
@@ -931,7 +932,9 @@ export function FindingPanel({ finding }: { finding: Finding }) {
   );
 }
 
-export function DeepAnalyzerPanel({ analysis }: { analysis: RotaryAirlockAnalysisResult }) {
+// Model-agnostic: renders any `MachineAnalysisResult`, so the rotary-airlock and
+// single-screw-extruder models share one panel.
+export function DeepAnalyzerPanel({ analysis }: { analysis: MachineAnalysisResult }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';

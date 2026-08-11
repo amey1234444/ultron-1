@@ -15,6 +15,7 @@ import type { DeviceNode } from '../../../lib/devices';
 import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import { apiFetch } from '../../../src/lib/apiClient';
+import { ExtruderAnalysisView } from './ExtruderAnalysisView';
 import {
   BulletList,
   DeepAnalyzerPanel,
@@ -245,7 +246,29 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
   );
 }
 
-export function AnalysisView({
+/**
+ * Analysis tab, dispatched by machine template.
+ *
+ * Each template with a condition-monitoring model gets its own analyzer; both
+ * produce a `MachineAnalysisResult`, so the shared panels (deep analyzer,
+ * maintenance guidance) and the durable `analysis_*` tables are model-agnostic.
+ */
+export function AnalysisView(props: AnalysisViewProps) {
+  if (props.machineTemplate === 'Single Screw Extruder') {
+    return (
+      <ExtruderAnalysisView
+        mappedChannels={props.mappedChannels}
+        devices={props.devices}
+        cards={props.cards}
+        live={props.live}
+        expectedPoints={props.expectedPoints}
+      />
+    );
+  }
+  return <RotaryAirlockAnalysisView {...props} />;
+}
+
+function RotaryAirlockAnalysisView({
   mappedChannels,
   devices,
   cards,

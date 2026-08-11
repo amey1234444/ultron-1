@@ -1,4 +1,4 @@
-import type { RotaryAirlockAnalysisResult } from './rotaryAirlockAnalyzer';
+import type { AnalysisModelKey, MachineAnalysisResult } from './types';
 
 // Contract for the machine Overview analysis. The browser owns the calculation
 // (it is the only place that sees the mapped live signals in real time) and
@@ -42,7 +42,7 @@ export type OverviewAnalysisInput = {
   weakSignals: string[];
   findings: OverviewFinding[];
   topEvidence: OverviewEvidence[];
-  deepAnalysis: RotaryAirlockAnalysisResult;
+  deepAnalysis: MachineAnalysisResult;
 };
 
 export type OverviewHistoryPoint = {
@@ -134,18 +134,24 @@ function parseEvidence(value: unknown): OverviewEvidence[] {
   });
 }
 
-// The deep analyzer result is produced by the shared analyzer module, so only
-// its identifying envelope is verified before it is stored verbatim.
-function parseDeepAnalysis(value: unknown): RotaryAirlockAnalysisResult {
+// The deep analyzer result is produced by one of the shared analyzer modules, so
+// only its identifying envelope is verified before it is stored verbatim. A
+// model-specific extension block (for example the extruder's `extruder` detail)
+// rides along inside the same payload.
+const SUPPORTED_MODELS: AnalysisModelKey[] = ['rotary_airlock_valve', 'single_screw_extruder'];
+
+function parseDeepAnalysis(value: unknown): MachineAnalysisResult {
   const deep = record(value, 'deepAnalysis');
-  if (deep.model !== 'rotary_airlock_valve') throw new OverviewAnalysisError('deepAnalysis.model is not supported.');
+  if (!SUPPORTED_MODELS.includes(deep.model as AnalysisModelKey)) {
+    throw new OverviewAnalysisError('deepAnalysis.model is not supported.');
+  }
   for (const key of ['readiness', 'operatingState', 'anomaly', 'maintenance', 'doctorReport', 'plantSummary'] as const) {
     record(deep[key], `deepAnalysis.${key}`);
   }
   for (const key of ['derived', 'quality', 'baselines', 'diagnoses'] as const) {
     if (!Array.isArray(deep[key])) throw new OverviewAnalysisError(`deepAnalysis.${key} must be an array.`);
   }
-  return deep as unknown as RotaryAirlockAnalysisResult;
+  return deep as unknown as MachineAnalysisResult;
 }
 
 export function parseOverviewAnalysis(raw: unknown): OverviewAnalysisInput {

@@ -15,7 +15,7 @@ export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
 export const COMPONENT_TYPES = ['Motor', 'Pump', 'Gearbox', 'Coupling', 'Bearing', 'Fan', 'Compressor', 'Custom Component'] as const;
 export type ComponentType = (typeof COMPONENT_TYPES)[number];
 
-export type MeasurementPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current';
+export type MeasurementPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Level';
 
 // Point lifecycle per spec Flow 5 — starts Not Configured, ends at a live-view
 // state once mapped, commissioned, and streaming.
@@ -93,41 +93,46 @@ const RAV_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   },
 ];
 
-// Single Screw Extruder — the point set the canvas template wires up, in the
-// same order the default layout drops its cards (drive side first, then the
-// barrel/die process points).
+// Single Screw Extruder — the ULTRON pilot sensor package, in the same order the
+// default layout drops its cards (drive side first, then feed and barrel).
+//
+// These labels are what the extruder analysis model resolves onto its canonical
+// pilot tags (`lib/analysis/extruder/signalMap.ts`), so renaming a point here
+// changes which diagnostic rules can run. E1 is the motor rear-shaft proximity
+// switch, so the speed point is motor shaft speed; screw speed is derived from
+// it through the controlled 20:1 gearbox ratio.
 const EXTRUDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   {
     type: 'Motor',
     label: 'Drive',
     points: [
       { label: 'Motor Current', kind: 'Current' },
-      { label: 'Screw Speed', kind: 'Speed' },
-    ],
-  },
-  {
-    type: 'Bearing',
-    label: 'Bearings',
-    points: [
-      { label: 'Motor DE Vibration Acceleration RMS', kind: 'Vibration' },
-      { label: 'Motor NDE Vibration Acceleration RMS', kind: 'Vibration' },
-      { label: 'Thrust Bearing Temperature', kind: 'Temperature' },
+      { label: 'Motor Shaft Speed', kind: 'Speed' },
+      { label: 'Motor Vibration', kind: 'Vibration' },
+      { label: 'Motor Temperature', kind: 'Temperature' },
     ],
   },
   {
     type: 'Gearbox',
     label: 'Gear Box',
-    points: [{ label: 'Gearbox Oil Temperature', kind: 'Temperature' }],
+    points: [
+      { label: 'Gearbox Vibration', kind: 'Vibration' },
+      { label: 'Gearbox Temperature', kind: 'Temperature' },
+    ],
+  },
+  {
+    type: 'Custom Component',
+    label: 'Feed',
+    points: [{ label: 'Hopper Level', kind: 'Level' }],
   },
   {
     type: 'Custom Component',
     label: 'Screw and Barrel',
     points: [
-      { label: 'Feed Throat Temperature', kind: 'Temperature' },
-      { label: 'Barrel Zone Temperature', kind: 'Temperature' },
-      { label: 'Melt Temperature', kind: 'Temperature' },
+      { label: 'Barrel Zone 1 Temperature', kind: 'Temperature' },
+      { label: 'Barrel Zone 2 Temperature', kind: 'Temperature' },
+      { label: 'Barrel Zone 3 Temperature', kind: 'Temperature' },
       { label: 'Melt Pressure', kind: 'Pressure' },
-      { label: 'Die Head Pressure', kind: 'Pressure' },
     ],
   },
 ];

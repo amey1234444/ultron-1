@@ -1,5 +1,7 @@
+import { analyzeExtruder, type ExtruderInputReading } from '../../lib/analysis/extruder';
 import type { OverviewAnalysisInput, OverviewHistoryPoint } from '../../lib/analysis/overviewSnapshot';
-import { analyzeRotaryAirlock, type AnalysisReading, type AnalysisSignalCode, type RotaryAirlockAnalysisResult } from '../../lib/analysis/rotaryAirlockAnalyzer';
+import { analyzeRotaryAirlock, type AnalysisReading, type AnalysisSignalCode } from '../../lib/analysis/rotaryAirlockAnalyzer';
+import type { MachineAnalysisResult } from '../../lib/analysis/types';
 import type { DeviceNode } from '../../lib/devices';
 import { applyLiveStatus, latestMeasurementForChannel } from '../../lib/liveTelemetry';
 import { listChannels, type CardNode } from '../../lib/rack';
@@ -67,32 +69,84 @@ function readingForMappedBox(
   };
 }
 
-export async function runMachineAnalysis(machineId: string): Promise<RotaryAirlockAnalysisResult> {
+// The extruder model resolves its canonical pilot tags from the mapped point's
+// own label, so a box only has to be named for the instrument it is wired to.
+function extruderReadingForMappedBox(
+  box: LayoutBox,
+  channel: ReturnType<typeof listChannels>[number],
+  devices: DeviceNode[],
+  cards: CardNode[],
+  live: Awaited<ReturnType<typeof getLiveState>>,
+): ExtruderInputReading | null {
+  if (!box.channelId) return null;
+  const rack = devices.find((device) => device.id === channel.rackId);
+  const card = cards.find((candidate) => candidate.deviceId === channel.rackId && candidate.slot === channel.slot);
+  if (!rack || !card) return null;
+  const measurement = latestMeasurementForChannel(rack, card, channelNumber(box.channelId), live);
+  if (!measurement) return null;
+  return {
+    // Resolve on the box label alone (falling back to the channel label when the
+    // box is unnamed), so a card's own wording cannot leak into the tag match.
+    label: (box.label ?? '').trim() || channel.label,
+    value: measurement.value,
+    unit: measurement.unit || channel.unit,
+    quality: measurement.quality,
+    valid: measurement.measurementValid,
+    timestamp: measurement.updatedAt,
+    source: 'gateway',
+  };
+}
+
+/**
+ * Analysis models available server-side, keyed by machine template.
+ *
+ * Both models produce a `MachineAnalysisResult`, so everything downstream —
+ * the durable `analysis_*` tables, the Overview deep-analyzer panel and the
+ * Analysis tab's shared panels — stays model-agnostic.
+ */
+const ANALYSIS_TEMPLATES = new Set(['Rotary Airlock Valve', 'Single Screw Extruder']);
+
+export async function runMachineAnalysis(machineId: string): Promise<MachineAnalysisResult> {
   if (!isDbEnabled()) throw new ApiError(503, 'DATABASE_URL is required for durable analysis.');
   await ensureSchema();
   const workspace = await getWorkspace();
   if (!workspace) throw new ApiError(503, 'Workspace persistence is not available.');
   const machine = workspace.machines.find((candidate) => candidate.id === machineId);
   if (!machine) throw new ApiError(404, 'Machine not found.');
-  if (machine.template !== 'Rotary Airlock Valve') throw new ApiError(400, 'Only Rotary Airlock Valve analysis is available.');
+  if (!ANALYSIS_TEMPLATES.has(machine.template)) {
+    throw new ApiError(400, `No analysis model exists for the ${machine.template} template.`);
+  }
 
   const live = await getLiveState();
   const liveDevices = applyLiveStatus(workspace.devices, live);
   const channels = listChannels(liveDevices, workspace.cards);
   const byId = new Map(channels.map((channel) => [channel.id, channel]));
-  const readings = boxes(workspace.layouts[machineId])
+  const mapped = boxes(workspace.layouts[machineId])
     .map((box) => {
       const channel = box.channelId ? byId.get(box.channelId) : undefined;
-      return channel ? readingForMappedBox(box, channel, liveDevices, workspace.cards, live) : null;
+      return channel ? { box, channel } : null;
     })
-    .filter((reading): reading is AnalysisReading => reading !== null);
+    .filter((entry): entry is { box: LayoutBox; channel: ReturnType<typeof listChannels>[number] } => entry !== null);
 
-  const result = analyzeRotaryAirlock({ readings, now: new Date().toISOString(), machineCount: workspace.machines.length });
+  const now = new Date().toISOString();
+  let result: MachineAnalysisResult;
+  if (machine.template === 'Single Screw Extruder') {
+    const readings = mapped
+      .map(({ box, channel }) => extruderReadingForMappedBox(box, channel, liveDevices, workspace.cards, live))
+      .filter((reading): reading is ExtruderInputReading => reading !== null);
+    result = analyzeExtruder({ readings, now, machineCount: workspace.machines.length });
+  } else {
+    const readings = mapped
+      .map(({ box, channel }) => readingForMappedBox(box, channel, liveDevices, workspace.cards, live))
+      .filter((reading): reading is AnalysisReading => reading !== null);
+    result = analyzeRotaryAirlock({ readings, now, machineCount: workspace.machines.length });
+  }
+
   await persistAnalysisSnapshot(machine.id, machine.template, result);
   return result;
 }
 
-export async function persistAnalysisSnapshot(machineId: string, machineTemplate: string, result: RotaryAirlockAnalysisResult): Promise<number> {
+export async function persistAnalysisSnapshot(machineId: string, machineTemplate: string, result: MachineAnalysisResult): Promise<number> {
   const title = result.diagnoses[0]?.title ?? '';
   const snapshot = await query<SnapshotRow>(
     `INSERT INTO analysis_snapshots
@@ -265,10 +319,10 @@ export async function getOverviewHistory(machineId: string, limit = 120): Promis
   return rows.rows.map(toHistoryPoint).reverse();
 }
 
-export async function getLatestAnalysisSnapshot(machineId: string): Promise<RotaryAirlockAnalysisResult | null> {
+export async function getLatestAnalysisSnapshot(machineId: string): Promise<MachineAnalysisResult | null> {
   if (!isDbEnabled()) return null;
   await ensureSchema();
-  const result = await query<{ payload: RotaryAirlockAnalysisResult }>(
+  const result = await query<{ payload: MachineAnalysisResult }>(
     `SELECT payload FROM analysis_snapshots WHERE machine_id = $1 ORDER BY generated_at DESC LIMIT 1`,
     [machineId],
   );
@@ -276,7 +330,7 @@ export async function getLatestAnalysisSnapshot(machineId: string): Promise<Rota
 }
 
 export async function getAnalysisUiBundle(machineId: string): Promise<{
-  latest: RotaryAirlockAnalysisResult | null;
+  latest: MachineAnalysisResult | null;
   snapshots: unknown[];
   episodes: unknown[];
   cases: unknown[];
@@ -313,6 +367,6 @@ export async function getAnalysisUiBundle(machineId: string): Promise<{
     ),
     getOverviewHistory(machineId),
   ]);
-  const latest = (snapshots.rows[0] as { payload?: RotaryAirlockAnalysisResult } | undefined)?.payload ?? null;
+  const latest = (snapshots.rows[0] as { payload?: MachineAnalysisResult } | undefined)?.payload ?? null;
   return { latest, snapshots: snapshots.rows, episodes: episodes.rows, cases: cases.rows, overview };
 }

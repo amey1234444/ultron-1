@@ -11,6 +11,7 @@ const UNIT_FOR_KIND: Record<MeasurementPointKind, string> = {
   Speed: 'rpm',
   Pressure: 'bar',
   Current: 'A',
+  Level: '%',
 };
 
 const LIVE_STATUSES: MeasurementPointStatus[] = ['Connected', 'Warning', 'Alarm'];
@@ -21,6 +22,9 @@ const KIND_LETTER: Record<MeasurementPointKind, LiveKindLetter> = {
   Speed: 'S',
   Pressure: 'P',
   Current: 'C',
+  // No dedicated level letter — 'X' is the generic 0-100 band, which is what a
+  // hopper level percentage is anyway.
+  Level: 'X',
 };
 
 // Green is reserved for a point that is actually carrying data. The setup

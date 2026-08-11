@@ -102,21 +102,38 @@ const GEARBOX_BOLTS = [
  * The default trail layout imports this list, so a card can never attach to a
  * place the artwork does not actually have an instrument — move a pad here and
  * the trail that lands on it moves with it.
+ *
+ * These are the ULTRON single-screw-extruder pilot tags, and the codes below
+ * are the tag names the extruder analysis model reads (`lib/analysis/extruder`).
+ * Two of them are easy to get wrong and are therefore worth stating:
+ *
+ * - **E1 is motor shaft speed**, not screw speed. The sensor is a
+ *   one-pulse-per-revolution proximity switch on the motor *rear* shaft, so at
+ *   the RD-001 screw speed of 100 rpm it reads 2000 rpm through the 20:1
+ *   gearbox. Screw speed is derived from it.
+ * - **V1 is on the motor housing and V2 on the gearbox housing.** The motor and
+ *   gearbox mechanical hypotheses are separated by which channel carries the
+ *   pattern, so the two pads are not interchangeable.
  */
 export type ExtruderConnector = { code: string; label: string; x: number; y: number; side: 'left' | 'right' };
 
 export const EXTRUDER_CONNECTORS: ExtruderConnector[] = [
-  { code: 'C1', label: 'Motor Current', side: 'left', x: 135, y: 429 },
-  { code: 'V2', label: 'Motor NDE Vibration Acceleration RMS', side: 'left', x: 64, y: 494 },
-  { code: 'V1', label: 'Motor DE Vibration Acceleration RMS', side: 'left', x: 198, y: 528 },
-  { code: 'S1', label: 'Screw Speed', side: 'left', x: 222, y: 494 },
-  { code: 'T1', label: 'Gearbox Oil Temperature', side: 'left', x: 348, y: 556 },
-  { code: 'T2', label: 'Thrust Bearing Temperature', side: 'left', x: 451, y: 332 },
-  { code: 'T3', label: 'Feed Throat Temperature', side: 'right', x: 540, y: 296 },
-  { code: 'T4', label: 'Barrel Zone Temperature', side: 'right', x: 726, y: ZONE_SENSOR_Y },
-  { code: 'T5', label: 'Melt Temperature', side: 'right', x: 1080, y: 300 },
+  // Drive
+  { code: 'E1', label: 'Motor Shaft Speed', side: 'left', x: 64, y: 494 },
+  { code: 'PM1', label: 'Motor Current', side: 'left', x: 135, y: 429 },
+  { code: 'V1', label: 'Motor Vibration', side: 'left', x: 198, y: 528 },
+  { code: 'T4', label: 'Motor Temperature', side: 'left', x: 96, y: 522 },
+  // Gear box — V2 on the housing, T5 at the oil sight glass
+  { code: 'V2', label: 'Gearbox Vibration', side: 'left', x: 400, y: 356 },
+  { code: 'T5', label: 'Gearbox Temperature', side: 'left', x: 348, y: 556 },
+  // Feed
+  { code: 'L1', label: 'Hopper Level', side: 'right', x: 518, y: 120 },
+  // Barrel zones 1-3
+  { code: 'T1', label: 'Barrel Zone 1 Temperature', side: 'right', x: 566, y: ZONE_SENSOR_Y },
+  { code: 'T2', label: 'Barrel Zone 2 Temperature', side: 'right', x: 726, y: ZONE_SENSOR_Y },
+  { code: 'T3', label: 'Barrel Zone 3 Temperature', side: 'right', x: 886, y: ZONE_SENSOR_Y },
+  // Metering-zone melt pressure, lower side opposite zone 3
   { code: 'P1', label: 'Melt Pressure', side: 'right', x: 960, y: 428 },
-  { code: 'P2', label: 'Die Head Pressure', side: 'right', x: 1052, y: 362 },
 ];
 
 const SCREW_FLIGHTS: number[] = [];
