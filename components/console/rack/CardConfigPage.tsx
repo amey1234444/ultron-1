@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { normalizedCardConfig, type CardConfig, type CardType, type ControllerConfig, type ProcessConfig, type SpeedConfig, type VibrationConfig } from '../../../lib/rack';
-import { cardConfigWithSimulation, type SimulatedChannel } from '../../../lib/simulation';
+import { cardConfigWithSimulation, simulationWithCardConfig, type SimulatedChannel } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
 import { ControllerFields, EnabledToggle, ProcessFields, SpeedFields, VibrationFields } from './CardConfigFields';
@@ -28,7 +28,16 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
   const [enabled, setEnabled] = useState(initialEnabled);
   const [simulation, setSimulation] = useState<SimulatedChannel[] | undefined>(initialSimulation);
 
-  const set = <K extends string>(key: K, value: string) => setConfig((prev) => ({ ...prev, [key]: value }));
+  // Unit, range and alarm limits live on the card AND on the signal definition
+  // of a simulated channel. Editing either side now updates the other, so a
+  // value typed here is not silently replaced on save — which is exactly what
+  // used to happen, and made the card's Unit field look read-only.
+  const set = <K extends string>(key: K, value: string) =>
+    setConfig((prev) => {
+      const next = { ...prev, [key]: value };
+      setSimulation((channels) => (channels ? simulationWithCardConfig(cardType, next, channels) : channels));
+      return next;
+    });
   const setChannelName = (index: number, value: string) =>
     setConfig((prev) => {
       if (!('channelNames' in prev)) return prev;
@@ -73,7 +82,12 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
             cardType={cardType}
             channelNames={'channelNames' in config ? config.channelNames : []}
             channels={simulation}
-            onChange={setSimulation}
+            // The reverse direction: editing the signal definition mirrors back
+            // onto the card fields, so both views always show the same numbers.
+            onChange={(channels) => {
+              setSimulation(channels);
+              setConfig((prev) => cardConfigWithSimulation(cardType, prev, channels));
+            }}
           />
         )}
       </ScrollView>
@@ -82,7 +96,9 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
         <ActionButton label="Cancel" variant="secondary" onPress={onBack} />
         <ActionButton
           label="Save"
-          onPress={() => canSave && onSave(simulation ? cardConfigWithSimulation(cardType, config, simulation) : config, enabled, simulation)}
+          // Both sides are already in step (see `set` above), so saving stores
+          // what is on screen rather than overwriting it from the signal.
+          onPress={() => canSave && onSave(config, enabled, simulation)}
           disabled={!canSave}
         />
       </View>

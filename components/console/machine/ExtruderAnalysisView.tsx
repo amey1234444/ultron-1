@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import {
@@ -9,6 +9,9 @@ import {
   CANONICAL_UNITS,
   faultName,
   resolveSignal,
+  runScenario,
+  scenarioById,
+  SCENARIOS,
   TAG_LABELS,
   type ConstraintCheck,
   type ExtruderAnalysisResult,
@@ -16,6 +19,7 @@ import {
   type ExtruderTag,
   type FaultAssessmentRecord,
   type ResolvedSignal,
+  type Scenario,
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
 import type { DeviceNode } from '../../../lib/devices';
@@ -364,6 +368,126 @@ function CandidateCard({ assessment, ordinal }: { assessment: FaultAssessmentRec
   );
 }
 
+/**
+ * Scenario picker — the twin's 61 verified diagnostic cases.
+ *
+ * Grouped by the same checklist sections the twin's own manual test matrix uses,
+ * so a case number here and a case number in its documentation are the same
+ * thing. Cases the console cannot reproduce are listed with the reason rather
+ * than hidden: "this needs a raw waveform" is information, and silently omitting
+ * 14 of 61 would misrepresent what the model covers.
+ */
+function ScenarioPicker({
+  activeId,
+  onSelect,
+}: {
+  activeId: string | null;
+  onSelect: (id: string | null) => void;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const [query, setQuery] = useState('');
+
+  const grouped = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    const matches = SCENARIOS.filter(
+      (scenario) =>
+        !needle ||
+        scenario.id.toLowerCase().includes(needle) ||
+        scenario.name.toLowerCase().includes(needle) ||
+        scenario.expectedFaultIds.some((id) => id.toLowerCase().includes(needle)),
+    );
+    const sections = new Map<string, { title: string; items: Scenario[] }>();
+    for (const scenario of matches) {
+      const entry = sections.get(scenario.section);
+      if (entry) entry.items.push(scenario);
+      else sections.set(scenario.section, { title: scenario.sectionTitle, items: [scenario] });
+    }
+    return [...sections.entries()];
+  }, [query]);
+
+  return (
+    <View className="gap-3">
+      <View className="flex-row flex-wrap items-center gap-2">
+        <View
+          className="min-w-[200px] flex-1 rounded-lg border px-3 py-2"
+          style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+        >
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Filter by id, name or fault code…"
+            placeholderTextColor={palette.inkFaint}
+            className="font-body text-xs"
+            style={{ color: palette.ink, outlineStyle: 'none' } as never}
+          />
+        </View>
+        {activeId ? (
+          <Pressable
+            onPress={() => onSelect(null)}
+            accessibilityRole="button"
+            className="rounded-lg border px-3 py-2"
+            style={{ borderColor: palette.line }}
+          >
+            <Text className="font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+              Back to live data
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
+
+      {grouped.length === 0 ? <Body muted>No scenario matches “{query}”.</Body> : null}
+
+      {grouped.map(([letter, section]) => (
+        <View key={letter} className="gap-1.5">
+          <SectionLabel>
+            {letter} · {section.title}
+          </SectionLabel>
+          {section.items.map((scenario) => {
+            const active = scenario.id === activeId;
+            const blocked = Boolean(scenario.unsupported);
+            return (
+              <Pressable
+                key={scenario.id}
+                onPress={() => onSelect(scenario.id)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+                className="flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+                style={{
+                  borderColor: active ? palette.lineStrong : palette.line,
+                  backgroundColor: active ? palette.panelRaised : 'transparent',
+                }}
+              >
+                <Text
+                  className="font-mono text-[10.5px]"
+                  style={{ color: palette.ink, minWidth: 168 }}
+                  numberOfLines={1}
+                >
+                  {scenario.id}
+                </Text>
+                <Text className="min-w-0 flex-1 font-body text-xs" style={{ color: palette.ink }} numberOfLines={1}>
+                  {scenario.name}
+                </Text>
+                {blocked ? (
+                  <Badge variant="muted" icon="waveform">
+                    Needs raw signal
+                  </Badge>
+                ) : scenario.expectedFaultIds.length === 0 ? (
+                  <Badge variant="success">No fault</Badge>
+                ) : (
+                  <Badge variant={scenario.expectedFaultIds.length > 1 ? 'warning' : 'info'} icon={null} outline>
+                    {scenario.expectedFaultIds.join(' / ')}
+                  </Badge>
+                )}
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
 function ConstraintRow({ check }: { check: ConstraintCheck }) {
   const variant = constraintVariant(check.status);
   const evaluated = check.value !== null;
@@ -411,6 +535,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const palette = consolePalette(isDark);
   const demo = useDemoOperatingPoint();
   const [tab, setTab] = useState<TabKey>('diagnosis');
+  const [scenarioId, setScenarioId] = useState<string | null>(null);
 
   // The twin's pipeline keeps its own rolling history so temporal features —
   // trend, repetition and dispersion — become available after a few samples.
@@ -418,7 +543,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // no instrumentation hypothesis can ever be raised.
   const historyRef = useRef<Partial<Record<ExtruderTag, (number | null)[]>>>({});
 
-  const { analysis, points, dataMode } = useMemo(() => {
+  const liveRun = useMemo(() => {
     const now = new Date().toISOString();
     const built = buildPoints(mappedChannels, devices, cards, live, demo, now);
     return {
@@ -435,9 +560,19 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // Accumulate in an effect rather than inside the memo: mutating a ref during
   // render double-appends under StrictMode's double-invoke.
   useEffect(() => {
-    historyRef.current = appendHistory(historyRef.current, analysis);
-  }, [analysis]);
+    historyRef.current = appendHistory(historyRef.current, liveRun.analysis);
+  }, [liveRun]);
 
+  // Scenario mode replaces the live vector wholesale. The pipeline is identical —
+  // only the measurements differ — so what is on screen is the same analysis the
+  // machine would produce if it were actually in that condition.
+  const scenarioRun = useMemo(() => {
+    const scenario = scenarioId ? scenarioById(scenarioId) : undefined;
+    return scenario ? runScenario(scenario) : null;
+  }, [scenarioId]);
+
+  const analysis = scenarioRun ? scenarioRun.analysis : liveRun.analysis;
+  const dataMode = liveRun.dataMode;
   const detail = analysis.extruder;
   const candidateAssessments = useMemo(
     () => detail.assessments.filter((assessment) => detail.candidateFaults.includes(assessment.faultId)),
@@ -609,6 +744,57 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           <KeyValue label="State" value={detail.inferredMachineState} variant={stateVariant(detail.inferredMachineState)} />
         </View>
       </View>
+
+      {/* --- scenario library ------------------------------------------------ */}
+      <Collapsible
+        title="Fault scenario library"
+        icon="flask-outline"
+        count={SCENARIOS.length}
+        variant={scenarioRun ? 'warning' : undefined}
+        defaultOpen={false}
+        summary={
+          scenarioRun
+            ? `Running ${scenarioRun.scenario.id} — ${scenarioRun.scenario.name}. Live data is not being analysed.`
+            : `${SCENARIOS.length} verified diagnostic cases from the digital twin. Select one to drive the analyzer with that condition; ${SCENARIOS.filter((s) => !s.unsupported).length} are reproducible here.`
+        }
+      >
+        <ScenarioPicker activeId={scenarioId} onSelect={setScenarioId} />
+      </Collapsible>
+
+      {scenarioRun && (
+        <Alert
+          variant={
+            scenarioRun.verdict === 'PASS'
+              ? 'success'
+              : scenarioRun.verdict === 'NOT_REPRODUCIBLE'
+                ? 'muted'
+                : 'destructive'
+          }
+          title={`${scenarioRun.scenario.id} · ${scenarioRun.scenario.name} — ${scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'not reproducible here' : scenarioRun.verdict.toLowerCase()}`}
+        >
+          <View className="gap-1.5">
+            <Body muted>{scenarioRun.rationale}</Body>
+            <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+              <KeyValue
+                label="Injected"
+                value={scenarioRun.expectedFaultIds.join(', ') || 'nothing'}
+              />
+              <KeyValue
+                label="Reported"
+                value={scenarioRun.actualFaultIds.join(', ') || 'nothing'}
+              />
+              <KeyValue label="Acceptance" value={scenarioRun.scenario.acceptance} />
+              {scenarioRun.scenario.severity !== null ? (
+                <KeyValue label="Severity" value={String(scenarioRun.scenario.severity)} />
+              ) : null}
+            </View>
+            <Body muted>
+              The request carried measurements only — no scenario id, fault id or expected result reached the
+              detector. The comparison above scores a diagnosis that had already finished.
+            </Body>
+          </View>
+        </Alert>
+      )}
 
       {/* --- the verdict ----------------------------------------------------- */}
       <VerdictBanner

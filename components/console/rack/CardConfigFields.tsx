@@ -189,6 +189,7 @@ export function SpeedFields({
           ))}
         </View>
       </View>
+      <FormField label="Engineering Unit" value={config.unit ?? ''} onChangeText={(v) => set('unit', v)} placeholder="e.g. rpm" />
       <FormField label="Pulses Per Revolution" value={config.pulsesPerRevolution} onChangeText={(v) => set('pulsesPerRevolution', v)} placeholder="1" />
       <View className="flex-row gap-3">
         <View className="flex-1">

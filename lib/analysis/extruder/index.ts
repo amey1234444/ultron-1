@@ -51,5 +51,14 @@ export {
   type ExtruderTag,
 } from './signalMap';
 export { allThresholds, faultName, PROCESS_CONSTRAINTS, type Threshold } from './registers';
+export {
+  reproducibleScenarios,
+  scenarioById,
+  SCENARIO_SECTIONS,
+  SCENARIOS,
+  type Scenario,
+  type ScenarioInputMode,
+} from './scenarios';
+export { readingsForScenario, runScenario, type ScenarioRun } from './scenarioRunner';
 export { type BaselineValue } from './baseline';
 export { MachineState } from './stateInference';

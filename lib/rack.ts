@@ -65,6 +65,11 @@ export type SpeedConfig = {
   pulsesPerRevolution: string;
   trigger: string;
   hysteresis: string;
+  /**
+   * Engineering unit for the speed reading. Optional so racks saved before this
+   * field existed keep working — `letterAndUnitForCard` falls back to rpm.
+   */
+  unit?: string;
   minSpeed: string;
   maxSpeed: string;
   alarmWarning: string;
@@ -161,6 +166,7 @@ export function emptyConfigFor(type: CardType): CardConfig {
         pulsesPerRevolution: '',
         trigger: '',
         hysteresis: '',
+        unit: 'rpm',
         minSpeed: '',
         maxSpeed: '',
         alarmWarning: '',
@@ -210,11 +216,22 @@ function parsedThreshold(value: string | undefined): number | undefined {
 // unit decides the letter for every channel on the card.
 function letterAndUnitForCard(card: CardNode): { letter: ChannelRef['letter']; unit: string } {
   if (card.type === 'Vibration Card') return { letter: 'V', unit: 'engineeringUnit' in card.config ? card.config.engineeringUnit || 'mm/s' : 'mm/s' };
-  if (card.type === 'Speed Card') return { letter: 'S', unit: 'rpm' };
+  if (card.type === 'Speed Card') {
+    const unit = ('unit' in card.config ? card.config.unit : '') || 'rpm';
+    return { letter: 'S', unit };
+  }
   if (card.type === 'Process Card' && 'unit' in card.config) {
     const unit = card.config.unit || '';
-    const normalized = unit.toLowerCase();
-    if (normalized.includes('bar') || normalized.includes('psi')) return { letter: 'P', unit: unit || 'bar' };
+    const normalized = unit.toLowerCase().trim();
+    if (normalized.includes('bar') || normalized.includes('psi') || normalized.includes('pa')) {
+      return { letter: 'P', unit: unit || 'bar' };
+    }
+    // Level/ratio units are matched before the temperature test: "percent"
+    // contains a 'c', so without this a hopper level would be typed — and
+    // demo-banded, and charted — as a temperature.
+    if (normalized === '%' || normalized.includes('percent') || normalized.includes('fraction')) {
+      return { letter: 'X', unit };
+    }
     if (normalized.includes('c') && !normalized.includes('ma')) return { letter: 'T', unit: unit || '°C' };
     if (normalized.includes('a')) return { letter: 'C', unit: unit || 'A' };
     return { letter: 'X', unit };

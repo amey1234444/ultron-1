@@ -530,6 +530,71 @@ function limitText(value: number | null): string {
  * Channel 1 decides the card-level values, since a card carries one unit and
  * one threshold pair for all of its channels.
  */
+/**
+ * Push a card-level edit back into the signal definition.
+ *
+ * The unit, range and alarm pair exist in two places for a simulated card: on
+ * the card (where a commissioning engineer expects to type them) and on the
+ * signal definition (which is what the generator actually publishes). Previously
+ * the signal definition won unconditionally on save, so editing the card's Unit
+ * field appeared to do nothing — the value snapped straight back.
+ *
+ * The two are now kept in step in BOTH directions: edit either side and the
+ * other follows. This is the reverse of `cardConfigWithSimulation`.
+ */
+export function simulationWithCardConfig(
+  type: CardType,
+  config: CardConfig,
+  channels: SimulatedChannel[],
+): SimulatedChannel[] {
+  const primary = channels[0];
+  if (!primary) return channels;
+
+  const numeric = (text: string | undefined, fallback: number): number => {
+    const parsed = Number.parseFloat(String(text ?? '').trim());
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+  const limit = (text: string | undefined, fallback: number | null): number | null => {
+    const raw = String(text ?? '').trim();
+    if (!raw) return null;
+    const parsed = Number.parseFloat(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  };
+
+  let next: Partial<SimulatedChannel> = {};
+  if (type === 'Vibration Card' && 'engineeringUnit' in config) {
+    next = {
+      unit: config.engineeringUnit || primary.unit,
+      min: numeric(config.measurementRangeMin, primary.min),
+      max: numeric(config.measurementRangeMax, primary.max),
+    };
+  } else if (type === 'Process Card' && 'engineeringMin' in config) {
+    next = {
+      unit: config.unit || primary.unit,
+      min: numeric(config.engineeringMin, primary.min),
+      max: numeric(config.engineeringMax, primary.max),
+    };
+  } else if (type === 'Speed Card' && 'minSpeed' in config) {
+    next = {
+      unit: config.unit || primary.unit,
+      min: numeric(config.minSpeed, primary.min),
+      max: numeric(config.maxSpeed, primary.max),
+    };
+  } else {
+    return channels;
+  }
+
+  if ('alarmWarning' in config) next.alertLimit = limit(config.alarmWarning, primary.alertLimit);
+  if ('alarmCritical' in config) next.dangerLimit = limit(config.alarmCritical, primary.dangerLimit);
+  // A range that ends up inverted would stall the generator; keep the stored one.
+  if (next.min !== undefined && next.max !== undefined && next.max <= next.min) {
+    next.min = primary.min;
+    next.max = primary.max;
+  }
+
+  return channels.map((channel, index) => (index === 0 ? { ...channel, ...next } : channel));
+}
+
 export function cardConfigWithSimulation(type: CardType, config: CardConfig, channels: SimulatedChannel[]): CardConfig {
   const primary = channels[0];
   if (!primary) return config;
@@ -558,7 +623,14 @@ export function cardConfigWithSimulation(type: CardType, config: CardConfig, cha
     };
   }
   if (type === 'Speed Card' && 'minSpeed' in config) {
-    return { ...config, minSpeed: String(primary.min), maxSpeed: String(primary.max), alarmWarning, alarmCritical };
+    return {
+      ...config,
+      unit: primary.unit,
+      minSpeed: String(primary.min),
+      maxSpeed: String(primary.max),
+      alarmWarning,
+      alarmCritical,
+    };
   }
   return config;
 }
