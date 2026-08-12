@@ -3,10 +3,29 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { isDbEnabled, query } from './db';
 import { clientIp, deviceFingerprint } from './request';
 import { recordSecurityAlert } from './securityAlerts';
-import { DEFAULT_RATE_LIMITS, getRateLimits, type RateRule } from './settings';
+import { DEFAULT_RATE_LIMITS, getRateLimits, type RateLimitSettings, type RateRule } from './settings';
 import { ApiError } from './users';
 
-export type RateBucket = 'signup' | 'login' | 'api';
+export type RateBucket = 'signup' | 'login' | 'api' | 'password_reset';
+
+/**
+ * Which configured rule each bucket is measured against.
+ *
+ * A bucket is its own counter, but several buckets may share a rule.
+ * `password_reset` deliberately borrows the SIGNUP rule — both send outbound
+ * email to an address the caller chose, so both need the strict 3-per-hour
+ * ceiling rather than the login allowance.
+ *
+ * It is a separate counter rather than literally reusing the `signup` bucket so
+ * the two cannot consume each other's quota: someone who just registered must
+ * still be able to recover a password, and vice versa.
+ */
+const RULE_SOURCE: Record<RateBucket, keyof RateLimitSettings> = {
+  signup: 'signup',
+  login: 'login',
+  api: 'api',
+  password_reset: 'signup',
+};
 
 // Every request is checked against TWO windows that must BOTH pass:
 //  1. IP + device fingerprint — the precise, per-client limit (the product
@@ -80,7 +99,7 @@ export async function checkRateLimit(req: NextApiRequest, bucket: RateBucket): P
   const now = Date.now();
   try {
     const rules = await getRateLimits();
-    const checks = checksFor(req, bucket, rules[bucket]);
+    const checks = checksFor(req, bucket, rules[RULE_SOURCE[bucket]]);
     if (isDbEnabled()) {
       for (const c of checks) {
         if ((await dbCount(c.key, c.rule.windowSec)) >= c.rule.max) return false;
@@ -108,7 +127,7 @@ export async function enforceRateLimit(
   const allowed = await checkRateLimit(req, bucket);
   if (!allowed) {
     const rules = await getRateLimits().catch(() => DEFAULT_RATE_LIMITS);
-    res.setHeader('Retry-After', String(rules[bucket].windowSec));
+    res.setHeader('Retry-After', String(rules[RULE_SOURCE[bucket]].windowSec));
     await recordSecurityAlert({
       kind: 'rate_limit',
       ip: clientIp(req),
@@ -117,7 +136,9 @@ export async function enforceRateLimit(
       detail:
         bucket === 'signup'
           ? 'Signup attempts exceeded the configured limit.'
-          : `Rate limit exceeded on the ${bucket} endpoint.`,
+          : bucket === 'password_reset'
+            ? 'Password-reset requests exceeded the configured limit (shares the signup rule).'
+            : `Rate limit exceeded on the ${bucket} endpoint.`,
     });
     throw new ApiError(429, 'Too many requests. Please slow down and try again later.');
   }

@@ -14,8 +14,10 @@ import { guardRequest } from '../../../server/security';
  * turns this endpoint into a way to test which email addresses hold accounts,
  * which is the classic mistake in this flow.
  *
- * Rate limited on the `login` bucket: without it this is a free outbound-email
- * cannon pointed at any address an attacker chooses.
+ * Rate limited on the `password_reset` bucket, which carries the SIGNUP rule
+ * (3 per hour by default) rather than the looser login allowance. Both endpoints
+ * send outbound email to an address the caller chose, so both need the strict
+ * ceiling — without it this is a free email cannon pointed at anyone.
  */
 
 const NEUTRAL_RESPONSE = {
@@ -42,7 +44,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(405).json({ error: 'Method not allowed.' });
     }
     res.setHeader('Cache-Control', 'no-store, max-age=0');
-    await enforceRateLimit(req, res, 'login');
+    await enforceRateLimit(req, res, 'password_reset');
 
     const { email } = (req.body ?? {}) as { email?: string };
     if (!email || typeof email !== 'string' || !email.includes('@')) {

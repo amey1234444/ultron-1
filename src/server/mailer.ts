@@ -8,8 +8,14 @@
 //   SMTP_PORT      587 (STARTTLS, default) or 465 (implicit TLS)
 //   SMTP_SECURE    'true' for implicit TLS on 465; inferred from the port otherwise
 //   SMTP_USER      omit both credentials for an unauthenticated relay
-//   SMTP_PASS
+//   SMTP_PASS      SMTP_PASSWORD is accepted as a fallback name
 //   SMTP_FROM      e.g. "ULTRON <no-reply@example.com>"
+//
+// Local development note: antivirus products that scan mail (Avast, ESET,
+// Kaspersky) intercept the TLS connection and re-sign it with their own root,
+// which Node rejects as UNABLE_TO_VERIFY_LEAF_SIGNATURE. That is a machine
+// problem, not a configuration one — turn the mail shield off for local testing.
+// Certificate verification is deliberately never disabled here.
 //
 // When SMTP_HOST is absent the transport is DISABLED rather than faked. Callers
 // are told the message was not sent, so a password-reset flow can decide for
@@ -37,7 +43,10 @@ function config() {
   const host = (process.env.SMTP_HOST ?? '').trim();
   const port = Number.parseInt((process.env.SMTP_PORT ?? '587').trim(), 10) || 587;
   const user = (process.env.SMTP_USER ?? '').trim();
-  const pass = process.env.SMTP_PASS ?? '';
+  // SMTP_PASSWORD is accepted as a fallback name — it is the spelling most
+  // hosting dashboards use, and silently authenticating with an empty password
+  // because of a one-word difference is a miserable thing to debug.
+  const pass = process.env.SMTP_PASS ?? process.env.SMTP_PASSWORD ?? '';
   const secureRaw = (process.env.SMTP_SECURE ?? '').trim().toLowerCase();
   // Port 465 is implicit TLS; 587 and 25 start plaintext and upgrade via STARTTLS.
   const secure = secureRaw ? secureRaw === 'true' || secureRaw === '1' : port === 465;
