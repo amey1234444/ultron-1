@@ -6,9 +6,11 @@ import {
   allThresholds,
   analyzeExtruder,
   appendHistory,
+  ALL_TAGS,
   CANONICAL_UNITS,
   faultName,
   resolveSignal,
+  SCENARIO_POINT_LABELS,
   runScenario,
   scenarioById,
   SCENARIOS,
@@ -50,7 +52,6 @@ import {
   type TabItem,
   type Variant,
 } from '../../ui';
-import { EmptyState } from '../EmptyState';
 import type { MappedChannel } from './RackOccupancyView';
 
 /**
@@ -124,8 +125,15 @@ type PointInput = {
   reporting: boolean;
 };
 
-/** Where the numbers on screen came from. */
-type DataMode = 'gateway' | 'demo' | 'mixed';
+/**
+ * Where the numbers on screen came from.
+ *
+ * `template` is the un-commissioned machine: nothing is mapped yet, so the full
+ * pilot tag set is synthesised at its controlled operating point. That keeps the
+ * whole analysis layer explorable — and the scenario library usable — before a
+ * single channel exists, which is what it is for.
+ */
+type DataMode = 'gateway' | 'demo' | 'mixed' | 'template';
 
 function alarmStateFor(channel: MappedChannel['channel'], value: number | null): {
   alarm: PointInput['alarm'];
@@ -163,6 +171,29 @@ function buildPoints(
   demo: Record<string, number>,
   now: string,
 ): { points: PointInput[]; mode: DataMode } {
+  // Nothing mapped at all: stand the machine up as a template at its controlled
+  // operating point, so the layer can be explored, demonstrated and driven with
+  // scenarios before commissioning. Every reading is flagged simulated.
+  if (mappedChannels.length === 0) {
+    const points = ALL_TAGS.map((tag) => ({
+      reading: {
+        label: SCENARIO_POINT_LABELS[tag],
+        value: demo[tag] ?? null,
+        unit: CANONICAL_UNITS[tag],
+        quality: 'GOOD',
+        valid: true,
+        timestamp: now,
+        source: 'demo' as const,
+      },
+      alarm: 'none' as const,
+      alarmLimit: null,
+      observed: demo[tag] ?? null,
+      channelUnit: CANONICAL_UNITS[tag],
+      reporting: false,
+    }));
+    return { points, mode: 'template' as const };
+  }
+
   // The box label is what the operator named the instrument, and it already
   // falls back to the channel label when the box is unnamed. Concatenating the
   // two would let a card's own wording ("Vibration Card CH1") leak into the
@@ -586,15 +617,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const degradedSignals = analysis.quality.filter((item) => item.status === 'BAD' || item.status === 'DEGRADED');
   const unresolved = detail.unconsumedSignals.length + detail.unrecognisedSignals.length + detail.rejectedSignals.length;
 
-  if (mappedChannels.length === 0) {
-    return (
-      <EmptyState
-        title="No mapped channels"
-        description="Analysis needs saved rack mappings — link a box to a channel in Design mode, then save the canvas configuration."
-      />
-    );
-  }
-
   // --- verdict ---------------------------------------------------------------
   const hasCandidates = detail.candidateFaults.length > 0;
   const verdictVariant: Variant = violations.length > 0
@@ -744,6 +766,26 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           <KeyValue label="State" value={detail.inferredMachineState} variant={stateVariant(detail.inferredMachineState)} />
         </View>
       </View>
+
+      {/* Say plainly where the numbers come from. A template machine that reads
+          healthy must never be mistaken for a real one that reads healthy. */}
+      {!scenarioRun && dataMode !== 'gateway' && (
+        <Alert
+          variant="info"
+          icon="flask-outline"
+          title={
+            dataMode === 'template'
+              ? 'Template preview — no channels mapped yet'
+              : dataMode === 'demo'
+                ? 'Simulated data — no channel is reporting'
+                : 'Partly simulated — some mapped channels are not reporting'
+          }
+        >
+          {dataMode === 'template'
+            ? `All ${ALL_TAGS.length} pilot tags are standing at their controlled operating point so the layer can be explored before commissioning. Map boxes to rack channels and save the canvas to analyse real data, or pick a case from the scenario library below to drive a specific condition.`
+            : 'These readings are generated at the machine’s controlled reference, not measured. Every one is marked “Simulated” in the Signals tab.'}
+        </Alert>
+      )}
 
       {/* --- scenario library ------------------------------------------------ */}
       <Collapsible

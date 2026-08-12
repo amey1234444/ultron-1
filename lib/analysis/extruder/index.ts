@@ -59,6 +59,11 @@ export {
   type Scenario,
   type ScenarioInputMode,
 } from './scenarios';
-export { readingsForScenario, runScenario, type ScenarioRun } from './scenarioRunner';
+export {
+  readingsForScenario,
+  runScenario,
+  SCENARIO_POINT_LABELS,
+  type ScenarioRun,
+} from './scenarioRunner';
 export { type BaselineValue } from './baseline';
 export { MachineState } from './stateInference';
