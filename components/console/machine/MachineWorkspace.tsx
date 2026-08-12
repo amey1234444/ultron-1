@@ -6,7 +6,12 @@ import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal } from '../../../lib/localPersist';
-import { expectedPointsForTemplate, type MachineComponent, type MachineNode } from '../../../lib/machines';
+import {
+  expectedPointLabelsForTemplate,
+  expectedPointsForTemplate,
+  type MachineComponent,
+  type MachineNode,
+} from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
 import { BackButton } from '../BackButton';
 import { AlarmView } from './AlarmView';
@@ -186,14 +191,33 @@ export function MachineWorkspace({
     setSavedBoxes([]);
   }, [isActual, actualTab, machine.id, layout]);
 
-  const mappedChannels = useMemo<MappedChannel[]>(
-    () =>
-      savedBoxes
-        .filter((box) => box.channelId)
-        .map((box) => ({ box, channel: allChannels.find((c) => c.id === box.channelId) }))
-        .filter((entry): entry is { box: Box; channel: NonNullable<(typeof entry)['channel']> } => !!entry.channel)
-        .map(({ box, channel }) => ({ id: box.id, channel, label: box.label.trim() || channel.label })),
-    [savedBoxes, allChannels],
+  const mappedChannels = useMemo<MappedChannel[]>(() => {
+    const fromCanvas = savedBoxes
+      .filter((box) => box.channelId)
+      .map((box) => ({ box, channel: allChannels.find((c) => c.id === box.channelId) }))
+      .filter((entry): entry is { box: Box; channel: NonNullable<(typeof entry)['channel']> } => !!entry.channel)
+      .map(({ box, channel }) => ({ id: box.id, channel, label: box.label.trim() || channel.label }));
+    if (fromCanvas.length > 0) return fromCanvas;
+
+    // No canvas mapping saved yet. Rather than leaving every tab empty, associate
+    // rack channels whose label matches one of this template's expected points,
+    // so a freshly created machine is immediately inspectable.
+    //
+    // Matching is by label ONLY. Associating by rack position would put a
+    // pressure reading under "Motor Current" and hand an operator a confident,
+    // wrong number — far worse than an empty tab.
+    const normalise = (text: string) => text.trim().toLowerCase().replace(/\s+/g, ' ');
+    const wanted = new Map(expectedPointLabelsForTemplate(machine.template).map((label) => [normalise(label), label]));
+    return allChannels
+      .map((channel) => ({ channel, label: wanted.get(normalise(channel.label)) }))
+      .filter((entry): entry is { channel: (typeof allChannels)[number]; label: string } => Boolean(entry.label))
+      .map(({ channel, label }) => ({ id: `auto-${channel.id}`, channel, label }));
+  }, [savedBoxes, allChannels, machine.template]);
+
+  /** True when the points on screen came from label matching rather than a saved canvas. */
+  const usingAutoAssociation = useMemo(
+    () => savedBoxes.filter((box) => box.channelId).length === 0 && mappedChannels.length > 0,
+    [savedBoxes, mappedChannels],
   );
   // Total measurement points the machine template defines (e.g. RAV's Motor
   // component lists 6) — the "expected" denominator for the coverage indicator
@@ -261,6 +285,13 @@ export function MachineWorkspace({
         {machine.name}
       </Text>
       <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.2em]', mutedClass)}>{machine.template}</Text>
+      {isActual && usingAutoAssociation ? (
+        // These points were matched by name, not mapped by anyone. Say so — an
+        // operator must never mistake an inferred association for a commissioned one.
+        <Text className={cn('font-body text-[10.5px]', mutedClass)}>
+          {mappedChannels.length} point{mappedChannels.length === 1 ? '' : 's'} matched by name · no canvas mapping saved
+        </Text>
+      ) : null}
     </View>
   );
 

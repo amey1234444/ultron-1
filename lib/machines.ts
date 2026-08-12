@@ -144,6 +144,21 @@ const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[
   'Single Screw Extruder': EXTRUDER_ANALYSIS_COMPONENTS,
 };
 
+/**
+ * The measurement-point labels this template expects, in canvas order.
+ *
+ * Used to associate rack channels with a machine before anyone has drawn a
+ * canvas mapping, so the Rack/Overview/Analysis/Alarm/Trend tabs have something
+ * to show on a freshly created machine. The match is by label only — never by
+ * position — because guessing that "the third channel in the rack" is the melt
+ * pressure would put a wrong number in front of an operator.
+ */
+export function expectedPointLabelsForTemplate(template: MachineTemplate): string[] {
+  const analysisComponents = ANALYSIS_COMPONENTS[template];
+  if (analysisComponents) return analysisComponents.flatMap((component) => component.points.map((point) => point.label));
+  return TEMPLATE_COMPONENTS[template].flatMap((component) => pointLabels(component.type).map((point) => point.label));
+}
+
 export function expectedPointsForTemplate(template: MachineTemplate): number {
   const analysisComponents = ANALYSIS_COMPONENTS[template];
   if (analysisComponents) return analysisComponents.reduce((sum, component) => sum + component.points.length, 0);

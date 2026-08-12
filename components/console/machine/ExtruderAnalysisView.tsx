@@ -26,7 +26,7 @@ import {
 import type { SignalQuality } from '../../../lib/analysis/types';
 import type { DeviceNode } from '../../../lib/devices';
 import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
-import type { CardNode } from '../../../lib/rack';
+import { configuredHealthyValue, type CardNode } from '../../../lib/rack';
 import {
   Alert,
   Badge,
@@ -55,57 +55,71 @@ import {
 import type { MappedChannel } from './RackOccupancyView';
 
 /**
- * Demo operating point for the ULTRON pilot extruder, in canonical units.
+ * Healthy operating point for the pilot extruder.
  *
- * The generic V/T/S/P/C demo bands elsewhere in the console are plausible for a
- * pump, not for an extruder — a 45-82 degC "temperature" would read as three
+ * These are NOT numbers chosen here. They are read straight off the twin's own
+ * verified healthy-nominal case (`SCN-N-001`), which carries the complete
+ * eleven-tag vector for a machine running correctly on recipe RD-001. Keeping a
+ * second table in this file would be a second source of truth that could drift
+ * away from the one the analyzer actually compares against.
+ *
+ * The generic V/T/S/P/C demo bands used elsewhere in the console are plausible
+ * for a pump, not an extruder — a 45-82 degC "temperature" would read as three
  * simultaneously failed barrel heaters against the controlled 180/210/220 degC
- * setpoints. These centres are the machine's own controlled reference points, so
- * an unmapped machine demonstrates a healthy extruder rather than a fabricated
- * catastrophe. Demo readings are labelled as simulated wherever they appear.
+ * setpoints — so they are deliberately not used here.
  */
-const DEMO_OPERATING_POINT: Record<ExtruderTag, { centre: number; jitter: number }> = {
-  E1: { centre: 2000, jitter: 8 },
-  V1: { centre: 2.0, jitter: 0.05 },
-  V2: { centre: 2.0, jitter: 0.05 },
-  T1: { centre: 180, jitter: 0.4 },
-  T2: { centre: 210, jitter: 0.4 },
-  T3: { centre: 220, jitter: 0.4 },
-  T4: { centre: 40, jitter: 0.5 },
-  T5: { centre: 40, jitter: 0.5 },
-  P1: { centre: 4.0, jitter: 0.06 },
-  L1: { centre: 75, jitter: 1.2 },
-  'PM1.current': { centre: 10, jitter: 0.25 },
-  'PM1.power': { centre: 10, jitter: 0.3 },
-  'PM1.voltage': { centre: 415, jitter: 2 },
-  'PM1.power_factor': { centre: 0.88, jitter: 0.01 },
-};
+const HEALTHY_OPERATING_POINT: Partial<Record<ExtruderTag, number>> = (() => {
+  const healthy = scenarioById('SCN-N-001');
+  if (!healthy) return {};
+  const out: Partial<Record<ExtruderTag, number>> = {};
+  for (const [tag, value] of Object.entries(healthy.measurements) as [ExtruderTag, number | null][]) {
+    if (value !== null && Number.isFinite(value)) out[tag] = value;
+  }
+  return out;
+})();
 
 const DEMO_TICK_MS = 1500;
 
-/** A slow random walk around each tag's controlled reference. Demo data only. */
-function useDemoOperatingPoint(): Record<string, number> {
-  const [values, setValues] = useState<Record<string, number>>(() =>
-    Object.fromEntries(
-      (Object.keys(DEMO_OPERATING_POINT) as ExtruderTag[]).map((tag) => [tag, DEMO_OPERATING_POINT[tag].centre]),
-    ),
-  );
+/** Dispersion applied to a synthesised reading: 0.2% of value, so it is visible but never a fault. */
+const SYNTHETIC_JITTER_FRACTION = 0.002;
+
+function jitterFor(value: number): number {
+  return Math.max(Math.abs(value) * SYNTHETIC_JITTER_FRACTION, 1e-4);
+}
+
+/**
+ * A slow walk around each tag's healthy value, used only where no measurement
+ * exists. Movement is not decoration: without it the temporal features (trend,
+ * dispersion, repetition) never accumulate, and the rules that separate heater
+ * failure from heater degradation could never be demonstrated.
+ */
+function useSyntheticOperatingPoint(centres: Partial<Record<ExtruderTag, number>>): Record<string, number> {
+  const centreKey = JSON.stringify(centres);
+  const [values, setValues] = useState<Record<string, number>>(() => ({ ...centres }) as Record<string, number>);
+
   useEffect(() => {
+    setValues({ ...(JSON.parse(centreKey) as Record<string, number>) });
+  }, [centreKey]);
+
+  useEffect(() => {
+    const targets = JSON.parse(centreKey) as Record<string, number>;
     const id = setInterval(() => {
       setValues((previous) => {
         const next: Record<string, number> = {};
-        for (const tag of Object.keys(DEMO_OPERATING_POINT) as ExtruderTag[]) {
-          const { centre, jitter } = DEMO_OPERATING_POINT[tag];
-          const drifted = (previous[tag] ?? centre) + (Math.random() - 0.5) * jitter;
-          // Pull back toward the reference so the walk cannot wander into a
-          // fault band and invent a diagnosis out of nothing.
-          next[tag] = Math.min(centre + jitter * 2, Math.max(centre - jitter * 2, drifted));
+        for (const [tag, centre] of Object.entries(targets)) {
+          if (!Number.isFinite(centre)) continue;
+          const spread = jitterFor(centre);
+          const drifted = (previous[tag] ?? centre) + (Math.random() - 0.5) * spread;
+          // Pull back toward the healthy value so the walk can never wander into
+          // a fault band and invent a diagnosis out of nothing.
+          next[tag] = Math.min(centre + spread * 2, Math.max(centre - spread * 2, drifted));
         }
         return next;
       });
     }, DEMO_TICK_MS);
     return () => clearInterval(id);
-  }, []);
+  }, [centreKey]);
+
   return values;
 }
 
@@ -168,7 +182,7 @@ function buildPoints(
   devices: DeviceNode[],
   cards: CardNode[],
   live: LiveState | undefined,
-  demo: Record<string, number>,
+  synthetic: Record<string, number>,
   now: string,
 ): { points: PointInput[]; mode: DataMode } {
   // Nothing mapped at all: stand the machine up as a template at its controlled
@@ -178,7 +192,7 @@ function buildPoints(
     const points = ALL_TAGS.map((tag) => ({
       reading: {
         label: SCENARIO_POINT_LABELS[tag],
-        value: demo[tag] ?? null,
+        value: synthetic[tag] ?? null,
         unit: CANONICAL_UNITS[tag],
         quality: 'GOOD',
         valid: true,
@@ -187,7 +201,7 @@ function buildPoints(
       },
       alarm: 'none' as const,
       alarmLimit: null,
-      observed: demo[tag] ?? null,
+      observed: synthetic[tag] ?? null,
       channelUnit: CANONICAL_UNITS[tag],
       reporting: false,
     }));
@@ -219,14 +233,24 @@ function buildPoints(
     if (previewing) {
       const resolution = resolveSignal(label);
       const tag = resolution.kind === 'mapped' ? resolution.tag : null;
-      const simulated = tag ? (demo[tag] ?? null) : null;
+      // Prefer what the CHANNEL itself declares over anything this view knows.
+      // A card carries its own engineering range and normal band, and that is
+      // the commissioning engineer's statement of what healthy reads like on
+      // this instrument — more authoritative here than a generic reference.
+      // Only when the card declares no range at all do we fall back to the
+      // twin's verified healthy vector.
+      const card = cards.find(
+        (candidate) => candidate.deviceId === mapped.channel.rackId && candidate.slot === mapped.channel.slot,
+      );
+      const fromChannel = card ? configuredHealthyValue(card) : null;
+      const simulated = fromChannel ?? (tag ? (synthetic[tag] ?? null) : null);
       return {
         reading: {
           label,
           value: simulated,
-          // Canonical unit, so a mis-declared card unit cannot make preview data
-          // look like a fault.
-          unit: tag ? CANONICAL_UNITS[tag] : mapped.channel.unit,
+          // A channel-derived value carries the channel's own unit; the fallback
+          // is already in the tag's canonical unit.
+          unit: fromChannel !== null ? mapped.channel.unit : tag ? CANONICAL_UNITS[tag] : mapped.channel.unit,
           quality: 'GOOD',
           valid: true,
           timestamp: now,
@@ -564,7 +588,7 @@ export type ExtruderAnalysisViewProps = {
 export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, expectedPoints }: ExtruderAnalysisViewProps) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const demo = useDemoOperatingPoint();
+  const synthetic = useSyntheticOperatingPoint(HEALTHY_OPERATING_POINT);
   const [tab, setTab] = useState<TabKey>('diagnosis');
   const [scenarioId, setScenarioId] = useState<string | null>(null);
 
@@ -576,7 +600,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
 
   const liveRun = useMemo(() => {
     const now = new Date().toISOString();
-    const built = buildPoints(mappedChannels, devices, cards, live, demo, now);
+    const built = buildPoints(mappedChannels, devices, cards, live, synthetic, now);
     return {
       analysis: analyzeExtruder({
         readings: built.points.map((point) => point.reading),
@@ -586,7 +610,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       points: built.points,
       dataMode: built.mode,
     };
-  }, [mappedChannels, devices, cards, live, demo]);
+  }, [mappedChannels, devices, cards, live, synthetic]);
 
   // Accumulate in an effect rather than inside the memo: mutating a ref during
   // render double-appends under StrictMode's double-invoke.

@@ -177,6 +177,43 @@ export function emptyConfigFor(type: CardType): CardConfig {
   }
 }
 
+function midpoint(low: string | undefined, high: string | undefined): number | null {
+  const min = Number.parseFloat(String(low ?? '').trim());
+  const max = Number.parseFloat(String(high ?? '').trim());
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
+  return (min + max) / 2;
+}
+
+/**
+ * The value this channel reads when the process is healthy, taken from the
+ * channel's own configuration.
+ *
+ * Preference order, strongest declaration first:
+ *   1. the simulated signal's declared NORMAL band (what the commissioning
+ *      engineer said "good" looks like)
+ *   2. the simulated signal's generation range
+ *   3. the card's engineering range
+ *
+ * Returns `null` when the card declares no range at all, so a caller reports
+ * "not configured" rather than inventing a number.
+ */
+export function configuredHealthyValue(card: CardNode): number | null {
+  const simulated = card.simulation?.[0];
+  if (simulated) {
+    if (simulated.normalMin !== null && simulated.normalMax !== null && simulated.normalMax > simulated.normalMin) {
+      return (simulated.normalMin + simulated.normalMax) / 2;
+    }
+    if (Number.isFinite(simulated.min) && Number.isFinite(simulated.max) && simulated.max > simulated.min) {
+      return (simulated.min + simulated.max) / 2;
+    }
+  }
+  const config = card.config;
+  if ('measurementRangeMin' in config) return midpoint(config.measurementRangeMin, config.measurementRangeMax);
+  if ('engineeringMin' in config) return midpoint(config.engineeringMin, config.engineeringMax);
+  if ('minSpeed' in config) return midpoint(config.minSpeed, config.maxSpeed);
+  return null;
+}
+
 // A freshly-installed card has only defaults — nothing worth showing in a
 // read-only overview yet, so callers use this to decide whether "Configure"
 // should land on the overview or jump straight to the edit form.
