@@ -30,8 +30,10 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
-# .env*.local
+# local env files — these hold real credentials and must never be committed.
+# (These rules were previously commented out, so a .env.local would have been
+# picked up by `git add .`.)
+.env*.local
 
 # typescript
 *.tsbuildinfo
@@ -40,9 +42,9 @@ yarn-error.*
 /ios
 /android
 .vercel
-# .env
-# .env.*
-# !.env.example
+.env
+.env.*
+!.env.example
 .next/
 next-env.d.ts
 /build

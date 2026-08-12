@@ -20,6 +20,14 @@ name: Deploy to Vercel
 # - SUPER_ADMIN_PASSWORD
 # - ADMIN_PASSWORD
 # - USER_PASSWORD
+# - APP_ORIGIN (recommended; canonical origin for password-reset links)
+# - SMTP_HOST (optional; enables password-reset email)
+# - SMTP_PORT / SMTP_SECURE / SMTP_USER / SMTP_PASS / SMTP_FROM (with SMTP_HOST)
+#
+# Note on SMTP: these are runtime-only, server-side values. They are not read
+# during `vercel build` (only NEXT_PUBLIC_* is inlined at build time), so they
+# exist here purely so this workflow can push them into the Vercel production
+# environment where the app actually runs.
 
 on:
   push:
@@ -56,6 +64,15 @@ jobs:
       SUPER_ADMIN_PASSWORD: ${{ secrets.SUPER_ADMIN_PASSWORD }}
       ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
       USER_PASSWORD: ${{ secrets.USER_PASSWORD }}
+
+      # Password-reset email
+      APP_ORIGIN: ${{ secrets.APP_ORIGIN }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_SECURE: ${{ secrets.SMTP_SECURE }}
+      SMTP_USER: ${{ secrets.SMTP_USER }}
+      SMTP_PASS: ${{ secrets.SMTP_PASS }}
+      SMTP_FROM: ${{ secrets.SMTP_FROM }}
 
     steps:
       - name: Checkout
@@ -149,6 +166,27 @@ jobs:
             echo "ABSTRACT_EMAIL_REPUTATION_API_KEY is not configured; signup email-reputation check fails open (status 'unknown')"
           fi
 
+          # Password reset needs a canonical origin. Without it the reset link is
+          # built from the request Host header, which a client controls — a
+          # spoofed Host would put an attacker's domain in the email.
+          if [ -n "$APP_ORIGIN" ]; then
+            echo "APP_ORIGIN is configured"
+          else
+            echo "::warning::APP_ORIGIN is not configured; password-reset links will be built from the Host header"
+          fi
+
+          # SMTP is optional. Without it the forgot-password endpoint still
+          # answers normally (it must never reveal whether an account exists),
+          # but no reset email is ever delivered.
+          if [ -n "$SMTP_HOST" ]; then
+            echo "SMTP_HOST is configured"
+            if [ -z "$SMTP_USER" ] || [ -z "$SMTP_PASS" ]; then
+              echo "::warning::SMTP_HOST is set but SMTP_USER/SMTP_PASS are not; sending will be attempted unauthenticated"
+            fi
+          else
+            echo "::warning::SMTP_HOST is not configured; password-reset email will NOT be delivered"
+          fi
+
       # Synchronize GitHub Repository Secrets into the
       # Vercel Production environment.
       #
@@ -201,6 +239,30 @@ jobs:
 
           if [ -n "$ABSTRACT_EMAIL_REPUTATION_API_KEY" ]; then
             sync_secret "ABSTRACT_EMAIL_REPUTATION_API_KEY" "$ABSTRACT_EMAIL_REPUTATION_API_KEY"
+          fi
+
+          if [ -n "$APP_ORIGIN" ]; then
+            sync_secret "APP_ORIGIN" "$APP_ORIGIN"
+          fi
+
+          # Only push SMTP when a host is present, so a half-configured mail
+          # setup cannot overwrite a working one in Vercel with blanks.
+          if [ -n "$SMTP_HOST" ]; then
+            sync_secret "SMTP_HOST" "$SMTP_HOST"
+            sync_secret "SMTP_USER" "$SMTP_USER"
+            sync_secret "SMTP_PASS" "$SMTP_PASS"
+            # Explicit if-blocks rather than `[ -n x ] && cmd`: under
+            # `set -euo pipefail` a false test as the head of an && list is an
+            # easy way to abort the whole workflow by accident.
+            if [ -n "$SMTP_PORT" ]; then
+              sync_secret "SMTP_PORT" "$SMTP_PORT"
+            fi
+            if [ -n "$SMTP_SECURE" ]; then
+              sync_secret "SMTP_SECURE" "$SMTP_SECURE"
+            fi
+            if [ -n "$SMTP_FROM" ]; then
+              sync_secret "SMTP_FROM" "$SMTP_FROM"
+            fi
           fi
 
       # Pull again so the local Vercel build environment contains

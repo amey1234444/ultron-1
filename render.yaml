@@ -53,6 +53,25 @@ services:
         generateValue: true
       - key: ABSTRACT_EMAIL_REPUTATION_API_KEY
         sync: false
+      # Canonical public origin, used to build password-reset links. Without it
+      # the link falls back to the request Host header, which a client controls.
+      - key: APP_ORIGIN
+        sync: false
+      # SMTP for password-reset email. Leave SMTP_HOST unset to disable outbound
+      # mail; the reset endpoint still answers normally (it must never reveal
+      # whether an account exists) but nothing is delivered.
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 465
+      - key: SMTP_SECURE
+        value: true
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM
+        sync: false
       - key: SUPER_ADMIN_PASSWORD
         sync: false
       - key: ADMIN_PASSWORD
