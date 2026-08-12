@@ -184,6 +184,23 @@ async function migrate(): Promise<void> {
   `);
   await query(`CREATE INDEX IF NOT EXISTS auth_sessions_user ON auth_sessions (user_id, expires_at);`);
 
+  // Password-reset tokens. Only the SHA-256 hash of the token is stored, exactly
+  // like auth_sessions: a database leak must not yield working reset links.
+  // `consumed_at` enforces single use, and the row is kept after consumption so
+  // a replayed link can be told apart from an unknown one.
+  await query(`
+    CREATE TABLE IF NOT EXISTS password_reset_tokens (
+      token_hash   TEXT PRIMARY KEY,
+      user_id      TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      expires_at   TIMESTAMPTZ NOT NULL,
+      consumed_at  TIMESTAMPTZ
+    );
+  `);
+  await query(
+    `CREATE INDEX IF NOT EXISTS password_reset_tokens_user ON password_reset_tokens (user_id, consumed_at);`,
+  );
+
   // App-wide settings (single row) — currently holds super-admin-tunable rate
   // limits stored as JSON.
   await query(`

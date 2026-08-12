@@ -69,7 +69,9 @@ const nextConfig = {
   experimental: { externalDir: true },
   // Keep pg out of the webpack bundle and ensure it is traced into the
   // serverless function output.
-  serverExternalPackages: ['pg'],
+  // Both reach for Node built-ins (net/tls/dns) and must stay out of the webpack
+  // bundle, and be traced into the serverless function output.
+  serverExternalPackages: ['pg', 'nodemailer'],
   transpilePackages: [
     'react-native',
     'react-native-web',

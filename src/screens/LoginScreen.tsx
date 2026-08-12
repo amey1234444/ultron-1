@@ -80,7 +80,7 @@ export default function LoginScreen() {
         error={fieldErrors.password}
         onSubmitEditing={onSubmit}
         hint={
-          <Pressable onPress={() => router.push('/signup')} accessibilityRole="link">
+          <Pressable onPress={() => router.push('/forgot-password')} accessibilityRole="link">
             <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 13, color: '#8A8A8A' }}>Forgot password?</Text>
           </Pressable>
         }
