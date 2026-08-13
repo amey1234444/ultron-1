@@ -14,7 +14,8 @@ import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/
 import { latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode, ChannelRef } from '../../../lib/rack';
 import { apiFetch } from '../../../src/lib/apiClient';
-import { LIVE_RANGE_FOR_LETTER, useLiveValue, type LiveKindLetter } from './liveValue';
+import { useChannelReading } from '../../../lib/liveChannelValue';
+import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
 // Semantic colours for the machine workspace, shared with AnalysisView and
@@ -854,11 +855,24 @@ function OverviewCard({ mapped, value }: { mapped: MappedChannel; value: number 
   );
 }
 
-function SampleCollector({ mapped, onSample }: { mapped: MappedChannel; onSample: (id: string, value: number) => void }) {
-  const value = useLiveValue(mapped.channel.letter, true);
+// Subscribes a mapped channel to the measurement bus and reports each real
+// sample up into the shared sample map. It previously ran an independent random
+// walk, which meant every unmapped or silent channel still contributed a
+// plausible number to the overview and to `analyseMachine`.
+function SampleCollector({
+  mapped,
+  devices,
+  onSample,
+}: {
+  mapped: MappedChannel;
+  devices: DeviceNode[];
+  onSample: (id: string, value: number) => void;
+}) {
+  const reading = useChannelReading(mapped.channel, devices);
+  const value = reading.value;
 
   useEffect(() => {
-    onSample(mapped.id, value);
+    if (typeof value === 'number') onSample(mapped.id, value);
   }, [mapped.id, onSample, value]);
 
   return null;
@@ -1321,7 +1335,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 16 }}>
       {mappedChannels.map((mapped) => (
-        <SampleCollector key={`collector.${mapped.id}`} mapped={mapped} onSample={onSample} />
+        <SampleCollector key={`collector.${mapped.id}`} mapped={mapped} devices={devices} onSample={onSample} />
       ))}
 
       <View className="flex-row flex-wrap items-end justify-between gap-3">

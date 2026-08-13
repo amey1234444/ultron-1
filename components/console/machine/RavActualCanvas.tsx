@@ -4,7 +4,12 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { ChannelRef } from '../../../lib/rack';
-import { LIVE_RANGE_FOR_LETTER, useLiveValue } from './liveValue';
+import type { DeviceNode } from '../../../lib/devices';
+import { useChannelReading } from '../../../lib/liveChannelValue';
+import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT } from './liveValue';
+
+// Grey: nothing has reported for this channel.
+const NO_DATA_COLOUR = '#8B8D93';
 import { Rav01LayoutCanvas } from './Rav01LayoutCanvas';
 import type { MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
@@ -26,14 +31,24 @@ function levelFor(channel: ChannelRef, value: number): Level {
 // coloured by the channel's real alarm thresholds, reporting its current level
 // up so the matching trail can be coloured the same way (Rav01LayoutCanvas's
 // getTrailColour only sees the static `point` object, not the live number).
-function LivePointCard({ mapped, onLevelChange }: { mapped: MappedChannel; onLevelChange: (level: Level) => void }) {
+function LivePointCard({
+  mapped,
+  devices,
+  onLevelChange,
+}: {
+  mapped: MappedChannel;
+  devices: DeviceNode[];
+  onLevelChange: (level: Level) => void;
+}) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const { channel, label } = mapped;
-  const value = useLiveValue(channel.letter, true);
-  const level = levelFor(channel, value);
-  const colour = LEVEL_COLOUR[level];
+  const reading = useChannelReading(channel, devices);
+  const value = reading.value;
+  const hasReading = typeof value === 'number';
+  const level = hasReading ? levelFor(channel, value) : 'normal';
+  const colour = hasReading ? LEVEL_COLOUR[level] : NO_DATA_COLOUR;
   const range = LIVE_RANGE_FOR_LETTER[channel.letter];
 
   useEffect(() => {
@@ -59,7 +74,7 @@ function LivePointCard({ mapped, onLevelChange }: { mapped: MappedChannel; onLev
       </Text>
 
       <Text style={{ color: colour }} className="font-mono text-sm font-bold">
-        {value.toFixed(range.decimals)} {channel.unit}
+        {hasReading ? `${value.toFixed(range.decimals)} ${channel.unit}` : NO_VALUE_TEXT}
       </Text>
     </View>
   );
@@ -67,12 +82,13 @@ function LivePointCard({ mapped, onLevelChange }: { mapped: MappedChannel; onLev
 
 export type RavActualCanvasProps = {
   mappedChannels: MappedChannel[];
+  devices?: DeviceNode[];
 };
 
 // Actual View → Machine for RAV: Rav01LayoutCanvas's hand-tuned 11-slot
 // arrangement, fed with real box↔channel mappings instead of fixed demo
 // values — live readings, live alarm-threshold colouring, real labels.
-export function RavActualCanvas({ mappedChannels }: RavActualCanvasProps) {
+export function RavActualCanvas({ mappedChannels, devices = [] }: RavActualCanvasProps) {
   const [levels, setLevels] = useState<Record<string, Level>>({});
   const setLevelFor = (id: string, level: Level) => setLevels((prev) => (prev[id] === level ? prev : { ...prev, [id]: level }));
 
@@ -86,7 +102,7 @@ export function RavActualCanvas({ mappedChannels }: RavActualCanvasProps) {
       points={points}
       renderMachine={() => <RotaryAirlockValve />}
       renderPointCard={(point, index) => (
-        <LivePointCard mapped={mappedChannels[index]} onLevelChange={(level) => setLevelFor(point.id, level)} />
+        <LivePointCard mapped={mappedChannels[index]} devices={devices} onLevelChange={(level) => setLevelFor(point.id, level)} />
       )}
       getTrailColour={(point) => LEVEL_COLOUR[levels[point.id] ?? 'normal']}
     />

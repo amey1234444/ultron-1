@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import type { LayoutChangeEvent } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
@@ -20,6 +21,138 @@ import { RackFaceplate } from './RackFaceplate';
 type ViewMode = 'visual' | 'cards' | 'channels';
 type CardPageView = 'overview' | 'config';
 
+// Tab order is also motion direction: moving right in this list means the
+// outgoing view leaves left and the incoming one enters from the right, so the
+// three modes read as one object turning rather than three screens swapping.
+const MODE_ORDER: ViewMode[] = ['visual', 'cards', 'channels'];
+const MODE_LABEL: Record<ViewMode, string> = {
+  visual: 'Visual Rack View',
+  cards: 'Card List View',
+  channels: 'Channel List View',
+};
+
+// The web build has no native animation driver (react-native-web runs Animated
+// on the JS thread), and asking for one there logs a warning on every switch.
+const USE_NATIVE_DRIVER = Platform.OS !== 'web';
+
+// Deliberately brief: this is a view an operator flips between all shift.
+const EXIT_MS = 90;
+const ENTER_MS = 150;
+const TAB_MS = 220;
+const TRAVEL = 12;
+
+/**
+ * Whether the OS/browser is asking for reduced motion.
+ *
+ * Subscribed rather than read once, so toggling the setting takes effect without
+ * a reload — on react-native-web this is backed by the
+ * `prefers-reduced-motion: reduce` media query.
+ */
+function useReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((value) => {
+        if (active) setReduced(value);
+      })
+      .catch(() => {
+        // An environment without the capability simply keeps motion on.
+      });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (value: boolean) => {
+      setReduced(value);
+    });
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
+
+  return reduced;
+}
+
+function ModeTabs({ mode, onSelect, reduced }: { mode: ViewMode; onSelect: (mode: ViewMode) => void; reduced: boolean }) {
+  const { isDark } = useAppTheme();
+  // Every tab is sized to the widest label, which makes the active pill a fixed
+  // width that can slide on translateX alone — no animated width, no layout.
+  const [widths, setWidths] = useState<number[]>(() => MODE_ORDER.map(() => 0));
+  const indicatorX = useRef(new Animated.Value(0)).current;
+
+  const tabWidth = widths.every((width) => width > 0) ? Math.max(...widths) : 0;
+  const index = MODE_ORDER.indexOf(mode);
+
+  useEffect(() => {
+    if (tabWidth === 0) return;
+    const target = index * tabWidth;
+    if (reduced) {
+      indicatorX.setValue(target);
+      return;
+    }
+    Animated.timing(indicatorX, {
+      toValue: target,
+      duration: TAB_MS,
+      easing: Easing.bezier(0.2, 0, 0, 1),
+      useNativeDriver: USE_NATIVE_DRIVER,
+    }).start();
+  }, [index, tabWidth, reduced, indicatorX]);
+
+  // Applying the max width back to every tab is a stable fixed point: each tab
+  // then measures at exactly that width, so this settles after one extra pass.
+  const handleLayout = (position: number) => (event: LayoutChangeEvent) => {
+    const width = Math.ceil(event.nativeEvent.layout.width);
+    setWidths((previous) =>
+      Math.abs((previous[position] ?? 0) - width) < 1 ? previous : previous.map((value, i) => (i === position ? width : value)),
+    );
+  };
+
+  return (
+    <View className={cn('flex-row rounded-full border p-1', isDark ? 'border-line-dark' : 'border-line-light')}>
+      <View className="flex-row">
+        {tabWidth > 0 && (
+          <Animated.View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: tabWidth,
+              transform: [{ translateX: indicatorX }],
+            }}
+          >
+            {/* Colour stays in a className so the palette lives in one place;
+                the Animated wrapper carries only the transform. */}
+            <View className={cn('flex-1 rounded-full', isDark ? 'bg-ink' : 'bg-ink-inverse')} />
+          </Animated.View>
+        )}
+
+        {MODE_ORDER.map((value, position) => {
+          const active = mode === value;
+          return (
+            <Pressable
+              key={value}
+              onPress={() => onSelect(value)}
+              onLayout={handleLayout(position)}
+              style={tabWidth > 0 ? { width: tabWidth } : undefined}
+              className="items-center rounded-full px-3 py-1.5"
+            >
+              <Text
+                className={cn(
+                  'font-body-medium text-xs',
+                  active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
+                )}
+              >
+                {MODE_LABEL[value]}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
 type RackDetailProps = {
   device: DeviceNode;
   devices?: DeviceNode[];
@@ -33,20 +166,6 @@ type RackDetailProps = {
   canEditDeleteSchema: boolean;
 };
 
-function ModeTab({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  const { isDark } = useAppTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      className={cn('rounded-full px-3 py-1.5', active && (isDark ? 'bg-ink' : 'bg-ink-inverse'))}
-    >
-      <Text className={cn('font-body-medium text-xs', active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
 export function RackDetail({ device, devices = [device], cards, live, onBack, backLabel = 'Back', onInstallCard, onUpdateCard, onRemoveCard, canEditDeleteSchema }: RackDetailProps) {
   const { isDark } = useAppTheme();
   const [mode, setMode] = useState<ViewMode>('visual');
@@ -55,6 +174,69 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
   const [cardPage, setCardPage] = useState<{ cardId: string; view: CardPageView } | null>(null);
   const [removeTarget, setRemoveTarget] = useState<CardNode | null>(null);
   const [stubNote, setStubNote] = useState<string | null>(null);
+
+  const reduced = useReducedMotion();
+  // `mode` is where we are going; `renderedMode` is what is on screen. They
+  // differ only for the ~90ms the outgoing view takes to leave.
+  const [renderedMode, setRenderedMode] = useState<ViewMode>(mode);
+  const opacity = useRef(new Animated.Value(1)).current;
+  const translateX = useRef(new Animated.Value(0)).current;
+
+  // Leave. Driven by an effect on `mode` rather than by the tab press handler so
+  // that every route into a mode change animates — including CardActionsMenu's
+  // "View Channels", which calls setMode directly.
+  useEffect(() => {
+    if (mode === renderedMode) return;
+    if (reduced) {
+      setRenderedMode(mode);
+      return;
+    }
+    const direction = MODE_ORDER.indexOf(mode) > MODE_ORDER.indexOf(renderedMode) ? 1 : -1;
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: EXIT_MS,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(translateX, {
+        toValue: -direction * TRAVEL,
+        duration: EXIT_MS,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+    ]).start(({ finished }) => {
+      // Interrupted means a third tab was pressed mid-flight; this effect reruns
+      // for the newer target rather than swapping to a stale one.
+      if (!finished) return;
+      translateX.setValue(direction * TRAVEL);
+      setRenderedMode(mode);
+    });
+  }, [mode, renderedMode, reduced, opacity, translateX]);
+
+  // Enter. Under reduced motion this is the whole transition: the view still
+  // changes, it just arrives already in place instead of travelling.
+  useEffect(() => {
+    if (reduced) {
+      opacity.setValue(1);
+      translateX.setValue(0);
+      return;
+    }
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: ENTER_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+      Animated.timing(translateX, {
+        toValue: 0,
+        duration: ENTER_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: USE_NATIVE_DRIVER,
+      }),
+    ]).start();
+  }, [renderedMode, reduced, opacity, translateX]);
 
   const effectiveDevice = deviceWithGatewayConnectionState(device, devices);
   const pageCard = cardPage ? cards.find((c) => c.id === cardPage.cardId) ?? null : null;
@@ -117,11 +299,7 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
             rack_id: {effectiveDevice.realRackId ?? '-'}
           </Text>
         </View>
-        <View className={cn('flex-row rounded-full border p-1', isDark ? 'border-line-dark' : 'border-line-light')}>
-          <ModeTab label="Visual Rack View" active={mode === 'visual'} onPress={() => setMode('visual')} />
-          <ModeTab label="Card List View" active={mode === 'cards'} onPress={() => setMode('cards')} />
-          <ModeTab label="Channel List View" active={mode === 'channels'} onPress={() => setMode('channels')} />
-        </View>
+        <ModeTabs mode={mode} onSelect={setMode} reduced={reduced} />
       </View>
 
       {stubNote && (
@@ -130,8 +308,8 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
         </View>
       )}
 
-      <View className="flex-1">
-        {mode === 'visual' && (
+      <Animated.View style={{ flex: 1, opacity, transform: [{ translateX }] }}>
+        {renderedMode === 'visual' && (
           <RackFaceplate
             device={effectiveDevice}
             cards={cards}
@@ -145,9 +323,16 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
             }}
           />
         )}
-        {mode === 'cards' && <CardListView cards={cards} onOpenMenu={canEditDeleteSchema ? (card, x, y) => setCardMenu({ card, x, y }) : undefined} />}
-        {mode === 'channels' && <ChannelListView device={effectiveDevice} cards={cards} live={live} />}
-      </View>
+        {renderedMode === 'cards' && (
+          <CardListView
+            cards={cards}
+            device={effectiveDevice}
+            live={live}
+            onOpenMenu={canEditDeleteSchema ? (card, x, y) => setCardMenu({ card, x, y }) : undefined}
+          />
+        )}
+        {renderedMode === 'channels' && <ChannelListView device={effectiveDevice} cards={cards} live={live} />}
+      </Animated.View>
 
       <InstallCardMenu
         state={installMenu}

@@ -153,24 +153,16 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     ? userHasPermission(currentUser, USER_PERMISSIONS.SCHEMA_EDIT_DELETE)
     : true;
   const [configureMode, setConfigureMode] = useState(false);
-  const [realMode, setRealMode] = useState(false);
   const canEditDeleteSchema = hasConfigureAccess && configureMode;
 
   useEffect(() => {
     if (!hasConfigureAccess && configureMode) setConfigureMode(false);
   }, [hasConfigureAccess, configureMode]);
 
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof window === 'undefined') return;
-    setRealMode(window.localStorage.getItem('ultron.realMode') === '1');
-  }, []);
-
-  const handleRealModeChange = (enabled: boolean) => {
-    setRealMode(enabled);
-    if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      window.localStorage.setItem('ultron.realMode', enabled ? '1' : '0');
-    }
-  };
+  // There is no longer an app-wide "real vs demo" mode. Every device is real:
+  // a physical gateway reports over the ingest pipeline, a simulated one
+  // publishes through the very same pipeline, and both are treated identically
+  // from here down. What used to be gated behind the toggle now always runs.
 
   // Auto-collapse the hierarchy sidebar on narrow (mobile/tablet) viewports so the
   // workspace stays usable; users can still toggle it back open via PanelToggle.
@@ -298,13 +290,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           realGatewayId: firstGateway.realGatewayId ?? defaultRealGatewayId(firstGateway.id),
           projectId: firstGateway.projectId ?? existing?.projectId ?? rack.projectId,
           archived: false,
-          status: realMode ? (existing?.status ?? rack.status) : 'Online' as const,
+          status: existing?.status ?? rack.status,
           realRackId: existing?.realRackId ?? rack.realRackId ?? index + 1,
         });
       });
 
     return Array.from(merged.values());
-  }, [configuredGateways, realMode, storedDevices]);
+  }, [configuredGateways, storedDevices]);
   const demoCards = useMemo(() => {
     const merged = new Map<string, CardNode>();
     for (const card of DEMO_SEED.cards) merged.set(card.id, card);
@@ -316,20 +308,18 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // One state for every consumer that takes live data. Simulated gateways carry
   // their own script ids and a reserved IP block, so real and simulated entries
   // coexist without either shadowing the other.
-  const effectiveLive = useMemo(
-    () => mergeLiveStates(realMode ? liveState : EMPTY_LIVE_STATE, simLive),
-    [liveState, realMode, simLive],
-  );
+  const effectiveLive = useMemo(() => mergeLiveStates(liveState, simLive), [liveState, simLive]);
   const devices = useMemo<DeviceNode[]>(
     () => {
-      // Simulated devices always take their status from the simulator — that is
-      // the point of Simulation Mode — while everything else keeps the existing
-      // demo/real-mode behaviour.
+      // Both kinds resolve their status the same way — from the pipeline that
+      // feeds them. A device is Not Connected until something reports for it;
+      // nothing is presumed Online any more.
       const physical = demoDevices.filter((device) => !isSimulatedDevice(device));
       const simulated = demoDevices.filter(isSimulatedDevice);
-      const resolvedPhysical = realMode
-        ? applyLiveStatus(physical.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' as const })), liveState)
-        : physical.map((device) => (device.archived ? device : { ...device, status: 'Online' as const }));
+      const resolvedPhysical = applyLiveStatus(
+        physical.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' as const })),
+        liveState,
+      );
       if (simulated.length === 0) return resolvedPhysical;
       const resolvedSimulated = applyLiveStatus(
         simulated.map((device) => (device.archived ? device : { ...device, status: 'Not Connected' as const })),
@@ -339,13 +329,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       // Rebuilt in the original order so the devices list never reshuffles.
       return demoDevices.map((device) => byId.get(device.id) ?? device);
     },
-    [demoDevices, liveState, realMode, simLive],
+    [demoDevices, liveState, simLive],
   );
   // Device-scoped views get exactly the pipeline that feeds that device;
   // plant-wide views get both, and fall back per device where nothing is bound.
   const liveFor = (device: DeviceNode | undefined) =>
-    device && isSimulatedDevice(device) ? simLive : realMode ? liveState : undefined;
-  const plantLive = realMode || simulationActive ? effectiveLive : undefined;
+    device && isSimulatedDevice(device) ? simLive : liveState;
+  const plantLive = effectiveLive;
   const visibleDeviceIds = useMemo(() => new Set(devices.map((device) => device.id)), [devices]);
   const visibleCards = useMemo(
     () => demoCards.filter((card) => visibleDeviceIds.has(card.deviceId)),
@@ -383,7 +373,6 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   useEffect(() => {
-    if (!realMode) return;
     for (const liveGateway of liveState.gateways) {
       const storedGateway = configuredGateways.find((device) => device.realGatewayId === liveGateway.gatewayId);
       if (!storedGateway) continue;
@@ -407,10 +396,9 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       ipNoticeTimer.current = setTimeout(() => setIpChangeNotice(null), 6000);
       break;
     }
-  }, [configuredGateways, currentUser?.role, liveState.gateways, realMode, storedDevices]);
+  }, [configuredGateways, currentUser?.role, liveState.gateways, storedDevices]);
 
   useEffect(() => {
-    if (!realMode) return;
     const alert = liveState.alerts.find((item) => item.type === 'IP_CONFLICT' && !seenIpConflictAlerts.current.has(item.id));
     if (!alert) return;
     seenIpConflictAlerts.current.add(alert.id);
@@ -419,7 +407,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       conflictDeviceName: currentUser?.role === 'super_admin' ? alert.conflictDeviceName : undefined,
       conflictDeviceType: currentUser?.role === 'super_admin' ? alert.conflictDeviceType : undefined,
     });
-  }, [currentUser?.role, liveState.alerts, realMode]);
+  }, [currentUser?.role, liveState.alerts]);
 
   useEffect(() => () => {
     if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
@@ -990,9 +978,6 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               } : undefined}
               onCreateProject={canEditDeleteSchema ? () => setCreateProjectVisible(true) : undefined}
               canConfigure={canEditDeleteSchema}
-              showRealModeToggle={currentUser?.role === 'super_admin'}
-              realMode={realMode}
-              onRealModeChange={handleRealModeChange}
               footer={sidebarFooter}
             />
 
@@ -1117,7 +1102,6 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               devices={overviewDevices}
               cards={visibleCards}
               live={plantLive}
-              realMode={realMode || simulationActive}
               currentUser={currentUser}
               onOpenDevices={() => setSelected({ kind: 'devices' })}
               onOpenMachine={(id) => setSelected({ kind: 'machine', id })}

@@ -371,11 +371,11 @@ export function MachineWorkspace({
       )}
 
       {isActual && actualTab === 'alarm' && (
-        <AlarmView mappedChannels={mappedChannels} machineId={machine.id} expectedPoints={expectedPoints} />
+        <AlarmView mappedChannels={mappedChannels} devices={devices} machineId={machine.id} expectedPoints={expectedPoints} />
       )}
 
       {isActual && actualTab === 'trend' && (
-        <TrendView mappedChannels={mappedChannels} machineId={machine.id} expectedPoints={expectedPoints} />
+        <TrendView mappedChannels={mappedChannels} devices={devices} machineId={machine.id} expectedPoints={expectedPoints} />
       )}
 
       {(mode === 'design' || (isActual && actualTab === 'machine')) && (

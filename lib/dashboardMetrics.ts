@@ -199,7 +199,6 @@ export type DashboardMetricsInput = {
   devices: DeviceNode[];
   cards: CardNode[];
   live: LiveState | undefined;
-  realMode: boolean;
   nowMs: number;
 };
 
@@ -210,12 +209,16 @@ export function buildDashboardMetrics({
   devices,
   cards,
   live,
-  realMode,
   nowMs,
 }: DashboardMetricsInput): DashboardMetrics {
   const plantName = projects[0]?.name || folders.find((folder) => folder.type === 'Plant')?.name || 'Northfield Plant';
 
-  if (!realMode || !live) {
+  // TODO: this branch still returns hardcoded placeholder figures (health 84 /
+  // "Good", fixed availability factors) rather than an empty state. It is
+  // reached only when there is no live state at all, and `live: false` marks it
+  // as not-real, but the numbers themselves are still invented and should be
+  // replaced with a genuine "no data yet" dashboard.
+  if (!live) {
     return {
       live: false,
       plantName,

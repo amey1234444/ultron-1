@@ -5,7 +5,10 @@ import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter, useLiveHistory } from './liveValue';
+import type { DeviceNode } from '../../../lib/devices';
+import { channelNumberFor, liveMeasurementKeyForChannel, useLiveChannelHistory } from '../../../lib/liveChannelValue';
+import type { ChannelRef } from '../../../lib/rack';
+import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT, type LiveKindLetter } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
 // Human labels for the V/T/S/P/C/X live-reading letter scheme (see liveValue.ts).
@@ -70,28 +73,44 @@ function smoothPath(points: Pt[]): string {
   return d;
 }
 
-type SeriesMeta = { id: string; letter: LiveKindLetter; colour: string; code: string; label: string; unit: string };
+type SeriesMeta = {
+  id: string;
+  letter: LiveKindLetter;
+  colour: string;
+  code: string;
+  label: string;
+  unit: string;
+  channel: ChannelRef;
+};
 
-// One overlaid line. Runs its own rolling history walk (demo data) and, whenever
-// it ticks, reports its latest value up so the legend can show a live readout in
-// the series' own colour. Each series is normalised to *its own* measurement
-// band, so a Temperature and a Vibration line are visually comparable even
-// though their real units differ.
+// One overlaid line, plotting the real samples this channel has reported.
+//
+// There is no server-side history endpoint, so the window is accumulated from
+// live frames as they arrive and persisted per channel. A channel that has
+// never reported draws nothing at all — a flat line would read as a genuine
+// measurement of zero. Each series is normalised to *its own* measurement band,
+// so a Temperature and a Vibration line stay visually comparable.
 function SeriesLine({
   meta,
+  devices,
   machineId,
   visible,
   chartWidth,
   onSample,
 }: {
   meta: SeriesMeta;
+  devices: DeviceNode[];
   machineId: string;
   visible: boolean;
   chartWidth: number;
-  onSample: (id: string, value: number) => void;
+  onSample: (id: string, value: number | undefined) => void;
 }) {
-  const history = useLiveHistory(meta.letter, true, `ultron.trendhistory.${machineId}.${meta.id}`);
-  const latest = history[history.length - 1];
+  const key = useMemo(
+    () => liveMeasurementKeyForChannel(meta.channel, channelNumberFor(meta.channel), devices),
+    [devices, meta.channel],
+  );
+  const history = useLiveChannelHistory(key, `ultron.trendhistory.${machineId}.${meta.id}`);
+  const latest = history.length > 0 ? history[history.length - 1] : undefined;
 
   // Report the latest sample up so the legend can show a live readout — in an
   // effect (not during render) so we never setState on the parent mid-render.
@@ -182,15 +201,20 @@ function Dropdown({
 
 export type TrendViewProps = {
   mappedChannels: MappedChannel[];
+  devices: DeviceNode[];
   machineId: string;
   expectedPoints: number;
 };
 
 // Actual View → Trend: every mapped channel overlaid on a single time chart.
 // A dropdown filters by measurement type, and each series can be toggled on/off
-// straight from the legend. All series start selected. Data is a demo random
-// walk (see liveValue.ts), not a real historian.
-export function TrendView({ mappedChannels, machineId, expectedPoints }: TrendViewProps) {
+// straight from the legend. All series start selected.
+//
+// The series are real: each one plots the samples its channel has actually
+// reported, accumulated from live frames and persisted per channel. There is no
+// historian behind this, so a series begins at the moment the channel first
+// reports and fills from there.
+export function TrendView({ mappedChannels, devices, machineId, expectedPoints }: TrendViewProps) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const gridColour = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(10,10,10,0.10)';
@@ -198,10 +222,12 @@ export function TrendView({ mappedChannels, machineId, expectedPoints }: TrendVi
 
   const [kindFilter, setKindFilter] = useState<'all' | LiveKindLetter>('all');
   const [hidden, setHidden] = useState<Record<string, boolean>>({});
-  const [latest, setLatest] = useState<Record<string, number>>({});
+  // Undefined for a series whose channel has not reported yet — the legend
+  // shows a dash for those rather than a number.
+  const [latest, setLatest] = useState<Record<string, number | undefined>>({});
   const [chartWidth, setChartWidth] = useState(0);
 
-  const onSample = useCallback((id: string, value: number) => {
+  const onSample = useCallback((id: string, value: number | undefined) => {
     setLatest((prev) => (prev[id] === value ? prev : { ...prev, [id]: value }));
   }, []);
 
@@ -218,6 +244,7 @@ export function TrendView({ mappedChannels, machineId, expectedPoints }: TrendVi
         code: m.channel.code,
         label: m.label,
         unit: m.channel.unit,
+        channel: m.channel,
       })),
     [mappedChannels],
   );
@@ -289,6 +316,7 @@ export function TrendView({ mappedChannels, machineId, expectedPoints }: TrendVi
             })}
             {filtered.map((meta) => (
               <SeriesLine
+                devices={devices}
                 key={meta.id}
                 meta={meta}
                 machineId={machineId}

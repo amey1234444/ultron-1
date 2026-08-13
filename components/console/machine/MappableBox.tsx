@@ -7,7 +7,8 @@ import { gatewayForRack, racksForGateway, type DeviceNode } from '../../../lib/d
 import { useLiveMeasurement } from '../../../lib/liveMeasurementBus';
 import type { ChannelRef } from '../../../lib/rack';
 import type { TrailStatus } from './AdjustableTrail';
-import { LIVE_RANGE_FOR_LETTER, useLiveValue } from './liveValue';
+import { useLiveChannelReading } from '../../../lib/liveChannelValue';
+import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT } from './liveValue';
 import { PointCard18, POINT_CARD_HEIGHT, POINT_CARD_WIDTH } from './PointCard18';
 
 export type Point = { x: number; y: number };
@@ -108,16 +109,16 @@ export function MappableBox({
   const [channelSearch, setChannelSearch] = useState('');
   const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
   const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
-  const brokerReading = useLiveMeasurement(liveMeasurementKey);
-  const effectiveReading = brokerReading ?? liveReading;
-  const liveValue = useLiveValue(channel?.letter ?? 'X', !!channel && dataLive);
-  // Between two telemetry frames (or across a stream reconnect) the reading is
-  // momentarily absent. Holding the last real value keeps a mapped point showing
-  // its measurement instead of flicking to demo data or a dash.
-  const lastReading = useRef<{ value: number; unit?: string } | null>(null);
-  if (typeof effectiveReading?.value === 'number') lastReading.current = { value: effectiveReading.value, unit: effectiveReading.unit };
-  const heldReading = typeof effectiveReading?.value === 'number' ? effectiveReading : lastReading.current ?? undefined;
-  const displayValue = typeof heldReading?.value === 'number' ? heldReading.value : liveValue;
+  // The bus is the source of truth; it already holds the last real value across
+  // the gap between frames and reports staleness. `liveReading` from the parent
+  // covers the case where no bus key could be built for this channel.
+  const busReading = useLiveChannelReading(liveMeasurementKey);
+  const fallbackValue = typeof liveReading?.value === 'number' ? liveReading.value : null;
+  // Null means nothing has ever reported for this channel. It is rendered as an
+  // explicit no-data state — never substituted with a generated number.
+  const displayValue = busReading.value ?? fallbackValue;
+  const hasReading = typeof displayValue === 'number';
+  const readingUnit = busReading.unit ?? liveReading?.unit;
   const renderedWidth = channel ? POINT_CARD_WIDTH : UNLINKED_BOX_WIDTH;
   const pickerChannels = pickableChannels ?? channels;
   const pickerGateways = useMemo(
@@ -144,16 +145,16 @@ export function MappableBox({
   }, [channelSearch, pickerChannelsForRack]);
 
   useEffect(() => {
-    if (channel && dataLive) onLiveValueChange?.(displayValue);
-  }, [channel, dataLive, displayValue, onLiveValueChange]);
+    if (channel && dataLive && hasReading) onLiveValueChange?.(displayValue);
+  }, [channel, dataLive, displayValue, hasReading, onLiveValueChange]);
 
   useEffect(() => {
     if (!pickerOpen || channel) setChannelSearch('');
   }, [channel, pickerOpen]);
 
-  useEffect(() => {
-    lastReading.current = null;
-  }, [channel?.id]);
+  // Clearing the held value on a channel change is now handled inside
+  // useLiveChannelReading, which resets whenever the subscription key moves —
+  // so one channel's reading can never be shown against another.
 
   useEffect(() => {
     if (!pickerOpen) {
@@ -213,7 +214,9 @@ export function MappableBox({
 
   if (channel) {
     const decimals = LIVE_RANGE_FOR_LETTER[channel.letter].decimals;
-    const status = dataLive ? statusFor(channel, displayValue) : 'offline';
+    // Without a reading there is no threshold to evaluate: the box reads
+    // offline rather than being coloured normal against an absent value.
+    const status = dataLive && hasReading ? statusFor(channel, displayValue) : 'offline';
     return (
       <>
         <View
@@ -239,8 +242,8 @@ export function MappableBox({
             tag={channel.code}
             channel={channel.code}
             title={channel.label}
-            value={dataLive ? displayValue.toFixed(decimals) : '--'}
-            unit={dataLive ? heldReading?.unit ?? channel.unit : ''}
+            value={dataLive && hasReading ? displayValue.toFixed(decimals) : NO_VALUE_TEXT}
+            unit={dataLive && hasReading ? readingUnit ?? channel.unit : ''}
             status={status}
             interactive={!readOnly}
             dragHandlers={panResponder.panHandlers}

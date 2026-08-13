@@ -6,13 +6,18 @@ import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import type { ChannelRef } from '../../../lib/rack';
-import { useLiveValue } from './liveValue';
+import type { DeviceNode } from '../../../lib/devices';
+import { useChannelReading } from '../../../lib/liveChannelValue';
+import { NO_VALUE_TEXT } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
 const LIVE_COLOUR = '#3FBF6A';
 const WARNING_COLOUR = '#D9962B';
 const CRITICAL_COLOUR = '#D64545';
 const RETURN_COLOUR = '#3FBF6A';
+// Grey, not red: a channel that has never reported is unknown, which is a
+// different condition from one reporting a bad value.
+const NO_DATA_COLOUR = '#8B8D93';
 
 type AlarmLevel = 'critical' | 'warning' | 'normal';
 // An alarm doesn't just track the live level — it latches, like a real annunciator:
@@ -43,12 +48,14 @@ function nextStatus(current: AckStatus, level: AlarmLevel): AckStatus {
 
 function AlarmRow({
   mapped,
+  devices,
   status,
   onLevelChange,
   onAcknowledge,
   onClear,
 }: {
   mapped: MappedChannel;
+  devices: DeviceNode[];
   status: AckStatus;
   onLevelChange: (level: AlarmLevel) => void;
   onAcknowledge: () => void;
@@ -58,16 +65,23 @@ function AlarmRow({
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const { channel, label } = mapped;
-  const value = useLiveValue(channel.letter, true);
-  const level = levelFor(channel, value);
+  const reading = useChannelReading(channel, devices);
+  const value = reading.value;
+  const hasReading = typeof value === 'number';
+  // A channel with nothing behind it is NOT "normal" — it is unknown. Treating
+  // an absent reading as 0 would silently latch every threshold as satisfied.
+  const level = hasReading ? levelFor(channel, value) : 'normal';
 
   useEffect(() => {
-    onLevelChange(level);
-  }, [level, onLevelChange]);
+    // Only a real measurement may drive the latch. Without one there is nothing
+    // to acknowledge, and a dead channel must not clear a standing alarm.
+    if (hasReading) onLevelChange(level);
+  }, [hasReading, level, onLevelChange]);
 
-  const colour = status === 'return-unacked' ? RETURN_COLOUR : LEVEL_COLOUR[level];
-  const statusLabel =
-    status === 'active-unacked' ? 'ACTIVE' : status === 'active-acked' ? 'ACKED' : status === 'return-unacked' ? 'RETURN TO NORMAL' : 'NORMAL';
+  const colour = !hasReading ? NO_DATA_COLOUR : status === 'return-unacked' ? RETURN_COLOUR : LEVEL_COLOUR[level];
+  const statusLabel = !hasReading
+    ? 'NO DATA'
+    : status === 'active-unacked' ? 'ACTIVE' : status === 'active-acked' ? 'ACKED' : status === 'return-unacked' ? 'RETURN TO NORMAL' : 'NORMAL';
 
   return (
     <View
@@ -85,7 +99,7 @@ function AlarmRow({
       </View>
       <View className="flex-row items-center gap-3">
         <Text style={{ color: colour }} className="font-mono text-xs font-bold">
-          {value.toFixed(2)} {channel.unit}
+          {hasReading ? `${value.toFixed(2)} ${channel.unit}` : NO_VALUE_TEXT}
         </Text>
         <Text style={{ color: colour }} className="font-body-bold text-[11px] uppercase tracking-wider">
           {statusLabel}
@@ -107,6 +121,7 @@ function AlarmRow({
 
 export type AlarmViewProps = {
   mappedChannels: MappedChannel[];
+  devices: DeviceNode[];
   machineId: string;
   expectedPoints: number;
 };
@@ -116,7 +131,7 @@ export type AlarmViewProps = {
 // event/history log behind this demo data — just a live level plus a
 // localStorage-backed ack/clear latch per channel, so ack state survives a
 // tab switch or reload the same way trail/box "Save Config" does.
-export function AlarmView({ mappedChannels, machineId, expectedPoints }: AlarmViewProps) {
+export function AlarmView({ mappedChannels, devices, machineId, expectedPoints }: AlarmViewProps) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const storageKey = `ultron.alarmstate.${machineId}`;
@@ -196,6 +211,7 @@ export function AlarmView({ mappedChannels, machineId, expectedPoints }: AlarmVi
       <View className="gap-2">
         {sorted.map((mapped) => (
           <AlarmRow
+            devices={devices}
             key={mapped.id}
             mapped={mapped}
             status={statusOf(mapped.id)}

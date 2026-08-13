@@ -5,9 +5,12 @@ import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
 import type { CardNode, ChannelRef } from '../../../lib/rack';
-import { LIVE_RANGE_FOR_LETTER, useLiveValue } from './liveValue';
+import { useChannelReading } from '../../../lib/liveChannelValue';
+import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT } from './liveValue';
 
 const LIVE_COLOUR = '#3FBF6A';
+// Grey: nothing has reported for this channel. Distinct from any alarm colour.
+const NO_DATA_COLOUR = '#8B8D93';
 const WARNING_COLOUR = '#D9962B';
 const CRITICAL_COLOUR = '#D64545';
 
@@ -24,13 +27,16 @@ function statusColour(channel: ChannelRef, value: number): string {
   return LIVE_COLOUR;
 }
 
-function ChannelReadout({ mapped }: { mapped: MappedChannel }) {
+function ChannelReadout({ mapped, devices }: { mapped: MappedChannel; devices: DeviceNode[] }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const { channel, label } = mapped;
-  const value = useLiveValue(channel.letter, true);
-  const colour = statusColour(channel, value);
+  const reading = useChannelReading(channel, devices);
+  const value = reading.value;
+  const hasReading = typeof value === 'number';
+  // No reading means no alarm colour — an absent value is grey, not green.
+  const colour = hasReading ? statusColour(channel, value) : NO_DATA_COLOUR;
   const range = LIVE_RANGE_FOR_LETTER[channel.letter];
 
   return (
@@ -44,7 +50,7 @@ function ChannelReadout({ mapped }: { mapped: MappedChannel }) {
         </Text>
       </View>
       <Text style={{ color: colour }} className="font-mono text-xs font-bold">
-        {value.toFixed(range.decimals)} {channel.unit}
+        {hasReading ? `${value.toFixed(range.decimals)} ${channel.unit}` : NO_VALUE_TEXT}
       </Text>
     </View>
   );
@@ -54,10 +60,12 @@ function SlotOccupancyCard({
   slot,
   card,
   channels,
+  devices,
 }: {
   slot: number;
   card: CardNode | null;
   channels: MappedChannel[];
+  devices: DeviceNode[];
 }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -72,7 +80,7 @@ function SlotOccupancyCard({
         <Text className={cn('font-body text-[11px]', mutedClass)}>{card?.type ?? 'Unknown card'}</Text>
       </View>
       {channels.map((mapped) => (
-        <ChannelReadout key={mapped.id} mapped={mapped} />
+        <ChannelReadout key={mapped.id} mapped={mapped} devices={devices} />
       ))}
     </View>
   );
@@ -128,7 +136,7 @@ export function RackOccupancyView({ devices, cards, mappedChannels, expectedPoin
               <View className="flex-row flex-wrap gap-3">
                 {slots.map((slot) => (
                   <View key={slot} style={{ width: 260 }}>
-                    <SlotOccupancyCard slot={slot} card={cards.find((c) => c.deviceId === rackId && c.slot === slot) ?? null} channels={bySlot.get(slot)!} />
+                    <SlotOccupancyCard slot={slot} card={cards.find((c) => c.deviceId === rackId && c.slot === slot) ?? null} channels={bySlot.get(slot)!} devices={devices} />
                   </View>
                 ))}
               </View>

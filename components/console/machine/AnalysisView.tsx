@@ -26,7 +26,7 @@ import {
   TONE_COLOUR,
   type IconName,
 } from './MachineOverview';
-import { LIVE_RANGE_FOR_LETTER, useLiveValue, type LiveKindLetter } from './liveValue';
+import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
 const LABEL_TO_SIGNAL: { match: RegExp; code: AnalysisSignalCode }[] = [
@@ -93,22 +93,16 @@ export type AnalysisViewProps = {
   expectedPoints?: number;
 };
 
-function useDemoValues(): Record<LiveKindLetter, number> {
-  const v = useLiveValue('V', true);
-  const t = useLiveValue('T', true);
-  const s = useLiveValue('S', true);
-  const p = useLiveValue('P', true);
-  const c = useLiveValue('C', true);
-  const x = useLiveValue('X', true);
-  return useMemo(() => ({ V: v, T: t, S: s, P: p, C: c, X: x }), [v, t, s, p, c, x]);
-}
+// `useDemoValues` used to fabricate one value per measurement letter and feed it
+// to the diagnosis engine whenever a channel had no real reading — so the
+// analyser could report a confident diagnosis about a plant it had no data from.
+// It is gone: a channel without a measurement now contributes nothing at all.
 
 function buildReadings(
   mappedChannels: MappedChannel[],
   devices: DeviceNode[],
   cards: CardNode[],
   live: LiveState | undefined,
-  demoValues: Record<LiveKindLetter, number>,
 ): AnalysisReading[] {
   const now = new Date().toISOString();
   return mappedChannels.flatMap((mapped) => {
@@ -123,7 +117,7 @@ function buildReadings(
     let quality = 'GOOD';
     let valid = true;
     let timestamp = now;
-    let source: AnalysisReading['source'] = 'demo';
+    let source: AnalysisReading['source'] = 'gateway';
 
     if (rack && card && live) {
       const measurement = latestMeasurementForChannel(rack, card, channelNumber(mapped.channel.id), live);
@@ -137,10 +131,11 @@ function buildReadings(
       }
     }
 
-    if (value === null || value === undefined) {
-      value = demoValues[mapped.channel.letter] ?? LIVE_RANGE_FOR_LETTER[mapped.channel.letter].min;
-      source = 'demo';
-    }
+    // No measurement means no reading. Substituting a plausible number here
+    // would let the analyser produce a diagnosis — with a confidence score —
+    // about a channel that has never reported. An analysis over fewer real
+    // signals is correct; an analysis over invented ones is not.
+    if (value === null || value === undefined) return [];
 
     return [
       {
@@ -281,7 +276,6 @@ function RotaryAirlockAnalysisView({
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
   const [bundle, setBundle] = useState<AnalysisBundle | null>(null);
-  const demoValues = useDemoValues();
 
   useEffect(() => {
     if (!machineId) return;
@@ -302,9 +296,9 @@ function RotaryAirlockAnalysisView({
   }, [machineId]);
 
   const analysis = useMemo<RotaryAirlockAnalysisResult>(() => {
-    const readings = buildReadings(mappedChannels, devices, cards, live, demoValues);
+    const readings = buildReadings(mappedChannels, devices, cards, live);
     return analyzeRotaryAirlock({ readings, now: new Date().toISOString() });
-  }, [mappedChannels, devices, cards, live, demoValues]);
+  }, [mappedChannels, devices, cards, live]);
 
   if (mappedChannels.length === 0) {
     return <EmptyState title="No mapped channels" description="Analysis needs saved rack mappings — link a box to a channel in Design mode, then save the canvas configuration." />;

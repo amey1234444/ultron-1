@@ -3,7 +3,7 @@
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { MeasurementPoint, MeasurementPointKind, MeasurementPointStatus } from '../../../lib/machines';
-import { LIVE_RANGE_FOR_LETTER, useLiveValue, type LiveKindLetter } from './liveValue';
+import { NO_VALUE_TEXT, type LiveKindLetter } from './liveValue';
 
 const UNIT_FOR_KIND: Record<MeasurementPointKind, string> = {
   Vibration: 'mm/s',
@@ -63,10 +63,13 @@ export function PointCard({ code, point }: PointCardProps) {
   const accent = ACCENT_FOR_STATUS[point.status];
   const unit = UNIT_FOR_KIND[point.kind];
 
+  // A bare MeasurementPoint carries no channel binding, so there is no
+  // measurement to show here. Points acquire a real reading only once they are
+  // mapped to a rack channel on the canvas, which renders PointCard18 with the
+  // value resolved from the measurement bus. Showing a generated number here
+  // was the old behaviour and is exactly what made unmapped points look live.
   const isLive = LIVE_STATUSES.includes(point.status);
-  const liveValue = useLiveValue(KIND_LETTER[point.kind], isLive);
-  const range = LIVE_RANGE_FOR_LETTER[KIND_LETTER[point.kind]];
-  const reading = isLive ? `${liveValue.toFixed(range.decimals)} ${unit}` : `-- ${unit}`;
+  const reading = `${NO_VALUE_TEXT} ${unit}`;
 
   return (
     <View

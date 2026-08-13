@@ -40,7 +40,6 @@ type DashboardOverviewProps = {
   devices: DeviceNode[];
   cards: CardNode[];
   live?: LiveState;
-  realMode: boolean;
   currentUser?: PublicUser | null;
   onOpenDevices: () => void;
   onOpenMachine: (id: string) => void;
@@ -1441,7 +1440,6 @@ export function DashboardOverview({
   devices,
   cards,
   live,
-  realMode,
   currentUser,
   onOpenDevices,
   onOpenMachine,
@@ -1520,9 +1518,9 @@ export function DashboardOverview({
   liveRef.current = live;
   const nowMs = now.getTime();
   const metrics = useMemo(
-    () => buildDashboardMetrics({ projects, folders, machines, devices, cards, live: liveRef.current, realMode, nowMs }),
+    () => buildDashboardMetrics({ projects, folders, machines, devices, cards, live: liveRef.current, nowMs }),
     // `live` is deliberately absent: `nowMs` is the rebuild trigger.
-    [cards, devices, folders, machines, nowMs, projects, realMode],
+    [cards, devices, folders, machines, nowMs, projects],
   );
 
   // Real mode has no historical aggregate endpoint, so the trend charts are fed

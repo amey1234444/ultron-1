@@ -23,9 +23,6 @@ type LeftPanelProps = {
   onOpenDeviceMenu?: (x: number, y: number, deviceId: string) => void;
   onCreateProject?: () => void;
   canConfigure?: boolean;
-  showRealModeToggle?: boolean;
-  realMode?: boolean;
-  onRealModeChange?: (enabled: boolean) => void;
   // Optional block pinned to the bottom of the sidebar (e.g. the web account
   // strip). Expo never passes it, so the shared tree stays untouched there.
   footer?: ReactNode;
@@ -178,9 +175,6 @@ export function LeftPanel({
   onOpenDeviceMenu,
   onCreateProject,
   canConfigure = false,
-  showRealModeToggle = false,
-  realMode = false,
-  onRealModeChange,
   footer,
 }: LeftPanelProps) {
   const { isDark } = useAppTheme();
@@ -316,31 +310,12 @@ export function LeftPanel({
           )}
           </ScrollView>
 
-          {showRealModeToggle || footer ? (
-            <View className={cn('border-t', isDark ? 'border-line-dark' : 'border-line-light')}>
-              {showRealModeToggle ? (
-                <View className="px-3 py-1.5">
-                  <Pressable
-                    onPress={() => onRealModeChange?.(!realMode)}
-                    className={cn(
-                      'flex-row items-center justify-between rounded-lg border px-2 py-1.5',
-                      isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel',
-                    )}
-                  >
-                    <View>
-                      <Text className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Real</Text>
-                      <Text className={cn('font-body text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                        {realMode ? 'Connected devices' : 'Demo data'}
-                      </Text>
-                    </View>
-                    <View className={cn('h-4 w-7 rounded-full p-0.5', realMode ? 'bg-status-success' : isDark ? 'bg-line-dark' : 'bg-line-light')}>
-                      <View className={cn('h-3 w-3 rounded-full bg-white', realMode && 'self-end')} />
-                    </View>
-                  </Pressable>
-                </View>
-              ) : null}
-              {footer}
-            </View>
+          {/* The global Real/Demo toggle used to live here. It is gone: there is
+              no longer an app-wide mode. Whether a device is physical or
+              simulated is a property of that device, chosen when it is created,
+              and its data is treated as real either way. */}
+          {footer ? (
+            <View className={cn('border-t', isDark ? 'border-line-dark' : 'border-line-light')}>{footer}</View>
           ) : null}
         </View>
       )}
