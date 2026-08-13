@@ -2,6 +2,17 @@
 // the tags and size the illustration; everyone else renders exactly what was
 // saved. Coordinates live in the map's fixed 640x330 viewBox so the layout is
 // resolution independent.
+//
+// The map itself now renders the 3D plant (see `scene3d` and lib/plantScene3d).
+// The 2D `tags` below are kept because they are the source of the area names
+// that live telemetry is matched against, and because previously saved layouts
+// must survive a round trip through this normalizer.
+
+import {
+  DEFAULT_PLANT_SCENE_3D,
+  normalizePlantScene3D,
+  type PlantScene3DConfig,
+} from './plantScene3d';
 
 export const PLANT_MAP_WIDTH = 640;
 export const PLANT_MAP_HEIGHT = 330;
@@ -25,10 +36,13 @@ export type PlantOverviewConfig = {
   /** Illustration size as a percentage of the card, 40-130. */
   imageScale: number;
   tags: PlantTag[];
+  /** The 3D plant map that replaced the illustration. */
+  scene3d: PlantScene3DConfig;
 };
 
 export const DEFAULT_PLANT_OVERVIEW: PlantOverviewConfig = {
   imageScale: 100,
+  scene3d: DEFAULT_PLANT_SCENE_3D,
   tags: [
     { id: 'compressor', name: 'Compressor Area', x: 250, y: 104, labelX: 78, labelY: 8, status: 'auto' },
     { id: 'boiler', name: 'Boiler Area', x: 478, y: 104, labelX: 350, labelY: 10, status: 'auto' },
@@ -52,7 +66,7 @@ function isTagStatus(value: unknown): value is PlantTagStatus {
 // dropping malformed tags rather than throwing.
 export function normalizePlantOverview(input: unknown): PlantOverviewConfig {
   if (!input || typeof input !== 'object') return DEFAULT_PLANT_OVERVIEW;
-  const raw = input as { imageScale?: unknown; tags?: unknown };
+  const raw = input as { imageScale?: unknown; tags?: unknown; scene3d?: unknown };
   const scale = typeof raw.imageScale === 'number' && Number.isFinite(raw.imageScale) ? raw.imageScale : 100;
   const tagsInput = Array.isArray(raw.tags) ? raw.tags : [];
   const tags: PlantTag[] = [];
@@ -77,6 +91,7 @@ export function normalizePlantOverview(input: unknown): PlantOverviewConfig {
   return {
     imageScale: Math.max(40, Math.min(130, Math.round(scale))),
     tags: tags.length > 0 ? tags : DEFAULT_PLANT_OVERVIEW.tags,
+    scene3d: normalizePlantScene3D(raw.scene3d),
   };
 }
 

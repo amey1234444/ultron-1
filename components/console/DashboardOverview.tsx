@@ -1,6 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Image, Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -17,7 +17,6 @@ import {
   type AttentionRow,
   type DashboardAlarm,
   type Insight,
-  type PlantArea,
 } from '../../lib/dashboardMetrics';
 import type { DeviceNode } from '../../lib/devices';
 import type { FolderNode, ProjectNode } from '../../lib/hierarchy';
@@ -29,8 +28,10 @@ import {
   normalizePlantOverview,
   type PlantOverviewConfig,
 } from '../../lib/plantOverview';
+import { countPartEdits, type PlantScene3DConfig } from '../../lib/plantScene3d';
 import { apiFetch } from '../../src/lib/apiClient';
 import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
+import { PlantScene3D } from './plant3d/PlantScene3D';
 import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
@@ -80,8 +81,6 @@ const DEMO_ALARM_BARS = {
   warning: [22, 29, 34, 27, 31, 36, 30],
   info: [14, 18, 16, 12, 20, 15, 18],
 };
-const PLANT_OVERVIEW_IMAGE_URI = '/dashboard/plant-overview.png';
-
 /** Health target every asset is scored against. */
 const HEALTH_TARGET = 90;
 /** Where the health score leaves the amber band and becomes an alarm. */
@@ -964,24 +963,32 @@ function Legend({ items }: { items: { color: string; label: string }[] }) {
 // Panels
 // ---------------------------------------------------------------------------
 
+/**
+ * The plant map, rendered as real 3D geometry.
+ *
+ * The illustration this panel used to show has been replaced by the Blender
+ * component models: an operator can orbit the plant, and every component
+ * carries its live status on the model itself (the beacon lens) as well as on
+ * its floating label.
+ */
 function PlantMap({
-  areas,
-  imageScale = 100,
+  scene,
+  statusColors,
   canEdit,
   onEdit,
 }: {
-  areas: PlantArea[];
-  imageScale?: number;
+  scene: PlantScene3DConfig;
+  /** Resolved status colour per component id. */
+  statusColors: Record<string, string>;
   canEdit: boolean;
   onEdit: () => void;
 }) {
   const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const imageInset = (100 - imageScale) / 2;
   return (
     <Panel
       label="Plant map"
       padded={false}
+      meta={`${scene.components.length} components`}
       action={
         canEdit ? (
           <Pressable onPress={onEdit} accessibilityRole="button" className="rounded-md px-2 py-1">
@@ -990,48 +997,8 @@ function PlantMap({
         ) : null
       }
     >
-      <View className="relative flex-1 overflow-hidden" style={{ minHeight: 0 }}>
-        <Image
-          source={{ uri: PLANT_OVERVIEW_IMAGE_URI }}
-          resizeMode="contain"
-          style={{
-            position: 'absolute',
-            left: `${imageInset}%`,
-            right: `${imageInset}%`,
-            top: `${imageInset}%`,
-            bottom: `${imageInset}%`,
-            // The artwork is drawn for paper. At full strength on a near-black
-            // panel it glares and pulls the eye off the pins, which are the
-            // part that carries state.
-            opacity: isDark ? 0.42 : 0.95,
-          }}
-        />
-        <Svg width="100%" height="100%" viewBox="0 0 640 330" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }}>
-          {areas.map((area) => {
-            const color = statusColor(palette, area.status);
-            const boxW = 118;
-            const boxH = 38;
-            const labelX = clamp(area.labelX, 4, 640 - boxW - 4);
-            const labelY = clamp(area.labelY, 4, 330 - boxH - 4);
-            const anchorX = clamp(area.x, labelX, labelX + boxW);
-            const anchorY = area.y > labelY + boxH ? labelY + boxH : area.y < labelY ? labelY : area.y;
-            return (
-              <G key={area.id}>
-                <Line x1={area.x} y1={area.y} x2={anchorX} y2={anchorY} stroke={color} strokeWidth={1} opacity={0.6} />
-                <Circle cx={area.x} cy={area.y} r={7} fill={color} opacity={0.16} />
-                <Circle cx={area.x} cy={area.y} r={3} fill={color} />
-                <Rect x={labelX} y={labelY} width={boxW} height={boxH} rx={7} fill={palette.panelRaised} opacity={0.95} />
-                <Circle cx={labelX + 12} cy={labelY + 19} r={3} fill={color} />
-                <SvgText x={labelX + 22} y={labelY + 16} fontSize={9.5} fill={palette.ink}>
-                  {area.name}
-                </SvgText>
-                <SvgText x={labelX + 22} y={labelY + 28} fontSize={8.5} fill={palette.inkFaint}>
-                  {area.count} assets
-                </SvgText>
-              </G>
-            );
-          })}
-        </Svg>
+      <View className="relative flex-1 overflow-hidden" style={{ minHeight: 220 }}>
+        <PlantScene3D scene={scene} statusColors={statusColors} dark={isDark} />
       </View>
     </Panel>
   );
@@ -1602,30 +1569,18 @@ export function DashboardOverview({
   );
   const severityTotal = severitySegments.reduce((sum, segment) => sum + segment.value, 0);
 
-  // Saved tags drive the map; `auto` tags borrow the live status of the area
-  // with the same name so the layout stays fixed while colours stay live.
-  const plantAreas: PlantArea[] = useMemo(
-    () =>
-      plantConfig.tags.map((tag) => {
-        const derived = metrics.areas.find((area) => area.name === tag.name);
-        return {
-          id: tag.id,
-          name: tag.name,
-          x: tag.x,
-          y: tag.y,
-          labelX: tag.labelX,
-          labelY: tag.labelY,
-          status: tag.status === 'auto' ? derived?.status ?? 'healthy' : tag.status,
-          count: derived?.count ?? 0,
-        };
-      }),
-    [metrics.areas, plantConfig.tags],
-  );
-  const plantAutoColors = useMemo(() => {
+  // The 3D components carry live status the same way the 2D tags did: an `auto`
+  // component borrows the status of the telemetry area with a matching name, so
+  // the placement stays fixed while the colours stay live.
+  const plantComponentColors = useMemo(() => {
     const colors: Record<string, string> = {};
-    for (const area of plantAreas) colors[area.name] = statusColor(palette, area.status);
+    for (const component of plantConfig.scene3d.components) {
+      const derived = metrics.areas.find((area) => area.name === component.name);
+      const status = component.status === 'auto' ? derived?.status ?? 'healthy' : component.status;
+      colors[component.id] = statusColor(palette, status);
+    }
     return colors;
-  }, [palette, plantAreas]);
+  }, [metrics.areas, palette, plantConfig.scene3d.components]);
 
   const healthValues = metrics.attention.map((row) => row.health);
   const gaps = healthValues.map((value) => value - HEALTH_TARGET);
@@ -1720,7 +1675,12 @@ export function DashboardOverview({
 
             <View className={rowClass} style={fillRow(340)}>
               <View style={{ flex: isCompact ? undefined : 1.45, height: isCompact ? 320 : undefined }}>
-                <PlantMap areas={plantAreas} imageScale={plantConfig.imageScale} canEdit={canEditPlant} onEdit={() => setPlantEditorOpen(true)} />
+                <PlantMap
+                  scene={plantConfig.scene3d}
+                  statusColors={plantComponentColors}
+                  canEdit={canEditPlant}
+                  onEdit={() => setPlantEditorOpen(true)}
+                />
               </View>
               <View style={{ flex: isCompact ? undefined : 1.55, height: isCompact ? 340 : undefined }}>
                 <AssetTable rows={metrics.attention} onOpenMachine={onOpenMachine} boxed={false} />
@@ -1959,7 +1919,7 @@ export function DashboardOverview({
               <View style={{ flex: isCompact ? undefined : 1.4, minHeight: 0 }}>
                 <OpenSection
                   label="Plant map layout"
-                  meta={`Scale ${plantConfig.imageScale}% · ${plantConfig.tags.length} tags`}
+                  meta={`Scale ${plantConfig.scene3d.modelScale}% · ${plantConfig.scene3d.components.length} components`}
                   action={
                     canEditPlant ? (
                       <Pressable onPress={() => setPlantEditorOpen(true)} accessibilityRole="button" className="rounded-md px-2 py-1">
@@ -1969,20 +1929,22 @@ export function DashboardOverview({
                   }
                 >
                   <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                    {plantConfig.tags.map((tag, index) => {
-                      const resolved = plantAreas.find((area) => area.id === tag.id);
-                      const color = statusColor(palette, resolved?.status ?? 'offline');
+                    {plantConfig.scene3d.components.map((component, index) => {
+                      const edits = countPartEdits(component.parts);
+                      const changed = edits.hidden + edits.colored + edits.resized;
                       return (
-                        <View key={tag.id}>
+                        <View key={component.id}>
                           {index > 0 ? <Rule /> : null}
                           <View className="flex-row items-center gap-3 py-2.5">
-                            <Dot color={color} size={5} />
+                            <Dot color={plantComponentColors[component.id] ?? '#7A7E86'} size={5} />
                             <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                              {tag.name}
+                              {component.name}
                             </Text>
-                            <Text className={cn('w-[64px] font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{tag.status}</Text>
-                            <Text className={cn('w-[86px] text-right font-mono text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                              {Math.round(tag.x)} / {Math.round(tag.y)}
+                            <Text className={cn('w-[86px] font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                              {changed > 0 ? `${changed} part edits` : component.status}
+                            </Text>
+                            <Text className={cn('w-[96px] text-right font-mono text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                              {Math.round(component.x)} / {Math.round(component.z)} · {component.scale}%
                             </Text>
                           </View>
                         </View>
@@ -1990,7 +1952,7 @@ export function DashboardOverview({
                     })}
                     {!canEditPlant ? (
                       <Text className={cn('pt-3 font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                        The map layout is shared. Only a super admin can move tags.
+                        The map layout is shared. Only a super admin can change the 3D plant.
                       </Text>
                     ) : null}
                   </ScrollView>
@@ -2156,8 +2118,7 @@ export function DashboardOverview({
         {plantEditorOpen ? (
           <PlantOverviewEditor
             initialConfig={plantConfig}
-            imageUri={PLANT_OVERVIEW_IMAGE_URI}
-            autoColors={plantAutoColors}
+            componentColors={plantComponentColors}
             saving={plantSaving}
             error={plantError}
             onCancel={() => setPlantEditorOpen(false)}
