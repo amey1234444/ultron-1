@@ -6,11 +6,7 @@ import {
   allThresholds,
   analyzeExtruder,
   appendHistory,
-  ALL_TAGS,
-  CANONICAL_UNITS,
   faultName,
-  resolveSignal,
-  SCENARIO_POINT_LABELS,
   runScenario,
   scenarioById,
   SCENARIOS,
@@ -25,8 +21,8 @@ import {
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
 import type { DeviceNode } from '../../../lib/devices';
-import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
-import { configuredHealthyValue, type CardNode } from '../../../lib/rack';
+import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
+import type { CardNode } from '../../../lib/rack';
 import {
   Alert,
   Badge,
@@ -54,84 +50,24 @@ import {
 } from '../../ui';
 import type { MappedChannel } from './RackOccupancyView';
 
-/**
- * Healthy operating point for the pilot extruder.
- *
- * These are NOT numbers chosen here. They are read straight off the twin's own
- * verified healthy-nominal case (`SCN-N-001`), which carries the complete
- * eleven-tag vector for a machine running correctly on recipe RD-001. Keeping a
- * second table in this file would be a second source of truth that could drift
- * away from the one the analyzer actually compares against.
- *
- * The generic V/T/S/P/C demo bands used elsewhere in the console are plausible
- * for a pump, not an extruder — a 45-82 degC "temperature" would read as three
- * simultaneously failed barrel heaters against the controlled 180/210/220 degC
- * setpoints — so they are deliberately not used here.
- */
-const HEALTHY_OPERATING_POINT: Partial<Record<ExtruderTag, number>> = (() => {
-  const healthy = scenarioById('SCN-N-001');
-  if (!healthy) return {};
-  const out: Partial<Record<ExtruderTag, number>> = {};
-  for (const [tag, value] of Object.entries(healthy.measurements) as [ExtruderTag, number | null][]) {
-    if (value !== null && Number.isFinite(value)) out[tag] = value;
-  }
-  return out;
-})();
-
-const DEMO_TICK_MS = 1500;
-
-/** Dispersion applied to a synthesised reading: 0.2% of value, so it is visible but never a fault. */
-const SYNTHETIC_JITTER_FRACTION = 0.002;
-
-function jitterFor(value: number): number {
-  return Math.max(Math.abs(value) * SYNTHETIC_JITTER_FRACTION, 1e-4);
-}
-
-/**
- * A slow walk around each tag's healthy value, used only where no measurement
- * exists. Movement is not decoration: without it the temporal features (trend,
- * dispersion, repetition) never accumulate, and the rules that separate heater
- * failure from heater degradation could never be demonstrated.
- */
-function useSyntheticOperatingPoint(centres: Partial<Record<ExtruderTag, number>>): Record<string, number> {
-  const centreKey = JSON.stringify(centres);
-  const [values, setValues] = useState<Record<string, number>>(() => ({ ...centres }) as Record<string, number>);
-
-  useEffect(() => {
-    setValues({ ...(JSON.parse(centreKey) as Record<string, number>) });
-  }, [centreKey]);
-
-  useEffect(() => {
-    const targets = JSON.parse(centreKey) as Record<string, number>;
-    const id = setInterval(() => {
-      setValues((previous) => {
-        const next: Record<string, number> = {};
-        for (const [tag, centre] of Object.entries(targets)) {
-          if (!Number.isFinite(centre)) continue;
-          const spread = jitterFor(centre);
-          const drifted = (previous[tag] ?? centre) + (Math.random() - 0.5) * spread;
-          // Pull back toward the healthy value so the walk can never wander into
-          // a fault band and invent a diagnosis out of nothing.
-          next[tag] = Math.min(centre + spread * 2, Math.max(centre - spread * 2, drifted));
-        }
-        return next;
-      });
-    }, DEMO_TICK_MS);
-    return () => clearInterval(id);
-  }, [centreKey]);
-
-  return values;
-}
-
 function channelNumber(channelId: string): number {
   const match = channelId.match(/\.CH(\d+)$/);
   return match ? Number(match[1]) : 1;
 }
 
+function usableMeasurementValue(measurement: LiveMeasurement | undefined): number | null {
+  if (!measurement) return null;
+  if (measurement.measurementValid === false) return null;
+  if (measurement.quality && measurement.quality !== 'GOOD') return null;
+  const ageMs = Date.now() - Date.parse(measurement.updatedAt);
+  if (!Number.isFinite(ageMs) || ageMs > CHANNEL_LIVE_GRACE_MS) return null;
+  return typeof measurement.value === 'number' && Number.isFinite(measurement.value) ? measurement.value : null;
+}
+
 /** A mapped point, plus the card-level alarm state the analyzer deliberately ignores. */
 type PointInput = {
   reading: ExtruderInputReading;
-  /** The channel's own commissioning alarm state — NOT a model finding. */
+  /** The channel's own commissioning alarm state - NOT a model finding. */
   alarm: 'none' | 'warning' | 'critical';
   alarmLimit: number | null;
   observed: number | null;
@@ -139,15 +75,8 @@ type PointInput = {
   reporting: boolean;
 };
 
-/**
- * Where the numbers on screen came from.
- *
- * `template` is the un-commissioned machine: nothing is mapped yet, so the full
- * pilot tag set is synthesised at its controlled operating point. That keeps the
- * whole analysis layer explorable — and the scenario library usable — before a
- * single channel exists, which is what it is for.
- */
-type DataMode = 'gateway' | 'demo' | 'mixed' | 'template';
+/** Where the live analysis inputs came from. */
+type DataMode = 'gateway' | 'mixed' | 'none';
 
 function alarmStateFor(channel: MappedChannel['channel'], value: number | null): {
   alarm: PointInput['alarm'];
@@ -169,43 +98,19 @@ function alarmStateFor(channel: MappedChannel['channel'], value: number | null):
  * A mapped channel that is not reporting is submitted with a NULL value, never
  * with a stand-in number. Substituting a plausible healthy value would
  * manufacture a clean bill of health for a machine nobody is actually
- * measuring — the single worst failure this model can have, and the exact
+ * measuring - the single worst failure this model can have, and the exact
  * reason the twin reports a missing input as NOT_EVALUATED instead of
  * defaulting it.
- *
- * The simulated operating point is therefore used only when NOTHING is
- * reporting, i.e. the view is being previewed with no gateway attached at all.
- * That state is announced in the header rather than left to be inferred.
  */
 function buildPoints(
   mappedChannels: MappedChannel[],
   devices: DeviceNode[],
   cards: CardNode[],
   live: LiveState | undefined,
-  synthetic: Record<string, number>,
   now: string,
 ): { points: PointInput[]; mode: DataMode } {
-  // Nothing mapped at all: stand the machine up as a template at its controlled
-  // operating point, so the layer can be explored, demonstrated and driven with
-  // scenarios before commissioning. Every reading is flagged simulated.
   if (mappedChannels.length === 0) {
-    const points = ALL_TAGS.map((tag) => ({
-      reading: {
-        label: SCENARIO_POINT_LABELS[tag],
-        value: synthetic[tag] ?? null,
-        unit: CANONICAL_UNITS[tag],
-        quality: 'GOOD',
-        valid: true,
-        timestamp: now,
-        source: 'demo' as const,
-      },
-      alarm: 'none' as const,
-      alarmLimit: null,
-      observed: synthetic[tag] ?? null,
-      channelUnit: CANONICAL_UNITS[tag],
-      reporting: false,
-    }));
-    return { points, mode: 'template' as const };
+    return { points: [], mode: 'none' as const };
   }
 
   // The box label is what the operator named the instrument, and it already
@@ -220,67 +125,28 @@ function buildPoints(
     );
     const measurement =
       rack && card && live ? latestMeasurementForChannel(rack, card, channelNumber(mapped.channel.id), live) : undefined;
-    const value =
-      measurement && measurement.value !== null && measurement.value !== undefined ? measurement.value : null;
+    const value = usableMeasurementValue(measurement);
     return { mapped, label, measurement, value };
   });
 
   const reportingCount = measured.filter((entry) => entry.value !== null).length;
-  // Nothing anywhere is reporting: this is a dashboard preview, not a machine.
-  const previewing = reportingCount === 0;
+  const points = measured.map(({ mapped, label, measurement, value }) => ({
+    reading: {
+      label,
+      value,
+      unit: measurement?.unit || mapped.channel.unit,
+      quality: measurement?.quality ?? (value === null ? 'UNAVAILABLE' : 'GOOD'),
+      valid: value !== null && (measurement?.measurementValid ?? true),
+      timestamp: measurement?.updatedAt ?? now,
+      source: 'gateway' as const,
+    },
+    ...alarmStateFor(mapped.channel, value),
+    observed: value,
+    channelUnit: mapped.channel.unit,
+    reporting: value !== null,
+  }));
 
-  const points = measured.map(({ mapped, label, measurement, value }) => {
-    if (previewing) {
-      const resolution = resolveSignal(label);
-      const tag = resolution.kind === 'mapped' ? resolution.tag : null;
-      // Prefer what the CHANNEL itself declares over anything this view knows.
-      // A card carries its own engineering range and normal band, and that is
-      // the commissioning engineer's statement of what healthy reads like on
-      // this instrument — more authoritative here than a generic reference.
-      // Only when the card declares no range at all do we fall back to the
-      // twin's verified healthy vector.
-      const card = cards.find(
-        (candidate) => candidate.deviceId === mapped.channel.rackId && candidate.slot === mapped.channel.slot,
-      );
-      const fromChannel = card ? configuredHealthyValue(card) : null;
-      const simulated = fromChannel ?? (tag ? (synthetic[tag] ?? null) : null);
-      return {
-        reading: {
-          label,
-          value: simulated,
-          // A channel-derived value carries the channel's own unit; the fallback
-          // is already in the tag's canonical unit.
-          unit: fromChannel !== null ? mapped.channel.unit : tag ? CANONICAL_UNITS[tag] : mapped.channel.unit,
-          quality: 'GOOD',
-          valid: true,
-          timestamp: now,
-          source: 'demo' as const,
-        },
-        ...alarmStateFor(mapped.channel, simulated),
-        observed: simulated,
-        channelUnit: mapped.channel.unit,
-        reporting: false,
-      };
-    }
-
-    return {
-      reading: {
-        label,
-        value,
-        unit: measurement?.unit || mapped.channel.unit,
-        quality: measurement?.quality ?? 'GOOD',
-        valid: measurement?.measurementValid ?? true,
-        timestamp: measurement?.updatedAt ?? now,
-        source: 'gateway' as const,
-      },
-      ...alarmStateFor(mapped.channel, value),
-      observed: value,
-      channelUnit: mapped.channel.unit,
-      reporting: value !== null,
-    };
-  });
-
-  const mode: DataMode = previewing ? 'demo' : reportingCount === points.length ? 'gateway' : 'mixed';
+  const mode: DataMode = reportingCount === 0 ? 'none' : reportingCount === points.length ? 'gateway' : 'mixed';
   return { points, mode };
 }
 
@@ -313,13 +179,13 @@ const QUALITY_VARIANT: Record<SignalQuality['status'], Variant> = {
 
 const LAYER_NOTE: Record<string, { title: string; detail: string; variant: Variant }> = {
   DATA_QUALITY: {
-    title: 'The data stream is broken — machine condition is not being reported',
+    title: 'The data stream is broken - machine condition is not being reported',
     detail:
       'A transport fault owns this answer. A plant diagnosis computed from these numbers would not be trustworthy, so it is withheld until the stream is fixed. The plant hypotheses are still assessed and visible under Evidence.',
     variant: 'destructive',
   },
   INSTRUMENTATION: {
-    title: 'A sensor is misreporting — machine condition is not being reported',
+    title: 'A sensor is misreporting - machine condition is not being reported',
     detail:
       'A measurement moved without any physically coupled measurement moving with it, so the measurement chain is the more likely explanation than a machine condition. Verify the sensor before acting on the reading.',
     variant: 'warning',
@@ -345,7 +211,7 @@ function stateVariant(state: string): Variant {
 }
 
 function formatNumber(value: number | null | undefined, digits = 3): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+  if (value === null || value === undefined || !Number.isFinite(value)) return '-';
   const rounded = Math.abs(value) >= 100 ? value.toFixed(1) : Number(value.toPrecision(digits));
   return String(rounded);
 }
@@ -394,7 +260,7 @@ function CandidateCard({ assessment, ordinal }: { assessment: FaultAssessmentRec
             <View className="min-w-0 flex-1 gap-0.5">
               <Body>{item.description}</Body>
               <Body muted mono>
-                {item.sensor} · {item.feature} = {formatNumber(item.observedValue)} · expected {item.expectedDirection}
+                {item.sensor} - {item.feature} = {formatNumber(item.observedValue)} - expected {item.expectedDirection}
               </Body>
             </View>
           </View>
@@ -406,7 +272,7 @@ function CandidateCard({ assessment, ordinal }: { assessment: FaultAssessmentRec
           <SectionLabel>Contradicting</SectionLabel>
           {assessment.contradicting.map((item, index) => (
             <Body key={`${item.feature}-${index}`} muted>
-              · {item.sensor}: {item.description}
+              - {item.sensor}: {item.description}
             </Body>
           ))}
         </CardContent>
@@ -424,7 +290,7 @@ function CandidateCard({ assessment, ordinal }: { assessment: FaultAssessmentRec
 }
 
 /**
- * Scenario picker — the twin's 61 verified diagnostic cases.
+ * Scenario picker - the twin's 61 verified diagnostic cases.
  *
  * Grouped by the same checklist sections the twin's own manual test matrix uses,
  * so a case number here and a case number in its documentation are the same
@@ -471,7 +337,7 @@ function ScenarioPicker({
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Filter by id, name or fault code…"
+            placeholder="Filter by id, name or fault code..."
             placeholderTextColor={palette.inkFaint}
             className="font-body text-xs"
             style={{ color: palette.ink, outlineStyle: 'none' } as never}
@@ -491,12 +357,12 @@ function ScenarioPicker({
         ) : null}
       </View>
 
-      {grouped.length === 0 ? <Body muted>No scenario matches “{query}”.</Body> : null}
+      {grouped.length === 0 ? <Body muted>No scenario matches "{query}".</Body> : null}
 
       {grouped.map(([letter, section]) => (
         <View key={letter} className="gap-1.5">
           <SectionLabel>
-            {letter} · {section.title}
+            {letter} - {section.title}
           </SectionLabel>
           {section.items.map((scenario) => {
             const active = scenario.id === activeId;
@@ -588,19 +454,18 @@ export type ExtruderAnalysisViewProps = {
 export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, expectedPoints }: ExtruderAnalysisViewProps) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const synthetic = useSyntheticOperatingPoint(HEALTHY_OPERATING_POINT);
   const [tab, setTab] = useState<TabKey>('diagnosis');
   const [scenarioId, setScenarioId] = useState<string | null>(null);
 
-  // The twin's pipeline keeps its own rolling history so temporal features —
-  // trend, repetition and dispersion — become available after a few samples.
+  // The twin's pipeline keeps its own rolling history so temporal features -
+  // trend, repetition and dispersion - become available after a few samples.
   // Without it, heater failure cannot be separated from heater degradation and
   // no instrumentation hypothesis can ever be raised.
   const historyRef = useRef<Partial<Record<ExtruderTag, (number | null)[]>>>({});
 
   const liveRun = useMemo(() => {
     const now = new Date().toISOString();
-    const built = buildPoints(mappedChannels, devices, cards, live, synthetic, now);
+    const built = buildPoints(mappedChannels, devices, cards, live, now);
     return {
       analysis: analyzeExtruder({
         readings: built.points.map((point) => point.reading),
@@ -610,7 +475,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       points: built.points,
       dataMode: built.mode,
     };
-  }, [mappedChannels, devices, cards, live, synthetic]);
+  }, [mappedChannels, devices, cards, live]);
 
   // Accumulate in an effect rather than inside the memo: mutating a ref during
   // render double-appends under StrictMode's double-invoke.
@@ -618,8 +483,8 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     historyRef.current = appendHistory(historyRef.current, liveRun.analysis);
   }, [liveRun]);
 
-  // Scenario mode replaces the live vector wholesale. The pipeline is identical —
-  // only the measurements differ — so what is on screen is the same analysis the
+  // Scenario mode replaces the live vector wholesale. The pipeline is identical -
+  // only the measurements differ - so what is on screen is the same analysis the
   // machine would produce if it were actually in that condition.
   const scenarioRun = useMemo(() => {
     const scenario = scenarioId ? scenarioById(scenarioId) : undefined;
@@ -640,17 +505,22 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const violations = detail.constraints.filter((check) => check.status === 'VIOLATION');
   const degradedSignals = analysis.quality.filter((item) => item.status === 'BAD' || item.status === 'DEGRADED');
   const unresolved = detail.unconsumedSignals.length + detail.unrecognisedSignals.length + detail.rejectedSignals.length;
+  const liveDataUnavailable = !scenarioRun && dataMode === 'none';
 
   // --- verdict ---------------------------------------------------------------
   const hasCandidates = detail.candidateFaults.length > 0;
-  const verdictVariant: Variant = violations.length > 0
+  const verdictVariant: Variant = liveDataUnavailable
+    ? 'muted'
+    : violations.length > 0
     ? 'destructive'
     : hasCandidates
       ? (SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'warning')
       : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
         ? 'info'
         : 'success';
-  const verdictTitle = hasCandidates
+  const verdictTitle = liveDataUnavailable
+    ? 'No live channel data'
+    : hasCandidates
     ? detail.candidateFaults.length === 1
       ? (analysis.diagnoses[0]?.title ?? detail.candidateFaults[0])
       : `${detail.candidateFaults.length} hypotheses the installed sensors cannot separate`
@@ -659,6 +529,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
         ? 'Something was observed, but it cannot be identified'
         : 'No controlled fault signature was met';
+  const verdictDetail = liveDataUnavailable
+    ? 'No diagnosis is computed until at least one saved mapped channel is receiving current gateway telemetry.'
+    : analysis.doctorReport.summary;
 
   const layerNote = LAYER_NOTE[detail.faultLayer];
 
@@ -673,7 +546,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // --- anomaly contributors as a magnitude series ----------------------------
   const contributorData: MagnitudeDatum[] = analysis.anomaly.contributors.map((item) => ({
     key: item.code,
-    label: `${item.code} — ${TAG_LABELS[item.code as ExtruderTag] ?? item.code}`,
+    label: `${item.code} - ${TAG_LABELS[item.code as ExtruderTag] ?? item.code}`,
     value: item.score,
     display: item.score.toFixed(1),
     direction: item.direction,
@@ -682,7 +555,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // --- table column definitions ---------------------------------------------
   const thresholdColumns: Column<(typeof detail.triggeredThresholds)[number]>[] = [
     { key: 'id', header: 'Threshold', width: 2.2, render: (row) => <Cell mono>{row.thresholdId}</Cell> },
-    // One threshold can be evaluated for several hypotheses — the melt-pressure
+    // One threshold can be evaluated for several hypotheses - the melt-pressure
     // signature is checked for both the screen and the die, because P1 sits
     // upstream of both. Without the fault those rows are indistinguishable.
     { key: 'fault', header: 'Hypothesis', width: 1.8, render: (row) => <Cell numberOfLines={2}>{faultName(row.faultId)}</Cell> },
@@ -791,23 +664,16 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         </View>
       </View>
 
-      {/* Say plainly where the numbers come from. A template machine that reads
-          healthy must never be mistaken for a real one that reads healthy. */}
+      {/* Say plainly when the live model has no gateway measurements to read. */}
       {!scenarioRun && dataMode !== 'gateway' && (
         <Alert
           variant="info"
-          icon="flask-outline"
-          title={
-            dataMode === 'template'
-              ? 'Template preview — no channels mapped yet'
-              : dataMode === 'demo'
-                ? 'Simulated data — no channel is reporting'
-                : 'Partly simulated — some mapped channels are not reporting'
-          }
+          icon="access-point-off"
+          title={dataMode === 'none' ? 'No live channel data' : 'Partial live channel data'}
         >
-          {dataMode === 'template'
-            ? `All ${ALL_TAGS.length} pilot tags are standing at their controlled operating point so the layer can be explored before commissioning. Map boxes to rack channels and save the canvas to analyse real data, or pick a case from the scenario library below to drive a specific condition.`
-            : 'These readings are generated at the machine’s controlled reference, not measured. Every one is marked “Simulated” in the Signals tab.'}
+          {mappedChannels.length === 0
+            ? 'No saved Mappable Box links exist for this machine. Link boxes to rack channels in Design mode and save the canvas before live analysis can run.'
+            : 'Only channels with current gateway measurements are evaluated. Silent mapped channels stay unavailable and do not receive fallback values.'}
         </Alert>
       )}
 
@@ -820,7 +686,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         defaultOpen={false}
         summary={
           scenarioRun
-            ? `Running ${scenarioRun.scenario.id} — ${scenarioRun.scenario.name}. Live data is not being analysed.`
+            ? `Running ${scenarioRun.scenario.id} - ${scenarioRun.scenario.name}. Live data is not being analysed.`
             : `${SCENARIOS.length} verified diagnostic cases from the digital twin. Select one to drive the analyzer with that condition; ${SCENARIOS.filter((s) => !s.unsupported).length} are reproducible here.`
         }
       >
@@ -836,7 +702,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
                 ? 'muted'
                 : 'destructive'
           }
-          title={`${scenarioRun.scenario.id} · ${scenarioRun.scenario.name} — ${scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'not reproducible here' : scenarioRun.verdict.toLowerCase()}`}
+          title={`${scenarioRun.scenario.id} - ${scenarioRun.scenario.name} - ${scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'not reproducible here' : scenarioRun.verdict.toLowerCase()}`}
         >
           <View className="gap-1.5">
             <Body muted>{scenarioRun.rationale}</Body>
@@ -855,7 +721,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
               ) : null}
             </View>
             <Body muted>
-              The request carried measurements only — no scenario id, fault id or expected result reached the
+              The request carried measurements only - no scenario id, fault id or expected result reached the
               detector. The comparison above scores a diagnosis that had already finished.
             </Body>
           </View>
@@ -865,9 +731,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       {/* --- the verdict ----------------------------------------------------- */}
       <VerdictBanner
         variant={verdictVariant}
-        eyebrow={hasCandidates ? `${humanise(detail.faultLayer)} layer · ${humanise(detail.faultCategory)}` : 'No fault signature'}
+        eyebrow={hasCandidates ? `${humanise(detail.faultLayer)} layer - ${humanise(detail.faultCategory)}` : 'No fault signature'}
         title={verdictTitle}
-        detail={analysis.doctorReport.summary}
+        detail={verdictDetail}
         meta={
           <>
             <Badge variant={verdictVariant}>{humanise(detail.identifiability)}</Badge>
@@ -947,73 +813,86 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       {/* --- Diagnosis ------------------------------------------------------- */}
       {tab === 'diagnosis' && (
         <View className="gap-3">
-          <Card>
-            <CardHeader>
-              <CardTitle size="sm">How this conclusion was reached</CardTitle>
-              <Body muted>{detail.explanation}</Body>
-            </CardHeader>
-            {detail.separatingMeasurements.length > 0 && (
-              <>
-                <Separator className="my-3" />
-                <CardContent>
-                  <SectionLabel>To collapse this ambiguity</SectionLabel>
-                  {detail.separatingMeasurements.map((item) => (
-                    <Body key={item}>· {item}</Body>
-                  ))}
-                </CardContent>
-              </>
-            )}
-          </Card>
-
-          {candidateAssessments.map((assessment, index) => (
-            <CandidateCard key={assessment.faultId} assessment={assessment} ordinal={index + 1} />
-          ))}
-
-          {analysis.maintenance.caseRequired && (
-            <Card accent={analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high' ? 'destructive' : 'warning'}>
+          {liveDataUnavailable ? (
+            <Card accent="warning">
               <CardHeader>
-                <View className="flex-row flex-wrap items-center justify-between gap-2">
-                  <CardTitle size="sm">Maintenance guidance</CardTitle>
-                  <Badge
-                    variant={analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high' ? 'destructive' : 'warning'}
-                  >
-                    {analysis.maintenance.priority} priority
-                  </Badge>
-                </View>
+                <CardTitle size="sm">Diagnosis withheld</CardTitle>
+                <Body muted>
+                  No saved mapped channel is receiving current gateway telemetry. Connect the Mappable Boxes to the correct rack channels and wait for live samples before diagnosing faults.
+                </Body>
               </CardHeader>
-              <Separator className="my-3" />
-              <CardContent>
-                <SectionLabel>Recommended actions</SectionLabel>
-                {analysis.maintenance.recommendedActions.map((action, index) => (
-                  <Body key={`${action}-${index}`}>· {action}</Body>
-                ))}
-              </CardContent>
-              <Separator className="my-3" />
-              <CardContent>
-                <SectionLabel>Verification</SectionLabel>
-                {analysis.maintenance.verificationSteps.map((step, index) => (
-                  <Body key={`${step}-${index}`} muted>
-                    · {step}
-                  </Body>
-                ))}
-              </CardContent>
             </Card>
-          )}
+          ) : (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle size="sm">How this conclusion was reached</CardTitle>
+                  <Body muted>{detail.explanation}</Body>
+                </CardHeader>
+                {detail.separatingMeasurements.length > 0 && (
+                  <>
+                    <Separator className="my-3" />
+                    <CardContent>
+                      <SectionLabel>To collapse this ambiguity</SectionLabel>
+                      {detail.separatingMeasurements.map((item) => (
+                        <Body key={item}>- {item}</Body>
+                      ))}
+                    </CardContent>
+                  </>
+                )}
+              </Card>
 
-          {eliminated.length > 0 && (
-            <Collapsible
-              title="Eliminated hypotheses"
-              count={eliminated.length}
-              icon="close-circle-outline"
-              summary="Ruled out because the measurement that most directly observes the mechanism says it is not acting."
-            >
-              {eliminated.map((assessment) => (
-                <View key={assessment.faultId} className="gap-0.5">
-                  <Body>{assessment.faultName}</Body>
-                  <Body muted>{assessment.contradicting[0]?.description ?? 'Primary observable contradicted.'}</Body>
-                </View>
+              {candidateAssessments.map((assessment, index) => (
+                <CandidateCard key={assessment.faultId} assessment={assessment} ordinal={index + 1} />
               ))}
-            </Collapsible>
+
+              {analysis.maintenance.caseRequired && (
+                <Card accent={analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high' ? 'destructive' : 'warning'}>
+                  <CardHeader>
+                    <View className="flex-row flex-wrap items-center justify-between gap-2">
+                      <CardTitle size="sm">Maintenance guidance</CardTitle>
+                      <Badge
+                        variant={analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high' ? 'destructive' : 'warning'}
+                      >
+                        {analysis.maintenance.priority} priority
+                      </Badge>
+                    </View>
+                  </CardHeader>
+                  <Separator className="my-3" />
+                  <CardContent>
+                    <SectionLabel>Recommended actions</SectionLabel>
+                    {analysis.maintenance.recommendedActions.map((action, index) => (
+                      <Body key={`${action}-${index}`}>- {action}</Body>
+                    ))}
+                  </CardContent>
+                  <Separator className="my-3" />
+                  <CardContent>
+                    <SectionLabel>Verification</SectionLabel>
+                    {analysis.maintenance.verificationSteps.map((step, index) => (
+                      <Body key={`${step}-${index}`} muted>
+                        - {step}
+                      </Body>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {eliminated.length > 0 && (
+                <Collapsible
+                  title="Eliminated hypotheses"
+                  count={eliminated.length}
+                  icon="close-circle-outline"
+                  summary="Ruled out because the measurement that most directly observes the mechanism says it is not acting."
+                >
+                  {eliminated.map((assessment) => (
+                    <View key={assessment.faultId} className="gap-0.5">
+                      <Body>{assessment.faultName}</Body>
+                      <Body muted>{assessment.contradicting[0]?.description ?? 'Primary observable contradicted.'}</Body>
+                    </View>
+                  ))}
+                </Collapsible>
+              )}
+            </>
           )}
         </View>
       )}
@@ -1023,7 +902,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         <View className="gap-3">
           <Alert variant="info" title="Limits are reported beside the diagnosis, never folded into it">
             A constraint answers whether the machine is inside its declared safe operating envelope right now. That is a
-            different question from what is wrong with the machine — an in-limit machine can still have a developing
+            different question from what is wrong with the machine - an in-limit machine can still have a developing
             fault, and an out-of-limit machine can be mechanically healthy.
           </Alert>
           <Card>
@@ -1044,7 +923,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
             <CardHeader>
               <CardTitle size="sm">Departure from the healthy reference</CardTitle>
               <Body muted>
-                Measured in analytical-redundancy consistency bands — a registered sensitivity value, not a calibrated
+                Measured in analytical-redundancy consistency bands - a registered sensitivity value, not a calibrated
                 severity unit. Absolute severity percent is a blocked output for this model.
               </Body>
             </CardHeader>
@@ -1091,7 +970,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
                 </Badge>
                 <Body>{assessment.faultName}</Body>
                 <Body muted mono>
-                  {assessment.faultId} · score {assessment.engineeringMatchScore}
+                  {assessment.faultId} - score {assessment.engineeringMatchScore}
                 </Body>
               </View>
             ))}
@@ -1196,7 +1075,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       {/* --- Model ----------------------------------------------------------- */}
       {tab === 'model' && (
         <View className="gap-3">
-          <Alert variant="info" title="Engineering-development baseline — not field validated">
+          <Alert variant="info" title="Engineering-development baseline - not field validated">
             {`All ${allThresholds().length} diagnostic thresholds are engineering-development values and none is field calibrated. This model is advisory only: automatic actuation is false, and ${detail.blockedOutputs.join(', ')} are blocked outputs. Machine-specific calibration and real asset-life claims require OEM inputs and field data.`}
           </Alert>
 
@@ -1220,11 +1099,11 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           <Collapsible
             title="Pipeline execution"
             icon="sitemap-outline"
-            summary={detail.trace.join(' → ')}
+            summary={detail.trace.join(' -> ')}
           >
             <SectionLabel>Stages</SectionLabel>
             <Body muted mono>
-              {detail.trace.join(' → ')}
+              {detail.trace.join(' -> ')}
             </Body>
             <Separator className="my-2" />
             <SectionLabel>Unavailable feature groups</SectionLabel>
@@ -1244,7 +1123,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           <Collapsible title="Caveats" icon="alert-circle-outline" count={analysis.doctorReport.caveats.length} summary="Everything this result depends on that is not yet established.">
             {analysis.doctorReport.caveats.map((caveat, index) => (
               <Body key={`${caveat}-${index}`} muted>
-                · {caveat}
+                - {caveat}
               </Body>
             ))}
           </Collapsible>

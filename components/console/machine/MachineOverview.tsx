@@ -11,7 +11,7 @@ import type { MachineAnalysisResult } from '../../../lib/analysis/types';
 import { cn } from '../../../lib/cn';
 import { consolePalette } from '../../../lib/consoleTheme';
 import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
-import { latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
+import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode, ChannelRef } from '../../../lib/rack';
 import { apiFetch } from '../../../src/lib/apiClient';
 import { useChannelReading } from '../../../lib/liveChannelValue';
@@ -205,6 +205,8 @@ function usableMeasurementValue(measurement: LiveMeasurement | undefined): numbe
   if (!measurement) return undefined;
   if (measurement.measurementValid === false) return undefined;
   if (measurement.quality && measurement.quality !== 'GOOD') return undefined;
+  const ageMs = Date.now() - Date.parse(measurement.updatedAt);
+  if (!Number.isFinite(ageMs) || ageMs > CHANNEL_LIVE_GRACE_MS) return undefined;
   return typeof measurement.value === 'number' ? measurement.value : undefined;
 }
 
@@ -246,7 +248,7 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
   const liveCount = signals.length;
   const coverage = expectedPoints > 0 ? clamp(mappedChannels.length / expectedPoints, 0, 1) : mappedChannels.length > 0 ? 1 : 0;
   const liveCoverage = mappedChannels.length > 0 ? clamp(liveCount / mappedChannels.length, 0, 1) : 0;
-  const readinessPercent = Math.round((coverage * 0.7 + liveCoverage * 0.3) * 100);
+  const readinessPercent = liveCount === 0 ? 0 : Math.round((coverage * 0.7 + liveCoverage * 0.3) * 100);
 
   const critical = channelsWithLevel(signals, 'critical');
   const warning = channelsWithLevel(signals, 'warning');
@@ -407,10 +409,10 @@ function analyseMachine(mappedChannels: MappedChannel[], samples: SampleMap, exp
   if (current && current.position > 0.82) conditionScore -= 10;
   if (speed && speed.position < 0.35 && current && current.position > 0.42) conditionScore -= 14;
   if (uniqueFindings[0]) conditionScore -= uniqueFindings[0].urgency === 'Critical' ? 24 : uniqueFindings[0].urgency === 'High' ? 16 : 9;
-  conditionScore = clamp(conditionScore, 0, 100);
+  conditionScore = liveCount === 0 ? 0 : clamp(conditionScore, 0, 100);
 
-  const conditionTone: Tone = conditionScore < 45 ? 'critical' : conditionScore < 72 ? 'warning' : conditionScore < 88 ? 'info' : 'live';
-  const conditionLabel = conditionScore < 45 ? 'Critical attention' : conditionScore < 72 ? 'Attention required' : conditionScore < 88 ? 'Watch' : 'Healthy';
+  const conditionTone: Tone = liveCount === 0 ? 'muted' : conditionScore < 45 ? 'critical' : conditionScore < 72 ? 'warning' : conditionScore < 88 ? 'info' : 'live';
+  const conditionLabel = liveCount === 0 ? 'No live data' : conditionScore < 45 ? 'Critical attention' : conditionScore < 72 ? 'Attention required' : conditionScore < 88 ? 'Watch' : 'Healthy';
   const readinessTone: Tone = readinessPercent < 55 ? 'critical' : readinessPercent < 80 ? 'warning' : readinessPercent < 100 ? 'info' : 'live';
   const readinessLabel = readinessPercent < 55 ? 'Not analysis-ready' : readinessPercent < 80 ? 'Partial evidence' : readinessPercent < 100 ? 'Nearly ready' : 'Analysis-ready';
 
@@ -849,7 +851,7 @@ function OverviewCard({ mapped, value }: { mapped: MappedChannel; value: number 
       </Text>
 
       <Text style={{ color: colour }} className="font-mono text-sm font-bold">
-        {value === undefined ? 'Sampling...' : `${value.toFixed(range.decimals)} ${channel.unit}`}
+        {value === undefined ? 'No data' : `${value.toFixed(range.decimals)} ${channel.unit}`}
       </Text>
     </View>
   );
@@ -866,14 +868,15 @@ function SampleCollector({
 }: {
   mapped: MappedChannel;
   devices: DeviceNode[];
-  onSample: (id: string, value: number) => void;
+  onSample: (id: string, value: number | undefined) => void;
 }) {
   const reading = useChannelReading(mapped.channel, devices);
   const value = reading.value;
+  const liveValue = reading.status === 'live' && typeof value === 'number' ? value : undefined;
 
   useEffect(() => {
-    if (typeof value === 'number') onSample(mapped.id, value);
-  }, [mapped.id, onSample, value]);
+    onSample(mapped.id, liveValue);
+  }, [liveValue, mapped.id, onSample]);
 
   return null;
 }
@@ -1091,7 +1094,7 @@ function ActivityFeed({ history, nowMs }: { history: OverviewHistoryPoint[]; now
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
-function useOverviewPersistence(machineId: string | undefined, build: () => OverviewAnalysisInput) {
+function useOverviewPersistence(machineId: string | undefined, build: () => OverviewAnalysisInput, enabled: boolean) {
   const [history, setHistory] = useState<OverviewHistoryPoint[]>([]);
   const [saveState, setSaveState] = useState<SaveState>('idle');
   const [savedAt, setSavedAt] = useState<string | null>(null);
@@ -1118,7 +1121,7 @@ function useOverviewPersistence(machineId: string | undefined, build: () => Over
   }, [machineId]);
 
   const save = useCallback(async () => {
-    if (!machineId) return;
+    if (!machineId || !enabled) return;
     setSaveState('saving');
     setSaveError(null);
     try {
@@ -1135,14 +1138,14 @@ function useOverviewPersistence(machineId: string | undefined, build: () => Over
       setSaveError(err instanceof Error ? err.message : 'Could not save the analysis.');
       setSaveState('error');
     }
-  }, [machineId]);
+  }, [enabled, machineId]);
 
   // Autosave on a fixed cadence so history accrues while the tab stays open.
   useEffect(() => {
-    if (!machineId) return;
+    if (!machineId || !enabled) return;
     const id = setInterval(() => void save(), SAVE_INTERVAL_MS);
     return () => clearInterval(id);
-  }, [machineId, save]);
+  }, [enabled, machineId, save]);
 
   return { history, save, saveState, savedAt, saveError };
 }
@@ -1178,8 +1181,14 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
     return () => clearInterval(id);
   }, []);
 
-  const onSample = useCallback((id: string, value: number) => {
-    setSamples((prev) => (prev[id] === value ? prev : { ...prev, [id]: value }));
+  const onSample = useCallback((id: string, value: number | undefined) => {
+    setSamples((prev) => {
+      if (typeof value === 'number') return prev[id] === value ? prev : { ...prev, [id]: value };
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
   }, []);
 
   useEffect(() => {
@@ -1219,7 +1228,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
         quality: measurement?.quality ?? 'GOOD',
         valid: measurement?.measurementValid ?? true,
         timestamp: measurement?.updatedAt ?? now,
-        source: measurement ? 'gateway' as const : 'demo' as const,
+        source: 'gateway' as const,
       }];
     });
     return analyzeRotaryAirlock({ readings, now });
@@ -1258,7 +1267,8 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
     [analysis, deepAnalysis, expectedPoints, machineTemplate, mappedChannels.length],
   );
 
-  const { history, save, saveState, savedAt, saveError } = useOverviewPersistence(machineId, buildPayload);
+  const canPersistAnalysis = analysis.liveCount > 0;
+  const { history, save, saveState, savedAt, saveError } = useOverviewPersistence(machineId, buildPayload, canPersistAnalysis);
 
   const healthTrend = useMemo(() => history.map((point) => ({ at: point.generatedAt, value: point.conditionScore })), [history]);
   const vibrationTrend = useMemo(
@@ -1273,14 +1283,14 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
   const healthChecks = useMemo(
     () => [
       {
-        label: analysis.findings.length === 0 ? 'Stable trends' : 'Fault pattern detected',
-        detail: analysis.priorityFinding?.title ?? 'No critical deviation',
-        tone: (analysis.findings.length === 0 ? 'live' : 'warning') as Tone,
+        label: analysis.liveCount === 0 ? 'No live data' : analysis.findings.length === 0 ? 'Stable trends' : 'Fault pattern detected',
+        detail: analysis.liveCount === 0 ? 'Mapped channels are silent or not connected' : analysis.priorityFinding?.title ?? 'No critical deviation',
+        tone: (analysis.liveCount === 0 ? 'muted' : analysis.findings.length === 0 ? 'live' : 'warning') as Tone,
       },
       {
-        label: analysis.weakSignals.length === 0 ? 'Signals healthy' : 'Signals outside limits',
-        detail: analysis.weakSignals[0] ?? 'All within quality range',
-        tone: (analysis.weakSignals.length === 0 ? 'live' : 'warning') as Tone,
+        label: analysis.liveCount === 0 ? 'No samples' : analysis.weakSignals.length === 0 ? 'Signals healthy' : 'Signals outside limits',
+        detail: analysis.liveCount === 0 ? 'No channel is currently reporting' : analysis.weakSignals[0] ?? 'All within quality range',
+        tone: (analysis.liveCount === 0 ? 'muted' : analysis.weakSignals.length === 0 ? 'live' : 'warning') as Tone,
       },
       {
         label: analysis.readinessPercent >= 100 ? 'Evidence strong' : 'Evidence partial',
@@ -1296,7 +1306,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
   }
 
   const saveLabel =
-    saveState === 'saving' ? 'Saving analysis...' : saveState === 'error' ? 'Retry save' : savedAt ? `Saved ${formatAgo(savedAt, nowMs)}` : 'Save analysis';
+    !canPersistAnalysis ? 'No live data to save' : saveState === 'saving' ? 'Saving analysis...' : saveState === 'error' ? 'Retry save' : savedAt ? `Saved ${formatAgo(savedAt, nowMs)}` : 'Save analysis';
 
   const rightColumn = (
     <View className="gap-3" style={stacked ? undefined : { width: 316 }}>
@@ -1345,7 +1355,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
             <MaterialCommunityIcons name="shimmer" size={17} color={ACCENT_COLOUR} />
           </View>
           <Text className={cn('font-body text-xs leading-5', mutedClass)}>
-            Calculated in this view from saved rack mappings, {hasGatewaySamples ? 'gateway telemetry' : 'demo live values'}, configured thresholds and
+            Calculated in this view from saved rack mappings, {hasGatewaySamples ? 'current gateway telemetry' : 'no current gateway data'}, configured thresholds and
             rotary-airlock operating rules, then saved to the analysis history.
           </Text>
           {expectedPoints > 0 && (
@@ -1362,10 +1372,10 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
         {machineId ? (
           <Pressable
             onPress={() => void save()}
-            disabled={saveState === 'saving'}
+            disabled={saveState === 'saving' || !canPersistAnalysis}
             accessibilityRole="button"
             className={cn('flex-row items-center gap-2 rounded-full border px-3.5 py-2', isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel')}
-            style={{ opacity: saveState === 'saving' ? 0.6 : 1 }}
+            style={{ opacity: saveState === 'saving' || !canPersistAnalysis ? 0.6 : 1 }}
           >
             <MaterialCommunityIcons
               name={saveState === 'error' ? 'alert-circle-outline' : saveState === 'saving' ? 'progress-upload' : 'content-save-outline'}

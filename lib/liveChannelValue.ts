@@ -1,7 +1,7 @@
 // Real live values for mapped channels.
 //
-// Everything that displays a channel reading — canvas boxes, machine overview,
-// trends, alarms, analysis — resolves it here, from the measurement bus fed by
+// Everything that displays a channel reading - canvas boxes, machine overview,
+// trends, alarms, analysis - resolves it here, from the measurement bus fed by
 // the ingest pipeline (and by Simulation Mode, which publishes through the same
 // pipeline). There is no generated data in this module: a channel with nothing
 // behind it reports `none` and the UI says so, rather than showing a plausible
@@ -15,11 +15,11 @@ import { loadLocal, saveLocal } from './localPersist';
 import type { ChannelRef } from './rack';
 
 /**
- * `live`  — a reading arrived recently.
- * `stale` — a reading arrived, but not lately: the value is real but ageing,
+ * `live`  - a reading arrived recently.
+ * `stale` - a reading arrived, but not lately: the value is real but ageing,
  *           which is a different (and more alarming) condition than never
  *           having reported at all.
- * `none`  — nothing has ever been received for this channel.
+ * `none`  - nothing has ever been received for this channel.
  */
 export type LiveReadingStatus = 'live' | 'stale' | 'none';
 
@@ -49,7 +49,7 @@ export function channelNumberFor(channel: Pick<ChannelRef, 'id'>): number {
 
 /**
  * Measurement-bus key for a mapped channel, or null when the channel cannot be
- * addressed yet — no rack, no gateway id, or a rack that has never been given a
+ * addressed yet - no rack, no gateway id, or a rack that has never been given a
  * `rack_id`. Callers treat null as "nothing to subscribe to".
  */
 export function liveMeasurementKeyForChannel(
@@ -71,7 +71,7 @@ export function liveMeasurementKeyForChannel(
  * The current reading for a channel.
  *
  * The last real value is held across the gap between frames (and across a stream
- * reconnect) so a mapped point does not flicker to a dash between samples — but
+ * reconnect) so a mapped point does not flicker to a dash between samples - but
  * it is reported as `stale` once it stops being refreshed, never as `live`.
  */
 export function useLiveChannelReading(key: string | null | undefined): LiveChannelReading {
@@ -113,7 +113,7 @@ export function useLiveChannelReading(key: string | null | undefined): LiveChann
 }
 
 /**
- * The reading for a mapped channel — the form most callers want, since they
+ * The reading for a mapped channel - the form most callers want, since they
  * hold a `ChannelRef` and the device list rather than a bus key.
  *
  * `devices` may be omitted by callers that do not have the list in scope; the
@@ -142,12 +142,13 @@ const PERSIST_EVERY_N = 4;
  *
  * There is no server-side history endpoint, so the window is built from live
  * frames as they arrive and persisted per channel. A channel that has never
- * reported returns an empty array — callers must render an empty state rather
+ * reported returns an empty array - callers must render an empty state rather
  * than draw a flat line, which would read as a real measurement of zero.
  */
 export function useLiveChannelHistory(key: string | null | undefined, storageKey?: string): number[] {
   const reading = useLiveChannelReading(key);
   const [history, setHistory] = useState<number[]>(() => {
+    if (!key) return [];
     const saved = storageKey ? loadLocal<number[]>(storageKey) : null;
     return Array.isArray(saved) ? saved.filter((n) => typeof n === 'number' && Number.isFinite(n)) : [];
   });
@@ -158,12 +159,20 @@ export function useLiveChannelHistory(key: string | null | undefined, storageKey
   useEffect(() => {
     if (lastKey.current === key) return;
     lastKey.current = key;
+    if (!key) {
+      setHistory([]);
+      return;
+    }
     const saved = storageKey ? loadLocal<number[]>(storageKey) : null;
     setHistory(Array.isArray(saved) ? saved.filter((n) => typeof n === 'number' && Number.isFinite(n)) : []);
   }, [key, storageKey]);
 
-  // Append only genuinely new samples — `ageMs` ticking does not add a point,
+  // Append only genuinely new samples - `ageMs` ticking does not add a point,
   // and a stale value is not resampled into the series.
+  useEffect(() => {
+    if (!key || reading.status !== 'live') setHistory([]);
+  }, [key, reading.status]);
+
   const appendedAt = useRef<number | null>(null);
   const tickRef = useRef(0);
   const value = reading.value;
