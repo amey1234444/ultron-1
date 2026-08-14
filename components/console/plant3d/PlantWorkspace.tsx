@@ -13,6 +13,7 @@ export type PlantKpi = {
   value: string;
   unit?: string;
   progress?: number;
+  target?: number;
   plan?: string;
   tone: string;
 };

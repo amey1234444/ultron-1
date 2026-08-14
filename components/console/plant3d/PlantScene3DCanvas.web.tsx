@@ -8,7 +8,7 @@
  * This file is web-only (`.web.tsx`) and is loaded lazily after mount, so it
  * never runs during SSR and never reaches the native bundle.
  */
-import { Grid, Html, Line, OrbitControls, useGLTF } from '@react-three/drei';
+import { Html, Line, OrbitControls, useGLTF } from '@react-three/drei';
 import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -31,7 +31,18 @@ export type PlantScene3DCanvasProps = {
   selectedComponentId?: string | null;
   selectedPart?: string | null;
   onSelectPart?: (componentId: string, partName: string) => void;
+  onSelectComponent?: (componentId: string) => void;
+  interactionMode?: 'parts' | 'connections';
   onPartsDiscovered?: (componentId: string, parts: PartNode[]) => void;
+  callouts?: Record<string, PlantCalloutFacts>;
+};
+
+export type PlantCalloutFacts = {
+  status: string;
+  health?: number;
+  machines?: number;
+  alarms?: number;
+  telemetry?: string;
 };
 
 /** A node of the model tree, flattened for the editor's part list. */
@@ -128,7 +139,7 @@ function SelectionWall({
   return (
     <group>
       {walls.map((wall, i) => (
-        <mesh key={i} position={wall.pos} rotation={wall.rot}>
+        <mesh key={i} position={wall.pos} rotation={wall.rot} raycast={() => undefined}>
           <planeGeometry args={[wall.len, height]} />
           <meshBasicMaterial
             map={tex}
@@ -178,17 +189,17 @@ function ComponentPad({
   return (
     <group>
       {/* body */}
-      <mesh position={[cx, PLINTH_H / 2, cz]} castShadow receiveShadow>
+      <mesh position={[cx, PLINTH_H / 2, cz]} castShadow receiveShadow raycast={() => undefined}>
         <boxGeometry args={[w, PLINTH_H, d]} />
         <meshStandardMaterial color={dark ? '#0E1218' : '#D5D9DF'} roughness={0.58} metalness={0.22} />
       </mesh>
       {/* top deck, inset so the slab reads as machined rather than extruded */}
-      <mesh position={[cx, PLINTH_H + 0.004, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+      <mesh position={[cx, PLINTH_H + 0.004, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow raycast={() => undefined}>
         <planeGeometry args={[w - 0.30, d - 0.30]} />
         <meshStandardMaterial color={dark ? '#141A23' : '#E7E9ED'} roughness={0.46} metalness={0.28} />
       </mesh>
       {/* chamfer cap around the top edge */}
-      <mesh position={[cx, PLINTH_H - 0.012, cz]}>
+      <mesh position={[cx, PLINTH_H - 0.012, cz]} raycast={() => undefined}>
         <boxGeometry args={[w + 0.05, 0.03, d + 0.05]} />
         <meshStandardMaterial color={dark ? '#1A212B' : '#C7CCD3'} roughness={0.4} metalness={0.35} />
       </mesh>
@@ -198,7 +209,7 @@ function ComponentPad({
         [0, (d + 0.03) / 2, w + 0.06, 0.035],
         [0, -(d + 0.03) / 2, w + 0.06, 0.035],
       ] as const).map(([ox, oz, bw, bd], i) => (
-        <mesh key={`bz${i}`} position={[cx + ox, bandY, cz + oz]}>
+        <mesh key={`bz${i}`} position={[cx + ox, bandY, cz + oz]} raycast={() => undefined}>
           <boxGeometry args={[bw, bandH, bd]} />
           <meshBasicMaterial color={rim} toneMapped={false} transparent opacity={rimDim} />
         </mesh>
@@ -207,7 +218,7 @@ function ComponentPad({
         [(w + 0.03) / 2, 0],
         [-(w + 0.03) / 2, 0],
       ] as const).map(([ox, oz], i) => (
-        <mesh key={`bx${i}`} position={[cx + ox, bandY, cz + oz]}>
+        <mesh key={`bx${i}`} position={[cx + ox, bandY, cz + oz]} raycast={() => undefined}>
           <boxGeometry args={[0.035, bandH, d + 0.06]} />
           <meshBasicMaterial color={rim} toneMapped={false} transparent opacity={rimDim} />
         </mesh>
@@ -220,7 +231,7 @@ function ComponentPad({
       {active && glow ? (
         <>
           {/* light spilling onto the floor around the plinth */}
-          <mesh position={[cx, 0.015, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+          <mesh position={[cx, 0.015, cz]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => undefined}>
             <planeGeometry args={[w * 2.4, d * 2.4]} />
             <meshBasicMaterial
               map={glow} color={SELECT} transparent opacity={dark ? 0.55 : 0.30}
@@ -228,7 +239,7 @@ function ComponentPad({
             />
           </mesh>
           {/* soft bloom hugging the band itself */}
-          <mesh position={[cx, bandY, cz]}>
+          <mesh position={[cx, bandY, cz]} raycast={() => undefined}>
             <boxGeometry args={[w + 0.34, bandH * 4.5, d + 0.34]} />
             <meshBasicMaterial
               color={SELECT} transparent opacity={dark ? 0.14 : 0.10}
@@ -282,9 +293,12 @@ function PlacedComponent({
   isSelectedComponent,
   selectedPart,
   onSelectPart,
+  onSelectComponent,
+  interactionMode,
   onPartsDiscovered,
   onPortsReady,
   showLabel,
+  callout,
   dark,
 }: {
   component: PlantComponent3D;
@@ -294,9 +308,12 @@ function PlacedComponent({
   isSelectedComponent: boolean;
   selectedPart: string | null;
   onSelectPart?: (componentId: string, partName: string) => void;
+  onSelectComponent?: (componentId: string) => void;
+  interactionMode: 'parts' | 'connections';
   onPartsDiscovered?: (componentId: string, parts: PartNode[]) => void;
   onPortsReady: (componentId: string, ports: Map<string, { pos: THREE.Vector3; dir: THREE.Vector3 }>) => void;
   showLabel: boolean;
+  callout?: PlantCalloutFacts;
   dark: boolean;
 }) {
   const groupRef = useRef<THREE.Group>(null);
@@ -416,13 +433,34 @@ function PlacedComponent({
 
   const handleClick = useCallback(
     (event: ThreeEvent<MouseEvent>) => {
-      if (!editable || !onSelectPart) return;
+      if (!editable) return;
       event.stopPropagation();
+      if (interactionMode === 'connections' && onSelectComponent) {
+        onSelectComponent(component.id);
+        return;
+      }
       const name = event.object.name;
-      if (name) onSelectPart(component.id, name);
+      if (name && onSelectPart) onSelectPart(component.id, name);
     },
-    [editable, onSelectPart, component.id],
+    [editable, interactionMode, onSelectComponent, onSelectPart, component.id],
   );
+
+  const handlePointerOut = useCallback((event: ThreeEvent<PointerEvent>) => {
+    const group = groupRef.current;
+    if (group) {
+      const stillInside = event.intersections.some((hit) => {
+        let node: THREE.Object3D | null = hit.object;
+        while (node) {
+          if (node === group) return true;
+          node = node.parent;
+        }
+        return false;
+      });
+      if (stillInside) return;
+    }
+    setHovered(false);
+    invalidate();
+  }, [invalidate]);
 
   const outline = useMemo(() => {
     if (!editable || !isSelectedComponent || !selectedPart) return null;
@@ -442,7 +480,7 @@ function PlacedComponent({
         scale={scale}
         onPointerDown={editable ? handleClick : undefined}
         onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); invalidate(); }}
-        onPointerOut={() => { setHovered(false); invalidate(); }}
+        onPointerOut={handlePointerOut}
       >
         <ComponentPad box={footprint} active={active} dark={dark} glow={glow} wallTex={wallTex} />
         {/* the model stands ON the plinth */}
@@ -457,39 +495,62 @@ function PlacedComponent({
                 lineWidth={1}
                 transparent
                 opacity={0.9}
+                raycast={() => undefined}
               />
-              <mesh position={[labelPos[0], labelPos[1] - 1.15, labelPos[2]]}>
+              <mesh position={[labelPos[0], labelPos[1] - 1.15, labelPos[2]]} raycast={() => undefined}>
                 <sphereGeometry args={[0.075, 10, 8]} />
                 <meshBasicMaterial color={active ? SELECT : statusColor} toneMapped={false} />
               </mesh>
               <Html position={labelPos} center distanceFactor={40} zIndexRange={[20, 0]} pointerEvents="none">
                 <div
                   style={{
-                    minWidth: 132,
-                    padding: '7px 11px 8px',
-                    borderRadius: 9,
-                    whiteSpace: 'nowrap',
+                    position: 'relative', width: 190, height: 114,
                     fontFamily: 'Inter, system-ui, sans-serif',
                     color: dark ? '#F7F6F2' : '#0A0B0D',
-                    background: dark
-                      ? 'linear-gradient(157deg, rgba(255,255,255,0.07), rgba(255,255,255,0.015)), rgba(13,15,19,0.72)'
-                      : 'linear-gradient(157deg, rgba(255,255,255,0.9), rgba(255,255,255,0.55)), rgba(255,255,255,0.6)',
-                    border: `1px solid ${active ? 'rgba(63,191,106,0.55)' : dark ? 'rgba(255,255,255,0.10)' : 'rgba(10,11,13,0.12)'}`,
-                    boxShadow: `inset 0 1px 0 ${dark ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.85)'}, 0 10px 26px rgba(0,0,0,0.36)`,
-                    backdropFilter: 'blur(14px) saturate(150%)',
-                    WebkitBackdropFilter: 'blur(14px) saturate(150%)',
                   }}
                 >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: 999, background: statusColor }} />
-                    <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em' }}>{component.name}</span>
-                  </div>
                   <div style={{
-                    marginTop: 4, fontFamily: '"JetBrains Mono", ui-monospace, monospace',
-                    fontSize: 8.5, letterSpacing: '0.14em', textTransform: 'uppercase',
-                    color: dark ? '#62666E' : '#80858D',
+                    position: 'absolute', insetInline: 0, top: 0, minHeight: 47,
+                    padding: '7px 11px 8px', borderRadius: 9, whiteSpace: 'nowrap',
+                    background: dark
+                      ? 'linear-gradient(157deg, rgba(255,255,255,0.07), rgba(255,255,255,0.015)), rgba(13,15,19,0.82)'
+                      : 'linear-gradient(157deg, rgba(255,255,255,0.94), rgba(255,255,255,0.62)), rgba(255,255,255,0.72)',
+                    border: `1px solid ${active ? 'rgba(63,191,106,0.55)' : dark ? 'rgba(255,255,255,0.10)' : 'rgba(10,11,13,0.12)'}`,
+                    boxShadow: `inset 0 1px 0 ${dark ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.85)'}, 0 10px 26px rgba(0,0,0,0.30)`,
+                    backdropFilter: 'blur(14px) saturate(150%)', WebkitBackdropFilter: 'blur(14px) saturate(150%)',
                   }}>
-                    {PLANT_MODELS[component.model].name}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 999, background: statusColor }} />
+                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em' }}>{component.name}</span>
+                      <span style={{ marginLeft: 'auto', fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 7.5, color: statusColor, textTransform: 'uppercase' }}>
+                        {callout?.status ?? component.status}
+                      </span>
+                    </div>
+                    <div style={{ marginTop: 4, fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', color: dark ? '#737780' : '#707680' }}>
+                      {PLANT_MODELS[component.model].name}
+                    </div>
+                  </div>
+                  <div aria-hidden={!active} style={{
+                    position: 'absolute', insetInline: 0, top: 51, height: 61, padding: '7px 10px', borderRadius: 8,
+                    display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6,
+                    background: dark ? 'rgba(9,12,16,0.90)' : 'rgba(248,250,251,0.92)',
+                    border: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(10,11,13,0.11)'}`,
+                    boxShadow: '0 8px 20px rgba(0,0,0,0.24)', opacity: active ? 1 : 0,
+                    transform: active ? 'translateY(0)' : 'translateY(-3px)',
+                  }}>
+                    {[
+                      ['Health', callout?.health === undefined ? '—' : `${callout.health}`],
+                      ['Machines', callout?.machines === undefined ? '—' : `${callout.machines}`],
+                      ['Alarms', callout?.alarms === undefined ? '—' : `${callout.alarms}`],
+                    ].map(([label, value]) => (
+                      <div key={label} style={{ minWidth: 0 }}>
+                        <div style={{ fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 6.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: dark ? '#747983' : '#6D737C' }}>{label}</div>
+                        <div style={{ marginTop: 3, fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10, color: label === 'Alarms' && Number(value) > 0 ? statusColor : dark ? '#F7F6F2' : '#0A0B0D' }}>{value}</div>
+                      </div>
+                    ))}
+                    <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, paddingTop: 3, borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(10,11,13,0.08)'}`, fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 6.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: dark ? '#747983' : '#6D737C' }}>
+                      <span>Telemetry</span><span style={{ marginLeft: 'auto', color: dark ? '#D5D8DC' : '#30343A' }}>{callout?.telemetry ?? '—'}</span>
+                    </div>
                   </div>
                 </div>
               </Html>
@@ -557,15 +618,63 @@ function Connections({ scene, ports, version }: { scene: PlantScene3DConfig; por
             gapSize={0.3}
             transparent
             opacity={0.95}
+            raycast={() => undefined}
           />
           {route.ends.map((end, i) => (
-            <mesh key={i} position={end}>
+            <mesh key={i} position={end} raycast={() => undefined}>
               <sphereGeometry args={[0.13, 10, 8]} />
               <meshBasicMaterial color={CONNECTION_COLOR} />
             </mesh>
           ))}
         </group>
       ))}
+    </group>
+  );
+}
+
+/**
+ * Deterministic finite floor grid. Each scale owns distinct line segments, so
+ * there is no coplanar overlap for the depth buffer to alternate between while
+ * orbiting. The minor grid is intentionally quiet at grazing angles.
+ */
+function StableFloorGrid({ scene, dark }: { scene: PlantScene3DConfig; dark: boolean }) {
+  const halfSize = useMemo(() => {
+    const extent = scene.components.reduce((max, component) => {
+      const [w, d] = PLANT_MODELS[component.model].footprint;
+      const scale = (component.scale / 100) * (scene.modelScale / 100);
+      return Math.max(max, Math.abs(component.x) + w * scale, Math.abs(component.z) + d * scale);
+    }, 24);
+    return Math.min(140, Math.max(40, Math.ceil((extent + 18) / 10) * 10));
+  }, [scene.components, scene.modelScale]);
+
+  const geometries = useMemo(() => {
+    const build = (step: number, skipMajor: boolean, y: number) => {
+      const positions: number[] = [];
+      for (let offset = -halfSize; offset <= halfSize + 0.001; offset += step) {
+        if (skipMajor && Math.abs(offset % 10) < 0.001) continue;
+        positions.push(-halfSize, y, offset, halfSize, y, offset);
+        positions.push(offset, y, -halfSize, offset, y, halfSize);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      return geometry;
+    };
+    return { minor: build(2, true, 0.018), major: build(10, false, 0.026) };
+  }, [halfSize]);
+
+  useEffect(() => () => {
+    geometries.minor.dispose();
+    geometries.major.dispose();
+  }, [geometries]);
+
+  return (
+    <group raycast={() => undefined}>
+      <lineSegments geometry={geometries.minor} raycast={() => undefined}>
+        <lineBasicMaterial color={dark ? '#28313A' : '#BFC5CD'} transparent opacity={dark ? 0.34 : 0.48} depthWrite={false} toneMapped={false} />
+      </lineSegments>
+      <lineSegments geometry={geometries.major} raycast={() => undefined}>
+        <lineBasicMaterial color={dark ? '#3A4652' : '#969FAA'} transparent opacity={dark ? 0.62 : 0.72} depthWrite={false} toneMapped={false} />
+      </lineSegments>
     </group>
   );
 }
@@ -668,24 +777,9 @@ function SceneContents(props: PlantScene3DCanvasProps) {
         />
       </mesh>
 
-      {/* Measurement grid. Two tiers so scale is readable: a fine 2 m cell for
-          local judgement, a heavier 10 m section line for distance. */}
-      {scene.showGrid ? (
-        <Grid
-          position={[0, 0, 0]}
-          args={[900, 900]}
-          cellSize={2}
-          cellThickness={0.9}
-          cellColor={dark ? '#2A343F' : '#C3C9D1'}
-          sectionSize={10}
-          sectionThickness={1.7}
-          sectionColor={dark ? '#3E4C5B' : '#9BA3AE'}
-          fadeDistance={125}
-          fadeStrength={1.0}
-          infiniteGrid
-          followCamera={false}
-        />
-      ) : null}
+      {/* Two non-overlapping finite scales avoid the long-distance derivative
+          shimmer of the previous 900 m infinite grid shader. */}
+      {scene.showGrid ? <StableFloorGrid scene={scene} dark={dark} /> : null}
 
       <Suspense fallback={null}>
         {scene.components.map((component) => (
@@ -698,9 +792,12 @@ function SceneContents(props: PlantScene3DCanvasProps) {
             isSelectedComponent={selectedComponentId === component.id}
             selectedPart={selectedPart ?? null}
             onSelectPart={props.onSelectPart}
+            onSelectComponent={props.onSelectComponent}
+            interactionMode={props.interactionMode ?? 'parts'}
             onPartsDiscovered={props.onPartsDiscovered}
             onPortsReady={onPortsReady}
             showLabel={scene.showLabels}
+            callout={props.callouts?.[component.id]}
             dark={dark}
           />
         ))}

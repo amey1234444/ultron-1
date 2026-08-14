@@ -45,8 +45,8 @@ export const PLANT_PART_COLORS = [
   '#D64545', '#8B5CF6', '#E8E3D8', '#111418',
 ] as const;
 
-/** The light blue used for every inter-component service connection. */
-export const CONNECTION_COLOR = '#7DD3FC';
+/** Shared active hue for selections and inter-component service runs. */
+export const CONNECTION_COLOR = '#3FBF6A';
 
 export const CONNECTION_KINDS = ['electrical', 'network', 'utility', 'data', 'air'] as const;
 export type PlantConnectionKind = (typeof CONNECTION_KINDS)[number];
@@ -273,7 +273,7 @@ export function normalizePlantScene3D(input: unknown): PlantScene3DConfig {
     showGrid: raw.showGrid !== false,
     showLabels: raw.showLabels !== false,
     components: Array.isArray(raw.components) ? components : DEFAULT_PLANT_SCENE_3D.components,
-    connections: Array.isArray(raw.components) ? connections : DEFAULT_PLANT_SCENE_3D.connections,
+    connections: Array.isArray(raw.connections) ? connections : DEFAULT_PLANT_SCENE_3D.connections,
   };
 }
 

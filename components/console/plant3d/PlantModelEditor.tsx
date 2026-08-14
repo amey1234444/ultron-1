@@ -295,6 +295,9 @@ export function PlantModelEditor({
   const [selectedPart, setSelectedPart] = useState<string | null>(null);
   const [partsByComponent, setPartsByComponent] = useState<Record<string, PartNode[]>>({});
   const [partQuery, setPartQuery] = useState('');
+  const [connecting, setConnecting] = useState(false);
+  const [connectionSourceId, setConnectionSourceId] = useState<string | null>(null);
+  const [connectionNotice, setConnectionNotice] = useState<string | null>(null);
 
   const selected = scene.components.find((c) => c.id === selectedComponentId) ?? null;
   const border = dark ? 'border-line-dark' : 'border-line-light';
@@ -388,24 +391,72 @@ export function PlantModelEditor({
   const edits = selected ? countPartEdits(selected.parts) : { hidden: 0, colored: 0, resized: 0 };
   const totalHidden = scene.components.reduce((sum, c) => sum + countPartEdits(c.parts).hidden, 0);
 
-  const addConnection = () => {
+  const serviceForPort = useCallback((port: string): PlantConnectionKind => {
+    const value = port.toUpperCase();
+    if (value.includes('POWER') || value.includes('ELECTRIC')) return 'electrical';
+    if (value.includes('NETWORK')) return 'network';
+    if (value.includes('DATA')) return 'data';
+    if (value.includes('AIR')) return 'air';
+    return 'utility';
+  }, []);
+
+  const beginConnection = () => {
     if (scene.components.length < 2) return;
-    const [a, b] = scene.components;
+    setConnecting(true);
+    setConnectionSourceId(null);
+    setSelectedPart(null);
+    setConnectionNotice('Select the source asset in the 3D preview.');
+  };
+
+  const handleSelectConnectionAsset = useCallback((componentId: string) => {
+    if (!connecting) return;
+    if (!connectionSourceId) {
+      setConnectionSourceId(componentId);
+      setSelectedComponentId(componentId);
+      setConnectionNotice('Source selected. Now select a different target asset.');
+      return;
+    }
+    if (componentId === connectionSourceId) {
+      setConnectionNotice('Source and target must be different assets.');
+      return;
+    }
+
+    const sourcePorts = portNames(connectionSourceId);
+    const targetPorts = portNames(componentId);
+    const candidates = sourcePorts.flatMap((fromPort) =>
+      targetPorts
+        .filter((toPort) => serviceForPort(toPort) === serviceForPort(fromPort))
+        .map((toPort) => ({ fromPort, toPort, kind: serviceForPort(fromPort) })),
+    );
+    if (candidates.length === 0) {
+      candidates.push({
+        fromPort: sourcePorts[0] ?? 'PORT_UTILITY_OUT',
+        toPort: targetPorts[0] ?? 'PORT_ELECTRICAL_IN',
+        kind: serviceForPort(sourcePorts[0] ?? targetPorts[0] ?? 'PORT_UTILITY'),
+      });
+    }
+    const available = candidates.find((candidate) => !scene.connections.some((connection) =>
+      connection.fromId === connectionSourceId && connection.toId === componentId &&
+      connection.fromPort === candidate.fromPort && connection.toPort === candidate.toPort,
+    ));
+    if (!available) {
+      setConnectionNotice('These assets already use every compatible route. Refine an existing connection below.');
+      return;
+    }
     onChange({
       ...scene,
-      connections: [
-        ...scene.connections,
-        {
-          id: newConnectionId(),
-          fromId: a.id,
-          fromPort: portNames(a.id)[0] ?? 'PORT_UTILITY_OUT',
-          toId: b.id,
-          toPort: portNames(b.id)[0] ?? 'PORT_ELECTRICAL_IN',
-          kind: 'utility',
-        },
-      ],
+      connections: [...scene.connections, {
+        id: newConnectionId(), fromId: connectionSourceId, toId: componentId,
+        fromPort: available.fromPort, toPort: available.toPort, kind: available.kind,
+      }],
     });
-  };
+    const sourceName = scene.components.find((component) => component.id === connectionSourceId)?.name ?? 'source';
+    const targetName = scene.components.find((component) => component.id === componentId)?.name ?? 'target';
+    setConnecting(false);
+    setConnectionSourceId(null);
+    setSelectedComponentId(componentId);
+    setConnectionNotice(`Connected ${sourceName} to ${targetName}.`);
+  }, [connecting, connectionSourceId, onChange, portNames, scene, serviceForPort]);
 
   return (
     <View className="gap-3">
@@ -419,13 +470,17 @@ export function PlantModelEditor({
           selectedComponentId={selectedComponentId}
           selectedPart={selectedPart}
           onSelectPart={handleSelectPart}
+          onSelectComponent={handleSelectConnectionAsset}
+          interactionMode={connecting ? 'connections' : 'parts'}
           onPartsDiscovered={handlePartsDiscovered}
         />
       </View>
 
       <View className={cn('flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2', border, dark ? 'bg-surface-darkpanel' : 'bg-white')}>
         <MaterialCommunityIcons name="rotate-3d-variant" size={15} color={dark ? '#F5F5F5' : '#111827'} />
-        <Text className={cn('font-body text-[11px]', inkMuted)}>Drag to orbit · scroll to zoom · click a part to select it</Text>
+        <Text className={cn('font-body text-[11px]', connecting ? 'text-accent' : inkMuted)}>
+          {connecting ? (connectionNotice ?? 'Select source, then target') : 'Drag to orbit · scroll to zoom · click a part to select it'}
+        </Text>
         <View className="flex-1" />
         <Stepper
           label="Model size"
@@ -455,7 +510,13 @@ export function PlantModelEditor({
                   : `Connections (${scene.connections.length})`
             }
             dark={dark}
-            onPress={() => setTab(key)}
+            onPress={() => {
+              setTab(key);
+              if (key !== 'connections') {
+                setConnecting(false);
+                setConnectionSourceId(null);
+              }
+            }}
           />
         ))}
         <View className="flex-1" />
@@ -622,7 +683,10 @@ export function PlantModelEditor({
         <View className="gap-2">
           <View className="flex-row items-center gap-2">
             <View style={{ width: 22, height: 0, borderTopWidth: 2, borderStyle: 'dashed', borderColor: CONNECTION_COLOR }} />
-            <Text className={cn('font-body text-[10.5px]', inkMuted)}>Connections render as a light-blue dotted run between the two component ports.</Text>
+            <Text className={cn('flex-1 font-body text-[10.5px]', inkMuted)}>
+              Green service runs share the plant&apos;s active wall color and route along the floor between asset ports.
+            </Text>
+            {connectionNotice && !connecting ? <Text className="font-mono text-[9.5px] text-accent">{connectionNotice}</Text> : null}
           </View>
           <ScrollView style={{ maxHeight: 260 }} showsVerticalScrollIndicator>
             <View className="gap-2">
@@ -637,7 +701,16 @@ export function PlantModelEditor({
                       <View className="flex-row flex-wrap items-center gap-1.5">
                         <Text className={cn('font-body text-[10px]', inkMuted)}>From</Text>
                         {scene.components.map((c) => (
-                          <Chip key={c.id} active={connection.fromId === c.id} label={c.name} dark={dark} onPress={() => patch({ fromId: c.id })} />
+                          <Chip
+                            key={c.id}
+                            active={connection.fromId === c.id}
+                            label={c.name}
+                            dark={dark}
+                            onPress={() => {
+                              if (c.id === connection.toId) return;
+                              patch({ fromId: c.id, fromPort: portNames(c.id)[0] ?? 'PORT_UTILITY_OUT' });
+                            }}
+                          />
                         ))}
                         <View className="flex-1" />
                         <Pressable
@@ -655,7 +728,16 @@ export function PlantModelEditor({
                       <View className="flex-row flex-wrap items-center gap-1.5">
                         <Text className={cn('font-body text-[10px]', inkMuted)}>To</Text>
                         {scene.components.map((c) => (
-                          <Chip key={c.id} active={connection.toId === c.id} label={c.name} dark={dark} onPress={() => patch({ toId: c.id })} />
+                          <Chip
+                            key={c.id}
+                            active={connection.toId === c.id}
+                            label={c.name}
+                            dark={dark}
+                            onPress={() => {
+                              if (c.id === connection.fromId) return;
+                              patch({ toId: c.id, toPort: portNames(c.id)[0] ?? 'PORT_ELECTRICAL_IN' });
+                            }}
+                          />
                         ))}
                       </View>
                       <View className="flex-row flex-wrap items-center gap-1.5">
@@ -676,14 +758,14 @@ export function PlantModelEditor({
             </View>
           </ScrollView>
           <Pressable
-            onPress={addConnection}
+            onPress={connecting ? () => { setConnecting(false); setConnectionSourceId(null); setConnectionNotice(null); } : beginConnection}
             disabled={scene.components.length < 2}
             className={cn('flex-row items-center justify-center gap-1 rounded-md border py-2', border)}
             style={{ opacity: scene.components.length < 2 ? 0.5 : 1 }}
           >
-            <MaterialCommunityIcons name="plus" size={14} color={CONNECTION_COLOR} />
+            <MaterialCommunityIcons name={connecting ? 'close' : 'connection'} size={14} color={CONNECTION_COLOR} />
             <Text className="font-body-medium text-[11px]" style={{ color: CONNECTION_COLOR }}>
-              Add connection
+              {connecting ? 'Cancel connection mode' : 'Connect assets in 3D'}
             </Text>
           </Pressable>
         </View>

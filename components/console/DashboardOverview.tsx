@@ -1542,6 +1542,23 @@ export function DashboardOverview({
     return colors;
   }, [metrics.areas, palette, plantConfig.scene3d.components]);
 
+  const plantCallouts = useMemo(() => {
+    const facts: Record<string, { status: string; health?: number; machines?: number; alarms?: number; telemetry?: string }> = {};
+    for (const component of plantConfig.scene3d.components) {
+      const area = metrics.areas.find((entry) => entry.name === component.name);
+      const rows = metrics.attention.filter((entry) => entry.area === component.name);
+      const health = rows.length > 0 ? Math.round(rows.reduce((sum, row) => sum + row.health, 0) / rows.length) : undefined;
+      facts[component.id] = {
+        status: component.status === 'auto' ? area?.status ?? 'healthy' : component.status,
+        health,
+        machines: area?.count,
+        alarms: rows.reduce((sum, row) => sum + row.alarms, 0),
+        telemetry: rows[0]?.telemetry,
+      };
+    }
+    return facts;
+  }, [metrics.areas, metrics.attention, plantConfig.scene3d.components]);
+
   // The same figure the header pill reports. `metrics.alarms` is a rolling log
   // that stays populated after alarms clear, so it cannot gate the alarm card.
   const openAlarmCount = metrics.criticalCount + metrics.warningCount + metrics.infoCount;
@@ -1646,9 +1663,9 @@ export function DashboardOverview({
             onEdit={() => setPlantEditorOpen(true)}
             kpis={headline.map((entry) => ({
               label: entry.label, value: entry.value, unit: entry.unit,
-              progress: entry.progress, plan: entry.plan, tone: entry.tone,
+              progress: entry.progress, target: entry.target, plan: entry.plan, tone: entry.tone,
             }))}
-            canvas={<PlantScene3D scene={plantConfig.scene3d} statusColors={plantComponentColors} dark={isDark} />}
+            canvas={<PlantScene3D scene={plantConfig.scene3d} statusColors={plantComponentColors} callouts={plantCallouts} dark={isDark} />}
             cards={
               <>
                 <WorkspaceCard
@@ -1678,11 +1695,12 @@ export function DashboardOverview({
                               is legible at a glance rather than arithmetic */}
                           <View
                             style={{
-                              marginTop: 3, height: 3, borderRadius: 3, overflow: 'hidden',
+                              position: 'relative', marginTop: 3, height: 4, borderRadius: 3,
                               backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,11,13,0.08)',
                             }}
                           >
                             <View style={{ width: `${Math.max(0, Math.min(100, row.health))}%`, height: '100%', backgroundColor: tone, borderRadius: 3 }} />
+                            <View style={{ position: 'absolute', left: `${HEALTH_TARGET}%`, top: -1, width: 1, height: 6, backgroundColor: isDark ? '#F7F6F2' : '#0A0B0D' }} />
                           </View>
                         </View>
                       );
@@ -1705,10 +1723,10 @@ export function DashboardOverview({
                     {/* Explicit height: FillChart measures its parent, and inside
                         a fixed-height card that resolved to 0 and drew nothing. */}
                     <StackedBars
-                      labels={DEMO_ALARM_DAYS}
-                      critical={DEMO_ALARM_BARS.critical}
-                      warning={DEMO_ALARM_BARS.warning}
-                      info={DEMO_ALARM_BARS.info}
+                      labels={alarmBars.labels}
+                      critical={alarmBars.critical}
+                      warning={alarmBars.warning}
+                      info={alarmBars.info}
                       height={112}
                     />
                   </WorkspaceCard>

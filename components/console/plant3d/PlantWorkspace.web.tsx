@@ -18,6 +18,8 @@ export type PlantKpi = {
   unit?: string;
   /** 0-1; drives the hairline meter under the value. */
   progress?: number;
+  /** 0-1; stable marker on the meter. */
+  target?: number;
   plan?: string;
   tone: string;
 };
@@ -134,6 +136,7 @@ const micro = (t: T): CSSProperties => ({
 
 function KpiTile({ kpi, t, dark }: { kpi: PlantKpi; t: T; dark: boolean }) {
   const pct = kpi.progress === undefined ? null : Math.max(0, Math.min(1, kpi.progress));
+  const target = kpi.target === undefined ? null : Math.max(0, Math.min(1, kpi.target));
   return (
     <GlassSurface t={t} dark={dark} style={{ padding: '10px 14px 11px', minWidth: 152 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -149,14 +152,16 @@ function KpiTile({ kpi, t, dark }: { kpi: PlantKpi; t: T; dark: boolean }) {
         {kpi.unit ? <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.inkMuted }}>{kpi.unit}</span> : null}
       </div>
       {pct !== null ? (
-        <div style={{ marginTop: 9, height: 3, borderRadius: 3, background: t.hair, overflow: 'hidden' }}>
+        <div style={{ position: 'relative', marginTop: 8, height: 4, borderRadius: 3, background: t.hair }}>
           <div style={{
             width: `${pct * 100}%`, height: '100%', borderRadius: 3,
             background: `linear-gradient(to right, ${kpi.tone}88, ${kpi.tone})`,
             boxShadow: `0 0 8px ${kpi.tone}66`,
           }} />
+          {target !== null ? <span aria-hidden style={{ position: 'absolute', left: `calc(${target * 100}% - 1px)`, top: -2, width: 2, height: 8, borderRadius: 1, background: t.ink, boxShadow: `0 0 0 1px ${t.base}` }} /> : null}
         </div>
       ) : null}
+      {kpi.plan ? <div style={{ ...micro(t), marginTop: 7, letterSpacing: '0.08em', textTransform: 'none', whiteSpace: 'nowrap' }}>{kpi.plan}</div> : null}
     </GlassSurface>
   );
 }
