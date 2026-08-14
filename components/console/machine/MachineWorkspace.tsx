@@ -89,56 +89,16 @@ function ActualSubTab({ label, active, onPress }: { label: string; active: boole
   );
 }
 
-/**
- * Design ⇄ Actual switch.
- *
- * Configuration and the deployed dashboard are two views of one machine, so the
- * switch between them belongs in the workspace header beside the machine's
- * name — not buried in a menu. Without it a configurator has no route to the
- * Actual View at all, and the Rack/Overview/Analysis/Alarm/Trend tabs that live
- * there are unreachable.
- */
-function ModeSwitch({ mode, onChange }: { mode: WorkspaceMode; onChange: (mode: WorkspaceMode) => void }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  return (
-    <View
-      accessibilityRole="tablist"
-      className="flex-row items-center gap-1 rounded-xl border p-1"
-      style={{ borderColor: palette.line, backgroundColor: palette.panel }}
-    >
-      {(['design', 'actual'] as const).map((value) => {
-        const active = mode === value;
-        return (
-          <Pressable
-            key={value}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
-            onPress={() => onChange(value)}
-            className="rounded-lg px-3 py-1.5"
-            style={active ? { backgroundColor: palette.ink } : undefined}
-          >
-            <Text
-              className="font-mono text-[10px] uppercase tracking-[0.16em]"
-              style={{ color: active ? palette.panel : palette.inkMuted }}
-            >
-              {value === 'design' ? 'Design' : 'Actual'}
-            </Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 function ZoomControls({ zoom, onZoomOut, onReset, onZoomIn }: { zoom: number; onZoomOut: () => void; onReset: () => void; onZoomIn: () => void }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
+  // Bottom-right, out of the way of the machine itself: the stage is centred, so
+  // anything parked in the middle of the canvas sits on top of the artwork.
   return (
-    <View pointerEvents="box-none" className="absolute inset-x-0 bottom-4 items-center">
+    <View pointerEvents="box-none" className="absolute bottom-4 right-4 items-end">
       <View className={cn('flex-row items-center gap-1 rounded-full border px-1 py-1', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}>
         <Pressable onPress={onZoomOut} disabled={zoom <= MIN_ZOOM} className="h-7 w-7 items-center justify-center rounded-full">
           <Text className={cn('font-body-bold text-sm', zoom <= MIN_ZOOM ? mutedClass : inkClass)}>−</Text>
@@ -365,10 +325,7 @@ export function MachineWorkspace({
         {backButton}
         {nameBlock}
       </View>
-      <View className="min-w-0 flex-row flex-wrap items-center justify-start gap-2 md:justify-end">
-        {canConfigure ? <ModeSwitch mode={mode} onChange={setConfiguratorMode} /> : null}
-        {controls}
-      </View>
+      <View className="min-w-0 flex-row flex-wrap items-center justify-start gap-2 md:justify-end">{controls}</View>
     </View>
   );
 

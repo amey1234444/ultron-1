@@ -1083,8 +1083,10 @@ export function TrailBoard({
   // toolbar's height — and therefore the stage scale — never changes.
   const selectionRail =
     selectedTrail && !readOnly ? (
-      <View pointerEvents="box-none" className="absolute inset-x-0 bottom-4 items-center">
-        <View pointerEvents="box-none" className="flex-row items-center gap-2 px-4">
+      // Bottom-right, stacked directly above the zoom control: both sets of
+      // canvas controls live in the same corner, and neither covers the machine.
+      <View pointerEvents="box-none" style={{ position: 'absolute', right: 16, bottom: 62 }} className="items-end">
+        <View pointerEvents="box-none" className="flex-row items-center gap-2">
           <Toolbar>
             <ToolbarGroup className="pl-1.5">
               <Badge variant="info" icon={null}>
