@@ -11,6 +11,7 @@ const UNIT_FOR_KIND: Record<MeasurementPointKind, string> = {
   Speed: 'rpm',
   Pressure: 'bar',
   Current: 'A',
+  Power: 'kW',
   Level: '%',
 };
 
@@ -22,6 +23,9 @@ const KIND_LETTER: Record<MeasurementPointKind, LiveKindLetter> = {
   Speed: 'S',
   Pressure: 'P',
   Current: 'C',
+  // Power shares the electrical letter: it is the same three-phase meter, and
+  // the live-value bands are per letter rather than per quantity.
+  Power: 'C',
   // No dedicated level letter — 'X' is the generic 0-100 band, which is what a
   // hopper level percentage is anyway.
   Level: 'X',

@@ -50,3 +50,82 @@ export function StageGrid() {
     </Svg>
   );
 }
+
+/**
+ * The same grid, drawn across the whole canvas instead of only the stage.
+ *
+ * The stage keeps a fixed 16:9 aspect so saved layouts render identically
+ * everywhere, which means a wider window leaves bands to its left and right.
+ * Drawing the grid in container coordinates — at the stage's own cadence and
+ * phase, so the two are indistinguishable — fills those bands and the canvas
+ * reads as one continuous work surface out to every edge.
+ *
+ * `scale` is the current stage scale, and the origin is where the scaled stage
+ * starts inside the container: `transform: scale` scales about the centre, so
+ * the visible stage is the container centre minus half the scaled stage.
+ */
+export function CanvasGrid({ width, height, scale }: { width: number; height: number; scale: number }) {
+  const { isDark } = useAppTheme();
+
+  const minorColour = isDark ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.055)';
+  const majorColour = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(10,10,10,0.11)';
+
+  const { minorPath, majorPath, stage } = useMemo(() => {
+    const step = MINOR_STEP * scale;
+    const major = MAJOR_STEP * scale;
+    const originX = (width - STAGE_WIDTH * scale) / 2;
+    const originY = (height - STAGE_HEIGHT * scale) / 2;
+
+    // Phase the lines to the stage origin, then walk outwards to both edges so
+    // the grid continues past the stage rather than starting at it.
+    const firstX = originX - Math.ceil(originX / step) * step;
+    const firstY = originY - Math.ceil(originY / step) * step;
+    const firstMajorX = originX - Math.ceil(originX / major) * major;
+    const firstMajorY = originY - Math.ceil(originY / major) * major;
+
+    let minor = '';
+    let majorLines = '';
+    if (step > 3) {
+      for (let x = firstX; x <= width; x += step) {
+        if (Math.abs((x - originX) % major) < 0.5) continue;
+        minor += `M ${x.toFixed(1)} 0 L ${x.toFixed(1)} ${height} `;
+      }
+      for (let y = firstY; y <= height; y += step) {
+        if (Math.abs((y - originY) % major) < 0.5) continue;
+        minor += `M 0 ${y.toFixed(1)} L ${width} ${y.toFixed(1)} `;
+      }
+    }
+    for (let x = firstMajorX; x <= width; x += major) majorLines += `M ${x.toFixed(1)} 0 L ${x.toFixed(1)} ${height} `;
+    for (let y = firstMajorY; y <= height; y += major) majorLines += `M 0 ${y.toFixed(1)} L ${width} ${y.toFixed(1)} `;
+
+    return {
+      minorPath: minor.trim(),
+      majorPath: majorLines.trim(),
+      stage: {
+        x: originX,
+        y: originY,
+        width: STAGE_WIDTH * scale,
+        height: STAGE_HEIGHT * scale,
+      },
+    };
+  }, [height, scale, width]);
+
+  if (width <= 0 || height <= 0 || scale <= 0) return null;
+
+  return (
+    <Svg pointerEvents="none" width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }}>
+      <Path d={minorPath} stroke={minorColour} strokeWidth={1} />
+      <Path d={majorPath} stroke={majorColour} strokeWidth={1} />
+      {/* The stage boundary stays marked — it is where a saved layout ends. */}
+      <Rect
+        x={stage.x + 0.5}
+        y={stage.y + 0.5}
+        width={Math.max(0, stage.width - 1)}
+        height={Math.max(0, stage.height - 1)}
+        fill="none"
+        stroke={majorColour}
+        strokeWidth={1}
+      />
+    </Svg>
+  );
+}

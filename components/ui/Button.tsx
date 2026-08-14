@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type React from 'react';
+import { useState } from 'react';
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -60,6 +61,11 @@ export function Button({
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const sizing = SIZING[size];
+  // Pressed state is held rather than read from Pressable's render callback:
+  // NativeWind replaces `style` with the compiled `className` output, and a
+  // function-form style is dropped on the floor — which is how a filled button
+  // ends up as white text on a white background.
+  const [pressed, setPressed] = useState(false);
 
   // Resolved once so the icon, the label and the chrome can never disagree.
   const skin = (() => {
@@ -83,10 +89,13 @@ export function Button({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? (typeof children === 'string' ? children : undefined)}
       accessibilityState={{ disabled }}
-      className={cn('flex-row items-center justify-center border', sizing.pad, sizing.gap, sizing.radius, block && 'flex-1', className)}
-      style={({ pressed }) => [
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      className={cn('flex-row items-center justify-center', sizing.pad, sizing.gap, sizing.radius, block && 'flex-1', className)}
+      style={[
         {
           backgroundColor: skin.background,
+          borderWidth: 1,
           borderColor: skin.border,
           opacity: disabled ? 0.42 : pressed ? 0.78 : 1,
           // web-only: a pointer makes a bordered pill read as pressable.
@@ -134,6 +143,7 @@ export function IconButton({
   const background = tone === 'ghost' ? 'transparent' : tone === 'primary' ? palette.ink : (variant?.tint ?? palette.panel);
   const border = tone === 'ghost' ? 'transparent' : tone === 'primary' ? palette.ink : (variant?.border ?? palette.line);
   const glyph = tone === 'primary' ? palette.panel : (variant?.accent ?? palette.inkMuted);
+  const [pressed, setPressed] = useState(false);
 
   return (
     <Pressable
@@ -142,15 +152,18 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
-      className={cn('items-center justify-center rounded-lg border', className)}
-      style={({ pressed }) => ({
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setPressed(false)}
+      className={cn('items-center justify-center rounded-lg', className)}
+      style={{
         width: size,
         height: size,
         backgroundColor: background,
+        borderWidth: 1,
         borderColor: border,
         opacity: disabled ? 0.4 : pressed ? 0.75 : 1,
         cursor: disabled ? 'default' : 'pointer',
-      }) as ViewStyle}
+      } as ViewStyle}
     >
       <MaterialCommunityIcons name={icon} size={Math.round(size * 0.52)} color={glyph} />
     </Pressable>

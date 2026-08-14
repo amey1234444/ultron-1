@@ -17,7 +17,7 @@ export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
 export const COMPONENT_TYPES = ['Motor', 'Pump', 'Gearbox', 'Coupling', 'Bearing', 'Fan', 'Compressor', 'Custom Component'] as const;
 export type ComponentType = (typeof COMPONENT_TYPES)[number];
 
-export type MeasurementPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Level';
+export type MeasurementPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Power' | 'Level';
 
 // Point lifecycle per spec Flow 5 — starts Not Configured, ends at a live-view
 // state once mapped, commissioned, and streaming.
@@ -115,7 +115,7 @@ const EXTRUDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   {
     type: 'Gearbox',
     label: 'Gear Box',
-    points: extruderPointDefs(['GEARBOX_VIB', 'GEARBOX_TEMP']),
+    points: extruderPointDefs(['GEARBOX_VIB_IN', 'GEARBOX_VIB', 'GEARBOX_TEMP']),
   },
   {
     type: 'Custom Component',

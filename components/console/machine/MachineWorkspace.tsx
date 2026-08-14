@@ -22,7 +22,7 @@ import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
-import { StageGrid, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
+import { CanvasGrid, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
 import { TrendView } from './TrendView';
 
@@ -379,10 +379,13 @@ export function MachineWorkspace({
       className="relative flex-1 overflow-hidden"
       onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
     >
+      {/* Grid first, in container coordinates, so the work surface runs to all
+          four edges instead of stopping at the letterboxed stage. */}
+      {canvasSize ? <CanvasGrid width={canvasSize.width} height={canvasSize.height} scale={stageScale} /> : null}
+
       {stageStyle && (
         <>
           <View pointerEvents="box-none" style={stageStyle} className="items-center justify-center">
-            <StageGrid />
             <View
               onLayout={(e) => {
                 const { x, y, width, height } = e.nativeEvent.layout;

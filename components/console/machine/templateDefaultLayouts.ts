@@ -70,16 +70,35 @@ const RAV_TEMPLATE_POINTS: TemplatePoint[] = RAV_CONNECTOR_POINTS.flatMap((conne
  * old copy of these coordinates drifted out of step with the drawing the first
  * time the machine was redrawn; there is now nothing to keep in step.
  */
-const EXTRUDER_CARD_SLOT_Y = [66, 158, 250, 342, 434, 526, 618, 710];
 const EXTRUDER_LEFT_COLUMN = 232;
 const EXTRUDER_RIGHT_COLUMN = 1208;
+// A card's connector sits 30 above its top edge and the card is 104 tall, so
+// these are the first and last connector heights that keep a whole card inside
+// the reference canvas.
+const EXTRUDER_SLOT_TOP = 32;
+const EXTRUDER_SLOT_BOTTOM = REFERENCE_CANVAS_H - MAPPABLE_BOX_HEIGHT + 30 - 4;
+
+/**
+ * Card heights for one column, spread evenly over the usable height.
+ *
+ * The number of pads on a side is whatever the artwork declares, so the slots
+ * are computed from that count rather than being a fixed list a new instrument
+ * would silently wrap around and stack on top of an existing card.
+ */
+function extruderSlots(count: number): number[] {
+  if (count <= 1) return [EXTRUDER_SLOT_TOP];
+  const step = (EXTRUDER_SLOT_BOTTOM - EXTRUDER_SLOT_TOP) / (count - 1);
+  return Array.from({ length: count }, (_, index) => Math.round(EXTRUDER_SLOT_TOP + index * step));
+}
 
 const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = (() => {
+  const leftSlots = extruderSlots(EXTRUDER_CONNECTORS.filter((connector) => connector.side === 'left').length);
+  const rightSlots = extruderSlots(EXTRUDER_CONNECTORS.filter((connector) => connector.side === 'right').length);
   let leftSlot = 0;
   let rightSlot = 0;
   return EXTRUDER_CONNECTORS.map((connector) => {
     const left = connector.side === 'left';
-    const slotY = EXTRUDER_CARD_SLOT_Y[(left ? leftSlot++ : rightSlot++) % EXTRUDER_CARD_SLOT_Y.length];
+    const slotY = left ? leftSlots[leftSlot++] : rightSlots[rightSlot++];
     const column = left ? EXTRUDER_LEFT_COLUMN : EXTRUDER_RIGHT_COLUMN;
     return {
       code: connector.code,

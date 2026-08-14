@@ -89,3 +89,100 @@ export function connectorByCode(machineTemplate: string, code: string | undefine
 
 /** How a pad is currently wired, for the artwork and the canvas overlay. */
 export type ConnectorState = 'idle' | 'linked' | 'live';
+
+// --------------------------------------------------------------------------------------
+// Parameter matching
+// --------------------------------------------------------------------------------------
+
+/**
+ * The physical quantity a pad expects, and a channel supplies.
+ *
+ * A pad is a *locking* point: it accepts a channel only when the channel
+ * measures the quantity the instrument at that spot measures. Wiring a
+ * thermocouple to the melt-pressure transducer is not a connection with a bad
+ * value in it — it is not a connection at all, and the canvas refuses it rather
+ * than letting the analysis layer discover the contradiction later.
+ */
+export type ParameterKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Electrical' | 'Level';
+
+/**
+ * The quantity a unit denotes.
+ *
+ * The unit is the only trustworthy declaration of what a channel carries: a
+ * rack Process Card stores one unit for all of its channels, so the card-level
+ * letter can say "temperature" for a channel that is in fact reporting
+ * kilowatts. The live measurement's own unit is therefore what this is asked
+ * about wherever one exists.
+ */
+export function parameterKindForUnit(unit: string | undefined | null): ParameterKind | null {
+  const value = (unit ?? '').trim().toLowerCase();
+  if (!value) return null;
+  if (['mm/s', 'mm/s rms', 'mms', 'in/s', 'ips', 'g', 'g rms', 'm/s2', 'm/s^2', 'm/s²'].includes(value)) return 'Vibration';
+  if (['degc', '°c', 'c', 'celsius', 'degf', '°f', 'f', 'k', 'kelvin'].includes(value)) return 'Temperature';
+  if (['rpm', 'rps', 'hz', 'r/min'].includes(value)) return 'Speed';
+  if (['mpa', 'kpa', 'pa', 'bar', 'mbar', 'psi', 'kg/cm2'].includes(value)) return 'Pressure';
+  if (['a', 'amp', 'amps', 'ma', 'kw', 'w', 'mw', 'v', 'kv', 'volt', 'volts', 'pf', 'kva', 'kvar'].includes(value)) return 'Electrical';
+  if (['%', 'percent', 'pct', 'fraction'].includes(value)) return 'Level';
+  return null;
+}
+
+/** The quantity a pad's instrument measures. */
+export function parameterKindForConnector(connector: MachineConnector): ParameterKind | null {
+  switch (connector.kind) {
+    case 'Vibration':
+      return 'Vibration';
+    case 'Temperature':
+      return 'Temperature';
+    case 'Speed':
+      return 'Speed';
+    case 'Pressure':
+      return 'Pressure';
+    case 'Current':
+    case 'Power':
+      // PM1 is one three-phase meter; current, power, voltage and power factor
+      // are all quantities the same instrument reports.
+      return 'Electrical';
+    case 'Level':
+      return 'Level';
+    default:
+      return null;
+  }
+}
+
+export type ConnectorFit = 'match' | 'mismatch' | 'unknown';
+
+/**
+ * Whether a channel may lock onto a pad.
+ *
+ * `unknown` — no unit has been declared yet, usually because the channel has
+ * not reported since it was linked — is deliberately not a refusal. Blocking a
+ * connection because a gateway has not sent its first sample would make the
+ * canvas unusable during commissioning, which is exactly when it is used most.
+ */
+export function connectorFitForUnit(connector: MachineConnector, unit: string | undefined | null): ConnectorFit {
+  const expected = parameterKindForConnector(connector);
+  const supplied = parameterKindForUnit(unit);
+  if (!expected || !supplied) return 'unknown';
+  return expected === supplied ? 'match' : 'mismatch';
+}
+
+/** Human wording for what a pad wants, used in the refusal message. */
+export function connectorExpectation(connector: MachineConnector): string {
+  const kind = parameterKindForConnector(connector);
+  switch (kind) {
+    case 'Vibration':
+      return 'a vibration channel (mm/s or g)';
+    case 'Temperature':
+      return 'a temperature channel (°C)';
+    case 'Speed':
+      return 'a speed channel (rpm)';
+    case 'Pressure':
+      return 'a pressure channel (MPa or bar)';
+    case 'Electrical':
+      return 'an electrical channel (A or kW)';
+    case 'Level':
+      return 'a level channel (%)';
+    default:
+      return 'a matching channel';
+  }
+}

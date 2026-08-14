@@ -173,16 +173,37 @@ export type SignalResolution =
   | { kind: 'unrecognised' };
 
 /**
+ * Which PM1 quantity a channel on the electrical pad actually carries.
+ *
+ * PM1 is one instrument — a MULTISPAN MFM-13 three-phase meter — so the
+ * machine drawing has one pad for it, and which of its quantities is wired
+ * there is a property of the channel, not of the pad. Deciding by unit is what
+ * keeps the two honest: amps resolve to current, kilowatts to power. Assuming
+ * one or the other would either discard a usable current channel or relabel
+ * kilowatts as amps, and the load thresholds are defined on current.
+ */
+function electricalTagForUnit(unit: string | undefined): ExtruderTag {
+  const lower = (unit ?? '').trim().toLowerCase();
+  if (lower === 'a' || lower === 'amp' || lower === 'amps' || lower === 'ma') return 'PM1.current';
+  if (lower === 'kw' || lower === 'w') return 'PM1.power';
+  if (lower === 'v' || lower === 'volt' || lower === 'volts') return 'PM1.voltage';
+  if (lower === 'pf' || lower === 'fraction') return 'PM1.power_factor';
+  // The pad is drawn as Motor Power, so an undeclared unit is read as power
+  // rather than being promoted into the current domain the rules act on.
+  return 'PM1.power';
+}
+
+/**
  * Resolve a measurement-point label onto a canonical pilot tag.
  *
  * The exclusion list is consulted first, so a label the model has explicitly
  * declined ("Motor NDE Vibration") cannot fall through to the generic pattern
  * below it and be consumed as the motor channel.
  */
-export function resolveSignal(label: string, templatePointCode?: string): SignalResolution {
+export function resolveSignal(label: string, templatePointCode?: string, unit?: string): SignalResolution {
   const registered = extruderPointByCode(templatePointCode);
   if (registered?.analyzerTag) {
-    const tag = registered.analyzerTag === 'PM1' ? 'PM1.power' : registered.analyzerTag;
+    const tag = registered.analyzerTag === 'PM1' ? electricalTagForUnit(unit) : registered.analyzerTag;
     return {
       kind: 'mapped',
       tag,

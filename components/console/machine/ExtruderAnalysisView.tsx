@@ -9,6 +9,7 @@ import {
   analyzeExtruder,
   appendHistory,
   faultName,
+  resolveSignal,
   runScenario,
   scenarioById,
   SCENARIOS,
@@ -23,6 +24,7 @@ import {
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
 import { cn } from '../../../lib/cn';
+import { extruderPointByCode } from '../../../lib/extruderPoints';
 import type { DeviceNode } from '../../../lib/devices';
 import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
@@ -52,6 +54,7 @@ import {
   VerdictBanner,
   type Column,
   type ConsolePalette,
+  type IconName,
   type MagnitudeDatum,
   type TabItem,
   type Variant,
@@ -230,6 +233,45 @@ function humanise(value: string): string {
 }
 
 type TabKey = 'diagnosis' | 'limits' | 'evidence' | 'signals' | 'model';
+
+/**
+ * What each pilot tag is actually for, in the words a plant operator would use.
+ *
+ * The model speaks in tags — P1, T5, PM1.current — because its registers do,
+ * and that precision is worth keeping. But "P1" tells a reader nothing on its
+ * own, so every place a tag is shown to a human it is shown with the sentence
+ * below beside it.
+ */
+const TAG_PURPOSE: Record<ExtruderTag, string> = {
+  E1: 'How fast the screw is turning. Tells the model whether the machine is running, and how hard.',
+  V1: 'Shake at the motor. Rises when the motor bearings or alignment go off.',
+  V2: 'Shake at the gearbox. Rises when gears or gearbox bearings wear.',
+  T1: 'Heat in barrel zone 1. Checked against the heater setpoint for heater faults.',
+  T2: 'Heat in barrel zone 2. Checked against the heater setpoint for heater faults.',
+  T3: 'Heat in barrel zone 3. Checked against the heater setpoint, and for shear heating.',
+  T4: 'Heat at the motor. Rises when the motor is working too hard or is not cooling.',
+  T5: 'Heat at the gearbox. Rises when lubrication or a bearing is failing.',
+  P1: 'Pressure of the melt before the screen and die. The main clue for blockages, starvation and over-feeding.',
+  L1: 'How much material is left in the hopper. Tells the model whether the machine is being fed.',
+  'PM1.current': 'How much current the drive is pulling. The direct measure of how hard the machine is working.',
+  'PM1.power': 'How much electrical power the drive is using. Recorded, but the load rules are written on current.',
+  'PM1.voltage': 'Supply voltage. Context for the electrical readings.',
+  'PM1.power_factor': 'How efficiently the drive draws power. Context for the electrical readings.',
+};
+
+/** One wired point, and whether it is actually reaching the model. */
+type WiringRow = {
+  id: string;
+  point: string;
+  channel: string;
+  reading: string;
+  /** Whether this card is locked to an instrument pad, or only name-matched. */
+  lock: string;
+  tag: string;
+  meaning: string;
+  status: string;
+  variant: Variant;
+};
 
 // --------------------------------------------------------------------------------------
 // Sections
@@ -910,6 +952,120 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         ? 'Partial live data'
         : 'No live data';
 
+  // What every Mappable Box on the canvas is doing for the model, one row each.
+  // This is the answer to "I connected the channels — is the analyzer getting
+  // them?", which otherwise has to be inferred from three other tables.
+  const wiringRows = useMemo<WiringRow[]>(() => {
+    return mappedChannels.map((mapped, index) => {
+      const point = liveRun.points[index];
+      const unit = point?.reading.unit || mapped.channel.unit;
+      const resolution = resolveSignal(mapped.label, mapped.templatePointCode, unit);
+      const rejected = liveRun.analysis.extruder.rejectedSignals.find((item) => item.label === mapped.label);
+      const reading = point?.observed !== null && point?.observed !== undefined ? `${formatNumber(point.observed)} ${unit}`.trim() : 'no reading';
+      const pad = extruderPointByCode(mapped.templatePointCode);
+      // Locked to an instrument pad on the drawing, or matched only by what the
+      // card is called. The first is a declaration; the second is a guess that
+      // happened to be right, and the difference is worth stating.
+      const lock = pad
+        ? `Locked to the ${pad.label} point on the machine.`
+        : 'Not locked to a point on the machine — the model matched this by the card\'s name. Drag its trail onto the matching pad to make the connection explicit.';
+      const base = {
+        id: mapped.id,
+        point: mapped.label,
+        channel: `${mapped.channel.code} · ${mapped.channel.deviceName}`,
+        reading,
+        lock,
+      };
+
+      if (rejected) {
+        return { ...base, tag: '—', meaning: rejected.error, status: 'Unit rejected', variant: 'destructive' as Variant };
+      }
+      if (resolution.kind === 'unmodelled') {
+        return { ...base, tag: '—', meaning: resolution.reason, status: 'Not used by the model', variant: 'muted' as Variant };
+      }
+      if (resolution.kind === 'unrecognised') {
+        return {
+          ...base,
+          tag: '—',
+          meaning: 'The model could not tell which instrument this is from its name. Rename the point to the instrument it is wired to, or drop its trail onto the matching pad on the machine.',
+          status: 'Name not recognised',
+          variant: 'warning' as Variant,
+        };
+      }
+      return {
+        ...base,
+        tag: resolution.tag,
+        meaning: TAG_PURPOSE[resolution.tag],
+        status: point?.reporting ? 'Feeding the model' : 'Waiting for data',
+        variant: point?.reporting ? ('success' as Variant) : ('warning' as Variant),
+      };
+    });
+  }, [liveRun, mappedChannels]);
+
+  const feedingCount = wiringRows.filter((row) => row.status === 'Feeding the model').length;
+  const wiringProblems = wiringRows.filter((row) => row.variant === 'warning' || row.variant === 'destructive').length;
+
+  // The whole page in four ordinary sentences. Everything else on this screen
+  // is the working behind these four lines.
+  const plainLines: { icon: IconName; label: string; text: string; variant: Variant }[] = [
+    {
+      icon: 'engine-outline',
+      label: 'Right now',
+      variant: stateVariant(detail.inferredMachineState),
+      text: liveDataUnavailable
+        ? 'Nothing is being measured, so the machine\'s condition is unknown.'
+        : `The machine looks like it is ${humanise(detail.inferredMachineState)}. ${detail.stateBasis[0] ?? ''}`.trim(),
+    },
+    {
+      icon: 'magnify',
+      label: 'What was found',
+      variant: verdictVariant,
+      text: liveDataUnavailable
+        ? 'No diagnosis is offered while no channel is reporting.'
+        : hasCandidates
+          ? detail.candidateFaults.length === 1
+            ? `One likely explanation: ${analysis.diagnoses[0]?.title ?? faultName(detail.candidateFaults[0])}.`
+            : `${detail.candidateFaults.length} possible explanations fit the same readings, and the sensors fitted to this machine cannot tell them apart: ${detail.candidateFaults.map((id) => faultName(id)).join(', ')}.`
+          : 'No known fault pattern matches the current readings. That is not a clean bill of health — it means nothing the model can recognise is happening.',
+    },
+    {
+      icon: 'wrench-outline',
+      label: 'What to do',
+      variant: analysis.maintenance.caseRequired ? 'warning' : 'success',
+      text:
+        violations.length > 0
+          ? `Bring the machine back inside its limits first: ${violations.map((check) => check.name).join(', ')}.`
+          : (analysis.maintenance.recommendedActions[0] ??
+            detail.separatingMeasurements[0] ??
+            'Nothing to act on. Keep running and keep watching.'),
+    },
+    {
+      icon: 'connection',
+      label: 'How much it can see',
+      variant: readinessVariant(analysis.readiness.score),
+      text: `${feedingCount} of ${mappedChannels.length} connected point${mappedChannels.length === 1 ? '' : 's'} ${feedingCount === 1 ? 'is' : 'are'} feeding the model${wiringProblems > 0 ? `, and ${wiringProblems} need${wiringProblems === 1 ? 's' : ''} attention` : ''}. ${analysis.readiness.ready ? 'Every essential instrument is mapped.' : `Missing: ${analysis.readiness.missingEssential.join(', ') || 'none'}.`}`,
+    },
+  ];
+
+  const wiringColumns: Column<WiringRow>[] = [
+    { key: 'point', header: 'Point on the machine', width: 2, render: (row) => <Cell numberOfLines={2}>{row.point}</Cell> },
+    { key: 'channel', header: 'Rack channel', width: 1.6, render: (row) => <Cell mono muted numberOfLines={2}>{row.channel}</Cell> },
+    { key: 'reading', header: 'Reading', width: 1.1, numeric: true, render: (row) => <Cell numeric>{row.reading}</Cell> },
+    { key: 'tag', header: 'Model tag', width: 0.9, render: (row) => <Cell mono>{row.tag}</Cell> },
+    {
+      key: 'meaning',
+      header: 'What it tells the model',
+      width: 3,
+      render: (row) => (
+        <View className="gap-0.5">
+          <Cell muted numberOfLines={3}>{row.meaning}</Cell>
+          <Cell muted numberOfLines={2}>{row.lock}</Cell>
+        </View>
+      ),
+    },
+    { key: 'status', header: 'Status', width: 1.3, render: (row) => <Badge variant={row.variant}>{row.status}</Badge> },
+  ];
+
   const maxMatchScore = Math.max(1, ...candidateAssessments.map((assessment) => assessment.engineeringMatchScore));
   const resolvedCount = detail.resolvedSignals.length;
   const totalTags = resolvedCount + detail.missingTags.length;
@@ -1111,6 +1267,40 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         </Card>
       </View>
 
+      {/* --- the page in four sentences --------------------------------------
+          Everything below this card is the working behind it. A reader who
+          knows nothing about pilot tags, baselines or match classes should be
+          able to stop here and still have the answer. */}
+      <Card className="gap-0">
+        <View className="flex-row items-center gap-2 pb-2">
+          <MaterialCommunityIcons name="text-account" size={14} color={palette.accent} />
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+            In plain words
+          </Text>
+        </View>
+        {plainLines.map((line, index) => (
+          <View key={line.label}>
+            {index > 0 ? <Separator /> : null}
+            <View className="flex-row items-start gap-3 py-2.5">
+              <View className="mt-[1px] h-6 w-6 items-center justify-center rounded-lg" style={{ backgroundColor: palette.panelRaised }}>
+                <MaterialCommunityIcons name={line.icon} size={13} color={palette.inkMuted} />
+              </View>
+              <View className="min-w-0 flex-1 gap-0.5">
+                <View className="flex-row items-center gap-2">
+                  <StatusDot variant={line.variant} />
+                  <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                    {line.label}
+                  </Text>
+                </View>
+                <Text className="font-body text-[13px] leading-[19px]" style={{ color: palette.ink }}>
+                  {line.text}
+                </Text>
+              </View>
+            </View>
+          </View>
+        ))}
+      </Card>
+
       {/* A hard-limit breach is the most urgent thing on this page and stays
           visible regardless of which tab is open. */}
       {violations.length > 0 && (
@@ -1255,6 +1445,31 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
               )}
             </>
           )}
+
+          {/* The page uses precise words because the model does. This is what
+              they mean, so the precision costs the reader nothing. */}
+          <Collapsible
+            title="What the words on this page mean"
+            icon="book-open-outline"
+            summary="Plain definitions for every term the analysis uses."
+          >
+            {[
+              ['Pilot tag', 'The model\'s name for one instrument — P1 is the melt-pressure transducer, T1 the zone 1 thermocouple. Your point names are matched onto these.'],
+              ['Baseline', 'What this machine reads when it is healthy and on recipe. Every judgement is a comparison against it, never against a number invented for the page.'],
+              ['Threshold', 'The boundary at which a reading counts as evidence. All of them are written down in the model with where they came from.'],
+              ['Hypothesis / candidate', 'A fault the model considered. Candidates are the ones the readings actually support; the rest are listed with why they were dropped.'],
+              ['Identifiability', 'Whether the installed sensors can tell the surviving candidates apart. When they cannot, the model says so instead of picking one.'],
+              ['Hard limit', 'A safe-operating boundary. Being inside it is a separate question from being healthy — a machine can be inside every limit and still be failing.'],
+              ['Anomaly band', 'How far a reading has drifted from its healthy reference, measured in consistency bands rather than a severity percentage the model cannot calibrate.'],
+              ['Match score', 'A ranking number for how well evidence fits a fault. It orders candidates; it is not a probability and must not be read as one.'],
+              ['Advisory only', 'Nothing here actuates anything. It is evidence for a human decision, and it has not been field calibrated on this machine.'],
+            ].map(([term, meaning]) => (
+              <View key={term} className="gap-0.5 py-1">
+                <Body>{term}</Body>
+                <Body muted>{meaning}</Body>
+              </View>
+            ))}
+          </Collapsible>
           </View>
 
           <View className="gap-3" style={wide ? { width: 340 } : undefined}>
@@ -1363,6 +1578,32 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       {/* --- Signals --------------------------------------------------------- */}
       {tab === 'signals' && (
         <View className="gap-3">
+          {/* The first question anyone asks after wiring the canvas: did it
+              land? One row per connected point, in the same words the canvas
+              uses, before any tag vocabulary appears. */}
+          <Card accent={wiringProblems > 0 ? 'warning' : 'success'}>
+            <CardHeader>
+              <View className="flex-row flex-wrap items-center justify-between gap-2">
+                <CardTitle size="sm">Your connections, and what each one feeds</CardTitle>
+                <Badge variant={wiringProblems > 0 ? 'warning' : 'success'}>
+                  {feedingCount}/{wiringRows.length} feeding the model
+                </Badge>
+              </View>
+              <Body muted>
+                Every Mappable Box saved on this machine&apos;s canvas. A point only reaches the model once its card is
+                linked to a rack channel, that channel is sending data, and the model recognises the instrument.
+              </Body>
+            </CardHeader>
+            <Separator className="my-3" />
+            <DataTable
+              columns={wiringColumns}
+              rows={wiringRows}
+              keyOf={(row) => row.id}
+              minWidth={900}
+              emptyLabel="No saved connections yet. Link boxes to rack channels in Design mode and press Save Config."
+            />
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle size="sm">Resolved pilot tags</CardTitle>
@@ -1389,14 +1630,17 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
                 <Body muted>Mapping these widens what the model can separate.</Body>
               </CardHeader>
               <Separator className="my-3" />
-              <View className="gap-1.5">
+              <View className="gap-2.5">
                 {detail.missingTags.map((item) => (
-                  <View key={item.tag} className="flex-row flex-wrap items-center gap-2">
-                    <Badge variant={item.essential ? 'warning' : 'muted'} icon={null} outline>
-                      {item.essential ? 'Essential' : 'Diagnostic'}
-                    </Badge>
-                    <Body mono>{item.tag}</Body>
-                    <Body muted>{item.label}</Body>
+                  <View key={item.tag} className="gap-1">
+                    <View className="flex-row flex-wrap items-center gap-2">
+                      <Badge variant={item.essential ? 'warning' : 'muted'} icon={null} outline>
+                        {item.essential ? 'Essential' : 'Diagnostic'}
+                      </Badge>
+                      <Body mono>{item.tag}</Body>
+                      <Body muted>{item.label}</Body>
+                    </View>
+                    <Body muted>{item.note ?? TAG_PURPOSE[item.tag]}</Body>
                   </View>
                 ))}
               </View>

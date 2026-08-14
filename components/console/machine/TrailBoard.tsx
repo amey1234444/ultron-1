@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
@@ -20,7 +20,14 @@ import {
   type Variant,
 } from '../../ui';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
-import type { ConnectorState, MachineConnector } from './machineConnectors';
+import {
+  connectorExpectation,
+  connectorFitForUnit,
+  parameterKindForUnit,
+  type ConnectorFit,
+  type ConnectorState,
+  type MachineConnector,
+} from './machineConnectors';
 import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { createTemplateDefaultLayout, hasDefaultLayout } from './templateDefaultLayouts';
 
@@ -200,21 +207,36 @@ function connectorStagePoint(connector: MachineConnector, rect: Rect): Point {
   return { x: rect.x + connector.rx * rect.width, y: rect.y + connector.ry * rect.height };
 }
 
+/**
+ * The pad a dropped endpoint should lock onto.
+ *
+ * A pad only attracts a channel that measures what its instrument measures, so
+ * the compatible pads are searched first and the whole set only afterwards —
+ * which means a wrong-parameter card is never quietly pulled onto a pad, and
+ * the nearest pad is still known so the refusal can name it.
+ */
 function nearestConnector(
   point: Point,
   rect: Rect | null,
   connectors: MachineConnector[],
-): { connector: MachineConnector; point: Point } | null {
+  unit?: string,
+): { connector: MachineConnector; point: Point; fit: ConnectorFit } | null {
   if (!rect || connectors.length === 0) return null;
-  let best: { connector: MachineConnector; point: Point; distance: number } | null = null;
+  let compatible: { connector: MachineConnector; point: Point; distance: number; fit: ConnectorFit } | null = null;
+  let any: { connector: MachineConnector; point: Point; distance: number; fit: ConnectorFit } | null = null;
+
   for (const connector of connectors) {
     const padPoint = connectorStagePoint(connector, rect);
     const distance = Math.hypot(point.x - padPoint.x, point.y - padPoint.y);
-    if (distance <= CONNECTOR_SNAP_RADIUS && (!best || distance < best.distance)) {
-      best = { connector, point: padPoint, distance };
-    }
+    if (distance > CONNECTOR_SNAP_RADIUS) continue;
+    const fit = connectorFitForUnit(connector, unit);
+    const candidate = { connector, point: padPoint, distance, fit };
+    if (!any || distance < any.distance) any = candidate;
+    if (fit !== 'mismatch' && (!compatible || distance < compatible.distance)) compatible = candidate;
   }
-  return best ? { connector: best.connector, point: best.point } : null;
+
+  const best = compatible ?? any;
+  return best ? { connector: best.connector, point: best.point, fit: best.fit } : null;
 }
 
 function channelLocationLabel(channel: ChannelRef): string {
@@ -239,28 +261,64 @@ function connectorForAnchor(anchor: Anchor | undefined, connectors: MachineConne
 }
 
 /**
- * Give saved trails their pad identity back.
+ * Give saved trails their pad identity back, and put them on the pad.
  *
  * Layouts saved before instrument pads were identified — including every trail
- * the template generator produced — carry only a machine anchor. That anchor is
- * already sitting on a pad, so the pad it is sitting on is recoverable, and
- * recovering it means an existing canvas lights up correctly instead of looking
- * unwired until every endpoint is dragged again.
+ * the template generator produced — carry a machine anchor but no pad code. The
+ * identity is recoverable three ways, in descending order of authority: the
+ * trail's own code, the point code on the card at the other end, and finally the
+ * pad the anchor is already sitting on.
+ *
+ * Once a trail declares an instrument, its endpoint is re-anchored to that
+ * instrument's current position. That is what keeps the drawing and the wiring
+ * from drifting apart when a pad is moved to a more accurate spot on the
+ * artwork: the connection follows the instrument instead of being left behind
+ * at an old coordinate.
  */
-function withResolvedConnectors(trails: Trail[], connectors: MachineConnector[]): Trail[] {
+function withResolvedConnectors(
+  trails: Trail[],
+  boxes: Box[],
+  connectors: MachineConnector[],
+  machineRect: Rect | null,
+): Trail[] {
   if (connectors.length === 0) return trails;
+  const byCode = new Map(connectors.map((connector) => [connector.code, connector]));
   let changed = false;
+
   const next = trails.map((trail) => {
-    const start = trail.startMachinePointCode ? undefined : connectorForAnchor(trail.startMachineAnchor, connectors);
-    const end = trail.endMachinePointCode ? undefined : connectorForAnchor(trail.endMachineAnchor, connectors);
-    if (!start && !end) return trail;
-    changed = true;
-    return {
-      ...trail,
-      ...(start ? { startMachinePointCode: start.code } : null),
-      ...(end ? { endMachinePointCode: end.code } : null),
-    };
+    let patched = trail;
+
+    for (const which of ['start', 'end'] as const) {
+      const codeKey = which === 'start' ? 'startMachinePointCode' : 'endMachinePointCode';
+      const anchorKey = which === 'start' ? 'startMachineAnchor' : 'endMachineAnchor';
+      const anchor = patched[anchorKey];
+      if (!anchor) continue;
+
+      const cardId = which === 'start' ? patched.endBoxId : patched.startBoxId;
+      const cardCode = cardId ? boxes.find((box) => box.id === cardId)?.templatePointCode : undefined;
+      const connector =
+        byCode.get(patched[codeKey] ?? '') ?? byCode.get(cardCode ?? '') ?? connectorForAnchor(anchor, connectors);
+      if (!connector) continue;
+
+      const codeStale = patched[codeKey] !== connector.code;
+      const anchorStale = Math.abs(anchor.rx - connector.rx) > 1e-4 || Math.abs(anchor.ry - connector.ry) > 1e-4;
+      if (!codeStale && !anchorStale) continue;
+
+      changed = true;
+      const index = which === 'start' ? 0 : patched.points.length - 1;
+      patched = {
+        ...patched,
+        [codeKey]: connector.code,
+        [anchorKey]: { rx: connector.rx, ry: connector.ry },
+        points: machineRect
+          ? patched.points.map((point, i) => (i === index ? connectorStagePoint(connector, machineRect) : point))
+          : patched.points,
+      };
+    }
+
+    return patched;
   });
+
   return changed ? next : trails;
 }
 
@@ -328,10 +386,11 @@ export function TrailBoard({
   const [justSavedTemplate, setJustSavedTemplate] = useState(false);
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTemplateFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Set while an endpoint is being dragged, so every instrument pad on the
-  // machine lights up as a target instead of the operator having to guess where
-  // a connection is allowed to land.
-  const [wiring, setWiring] = useState(false);
+  // Set while an endpoint is being dragged: which endpoint is moving, and what
+  // the card on its other end measures. Every pad that can accept that channel
+  // lights up as a target, so where a connection may land is shown rather than
+  // guessed.
+  const [wiring, setWiring] = useState<{ trailId: string; which: 'start' | 'end'; unit?: string } | null>(null);
   // The pad a connection was just made to — pulsed briefly so the eye is taken
   // to the instrument that was wired, not just to the toast.
   const [flashedConnector, setFlashedConnector] = useState<string | null>(null);
@@ -412,11 +471,37 @@ export function TrailBoard({
    * model does not consume, or one that has never sent a sample, is a different
    * situation and says so rather than being congratulated.
    */
+  /** What a card wired to this box is currently reporting, unit included. */
+  const channelUnitFor = useCallback(
+    (box: Box | undefined): { channel: ChannelRef | null; unit: string | undefined } => {
+      const channel = box?.channelId ? channelsRef.current.find((c) => c.id === box.channelId) ?? null : null;
+      if (!channel) return { channel: null, unit: undefined };
+      const reading = liveReadingFor(channel);
+      return { channel, unit: reading?.unit || channel.unit || undefined };
+    },
+    [liveReadingFor],
+  );
+
   const announceConnection = useCallback(
-    (connector: MachineConnector, box: Box | undefined) => {
+    (connector: MachineConnector, box: Box | undefined, fit: ConnectorFit = 'unknown') => {
       const channel = box?.channelId ? channelsRef.current.find((c) => c.id === box.channelId) ?? null : null;
       const reading = channel ? liveReadingFor(channel) : undefined;
       const value = channel && isChannelLive(channel) ? readingText(reading, channel) : null;
+
+      // A refusal is stated before anything else: nothing was connected, and
+      // saying why is the only useful thing this toast can do.
+      if (fit === 'mismatch' && channel) {
+        const supplied = reading?.unit || channel.unit;
+        noticeSeq.current += 1;
+        setNotice({
+          id: noticeSeq.current,
+          variant: 'destructive',
+          icon: 'close-octagon-outline',
+          title: `${connector.label} will not accept ${channel.code}`,
+          detail: `This point needs ${connectorExpectation(connector)}; ${channel.code} reports ${parameterKindForUnit(supplied)?.toLowerCase() ?? 'an unrecognised quantity'}${supplied ? ` in ${supplied}` : ''}.`,
+        });
+        return;
+      }
 
       const next: Omit<ConnectionNotice, 'id'> = !connector.analyzerTag
         ? {
@@ -614,8 +699,21 @@ export function TrailBoard({
     replaceBoxes((prev) => [...prev, { id: makeId('box'), x: baseX - 220, y: baseY - 120 + stagger, label: '' }]);
   };
 
+  // The magnet, applied live while the endpoint is being dragged: inside the
+  // snap radius of a pad it can lock onto, the endpoint jumps to that pad and
+  // stays there until it is pulled away. Releasing re-derives the same result,
+  // so what is on screen during the drag is what gets saved.
+  const magnetised = (id: string, points: Point[]): Point[] => {
+    if (!wiring || wiring.trailId !== id || !machineRect || connectors.length === 0) return points;
+    const index = wiring.which === 'start' ? 0 : points.length - 1;
+    const pad = nearestConnector(points[index], machineRect, connectors, wiring.unit);
+    if (!pad || pad.fit === 'mismatch') return points;
+    return points.map((point, i) => (i === index ? pad.point : point));
+  };
+
   const updateTrailPoints = (id: string, points: Point[]) => {
-    replaceTrails((prev) => prev.map((t) => (t.id === id ? { ...t, points } : t)));
+    const next = magnetised(id, points);
+    replaceTrails((prev) => prev.map((t) => (t.id === id ? { ...t, points: next } : t)));
   };
 
   const removeTrail = (id: string) => {
@@ -648,7 +746,18 @@ export function TrailBoard({
   // Every case is remembered as a fraction of that box's/machine's rect, so the
   // endpoint tracks its target through drags, resizes and zoom.
   const releaseEndpoint = (trailId: string, which: 'start' | 'end', point: Point) => {
-    const pad = nearestConnector(point, machineRect, connectors);
+    // The card at the *other* end is the one this instrument would describe, so
+    // it is what decides whether the pad accepts the connection.
+    const releasedTrail = trailsRef.current.find((t) => t.id === trailId);
+    const oppositeBoxId = releasedTrail ? (which === 'start' ? releasedTrail.endBoxId : releasedTrail.startBoxId) : undefined;
+    const oppositeBox = oppositeBoxId ? boxesRef.current.find((b) => b.id === oppositeBoxId) : undefined;
+    const { unit } = channelUnitFor(oppositeBox);
+
+    const near = nearestConnector(point, machineRect, connectors, unit);
+    // A pad the channel does not fit is not a connection. The endpoint lands as
+    // an ordinary machine anchor and the refusal says which parameter is wanted.
+    const pad = near && near.fit !== 'mismatch' ? near : null;
+    const refused = near && near.fit === 'mismatch' ? near : null;
 
     const candidateBoxes = pad
       ? []
@@ -659,10 +768,6 @@ export function TrailBoard({
 
     const hit = candidateBoxes[0] ?? null;
     const hitMachine = !pad && !hit && machineRect && pointInRect(point, machineRect) ? machineRect : null;
-
-    // The card at the *other* end is the one this instrument now describes.
-    const releasedTrail = trailsRef.current.find((t) => t.id === trailId);
-    const oppositeBoxId = releasedTrail ? (which === 'start' ? releasedTrail.endBoxId : releasedTrail.startBoxId) : undefined;
 
     const nextTrails = trailsRef.current.map((t) => {
       if (t.id !== trailId) return t;
@@ -707,22 +812,27 @@ export function TrailBoard({
 
     // Landing on a pad names the card: the instrument's code is what the
     // analysis layer resolves the signal through, and an unnamed card takes the
-    // instrument's own label rather than staying blank.
-    const connectedBox = oppositeBoxId ? boxesRef.current.find((b) => b.id === oppositeBoxId) : undefined;
-    const nextBoxes =
-      pad && connectedBox
-        ? boxesRef.current.map((b) =>
-            b.id === connectedBox.id
-              ? { ...b, templatePointCode: pad.connector.code, label: b.label.trim() ? b.label : pad.connector.label }
-              : b,
-          )
-        : boxesRef.current;
+    // instrument's own label rather than staying blank. Leaving a pad clears
+    // that declaration again, so a card can never keep claiming to be an
+    // instrument its trail no longer touches.
+    const previousCode = which === 'start' ? releasedTrail?.startMachinePointCode : releasedTrail?.endMachinePointCode;
+    const nextBoxes = oppositeBox
+      ? boxesRef.current.map((b) => {
+          if (b.id !== oppositeBox.id) return b;
+          if (pad) {
+            return { ...b, templatePointCode: pad.connector.code, label: b.label.trim() ? b.label : pad.connector.label };
+          }
+          return b.templatePointCode && b.templatePointCode === previousCode ? { ...b, templatePointCode: undefined } : b;
+        })
+      : boxesRef.current;
 
     replaceTrails(nextTrails, false);
     replaceBoxes(nextBoxes);
 
     if (pad) {
-      announceConnection(pad.connector, nextBoxes.find((b) => b.id === oppositeBoxId));
+      announceConnection(pad.connector, nextBoxes.find((b) => b.id === oppositeBoxId), pad.fit);
+    } else if (refused) {
+      announceConnection(refused.connector, oppositeBox, 'mismatch');
     }
   };
 
@@ -747,7 +857,10 @@ export function TrailBoard({
     );
     const code = attached?.endBoxId === id ? attached?.startMachinePointCode : attached?.endMachinePointCode;
     const connector = code ? connectors.find((candidate) => candidate.code === code) : undefined;
-    if (connector) announceConnection(connector, nextBoxes.find((b) => b.id === id));
+    if (!connector) return;
+    const box = nextBoxes.find((b) => b.id === id);
+    const { unit } = channelUnitFor(box);
+    announceConnection(connector, box, connectorFitForUnit(connector, unit));
   };
 
   const removeBox = (id: string) => {
@@ -865,11 +978,11 @@ export function TrailBoard({
   // template generator; all three are normalised here rather than at each entry
   // point, so no path can leave a trail on a pad without knowing which pad.
   useEffect(() => {
-    const resolved = withResolvedConnectors(trailsRef.current, connectors);
+    const resolved = withResolvedConnectors(trailsRef.current, boxesRef.current, connectors, machineRect);
     if (resolved === trailsRef.current) return;
     trailsRef.current = resolved;
     setTrails(resolved);
-  }, [connectors, trails]);
+  }, [boxes, connectors, machineRect, trails]);
 
   // Which instrument pads are wired, and whether the card on the other end is
   // actually reporting. The artwork draws an empty pad, a wired pad and a live
@@ -910,39 +1023,33 @@ export function TrailBoard({
     onConnectorStateChange?.(connectorStateRef.current);
   }, [connectorStateKey, onConnectorStateChange]);
 
-  const selectedTrail = selectedId ? trails.find((trail) => trail.id === selectedId) ?? null : null;
-  const linkedChannelCount = boxes.filter((box) => box.channelId).length;
-  const wiredPadCount = Object.keys(connectorState).length;
+  // The pad the dragged endpoint is currently held by, recomputed from the live
+  // endpoint position so the highlight and the drawn endpoint always agree.
+  const magnetTarget = useMemo(() => {
+    if (!wiring || !machineRect || connectors.length === 0) return null;
+    const trail = trails.find((candidate) => candidate.id === wiring.trailId);
+    if (!trail || trail.points.length === 0) return null;
+    const endpoint = wiring.which === 'start' ? trail.points[0] : trail.points[trail.points.length - 1];
+    const pad = nearestConnector(endpoint, machineRect, connectors, wiring.unit);
+    return pad && pad.fit !== 'mismatch' ? pad : null;
+  }, [connectors, machineRect, trails, wiring]);
 
-  // The command rail. One instrument, grouped by what the buttons do: what the
-  // canvas holds, what can be added, the template, then the two commit actions.
+  const selectedTrail = selectedId ? trails.find((trail) => trail.id === selectedId) ?? null : null;
+  // The command rail. One instrument, grouped by what the buttons do: what can
+  // be added, the template, then the commit action. The glyphs are the ones the
+  // canvas has always used, so the buttons stay recognisable at a glance.
+  //
   // Trail-specific editing is deliberately not here — it lives on the canvas
   // beside the selected trail, so this rail keeps a fixed height and the stage
   // below it never resizes when a selection changes.
   const toolbar = readOnly ? null : (
     <Toolbar>
-      <ToolbarGroup className="px-1.5">
-        <Badge variant="muted" icon="vector-polyline">
-          {trails.length} trail{trails.length === 1 ? '' : 's'}
-        </Badge>
-        <Badge variant={linkedChannelCount > 0 ? 'success' : 'muted'} icon="link-variant">
-          {linkedChannelCount}/{boxes.length} linked
-        </Badge>
-        {connectors.length > 0 ? (
-          <Badge variant={wiredPadCount > 0 ? 'info' : 'muted'} icon="target-variant">
-            {wiredPadCount}/{connectors.length} pads
-          </Badge>
-        ) : null}
-      </ToolbarGroup>
-
-      <ToolbarDivider />
-
       <ToolbarGroup>
-        <Button tone="primary" icon="vector-line" onPress={addTrail} accessibilityLabel="Add trail">
-          Add Trail
+        <Button tone="primary" onPress={addTrail} accessibilityLabel="Add trail">
+          + Add Trail
         </Button>
-        <Button tone="secondary" icon="card-plus-outline" onPress={addBox} accessibilityLabel="Add data box">
-          Add Box
+        <Button tone="secondary" onPress={addBox} accessibilityLabel="Add data box">
+          + Add Box
         </Button>
       </ToolbarGroup>
 
@@ -951,18 +1058,13 @@ export function TrailBoard({
           <ToolbarDivider />
           <ToolbarGroup>
             {hasDefaultLayout(machineTemplate) && (
-              <Button tone="info" icon="restore" onPress={applyTemplateLayout} accessibilityLabel="Apply the template layout">
-                Template
+              <Button tone="info" onPress={applyTemplateLayout} accessibilityLabel="Apply the template layout">
+                ⟲ Template
               </Button>
             )}
             {canSaveTemplate && onSaveTemplate && (
-              <Button
-                tone="info"
-                icon={justSavedTemplate ? 'check' : 'content-save-cog-outline'}
-                onPress={saveTemplate}
-                accessibilityLabel="Save this layout as the template"
-              >
-                {justSavedTemplate ? 'Template saved' : 'Save Template'}
+              <Button tone="info" onPress={saveTemplate} accessibilityLabel="Save this layout as the template">
+                {justSavedTemplate ? '✓ Template Saved' : 'Save Template'}
               </Button>
             )}
           </ToolbarGroup>
@@ -971,13 +1073,8 @@ export function TrailBoard({
 
       <ToolbarDivider />
 
-      <Button
-        tone="success"
-        icon={justSaved ? 'check-decagram' : 'content-save-outline'}
-        onPress={saveConfig}
-        accessibilityLabel="Save the canvas configuration"
-      >
-        {justSaved ? 'Configuration saved' : 'Save Config'}
+      <Button tone="success" onPress={saveConfig} accessibilityLabel="Save the canvas configuration">
+        {justSaved ? '✓ Saved' : '💾 Save Config'}
       </Button>
     </Toolbar>
   );
@@ -990,7 +1087,7 @@ export function TrailBoard({
         <View pointerEvents="box-none" className="flex-row items-center gap-2 px-4">
           <Toolbar>
             <ToolbarGroup className="pl-1.5">
-              <Badge variant="info" icon="vector-polyline">
+              <Badge variant="info" icon={null}>
                 Trail · {selectedTrail.points.length - 2} bend{selectedTrail.points.length - 2 === 1 ? '' : 's'}
               </Badge>
             </ToolbarGroup>
@@ -998,27 +1095,19 @@ export function TrailBoard({
             <ToolbarGroup>
               <Button
                 tone="secondary"
-                size="xs"
-                icon="minus"
                 disabled={selectedTrail.points.length <= 2}
                 onPress={removeBendFromSelected}
                 accessibilityLabel="Remove a bend from the selected trail"
               >
-                Bend
+                Remove bend
               </Button>
-              <Button tone="secondary" size="xs" icon="plus" onPress={addBendToSelected} accessibilityLabel="Add a bend to the selected trail">
-                Bend
+              <Button tone="secondary" onPress={addBendToSelected} accessibilityLabel="Add a bend to the selected trail">
+                + Add bend
               </Button>
             </ToolbarGroup>
             <ToolbarDivider />
-            <Button
-              tone="destructive"
-              size="xs"
-              icon="trash-can-outline"
-              onPress={() => removeTrail(selectedTrail.id)}
-              accessibilityLabel="Delete the selected trail"
-            >
-              Delete
+            <Button tone="destructive" onPress={() => removeTrail(selectedTrail.id)} accessibilityLabel="Delete the selected trail">
+              Delete trail
             </Button>
           </Toolbar>
         </View>
@@ -1063,8 +1152,14 @@ export function TrailBoard({
               const flashed = flashedConnector === connector.code;
               if (!wiring && !flashed) return null;
               const padPoint = connectorStagePoint(connector, machineRect);
-              const size = flashed ? 34 : 26;
-              const colour = connector.analyzerTag ? palette.accent : palette.neutral;
+              const fit = wiring ? connectorFitForUnit(connector, wiring.unit) : 'unknown';
+              const locked = magnetTarget?.connector.code === connector.code;
+              // A pad the dragged card cannot serve is drawn as a refusal —
+              // struck through in the critical colour — instead of quietly
+              // being one of the available targets.
+              const rejects = fit === 'mismatch';
+              const colour = rejects ? palette.critical : connector.analyzerTag ? palette.accent : palette.neutral;
+              const size = locked || flashed ? 36 : rejects ? 18 : 26;
               return (
                 <View
                   key={connector.code}
@@ -1075,13 +1170,45 @@ export function TrailBoard({
                     width: size,
                     height: size,
                     borderRadius: size / 2,
-                    borderWidth: flashed ? 2 : 1.5,
-                    borderColor: alpha(colour, flashed ? 0.95 : 0.42),
-                    backgroundColor: alpha(colour, flashed ? 0.2 : 0.08),
+                    borderWidth: locked || flashed ? 2 : 1.5,
+                    borderColor: alpha(colour, rejects ? 0.5 : locked || flashed ? 0.95 : 0.42),
+                    backgroundColor: alpha(colour, rejects ? 0.06 : locked || flashed ? 0.22 : 0.08),
+                    alignItems: 'center',
+                    justifyContent: 'center',
                   }}
-                />
+                >
+                  {rejects ? <View style={{ width: size - 6, height: 1.5, backgroundColor: alpha(colour, 0.55) }} /> : null}
+                </View>
               );
             })}
+
+            {/* Name the pad the endpoint is locked onto, so a connection is
+                confirmed before the mouse is released rather than after. */}
+            {magnetTarget && (
+              <View
+                style={{
+                  position: 'absolute',
+                  left: magnetTarget.point.x + 24,
+                  top: magnetTarget.point.y - 13,
+                  maxWidth: 260,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: alpha(palette.accent, 0.45),
+                  backgroundColor: palette.panel,
+                  paddingHorizontal: 8,
+                  paddingVertical: 5,
+                }}
+              >
+                <Text className="font-body-bold text-[12px]" style={{ color: palette.ink }} numberOfLines={1}>
+                  {magnetTarget.connector.label}
+                </Text>
+                <Text className="font-mono text-[10px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
+                  {magnetTarget.connector.analyzerTag
+                    ? `locks to analyzer tag ${magnetTarget.connector.analyzerTag}`
+                    : 'recorded, not read by the analysis layer'}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -1099,11 +1226,13 @@ export function TrailBoard({
             onPointsChange={(points) => updateTrailPoints(trail.id, points)}
             onSelect={() => setSelectedId(trail.id)}
             onEndpointGrab={(which) => {
-              setWiring(true);
+              const cardId = which === 'start' ? trail.endBoxId : trail.startBoxId;
+              const card = cardId ? boxes.find((box) => box.id === cardId) : undefined;
+              setWiring({ trailId: trail.id, which, unit: channelUnitFor(card).unit });
               detachEndpoint(trail.id, which);
             }}
             onEndpointRelease={(which, point) => {
-              setWiring(false);
+              setWiring(null);
               releaseEndpoint(trail.id, which, point);
             }}
           />

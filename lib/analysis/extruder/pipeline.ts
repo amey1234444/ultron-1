@@ -177,7 +177,7 @@ export type ExtruderDetail = {
   unconsumedSignals: UnconsumedSignal[];
   unrecognisedSignals: string[];
   rejectedSignals: { label: string; error: string }[];
-  missingTags: { tag: ExtruderTag; label: string; essential: boolean }[];
+  missingTags: { tag: ExtruderTag; label: string; essential: boolean; note?: string }[];
   baseline: BaselineValue[];
   availability: Record<string, string>;
   // Mirrors the twin's `FeatureSet.as_dict()`, so a report can show exactly
@@ -205,6 +205,25 @@ export type ExtruderAnalysisResult = MachineAnalysisResult & {
 // Signal resolution
 // --------------------------------------------------------------------------------------
 
+/**
+ * Why an unmapped tag is unmapped, when the answer is not simply "no card".
+ *
+ * The electrical channel is the case that matters. PM1 is one meter, so the
+ * drawing has one pad for it, and wiring its kilowatt output there is a
+ * perfectly reasonable thing to do — but every load threshold in the register
+ * is defined on drive current against a controlled 10 A reference, and there is
+ * no controlled healthy-power reference to compare kilowatts against. Without
+ * this note the page would show "PM1.current not mapped" beside a card that
+ * plainly reads Motor Power, which looks like a bug rather than the units
+ * question it actually is.
+ */
+function missingTagNote(tag: ExtruderTag, mapped: Set<ExtruderTag>): string | undefined {
+  if (tag === 'PM1.current' && mapped.has('PM1.power')) {
+    return 'A kilowatt channel is mapped on the motor electrical pad. The motor-load, feed-starvation and over-feed rules are defined on drive current against the controlled 10 A reference, and no controlled healthy power reference exists to compare kW against, so they stay unevaluated. Wire the meter\'s current output (A) to that pad to enable them.';
+  }
+  return undefined;
+}
+
 function buildSnapshot(
   input: ExtruderAnalysisInput,
   baseline: BaselineContext,
@@ -224,14 +243,28 @@ function buildSnapshot(
   const unrecognised: string[] = [];
   const rejected: { label: string; error: string }[] = [];
 
+  // Which point already claimed each tag. A tag is one instrument, so a second
+  // point claiming it is a wiring error, not a second opinion — and silently
+  // letting the last one win would put an unannounced measurement into every
+  // rule that reads that tag.
+  const claimedBy = new Map<ExtruderTag, string>();
+
   for (const reading of input.readings) {
-    const resolution = resolveSignal(reading.label, reading.templatePointCode);
+    const resolution = resolveSignal(reading.label, reading.templatePointCode, reading.unit);
     if (resolution.kind === 'unmodelled') {
       unconsumed.push({ label: reading.label, reason: resolution.reason });
       continue;
     }
     if (resolution.kind === 'unrecognised') {
       unrecognised.push(reading.label);
+      continue;
+    }
+    const claimant = claimedBy.get(resolution.tag);
+    if (claimant !== undefined) {
+      rejected.push({
+        label: reading.label,
+        error: `${resolution.tag} (${TAG_LABELS[resolution.tag]}) is already supplied by "${claimant}". One tag is one instrument, so this second point is not read — connect it to its own instrument pad on the machine, or unlink one of the two.`,
+      });
       continue;
     }
     let converted;
@@ -257,6 +290,7 @@ function buildSnapshot(
       normalised[resolution.tag] = converted.value;
     }
     conversions[resolution.tag] = converted.conversion;
+    claimedBy.set(resolution.tag, reading.label);
     resolved.push({
       tag: resolution.tag,
       label: reading.label,
@@ -917,6 +951,7 @@ export function analyzeExtruder(input: ExtruderAnalysisInput): ExtruderAnalysisR
       tag,
       label: TAG_LABELS[tag],
       essential: missingEssential.includes(tag),
+      note: missingTagNote(tag, mappedTags),
     })),
     baseline: records,
     availability: features.availability,
