@@ -19,7 +19,7 @@ const CRITICAL_COLOUR = '#D64545';
 // channel (e.g. a template with more V1-lettered slots than the demo rack has
 // real V1 channels), and keying list items by `channel.id` in that case
 // produces React's "two children with the same key" warning.
-export type MappedChannel = { id: string; channel: ChannelRef; label: string };
+export type MappedChannel = { id: string; channel: ChannelRef; label: string; templatePointCode?: string };
 
 function statusColour(channel: ChannelRef, value: number): string {
   if (channel.alarmCritical !== undefined && value >= channel.alarmCritical) return CRITICAL_COLOUR;

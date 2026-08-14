@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { normalizedCardConfig, type CardConfig, type CardType, type ControllerConfig, type ProcessConfig, type SpeedConfig, type VibrationConfig } from '../../../lib/rack';
-import { cardConfigWithSimulation, simulationWithCardConfig, type SimulatedChannel } from '../../../lib/simulation';
+import { cardConfigWithSimulation, simulationWithCardConfig, validateSimulatedChannel, type SimulatedChannel } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
 import { ControllerFields, EnabledToggle, ProcessFields, SpeedFields, VibrationFields } from './CardConfigFields';
@@ -24,26 +24,37 @@ type CardConfigPageProps = {
 
 export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, initialSimulation, backLabel = 'Back', onBack, onSave }: CardConfigPageProps) {
   const { isDark } = useAppTheme();
-  const [config, setConfig] = useState<CardConfig>(() => normalizedCardConfig(cardType, initialConfig));
-  const [enabled, setEnabled] = useState(initialEnabled);
-  const [simulation, setSimulation] = useState<SimulatedChannel[] | undefined>(initialSimulation);
+  const [form, setForm] = useState<{ config: CardConfig; enabled: boolean; simulation?: SimulatedChannel[] }>(() => {
+    const normalized = normalizedCardConfig(cardType, initialConfig);
+    return {
+      config: initialSimulation?.length ? cardConfigWithSimulation(cardType, normalized, initialSimulation) : normalized,
+      enabled: initialEnabled,
+      simulation: initialSimulation,
+    };
+  });
+  const { config, enabled, simulation } = form;
+  const isSimulatedSignal = !!simulation?.length;
+  const isExistingSignal = 'channelNames' in initialConfig && !!initialConfig.channelNames[0]?.trim();
 
   // Unit, range and alarm limits live on the card AND on the signal definition
   // of a simulated channel. Editing either side now updates the other, so a
   // value typed here is not silently replaced on save — which is exactly what
   // used to happen, and made the card's Unit field look read-only.
   const set = <K extends string>(key: K, value: string) =>
-    setConfig((prev) => {
-      const next = { ...prev, [key]: value };
-      setSimulation((channels) => (channels ? simulationWithCardConfig(cardType, next, channels) : channels));
-      return next;
+    setForm((previous) => {
+      const nextConfig = { ...previous.config, [key]: value } as CardConfig;
+      return {
+        ...previous,
+        config: nextConfig,
+        simulation: previous.simulation ? simulationWithCardConfig(cardType, nextConfig, previous.simulation) : previous.simulation,
+      };
     });
   const setChannelName = (index: number, value: string) =>
-    setConfig((prev) => {
-      if (!('channelNames' in prev)) return prev;
-      const channelNames = [...prev.channelNames];
+    setForm((previous) => {
+      if (!('channelNames' in previous.config)) return previous;
+      const channelNames = [...previous.config.channelNames];
       channelNames[index] = value;
-      return { ...prev, channelNames };
+      return { ...previous, config: { ...previous.config, channelNames } };
     });
 
   const canSave = (() => {
@@ -51,7 +62,11 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
       return config.controllerName.trim().length > 0 && config.ip.trim().length > 0 && config.port.trim().length > 0;
     }
     if ('channelNames' in config) {
-      return config.channelNames[0]?.trim().length > 0;
+      if (!config.channelNames[0]?.trim()) return false;
+      if (isSimulatedSignal && simulation) {
+        return simulation.every((channel, index) => Object.keys(validateSimulatedChannel(channel, config.channelNames[index] ?? '')).length === 0);
+      }
+      return true;
     }
     return false;
   })();
@@ -70,23 +85,27 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="gap-4 px-6 py-5" style={{ maxWidth: 480 }}>
-        {cardType === 'Vibration Card' && <VibrationFields config={config as VibrationConfig} set={set} setChannelName={setChannelName} />}
-        {cardType === 'Process Card' && <ProcessFields config={config as ProcessConfig} set={set} setChannelName={setChannelName} />}
-        {cardType === 'Speed Card' && <SpeedFields config={config as SpeedConfig} set={set} setChannelName={setChannelName} />}
+        {!isSimulatedSignal && cardType === 'Vibration Card' && <VibrationFields config={config as VibrationConfig} set={set} setChannelName={setChannelName} />}
+        {!isSimulatedSignal && cardType === 'Process Card' && <ProcessFields config={config as ProcessConfig} set={set} setChannelName={setChannelName} />}
+        {!isSimulatedSignal && cardType === 'Speed Card' && <SpeedFields config={config as SpeedConfig} set={set} setChannelName={setChannelName} />}
         {cardType === 'Communication Controller' && <ControllerFields config={config as ControllerConfig} set={set} />}
 
-        <EnabledToggle enabled={enabled} onChange={setEnabled} />
+        {!isSimulatedSignal && <EnabledToggle enabled={enabled} onChange={(next) => setForm((previous) => ({ ...previous, enabled: next }))} />}
 
-        {simulation && (
+        {isSimulatedSignal && simulation && (
           <SimulationFields
             cardType={cardType}
-            channelNames={'channelNames' in config ? config.channelNames : []}
+            config={config}
+            cardEnabled={enabled}
             channels={simulation}
-            // The reverse direction: editing the signal definition mirrors back
-            // onto the card fields, so both views always show the same numbers.
+            onCardEnabledChange={(next) => setForm((previous) => ({ ...previous, enabled: next }))}
+            onConfigChange={(next) => setForm((previous) => ({ ...previous, config: next }))}
             onChange={(channels) => {
-              setSimulation(channels);
-              setConfig((prev) => cardConfigWithSimulation(cardType, prev, channels));
+              setForm((previous) => ({
+                ...previous,
+                simulation: channels,
+                config: cardConfigWithSimulation(cardType, previous.config, channels),
+              }));
             }}
           />
         )}
@@ -95,7 +114,7 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
       <View className={cn('flex-row justify-end gap-3 border-t px-6 py-4', lineClass)}>
         <ActionButton label="Cancel" variant="secondary" onPress={onBack} />
         <ActionButton
-          label="Save"
+          label={isSimulatedSignal ? `Save & ${isExistingSignal ? 'update' : 'start'} simulation` : 'Save'}
           // Both sides are already in step (see `set` above), so saving stores
           // what is on screen rather than overwriting it from the signal.
           onPress={() => canSave && onSave(config, enabled, simulation)}

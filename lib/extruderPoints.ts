@@ -1,0 +1,38 @@
+/** Canonical commissioning registry for the 1200 x 760 extruder artwork. */
+export type ExtruderPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Level';
+
+export type ExtruderAnalyzerTag = 'E1' | 'PM1' | 'V1' | 'V2' | 'T1' | 'T2' | 'T3' | 'T4' | 'T5' | 'L1' | 'P1';
+
+export type ExtruderPointDefinition = {
+  code: string;
+  label: string;
+  kind: ExtruderPointKind;
+  x: number;
+  y: number;
+  side: 'left' | 'right';
+  analyzerTag?: ExtruderAnalyzerTag;
+  analyzerNote?: string;
+};
+
+export const EXTRUDER_POINT_REGISTRY: readonly ExtruderPointDefinition[] = [
+  { code: 'MOTOR_NDE_VIB', label: 'Motor Non Driving End Vibration', kind: 'Vibration', x: 64, y: 494, side: 'left', analyzerNote: 'Not consumed by the current pilot model.' },
+  { code: 'MOTOR_TEMP', label: 'Motor Temperature', kind: 'Temperature', x: 96, y: 522, side: 'left', analyzerTag: 'T4' },
+  { code: 'MOTOR_DE_VIB', label: 'Motor Driving End Vibration', kind: 'Vibration', x: 198, y: 494, side: 'left', analyzerTag: 'V1' },
+  { code: 'MOTOR_POWER', label: 'Motor Power', kind: 'Current', x: 135, y: 429, side: 'left', analyzerTag: 'PM1' },
+  { code: 'MOTOR_RPM', label: 'Motor RPM', kind: 'Speed', x: 214, y: 494, side: 'left', analyzerTag: 'E1' },
+  { code: 'GEARBOX_VIB', label: 'Gearbox Vibration', kind: 'Vibration', x: 400, y: 356, side: 'left', analyzerTag: 'V2' },
+  { code: 'GEARBOX_TEMP', label: 'Gearbox Temperature', kind: 'Temperature', x: 348, y: 556, side: 'left', analyzerTag: 'T5' },
+  { code: 'SCREW_RPM', label: 'Screw RPM', kind: 'Speed', x: 448, y: 425, side: 'left', analyzerNote: 'Derived from motor speed and gearbox ratio by the current model.' },
+  { code: 'HOPPER_LEVEL', label: 'Hopper Level', kind: 'Level', x: 518, y: 120, side: 'right', analyzerTag: 'L1' },
+  { code: 'BARREL_Z1_TEMP', label: 'Barrel Zone 1 Temperature', kind: 'Temperature', x: 566, y: 290, side: 'right', analyzerTag: 'T1' },
+  { code: 'BARREL_Z2_TEMP', label: 'Barrel Zone 2 Temperature', kind: 'Temperature', x: 646, y: 290, side: 'right', analyzerTag: 'T2' },
+  { code: 'BARREL_Z3_TEMP', label: 'Barrel Zone 3 Temperature', kind: 'Temperature', x: 726, y: 290, side: 'right', analyzerTag: 'T3' },
+  { code: 'BARREL_Z4_TEMP', label: 'Barrel Zone 4 Temperature', kind: 'Temperature', x: 806, y: 290, side: 'right', analyzerNote: 'Outside the current three-zone pilot model.' },
+  { code: 'BARREL_Z5_TEMP', label: 'Barrel Zone 5 Temperature', kind: 'Temperature', x: 886, y: 290, side: 'right', analyzerNote: 'Outside the current three-zone pilot model.' },
+  { code: 'MELT_PRESSURE', label: 'Melt Pressure', kind: 'Pressure', x: 955, y: 334, side: 'right', analyzerTag: 'P1' },
+  { code: 'MELT_TEMP', label: 'Melt Temperature', kind: 'Temperature', x: 990, y: 334, side: 'right', analyzerNote: 'Outside the current pilot model.' },
+] as const;
+
+export function extruderPointByCode(code: string | undefined): ExtruderPointDefinition | undefined {
+  return code ? EXTRUDER_POINT_REGISTRY.find((point) => point.code === code) : undefined;
+}

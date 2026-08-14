@@ -87,6 +87,68 @@ export type SimulatedChannel = {
   decimals: number;
 };
 
+export type SimulatedChannelValidationErrors = Partial<
+  Record<
+    | 'channelName'
+    | 'min'
+    | 'max'
+    | 'samplesPerSecond'
+    | 'decimals'
+    | 'normalMin'
+    | 'normalMax'
+    | 'alertLimit'
+    | 'dangerLimit',
+    string
+  >
+>;
+
+/** Shared save-time and field-level validation for the canonical signal form. */
+export function validateSimulatedChannel(channel: SimulatedChannel, channelName: string): SimulatedChannelValidationErrors {
+  const errors: SimulatedChannelValidationErrors = {};
+  if (!channelName.trim()) errors.channelName = 'Enter a channel name.';
+
+  if (!Number.isFinite(channel.min)) errors.min = 'Enter a valid minimum value.';
+  if (!Number.isFinite(channel.max)) errors.max = 'Enter a valid maximum value.';
+  if (Number.isFinite(channel.min) && Number.isFinite(channel.max) && channel.max <= channel.min) {
+    errors.max = 'Maximum must be greater than minimum.';
+  }
+
+  if (!Number.isFinite(channel.samplesPerSecond) || channel.samplesPerSecond < 0.1 || channel.samplesPerSecond > 50) {
+    errors.samplesPerSecond = 'Use a sampling rate from 0.1 to 50 samples/second.';
+  }
+  if (!Number.isInteger(channel.decimals) || channel.decimals < 0 || channel.decimals > 6) {
+    errors.decimals = 'Use a whole number from 0 to 6.';
+  }
+
+  if (channel.normalMin !== null && !Number.isFinite(channel.normalMin)) errors.normalMin = 'Enter a valid number or leave blank.';
+  if (channel.normalMax !== null && !Number.isFinite(channel.normalMax)) errors.normalMax = 'Enter a valid number or leave blank.';
+  if (channel.normalMin === null && channel.normalMax !== null) errors.normalMin = 'Enter the lower normal limit.';
+  if (channel.normalMin !== null && channel.normalMax === null) errors.normalMax = 'Enter the upper normal limit.';
+  if (
+    channel.normalMin !== null &&
+    channel.normalMax !== null &&
+    Number.isFinite(channel.normalMin) &&
+    Number.isFinite(channel.normalMax) &&
+    channel.normalMax <= channel.normalMin
+  ) {
+    errors.normalMax = 'Normal maximum must be greater than normal minimum.';
+  }
+
+  if (channel.alertLimit !== null && !Number.isFinite(channel.alertLimit)) errors.alertLimit = 'Enter a valid number or leave blank.';
+  if (channel.dangerLimit !== null && !Number.isFinite(channel.dangerLimit)) errors.dangerLimit = 'Enter a valid number or leave blank.';
+  if (
+    channel.alertLimit !== null &&
+    channel.dangerLimit !== null &&
+    Number.isFinite(channel.alertLimit) &&
+    Number.isFinite(channel.dangerLimit) &&
+    channel.dangerLimit <= channel.alertLimit
+  ) {
+    errors.dangerLimit = 'Critical limit must be greater than warning limit.';
+  }
+
+  return errors;
+}
+
 type KindDefaults = Omit<SimulatedChannel, 'enabled' | 'kind' | 'behaviour'> & { sensor: string };
 
 const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
@@ -567,6 +629,9 @@ export function simulationWithCardConfig(
       unit: config.engineeringUnit || primary.unit,
       min: numeric(config.measurementRangeMin, primary.min),
       max: numeric(config.measurementRangeMax, primary.max),
+      // Accept both "10" and the persisted card representation "10 Hz" so a
+      // configuration round-trip keeps the requested cadence.
+      samplesPerSecond: numeric(config.samplingRate, primary.samplesPerSecond),
     };
   } else if (type === 'Process Card' && 'engineeringMin' in config) {
     next = {

@@ -133,6 +133,7 @@ function buildPoints(
   const points = measured.map(({ mapped, label, measurement, value }) => ({
     reading: {
       label,
+      templatePointCode: mapped.templatePointCode,
       value,
       unit: measurement?.unit || mapped.channel.unit,
       quality: measurement?.quality ?? (value === null ? 'UNAVAILABLE' : 'GOOD'),
@@ -449,9 +450,10 @@ export type ExtruderAnalysisViewProps = {
   cards: CardNode[];
   live?: LiveState;
   expectedPoints?: number;
+  machineId?: string;
 };
 
-export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, expectedPoints }: ExtruderAnalysisViewProps) {
+export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, expectedPoints, machineId }: ExtruderAnalysisViewProps) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const [tab, setTab] = useState<TabKey>('diagnosis');
@@ -659,6 +661,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         </Text>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <KeyValue label="Model" value={`Single-screw extruder ${analysis.modelVersion}`} />
+          {machineId ? <KeyValue label="Machine" value={machineId} /> : null}
           <KeyValue label="Recipe" value={detail.recipeId} />
           <KeyValue label="State" value={detail.inferredMachineState} variant={stateVariant(detail.inferredMachineState)} />
         </View>

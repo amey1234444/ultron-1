@@ -26,6 +26,8 @@
 //     acceleration RMS and is the domain rolling-element and gear-mesh damage
 //     actually lives in. The unit on the channel decides which one a reading is.
 
+import { extruderPointByCode } from '../../extruderPoints';
+
 export type ExtruderTag =
   | 'E1'
   | 'V1'
@@ -177,7 +179,17 @@ export type SignalResolution =
  * declined ("Motor NDE Vibration") cannot fall through to the generic pattern
  * below it and be consumed as the motor channel.
  */
-export function resolveSignal(label: string): SignalResolution {
+export function resolveSignal(label: string, templatePointCode?: string): SignalResolution {
+  const registered = extruderPointByCode(templatePointCode);
+  if (registered?.analyzerTag) {
+    const tag = registered.analyzerTag === 'PM1' ? 'PM1.power' : registered.analyzerTag;
+    return {
+      kind: 'mapped',
+      tag,
+      ...(registered.analyzerTag === 'E1' ? { speedDomain: registered.code === 'SCREW_RPM' ? 'screw' as const : 'motor' as const } : {}),
+    };
+  }
+  if (registered?.analyzerNote) return { kind: 'unmodelled', reason: registered.analyzerNote };
   const text = label.trim();
   if (!text) return { kind: 'unrecognised' };
   const unmodelled = UNMODELLED.find((entry) => entry.match.test(text));

@@ -16,6 +16,7 @@ import Svg, {
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
+import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
 
 type SingleScrewExtruderProps = {
   className?: string;
@@ -115,9 +116,11 @@ const GEARBOX_BOLTS = [
  *   gearbox mechanical hypotheses are separated by which channel carries the
  *   pattern, so the two pads are not interchangeable.
  */
-export type ExtruderConnector = { code: string; label: string; x: number; y: number; side: 'left' | 'right' };
+export type ExtruderConnector = (typeof EXTRUDER_POINT_REGISTRY)[number];
 
-export const EXTRUDER_CONNECTORS: ExtruderConnector[] = [
+export const EXTRUDER_CONNECTORS: readonly ExtruderConnector[] = EXTRUDER_POINT_REGISTRY;
+/* Legacy point list retained below for historical context only.
+const LEGACY_EXTRUDER_CONNECTORS: ExtruderConnector[] = [
   // Drive
   { code: 'E1', label: 'Motor Shaft Speed', side: 'left', x: 64, y: 494 },
   { code: 'PM1', label: 'Motor Current', side: 'left', x: 135, y: 429 },
@@ -134,7 +137,7 @@ export const EXTRUDER_CONNECTORS: ExtruderConnector[] = [
   { code: 'T3', label: 'Barrel Zone 3 Temperature', side: 'right', x: 886, y: ZONE_SENSOR_Y },
   // Metering-zone melt pressure, lower side opposite zone 3
   { code: 'P1', label: 'Melt Pressure', side: 'right', x: 960, y: 428 },
-];
+]; */
 
 const SCREW_FLIGHTS: number[] = [];
 for (let x = BORE_LEFT - FLIGHT_PITCH; x < BORE_RIGHT + FLIGHT_PITCH; x += FLIGHT_PITCH) {
@@ -610,8 +613,9 @@ export function SingleScrewExtruder({
             place the machine has no instrument. */}
         {EXTRUDER_CONNECTORS.map((connector) => (
           <G key={connector.code}>
-            <Circle cx={connector.x} cy={connector.y} r={9} fill={colours.accent} opacity={0.12} />
-            <Circle cx={connector.x} cy={connector.y} r={4.5} fill={colours.panel} stroke={colours.accent} strokeWidth={1.6} />
+            <Circle cx={connector.x} cy={connector.y} r={9} fill={colours.accent} opacity={0.14} />
+            <Circle cx={connector.x} cy={connector.y} r={5} fill={colours.accent} stroke={colours.panel} strokeWidth={1.4} />
+            <Circle cx={connector.x} cy={connector.y} r={2} fill="#ffffff" opacity={0.82} />
           </G>
         ))}
 

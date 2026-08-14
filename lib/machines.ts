@@ -1,3 +1,5 @@
+import { EXTRUDER_POINT_REGISTRY } from './extruderPoints';
+
 export const MACHINE_TEMPLATES = [
   'Centrifugal Pump',
   'Motor',
@@ -101,39 +103,29 @@ const RAV_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
 // changes which diagnostic rules can run. E1 is the motor rear-shaft proximity
 // switch, so the speed point is motor shaft speed; screw speed is derived from
 // it through the controlled 20:1 gearbox ratio.
+const extruderPointDefs = (codes: string[]): PointDef[] =>
+  EXTRUDER_POINT_REGISTRY.filter((point) => codes.includes(point.code)).map((point) => ({ label: point.label, kind: point.kind }));
+
 const EXTRUDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   {
     type: 'Motor',
     label: 'Drive',
-    points: [
-      { label: 'Motor Current', kind: 'Current' },
-      { label: 'Motor Shaft Speed', kind: 'Speed' },
-      { label: 'Motor Vibration', kind: 'Vibration' },
-      { label: 'Motor Temperature', kind: 'Temperature' },
-    ],
+    points: extruderPointDefs(['MOTOR_NDE_VIB', 'MOTOR_TEMP', 'MOTOR_DE_VIB', 'MOTOR_POWER', 'MOTOR_RPM']),
   },
   {
     type: 'Gearbox',
     label: 'Gear Box',
-    points: [
-      { label: 'Gearbox Vibration', kind: 'Vibration' },
-      { label: 'Gearbox Temperature', kind: 'Temperature' },
-    ],
+    points: extruderPointDefs(['GEARBOX_VIB', 'GEARBOX_TEMP']),
   },
   {
     type: 'Custom Component',
     label: 'Feed',
-    points: [{ label: 'Hopper Level', kind: 'Level' }],
+    points: extruderPointDefs(['HOPPER_LEVEL']),
   },
   {
     type: 'Custom Component',
     label: 'Screw and Barrel',
-    points: [
-      { label: 'Barrel Zone 1 Temperature', kind: 'Temperature' },
-      { label: 'Barrel Zone 2 Temperature', kind: 'Temperature' },
-      { label: 'Barrel Zone 3 Temperature', kind: 'Temperature' },
-      { label: 'Melt Pressure', kind: 'Pressure' },
-    ],
+    points: extruderPointDefs(['SCREW_RPM', 'BARREL_Z1_TEMP', 'BARREL_Z2_TEMP', 'BARREL_Z3_TEMP', 'BARREL_Z4_TEMP', 'BARREL_Z5_TEMP', 'MELT_PRESSURE', 'MELT_TEMP']),
   },
 ];
 

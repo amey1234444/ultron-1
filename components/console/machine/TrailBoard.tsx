@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -51,6 +51,8 @@ export type Box = {
   centerY?: number;
   label: string;
   channelId?: string;
+  /** Stable machine-template identity; legacy saved boxes remain label-resolved. */
+  templatePointCode?: string;
 };
 
 type Rect = { x: number; y: number; width: number; height: number };
@@ -82,6 +84,14 @@ type TrailBoardProps = {
   onSaveLayout?: (machineId: string, layout: SavedLayout) => void;
   onSaveTemplate?: (machineTemplate: string, layout: SavedLayout) => void;
   canSaveTemplate?: boolean;
+  // TrailBoard keeps ownership of edit state while the workspace decides where
+  // the command rail and stage layers are hosted.
+  renderWorkspace?: (layers: TrailBoardLayers) => ReactNode;
+};
+
+export type TrailBoardLayers = {
+  toolbar: ReactNode | null;
+  board: ReactNode;
 };
 
 export type SavedLayout = { trails: Trail[]; boxes: Box[] };
@@ -171,6 +181,7 @@ export function TrailBoard({
   onSaveLayout,
   onSaveTemplate,
   canSaveTemplate = false,
+  renderWorkspace,
 }: TrailBoardProps) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -607,7 +618,68 @@ export function TrailBoard({
     return 'normal';
   };
 
-  return (
+  const selectedTrail = selectedId ? trails.find((trail) => trail.id === selectedId) ?? null : null;
+  const toolbar = readOnly ? null : (
+    <View className="flex-row items-center gap-2">
+      <View className={cn('rounded-lg border px-2.5 py-1.5', lineClass, isDark ? 'bg-white/5' : 'bg-black/[0.025]')}>
+        <Text className={cn('font-mono text-[9px] uppercase tracking-[0.14em]', mutedClass)}>
+          {trails.length} trail{trails.length === 1 ? '' : 's'}
+        </Text>
+      </View>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Add trail"
+        onPress={addTrail}
+        className={cn('rounded-lg px-3 py-2', isDark ? 'bg-ink' : 'bg-ink-inverse')}
+      >
+        <Text className={cn('font-body-bold text-[11px]', isDark ? 'text-ink-inverse' : 'text-ink')}>+ Add Trail</Text>
+      </Pressable>
+      <Pressable accessibilityRole="button" accessibilityLabel="Add data box" onPress={addBox} className={cn('rounded-lg border px-3 py-2', lineClass)}>
+        <Text className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>+ Add Box</Text>
+      </Pressable>
+      {hasDefaultLayout(machineTemplate) && (
+        <Pressable accessibilityRole="button" onPress={applyTemplateLayout} className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2">
+          <Text className="font-body-bold text-[11px] text-accent">Apply Template</Text>
+        </Pressable>
+      )}
+      {canSaveTemplate && onSaveTemplate && (
+        <Pressable accessibilityRole="button" onPress={saveTemplate} className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2">
+          <Text className="font-body-bold text-[11px] text-accent">{justSavedTemplate ? 'Template Saved' : 'Save Template'}</Text>
+        </Pressable>
+      )}
+      <Pressable accessibilityRole="button" onPress={saveConfig} className="rounded-lg border border-status-success/40 bg-status-success/10 px-3 py-2">
+        <Text className="font-body-bold text-[11px] text-status-success">{justSaved ? 'Configuration Saved' : 'Save Config'}</Text>
+      </Pressable>
+      {selectedTrail && (
+        <>
+          <View className={cn('mx-1 h-6 w-px', isDark ? 'bg-line-dark' : 'bg-line-light')} />
+          <View className={cn('rounded-lg px-2.5 py-1.5', isDark ? 'bg-white/5' : 'bg-black/[0.025]')}>
+            <Text className={cn('font-mono text-[9px] uppercase tracking-[0.14em]', mutedClass)}>Selected trail</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            disabled={selectedTrail.points.length <= 2}
+            onPress={removeBendFromSelected}
+            className={cn('rounded-lg border px-3 py-2', lineClass, selectedTrail.points.length <= 2 && 'opacity-40')}
+          >
+            <Text className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Remove Bend</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" onPress={addBendToSelected} className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2">
+            <Text className="font-body-bold text-[11px] text-accent">Add Bend</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => removeTrail(selectedTrail.id)}
+            className="rounded-lg border border-status-critical/35 bg-status-critical/10 px-3 py-2"
+          >
+            <Text className="font-body-bold text-[11px] text-status-critical">Delete Trail</Text>
+          </Pressable>
+        </>
+      )}
+    </View>
+  );
+
+  const board = (
     <>
       {/* Tapping empty canvas deselects — only mounted while something is selected, so
           it never intercepts clicks meant for the machine underneath otherwise. */}
@@ -618,7 +690,7 @@ export function TrailBoard({
         />
       )}
 
-      {!readOnly && (
+      {!renderWorkspace && !readOnly && (
         <View pointerEvents="box-none" className="absolute left-4 top-4 flex-row items-center gap-2">
           <View className={cn('rounded-full border px-2.5 py-1', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}>
             <Text className={cn('font-body text-[11px]', mutedClass)}>
@@ -647,7 +719,7 @@ export function TrailBoard({
         </View>
       )}
 
-      {selectedId && !readOnly && (
+      {!renderWorkspace && selectedId && !readOnly && (
         <View pointerEvents="box-none" className="absolute left-4 top-14 flex-row items-center gap-2">
           <Pressable onPress={removeBendFromSelected} className={cn('rounded-full border px-3 py-1.5', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}>
             <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Remove bend</Text>
@@ -724,4 +796,8 @@ export function TrailBoard({
       </View>
     </>
   );
+
+  if (renderWorkspace) return <>{renderWorkspace({ toolbar, board })}</>;
+
+  return board;
 }

@@ -147,12 +147,17 @@ export function MachineWorkspace({
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
-  const mode: WorkspaceMode = canConfigure ? 'design' : 'actual';
+  const [actualTab, setActualTab] = useState<ActualTab>('machine');
+  const [configuratorMode, setConfiguratorMode] = useState<WorkspaceMode>('design');
+  const mode: WorkspaceMode = canConfigure ? configuratorMode : 'actual';
+  useEffect(() => {
+    setConfiguratorMode('design');
+    setActualTab('machine');
+  }, [machine.id]);
   useEffect(() => {
     onModeChange?.(mode);
     return () => onModeChange?.('design');
   }, [mode, onModeChange]);
-  const [actualTab, setActualTab] = useState<ActualTab>('machine');
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(machine.components[0]?.id ?? null);
   const [zoom, setZoom] = useState(1);
   // Layout of the machine wrapper in *stage coordinates* (the stage is a fixed
@@ -195,7 +200,12 @@ export function MachineWorkspace({
       .filter((box) => box.channelId)
       .map((box) => ({ box, channel: allChannels.find((c) => c.id === box.channelId) }))
       .filter((entry): entry is { box: Box; channel: NonNullable<(typeof entry)['channel']> } => !!entry.channel)
-      .map(({ box, channel }) => ({ id: box.id, channel, label: box.label.trim() || channel.label }));
+      .map(({ box, channel }) => ({
+        id: box.id,
+        channel,
+        label: box.label.trim() || channel.label,
+        templatePointCode: box.templatePointCode,
+      }));
   }, [savedBoxes, allChannels]);
   // Total measurement points the machine template defines (e.g. RAV's Motor
   // component lists 6) — the "expected" denominator for the coverage indicator

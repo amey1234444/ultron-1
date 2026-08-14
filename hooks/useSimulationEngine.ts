@@ -16,7 +16,7 @@ import {
 // configured sample rate (see simulationFramesForGateway). 100ms is fast enough
 // for a 10 samples/sec channel — the highest rate the UI can usefully paint —
 // while costing one batched state update per animation frame.
-const TICK_MS = 100;
+const TICK_MS = 20;
 
 type SimulationPlan = {
   gateway: DeviceNode;

@@ -16,6 +16,7 @@ import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTe
 import type { CardNode } from '../../../lib/rack';
 import { apiFetch } from '../../../src/lib/apiClient';
 import { ExtruderAnalysisView } from './ExtruderAnalysisView';
+import { Badge, Body, Card, Collapsible, DataTable, Cell, StatTile, Tabs, VerdictBanner, type Column, type TabItem, type Variant } from '../../ui';
 import {
   BulletList,
   DeepAnalyzerPanel,
@@ -81,6 +82,15 @@ type AnomalyEpisode = {
   started_at?: string;
   last_seen_at?: string;
   resolved_at?: string | null;
+};
+
+type RotaryAnalysisTab = 'diagnosis' | 'evidence' | 'signals' | 'cases';
+type RotarySignalRow = {
+  id: string;
+  label: string;
+  code: string;
+  value: string;
+  status: 'Live' | 'No current reading' | 'Not consumed';
 };
 
 export type AnalysisViewProps = {
@@ -176,6 +186,13 @@ function readinessTone(score: number): Tone {
   return 'warning';
 }
 
+function toneVariant(tone: Tone): Variant {
+  if (tone === 'critical') return 'destructive';
+  if (tone === 'warning') return 'warning';
+  if (tone === 'live') return 'success';
+  return 'info';
+}
+
 function formatUrgency(urgency: DiagnosisCandidate['urgency']): string {
   const map: Record<DiagnosisCandidate['urgency'], string> = {
     monitor: 'Monitor',
@@ -190,6 +207,7 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const [analysisTab, setAnalysisTab] = useState<RotaryAnalysisTab>('diagnosis');
   const tone = urgencyTone(diagnosis.urgency);
   const colour = TONE_COLOUR[tone];
 
@@ -249,7 +267,8 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
  * maintenance guidance) and the durable `analysis_*` tables are model-agnostic.
  */
 export function AnalysisView(props: AnalysisViewProps) {
-  if (props.machineTemplate === 'Single Screw Extruder') {
+  const analyzer = ANALYZER_REGISTRY[props.machineTemplate ?? ''];
+  if (analyzer === 'extruder') {
     return (
       <ExtruderAnalysisView
         mappedChannels={props.mappedChannels}
@@ -257,11 +276,28 @@ export function AnalysisView(props: AnalysisViewProps) {
         cards={props.cards}
         live={props.live}
         expectedPoints={props.expectedPoints}
+        machineId={props.machineId}
       />
     );
   }
-  return <RotaryAirlockAnalysisView {...props} />;
+  if (analyzer === 'rotary-airlock') return <RotaryAirlockAnalysisView {...props} />;
+  return (
+    <View className="flex-1 items-center justify-center px-6 py-10">
+      <Card className="w-full max-w-2xl gap-3" accent="info">
+        <Badge variant="info">Analyzer unavailable</Badge>
+        <Text className="font-body-bold text-xl">No condition model for {props.machineTemplate || 'this template'}</Text>
+        <Body muted>
+          Analysis is only enabled when a template has a verified machine-specific model. Live readings remain available in Overview and Trends; no rotary-airlock conclusions are being substituted here.
+        </Body>
+      </Card>
+    </View>
+  );
 }
+
+const ANALYZER_REGISTRY: Record<string, 'rotary-airlock' | 'extruder'> = {
+  'Rotary Airlock Valve': 'rotary-airlock',
+  'Single Screw Extruder': 'extruder',
+};
 
 function RotaryAirlockAnalysisView({
   mappedChannels,
@@ -300,6 +336,21 @@ function RotaryAirlockAnalysisView({
     return analyzeRotaryAirlock({ readings, now: new Date().toISOString() });
   }, [mappedChannels, devices, cards, live]);
 
+  const signalRows = useMemo<RotarySignalRow[]>(() => {
+    const readings = buildReadings(mappedChannels, devices, cards, live);
+    return mappedChannels.map((mapped) => {
+      const code = signalCodeFor(`${mapped.label} ${mapped.channel.label}`);
+      const reading = code ? readings.find((candidate) => candidate.code === code) : undefined;
+      return {
+        id: mapped.id,
+        label: mapped.label,
+        code: code ?? 'UNMODELLED',
+        value: reading ? `${reading.value} ${reading.unit}`.trim() : '—',
+        status: code ? (reading ? 'Live' : 'No current reading') : 'Not consumed',
+      };
+    });
+  }, [mappedChannels, devices, cards, live]);
+
   if (mappedChannels.length === 0) {
     return <EmptyState title="No mapped channels" description="Analysis needs saved rack mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
@@ -315,48 +366,99 @@ function RotaryAirlockAnalysisView({
     analysis.diagnoses[0]?.supporting[0] ??
     analysis.maintenance.recommendedActions[0] ??
     'Mapped evidence does not currently support a dominant diagnosis.';
+  const verdictVariant = toneVariant(conditionTone);
+  const tabs: TabItem<RotaryAnalysisTab>[] = [
+    { value: 'diagnosis', label: 'Diagnosis', icon: 'stethoscope', count: analysis.diagnoses.length, countVariant: verdictVariant },
+    { value: 'evidence', label: 'Evidence', icon: 'chart-timeline-variant', count: analysis.anomaly.contributors.length },
+    { value: 'signals', label: 'Signals', icon: 'access-point', count: signalRows.filter((row) => row.status !== 'Live').length, countVariant: 'warning' },
+    { value: 'cases', label: 'Cases / history', icon: 'clipboard-text-clock-outline', count: (bundle?.cases.length ?? 0) + (bundle?.episodes.length ?? 0) },
+  ];
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 16 }}>
       <View className="min-w-0 flex-1 gap-1">
-        <Text className={cn('font-body-bold text-3xl tracking-[-0.03em]', textClass)}>Analysis layer</Text>
-        <Text className={cn('font-body text-xs leading-5', mutedClass)}>
-          Computed from saved rack mappings and live signals using the rotary-airlock analysis model.
-          {expectedPoints ? ` ${mappedChannels.length} of ${expectedPoints} expected points mapped.` : ` ${mappedChannels.length} mapped channels.`}
-        </Text>
+        <Text className={cn('font-body-bold text-2xl tracking-[-0.03em]', textClass)}>Rotary airlock analysis</Text>
+        <View className="flex-row flex-wrap items-center gap-2">
+          <Badge variant="info" outline>Live source</Badge>
+          <Badge variant="muted" outline>Model {analysis.modelVersion}</Badge>
+          <Badge variant={analysis.readiness.ready ? 'success' : 'warning'} outline>
+            {mappedChannels.length}/{expectedPoints ?? mappedChannels.length} mapped
+          </Badge>
+          {machineId ? <Body mono muted>{machineId}</Body> : null}
+        </View>
       </View>
+
+      <VerdictBanner
+        variant={verdictVariant}
+        eyebrow="Current conclusion"
+        title={conditionLabel}
+        detail={conditionDetail}
+        meta={<Badge variant={verdictVariant}>{Math.round((analysis.diagnoses[0]?.confidence ?? analysis.operatingState.confidence) * 100)}% confidence</Badge>}
+      />
 
       <View className="flex-row flex-wrap gap-3">
-        <StatusPanel
-          icon={'check-decagram-outline' as IconName}
-          title="Readiness"
+        <StatTile
+          className="min-w-[210px] flex-1"
+          icon="check-decagram-outline"
+          label="Readiness"
           value={analysis.readiness.ready ? 'Ready' : 'Not ready'}
           detail={analysis.readiness.limitations[0] ?? 'Mapped evidence is ready for live condition analysis.'}
-          tone={readinessTone(analysis.readiness.score)}
-          meta={`${analysis.readiness.score}%`}
+          variant={toneVariant(readinessTone(analysis.readiness.score))}
+          meter={analysis.readiness.score}
         />
-        <StatusPanel
-          icon={'help-circle-outline' as IconName}
-          title="Operating state"
+        <StatTile
+          className="min-w-[210px] flex-1"
+          icon="engine-outline"
+          label="Operating state"
           value={analysis.operatingState.state}
-          detail={
-            analysis.operatingState.supporting[0] ??
-            analysis.operatingState.limitations[0] ??
-            'State inferred from speed/load evidence.'
-          }
-          tone={stateTone(analysis.operatingState.state)}
-          meta={`${Math.round(analysis.operatingState.confidence * 100)}%`}
+          detail={`${Math.round(analysis.operatingState.confidence * 100)}% confidence`}
+          variant={toneVariant(stateTone(analysis.operatingState.state))}
         />
-        <StatusPanel
-          icon={'eye-outline' as IconName}
-          title="Condition"
+        <StatTile
+          className="min-w-[210px] flex-1"
+          icon="eye-outline"
+          label="Dominant condition"
           value={conditionLabel}
           detail={conditionDetail}
-          tone={conditionTone}
+          variant={verdictVariant}
+        />
+        <StatTile
+          className="min-w-[210px] flex-1"
+          icon="wrench-clock-outline"
+          label="Maintenance priority"
+          value={analysis.maintenance.priority}
+          detail={analysis.maintenance.recommendedActions[0] ?? 'Continue routine monitoring.'}
+          variant={toneVariant(priorityTone(analysis.maintenance.priority))}
         />
       </View>
 
-      <DeepAnalyzerPanel analysis={analysis} />
+      <Tabs items={tabs} value={analysisTab} onChange={setAnalysisTab} />
+
+      {analysisTab === 'evidence' ? (
+        <View className="gap-3">
+          <DeepAnalyzerPanel analysis={analysis} />
+          <Collapsible title="Model provenance and limitations" icon="file-document-outline" summary={`${analysis.readiness.limitations.length} current limitations`} count={analysis.readiness.limitations.length}>
+            {analysis.readiness.limitations.length > 0 ? analysis.readiness.limitations.map((item) => <Body key={item} muted>• {item}</Body>) : <Body muted>No additional model limitations are active.</Body>}
+          </Collapsible>
+        </View>
+      ) : null}
+
+      {analysisTab === 'signals' ? (
+        <Card className="gap-3">
+          <Text className={cn('font-body-bold text-sm', textClass)}>Signal quality and mapping</Text>
+          <DataTable
+            rows={signalRows}
+            keyOf={(row) => row.id}
+            emptyLabel="No saved mapped signals."
+            columns={[
+              { key: 'point', header: 'Mapped point', width: 2.2, render: (row) => <Cell>{row.label}</Cell> },
+              { key: 'code', header: 'Model signal', width: 1.4, render: (row) => <Cell mono muted>{row.code}</Cell> },
+              { key: 'value', header: 'Latest', width: 1.2, numeric: true, render: (row) => <Cell mono numeric>{row.value}</Cell> },
+              { key: 'status', header: 'Quality', width: 1.3, render: (row) => <Badge variant={row.status === 'Live' ? 'success' : row.status === 'Not consumed' ? 'muted' : 'warning'} icon={null}>{row.status}</Badge> },
+            ]}
+          />
+        </Card>
+      ) : null}
 
       <View className="gap-3">
         <SectionTitle title="Diagnoses" />

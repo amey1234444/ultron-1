@@ -89,6 +89,8 @@ const QUALITY_STALE_AFTER_MS = 120_000;
 export type ExtruderInputReading = {
   /** The mapped point's label, used to resolve the canonical pilot tag. */
   label: string;
+  /** Stable template identity; absent on legacy/custom boxes. */
+  templatePointCode?: string;
   value: number | null;
   unit: string;
   quality?: string;
@@ -223,7 +225,7 @@ function buildSnapshot(
   const rejected: { label: string; error: string }[] = [];
 
   for (const reading of input.readings) {
-    const resolution = resolveSignal(reading.label);
+    const resolution = resolveSignal(reading.label, reading.templatePointCode);
     if (resolution.kind === 'unmodelled') {
       unconsumed.push({ label: reading.label, reason: resolution.reason });
       continue;

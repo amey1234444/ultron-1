@@ -51,7 +51,7 @@ const RAV_TEMPLATE_POINTS: TemplatePoint[] = [
  * old copy of these coordinates drifted out of step with the drawing the first
  * time the machine was redrawn; there is now nothing to keep in step.
  */
-const EXTRUDER_CARD_SLOT_Y = [79, 184, 289, 394, 499, 604];
+const EXTRUDER_CARD_SLOT_Y = [66, 158, 250, 342, 434, 526, 618, 710];
 const EXTRUDER_LEFT_COLUMN = 232;
 const EXTRUDER_RIGHT_COLUMN = 1208;
 
@@ -95,13 +95,14 @@ function stageFromReference(point: ReferencePoint) {
   };
 }
 
-function boxFromEndpoint(point: ReferencePoint, side: TemplatePoint['side'], label: string): Box {
+function boxFromEndpoint(point: ReferencePoint, side: TemplatePoint['side'], label: string, templatePointCode?: string): Box {
   const cardLeft = side === 'left' ? point.x - UNLINKED_BOX_WIDTH - BOX_CONNECTOR_GAP : point.x + BOX_CONNECTOR_GAP;
   return {
     id: makeId('box'),
     x: cardLeft - 12,
     y: point.y - BOX_CONNECTOR_Y_OFFSET,
     label,
+    templatePointCode,
   };
 }
 
@@ -153,7 +154,7 @@ export function createTemplateDefaultLayout(
 
   for (const templatePoint of templatePoints) {
     const referenceBoxEnd = stageFromReference(templatePoint.boxEnd);
-    const box = boxFromEndpoint(referenceBoxEnd, templatePoint.side, templatePoint.label);
+    const box = boxFromEndpoint(referenceBoxEnd, templatePoint.side, templatePoint.label, templatePoint.code);
     const boxEnd = boxEndpoint(box, templatePoint.side);
 
     const { x: sx, y: sy } = templatePoint.anchor;
