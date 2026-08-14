@@ -22,6 +22,7 @@ import {
   PART_SCALE_MAX,
   PART_SCALE_MIN,
   PLANT_MODELS,
+  PLANT_MODEL_KEYS,
   PLANT_PART_COLORS,
   countPartEdits,
   newComponentId,
@@ -29,6 +30,7 @@ import {
   type PlantComponent3D,
   type PlantComponentStatus,
   type PlantConnectionKind,
+  type PlantModelKey,
   type PlantPartOverride,
   type PlantScene3DConfig,
 } from '../../../lib/plantScene3d';
@@ -339,13 +341,20 @@ export function PlantModelEditor({
   const restoreComponent = (componentId: string) => patchComponent(componentId, { parts: {} });
   const restoreEverything = () => onChange({ ...scene, components: scene.components.map((c) => ({ ...c, parts: {} })) });
 
-  const addComponent = () => {
+  const addComponent = (model: PlantModelKey) => {
+    // Drop it clear of whatever is already placed, using the widest extent so a
+    // power house (with its transformer bay) never lands inside its neighbour.
+    const rightEdge = scene.components.reduce((max, c) => {
+      const [fx] = PLANT_MODELS[c.model].footprint;
+      return Math.max(max, c.x + (fx / 2) * (c.scale / 100));
+    }, 0);
+    const [nfx] = PLANT_MODELS[model].footprint;
     const component: PlantComponent3D = {
       id: newComponentId(),
-      name: `Component ${scene.components.length + 1}`,
-      model: 'utility-building',
-      x: Math.round((scene.components.length % 3) * 14 - 14),
-      z: Math.round(Math.floor(scene.components.length / 3) * 12),
+      name: PLANT_MODELS[model].name,
+      model,
+      x: Math.round(rightEdge + nfx / 2 + 4),
+      z: 0,
       rotation: 0,
       scale: 100,
       status: 'auto',
@@ -481,10 +490,23 @@ export function PlantModelEditor({
                         placeholderTextColor="#7A7E86"
                         style={textInputStyle(dark, { flexGrow: 1, minWidth: 150 })}
                       />
-                      <Text className={cn('font-body text-[9.5px]', inkMuted)}>{PLANT_MODELS[component.model].name}</Text>
                       <Pressable onPress={() => removeComponent(component.id)} accessibilityLabel={`Remove ${component.name}`}>
                         <MaterialCommunityIcons name="trash-can-outline" size={16} color="#D64545" />
                       </Pressable>
+                    </View>
+                    <View className="flex-row flex-wrap items-center gap-1">
+                      <Text className={cn('font-body text-[10px]', inkMuted)}>Template</Text>
+                      {PLANT_MODEL_KEYS.map((key) => (
+                        <Chip
+                          key={key}
+                          active={component.model === key}
+                          label={PLANT_MODELS[key].name}
+                          dark={dark}
+                          // Switching template invalidates part overrides: the
+                          // node names belong to the old model.
+                          onPress={() => patchComponent(component.id, { model: key, parts: {} })}
+                        />
+                      ))}
                     </View>
                     <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
                       <Stepper label="X" value={component.x} step={0.5} min={-400} max={400} dark={dark} onChange={(x) => patchComponent(component.id, { x })} />
@@ -517,10 +539,19 @@ export function PlantModelEditor({
               })}
             </View>
           </ScrollView>
-          <Pressable onPress={addComponent} className={cn('flex-row items-center justify-center gap-1 rounded-md border py-2', border)}>
-            <MaterialCommunityIcons name="plus" size={14} color="#3FBF6A" />
-            <Text className="font-body-medium text-[11px] text-accent">Add component</Text>
-          </Pressable>
+          <View className="flex-row flex-wrap gap-2">
+            {PLANT_MODEL_KEYS.map((key) => (
+              <Pressable
+                key={key}
+                onPress={() => addComponent(key)}
+                className={cn('flex-1 flex-row items-center justify-center gap-1 rounded-md border py-2', border)}
+                style={{ minWidth: 180 }}
+              >
+                <MaterialCommunityIcons name="plus" size={14} color="#3FBF6A" />
+                <Text className="font-body-medium text-[11px] text-accent">Add {PLANT_MODELS[key].name}</Text>
+              </Pressable>
+            ))}
+          </View>
         </View>
       ) : null}
 

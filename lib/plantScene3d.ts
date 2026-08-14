@@ -10,9 +10,15 @@
 // component origin is the centre of the building footprint at ground level and a
 // component placed at (0, 0) sits flat on the ground plane.
 
-export type PlantModelKey = 'utility-building';
+export type PlantModelKey = 'utility-building' | 'power-house';
 
-/** Registry of every component model the plant editor can place. */
+/**
+ * Registry of every component model the plant editor can place.
+ *
+ * `footprint` / `height` are the model's *overall* extents (including anything
+ * that sits outside the building itself, such as the power house transformer
+ * bay), because the only thing they drive is camera framing.
+ */
 export const PLANT_MODELS: Record<
   PlantModelKey,
   { name: string; url: string; footprint: [number, number]; height: number }
@@ -20,10 +26,18 @@ export const PLANT_MODELS: Record<
   'utility-building': {
     name: 'Industrial Utility Building',
     url: '/models/plant/utility-building.glb',
-    footprint: [8, 6],
-    height: 4.23,
+    footprint: [8.8, 7.6],
+    height: 5.03,
+  },
+  'power-house': {
+    name: 'Electrical / Power House',
+    url: '/models/plant/power-house.glb',
+    footprint: [15.3, 9.3],
+    height: 5.91,
   },
 };
+
+export const PLANT_MODEL_KEYS = Object.keys(PLANT_MODELS) as PlantModelKey[];
 
 export const PLANT_PART_COLORS = [
   '#B7BCC3', '#6C7480', '#2B3038', '#4E5A66', '#8A9099',
@@ -101,45 +115,38 @@ export const DEFAULT_PLANT_SCENE_3D: PlantScene3DConfig = {
   modelScale: 100,
   showGrid: true,
   showLabels: true,
+  // One instance of each template. The power house origin is the centre of its
+  // building footprint, so its transformer bay extends a further ~9.8 m in +X;
+  // the two are spaced to leave a clear service gap between them.
   components: [
     {
       id: 'utility',
       name: 'Utility Area',
       model: 'utility-building',
-      x: -13,
-      z: 4,
+      x: -10,
+      z: 0,
       rotation: 0,
       scale: 100,
       status: 'auto',
       parts: {},
     },
     {
-      id: 'compressor',
-      name: 'Compressor Area',
-      model: 'utility-building',
-      x: 0,
-      z: -5,
-      rotation: 25,
-      scale: 100,
-      status: 'auto',
-      parts: {},
-    },
-    {
-      id: 'boiler',
-      name: 'Boiler Area',
-      model: 'utility-building',
-      x: 14,
-      z: 3,
-      rotation: -18,
+      id: 'power-house',
+      name: 'Power House',
+      model: 'power-house',
+      x: 5,
+      z: 0,
+      rotation: 0,
       scale: 100,
       status: 'auto',
       parts: {},
     },
   ],
   connections: [
-    { id: 'c-util-comp', fromId: 'utility', fromPort: 'PORT_UTILITY_OUT', toId: 'compressor', toPort: 'PORT_ELECTRICAL_IN', kind: 'utility' },
-    { id: 'c-comp-boil', fromId: 'compressor', fromPort: 'PORT_NETWORK', toId: 'boiler', toPort: 'PORT_DATA', kind: 'network' },
-    { id: 'c-util-boil', fromId: 'utility', fromPort: 'PORT_NETWORK', toId: 'boiler', toPort: 'PORT_AIR', kind: 'air' },
+    // LV distribution leaves the power house switchgear and feeds the utility
+    // building; both ports face each other across the gap.
+    { id: 'c-power-utility', fromId: 'power-house', fromPort: 'PORT_POWER_OUT', toId: 'utility', toPort: 'PORT_ELECTRICAL_IN', kind: 'electrical' },
+    { id: 'c-power-network', fromId: 'power-house', fromPort: 'PORT_NETWORK', toId: 'utility', toPort: 'PORT_NETWORK', kind: 'network' },
   ],
 };
 
