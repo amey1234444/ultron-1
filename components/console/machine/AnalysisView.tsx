@@ -16,7 +16,24 @@ import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTe
 import type { CardNode } from '../../../lib/rack';
 import { apiFetch } from '../../../src/lib/apiClient';
 import { ExtruderAnalysisView } from './ExtruderAnalysisView';
-import { Badge, Body, Card, Collapsible, DataTable, Cell, StatTile, Tabs, VerdictBanner, type Column, type TabItem, type Variant } from '../../ui';
+import {
+  Badge,
+  Body,
+  Card,
+  CardHeader,
+  CardTitle,
+  Cell,
+  Collapsible,
+  consolePalette,
+  DataTable,
+  Separator,
+  StatTile,
+  StatusDot,
+  Tabs,
+  VerdictBanner,
+  type TabItem,
+  type Variant,
+} from '../../ui';
 import {
   BulletList,
   DeepAnalyzerPanel,
@@ -207,7 +224,6 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const [analysisTab, setAnalysisTab] = useState<RotaryAnalysisTab>('diagnosis');
   const tone = urgencyTone(diagnosis.urgency);
   const colour = TONE_COLOUR[tone];
 
@@ -308,9 +324,11 @@ function RotaryAirlockAnalysisView({
   expectedPoints,
 }: AnalysisViewProps) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const textClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
+  const [analysisTab, setAnalysisTab] = useState<RotaryAnalysisTab>('diagnosis');
   const [bundle, setBundle] = useState<AnalysisBundle | null>(null);
 
   useEffect(() => {
@@ -374,20 +392,51 @@ function RotaryAirlockAnalysisView({
     { value: 'cases', label: 'Cases / history', icon: 'clipboard-text-clock-outline', count: (bundle?.cases.length ?? 0) + (bundle?.episodes.length ?? 0) },
   ];
 
+  const liveSignalCount = signalRows.filter((row) => row.status === 'Live').length;
+
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 16 }}>
-      <View className="min-w-0 flex-1 gap-1">
-        <Text className={cn('font-body-bold text-2xl tracking-[-0.03em]', textClass)}>Rotary airlock analysis</Text>
-        <View className="flex-row flex-wrap items-center gap-2">
-          <Badge variant="info" outline>Live source</Badge>
-          <Badge variant="muted" outline>Model {analysis.modelVersion}</Badge>
-          <Badge variant={analysis.readiness.ready ? 'success' : 'warning'} outline>
-            {mappedChannels.length}/{expectedPoints ?? mappedChannels.length} mapped
-          </Badge>
-          {machineId ? <Body mono muted>{machineId}</Body> : null}
+    <View className="min-h-0 flex-1" style={{ backgroundColor: palette.bg }}>
+      {/* Same chrome as the extruder analysis layer: identity and data source
+          fixed above a scrolling body, so what the numbers came from is always
+          on screen. */}
+      <View
+        className="gap-3 px-5 py-3 md:flex-row md:items-center md:justify-between"
+        style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}
+      >
+        <View className="min-w-0 gap-1.5">
+          <View className="flex-row flex-wrap items-center gap-2">
+            <Text className={cn('font-body-bold text-[18px] tracking-[-0.025em]', textClass)}>Rotary airlock analysis</Text>
+            <Badge variant="muted" icon="hand-back-right-outline">Advisory only</Badge>
+          </View>
+          <View className="flex-row flex-wrap items-center gap-2">
+            <Badge variant="muted" outline>Model {analysis.modelVersion}</Badge>
+            <Badge variant={analysis.readiness.ready ? 'success' : 'warning'} outline>
+              {mappedChannels.length}/{expectedPoints ?? mappedChannels.length} mapped
+            </Badge>
+            {machineId ? <Body mono muted>{machineId}</Body> : null}
+          </View>
+        </View>
+
+        <View
+          className="flex-row items-center gap-2 self-start rounded-lg border px-2.5 py-1.5"
+          style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+        >
+          <StatusDot variant={liveSignalCount > 0 ? 'success' : 'muted'} />
+          <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+            {liveSignalCount > 0 ? `${liveSignalCount} live signal${liveSignalCount === 1 ? '' : 's'}` : 'No live data'}
+          </Text>
         </View>
       </View>
 
+      <View className="px-5 py-2" style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}>
+        <Tabs items={tabs} value={analysisTab} onChange={setAnalysisTab} />
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 56, alignItems: 'center' }}
+      >
+        <View className="w-full gap-4" style={{ maxWidth: 1280 }}>
       <VerdictBanner
         variant={verdictVariant}
         eyebrow="Current conclusion"
@@ -432,20 +481,102 @@ function RotaryAirlockAnalysisView({
         />
       </View>
 
-      <Tabs items={tabs} value={analysisTab} onChange={setAnalysisTab} />
+      {/* Every section belongs to exactly one tab. Before this the page stacked
+          the diagnoses, contributors, guidance and history under whichever tab
+          was open, so switching tabs appeared to do almost nothing. */}
+      {analysisTab === 'diagnosis' && (
+        <View className="gap-3">
+          <SectionTitle title="Diagnoses" />
+          {analysis.diagnoses.length === 0 ? (
+            <Panel>
+              <Text className={cn('font-body text-xs leading-5', mutedClass)}>
+                No probable blockage, rubbing, bearing, overload, or drive-slip pattern is strong enough yet. This is not a
+                clearance; it only means the mapped live evidence does not currently support a dominant diagnosis.
+              </Text>
+            </Panel>
+          ) : (
+            analysis.diagnoses.map((diagnosis) => <DiagnosisCard key={diagnosis.code} diagnosis={diagnosis} />)
+          )}
 
-      {analysisTab === 'evidence' ? (
+          {analysis.maintenance.caseRequired && (
+            <>
+              <SectionTitle title="Maintenance guidance" />
+              <BulletList
+                title="Recommended actions"
+                items={analysis.maintenance.recommendedActions}
+                tone={priorityTone(analysis.maintenance.priority)}
+                emptyLabel="No actions defined."
+              />
+              {analysis.maintenance.verificationSteps.length > 0 && (
+                <BulletList
+                  title="Verification steps"
+                  items={analysis.maintenance.verificationSteps}
+                  tone="info"
+                  emptyLabel="No verification steps defined."
+                />
+              )}
+            </>
+          )}
+        </View>
+      )}
+
+      {analysisTab === 'evidence' && (
         <View className="gap-3">
           <DeepAnalyzerPanel analysis={analysis} />
-          <Collapsible title="Model provenance and limitations" icon="file-document-outline" summary={`${analysis.readiness.limitations.length} current limitations`} count={analysis.readiness.limitations.length}>
-            {analysis.readiness.limitations.length > 0 ? analysis.readiness.limitations.map((item) => <Body key={item} muted>• {item}</Body>) : <Body muted>No additional model limitations are active.</Body>}
+
+          <SectionTitle title="Anomaly contributors" />
+          {analysis.anomaly.contributors.length === 0 ? (
+            <Panel>
+              <Text className={cn('font-body text-xs leading-5', mutedClass)}>
+                No mature baseline departure is available.
+              </Text>
+            </Panel>
+          ) : (
+            <View className="flex-row flex-wrap gap-3">
+              {analysis.anomaly.contributors.map((contributor) => {
+                const contributorTone: Tone =
+                  contributor.direction === 'normal' ? 'live' : contributor.direction === 'high' ? 'warning' : 'info';
+                return (
+                  <Panel key={contributor.code} className="min-w-[240px] flex-1 gap-1">
+                    <Text className={cn('font-body-medium text-xs', textClass)}>{contributor.code}</Text>
+                    <Text className={cn('font-body text-[11px] leading-4', mutedClass)}>{contributor.description}</Text>
+                    <Text style={{ color: TONE_COLOUR[contributorTone] }} className="font-mono text-[11px] font-bold">
+                      {contributor.direction} · {contributor.score.toFixed(1)}
+                    </Text>
+                  </Panel>
+                );
+              })}
+            </View>
+          )}
+
+          <Collapsible
+            title="Model provenance and limitations"
+            icon="file-document-outline"
+            summary={`${analysis.readiness.limitations.length} current limitations`}
+            count={analysis.readiness.limitations.length}
+          >
+            {analysis.readiness.limitations.length > 0 ? (
+              analysis.readiness.limitations.map((item) => (
+                <Body key={item} muted>
+                  • {item}
+                </Body>
+              ))
+            ) : (
+              <Body muted>No additional model limitations are active.</Body>
+            )}
           </Collapsible>
         </View>
-      ) : null}
+      )}
 
-      {analysisTab === 'signals' ? (
+      {analysisTab === 'signals' && (
         <Card className="gap-3">
-          <Text className={cn('font-body-bold text-sm', textClass)}>Signal quality and mapping</Text>
+          <CardHeader>
+            <CardTitle size="sm">Signal quality and mapping</CardTitle>
+            <Body muted>
+              {liveSignalCount} of {signalRows.length} saved mapped points are currently reporting into the model.
+            </Body>
+          </CardHeader>
+          <Separator />
           <DataTable
             rows={signalRows}
             keyOf={(row) => row.id}
@@ -454,136 +585,89 @@ function RotaryAirlockAnalysisView({
               { key: 'point', header: 'Mapped point', width: 2.2, render: (row) => <Cell>{row.label}</Cell> },
               { key: 'code', header: 'Model signal', width: 1.4, render: (row) => <Cell mono muted>{row.code}</Cell> },
               { key: 'value', header: 'Latest', width: 1.2, numeric: true, render: (row) => <Cell mono numeric>{row.value}</Cell> },
-              { key: 'status', header: 'Quality', width: 1.3, render: (row) => <Badge variant={row.status === 'Live' ? 'success' : row.status === 'Not consumed' ? 'muted' : 'warning'} icon={null}>{row.status}</Badge> },
+              {
+                key: 'status',
+                header: 'Quality',
+                width: 1.3,
+                render: (row) => (
+                  <Badge variant={row.status === 'Live' ? 'success' : row.status === 'Not consumed' ? 'muted' : 'warning'} icon={null}>
+                    {row.status}
+                  </Badge>
+                ),
+              },
             ]}
           />
         </Card>
-      ) : null}
-
-      <View className="gap-3">
-        <SectionTitle title="Diagnoses" />
-        {analysis.diagnoses.length === 0 ? (
-          <Panel>
-            <Text className={cn('font-body text-xs leading-5', mutedClass)}>
-              No probable blockage, rubbing, bearing, overload, or drive-slip pattern is strong enough yet. This is not a
-              clearance; it only means the mapped live evidence does not currently support a dominant diagnosis.
-            </Text>
-          </Panel>
-        ) : (
-          analysis.diagnoses.map((diagnosis) => <DiagnosisCard key={diagnosis.code} diagnosis={diagnosis} />)
-        )}
-      </View>
-
-      <View className="gap-3">
-        <SectionTitle title="Anomaly contributors" />
-        {analysis.anomaly.contributors.length === 0 ? (
-          <Panel>
-            <Text className={cn('font-body text-xs leading-5', mutedClass)}>
-              No mature baseline departure is available.
-            </Text>
-          </Panel>
-        ) : (
-          <View className="flex-row flex-wrap gap-3">
-            {analysis.anomaly.contributors.map((contributor) => {
-              const contributorTone: Tone =
-                contributor.direction === 'normal' ? 'live' : contributor.direction === 'high' ? 'warning' : 'info';
-              return (
-                <Panel key={contributor.code} className="min-w-[240px] flex-1 gap-1">
-                  <Text className={cn('font-body-medium text-xs', textClass)}>{contributor.code}</Text>
-                  <Text className={cn('font-body text-[11px] leading-4', mutedClass)}>{contributor.description}</Text>
-                  <Text
-                    style={{ color: TONE_COLOUR[contributorTone] }}
-                    className="font-mono text-[11px] font-bold"
-                  >
-                    {contributor.direction} · {contributor.score.toFixed(1)}
-                  </Text>
-                </Panel>
-              );
-            })}
-          </View>
-        )}
-      </View>
-
-      {analysis.maintenance.caseRequired && (
-        <View className="gap-3">
-          <SectionTitle title="Maintenance guidance" />
-          <BulletList
-            title="Recommended actions"
-            items={analysis.maintenance.recommendedActions}
-            tone={priorityTone(analysis.maintenance.priority)}
-            emptyLabel="No actions defined."
-          />
-          {analysis.maintenance.verificationSteps.length > 0 && (
-            <BulletList
-              title="Verification steps"
-              items={analysis.maintenance.verificationSteps}
-              tone="info"
-              emptyLabel="No verification steps defined."
-            />
-          )}
-        </View>
       )}
 
-      {bundle && bundle.cases.length > 0 && (
+      {analysisTab === 'cases' && (
         <View className="gap-3">
           <SectionTitle title="Maintenance cases" />
-          {bundle.cases.map((maintenanceCase) => (
-            <Panel key={maintenanceCase.id} className="gap-2">
-              <View className="flex-row flex-wrap items-center justify-between gap-2">
-                <Text className={cn('font-body-bold text-sm', textClass)}>{maintenanceCase.title}</Text>
-                <Text className={cn('font-body-medium text-[11px]', mutedClass)}>
-                  {maintenanceCase.status} · {maintenanceCase.priority}
-                </Text>
-              </View>
-              {(maintenanceCase.recommended_actions ?? []).length > 0 && (
-                <View className="gap-1">
-                  {maintenanceCase.recommended_actions?.map((action) => (
-                    <Text key={action} className={cn('font-body text-xs leading-4', textClass)}>
-                      - {action}
-                    </Text>
-                  ))}
-                </View>
-              )}
+          {!bundle || bundle.cases.length === 0 ? (
+            <Panel>
+              <Text className={cn('font-body text-xs leading-5', mutedClass)}>No durable maintenance case has been raised for this machine.</Text>
             </Panel>
-          ))}
-        </View>
-      )}
-
-      {bundle && bundle.episodes.length > 0 && (
-        <View className="gap-3">
-          <SectionTitle title="Anomaly episodes" />
-          {bundle.episodes.map((episode) => {
-            const ep = episode as AnomalyEpisode;
-            const tone: Tone =
-              ep.severity === 'critical' || ep.severity === 'high'
-                ? 'critical'
-                : ep.severity === 'medium' || ep.severity === 'low'
-                  ? 'warning'
-                  : 'live';
-            return (
-              <Panel key={ep.id} className="gap-2">
+          ) : (
+            bundle.cases.map((maintenanceCase) => (
+              <Panel key={maintenanceCase.id} className="gap-2">
                 <View className="flex-row flex-wrap items-center justify-between gap-2">
-                  <Text className={cn('font-body-bold text-sm', textClass)}>
-                    {ep.state.replace(/_/g, ' ')}
-                  </Text>
-                  <Text style={{ color: TONE_COLOUR[tone] }} className="font-body-medium text-[11px]">
-                    {ep.severity} · {ep.score.toFixed(1)}
+                  <Text className={cn('font-body-bold text-sm', textClass)}>{maintenanceCase.title}</Text>
+                  <Text className={cn('font-body-medium text-[11px]', mutedClass)}>
+                    {maintenanceCase.status} · {maintenanceCase.priority}
                   </Text>
                 </View>
-                {(ep.contributors ?? []).length > 0 && (
+                {(maintenanceCase.recommended_actions ?? []).length > 0 && (
                   <View className="gap-1">
-                    {ep.contributors?.map((contributor) => (
-                      <Text key={contributor.code} className={cn('font-body text-xs leading-4', mutedClass)}>
-                        - {contributor.code}: {contributor.description} ({contributor.direction}, {contributor.score.toFixed(1)})
+                    {maintenanceCase.recommended_actions?.map((action) => (
+                      <Text key={action} className={cn('font-body text-xs leading-4', textClass)}>
+                        - {action}
                       </Text>
                     ))}
                   </View>
                 )}
               </Panel>
-            );
-          })}
+            ))
+          )}
+
+          <SectionTitle title="Anomaly episodes" />
+          {!bundle || bundle.episodes.length === 0 ? (
+            <Panel>
+              <Text className={cn('font-body text-xs leading-5', mutedClass)}>No anomaly episode has been recorded.</Text>
+            </Panel>
+          ) : (
+            bundle.episodes.map((episode) => {
+              const ep = episode as AnomalyEpisode;
+              const tone: Tone =
+                ep.severity === 'critical' || ep.severity === 'high'
+                  ? 'critical'
+                  : ep.severity === 'medium' || ep.severity === 'low'
+                    ? 'warning'
+                    : 'live';
+              return (
+                <Panel key={ep.id} className="gap-2">
+                  <View className="flex-row flex-wrap items-center justify-between gap-2">
+                    <Text className={cn('font-body-bold text-sm', textClass)}>{ep.state.replace(/_/g, ' ')}</Text>
+                    <Text style={{ color: TONE_COLOUR[tone] }} className="font-body-medium text-[11px]">
+                      {ep.severity} · {ep.score.toFixed(1)}
+                    </Text>
+                  </View>
+                  {(ep.contributors ?? []).length > 0 && (
+                    <View className="gap-1">
+                      {ep.contributors?.map((contributor) => (
+                        <Text key={contributor.code} className={cn('font-body text-xs leading-4', mutedClass)}>
+                          - {contributor.code}: {contributor.description} ({contributor.direction}, {contributor.score.toFixed(1)})
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                </Panel>
+              );
+            })
+          )}
         </View>
       )}
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

@@ -1,5 +1,7 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import {
@@ -20,13 +22,16 @@ import {
   type Scenario,
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
+import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
 import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import {
   Alert,
+  alpha,
   Badge,
   Body,
+  Button,
   Card,
   CardContent,
   CardHeader,
@@ -38,12 +43,15 @@ import {
   KeyValue,
   LimitBar,
   MagnitudeBars,
+  Meter,
   SectionLabel,
   Separator,
   StatTile,
+  StatusDot,
   Tabs,
   VerdictBanner,
   type Column,
+  type ConsolePalette,
   type MagnitudeDatum,
   type TabItem,
   type Variant,
@@ -227,65 +235,293 @@ type TabKey = 'diagnosis' | 'limits' | 'evidence' | 'signals' | 'model';
 // Sections
 // --------------------------------------------------------------------------------------
 
-function CandidateCard({ assessment, ordinal }: { assessment: FaultAssessmentRecord; ordinal: number }) {
+/**
+ * A bounded ring for a 0-100 score.
+ *
+ * The page's one dial. A readiness figure is the single number the whole result
+ * is conditional on, so it gets a mark that reads at a glance from across a
+ * control room; every other magnitude on the page stays a bar, where lengths
+ * can be compared against each other.
+ */
+function ScoreDial({
+  score,
+  variant,
+  palette,
+  size = 92,
+}: {
+  score: number;
+  variant: Variant;
+  palette: ConsolePalette;
+  size?: number;
+}) {
+  const accent =
+    variant === 'success' ? palette.accent : variant === 'warning' ? palette.warning : variant === 'destructive' ? palette.critical : palette.neutral;
+  const stroke = 8;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const clamped = Math.max(0, Math.min(100, score));
+
+  return (
+    <View style={{ width: size, height: size }} className="items-center justify-center">
+      <Svg width={size} height={size} style={{ position: 'absolute' }}>
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={alpha(accent, 0.16)} strokeWidth={stroke} fill="none" />
+        <Circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke={accent}
+          strokeWidth={stroke}
+          strokeLinecap="round"
+          fill="none"
+          strokeDasharray={`${(clamped / 100) * circumference} ${circumference}`}
+          // Start the arc at twelve o'clock rather than three.
+          transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </Svg>
+      <Text className="font-body-bold text-[20px] tracking-[-0.03em]" style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}>
+        {Math.round(clamped)}
+      </Text>
+      <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+        percent
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * A tag's recent samples, drawn at the size of a line of text.
+ *
+ * The rolling history the pipeline keeps for its temporal features is already
+ * in memory; showing it costs nothing and turns a bare number into a number
+ * with a direction. Nulls break the line rather than being interpolated over —
+ * a gap in the data is information.
+ */
+function TagTrend({ values, colour, width = 74, height = 20 }: { values: (number | null)[]; colour: string; width?: number; height?: number }) {
+  const path = useMemo(() => {
+    const samples = values.slice(-24);
+    const finite = samples.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    if (finite.length < 2) return null;
+    const min = Math.min(...finite);
+    const max = Math.max(...finite);
+    const span = max - min || Math.abs(max) || 1;
+    const stepX = samples.length > 1 ? width / (samples.length - 1) : width;
+
+    let d = '';
+    let pen = false;
+    samples.forEach((value, index) => {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        pen = false;
+        return;
+      }
+      const x = index * stepX;
+      const y = height - 2 - ((value - min) / span) * (height - 4);
+      d += `${pen ? ' L' : ' M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      pen = true;
+    });
+    return d.trim() || null;
+  }, [height, values, width]);
+
+  if (!path) {
+    return (
+      <View style={{ width, height }} className="justify-center">
+        <View style={{ height: 1, backgroundColor: alpha(colour, 0.25) }} />
+      </View>
+    );
+  }
+
+  return (
+    <Svg width={width} height={height}>
+      <Path d={path} fill="none" stroke={colour} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
+/**
+ * The live instrument readout.
+ *
+ * Every tag the model resolved, its current value in the canonical unit, its
+ * recent movement and its quality — the answer to "what is the model actually
+ * looking at right now", which otherwise takes three tabs to assemble.
+ */
+function SignalRail({
+  signals,
+  quality,
+  history,
+  missing,
+  palette,
+}: {
+  signals: ResolvedSignal[];
+  quality: SignalQuality[];
+  history: Partial<Record<ExtruderTag, (number | null)[]>>;
+  missing: { tag: ExtruderTag; label: string; essential: boolean }[];
+  palette: ConsolePalette;
+}) {
+  const qualityByCode = useMemo(() => new Map(quality.map((item) => [item.code, item])), [quality]);
+
+  return (
+    <Card className="gap-3">
+      <CardHeader>
+        <View className="flex-row items-center justify-between gap-2">
+          <CardTitle size="sm">Live instrument readout</CardTitle>
+          <Badge variant={signals.length > 0 ? 'success' : 'muted'} icon="access-point">
+            {signals.length} tag{signals.length === 1 ? '' : 's'}
+          </Badge>
+        </View>
+      </CardHeader>
+      <Separator />
+
+      {signals.length === 0 ? (
+        <Body muted>No mapped point resolved onto a pilot tag, so the model has nothing to read.</Body>
+      ) : (
+        <View className="gap-2.5">
+          {signals.map((signal) => {
+            const status = qualityByCode.get(signal.tag)?.status ?? (signal.value === null ? 'UNAVAILABLE' : 'GOOD');
+            const variant = QUALITY_VARIANT[status];
+            const colour =
+              variant === 'success' ? palette.accent : variant === 'warning' ? palette.warning : variant === 'destructive' ? palette.critical : palette.neutral;
+            return (
+              <View key={`${signal.tag}-${signal.label}`} className="flex-row items-center gap-2.5">
+                <StatusDot variant={variant} />
+                <View className="min-w-0 flex-1">
+                  <Text className="font-mono text-[10.5px]" style={{ color: palette.ink }} numberOfLines={1}>
+                    {signal.tag}
+                  </Text>
+                  <Text className="font-body text-[10.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
+                    {TAG_LABELS[signal.tag]}
+                  </Text>
+                </View>
+                <TagTrend values={history[signal.tag] ?? []} colour={colour} />
+                <View style={{ minWidth: 74 }} className="items-end">
+                  <Text
+                    className="font-mono text-[11.5px]"
+                    style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
+                    numberOfLines={1}
+                  >
+                    {formatNumber(signal.value)}
+                  </Text>
+                  <Text className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: palette.inkFaint }} numberOfLines={1}>
+                    {signal.unit}
+                  </Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
+
+      {missing.length > 0 && (
+        <>
+          <Separator />
+          <SectionLabel>Not mapped</SectionLabel>
+          <View className="flex-row flex-wrap gap-1.5">
+            {missing.map((item) => (
+              <Badge key={item.tag} variant={item.essential ? 'warning' : 'muted'} icon={null} outline>
+                {item.tag}
+              </Badge>
+            ))}
+          </View>
+        </>
+      )}
+    </Card>
+  );
+}
+
+function CandidateCard({ assessment, ordinal, maxScore }: { assessment: FaultAssessmentRecord; ordinal: number; maxScore: number }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const variant = MATCH_CLASS_VARIANT[assessment.matchClass] ?? 'info';
   const evidence = [...assessment.primary, ...assessment.supporting, ...assessment.weak];
+  const [openEvidence, setOpenEvidence] = useState(ordinal === 1);
 
   return (
     <Card accent={variant} className="gap-3">
       <CardHeader>
-        <View className="flex-row flex-wrap items-center justify-between gap-2">
-          <CardTitle>
-            {ordinal}. {assessment.faultName}
-          </CardTitle>
+        <View className="flex-row flex-wrap items-start justify-between gap-2">
+          <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
+            <View
+              className="h-6 w-6 items-center justify-center rounded-md"
+              style={{ backgroundColor: palette.panelRaised }}
+            >
+              <Text className="font-mono text-[11px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+                {ordinal}
+              </Text>
+            </View>
+            <CardTitle className="min-w-0 flex-1">{assessment.faultName}</CardTitle>
+          </View>
           <Badge variant={variant}>{humanise(assessment.matchClass)}</Badge>
         </View>
-        <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+
+        <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
           <KeyValue label="Fault" value={assessment.faultId} />
           <KeyValue label="Subsystem" value={humanise(assessment.category)} />
-          <KeyValue label="Match score" value={String(assessment.engineeringMatchScore)} />
+          <KeyValue label="Evidence" value={`${assessment.primary.length} primary · ${assessment.supporting.length} supporting`} />
         </View>
       </CardHeader>
 
-      <CardContent>
-        <SectionLabel>Evidence</SectionLabel>
-        {evidence.map((item, index) => (
-          <View key={`${item.feature}-${index}`} className="flex-row gap-2">
-            <Badge
-              variant={item.strength === 'PRIMARY_MATCH' ? 'destructive' : item.strength === 'SUPPORTING_MATCH' ? 'warning' : 'muted'}
-              icon={null}
-              outline
-            >
-              {item.strength.replace('_MATCH', '')}
-            </Badge>
-            <View className="min-w-0 flex-1 gap-0.5">
-              <Body>{item.description}</Body>
-              <Body muted mono>
-                {item.sensor} - {item.feature} = {formatNumber(item.observedValue)} - expected {item.expectedDirection}
-              </Body>
-            </View>
-          </View>
-        ))}
-      </CardContent>
+      {/* The match score is ordinal, so it is drawn against the strongest
+          candidate on screen rather than as a percentage of anything. */}
+      <View className="gap-1">
+        <View className="flex-row items-center justify-between">
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+            Engineering match score — ordinal, not a probability
+          </Text>
+          <Text className="font-mono text-[10.5px]" style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}>
+            {assessment.engineeringMatchScore}
+          </Text>
+        </View>
+        <Meter value={maxScore > 0 ? (assessment.engineeringMatchScore / maxScore) * 100 : 0} variant={variant} height={5} />
+      </View>
 
-      {assessment.contradicting.length > 0 && (
+      <Separator />
+
+      <Pressable
+        onPress={() => setOpenEvidence((previous) => !previous)}
+        accessibilityRole="button"
+        accessibilityState={{ expanded: openEvidence }}
+        className="flex-row items-center justify-between gap-2"
+      >
+        <SectionLabel>Evidence · {evidence.length}</SectionLabel>
+        <MaterialCommunityIcons name={openEvidence ? 'chevron-up' : 'chevron-down'} size={16} color={palette.inkFaint} />
+      </Pressable>
+
+      {openEvidence && (
         <CardContent>
-          <SectionLabel>Contradicting</SectionLabel>
-          {assessment.contradicting.map((item, index) => (
-            <Body key={`${item.feature}-${index}`} muted>
-              - {item.sensor}: {item.description}
-            </Body>
+          {evidence.map((item, index) => (
+            <View key={`${item.feature}-${index}`} className="flex-row gap-2">
+              <Badge
+                variant={item.strength === 'PRIMARY_MATCH' ? 'destructive' : item.strength === 'SUPPORTING_MATCH' ? 'warning' : 'muted'}
+                icon={null}
+                outline
+              >
+                {item.strength.replace('_MATCH', '')}
+              </Badge>
+              <View className="min-w-0 flex-1 gap-0.5">
+                <Body>{item.description}</Body>
+                <Body muted mono>
+                  {item.sensor} · {item.feature} = {formatNumber(item.observedValue)} · expected {item.expectedDirection}
+                </Body>
+              </View>
+            </View>
           ))}
+
+          {assessment.contradicting.length > 0 && (
+            <>
+              <SectionLabel>Contradicting</SectionLabel>
+              {assessment.contradicting.map((item, index) => (
+                <Body key={`${item.feature}-${index}`} muted>
+                  · {item.sensor}: {item.description}
+                </Body>
+              ))}
+            </>
+          )}
+
+          <SectionLabel>Identifiability</SectionLabel>
+          <Body muted>{humanise(assessment.identifiability)}</Body>
+          {assessment.separatingMeasurement ? (
+            <Body muted>Separating measurement required: {assessment.separatingMeasurement}.</Body>
+          ) : null}
         </CardContent>
       )}
-
-      <CardContent>
-        <SectionLabel>Identifiability</SectionLabel>
-        <Body muted>{humanise(assessment.identifiability)}</Body>
-        {assessment.separatingMeasurement ? (
-          <Body muted>Separating measurement required: {assessment.separatingMeasurement}.</Body>
-        ) : null}
-      </CardContent>
     </Card>
   );
 }
@@ -458,6 +694,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const palette = consolePalette(isDark);
   const [tab, setTab] = useState<TabKey>('diagnosis');
   const [scenarioId, setScenarioId] = useState<string | null>(null);
+  // The scenario library is a drawer opened from the header rather than a
+  // section in the flow: it is a testing instrument, not part of the reading.
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   // The twin's pipeline keeps its own rolling history so temporal features -
   // trend, repetition and dispersion - become available after a few samples.
@@ -652,20 +891,129 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     { key: 'prov', header: 'Provenance', width: 3.2, render: (row) => <Cell mono muted numberOfLines={3}>{row.provenance}</Cell> },
   ];
 
+  const { width } = useWindowDimensions();
+  // Two columns only where a 340px rail still leaves a readable main column.
+  const wide = width >= 1180;
+
+  const sourceVariant: Variant = scenarioRun
+    ? 'warning'
+    : dataMode === 'gateway'
+      ? 'success'
+      : dataMode === 'mixed'
+        ? 'warning'
+        : 'muted';
+  const sourceLabel = scenarioRun
+    ? 'Scenario injection'
+    : dataMode === 'gateway'
+      ? 'Live gateway'
+      : dataMode === 'mixed'
+        ? 'Partial live data'
+        : 'No live data';
+
+  const maxMatchScore = Math.max(1, ...candidateAssessments.map((assessment) => assessment.engineeringMatchScore));
+  const resolvedCount = detail.resolvedSignals.length;
+  const totalTags = resolvedCount + detail.missingTags.length;
+
+  const signalRail = (
+    <SignalRail
+      signals={detail.resolvedSignals}
+      quality={analysis.quality}
+      history={historyRef.current}
+      missing={detail.missingTags}
+      palette={palette}
+    />
+  );
+
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 48 }}>
-      {/* --- header ---------------------------------------------------------- */}
-      <View className="gap-1">
-        <Text className="font-body-bold text-3xl tracking-[-0.03em]" style={{ color: palette.ink }}>
-          Analysis layer
-        </Text>
-        <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
-          <KeyValue label="Model" value={`Single-screw extruder ${analysis.modelVersion}`} />
-          {machineId ? <KeyValue label="Machine" value={machineId} /> : null}
-          <KeyValue label="Recipe" value={detail.recipeId} />
-          <KeyValue label="State" value={detail.inferredMachineState} variant={stateVariant(detail.inferredMachineState)} />
+    <View className="min-h-0 flex-1" style={{ backgroundColor: palette.bg }}>
+      {/* --- fixed chrome ---------------------------------------------------
+          Identity and the data source never scroll away: every number below is
+          conditional on which of them is in force, and a reader who has
+          scrolled past "scenario injection" would be reading fabricated
+          measurements as if they were the plant. */}
+      <View
+        className="gap-3 px-5 py-3 md:flex-row md:items-center md:justify-between"
+        style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}
+      >
+        <View className="min-w-0 gap-1.5">
+          <View className="flex-row flex-wrap items-center gap-2">
+            <MaterialCommunityIcons name="stethoscope" size={17} color={palette.accent} />
+            <Text className="font-body-bold text-[18px] tracking-[-0.025em]" style={{ color: palette.ink }}>
+              Analysis layer
+            </Text>
+            <Badge variant="muted" icon="hand-back-right-outline">
+              Advisory only
+            </Badge>
+          </View>
+          <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+            <KeyValue label="Model" value={`Single-screw extruder ${analysis.modelVersion}`} />
+            {machineId ? <KeyValue label="Machine" value={machineId} /> : null}
+            <KeyValue label="Recipe" value={detail.recipeId} />
+            <KeyValue label="State" value={humanise(detail.inferredMachineState)} variant={stateVariant(detail.inferredMachineState)} />
+          </View>
+        </View>
+
+        <View className="flex-row flex-wrap items-center gap-2">
+          <View
+            className="flex-row items-center gap-2 rounded-lg border px-2.5 py-1.5"
+            style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+          >
+            <StatusDot variant={sourceVariant} />
+            <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+              {sourceLabel}
+            </Text>
+          </View>
+          <Button
+            tone={scenarioRun ? 'warning' : 'secondary'}
+            icon="flask-outline"
+            onPress={() => setLibraryOpen((previous) => !previous)}
+            accessibilityLabel="Open the fault scenario library"
+          >
+            {scenarioRun ? scenarioRun.scenario.id : 'Scenarios'}
+          </Button>
+          {scenarioRun ? (
+            <Button tone="secondary" icon="broadcast" onPress={() => setScenarioId(null)} accessibilityLabel="Return to live data">
+              Live data
+            </Button>
+          ) : null}
         </View>
       </View>
+
+      {/* Tab bar — also fixed, so switching views never means scrolling back up. */}
+      <View
+        className="px-5 py-2"
+        style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}
+      >
+        <Tabs items={tabs} value={tab} onChange={setTab} />
+      </View>
+
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 56, alignItems: 'center' }}
+      >
+        {/* A measured column: analysis prose is unreadable at 2000px, and the
+            tables inside scroll on their own rather than stretching. */}
+        <View className="w-full gap-4" style={{ maxWidth: 1280 }}>
+
+      {libraryOpen && (
+        <Card className="gap-3">
+          <CardHeader>
+            <View className="flex-row flex-wrap items-center justify-between gap-2">
+              <CardTitle size="sm">Fault scenario library</CardTitle>
+              <Badge variant={scenarioRun ? 'warning' : 'muted'} icon="flask-outline">
+                {SCENARIOS.filter((scenario) => !scenario.unsupported).length}/{SCENARIOS.length} reproducible
+              </Badge>
+            </View>
+            <Body muted>
+              {scenarioRun
+                ? `Running ${scenarioRun.scenario.id} — ${scenarioRun.scenario.name}. Live data is not being analysed.`
+                : 'Verified diagnostic cases from the digital twin. Selecting one drives this same pipeline with that condition instead of live measurements.'}
+            </Body>
+          </CardHeader>
+          <Separator />
+          <ScenarioPicker activeId={scenarioId} onSelect={setScenarioId} />
+        </Card>
+      )}
 
       {/* Say plainly when the live model has no gateway measurements to read. */}
       {!scenarioRun && dataMode !== 'gateway' && (
@@ -679,22 +1027,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
             : 'Only channels with current gateway measurements are evaluated. Silent mapped channels stay unavailable and do not receive fallback values.'}
         </Alert>
       )}
-
-      {/* --- scenario library ------------------------------------------------ */}
-      <Collapsible
-        title="Fault scenario library"
-        icon="flask-outline"
-        count={SCENARIOS.length}
-        variant={scenarioRun ? 'warning' : undefined}
-        defaultOpen={false}
-        summary={
-          scenarioRun
-            ? `Running ${scenarioRun.scenario.id} - ${scenarioRun.scenario.name}. Live data is not being analysed.`
-            : `${SCENARIOS.length} verified diagnostic cases from the digital twin. Select one to drive the analyzer with that condition; ${SCENARIOS.filter((s) => !s.unsupported).length} are reproducible here.`
-        }
-      >
-        <ScenarioPicker activeId={scenarioId} onSelect={setScenarioId} />
-      </Collapsible>
 
       {scenarioRun && (
         <Alert
@@ -731,24 +1063,53 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         </Alert>
       )}
 
-      {/* --- the verdict ----------------------------------------------------- */}
-      <VerdictBanner
-        variant={verdictVariant}
-        eyebrow={hasCandidates ? `${humanise(detail.faultLayer)} layer - ${humanise(detail.faultCategory)}` : 'No fault signature'}
-        title={verdictTitle}
-        detail={verdictDetail}
-        meta={
-          <>
-            <Badge variant={verdictVariant}>{humanise(detail.identifiability)}</Badge>
-            <Badge variant="muted" icon="flask-outline">
-              Engineering development
-            </Badge>
-            <Badge variant="muted" icon="hand-back-right-outline">
-              Advisory only
-            </Badge>
-          </>
-        }
-      />
+      {/* --- the verdict -----------------------------------------------------
+          The conclusion and the readiness the conclusion rests on are one
+          block: a strong verdict computed from half the instrument set means
+          something different from the same verdict computed from all of it. */}
+      <View className={cn('gap-4', wide && 'flex-row items-stretch')}>
+        <View className="min-w-0 flex-1">
+          <VerdictBanner
+            variant={verdictVariant}
+            eyebrow={hasCandidates ? `${humanise(detail.faultLayer)} layer · ${humanise(detail.faultCategory)}` : 'No fault signature'}
+            title={verdictTitle}
+            detail={verdictDetail}
+            meta={
+              <>
+                <Badge variant={verdictVariant}>{humanise(detail.identifiability)}</Badge>
+                <Badge variant="muted" icon="flask-outline">
+                  Engineering development
+                </Badge>
+                <Badge variant="muted" icon="scale-balance">
+                  {resolvedCount}/{totalTags} pilot tags resolved
+                </Badge>
+              </>
+            }
+          />
+        </View>
+
+        <Card className="justify-between gap-3" style={wide ? { width: 268 } : undefined}>
+          <View className="flex-row items-center gap-2">
+            <MaterialCommunityIcons name="check-decagram-outline" size={13} color={palette.inkMuted} />
+            <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+              Evidence readiness
+            </Text>
+          </View>
+          <View className="flex-row items-center gap-3">
+            <ScoreDial score={analysis.readiness.score} variant={readinessVariant(analysis.readiness.score)} palette={palette} />
+            <View className="min-w-0 flex-1 gap-1">
+              <Badge variant={analysis.readiness.ready ? 'success' : 'warning'}>
+                {analysis.readiness.ready ? 'Ready' : 'Not ready'}
+              </Badge>
+              <Text className="font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }} numberOfLines={4}>
+                {analysis.readiness.ready
+                  ? 'Every essential pilot tag is mapped and reporting.'
+                  : `${analysis.readiness.missingEssential.length} essential tag${analysis.readiness.missingEssential.length === 1 ? '' : 's'} not mapped: ${analysis.readiness.missingEssential.join(', ') || '—'}`}
+              </Text>
+            </View>
+          </View>
+        </Card>
+      </View>
 
       {/* A hard-limit breach is the most urgent thing on this page and stays
           visible regardless of which tab is open. */}
@@ -768,19 +1129,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
 
       {/* --- KPI row --------------------------------------------------------- */}
       <View className="flex-row flex-wrap gap-3">
-        <StatTile
-          className="min-w-[220px] flex-1"
-          label="Evidence readiness"
-          value={`${analysis.readiness.score}%`}
-          variant={readinessVariant(analysis.readiness.score)}
-          icon="check-decagram-outline"
-          meter={analysis.readiness.score}
-          detail={
-            analysis.readiness.ready
-              ? 'All essential pilot tags are mapped.'
-              : `${analysis.readiness.missingEssential.length} essential tag(s) not mapped.`
-          }
-        />
         <StatTile
           className="min-w-[220px] flex-1"
           label="Machine state"
@@ -809,13 +1157,23 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           icon="ruler-square"
           detail={`${detail.constraints.filter((c) => c.status === 'PASS').length} of ${detail.constraints.length} evaluated and inside limits.`}
         />
+        <StatTile
+          className="min-w-[220px] flex-1"
+          label="Signal quality"
+          value={degradedSignals.length === 0 ? 'All good' : `${degradedSignals.length} degraded`}
+          variant={degradedSignals.length === 0 ? 'success' : 'warning'}
+          icon="access-point"
+          meter={totalTags > 0 ? (resolvedCount / totalTags) * 100 : 0}
+          detail={`${resolvedCount} of ${totalTags} pilot tags resolved from ${mappedChannels.length} mapped point${mappedChannels.length === 1 ? '' : 's'}.`}
+        />
       </View>
 
-      <Tabs items={tabs} value={tab} onChange={setTab} />
-
-      {/* --- Diagnosis ------------------------------------------------------- */}
+      {/* --- Diagnosis -------------------------------------------------------
+          The conclusion on the left, the instruments it was read from on the
+          right: the two questions an operator asks in the same breath. */}
       {tab === 'diagnosis' && (
-        <View className="gap-3">
+        <View className={cn('gap-4', wide && 'flex-row items-start')}>
+          <View className="min-w-0 flex-1 gap-3">
           {liveDataUnavailable ? (
             <Card accent="warning">
               <CardHeader>
@@ -846,7 +1204,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
               </Card>
 
               {candidateAssessments.map((assessment, index) => (
-                <CandidateCard key={assessment.faultId} assessment={assessment} ordinal={index + 1} />
+                <CandidateCard key={assessment.faultId} assessment={assessment} ordinal={index + 1} maxScore={maxMatchScore} />
               ))}
 
               {analysis.maintenance.caseRequired && (
@@ -897,6 +1255,27 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
               )}
             </>
           )}
+          </View>
+
+          <View className="gap-3" style={wide ? { width: 340 } : undefined}>
+            {signalRail}
+
+            {detail.separatingMeasurements.length === 0 && detail.blockedOutputs.length > 0 ? (
+              <Card className="gap-2">
+                <CardHeader>
+                  <CardTitle size="sm">Blocked outputs</CardTitle>
+                  <Body muted>Quantities this model refuses to state because it has no calibrated basis for them.</Body>
+                </CardHeader>
+                <View className="flex-row flex-wrap gap-1.5">
+                  {detail.blockedOutputs.map((output) => (
+                    <Badge key={output} variant="muted" icon="cancel">
+                      {humanise(output)}
+                    </Badge>
+                  ))}
+                </View>
+              </Card>
+            ) : null}
+          </View>
         </View>
       )}
 
@@ -1132,6 +1511,8 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           </Collapsible>
         </View>
       )}
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

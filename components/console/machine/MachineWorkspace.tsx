@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -12,7 +12,9 @@ import {
   type MachineNode,
 } from '../../../lib/machines';
 import { listChannels, type CardNode } from '../../../lib/rack';
+import { consolePalette } from '../../ui';
 import { BackButton } from '../BackButton';
+import { connectorsForTemplate, type ConnectorState } from './machineConnectors';
 import { AlarmView } from './AlarmView';
 import { AnalysisView } from './AnalysisView';
 import { MachineOverview } from './MachineOverview';
@@ -87,6 +89,48 @@ function ActualSubTab({ label, active, onPress }: { label: string; active: boole
   );
 }
 
+/**
+ * Design ⇄ Actual switch.
+ *
+ * Configuration and the deployed dashboard are two views of one machine, so the
+ * switch between them belongs in the workspace header beside the machine's
+ * name — not buried in a menu. Without it a configurator has no route to the
+ * Actual View at all, and the Rack/Overview/Analysis/Alarm/Trend tabs that live
+ * there are unreachable.
+ */
+function ModeSwitch({ mode, onChange }: { mode: WorkspaceMode; onChange: (mode: WorkspaceMode) => void }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  return (
+    <View
+      accessibilityRole="tablist"
+      className="flex-row items-center gap-1 rounded-xl border p-1"
+      style={{ borderColor: palette.line, backgroundColor: palette.panel }}
+    >
+      {(['design', 'actual'] as const).map((value) => {
+        const active = mode === value;
+        return (
+          <Pressable
+            key={value}
+            accessibilityRole="tab"
+            accessibilityState={{ selected: active }}
+            onPress={() => onChange(value)}
+            className="rounded-lg px-3 py-1.5"
+            style={active ? { backgroundColor: palette.ink } : undefined}
+          >
+            <Text
+              className="font-mono text-[10px] uppercase tracking-[0.16em]"
+              style={{ color: active ? palette.panel : palette.inkMuted }}
+            >
+              {value === 'design' ? 'Design' : 'Actual'}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 function ZoomControls({ zoom, onZoomOut, onReset, onZoomIn }: { zoom: number; onZoomOut: () => void; onReset: () => void; onZoomIn: () => void }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -145,6 +189,7 @@ export function MachineWorkspace({
   canSaveTemplate = false,
 }: MachineWorkspaceProps) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   const [actualTab, setActualTab] = useState<ActualTab>('machine');
@@ -258,6 +303,15 @@ export function MachineWorkspace({
     setSelectedComponentId(component.id);
   };
 
+  // Instrument pads this machine's drawing has. The canvas snaps trail
+  // endpoints to them; the drawing renders which of them are wired.
+  const connectors = useMemo(() => connectorsForTemplate(machine.template), [machine.template]);
+  const [connectorState, setConnectorState] = useState<Record<string, ConnectorState>>({});
+  useEffect(() => setConnectorState({}), [machine.id]);
+  // Stable identity: TrailBoard only calls this when the wiring actually
+  // changes, and an unstable callback would defeat that.
+  const handleConnectorState = useCallback((state: Record<string, ConnectorState>) => setConnectorState(state), []);
+
   // Wrapped so BackButton's `self-start` sizes it to its content instead of
   // stretching; in Actual View the hierarchy sidebar is hidden entirely, so this
   // is the only way out of the workspace and needs a real tap target.
@@ -281,7 +335,7 @@ export function MachineWorkspace({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={{ alignItems: 'center', paddingVertical: 2 }}
-      style={{ flexGrow: 0, flexShrink: 1, marginLeft: 'auto' }}
+      style={{ flexGrow: 0, flexShrink: 1 }}
     >
       <View
         className={cn(
@@ -299,29 +353,99 @@ export function MachineWorkspace({
     </ScrollView>
   );
 
-  return (
-    <View className="flex-1">
-      {isActual ? (
-        // Actual View is a full-screen dashboard preview — the mode switcher
-        // (and the hierarchy sidebar, hidden by the parent) stay out of the
-        // way entirely, so Back, the name, and the sub-tabs share one compact
-        // row instead of leaving a mostly-empty strip above it.
-        <View className="gap-3 px-4 py-4 md:flex-row md:items-center md:justify-between md:px-6">
-          <View className="flex-row items-center gap-4">
-            {backButton}
-            {nameBlock}
-          </View>
-          {actualSubTabs}
-        </View>
-      ) : (
+  // One header band for every mode: identity on the left, the controls for
+  // whatever is below it on the right. It is the only chrome above the canvas,
+  // which is what lets the stage run to the left, right and bottom edges.
+  const header = (controls: ReactNode) => (
+    <View
+      className="gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-6 md:px-6"
+      style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
+    >
+      <View className="min-w-0 flex-row items-center gap-3">
+        {backButton}
+        {nameBlock}
+      </View>
+      <View className="min-w-0 flex-row flex-wrap items-center justify-start gap-2 md:justify-end">
+        {canConfigure ? <ModeSwitch mode={mode} onChange={setConfiguratorMode} /> : null}
+        {controls}
+      </View>
+    </View>
+  );
+
+  // The stage. Nothing but the canvas lives below the header, so the machine
+  // gets the entire remaining area on every screen.
+  const canvasRegion = (board: ReactNode) => (
+    <View
+      className="relative flex-1 overflow-hidden"
+      onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+    >
+      {stageStyle && (
         <>
-          <View className="gap-3 px-4 pt-4 md:flex-row md:items-center md:px-6 md:pt-5">
-            {backButton}
+          <View pointerEvents="box-none" style={stageStyle} className="items-center justify-center">
+            <StageGrid />
+            <View
+              onLayout={(e) => {
+                const { x, y, width, height } = e.nativeEvent.layout;
+                setMachineLayout({ x, y, width, height });
+              }}
+              style={{ transform: [{ scale: zoom }] }}
+              className={hasTemplateArtwork ? 'w-full max-w-5xl p-6' : 'h-full w-full'}
+            >
+              {machine.template === 'Rotary Airlock Valve' ? (
+                <RotaryAirlockValve />
+              ) : machine.template === 'Single Screw Extruder' ? (
+                <SingleScrewExtruder connectorState={connectorState} />
+              ) : (
+                <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
+              )}
+            </View>
           </View>
 
-          <View className="flex-row items-center justify-between px-4 pt-3 md:px-6">{nameBlock}</View>
+          {board}
+
+          <ZoomControls zoom={zoom} onZoomOut={zoomOut} onReset={resetZoom} onZoomIn={zoomIn} />
         </>
       )}
+    </View>
+  );
+
+  const showsCanvas = mode === 'design' || (isActual && actualTab === 'machine');
+
+  if (showsCanvas) {
+    return (
+      <TrailBoard
+        devices={devices}
+        cards={cards}
+        live={live}
+        machineRect={machineRect}
+        machineId={machine.id}
+        machineTemplate={machine.template}
+        templateLayout={templateLayout ?? null}
+        initialLayout={layout ?? null}
+        onSaveLayout={onSaveLayout}
+        onSaveTemplate={onSaveTemplate}
+        stageStyle={stageStyle}
+        stageScale={stageScale}
+        readOnly={readOnlyCanvas}
+        hideUnlink={readOnlyCanvas}
+        canSaveTemplate={canSaveTemplate}
+        connectors={connectors}
+        onConnectorStateChange={handleConnectorState}
+        // The board owns the whole workspace shell so its command rail can sit
+        // in the header while its canvas layer stays inside the stage.
+        renderWorkspace={({ toolbar, board }) => (
+          <View className="flex-1">
+            {header(isActual ? actualSubTabs : toolbar)}
+            {canvasRegion(board)}
+          </View>
+        )}
+      />
+    );
+  }
+
+  return (
+    <View className="flex-1">
+      {header(actualSubTabs)}
 
       {isActual && actualTab === 'rack' && (
         <RackOccupancyView devices={devices} cards={cards} mappedChannels={mappedChannels} expectedPoints={expectedPoints} />
@@ -359,59 +483,6 @@ export function MachineWorkspace({
         <TrendView mappedChannels={mappedChannels} devices={devices} machineId={machine.id} expectedPoints={expectedPoints} />
       )}
 
-      {(mode === 'design' || (isActual && actualTab === 'machine')) && (
-        <View className="relative flex-1 flex-row">
-          <View
-            className="relative flex-1 overflow-hidden"
-            onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-          >
-            {stageStyle && (
-              <>
-                <View pointerEvents="box-none" style={stageStyle} className="items-center justify-center">
-                  <StageGrid />
-                  <View
-                    onLayout={(e) => {
-                      const { x, y, width, height } = e.nativeEvent.layout;
-                      setMachineLayout({ x, y, width, height });
-                    }}
-                    style={{ transform: [{ scale: zoom }] }}
-                    className={hasTemplateArtwork ? 'w-full max-w-5xl p-6' : 'h-full w-full'}
-                  >
-                    {machine.template === 'Rotary Airlock Valve' ? (
-                      <RotaryAirlockValve />
-                    ) : machine.template === 'Single Screw Extruder' ? (
-                      <SingleScrewExtruder />
-                    ) : (
-                      <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
-                    )}
-                  </View>
-                </View>
-
-                <TrailBoard
-                  devices={devices}
-                  cards={cards}
-                  live={live}
-                  machineRect={machineRect}
-                  machineId={machine.id}
-                  machineTemplate={machine.template}
-                  templateLayout={templateLayout ?? null}
-                  initialLayout={layout ?? null}
-                  onSaveLayout={onSaveLayout}
-                  onSaveTemplate={onSaveTemplate}
-                  stageStyle={stageStyle}
-                  stageScale={stageScale}
-                  readOnly={readOnlyCanvas}
-                  hideUnlink={readOnlyCanvas}
-                  canSaveTemplate={canSaveTemplate}
-                />
-
-                <ZoomControls zoom={zoom} onZoomOut={zoomOut} onReset={resetZoom} onZoomIn={zoomIn} />
-              </>
-            )}
-          </View>
-
-        </View>
-      )}
     </View>
   );
 }

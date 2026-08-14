@@ -23,6 +23,16 @@ type SingleScrewExtruderProps = {
   style?: StyleProp<ViewStyle>;
 
   /**
+   * How each instrument pad is currently wired, keyed by point code.
+   *
+   * An empty pad is a hollow ring, a pad with a card attached is filled, and a
+   * pad whose card is reporting gets a halo. The machine drawing is therefore
+   * the fastest read of what is actually instrumented — no legend, no second
+   * panel to cross-reference.
+   */
+  connectorState?: Record<string, 'idle' | 'linked' | 'live'>;
+
+  /**
    * Advance the screw flights along the barrel.
    * One full turn (360) shifts the flights by exactly one pitch.
    */
@@ -215,6 +225,7 @@ export function SingleScrewExtruder({
   style,
   screwRotation = 0,
   showBackground = false,
+  connectorState,
 }: SingleScrewExtruderProps) {
   const { isDark } = useAppTheme();
 
@@ -610,14 +621,33 @@ export function SingleScrewExtruder({
 
         {/* Instrument pads. Every card attaches to one of these, and the trail
             layout reads the same list, so a connection can never point at a
-            place the machine has no instrument. */}
-        {EXTRUDER_CONNECTORS.map((connector) => (
-          <G key={connector.code}>
-            <Circle cx={connector.x} cy={connector.y} r={9} fill={colours.accent} opacity={0.14} />
-            <Circle cx={connector.x} cy={connector.y} r={5} fill={colours.accent} stroke={colours.panel} strokeWidth={1.4} />
-            <Circle cx={connector.x} cy={connector.y} r={2} fill="#ffffff" opacity={0.82} />
-          </G>
-        ))}
+            place the machine has no instrument.
+
+            Three states, drawn as three different marks rather than three
+            shades of one: empty is a hollow ring, wired is a filled pad, and a
+            pad whose card is reporting carries a halo. Shape does the work, so
+            the states survive greyscale and colour-blindness. */}
+        {EXTRUDER_CONNECTORS.map((connector) => {
+          const state = connectorState?.[connector.code] ?? 'idle';
+          const wired = state !== 'idle';
+          const live = state === 'live';
+          return (
+            <G key={connector.code}>
+              {live && <Circle cx={connector.x} cy={connector.y} r={12} fill={colours.accent} opacity={0.16} />}
+              <Circle cx={connector.x} cy={connector.y} r={9} fill={colours.accent} opacity={wired ? 0.18 : 0.08} />
+              <Circle
+                cx={connector.x}
+                cy={connector.y}
+                r={5}
+                fill={wired ? colours.accent : colours.panel}
+                stroke={wired ? colours.panel : colours.accent}
+                strokeWidth={wired ? 1.4 : 1.6}
+                opacity={wired ? 1 : 0.75}
+              />
+              {wired && <Circle cx={connector.x} cy={connector.y} r={2} fill="#ffffff" opacity={0.82} />}
+            </G>
+          );
+        })}
 
         {/* Process out */}
         <Polygon points={`1164,${BARREL_AXIS_Y - 10} 1164,${BARREL_AXIS_Y + 10} 1184,${BARREL_AXIS_Y}`} fill={colours.accent} />

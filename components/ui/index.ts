@@ -16,8 +16,10 @@
 export { Body, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, SectionLabel, Separator } from './Card';
 export { Badge, KeyValue, StatusDot } from './Badge';
 export { Alert, VerdictBanner } from './Alert';
+export { Button, IconButton, Toolbar, ToolbarDivider, ToolbarGroup, type ButtonSize, type ButtonTone } from './Button';
+export { Toast } from './Toast';
 export { Tabs, type TabItem } from './Tabs';
 export { Collapsible } from './Collapsible';
 export { LimitBar, MagnitudeBars, Meter, StatTile, type MagnitudeDatum } from './Metrics';
 export { Cell, DataTable, type Column } from './DataTable';
-export { alpha, consolePalette, variantStyle, type IconName, type Variant } from './tokens';
+export { alpha, consolePalette, variantStyle, type ConsolePalette, type IconName, type Variant } from './tokens';

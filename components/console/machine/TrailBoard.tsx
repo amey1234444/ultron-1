@@ -1,14 +1,26 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
-import { cn } from '../../../lib/cn';
 import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
 import { liveMeasurementKey } from '../../../lib/liveMeasurementBus';
 import { channelHasRecentData, channelLiveStatus, deviceHasLiveBinding, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
+import {
+  alpha,
+  Badge,
+  Button,
+  consolePalette,
+  Toast,
+  Toolbar,
+  ToolbarDivider,
+  ToolbarGroup,
+  type IconName,
+  type Variant,
+} from '../../ui';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
+import type { ConnectorState, MachineConnector } from './machineConnectors';
 import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { createTemplateDefaultLayout, hasDefaultLayout } from './templateDefaultLayouts';
 
@@ -23,6 +35,12 @@ export type Trail = {
   endBoxAnchor?: Anchor;
   startMachineAnchor?: Anchor;
   endMachineAnchor?: Anchor;
+  // Set when the machine end landed on one of the artwork's instrument pads
+  // rather than on bare machine body. This is what turns a drawn line into a
+  // declared connection: the pad's code identifies the instrument, and the
+  // analysis layer resolves the card's signal through it.
+  startMachinePointCode?: string;
+  endMachinePointCode?: string;
   // Template-generated trails: the middle bend is *derived* (horizontal run out
   // of the box + one 45° segment into the machine), so whenever either endpoint
   // re-anchors (zoom, box move/resize) the bend is recomputed to keep that
@@ -84,6 +102,12 @@ type TrailBoardProps = {
   onSaveLayout?: (machineId: string, layout: SavedLayout) => void;
   onSaveTemplate?: (machineTemplate: string, layout: SavedLayout) => void;
   canSaveTemplate?: boolean;
+  // The instrument pads this machine's artwork draws. A trail endpoint dropped
+  // near one snaps onto it exactly and records which instrument it is.
+  connectors?: MachineConnector[];
+  // Reports which pads are wired right now, so the artwork can draw a connected
+  // pad differently from an empty one.
+  onConnectorStateChange?: (state: Record<string, ConnectorState>) => void;
   // TrailBoard keeps ownership of edit state while the workspace decides where
   // the command rail and stage layers are hosted.
   renderWorkspace?: (layers: TrailBoardLayers) => ReactNode;
@@ -165,6 +189,90 @@ function worseStatus(a: TrailStatus, b: TrailStatus): TrailStatus {
   return STATUS_RANK[a] >= STATUS_RANK[b] ? a : b;
 }
 
+// How close, in stage units, a dropped endpoint has to be to an instrument pad
+// before it counts as a connection to that instrument. Wide enough to hit with
+// a mouse at any zoom; well under the 80-unit spacing of the closest pair of
+// pads on either artwork, so two neighbouring barrel zones can never be
+// confused for each other.
+const CONNECTOR_SNAP_RADIUS = 26;
+
+function connectorStagePoint(connector: MachineConnector, rect: Rect): Point {
+  return { x: rect.x + connector.rx * rect.width, y: rect.y + connector.ry * rect.height };
+}
+
+function nearestConnector(
+  point: Point,
+  rect: Rect | null,
+  connectors: MachineConnector[],
+): { connector: MachineConnector; point: Point } | null {
+  if (!rect || connectors.length === 0) return null;
+  let best: { connector: MachineConnector; point: Point; distance: number } | null = null;
+  for (const connector of connectors) {
+    const padPoint = connectorStagePoint(connector, rect);
+    const distance = Math.hypot(point.x - padPoint.x, point.y - padPoint.y);
+    if (distance <= CONNECTOR_SNAP_RADIUS && (!best || distance < best.distance)) {
+      best = { connector, point: padPoint, distance };
+    }
+  }
+  return best ? { connector: best.connector, point: best.point } : null;
+}
+
+function channelLocationLabel(channel: ChannelRef): string {
+  return `S${String(channel.slot).padStart(2, '0')}.CH${channelNumberFor(channel)}`;
+}
+
+// Anchors are fractions of the machine rect; both artworks are drawn on the
+// same 1200×760 viewBox, so comparing them in artwork units gives one tolerance
+// that means the same thing at every zoom and screen size.
+const ARTWORK_WIDTH = 1200;
+const ARTWORK_HEIGHT = 760;
+const ANCHOR_MATCH_TOLERANCE = 14;
+
+function connectorForAnchor(anchor: Anchor | undefined, connectors: MachineConnector[]): MachineConnector | undefined {
+  if (!anchor) return undefined;
+  let best: { connector: MachineConnector; distance: number } | undefined;
+  for (const connector of connectors) {
+    const distance = Math.hypot((anchor.rx - connector.rx) * ARTWORK_WIDTH, (anchor.ry - connector.ry) * ARTWORK_HEIGHT);
+    if (distance <= ANCHOR_MATCH_TOLERANCE && (!best || distance < best.distance)) best = { connector, distance };
+  }
+  return best?.connector;
+}
+
+/**
+ * Give saved trails their pad identity back.
+ *
+ * Layouts saved before instrument pads were identified — including every trail
+ * the template generator produced — carry only a machine anchor. That anchor is
+ * already sitting on a pad, so the pad it is sitting on is recoverable, and
+ * recovering it means an existing canvas lights up correctly instead of looking
+ * unwired until every endpoint is dragged again.
+ */
+function withResolvedConnectors(trails: Trail[], connectors: MachineConnector[]): Trail[] {
+  if (connectors.length === 0) return trails;
+  let changed = false;
+  const next = trails.map((trail) => {
+    const start = trail.startMachinePointCode ? undefined : connectorForAnchor(trail.startMachineAnchor, connectors);
+    const end = trail.endMachinePointCode ? undefined : connectorForAnchor(trail.endMachineAnchor, connectors);
+    if (!start && !end) return trail;
+    changed = true;
+    return {
+      ...trail,
+      ...(start ? { startMachinePointCode: start.code } : null),
+      ...(end ? { endMachinePointCode: end.code } : null),
+    };
+  });
+  return changed ? next : trails;
+}
+
+/** A transient confirmation raised by a connection the operator just made. */
+type ConnectionNotice = {
+  id: number;
+  variant: Variant;
+  icon: IconName;
+  title: string;
+  detail?: string;
+};
+
 export function TrailBoard({
   devices,
   cards,
@@ -181,11 +289,12 @@ export function TrailBoard({
   onSaveLayout,
   onSaveTemplate,
   canSaveTemplate = false,
+  connectors = [],
+  onConnectorStateChange,
   renderWorkspace,
 }: TrailBoardProps) {
   const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const palette = consolePalette(isDark);
 
   const storageKey = trailBoardStorageKey(machineId);
   const effectiveRack = useCallback((rack: DeviceNode) => deviceWithGatewayConnectionState(rack, devices), [devices]);
@@ -219,6 +328,16 @@ export function TrailBoard({
   const [justSavedTemplate, setJustSavedTemplate] = useState(false);
   const savedFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const savedTemplateFlashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Set while an endpoint is being dragged, so every instrument pad on the
+  // machine lights up as a target instead of the operator having to guess where
+  // a connection is allowed to land.
+  const [wiring, setWiring] = useState(false);
+  // The pad a connection was just made to — pulsed briefly so the eye is taken
+  // to the instrument that was wired, not just to the toast.
+  const [flashedConnector, setFlashedConnector] = useState<string | null>(null);
+  const [notice, setNotice] = useState<ConnectionNotice | null>(null);
+  const noticeSeq = useRef(0);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
   const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter }), [devices, cards, pickableChannelFilter]);
@@ -277,6 +396,64 @@ export function TrailBoard({
   boxSizesRef.current = boxSizes;
   readOnlyRef.current = readOnly;
   onSaveLayoutRef.current = onSaveLayout;
+
+  const readingText = useCallback((reading: LiveMeasurement | undefined, channel: ChannelRef): string | null => {
+    if (!reading || typeof reading.value !== 'number' || !Number.isFinite(reading.value)) return null;
+    const value = Math.abs(reading.value) >= 100 ? reading.value.toFixed(1) : reading.value.toFixed(2);
+    return `${value} ${reading.unit ?? channel.unit}`.trim();
+  }, []);
+
+  /**
+   * State the connection the operator just made, then get out of the way.
+   *
+   * The four outcomes are deliberately distinct. "Connected to the analysis
+   * layer" is only claimed when a pad the model actually reads carries a linked
+   * channel that is currently reporting — a card sitting on an instrument the
+   * model does not consume, or one that has never sent a sample, is a different
+   * situation and says so rather than being congratulated.
+   */
+  const announceConnection = useCallback(
+    (connector: MachineConnector, box: Box | undefined) => {
+      const channel = box?.channelId ? channelsRef.current.find((c) => c.id === box.channelId) ?? null : null;
+      const reading = channel ? liveReadingFor(channel) : undefined;
+      const value = channel && isChannelLive(channel) ? readingText(reading, channel) : null;
+
+      const next: Omit<ConnectionNotice, 'id'> = !connector.analyzerTag
+        ? {
+            variant: 'muted',
+            icon: 'link-variant-off',
+            title: `${connector.label} is not read by the analysis layer`,
+            detail: connector.analyzerNote ?? 'This instrument carries no tag in the current model.',
+          }
+        : !channel
+          ? {
+              variant: 'info',
+              icon: 'link-variant',
+              title: `Connected to ${connector.label}`,
+              detail: `Link a rack channel to feed analyzer tag ${connector.analyzerTag}.`,
+            }
+          : value
+            ? {
+                variant: 'success',
+                icon: 'check-decagram',
+                title: `This data is connected to channel ${channel.code}`,
+                detail: `${connector.label} → ${connector.analyzerTag} · ${channelLocationLabel(channel)} · ${value}`,
+              }
+            : {
+                variant: 'warning',
+                icon: 'timer-sand',
+                title: `${channel.code} linked to ${connector.label}`,
+                detail: `Analyzer tag ${connector.analyzerTag} — waiting for the first gateway sample.`,
+              };
+
+      noticeSeq.current += 1;
+      setNotice({ ...next, id: noticeSeq.current });
+      setFlashedConnector(connector.code);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+      flashTimer.current = setTimeout(() => setFlashedConnector(null), 2000);
+    },
+    [isChannelLive, liveReadingFor, readingText],
+  );
 
   const layoutWithCenters = useCallback((nextTrails: Trail[], nextBoxes: Box[]): SavedLayout => {
     return {
@@ -385,6 +562,7 @@ export function TrailBoard({
     return () => {
       if (savedFlashTimer.current) clearTimeout(savedFlashTimer.current);
       if (savedTemplateFlashTimer.current) clearTimeout(savedTemplateFlashTimer.current);
+      if (flashTimer.current) clearTimeout(flashTimer.current);
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
       if (pendingLayout.current) {
         onSaveLayoutRef.current?.(machineId, pendingLayout.current);
@@ -452,47 +630,100 @@ export function TrailBoard({
     const boxIdKey = which === 'start' ? 'startBoxId' : 'endBoxId';
     const boxAnchorKey = which === 'start' ? 'startBoxAnchor' : 'endBoxAnchor';
     const machineAnchorKey = which === 'start' ? 'startMachineAnchor' : 'endMachineAnchor';
+    const pointCodeKey = which === 'start' ? 'startMachinePointCode' : 'endMachinePointCode';
     replaceTrails((prev) =>
-      prev.map((t) => (t.id === trailId ? { ...t, [boxIdKey]: undefined, [boxAnchorKey]: undefined, [machineAnchorKey]: undefined } : t)),
+      prev.map((t) =>
+        t.id === trailId
+          ? { ...t, [boxIdKey]: undefined, [boxAnchorKey]: undefined, [machineAnchorKey]: undefined, [pointCodeKey]: undefined }
+          : t,
+      ),
     );
   };
 
-  // On release: attach to a box if dropped anywhere on one (nearest wins), else
-  // attach to the machine if dropped anywhere on it. Either way it sticks to the
-  // *exact* spot it was dropped — any border or corner, not just a fixed
-  // connector — remembered as a fraction of that box's/machine's rect so it can
-  // track it through drags/resizes.
+  // On release, in priority order:
+  //   1. an instrument pad within snapping distance — the endpoint jumps onto
+  //      the pad exactly and the connection is recorded against that instrument;
+  //   2. a box the endpoint was dropped on (nearest wins);
+  //   3. bare machine body, anchored at the exact spot it was dropped.
+  // Every case is remembered as a fraction of that box's/machine's rect, so the
+  // endpoint tracks its target through drags, resizes and zoom.
   const releaseEndpoint = (trailId: string, which: 'start' | 'end', point: Point) => {
-    const candidateBoxes = boxes
-      .map((box) => ({ box, rect: boxHitRect(box, boxSizes[box.id]) }))
-      .filter(({ rect }) => pointInRect(point, rect))
-      .sort((a, b) => Math.hypot(point.x - a.box.x, point.y - a.box.y) - Math.hypot(point.x - b.box.x, point.y - b.box.y));
+    const pad = nearestConnector(point, machineRect, connectors);
+
+    const candidateBoxes = pad
+      ? []
+      : boxes
+          .map((box) => ({ box, rect: boxHitRect(box, boxSizes[box.id]) }))
+          .filter(({ rect }) => pointInRect(point, rect))
+          .sort((a, b) => Math.hypot(point.x - a.box.x, point.y - a.box.y) - Math.hypot(point.x - b.box.x, point.y - b.box.y));
 
     const hit = candidateBoxes[0] ?? null;
-    const hitMachine = !hit && machineRect && pointInRect(point, machineRect) ? machineRect : null;
+    const hitMachine = !pad && !hit && machineRect && pointInRect(point, machineRect) ? machineRect : null;
 
-    replaceTrails((prev) =>
-      prev.map((t) => {
-        if (t.id !== trailId) return t;
-        const index = which === 'start' ? 0 : t.points.length - 1;
-        const boxIdKey = which === 'start' ? 'startBoxId' : 'endBoxId';
-        const boxAnchorKey = which === 'start' ? 'startBoxAnchor' : 'endBoxAnchor';
-        const machineAnchorKey = which === 'start' ? 'startMachineAnchor' : 'endMachineAnchor';
-        const nextPoints = t.points.map((p, i) => (i === index ? point : p));
+    // The card at the *other* end is the one this instrument now describes.
+    const releasedTrail = trailsRef.current.find((t) => t.id === trailId);
+    const oppositeBoxId = releasedTrail ? (which === 'start' ? releasedTrail.endBoxId : releasedTrail.startBoxId) : undefined;
 
-        if (hit) {
-          const anchor: Anchor = { rx: (point.x - hit.rect.x) / hit.rect.width, ry: (point.y - hit.rect.y) / hit.rect.height };
-          return { ...t, points: nextPoints, [boxIdKey]: hit.box.id, [boxAnchorKey]: anchor, [machineAnchorKey]: undefined };
-        }
+    const nextTrails = trailsRef.current.map((t) => {
+      if (t.id !== trailId) return t;
+      const index = which === 'start' ? 0 : t.points.length - 1;
+      const boxIdKey = which === 'start' ? 'startBoxId' : 'endBoxId';
+      const boxAnchorKey = which === 'start' ? 'startBoxAnchor' : 'endBoxAnchor';
+      const machineAnchorKey = which === 'start' ? 'startMachineAnchor' : 'endMachineAnchor';
+      const pointCodeKey = which === 'start' ? 'startMachinePointCode' : 'endMachinePointCode';
+      const landing = pad ? pad.point : point;
+      const nextPoints = t.points.map((p, i) => (i === index ? landing : p));
 
-        if (hitMachine) {
-          const anchor: Anchor = { rx: (point.x - hitMachine.x) / hitMachine.width, ry: (point.y - hitMachine.y) / hitMachine.height };
-          return { ...t, points: nextPoints, [boxIdKey]: undefined, [boxAnchorKey]: undefined, [machineAnchorKey]: anchor };
-        }
+      if (pad && machineRect) {
+        return {
+          ...t,
+          points: nextPoints,
+          [boxIdKey]: undefined,
+          [boxAnchorKey]: undefined,
+          [machineAnchorKey]: { rx: pad.connector.rx, ry: pad.connector.ry } satisfies Anchor,
+          [pointCodeKey]: pad.connector.code,
+        };
+      }
 
-        return { ...t, points: nextPoints, [boxIdKey]: undefined, [boxAnchorKey]: undefined, [machineAnchorKey]: undefined };
-      }),
-    );
+      if (hit) {
+        const anchor: Anchor = { rx: (point.x - hit.rect.x) / hit.rect.width, ry: (point.y - hit.rect.y) / hit.rect.height };
+        return { ...t, points: nextPoints, [boxIdKey]: hit.box.id, [boxAnchorKey]: anchor, [machineAnchorKey]: undefined, [pointCodeKey]: undefined };
+      }
+
+      if (hitMachine) {
+        const anchor: Anchor = { rx: (point.x - hitMachine.x) / hitMachine.width, ry: (point.y - hitMachine.y) / hitMachine.height };
+        return { ...t, points: nextPoints, [boxIdKey]: undefined, [boxAnchorKey]: undefined, [machineAnchorKey]: anchor, [pointCodeKey]: undefined };
+      }
+
+      return {
+        ...t,
+        points: nextPoints,
+        [boxIdKey]: undefined,
+        [boxAnchorKey]: undefined,
+        [machineAnchorKey]: undefined,
+        [pointCodeKey]: undefined,
+      };
+    });
+
+    // Landing on a pad names the card: the instrument's code is what the
+    // analysis layer resolves the signal through, and an unnamed card takes the
+    // instrument's own label rather than staying blank.
+    const connectedBox = oppositeBoxId ? boxesRef.current.find((b) => b.id === oppositeBoxId) : undefined;
+    const nextBoxes =
+      pad && connectedBox
+        ? boxesRef.current.map((b) =>
+            b.id === connectedBox.id
+              ? { ...b, templatePointCode: pad.connector.code, label: b.label.trim() ? b.label : pad.connector.label }
+              : b,
+          )
+        : boxesRef.current;
+
+    replaceTrails(nextTrails, false);
+    replaceBoxes(nextBoxes);
+
+    if (pad) {
+      announceConnection(pad.connector, nextBoxes.find((b) => b.id === oppositeBoxId));
+    }
   };
 
   const updateBoxPosition = (id: string, point: Point) => {
@@ -504,7 +735,19 @@ export function TrailBoard({
   };
 
   const pickBoxChannel = (id: string, channel: ChannelRef | null) => {
-    replaceBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, channelId: channel?.id } : b)));
+    const nextBoxes = boxesRef.current.map((b) => (b.id === id ? { ...b, channelId: channel?.id } : b));
+    replaceBoxes(nextBoxes);
+
+    // The card was already sitting on an instrument pad and has only now been
+    // given a channel — that is the same connection event as dropping it there,
+    // so it gets the same confirmation.
+    if (!channel) return;
+    const attached = trailsRef.current.find(
+      (t) => (t.endBoxId === id && t.startMachinePointCode) || (t.startBoxId === id && t.endMachinePointCode),
+    );
+    const code = attached?.endBoxId === id ? attached?.startMachinePointCode : attached?.endMachinePointCode;
+    const connector = code ? connectors.find((candidate) => candidate.code === code) : undefined;
+    if (connector) announceConnection(connector, nextBoxes.find((b) => b.id === id));
   };
 
   const removeBox = (id: string) => {
@@ -618,66 +861,169 @@ export function TrailBoard({
     return 'normal';
   };
 
+  // A layout can arrive from local storage, from the server, or from the
+  // template generator; all three are normalised here rather than at each entry
+  // point, so no path can leave a trail on a pad without knowing which pad.
+  useEffect(() => {
+    const resolved = withResolvedConnectors(trailsRef.current, connectors);
+    if (resolved === trailsRef.current) return;
+    trailsRef.current = resolved;
+    setTrails(resolved);
+  }, [connectors, trails]);
+
+  // Which instrument pads are wired, and whether the card on the other end is
+  // actually reporting. The artwork draws an empty pad, a wired pad and a live
+  // pad differently, so the machine itself shows what is instrumented.
+  const connectorState = useMemo<Record<string, ConnectorState>>(() => {
+    if (connectors.length === 0) return {};
+    const state: Record<string, ConnectorState> = {};
+    for (const trail of trails) {
+      const ends = [
+        { code: trail.startMachinePointCode, boxId: trail.endBoxId },
+        { code: trail.endMachinePointCode, boxId: trail.startBoxId },
+      ];
+      for (const end of ends) {
+        if (!end.code) continue;
+        const box = end.boxId ? boxes.find((b) => b.id === end.boxId) : undefined;
+        const channel = box?.channelId ? channels.find((c) => c.id === box.channelId) ?? null : null;
+        const reporting = !!channel && isChannelLive(channel) && typeof liveReadingFor(channel)?.value === 'number';
+        if (state[end.code] === 'live') continue;
+        state[end.code] = reporting ? 'live' : 'linked';
+      }
+    }
+    return state;
+  }, [boxes, channels, connectors.length, isChannelLive, liveReadingFor, trails]);
+
+  // Telemetry ticks rebuild the map every few hundred ms; only a real change in
+  // what is wired should reach the parent and re-render the artwork.
+  const connectorStateRef = useRef(connectorState);
+  connectorStateRef.current = connectorState;
+  const connectorStateKey = useMemo(
+    () =>
+      Object.keys(connectorState)
+        .sort()
+        .map((code) => `${code}:${connectorState[code]}`)
+        .join('|'),
+    [connectorState],
+  );
+  useEffect(() => {
+    onConnectorStateChange?.(connectorStateRef.current);
+  }, [connectorStateKey, onConnectorStateChange]);
+
   const selectedTrail = selectedId ? trails.find((trail) => trail.id === selectedId) ?? null : null;
+  const linkedChannelCount = boxes.filter((box) => box.channelId).length;
+  const wiredPadCount = Object.keys(connectorState).length;
+
+  // The command rail. One instrument, grouped by what the buttons do: what the
+  // canvas holds, what can be added, the template, then the two commit actions.
+  // Trail-specific editing is deliberately not here — it lives on the canvas
+  // beside the selected trail, so this rail keeps a fixed height and the stage
+  // below it never resizes when a selection changes.
   const toolbar = readOnly ? null : (
-    <View className="flex-row items-center gap-2">
-      <View className={cn('rounded-lg border px-2.5 py-1.5', lineClass, isDark ? 'bg-white/5' : 'bg-black/[0.025]')}>
-        <Text className={cn('font-mono text-[9px] uppercase tracking-[0.14em]', mutedClass)}>
+    <Toolbar>
+      <ToolbarGroup className="px-1.5">
+        <Badge variant="muted" icon="vector-polyline">
           {trails.length} trail{trails.length === 1 ? '' : 's'}
-        </Text>
-      </View>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="Add trail"
-        onPress={addTrail}
-        className={cn('rounded-lg px-3 py-2', isDark ? 'bg-ink' : 'bg-ink-inverse')}
-      >
-        <Text className={cn('font-body-bold text-[11px]', isDark ? 'text-ink-inverse' : 'text-ink')}>+ Add Trail</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Add data box" onPress={addBox} className={cn('rounded-lg border px-3 py-2', lineClass)}>
-        <Text className={cn('font-body-bold text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>+ Add Box</Text>
-      </Pressable>
-      {hasDefaultLayout(machineTemplate) && (
-        <Pressable accessibilityRole="button" onPress={applyTemplateLayout} className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2">
-          <Text className="font-body-bold text-[11px] text-accent">Apply Template</Text>
-        </Pressable>
-      )}
-      {canSaveTemplate && onSaveTemplate && (
-        <Pressable accessibilityRole="button" onPress={saveTemplate} className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2">
-          <Text className="font-body-bold text-[11px] text-accent">{justSavedTemplate ? 'Template Saved' : 'Save Template'}</Text>
-        </Pressable>
-      )}
-      <Pressable accessibilityRole="button" onPress={saveConfig} className="rounded-lg border border-status-success/40 bg-status-success/10 px-3 py-2">
-        <Text className="font-body-bold text-[11px] text-status-success">{justSaved ? 'Configuration Saved' : 'Save Config'}</Text>
-      </Pressable>
-      {selectedTrail && (
+        </Badge>
+        <Badge variant={linkedChannelCount > 0 ? 'success' : 'muted'} icon="link-variant">
+          {linkedChannelCount}/{boxes.length} linked
+        </Badge>
+        {connectors.length > 0 ? (
+          <Badge variant={wiredPadCount > 0 ? 'info' : 'muted'} icon="target-variant">
+            {wiredPadCount}/{connectors.length} pads
+          </Badge>
+        ) : null}
+      </ToolbarGroup>
+
+      <ToolbarDivider />
+
+      <ToolbarGroup>
+        <Button tone="primary" icon="vector-line" onPress={addTrail} accessibilityLabel="Add trail">
+          Add Trail
+        </Button>
+        <Button tone="secondary" icon="card-plus-outline" onPress={addBox} accessibilityLabel="Add data box">
+          Add Box
+        </Button>
+      </ToolbarGroup>
+
+      {(hasDefaultLayout(machineTemplate) || (canSaveTemplate && onSaveTemplate)) && (
         <>
-          <View className={cn('mx-1 h-6 w-px', isDark ? 'bg-line-dark' : 'bg-line-light')} />
-          <View className={cn('rounded-lg px-2.5 py-1.5', isDark ? 'bg-white/5' : 'bg-black/[0.025]')}>
-            <Text className={cn('font-mono text-[9px] uppercase tracking-[0.14em]', mutedClass)}>Selected trail</Text>
-          </View>
-          <Pressable
-            accessibilityRole="button"
-            disabled={selectedTrail.points.length <= 2}
-            onPress={removeBendFromSelected}
-            className={cn('rounded-lg border px-3 py-2', lineClass, selectedTrail.points.length <= 2 && 'opacity-40')}
-          >
-            <Text className={cn('font-body-medium text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Remove Bend</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={addBendToSelected} className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2">
-            <Text className="font-body-bold text-[11px] text-accent">Add Bend</Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => removeTrail(selectedTrail.id)}
-            className="rounded-lg border border-status-critical/35 bg-status-critical/10 px-3 py-2"
-          >
-            <Text className="font-body-bold text-[11px] text-status-critical">Delete Trail</Text>
-          </Pressable>
+          <ToolbarDivider />
+          <ToolbarGroup>
+            {hasDefaultLayout(machineTemplate) && (
+              <Button tone="info" icon="restore" onPress={applyTemplateLayout} accessibilityLabel="Apply the template layout">
+                Template
+              </Button>
+            )}
+            {canSaveTemplate && onSaveTemplate && (
+              <Button
+                tone="info"
+                icon={justSavedTemplate ? 'check' : 'content-save-cog-outline'}
+                onPress={saveTemplate}
+                accessibilityLabel="Save this layout as the template"
+              >
+                {justSavedTemplate ? 'Template saved' : 'Save Template'}
+              </Button>
+            )}
+          </ToolbarGroup>
         </>
       )}
-    </View>
+
+      <ToolbarDivider />
+
+      <Button
+        tone="success"
+        icon={justSaved ? 'check-decagram' : 'content-save-outline'}
+        onPress={saveConfig}
+        accessibilityLabel="Save the canvas configuration"
+      >
+        {justSaved ? 'Configuration saved' : 'Save Config'}
+      </Button>
+    </Toolbar>
   );
+
+  // Contextual editing for the selected trail, floated over the canvas so the
+  // toolbar's height — and therefore the stage scale — never changes.
+  const selectionRail =
+    selectedTrail && !readOnly ? (
+      <View pointerEvents="box-none" className="absolute inset-x-0 bottom-4 items-center">
+        <View pointerEvents="box-none" className="flex-row items-center gap-2 px-4">
+          <Toolbar>
+            <ToolbarGroup className="pl-1.5">
+              <Badge variant="info" icon="vector-polyline">
+                Trail · {selectedTrail.points.length - 2} bend{selectedTrail.points.length - 2 === 1 ? '' : 's'}
+              </Badge>
+            </ToolbarGroup>
+            <ToolbarDivider />
+            <ToolbarGroup>
+              <Button
+                tone="secondary"
+                size="xs"
+                icon="minus"
+                disabled={selectedTrail.points.length <= 2}
+                onPress={removeBendFromSelected}
+                accessibilityLabel="Remove a bend from the selected trail"
+              >
+                Bend
+              </Button>
+              <Button tone="secondary" size="xs" icon="plus" onPress={addBendToSelected} accessibilityLabel="Add a bend to the selected trail">
+                Bend
+              </Button>
+            </ToolbarGroup>
+            <ToolbarDivider />
+            <Button
+              tone="destructive"
+              size="xs"
+              icon="trash-can-outline"
+              onPress={() => removeTrail(selectedTrail.id)}
+              accessibilityLabel="Delete the selected trail"
+            >
+              Delete
+            </Button>
+          </Toolbar>
+        </View>
+      </View>
+    ) : null;
 
   const board = (
     <>
@@ -690,46 +1036,11 @@ export function TrailBoard({
         />
       )}
 
+      {/* Standalone use (no host workspace): the rail floats top-right over the
+          canvas, matching where the workspace puts it. */}
       {!renderWorkspace && !readOnly && (
-        <View pointerEvents="box-none" className="absolute left-4 top-4 flex-row items-center gap-2">
-          <View className={cn('rounded-full border px-2.5 py-1', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}>
-            <Text className={cn('font-body text-[11px]', mutedClass)}>
-              {trails.length} trail{trails.length === 1 ? '' : 's'}
-            </Text>
-          </View>
-          <Pressable onPress={addTrail} className={cn('rounded-full px-3 py-1.5', isDark ? 'bg-ink' : 'bg-ink-inverse')}>
-            <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-inverse' : 'text-ink')}>+ Add Trail</Text>
-          </Pressable>
-          <Pressable onPress={addBox} className={cn('rounded-full border px-3 py-1.5', lineClass)}>
-            <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>+ Add Box</Text>
-          </Pressable>
-          {hasDefaultLayout(machineTemplate) && (
-            <Pressable onPress={applyTemplateLayout} className="rounded-full border border-accent/35 bg-accent/10 px-3 py-1.5">
-              <Text className="font-body-bold text-xs text-accent">⟲ Template</Text>
-            </Pressable>
-          )}
-          {canSaveTemplate && onSaveTemplate && (
-            <Pressable onPress={saveTemplate} className="rounded-full border border-accent/35 bg-accent/10 px-3 py-1.5">
-              <Text className="font-body-bold text-xs text-accent">{justSavedTemplate ? 'Saved Template' : 'Save Template'}</Text>
-            </Pressable>
-          )}
-          <Pressable onPress={saveConfig} className="rounded-full border border-status-success/40 bg-status-success/10 px-3 py-1.5">
-            <Text className="font-body-bold text-xs text-status-success">{justSaved ? '✓ Saved' : '💾 Save Config'}</Text>
-          </Pressable>
-        </View>
-      )}
-
-      {!renderWorkspace && selectedId && !readOnly && (
-        <View pointerEvents="box-none" className="absolute left-4 top-14 flex-row items-center gap-2">
-          <Pressable onPress={removeBendFromSelected} className={cn('rounded-full border px-3 py-1.5', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}>
-            <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>Remove bend</Text>
-          </Pressable>
-          <Pressable onPress={addBendToSelected} className="rounded-full border border-accent/35 bg-accent/10 px-3 py-1.5">
-            <Text className="font-body-bold text-xs text-accent">Add bend</Text>
-          </Pressable>
-          <Pressable onPress={() => removeTrail(selectedId)} className="rounded-full border border-status-critical/35 bg-status-critical/10 px-3 py-1.5">
-            <Text className="font-body-bold text-xs text-status-critical">Delete trail</Text>
-          </Pressable>
+        <View pointerEvents="box-none" className="absolute right-4 top-4 items-end" style={{ zIndex: 20 }}>
+          {toolbar}
         </View>
       )}
 
@@ -742,6 +1053,38 @@ export function TrailBoard({
         style={[stageStyle, { userSelect: 'none' }]}
         onLayout={(e) => setBoardSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
       >
+        {/* Instrument pads as drop targets. They appear the moment an endpoint
+            is picked up, so where a connection may land is shown rather than
+            guessed, and the pad just wired keeps a ring for the life of the
+            confirmation toast. */}
+        {!readOnly && machineRect && connectors.length > 0 && (wiring || flashedConnector) && (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+            {connectors.map((connector) => {
+              const flashed = flashedConnector === connector.code;
+              if (!wiring && !flashed) return null;
+              const padPoint = connectorStagePoint(connector, machineRect);
+              const size = flashed ? 34 : 26;
+              const colour = connector.analyzerTag ? palette.accent : palette.neutral;
+              return (
+                <View
+                  key={connector.code}
+                  style={{
+                    position: 'absolute',
+                    left: padPoint.x - size / 2,
+                    top: padPoint.y - size / 2,
+                    width: size,
+                    height: size,
+                    borderRadius: size / 2,
+                    borderWidth: flashed ? 2 : 1.5,
+                    borderColor: alpha(colour, flashed ? 0.95 : 0.42),
+                    backgroundColor: alpha(colour, flashed ? 0.2 : 0.08),
+                  }}
+                />
+              );
+            })}
+          </View>
+        )}
+
         {trails.map((trail) => (
           <AdjustableTrail
             key={trail.id}
@@ -755,8 +1098,14 @@ export function TrailBoard({
             showControlPoints={!readOnly}
             onPointsChange={(points) => updateTrailPoints(trail.id, points)}
             onSelect={() => setSelectedId(trail.id)}
-            onEndpointGrab={(which) => detachEndpoint(trail.id, which)}
-            onEndpointRelease={(which, point) => releaseEndpoint(trail.id, which, point)}
+            onEndpointGrab={(which) => {
+              setWiring(true);
+              detachEndpoint(trail.id, which);
+            }}
+            onEndpointRelease={(which, point) => {
+              setWiring(false);
+              releaseEndpoint(trail.id, which, point);
+            }}
           />
         ))}
 
@@ -794,6 +1143,24 @@ export function TrailBoard({
           );
         })}
       </View>
+
+      {selectionRail}
+
+      {/* The connection confirmation. Sits over the canvas rather than in the
+          page flow so it cannot reflow the stage while it is on screen. */}
+      {notice && (
+        <View pointerEvents="box-none" className="absolute inset-x-0 top-4 items-center px-4" style={{ zIndex: 30 }}>
+          <Toast
+            key={notice.id}
+            variant={notice.variant}
+            icon={notice.icon}
+            title={notice.title}
+            detail={notice.detail}
+            durationMs={2000}
+            onDone={() => setNotice((current) => (current && current.id === notice.id ? null : current))}
+          />
+        </View>
+      )}
     </>
   );
 

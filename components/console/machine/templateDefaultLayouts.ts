@@ -1,4 +1,5 @@
 import type { ChannelRef } from '../../../lib/rack';
+import { RAV_CONNECTOR_POINTS } from './machineConnectors';
 import { MAPPABLE_BOX_HEIGHT, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { EXTRUDER_CONNECTORS } from './SingleScrewExtruder';
 import type { Anchor, Box, SavedLayout, Trail } from './TrailBoard';
@@ -31,17 +32,35 @@ type TemplatePoint = {
   bend?: ReferencePoint;
 };
 
-const RAV_TEMPLATE_POINTS: TemplatePoint[] = [
-  { code: 'C1', label: 'Motor Current', side: 'left', anchor: { x: 405, y: 218 }, boxEnd: { x: 255, y: 79 }, bend: { x: 415, y: 79 } },
-  { code: 'S1', label: 'Rotor Speed', side: 'left', anchor: { x: 126, y: 357 }, boxEnd: { x: 255, y: 184 }, bend: { x: 355, y: 184 } },
-  { code: 'P1', label: 'Inlet Pressure', side: 'left', anchor: { x: 126, y: 403 }, boxEnd: { x: 255, y: 289 }, bend: { x: 355, y: 289 } },
-  { code: 'P2', label: 'Outlet Pressure', side: 'left', anchor: { x: 405, y: 542 }, boxEnd: { x: 255, y: 394 }, bend: { x: 410, y: 394 } },
-  { code: 'T3', label: 'Material Temperature', side: 'left', anchor: { x: 635, y: 542 }, boxEnd: { x: 255, y: 499 }, bend: { x: 410, y: 499 } },
-  { code: 'V1', label: 'DE Vibration Acceleration RMS', side: 'right', anchor: { x: 635, y: 218 }, boxEnd: { x: 1185, y: 79 }, bend: { x: 1035, y: 79 } },
-  { code: 'V2', label: 'NDE Vibration Acceleration RMS', side: 'right', anchor: { x: 720, y: 328 }, boxEnd: { x: 1185, y: 184 }, bend: { x: 1040, y: 184 } },
-  { code: 'T1', label: 'DE Bearing Temperature', side: 'right', anchor: { x: 720, y: 432 }, boxEnd: { x: 1185, y: 289 }, bend: { x: 1045, y: 289 } },
-  { code: 'T2', label: 'NDE Bearing Temperature', side: 'right', anchor: { x: 700, y: 522 }, boxEnd: { x: 1185, y: 394 }, bend: { x: 1040, y: 394 } },
-];
+// Card column, bend and side per pad. The pad's own position comes from
+// `RAV_CONNECTOR_POINTS`, which is also what the canvas snaps trail endpoints
+// to — so a generated trail and a hand-drawn one land on the same spot.
+const RAV_CARD_PLACEMENT: Record<string, { side: 'left' | 'right'; boxEnd: ReferencePoint; bend: ReferencePoint }> = {
+  C1: { side: 'left', boxEnd: { x: 255, y: 79 }, bend: { x: 415, y: 79 } },
+  S1: { side: 'left', boxEnd: { x: 255, y: 184 }, bend: { x: 355, y: 184 } },
+  P1: { side: 'left', boxEnd: { x: 255, y: 289 }, bend: { x: 355, y: 289 } },
+  P2: { side: 'left', boxEnd: { x: 255, y: 394 }, bend: { x: 410, y: 394 } },
+  T3: { side: 'left', boxEnd: { x: 255, y: 499 }, bend: { x: 410, y: 499 } },
+  V1: { side: 'right', boxEnd: { x: 1185, y: 79 }, bend: { x: 1035, y: 79 } },
+  V2: { side: 'right', boxEnd: { x: 1185, y: 184 }, bend: { x: 1040, y: 184 } },
+  T1: { side: 'right', boxEnd: { x: 1185, y: 289 }, bend: { x: 1045, y: 289 } },
+  T2: { side: 'right', boxEnd: { x: 1185, y: 394 }, bend: { x: 1040, y: 394 } },
+};
+
+const RAV_TEMPLATE_POINTS: TemplatePoint[] = RAV_CONNECTOR_POINTS.flatMap((connector) => {
+  const placement = RAV_CARD_PLACEMENT[connector.code];
+  if (!placement) return [];
+  return [
+    {
+      code: connector.code,
+      label: connector.label,
+      side: placement.side,
+      anchor: { x: connector.x, y: connector.y },
+      boxEnd: placement.boxEnd,
+      bend: placement.bend,
+    },
+  ];
+});
 
 /**
  * Single Screw Extruder — the anchors come from the artwork itself.
@@ -166,6 +185,10 @@ export function createTemplateDefaultLayout(
       id: makeId('trail'),
       points: [machineEnd, ...bends, boxEnd],
       startMachineAnchor: machineAnchor(sx, sy),
+      // The generated trail lands on a real instrument pad, so it says which
+      // one — a template connection and a hand-drawn one are then the same
+      // kind of thing to everything downstream.
+      startMachinePointCode: templatePoint.code,
       endBoxId: box.id,
       endBoxAnchor: boxAnchorFor(box, boxEnd),
     });
