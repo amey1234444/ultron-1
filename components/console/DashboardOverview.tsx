@@ -32,6 +32,7 @@ import { countPartEdits, type PlantScene3DConfig } from '../../lib/plantScene3d'
 import { apiFetch } from '../../src/lib/apiClient';
 import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
 import { PlantScene3D } from './plant3d/PlantScene3D';
+import PlantWorkspace from './plant3d/PlantWorkspace';
 import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
@@ -1668,43 +1669,106 @@ export function DashboardOverview({
       // Map first and wide, the scorecard beside it, transport underneath. The
       // action rail moved to History, where a log of what already happened
       // belongs.
+      // The plant map is the page here: the canvas runs full bleed and every
+      // other panel is docked onto it (KPIs top, analysis right, charts bottom).
       case 'operations':
         return (
-          <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            <View style={{ height: 124 }}>{headlineBand}</View>
-
-            <View className={rowClass} style={fillRow(340)}>
-              <View style={{ flex: isCompact ? undefined : 1.45, height: isCompact ? 320 : undefined }}>
-                <PlantMap
-                  scene={plantConfig.scene3d}
-                  statusColors={plantComponentColors}
-                  canEdit={canEditPlant}
-                  onEdit={() => setPlantEditorOpen(true)}
-                />
-              </View>
-              <View style={{ flex: isCompact ? undefined : 1.55, height: isCompact ? 340 : undefined }}>
-                <AssetTable rows={metrics.attention} onOpenMachine={onOpenMachine} boxed={false} />
-              </View>
-            </View>
-
-            <Rule />
-
-            <View style={{ height: 84 }}>
-              <OpenSection
-                label="Transport"
-                meta={metrics.streamHealthy ? `${metrics.packetRate.toLocaleString()} pkt/s · ${metrics.avgLatencyMs} ms` : 'Stream stale'}
-              >
-                <View className="flex-row flex-wrap content-start gap-x-6 gap-y-2">
-                  {metrics.services.map((service) => (
-                    <View key={service.name} className="flex-row items-center gap-2">
-                      <Dot color={statusColor(palette, service.status)} size={5} />
-                      <Text numberOfLines={1} className={cn('font-body text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{service.name}</Text>
-                    </View>
-                  ))}
+          <PlantWorkspace
+            dark={isDark}
+            compact={isCompact}
+            title="Plant map"
+            meta={`${plantConfig.scene3d.components.length} components · ${metrics.machinesOnline}/${metrics.machinesTotal} machines online`}
+            live={metrics.live}
+            canEdit={canEditPlant}
+            onEdit={() => setPlantEditorOpen(true)}
+            kpis={headline.map((entry) => ({
+              label: entry.label, value: entry.value, unit: entry.unit,
+              progress: entry.progress, plan: entry.plan, tone: entry.tone,
+            }))}
+            canvas={<PlantScene3D scene={plantConfig.scene3d} statusColors={plantComponentColors} dark={isDark} />}
+            rail={
+              <View style={{ gap: 14 }}>
+                <View>
+                  <Text className={cn('font-mono text-[8.5px] uppercase tracking-[0.15em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                    Components
+                  </Text>
+                  <View style={{ marginTop: 6 }}>
+                    {plantConfig.scene3d.components.map((component, index) => (
+                      <View key={component.id}>
+                        {index > 0 ? <Rule /> : null}
+                        <View className="flex-row items-center gap-2.5 py-2">
+                          <Dot color={plantComponentColors[component.id] ?? palette.neutral} size={5} />
+                          <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+                            {component.name}
+                          </Text>
+                          <Text className={cn('font-mono text-[9.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                            {component.scale}%
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </OpenSection>
-            </View>
-          </View>
+                <Rule />
+                <View style={{ minHeight: 280 }}>
+                  <AssetTable rows={metrics.attention} onOpenMachine={onOpenMachine} boxed={false} label="Assets off plan" />
+                </View>
+                <Rule />
+                <View>
+                  <Text className={cn('font-mono text-[8.5px] uppercase tracking-[0.15em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                    Transport
+                  </Text>
+                  <View className="mt-2 gap-1.5">
+                    {metrics.services.map((service) => (
+                      <View key={service.name} className="flex-row items-center gap-2">
+                        <Dot color={statusColor(palette, service.status)} size={5} />
+                        <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+                          {service.name}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              </View>
+            }
+            dock={
+              <View className={isCompact ? 'gap-3' : 'flex-row gap-3'} style={{ flex: 1, minHeight: 0 }}>
+                <View style={{ flex: isCompact ? undefined : 2, minWidth: 0, minHeight: isCompact ? 150 : 0 }}>
+                  <OpenSection label="Throughput" meta={metrics.live ? 'Live' : 'Demo plant'}>
+                    <FillChart
+                      min={110}
+                      render={(height) => (
+                        <TrendChart
+                          primary={throughputTrend}
+                          height={height}
+                          primaryMax={Math.max(10, ...throughputTrend)}
+                          color={SERIES_B}
+                          timeLabels={trendTimeLabels}
+                        />
+                      )}
+                    />
+                  </OpenSection>
+                </View>
+                <Rule vertical />
+                <View style={{ flex: isCompact ? undefined : 1, minWidth: 0, minHeight: isCompact ? 150 : 0 }}>
+                  <OpenSection label="Alarms by day" meta={`${metrics.criticalCount} critical`}>
+                    <FillChart
+                      min={110}
+                      render={(height) => (
+                        <StackedBars
+                          labels={DEMO_ALARM_DAYS}
+                          critical={DEMO_ALARM_BARS.critical}
+                          warning={DEMO_ALARM_BARS.warning}
+                          info={DEMO_ALARM_BARS.info}
+                          height={height}
+                        />
+                      )}
+                    />
+                  </OpenSection>
+                </View>
+              </View>
+            }
+          />
         );
 
       case 'scorecard':
@@ -2105,14 +2169,23 @@ export function DashboardOverview({
     <View className="flex-1" style={{ minHeight: 0, backgroundColor: palette.bg }}>
       <SectionTabs active={section} onChange={setSection} />
 
-      <ScrollView
-        className="flex-1"
-        style={{ minHeight: 0 }}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ flexGrow: 1, padding: 14 }}
-      >
-        {renderSection()}
-      </ScrollView>
+      {/* Operations is the full-bleed plant workspace: it manages its own
+          scrolling inside the docked rails, so it must not sit in the padded
+          page scroller or the canvas would be inset and double-scrolled. */}
+      {section === 'operations' ? (
+        <View className="flex-1" style={{ minHeight: 0 }}>
+          {renderSection()}
+        </View>
+      ) : (
+        <ScrollView
+          className="flex-1"
+          style={{ minHeight: 0 }}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ flexGrow: 1, padding: 14 }}
+        >
+          {renderSection()}
+        </ScrollView>
+      )}
 
       <Sheet visible={plantEditorOpen} title="Edit plant map" onClose={() => setPlantEditorOpen(false)}>
         {plantEditorOpen ? (
