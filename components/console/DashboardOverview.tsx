@@ -32,7 +32,7 @@ import { countPartEdits, type PlantScene3DConfig } from '../../lib/plantScene3d'
 import { apiFetch } from '../../src/lib/apiClient';
 import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
 import { PlantScene3D } from './plant3d/PlantScene3D';
-import PlantWorkspace from './plant3d/PlantWorkspace';
+import PlantWorkspace, { WorkspaceCard } from './plant3d/PlantWorkspace';
 import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
@@ -965,47 +965,6 @@ function Legend({ items }: { items: { color: string; label: string }[] }) {
 // ---------------------------------------------------------------------------
 
 /**
- * The plant map, rendered as real 3D geometry.
- *
- * The illustration this panel used to show has been replaced by the Blender
- * component models: an operator can orbit the plant, and every component
- * carries its live status on the model itself (the beacon lens) as well as on
- * its floating label.
- */
-function PlantMap({
-  scene,
-  statusColors,
-  canEdit,
-  onEdit,
-}: {
-  scene: PlantScene3DConfig;
-  /** Resolved status colour per component id. */
-  statusColors: Record<string, string>;
-  canEdit: boolean;
-  onEdit: () => void;
-}) {
-  const { isDark } = useAppTheme();
-  return (
-    <Panel
-      label="Plant map"
-      padded={false}
-      meta={`${scene.components.length} components`}
-      action={
-        canEdit ? (
-          <Pressable onPress={onEdit} accessibilityRole="button" className="rounded-md px-2 py-1">
-            <Text className="font-body text-[10.5px] text-accent">Edit map</Text>
-          </Pressable>
-        ) : null
-      }
-    >
-      <View className="relative flex-1 overflow-hidden" style={{ minHeight: 220 }}>
-        <PlantScene3D scene={scene} statusColors={statusColors} dark={isDark} />
-      </View>
-    </Panel>
-  );
-}
-
-/**
  * Asset performance against plan.
  *
  * The row an operator reads first, so it states target, actual and the gap
@@ -1686,87 +1645,48 @@ export function DashboardOverview({
               progress: entry.progress, plan: entry.plan, tone: entry.tone,
             }))}
             canvas={<PlantScene3D scene={plantConfig.scene3d} statusColors={plantComponentColors} dark={isDark} />}
-            rail={
-              <View style={{ gap: 14 }}>
-                <View>
-                  <Text className={cn('font-mono text-[8.5px] uppercase tracking-[0.15em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    Components
-                  </Text>
-                  <View style={{ marginTop: 6 }}>
-                    {plantConfig.scene3d.components.map((component, index) => (
-                      <View key={component.id}>
-                        {index > 0 ? <Rule /> : null}
-                        <View className="flex-row items-center gap-2.5 py-2">
-                          <Dot color={plantComponentColors[component.id] ?? palette.neutral} size={5} />
-                          <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                            {component.name}
+            cards={
+              <>
+                <WorkspaceCard
+                  title="Assets on plan"
+                  meta={`${metrics.attention.filter((r) => r.health >= HEALTH_TARGET - 3).length}/${metrics.attention.length}`}
+                  dark={isDark}
+                >
+                  <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
+                    {metrics.attention.slice(0, 6).map((row, index) => {
+                      const gap = row.health - HEALTH_TARGET;
+                      const tone = gap >= -3 ? palette.accent : gap >= -10 ? palette.warning : palette.critical;
+                      return (
+                        <View key={row.id} className="flex-row items-center gap-2" style={{ paddingVertical: 3.5 }}>
+                          <Dot color={tone} size={4} />
+                          <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[10.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+                            {row.name}
                           </Text>
-                          <Text className={cn('font-mono text-[9.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                            {component.scale}%
+                          <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row.health}</Text>
+                          <Text className="font-mono text-[9.5px]" style={{ color: tone, width: 30, textAlign: 'right' }}>
+                            {gap >= 0 ? '+' : ''}{gap}
                           </Text>
                         </View>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-                <Rule />
-                <View style={{ minHeight: 280 }}>
-                  <AssetTable rows={metrics.attention} onOpenMachine={onOpenMachine} boxed={false} label="Assets off plan" />
-                </View>
-                <Rule />
-                <View>
-                  <Text className={cn('font-mono text-[8.5px] uppercase tracking-[0.15em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    Transport
-                  </Text>
-                  <View className="mt-2 gap-1.5">
-                    {metrics.services.map((service) => (
-                      <View key={service.name} className="flex-row items-center gap-2">
-                        <Dot color={statusColor(palette, service.status)} size={5} />
-                        <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                          {service.name}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              </View>
-            }
-            dock={
-              <View className={isCompact ? 'gap-3' : 'flex-row gap-3'} style={{ flex: 1, minHeight: 0 }}>
-                <View style={{ flex: isCompact ? undefined : 2, minWidth: 0, minHeight: isCompact ? 150 : 0 }}>
-                  <OpenSection label="Throughput" meta={metrics.live ? 'Live' : 'Demo plant'}>
-                    <FillChart
-                      min={110}
-                      render={(height) => (
-                        <TrendChart
-                          primary={throughputTrend}
-                          height={height}
-                          primaryMax={Math.max(10, ...throughputTrend)}
-                          color={SERIES_B}
-                          timeLabels={trendTimeLabels}
-                        />
-                      )}
-                    />
-                  </OpenSection>
-                </View>
-                <Rule vertical />
-                <View style={{ flex: isCompact ? undefined : 1, minWidth: 0, minHeight: isCompact ? 150 : 0 }}>
-                  <OpenSection label="Alarms by day" meta={`${metrics.criticalCount} critical`}>
-                    <FillChart
-                      min={110}
-                      render={(height) => (
-                        <StackedBars
-                          labels={DEMO_ALARM_DAYS}
-                          critical={DEMO_ALARM_BARS.critical}
-                          warning={DEMO_ALARM_BARS.warning}
-                          info={DEMO_ALARM_BARS.info}
-                          height={height}
-                        />
-                      )}
-                    />
-                  </OpenSection>
-                </View>
-              </View>
+                      );
+                    })}
+                  </ScrollView>
+                </WorkspaceCard>
+
+                <WorkspaceCard title="Alarms by day" meta={`${metrics.criticalCount} critical`} dark={isDark}>
+                  <FillChart
+                    min={104}
+                    render={(height) => (
+                      <StackedBars
+                        labels={DEMO_ALARM_DAYS}
+                        critical={DEMO_ALARM_BARS.critical}
+                        warning={DEMO_ALARM_BARS.warning}
+                        info={DEMO_ALARM_BARS.info}
+                        height={height}
+                      />
+                    )}
+                  />
+                </WorkspaceCard>
+              </>
             }
           />
         );

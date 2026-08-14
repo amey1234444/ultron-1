@@ -63,6 +63,87 @@ function classify(name: string): PartNode['kind'] {
   return 'mesh';
 }
 
+const SELECT = '#3FBF6A';   // the console's single rationed accent: live / active
+
+/** Soft radial falloff used for the ground glow under an active component. */
+function useGlowTexture() {
+  return useMemo(() => {
+    const size = 128;
+    const c = document.createElement('canvas');
+    c.width = c.height = size;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    g.addColorStop(0, 'rgba(255,255,255,0.85)');
+    g.addColorStop(0.45, 'rgba(255,255,255,0.28)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, size, size);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
+}
+
+/**
+ * The plinth every component stands on, plus its boundary.
+ *
+ * The boundary is the selection affordance: a hairline at rest, and the accent
+ * green when the component is hovered or selected — which is what "the one I am
+ * in" means here, so the colour carries state rather than decoration.
+ */
+function ComponentPad({
+  box, active, dark, glow,
+}: { box: THREE.Box3; active: boolean; dark: boolean; glow: THREE.Texture | null }) {
+  const size = box.getSize(new THREE.Vector3());
+  const centre = box.getCenter(new THREE.Vector3());
+  const m = 1.1;                                   // margin around the footprint
+  const w = size.x + m;
+  const d = size.z + m;
+  const cx = centre.x;
+  const cz = centre.z;
+  const TOP = 0.02;                                // plinth top sits just proud of
+  const H = 0.30;                                  // y=0 so the base embeds into it
+  const rail = 0.075;
+  const edgeColor = active ? SELECT : dark ? '#2C3239' : '#B9BEC6';
+
+  return (
+    <group>
+      <mesh position={[cx, TOP - H / 2, cz]} receiveShadow>
+        <boxGeometry args={[w, H, d]} />
+        <meshStandardMaterial color={dark ? '#0D1015' : '#D8DBE0'} roughness={0.62} metalness={0.15} />
+      </mesh>
+      {/* inset deck, so the plinth reads as a machined pad not a slab */}
+      <mesh position={[cx, TOP + 0.002, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+        <planeGeometry args={[w - 0.26, d - 0.26]} />
+        <meshStandardMaterial color={dark ? '#121620' : '#E6E8EC'} roughness={0.5} metalness={0.2} />
+      </mesh>
+      {/* boundary rail: four bars, so the highlight traces the actual edge */}
+      {([[0, (d - rail) / 2], [0, -(d - rail) / 2]] as const).map(([ox, oz], i) => (
+        <mesh key={`z${i}`} position={[cx + ox, TOP + 0.028, cz + oz]}>
+          <boxGeometry args={[w, 0.055, rail]} />
+          <meshBasicMaterial color={edgeColor} toneMapped={false} />
+        </mesh>
+      ))}
+      {([[(w - rail) / 2, 0], [-(w - rail) / 2, 0]] as const).map(([ox, oz], i) => (
+        <mesh key={`x${i}`} position={[cx + ox, TOP + 0.028, cz + oz]}>
+          <boxGeometry args={[rail, 0.055, d - rail * 2]} />
+          <meshBasicMaterial color={edgeColor} toneMapped={false} />
+        </mesh>
+      ))}
+      {active && glow ? (
+        <mesh position={[cx, 0.012, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+          <planeGeometry args={[w * 2.0, d * 2.0]} />
+          <meshBasicMaterial
+            map={glow} color={SELECT} transparent opacity={dark ? 0.5 : 0.3}
+            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
+          />
+        </mesh>
+      ) : null}
+    </group>
+  );
+}
+
 /**
  * Clones the loaded GLB once per placed component and keeps a pristine copy of
  * every node's transform + material, so overrides can be re-applied from the
@@ -125,6 +206,18 @@ function PlacedComponent({
   const model = useModelInstance(PLANT_MODELS[component.model].url);
   const overrideMaterials = useRef(new Map<string, THREE.MeshStandardMaterial>());
   const [labelPos, setLabelPos] = useState<[number, number, number]>([0, 5.6, 0]);
+  const [hovered, setHovered] = useState(false);
+  const glow = useGlowTexture();
+  // Footprint measured from the model itself, so the plinth fits a utility
+  // building and a power house (whose transformer bay extends well past the
+  // building) without either being hand-tuned.
+  const footprint = useMemo(() => {
+    const box = new THREE.Box3();
+    model.root.traverse((n) => {
+      if (isMesh(n) && n.visible) box.expandByObject(n);
+    });
+    return box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-4, 0, -3), new THREE.Vector3(4, 4, 3)) : box;
+  }, [model]);
   // These effects mutate the scene graph directly; on a `demand` frameloop that
   // has to be paired with an explicit redraw request or the edit is invisible
   // until the next orbit.
@@ -249,7 +342,10 @@ function PlacedComponent({
         rotation={[0, THREE.MathUtils.degToRad(component.rotation), 0]}
         scale={scale}
         onPointerDown={editable ? handleClick : undefined}
+        onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); invalidate(); }}
+        onPointerOut={() => { setHovered(false); invalidate(); }}
       >
+        <ComponentPad box={footprint} active={hovered || isSelectedComponent} dark={dark} glow={glow} />
         <primitive object={model.root} />
         {showLabel ? (
           <Html position={labelPos} center distanceFactor={38} zIndexRange={[20, 0]} pointerEvents="none">
@@ -428,25 +524,33 @@ function SceneContents(props: PlantScene3DCanvasProps) {
       />
       <directionalLight position={[-14, 10, -18]} intensity={dark ? 0.4 : 0.55} />
 
-      {/* Shadow catcher, kept marginally below Z=0 so it never fights the
-          foundation slabs, which sit exactly on the ground plane by design. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
-        <planeGeometry args={[400, 400]} />
-        <shadowMaterial opacity={dark ? 0.42 : 0.22} />
+      {/* Distance fog tinted to the page background: the floor dissolves into
+          the panel instead of ending at a hard rim when the camera orbits low. */}
+      <fog attach="fog" args={[dark ? '#08090C' : '#EEEFF1', 34, 165]} />
+
+      {/* Solid floor beneath the grid so the ground reads as a surface rather
+          than as lines hanging in space. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]} receiveShadow>
+        <planeGeometry args={[600, 600]} />
+        <meshStandardMaterial color={dark ? '#0A0C10' : '#E4E6EA'} roughness={0.92} metalness={0.05} />
+      </mesh>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} receiveShadow>
+        <planeGeometry args={[600, 600]} />
+        <shadowMaterial opacity={dark ? 0.45 : 0.20} />
       </mesh>
 
       {scene.showGrid ? (
         <Grid
-          position={[0, 0, 0]}
+          position={[0, -0.02, 0]}
           args={[400, 400]}
           cellSize={2}
           cellThickness={0.5}
-          cellColor={dark ? '#2a3038' : '#c8cdd4'}
+          cellColor={dark ? '#1B212A' : '#D2D6DC'}
           sectionSize={10}
           sectionThickness={1}
-          sectionColor={dark ? '#3a4450' : '#a9b1bb'}
-          fadeDistance={110}
-          fadeStrength={1.4}
+          sectionColor={dark ? '#28323E' : '#B6BCC5'}
+          fadeDistance={135}
+          fadeStrength={1.6}
           infiniteGrid
           followCamera={false}
         />

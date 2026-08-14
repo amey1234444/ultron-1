@@ -20,8 +20,7 @@ export type PlantKpi = {
 export type PlantWorkspaceProps = {
   canvas: ReactNode;
   kpis: PlantKpi[];
-  rail: ReactNode;
-  dock: ReactNode;
+  cards: ReactNode;
   title: string;
   meta?: string;
   live?: boolean;
@@ -31,7 +30,7 @@ export type PlantWorkspaceProps = {
   onEdit?: () => void;
 };
 
-export default function PlantWorkspace({ canvas, kpis, rail, dock, title, meta, dark }: PlantWorkspaceProps) {
+export default function PlantWorkspace({ canvas, kpis, cards, title, meta, dark }: PlantWorkspaceProps) {
   const ink = dark ? '#F7F6F2' : '#0A0B0D';
   const inkMuted = dark ? '#8B8D93' : '#5C6068';
   const border = dark ? 'rgba(255,255,255,0.10)' : 'rgba(10,11,13,0.10)';
@@ -54,8 +53,24 @@ export default function PlantWorkspace({ canvas, kpis, rail, dock, title, meta, 
         ))}
       </View>
       <View style={{ height: 320, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: border }}>{canvas}</View>
-      {rail}
-      {dock}
+      {cards}
     </ScrollView>
+  );
+}
+
+/** Native counterpart of the web glass card. */
+export function WorkspaceCard({
+  title, meta, dark, children, height = 150,
+}: { title: string; meta?: string; dark: boolean; children: ReactNode; width?: number; height?: number }) {
+  const inkMuted = dark ? '#8B8D93' : '#5C6068';
+  const border = dark ? 'rgba(255,255,255,0.10)' : 'rgba(10,11,13,0.10)';
+  return (
+    <View style={{ borderWidth: 1, borderColor: border, borderRadius: 13, padding: 10, height, minWidth: 0 }}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+        <Text style={{ fontSize: 8.5, letterSpacing: 1.4, color: inkMuted }}>{title.toUpperCase()}</Text>
+        {meta ? <Text style={{ fontSize: 9, color: inkMuted }}>{meta}</Text> : null}
+      </View>
+      <View style={{ flex: 1, minHeight: 0 }}>{children}</View>
+    </View>
   );
 }
