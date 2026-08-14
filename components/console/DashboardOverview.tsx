@@ -1542,6 +1542,10 @@ export function DashboardOverview({
     return colors;
   }, [metrics.areas, palette, plantConfig.scene3d.components]);
 
+  // The same figure the header pill reports. `metrics.alarms` is a rolling log
+  // that stays populated after alarms clear, so it cannot gate the alarm card.
+  const openAlarmCount = metrics.criticalCount + metrics.warningCount + metrics.infoCount;
+
   const healthValues = metrics.attention.map((row) => row.health);
   const gaps = healthValues.map((value) => value - HEALTH_TARGET);
   const onPlanCount = gaps.filter((gap) => gap >= -3).length;
@@ -1653,19 +1657,33 @@ export function DashboardOverview({
                   dark={isDark}
                 >
                   <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                    {metrics.attention.slice(0, 6).map((row, index) => {
+                    {metrics.attention.slice(0, 5).map((row) => {
                       const gap = row.health - HEALTH_TARGET;
                       const tone = gap >= -3 ? palette.accent : gap >= -10 ? palette.warning : palette.critical;
                       return (
-                        <View key={row.id} className="flex-row items-center gap-2" style={{ paddingVertical: 3.5 }}>
-                          <Dot color={tone} size={4} />
-                          <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[10.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                            {row.name}
-                          </Text>
-                          <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row.health}</Text>
-                          <Text className="font-mono text-[9.5px]" style={{ color: tone, width: 30, textAlign: 'right' }}>
-                            {gap >= 0 ? '+' : ''}{gap}
-                          </Text>
+                        <View key={row.id} style={{ paddingVertical: 3 }}>
+                          <View className="flex-row items-center gap-2">
+                            <Text
+                              numberOfLines={1}
+                              className={cn('min-w-0 flex-1 font-body text-[10.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}
+                            >
+                              {row.name}
+                            </Text>
+                            <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row.health}</Text>
+                            <Text className="font-mono text-[9.5px]" style={{ color: tone, width: 28, textAlign: 'right' }}>
+                              {gap >= 0 ? '+' : ''}{gap}
+                            </Text>
+                          </View>
+                          {/* health bar with the plan line marked, so "on plan"
+                              is legible at a glance rather than arithmetic */}
+                          <View
+                            style={{
+                              marginTop: 3, height: 3, borderRadius: 3, overflow: 'hidden',
+                              backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,11,13,0.08)',
+                            }}
+                          >
+                            <View style={{ width: `${Math.max(0, Math.min(100, row.health))}%`, height: '100%', backgroundColor: tone, borderRadius: 3 }} />
+                          </View>
                         </View>
                       );
                     })}
@@ -1674,24 +1692,24 @@ export function DashboardOverview({
 
                 {/* An alarm chart with nothing in it is a panel asking for space
                     it has not earned — drop the card entirely when the plant is
-                    quiet, and let "Assets on plan" take the corner alone. */}
-                {metrics.alarms.length > 0 ? (
+                    quiet and let "Assets on plan" take the corner alone.
+                    Gated on the same count the header pill uses; `metrics.alarms`
+                    is a rolling log that stays populated after alarms clear. */}
+                {openAlarmCount > 0 ? (
                   <WorkspaceCard
                     title="Alarms by day"
-                    meta={metrics.criticalCount > 0 ? `${metrics.criticalCount} critical` : `${metrics.alarms.length} open`}
+                    meta={metrics.criticalCount > 0 ? `${metrics.criticalCount} critical` : `${openAlarmCount} open`}
+                    metaTone={metrics.criticalCount > 0 ? palette.critical : palette.warning}
                     dark={isDark}
                   >
-                    <FillChart
-                      min={104}
-                      render={(height) => (
-                        <StackedBars
-                          labels={DEMO_ALARM_DAYS}
-                          critical={DEMO_ALARM_BARS.critical}
-                          warning={DEMO_ALARM_BARS.warning}
-                          info={DEMO_ALARM_BARS.info}
-                          height={height}
-                        />
-                      )}
+                    {/* Explicit height: FillChart measures its parent, and inside
+                        a fixed-height card that resolved to 0 and drew nothing. */}
+                    <StackedBars
+                      labels={DEMO_ALARM_DAYS}
+                      critical={DEMO_ALARM_BARS.critical}
+                      warning={DEMO_ALARM_BARS.warning}
+                      info={DEMO_ALARM_BARS.info}
+                      height={112}
                     />
                   </WorkspaceCard>
                 ) : null}

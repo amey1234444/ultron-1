@@ -58,17 +58,21 @@ export default function PlantWorkspace({ canvas, kpis, cards, title, meta, dark 
   );
 }
 
-/** Native counterpart of the web glass card. */
+/** Native counterpart of the web glass card. Signature must stay in step with
+ *  `PlantWorkspace.web.tsx` — TypeScript resolves this file, webpack the other. */
 export function WorkspaceCard({
-  title, meta, dark, children, height = 150,
-}: { title: string; meta?: string; dark: boolean; children: ReactNode; width?: number; height?: number }) {
+  title, meta, metaTone, dark, children, height = 158,
+}: {
+  title: string; meta?: string; metaTone?: string; dark: boolean;
+  children: ReactNode; width?: number; height?: number;
+}) {
   const inkMuted = dark ? '#8B8D93' : '#5C6068';
   const border = dark ? 'rgba(255,255,255,0.10)' : 'rgba(10,11,13,0.10)';
   return (
     <View style={{ borderWidth: 1, borderColor: border, borderRadius: 13, padding: 10, height, minWidth: 0 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
         <Text style={{ fontSize: 8.5, letterSpacing: 1.4, color: inkMuted }}>{title.toUpperCase()}</Text>
-        {meta ? <Text style={{ fontSize: 9, color: inkMuted }}>{meta}</Text> : null}
+        {meta ? <Text style={{ fontSize: 9, color: metaTone ?? inkMuted }}>{meta}</Text> : null}
       </View>
       <View style={{ flex: 1, minHeight: 0 }}>{children}</View>
     </View>

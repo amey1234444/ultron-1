@@ -47,26 +47,30 @@ export function workspaceTokens(dark: boolean) {
         glassBottom: 'rgba(255,255,255,0.012)',
         base: 'rgba(13,15,19,0.62)',
         border: 'rgba(255,255,255,0.09)',
-        rim: 'rgba(255,255,255,0.11)',
+        rim: 'rgba(255,255,255,0.13)',
         hair: 'rgba(255,255,255,0.06)',
         ink: '#F7F6F2',
         inkMuted: '#8B8D93',
         inkFaint: '#62666E',
         scrim: 'rgba(6,7,9,0.60)',
+        shadow: 'rgba(0,0,0,0.42)',
         accent: '#3FBF6A',
       }
     : {
         canvas: '#EEEFF1',
-        glassTop: 'rgba(255,255,255,0.80)',
-        glassBottom: 'rgba(255,255,255,0.42)',
-        base: 'rgba(255,255,255,0.55)',
-        border: 'rgba(10,11,13,0.10)',
-        rim: 'rgba(255,255,255,0.85)',
-        hair: 'rgba(10,11,13,0.07)',
+        // Light theme needs a real gradient, not white-on-white, or the glass
+        // flattens into a plain card — which is exactly how it was reading.
+        glassTop: 'rgba(255,255,255,0.92)',
+        glassBottom: 'rgba(226,229,234,0.55)',
+        base: 'rgba(248,249,251,0.52)',
+        border: 'rgba(10,11,13,0.13)',
+        rim: 'rgba(255,255,255,0.95)',
+        hair: 'rgba(10,11,13,0.08)',
         ink: '#0A0B0D',
         inkMuted: '#5C6068',
-        inkFaint: '#80858D',
+        inkFaint: '#7B818A',
         scrim: 'rgba(255,255,255,0.62)',
+        shadow: 'rgba(15,20,30,0.16)',
         accent: '#2A7A48',
       };
 }
@@ -74,15 +78,50 @@ export function workspaceTokens(dark: boolean) {
 type T = ReturnType<typeof workspaceTokens>;
 
 /** Glass: a gradient wash over a translucent base, with a lit top rim. */
-function glass(t: T): CSSProperties {
+function glass(t: T, radius = 13): CSSProperties {
   return {
     background: `linear-gradient(157deg, ${t.glassTop}, ${t.glassBottom}), ${t.base}`,
     border: `1px solid ${t.border}`,
-    borderRadius: 13,
+    borderRadius: radius,
     backdropFilter: 'blur(22px) saturate(150%)',
     WebkitBackdropFilter: 'blur(22px) saturate(150%)',
-    boxShadow: `inset 0 1px 0 ${t.rim}, 0 14px 40px rgba(0,0,0,0.34)`,
+    boxShadow: `inset 0 1px 0 ${t.rim}, inset 0 -1px 0 ${t.hair}, 0 14px 40px ${t.shadow}`,
   };
+}
+
+/**
+ * Shared glass shell.
+ *
+ * The gradient + blur alone reads as a translucent rectangle; what makes it look
+ * like glass is the pair of layers below — a specular highlight raking the
+ * top-left, and a hairline that catches light along the top edge only.
+ */
+function GlassSurface({
+  t, dark, children, style, radius = 13,
+}: { t: T; dark: boolean; children: ReactNode; style?: CSSProperties; radius?: number }) {
+  return (
+    <div style={{ ...glass(t, radius), position: 'relative', overflow: 'hidden', isolation: 'isolate', ...style }}>
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+          background: dark
+            ? 'radial-gradient(130% 78% at 6% -18%, rgba(255,255,255,0.13) 0%, rgba(255,255,255,0.035) 40%, transparent 70%)'
+            : 'radial-gradient(130% 78% at 6% -18%, rgba(255,255,255,1) 0%, rgba(255,255,255,0.42) 40%, transparent 70%)',
+        }}
+      />
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', top: 0, left: '10%', right: '10%', height: 1, pointerEvents: 'none', zIndex: 1,
+          background: `linear-gradient(to right, transparent, ${dark ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,1)'}, transparent)`,
+        }}
+      />
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        {children}
+      </div>
+    </div>
+  );
 }
 
 const micro = (t: T): CSSProperties => ({
@@ -93,23 +132,32 @@ const micro = (t: T): CSSProperties => ({
   color: t.inkFaint,
 });
 
-function KpiTile({ kpi, t }: { kpi: PlantKpi; t: T }) {
+function KpiTile({ kpi, t, dark }: { kpi: PlantKpi; t: T; dark: boolean }) {
+  const pct = kpi.progress === undefined ? null : Math.max(0, Math.min(1, kpi.progress));
   return (
-    <div style={{ ...glass(t), padding: '9px 14px 10px', minWidth: 146 }}>
-      <div style={micro(t)}>{kpi.label}</div>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginTop: 4 }}>
+    <GlassSurface t={t} dark={dark} style={{ padding: '10px 14px 11px', minWidth: 152 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+        {/* tone pip: states which measure is off plan without adding a hue */}
+        <span style={{ width: 5, height: 5, borderRadius: 999, background: kpi.tone, boxShadow: `0 0 7px ${kpi.tone}` }} />
+        <span style={micro(t)}>{kpi.label}</span>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 3, marginTop: 5 }}>
         {/* Light numerals: a measurement, not a marketing claim. */}
-        <span style={{ fontFamily: SANS, fontSize: 25, fontWeight: 300, lineHeight: 1, color: t.ink, letterSpacing: '-0.02em' }}>
+        <span style={{ fontFamily: SANS, fontSize: 27, fontWeight: 300, lineHeight: 1, color: t.ink, letterSpacing: '-0.025em' }}>
           {kpi.value}
         </span>
         {kpi.unit ? <span style={{ fontFamily: MONO, fontSize: 10.5, color: t.inkMuted }}>{kpi.unit}</span> : null}
       </div>
-      {kpi.progress !== undefined ? (
-        <div style={{ marginTop: 8, height: 2, borderRadius: 2, background: t.hair, overflow: 'hidden' }}>
-          <div style={{ width: `${Math.max(0, Math.min(1, kpi.progress)) * 100}%`, height: '100%', background: kpi.tone }} />
+      {pct !== null ? (
+        <div style={{ marginTop: 9, height: 3, borderRadius: 3, background: t.hair, overflow: 'hidden' }}>
+          <div style={{
+            width: `${pct * 100}%`, height: '100%', borderRadius: 3,
+            background: `linear-gradient(to right, ${kpi.tone}88, ${kpi.tone})`,
+            boxShadow: `0 0 8px ${kpi.tone}66`,
+          }} />
         </div>
       ) : null}
-    </div>
+    </GlassSurface>
   );
 }
 
@@ -157,7 +205,7 @@ export default function PlantWorkspace({
           ) : null}
         </div>
         <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
-          {kpis.map((kpi) => <KpiTile key={kpi.label} kpi={kpi} t={t} />)}
+          {kpis.map((kpi) => <KpiTile key={kpi.label} kpi={kpi} t={t} dark={dark} />)}
         </div>
       </div>
 
@@ -180,43 +228,30 @@ export default function PlantWorkspace({
  * — these annotate the plant, they do not compete with it.
  */
 export function WorkspaceCard({
-  title, meta, dark, children, width = 286, height = 150,
-}: { title: string; meta?: string; dark: boolean; children: ReactNode; width?: number; height?: number }) {
+  title, meta, metaTone, dark, children, width = 292, height = 158,
+}: {
+  title: string; meta?: string; metaTone?: string; dark: boolean;
+  children: ReactNode; width?: number; height?: number;
+}) {
   const t = workspaceTokens(dark);
   return (
-    <div
-      style={{
-        ...glass(t), width, height, padding: '9px 12px 10px',
-        display: 'flex', flexDirection: 'column', minWidth: 0,
-        position: 'relative', overflow: 'hidden', isolation: 'isolate',
-      }}
-    >
-      {/* specular sheen: a soft diagonal highlight raking the top-left corner,
-          which is what separates "glass" from "a translucent rectangle" */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
-          background: dark
-            ? 'radial-gradient(120% 70% at 8% -14%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 38%, transparent 68%)'
-            : 'radial-gradient(120% 70% at 8% -14%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 38%, transparent 68%)',
-        }}
-      />
-      {/* hairline that catches the light along the top edge only */}
-      <div
-        aria-hidden
-        style={{
-          position: 'absolute', top: 0, left: '9%', right: '9%', height: 1, pointerEvents: 'none', zIndex: 1,
-          background: `linear-gradient(to right, transparent, ${dark ? 'rgba(255,255,255,0.26)' : 'rgba(255,255,255,1)'}, transparent)`,
-        }}
-      />
-      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
-          <span style={micro(t)}>{title}</span>
-          {meta ? <span style={{ fontFamily: MONO, fontSize: 9, color: t.inkFaint, whiteSpace: 'nowrap' }}>{meta}</span> : null}
-        </div>
-        <div style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}>{children}</div>
+    <GlassSurface t={t} dark={dark} style={{ width, height, padding: '10px 13px 11px', minWidth: 0 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+        <span style={micro(t)}>{title}</span>
+        {meta ? (
+          <span style={{
+            fontFamily: MONO, fontSize: 9, whiteSpace: 'nowrap',
+            color: metaTone ?? t.inkFaint,
+            ...(metaTone ? {
+              padding: '1.5px 6px', borderRadius: 999,
+              background: `${metaTone}1F`, border: `1px solid ${metaTone}44`,
+            } : {}),
+          }}>
+            {meta}
+          </span>
+        ) : null}
       </div>
-    </div>
+      <div style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}>{children}</div>
+    </GlassSurface>
   );
 }

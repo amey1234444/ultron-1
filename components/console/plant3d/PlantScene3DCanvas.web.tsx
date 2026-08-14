@@ -87,6 +87,65 @@ function useGlowTexture() {
   }, []);
 }
 
+/** Vertical falloff: opaque where the wall meets the plinth, gone at the top. */
+function useWallGradient() {
+  return useMemo(() => {
+    const c = document.createElement('canvas');
+    c.width = 4;
+    c.height = 128;
+    const ctx = c.getContext('2d');
+    if (!ctx) return null;
+    // canvas y=0 is the TOP of the texture, which maps to the top of the wall
+    const g = ctx.createLinearGradient(0, 0, 0, 128);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.55, 'rgba(255,255,255,0.20)');
+    g.addColorStop(0.86, 'rgba(255,255,255,0.62)');
+    g.addColorStop(1, 'rgba(255,255,255,1)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 4, 128);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
+  }, []);
+}
+
+/**
+ * The selection volume: four translucent walls standing on the plinth edge that
+ * fade out as they rise, so the component reads as sitting inside a lit cage
+ * rather than being outlined. Additive and depth-write-free, so it glows over
+ * the model instead of clipping it.
+ */
+function SelectionWall({
+  cx, cz, w, d, height, tex, dark,
+}: { cx: number; cz: number; w: number; d: number; height: number; tex: THREE.Texture | null; dark: boolean }) {
+  if (!tex) return null;
+  const walls: { pos: [number, number, number]; rot: [number, number, number]; len: number }[] = [
+    { pos: [cx, height / 2, cz + d / 2], rot: [0, 0, 0], len: w },
+    { pos: [cx, height / 2, cz - d / 2], rot: [0, Math.PI, 0], len: w },
+    { pos: [cx + w / 2, height / 2, cz], rot: [0, Math.PI / 2, 0], len: d },
+    { pos: [cx - w / 2, height / 2, cz], rot: [0, -Math.PI / 2, 0], len: d },
+  ];
+  return (
+    <group>
+      {walls.map((wall, i) => (
+        <mesh key={i} position={wall.pos} rotation={wall.rot}>
+          <planeGeometry args={[wall.len, height]} />
+          <meshBasicMaterial
+            map={tex}
+            color={SELECT}
+            transparent
+            opacity={dark ? 0.62 : 0.42}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+            toneMapped={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  );
+}
+
 /** Height of the raised plinth each component stands on. */
 export const PLINTH_H = 0.42;
 
@@ -99,14 +158,17 @@ export const PLINTH_H = 0.42;
  * the accent green when hovered or selected, so the colour carries state.
  */
 function ComponentPad({
-  box, active, dark, glow,
-}: { box: THREE.Box3; active: boolean; dark: boolean; glow: THREE.Texture | null }) {
+  box, active, dark, glow, wallTex,
+}: { box: THREE.Box3; active: boolean; dark: boolean; glow: THREE.Texture | null; wallTex: THREE.Texture | null }) {
   const size = box.getSize(new THREE.Vector3());
   const centre = box.getCenter(new THREE.Vector3());
   const w = size.x + 1.5;
   const d = size.z + 1.5;
   const cx = centre.x;
   const cz = centre.z;
+  // Cage rises to roughly the component's own height, so tall and short
+  // components both read as enclosed rather than one being swamped.
+  const wallH = Math.max(2.2, size.y * 0.95);
 
   const bandY = PLINTH_H - 0.10;      // lit band sits just under the top edge
   const bandH = 0.075;
@@ -150,6 +212,10 @@ function ComponentPad({
           <meshBasicMaterial color={rim} toneMapped={false} transparent opacity={rimDim} />
         </mesh>
       ))}
+
+      {active ? (
+        <SelectionWall cx={cx} cz={cz} w={w} d={d} height={wallH} tex={wallTex} dark={dark} />
+      ) : null}
 
       {active && glow ? (
         <>
@@ -240,6 +306,7 @@ function PlacedComponent({
   const [hovered, setHovered] = useState(false);
   const active = hovered || isSelectedComponent;
   const glow = useGlowTexture();
+  const wallTex = useWallGradient();
   // Footprint measured from the model itself, so the plinth fits a utility
   // building and a power house (whose transformer bay extends well past the
   // building) without either being hand-tuned.
@@ -377,7 +444,7 @@ function PlacedComponent({
         onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); invalidate(); }}
         onPointerOut={() => { setHovered(false); invalidate(); }}
       >
-        <ComponentPad box={footprint} active={active} dark={dark} glow={glow} />
+        <ComponentPad box={footprint} active={active} dark={dark} glow={glow} wallTex={wallTex} />
         {/* the model stands ON the plinth */}
         <group position={[0, PLINTH_H, 0]}>
           <primitive object={model.root} />
@@ -585,29 +652,33 @@ function SceneContents(props: PlantScene3DCanvasProps) {
           the panel instead of ending at a hard rim when the camera orbits low. */}
       <fog attach="fog" args={[dark ? '#08090C' : '#EEEFF1', 48, 175]} />
 
-      {/* Solid floor beneath the grid so the ground reads as a surface rather
-          than as lines hanging in space. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.06, 0]} receiveShadow>
-        <planeGeometry args={[600, 600]} />
-        <meshStandardMaterial color={dark ? '#0A0C10' : '#E4E6EA'} roughness={0.92} metalness={0.05} />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.04, 0]} receiveShadow>
-        <planeGeometry args={[600, 600]} />
-        <shadowMaterial opacity={dark ? 0.45 : 0.20} />
+      {/* Solid floor. It receives shadows itself (no second shadow-catcher
+          plane) and is pushed back with polygonOffset, because a plane sitting a
+          few centimetres under the grid is the classic z-fighting pair — that is
+          what made the grid lines shimmer while orbiting. */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.18, 0]} receiveShadow>
+        <planeGeometry args={[900, 900]} />
+        <meshStandardMaterial
+          color={dark ? '#0A0C10' : '#E4E6EA'}
+          roughness={0.94}
+          metalness={0.04}
+          polygonOffset
+          polygonOffsetFactor={4}
+          polygonOffsetUnits={4}
+        />
       </mesh>
 
       {/* Measurement grid. Two tiers so scale is readable: a fine 2 m cell for
-          local judgement and a heavier 10 m section line for distance. Carried
-          far enough that the floor never runs out before the fog takes it. */}
+          local judgement, a heavier 10 m section line for distance. */}
       {scene.showGrid ? (
         <Grid
-          position={[0, -0.015, 0]}
-          args={[600, 600]}
+          position={[0, 0, 0]}
+          args={[900, 900]}
           cellSize={2}
-          cellThickness={0.7}
+          cellThickness={0.9}
           cellColor={dark ? '#2A343F' : '#C3C9D1'}
           sectionSize={10}
-          sectionThickness={1.5}
+          sectionThickness={1.7}
           sectionColor={dark ? '#3E4C5B' : '#9BA3AE'}
           fadeDistance={125}
           fadeStrength={1.0}
@@ -651,7 +722,10 @@ export default function PlantScene3DCanvas(props: PlantScene3DCanvasProps) {
         // something actually changes, not 60x a second behind the telemetry.
         frameloop="demand"
         gl={{ antialias: true, alpha: true, powerPreference: 'high-performance' }}
-        camera={{ fov: 42, near: 0.1, far: 900 }}
+        // A 0.1 : 900 frustum spends almost all depth precision in the first few
+        // metres, which is the other half of the grid shimmer. 0.5 : 420 gives
+        // roughly a 10x better distribution across the ground plane.
+        camera={{ fov: 42, near: 0.5, far: 420 }}
         style={{ width: '100%', height: '100%' }}
       >
         <SceneContents {...props} />
