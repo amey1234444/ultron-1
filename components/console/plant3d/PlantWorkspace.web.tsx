@@ -184,12 +184,39 @@ export function WorkspaceCard({
 }: { title: string; meta?: string; dark: boolean; children: ReactNode; width?: number; height?: number }) {
   const t = workspaceTokens(dark);
   return (
-    <div style={{ ...glass(t), width, height, padding: '9px 12px 10px', display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
-        <span style={micro(t)}>{title}</span>
-        {meta ? <span style={{ fontFamily: MONO, fontSize: 9, color: t.inkFaint, whiteSpace: 'nowrap' }}>{meta}</span> : null}
+    <div
+      style={{
+        ...glass(t), width, height, padding: '9px 12px 10px',
+        display: 'flex', flexDirection: 'column', minWidth: 0,
+        position: 'relative', overflow: 'hidden', isolation: 'isolate',
+      }}
+    >
+      {/* specular sheen: a soft diagonal highlight raking the top-left corner,
+          which is what separates "glass" from "a translucent rectangle" */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0,
+          background: dark
+            ? 'radial-gradient(120% 70% at 8% -14%, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0.03) 38%, transparent 68%)'
+            : 'radial-gradient(120% 70% at 8% -14%, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.35) 38%, transparent 68%)',
+        }}
+      />
+      {/* hairline that catches the light along the top edge only */}
+      <div
+        aria-hidden
+        style={{
+          position: 'absolute', top: 0, left: '9%', right: '9%', height: 1, pointerEvents: 'none', zIndex: 1,
+          background: `linear-gradient(to right, transparent, ${dark ? 'rgba(255,255,255,0.26)' : 'rgba(255,255,255,1)'}, transparent)`,
+        }}
+      />
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 7 }}>
+          <span style={micro(t)}>{title}</span>
+          {meta ? <span style={{ fontFamily: MONO, fontSize: 9, color: t.inkFaint, whiteSpace: 'nowrap' }}>{meta}</span> : null}
+        </div>
+        <div style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}>{children}</div>
       </div>
-      <div style={{ flex: 1, minHeight: 0, minWidth: 0, overflow: 'hidden' }}>{children}</div>
     </div>
   );
 }

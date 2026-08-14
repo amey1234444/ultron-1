@@ -1672,20 +1672,29 @@ export function DashboardOverview({
                   </ScrollView>
                 </WorkspaceCard>
 
-                <WorkspaceCard title="Alarms by day" meta={`${metrics.criticalCount} critical`} dark={isDark}>
-                  <FillChart
-                    min={104}
-                    render={(height) => (
-                      <StackedBars
-                        labels={DEMO_ALARM_DAYS}
-                        critical={DEMO_ALARM_BARS.critical}
-                        warning={DEMO_ALARM_BARS.warning}
-                        info={DEMO_ALARM_BARS.info}
-                        height={height}
-                      />
-                    )}
-                  />
-                </WorkspaceCard>
+                {/* An alarm chart with nothing in it is a panel asking for space
+                    it has not earned — drop the card entirely when the plant is
+                    quiet, and let "Assets on plan" take the corner alone. */}
+                {metrics.alarms.length > 0 ? (
+                  <WorkspaceCard
+                    title="Alarms by day"
+                    meta={metrics.criticalCount > 0 ? `${metrics.criticalCount} critical` : `${metrics.alarms.length} open`}
+                    dark={isDark}
+                  >
+                    <FillChart
+                      min={104}
+                      render={(height) => (
+                        <StackedBars
+                          labels={DEMO_ALARM_DAYS}
+                          critical={DEMO_ALARM_BARS.critical}
+                          warning={DEMO_ALARM_BARS.warning}
+                          info={DEMO_ALARM_BARS.info}
+                          height={height}
+                        />
+                      )}
+                    />
+                  </WorkspaceCard>
+                ) : null}
               </>
             }
           />

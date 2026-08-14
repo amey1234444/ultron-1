@@ -37,8 +37,10 @@ export type PlantScene3DCanvasProps = {
 /** A node of the model tree, flattened for the editor's part list. */
 export type PartNode = { name: string; depth: number; kind: 'mesh' | 'group' | 'port' | 'anchor' };
 
-const ROUTE_Y = 0.28;
-const PORT_STUB = 1.1;
+// Runs sit on the floor between the raised plinths, so cables read as dropping
+// off a component and crossing the yard rather than floating through the slabs.
+const ROUTE_Y = 0.16;
+const PORT_STUB = 1.35;
 
 // ---------------------------------------------------------------------------
 // Model instance
@@ -85,60 +87,89 @@ function useGlowTexture() {
   }, []);
 }
 
+/** Height of the raised plinth each component stands on. */
+export const PLINTH_H = 0.42;
+
 /**
- * The plinth every component stands on, plus its boundary.
+ * The raised plinth every component stands on, plus its boundary.
  *
- * The boundary is the selection affordance: a hairline at rest, and the accent
- * green when the component is hovered or selected — which is what "the one I am
- * in" means here, so the colour carries state rather than decoration.
+ * It is a real slab sitting ON the floor (0 → PLINTH_H) with the model on top,
+ * so the highlight has a lit vertical face to wrap around rather than reading as
+ * a flat outline. The boundary is the selection affordance: a dim rim at rest,
+ * the accent green when hovered or selected, so the colour carries state.
  */
 function ComponentPad({
   box, active, dark, glow,
 }: { box: THREE.Box3; active: boolean; dark: boolean; glow: THREE.Texture | null }) {
   const size = box.getSize(new THREE.Vector3());
   const centre = box.getCenter(new THREE.Vector3());
-  const m = 1.1;                                   // margin around the footprint
-  const w = size.x + m;
-  const d = size.z + m;
+  const w = size.x + 1.5;
+  const d = size.z + 1.5;
   const cx = centre.x;
   const cz = centre.z;
-  const TOP = 0.02;                                // plinth top sits just proud of
-  const H = 0.30;                                  // y=0 so the base embeds into it
-  const rail = 0.075;
-  const edgeColor = active ? SELECT : dark ? '#2C3239' : '#B9BEC6';
+
+  const bandY = PLINTH_H - 0.10;      // lit band sits just under the top edge
+  const bandH = 0.075;
+  const rim = active ? SELECT : dark ? '#333B45' : '#AEB4BD';
+  const rimDim = active ? 1 : 0.55;
 
   return (
     <group>
-      <mesh position={[cx, TOP - H / 2, cz]} receiveShadow>
-        <boxGeometry args={[w, H, d]} />
-        <meshStandardMaterial color={dark ? '#0D1015' : '#D8DBE0'} roughness={0.62} metalness={0.15} />
+      {/* body */}
+      <mesh position={[cx, PLINTH_H / 2, cz]} castShadow receiveShadow>
+        <boxGeometry args={[w, PLINTH_H, d]} />
+        <meshStandardMaterial color={dark ? '#0E1218' : '#D5D9DF'} roughness={0.58} metalness={0.22} />
       </mesh>
-      {/* inset deck, so the plinth reads as a machined pad not a slab */}
-      <mesh position={[cx, TOP + 0.002, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[w - 0.26, d - 0.26]} />
-        <meshStandardMaterial color={dark ? '#121620' : '#E6E8EC'} roughness={0.5} metalness={0.2} />
+      {/* top deck, inset so the slab reads as machined rather than extruded */}
+      <mesh position={[cx, PLINTH_H + 0.004, cz]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
+        <planeGeometry args={[w - 0.30, d - 0.30]} />
+        <meshStandardMaterial color={dark ? '#141A23' : '#E7E9ED'} roughness={0.46} metalness={0.28} />
       </mesh>
-      {/* boundary rail: four bars, so the highlight traces the actual edge */}
-      {([[0, (d - rail) / 2], [0, -(d - rail) / 2]] as const).map(([ox, oz], i) => (
-        <mesh key={`z${i}`} position={[cx + ox, TOP + 0.028, cz + oz]}>
-          <boxGeometry args={[w, 0.055, rail]} />
-          <meshBasicMaterial color={edgeColor} toneMapped={false} />
+      {/* chamfer cap around the top edge */}
+      <mesh position={[cx, PLINTH_H - 0.012, cz]}>
+        <boxGeometry args={[w + 0.05, 0.03, d + 0.05]} />
+        <meshStandardMaterial color={dark ? '#1A212B' : '#C7CCD3'} roughness={0.4} metalness={0.35} />
+      </mesh>
+
+      {/* lit boundary band wrapping all four vertical faces */}
+      {([
+        [0, (d + 0.03) / 2, w + 0.06, 0.035],
+        [0, -(d + 0.03) / 2, w + 0.06, 0.035],
+      ] as const).map(([ox, oz, bw, bd], i) => (
+        <mesh key={`bz${i}`} position={[cx + ox, bandY, cz + oz]}>
+          <boxGeometry args={[bw, bandH, bd]} />
+          <meshBasicMaterial color={rim} toneMapped={false} transparent opacity={rimDim} />
         </mesh>
       ))}
-      {([[(w - rail) / 2, 0], [-(w - rail) / 2, 0]] as const).map(([ox, oz], i) => (
-        <mesh key={`x${i}`} position={[cx + ox, TOP + 0.028, cz + oz]}>
-          <boxGeometry args={[rail, 0.055, d - rail * 2]} />
-          <meshBasicMaterial color={edgeColor} toneMapped={false} />
+      {([
+        [(w + 0.03) / 2, 0],
+        [-(w + 0.03) / 2, 0],
+      ] as const).map(([ox, oz], i) => (
+        <mesh key={`bx${i}`} position={[cx + ox, bandY, cz + oz]}>
+          <boxGeometry args={[0.035, bandH, d + 0.06]} />
+          <meshBasicMaterial color={rim} toneMapped={false} transparent opacity={rimDim} />
         </mesh>
       ))}
+
       {active && glow ? (
-        <mesh position={[cx, 0.012, cz]} rotation={[-Math.PI / 2, 0, 0]}>
-          <planeGeometry args={[w * 2.0, d * 2.0]} />
-          <meshBasicMaterial
-            map={glow} color={SELECT} transparent opacity={dark ? 0.5 : 0.3}
-            blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
-          />
-        </mesh>
+        <>
+          {/* light spilling onto the floor around the plinth */}
+          <mesh position={[cx, 0.015, cz]} rotation={[-Math.PI / 2, 0, 0]}>
+            <planeGeometry args={[w * 2.4, d * 2.4]} />
+            <meshBasicMaterial
+              map={glow} color={SELECT} transparent opacity={dark ? 0.55 : 0.30}
+              blending={THREE.AdditiveBlending} depthWrite={false} toneMapped={false}
+            />
+          </mesh>
+          {/* soft bloom hugging the band itself */}
+          <mesh position={[cx, bandY, cz]}>
+            <boxGeometry args={[w + 0.34, bandH * 4.5, d + 0.34]} />
+            <meshBasicMaterial
+              color={SELECT} transparent opacity={dark ? 0.14 : 0.10}
+              blending={THREE.AdditiveBlending} depthWrite={false} side={THREE.BackSide} toneMapped={false}
+            />
+          </mesh>
+        </>
       ) : null}
     </group>
   );
@@ -207,6 +238,7 @@ function PlacedComponent({
   const overrideMaterials = useRef(new Map<string, THREE.MeshStandardMaterial>());
   const [labelPos, setLabelPos] = useState<[number, number, number]>([0, 5.6, 0]);
   const [hovered, setHovered] = useState(false);
+  const active = hovered || isSelectedComponent;
   const glow = useGlowTexture();
   // Footprint measured from the model itself, so the plinth fits a utility
   // building and a power house (whose transformer bay extends well past the
@@ -345,33 +377,58 @@ function PlacedComponent({
         onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); invalidate(); }}
         onPointerOut={() => { setHovered(false); invalidate(); }}
       >
-        <ComponentPad box={footprint} active={hovered || isSelectedComponent} dark={dark} glow={glow} />
-        <primitive object={model.root} />
-        {showLabel ? (
-          <Html position={labelPos} center distanceFactor={38} zIndexRange={[20, 0]} pointerEvents="none">
-            <div
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                whiteSpace: 'nowrap',
-                padding: '4px 9px',
-                borderRadius: 7,
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: 0.2,
-                color: dark ? '#F5F5F5' : '#111827',
-                background: dark ? 'rgba(18,20,24,0.86)' : 'rgba(255,255,255,0.94)',
-                border: `1px solid ${isSelectedComponent ? '#3FBF6A' : dark ? 'rgba(255,255,255,0.16)' : '#dbe3ec'}`,
-                boxShadow: '0 2px 8px rgba(0,0,0,0.22)',
-                transform: 'translateY(-6px)',
-              }}
-            >
-              <span style={{ width: 7, height: 7, borderRadius: 999, background: statusColor }} />
-              {component.name}
-            </div>
-          </Html>
-        ) : null}
+        <ComponentPad box={footprint} active={active} dark={dark} glow={glow} />
+        {/* the model stands ON the plinth */}
+        <group position={[0, PLINTH_H, 0]}>
+          <primitive object={model.root} />
+          {showLabel ? (
+            <>
+              {/* leader line from the roofline up to the callout */}
+              <Line
+                points={[[labelPos[0], labelPos[1] - 1.15, labelPos[2]], [labelPos[0], labelPos[1] - 0.16, labelPos[2]]]}
+                color={active ? SELECT : dark ? '#4A525C' : '#9AA1AA'}
+                lineWidth={1}
+                transparent
+                opacity={0.9}
+              />
+              <mesh position={[labelPos[0], labelPos[1] - 1.15, labelPos[2]]}>
+                <sphereGeometry args={[0.075, 10, 8]} />
+                <meshBasicMaterial color={active ? SELECT : statusColor} toneMapped={false} />
+              </mesh>
+              <Html position={labelPos} center distanceFactor={40} zIndexRange={[20, 0]} pointerEvents="none">
+                <div
+                  style={{
+                    minWidth: 132,
+                    padding: '7px 11px 8px',
+                    borderRadius: 9,
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'Inter, system-ui, sans-serif',
+                    color: dark ? '#F7F6F2' : '#0A0B0D',
+                    background: dark
+                      ? 'linear-gradient(157deg, rgba(255,255,255,0.07), rgba(255,255,255,0.015)), rgba(13,15,19,0.72)'
+                      : 'linear-gradient(157deg, rgba(255,255,255,0.9), rgba(255,255,255,0.55)), rgba(255,255,255,0.6)',
+                    border: `1px solid ${active ? 'rgba(63,191,106,0.55)' : dark ? 'rgba(255,255,255,0.10)' : 'rgba(10,11,13,0.12)'}`,
+                    boxShadow: `inset 0 1px 0 ${dark ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.85)'}, 0 10px 26px rgba(0,0,0,0.36)`,
+                    backdropFilter: 'blur(14px) saturate(150%)',
+                    WebkitBackdropFilter: 'blur(14px) saturate(150%)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: 999, background: statusColor }} />
+                    <span style={{ fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em' }}>{component.name}</span>
+                  </div>
+                  <div style={{
+                    marginTop: 4, fontFamily: '"JetBrains Mono", ui-monospace, monospace',
+                    fontSize: 8.5, letterSpacing: '0.14em', textTransform: 'uppercase',
+                    color: dark ? '#62666E' : '#80858D',
+                  }}>
+                    {PLANT_MODELS[component.model].name}
+                  </div>
+                </div>
+              </Html>
+            </>
+          ) : null}
+        </group>
       </group>
       {/* Outline lives outside the group: the box is already in world space. */}
       {outline ? <primitive object={outline} /> : null}
@@ -526,7 +583,7 @@ function SceneContents(props: PlantScene3DCanvasProps) {
 
       {/* Distance fog tinted to the page background: the floor dissolves into
           the panel instead of ending at a hard rim when the camera orbits low. */}
-      <fog attach="fog" args={[dark ? '#08090C' : '#EEEFF1', 34, 165]} />
+      <fog attach="fog" args={[dark ? '#08090C' : '#EEEFF1', 48, 175]} />
 
       {/* Solid floor beneath the grid so the ground reads as a surface rather
           than as lines hanging in space. */}
@@ -539,18 +596,21 @@ function SceneContents(props: PlantScene3DCanvasProps) {
         <shadowMaterial opacity={dark ? 0.45 : 0.20} />
       </mesh>
 
+      {/* Measurement grid. Two tiers so scale is readable: a fine 2 m cell for
+          local judgement and a heavier 10 m section line for distance. Carried
+          far enough that the floor never runs out before the fog takes it. */}
       {scene.showGrid ? (
         <Grid
-          position={[0, -0.02, 0]}
-          args={[400, 400]}
+          position={[0, -0.015, 0]}
+          args={[600, 600]}
           cellSize={2}
-          cellThickness={0.5}
-          cellColor={dark ? '#1B212A' : '#D2D6DC'}
+          cellThickness={0.7}
+          cellColor={dark ? '#2A343F' : '#C3C9D1'}
           sectionSize={10}
-          sectionThickness={1}
-          sectionColor={dark ? '#28323E' : '#B6BCC5'}
-          fadeDistance={135}
-          fadeStrength={1.6}
+          sectionThickness={1.5}
+          sectionColor={dark ? '#3E4C5B' : '#9BA3AE'}
+          fadeDistance={125}
+          fadeStrength={1.0}
           infiniteGrid
           followCamera={false}
         />
