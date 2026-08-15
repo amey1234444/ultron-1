@@ -5,7 +5,7 @@
  */
 import { Pressable, Text, View } from 'react-native';
 
-import type { ConsolePalette } from '../../../lib/consoleTheme';
+import { alpha, type ConsolePalette } from '../../../lib/consoleTheme';
 import { LivePill, STEP } from './PlantSurfaces';
 
 function HeaderAction({
@@ -13,28 +13,43 @@ function HeaderAction({
   onPress,
   palette,
   tone,
+  /**
+   * Marks the one action on this header that changes what page you are on.
+   *
+   * Entering the twin used to also happen on any click into the yard, so the
+   * button was one of two equal ways in and was styled like its neighbour.
+   * It is now the only way in, and a sole entrance that looks like a secondary
+   * control is an entrance people do not find.
+   */
+  primary = false,
+  accessibilityHint,
 }: {
   label: string;
   onPress: () => void;
   palette: ConsolePalette;
   tone?: string;
+  primary?: boolean;
+  accessibilityHint?: string;
 }) {
+  const ink = tone ?? palette.inkMuted;
   return (
     <Pressable
       onPress={onPress}
       accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityHint={accessibilityHint}
       style={{
-        paddingHorizontal: STEP * 3,
+        paddingHorizontal: STEP * (primary ? 3.5 : 3),
         paddingVertical: STEP * 1.5,
         borderRadius: 4,
         borderWidth: 1,
-        borderColor: palette.line,
-        backgroundColor: palette.panel,
+        borderColor: primary ? alpha(ink, 0.45) : palette.line,
+        backgroundColor: primary ? alpha(ink, 0.13) : palette.panel,
       }}
     >
       <Text
         className="font-mono"
-        style={{ fontSize: 10, letterSpacing: 1.3, textTransform: 'uppercase', color: tone ?? palette.inkMuted }}
+        style={{ fontSize: primary ? 10.5 : 10, letterSpacing: 1.3, textTransform: 'uppercase', color: ink }}
       >
         {label}
       </Text>
@@ -58,8 +73,8 @@ export function PlantOverviewHeader({
   palette: ConsolePalette;
   canEdit?: boolean;
   onEdit?: () => void;
-  /** Enters the fullscreen twin. Lives here rather than over the world, where
-   *  it collided with the analytics strip along the bottom edge. */
+  /** Enters the fullscreen twin. The only way in — clicking the yard selects
+   *  an asset, it does not change the page. */
   onEnter?: () => void;
 }) {
   return (
@@ -87,7 +102,16 @@ export function PlantOverviewHeader({
 
       <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: STEP * 1.5 }}>
         {canEdit && onEdit ? <HeaderAction label="Edit map" onPress={onEdit} palette={palette} /> : null}
-        {onEnter ? <HeaderAction label="Enter plant" onPress={onEnter} palette={palette} tone={palette.accent} /> : null}
+        {onEnter ? (
+          <HeaderAction
+            label="Enter map"
+            onPress={onEnter}
+            palette={palette}
+            tone={palette.accent}
+            primary
+            accessibilityHint="Opens the plant map fullscreen"
+          />
+        ) : null}
       </View>
     </View>
   );

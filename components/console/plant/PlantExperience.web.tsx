@@ -17,7 +17,7 @@
  * Web-only (`.web.tsx`) alongside the canvas it hosts; the native build gets the
  * sibling stub.
  */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 import type { PlantAssetTelemetry } from '../../../lib/plantAnalytics';
@@ -207,6 +207,69 @@ function SceneControls({
   );
 }
 
+/**
+ * The way back to the plant overview.
+ *
+ * Deliberately the heaviest control in the immersive view. Everything else over
+ * the world is a hairline icon that recedes behind the plant; this one is the
+ * only thing on screen an operator needs to be able to find without looking for
+ * it, so it carries a filled surface, a word for where it goes, and the
+ * keyboard shortcut that does the same thing.
+ */
+function ExitButton({
+  onPress,
+  palette,
+  isDark,
+}: {
+  onPress: () => void;
+  palette: ConsolePalette;
+  isDark: boolean;
+}) {
+  const [hover, setHover] = useState(false);
+  return (
+    <button
+      type="button"
+      onClick={onPress}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      aria-label="Back to plant overview"
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        padding: '8px 12px 8px 9px',
+        cursor: 'pointer',
+        borderRadius: 6,
+        background: hover ? palette.panelRaised : palette.panel,
+        border: `1px solid ${hover ? palette.lineStrong : palette.line}`,
+        color: hover ? palette.ink : palette.inkMuted,
+        fontFamily: MONO,
+        fontSize: 10.5,
+        letterSpacing: '0.14em',
+        textTransform: 'uppercase',
+        boxShadow: isDark ? '0 8px 22px rgba(0,0,0,0.5)' : '0 6px 16px rgba(15,20,30,0.16)',
+        transition: `background 140ms ease, border-color 140ms ease, color 140ms ease`,
+      }}
+    >
+      <Icons.back size={15} />
+      Plant overview
+      <span
+        style={{
+          marginLeft: 2,
+          padding: '1px 5px',
+          borderRadius: 3,
+          border: `1px solid ${palette.line}`,
+          fontSize: 8.5,
+          letterSpacing: '0.1em',
+          color: palette.inkFaint,
+        }}
+      >
+        Esc
+      </span>
+    </button>
+  );
+}
+
 /** Contextual inspector for the selected asset. */
 function AssetDetails({
   asset,
@@ -313,7 +376,6 @@ function AssetDetails({
 
 export default function PlantExperience({
   mode,
-  onEnter,
   onExit,
   scene,
   statusColors,
@@ -390,43 +452,66 @@ export default function PlantExperience({
   }, []);
 
   // --- Esc leaves the twin --------------------------------------------------
+  //
+  // One press, one result. Esc used to unwind a level at a time — clear the
+  // selection, then leave — but the exit button now prints "Esc" on it, and a
+  // shortcut that sometimes does what its label says is worse than no shortcut.
+  // Dropping the selection is what clicking the empty yard is for.
   useEffect(() => {
     if (mode !== 'immersive') return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      // Esc unwinds one level at a time: clear the selection first, leave second.
-      if (selectedId) onSelect(null);
-      else onExit();
+      onExit();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [mode, onExit, onSelect, selectedId]);
+  }, [mode, onExit]);
 
   const runCommand = useCallback((kind: PlantCameraCommand['kind']) => {
     commandId.current += 1;
     setCommand({ id: commandId.current, kind });
   }, []);
 
+  // Entering the twin is a deliberate act with a button of its own.
+  //
+  // Both of these gestures used to enter it as a side effect — a click on the
+  // empty yard, or a click on any asset — which meant a stray click while
+  // reading the dashboard replaced the whole page with a fullscreen scene the
+  // operator had not asked for. Selecting and entering are now separate: these
+  // two only ever change the selection, in either view, and the single way in
+  // is the header's Enter map button.
   const handleBackgroundClick = useCallback(() => {
     if (transitioning) return;
-    // From the dashboard, clicking the yard is how you go in. Inside, it is how
-    // you drop the current selection.
-    if (immersive) onSelect(null);
-    else onEnter();
-  }, [immersive, onEnter, onSelect, transitioning]);
+    onSelect(null);
+  }, [onSelect, transitioning]);
 
   const handleSelectComponent = useCallback(
     (id: string) => {
       if (transitioning) return;
       onSelect(id);
-      // Selecting an asset from the dashboard is a request to go and look at
-      // it, so the same gesture enters and focuses.
-      if (!immersive) onEnter();
     },
-    [immersive, onEnter, onSelect, transitioning],
+    [onSelect, transitioning],
   );
 
   const selected = selectedId ? assets.find((asset) => asset.id === selectedId) ?? null : null;
+
+  // Which parts of the canvas are under chrome, so the label solver can keep
+  // every callout in the yard the operator can actually see. Memoised because
+  // the solver re-runs whenever this identity changes, and it re-runs on every
+  // projected frame as it is.
+  //
+  // Immersive covers the viewport and carries only its own chrome: the exit
+  // band across the top, the camera rail down the left, and the asset inspector
+  // on the right whenever one is open. Docked takes the page's, which cover the
+  // analytics column and the chart strip.
+  const insetTop = immersive ? 58 : (chromeInsets?.top ?? 0);
+  const insetRight = immersive ? (selected ? 292 : 14) : (chromeInsets?.right ?? 0);
+  const insetBottom = immersive ? 14 : (chromeInsets?.bottom ?? 0);
+  const insetLeft = immersive ? 52 : (chromeInsets?.left ?? 52);
+  const labelInsets = useMemo(
+    () => ({ top: insetTop, right: insetRight, bottom: insetBottom, left: insetLeft }),
+    [insetBottom, insetLeft, insetRight, insetTop],
+  );
 
   const layerStyle: CSSProperties = immersive
     ? { top: 0, left: 0, width: '100vw', height: '100vh' }
@@ -484,11 +569,7 @@ export default function PlantExperience({
           height={layerSize.height}
           // Immersive covers the viewport and carries only its own header, so
           // the page's docked chrome no longer applies.
-          insets={
-            immersive
-              ? { top: 44, right: selected ? 280 : 12, bottom: 12, left: 48 }
-              : (chromeInsets ?? { top: 0, right: 0, bottom: 0, left: 48 })
-          }
+          insets={labelInsets}
           // Labels are noise while the frame is moving; they come back the
           // instant the move lands.
           visible={!transitioning}
@@ -496,44 +577,28 @@ export default function PlantExperience({
 
         <SceneControls palette={palette} isDark={isDark} onCommand={runCommand} />
 
-        {/* --- immersive header --- */}
+        {/* --- immersive header ---
+            The way out has to be the most obvious control on the screen. This
+            view covers the app's own chrome, so the browser's back button does
+            not apply and the operator has no other exit besides Esc — which
+            nobody discovers on their own. It gets a real button: an arrow, a
+            destination in words, and the keyboard shortcut printed on it. */}
         <div
           style={{
             position: 'absolute',
-            top: 12,
-            left: 12,
-            zIndex: 7,
+            top: 14,
+            left: 14,
+            zIndex: 9,
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 12,
             opacity: immersive ? 1 : 0,
             transform: immersive ? 'translateY(0)' : 'translateY(-6px)',
             pointerEvents: immersive ? 'auto' : 'none',
             transition: `opacity 240ms ${EASE} ${immersive ? '180ms' : '0ms'}, transform 240ms ${EASE}`,
           }}
         >
-          <button
-            type="button"
-            onClick={onExit}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '5px 10px 5px 7px',
-              cursor: 'pointer',
-              borderRadius: 5,
-              background: palette.panel,
-              border: `1px solid ${palette.line}`,
-              color: palette.inkMuted,
-              fontFamily: MONO,
-              fontSize: 10,
-              letterSpacing: '0.14em',
-              textTransform: 'uppercase',
-            }}
-          >
-            <Icons.back />
-            Plant overview
-          </button>
+          <ExitButton onPress={onExit} palette={palette} isDark={isDark} />
           <span
             style={{
               fontFamily: MONO,
@@ -562,10 +627,6 @@ export default function PlantExperience({
             </span>
           </span>
         </div>
-
-        {/* Entering is a header action and a click on the empty yard; there is
-            no button over the world, because every corner of it is already
-            spoken for by the KPI strip, the analytics column and the charts. */}
 
         {/* --- asset inspector, immersive only --- */}
         {immersive && selected ? (
