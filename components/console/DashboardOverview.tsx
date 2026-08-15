@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 import Svg, { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
 
@@ -28,11 +28,17 @@ import {
   normalizePlantOverview,
   type PlantOverviewConfig,
 } from '../../lib/plantOverview';
+import { buildPlantAnalytics, type PlantAssetStatus } from '../../lib/plantAnalytics';
 import { countPartEdits, type PlantScene3DConfig } from '../../lib/plantScene3d';
+import { chromeVisible, isImmersive, PLANT_TRANSITION_MS, type PlantViewMode } from '../../lib/plantViewState';
 import { apiFetch } from '../../src/lib/apiClient';
 import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
-import { PlantScene3D } from './plant3d/PlantScene3D';
-import PlantWorkspace, { WorkspaceCard } from './plant3d/PlantWorkspace';
+import type { PlantCalloutFacts } from './plant3d/types';
+import { FadeLayer } from './plant/FadeLayer';
+import { PlantAnalyticsPanel, type PlantKpi } from './plant/PlantAnalyticsPanel';
+import { PlantBottomAnalytics } from './plant/PlantBottomAnalytics';
+import PlantExperience from './plant/PlantExperience';
+import { PlantOverviewHeader } from './plant/PlantOverviewHeader';
 import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
@@ -1381,7 +1387,52 @@ export function DashboardOverview({
   const [plantSaving, setPlantSaving] = useState(false);
   const [plantError, setPlantError] = useState<string | null>(null);
   const isCompact = width > 0 && width < 1180;
+  // Below this the analytics column would be taking width the plant needs, so
+  // it drops out entirely — the plant never shrinks to make room for a panel.
+  const isNarrow = width > 0 && width < 1280;
   const canEditPlant = currentUser?.role === 'super_admin';
+
+  // --- digital twin view state ---------------------------------------------
+  const [plantView, setPlantView] = useState<PlantViewMode>('overview');
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const transitionTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // `entering`/`exiting` are held for exactly as long as the animation runs, so
+  // the state and what is on screen never disagree.
+  const runTransition = useCallback((next: PlantViewMode, settled: PlantViewMode) => {
+    if (transitionTimer.current) clearTimeout(transitionTimer.current);
+    setPlantView(next);
+    transitionTimer.current = setTimeout(() => setPlantView(settled), PLANT_TRANSITION_MS);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (transitionTimer.current) clearTimeout(transitionTimer.current);
+    },
+    [],
+  );
+
+  const enterPlant = useCallback(() => {
+    if (plantView !== 'overview') return;
+    runTransition('entering', 'immersive');
+  }, [plantView, runTransition]);
+
+  const exitPlant = useCallback(() => {
+    if (plantView !== 'immersive') return;
+    // Deselect first: the camera pulls back from the asset and out to the yard
+    // as one move rather than snapping between two framings.
+    setSelectedAssetId(null);
+    runTransition('exiting', 'overview');
+  }, [plantView, runTransition]);
+
+  // Leaving Operations must not strand the console in a fullscreen canvas.
+  useEffect(() => {
+    if (section !== 'operations' && plantView !== 'overview') {
+      if (transitionTimer.current) clearTimeout(transitionTimer.current);
+      setPlantView('overview');
+      setSelectedAssetId(null);
+    }
+  }, [plantView, section]);
 
   // The plant overview layout is shared: super admins save it, everyone else
   // renders whatever was saved.
@@ -1529,39 +1580,54 @@ export function DashboardOverview({
   );
   const severityTotal = severitySegments.reduce((sum, segment) => sum + segment.value, 0);
 
-  // The 3D components carry live status the same way the 2D tags did: an `auto`
-  // component borrows the status of the telemetry area with a matching name, so
-  // the placement stays fixed while the colours stay live.
+  // The 3D components carry live status the same way the 2D tags did, but the
+  // component → telemetry-area binding now lives in `buildPlantAnalytics`
+  // (exact name, then word overlap, then leftovers) so a freshly seeded plant
+  // reports six distinct real areas instead of six copies of one.
+  //
+  // Only an *explicit* status is passed in. `auto` is resolved from the bound
+  // area inside the model, which is the one place that binding is known.
+  const plantStatusOverrides = useMemo(() => {
+    const out: Record<string, PlantAssetStatus> = {};
+    for (const component of plantConfig.scene3d.components) {
+      if (component.status !== 'auto') out[component.id] = component.status;
+    }
+    return out;
+  }, [plantConfig.scene3d.components]);
+
+  const analytics = useMemo(
+    () =>
+      buildPlantAnalytics({
+        metrics,
+        components: plantConfig.scene3d.components,
+        statuses: plantStatusOverrides,
+        nowMs,
+      }),
+    [metrics, nowMs, plantConfig.scene3d.components, plantStatusOverrides],
+  );
+
   const plantComponentColors = useMemo(() => {
     const colors: Record<string, string> = {};
-    for (const component of plantConfig.scene3d.components) {
-      const derived = metrics.areas.find((area) => area.name === component.name);
-      const status = component.status === 'auto' ? derived?.status ?? 'healthy' : component.status;
-      colors[component.id] = statusColor(palette, status);
-    }
+    for (const asset of analytics.assets) colors[asset.id] = statusColor(palette, asset.status);
     return colors;
-  }, [metrics.areas, palette, plantConfig.scene3d.components]);
+  }, [analytics.assets, palette]);
 
   const plantCallouts = useMemo(() => {
-    const facts: Record<string, { status: string; health?: number; machines?: number; alarms?: number; telemetry?: string }> = {};
-    for (const component of plantConfig.scene3d.components) {
-      const area = metrics.areas.find((entry) => entry.name === component.name);
-      const rows = metrics.attention.filter((entry) => entry.area === component.name);
-      const health = rows.length > 0 ? Math.round(rows.reduce((sum, row) => sum + row.health, 0) / rows.length) : undefined;
-      facts[component.id] = {
-        status: component.status === 'auto' ? area?.status ?? 'healthy' : component.status,
-        health,
-        machines: area?.count,
-        alarms: rows.reduce((sum, row) => sum + row.alarms, 0),
-        telemetry: rows[0]?.telemetry,
+    const facts: Record<string, PlantCalloutFacts> = {};
+    for (const asset of analytics.assets) {
+      facts[asset.id] = {
+        status: asset.status,
+        health: asset.health,
+        machines: asset.machines,
+        machinesActive: asset.machinesActive,
+        alarms: asset.alarms,
+        telemetry: asset.telemetry,
+        power: asset.powerKw,
+        temperature: asset.temperatureC,
       };
     }
     return facts;
-  }, [metrics.areas, metrics.attention, plantConfig.scene3d.components]);
-
-  // The same figure the header pill reports. `metrics.alarms` is a rolling log
-  // that stays populated after alarms clear, so it cannot gate the alarm card.
-  const openAlarmCount = metrics.criticalCount + metrics.warningCount + metrics.infoCount;
+  }, [analytics.assets]);
 
   const healthValues = metrics.attention.map((row) => row.health);
   const gaps = healthValues.map((value) => value - HEALTH_TARGET);
@@ -1569,44 +1635,85 @@ export function DashboardOverview({
   const worstAsset = metrics.attention[0];
   const bestAsset = metrics.attention[metrics.attention.length - 1];
 
+  // One source for the four headline measures. `plan` is the combined string
+  // the open `Metric` reads on the other sections; `planShort` + `detail` are
+  // the same facts split into the two footer columns the KPI cards use.
   const headline = [
     {
+      id: 'health',
       label: 'Overall health',
       value: String(metrics.healthScore),
       unit: '/100',
       progress: metrics.healthScore / 100,
       target: HEALTH_TARGET / 100,
       plan: `Plan ${HEALTH_TARGET} · △ ${metrics.healthScore - HEALTH_TARGET >= 0 ? '+' : ''}${metrics.healthScore - HEALTH_TARGET}`,
+      planShort: `Plan ${HEALTH_TARGET}`,
+      detail: `${metrics.healthScore - HEALTH_TARGET >= 0 ? '+' : ''}${metrics.healthScore - HEALTH_TARGET}`,
+      detailIsDeviation: true,
       tone: metrics.healthScore >= 85 ? palette.accent : metrics.healthScore >= 60 ? palette.warning : palette.critical,
     },
     {
+      id: 'machines',
       label: 'Machines online',
       value: String(metrics.machinesOnline),
       unit: `/${metrics.machinesTotal}`,
       progress: metrics.machinesTotal > 0 ? metrics.machinesOnline / metrics.machinesTotal : 0,
       target: 1,
       plan: `Plan ${metrics.machinesTotal} · △ -${metrics.machinesTotal - metrics.machinesOnline}`,
+      planShort: `Plan ${metrics.machinesTotal}`,
+      detail: `-${metrics.machinesTotal - metrics.machinesOnline}`,
+      detailIsDeviation: true,
       tone: metrics.machinesOnline < metrics.machinesTotal ? palette.warning : palette.accent,
     },
     {
+      id: 'channels',
       label: 'Channels streaming',
       value: metrics.activeChannels.toLocaleString(),
       unit: `/${metrics.configuredChannels.toLocaleString()}`,
       progress: metrics.configuredChannels > 0 ? metrics.activeChannels / metrics.configuredChannels : 0,
       target: 1,
       plan: `Plan ${metrics.configuredChannels.toLocaleString()} · ${metrics.packetRate.toLocaleString()} pkt/s`,
+      planShort: `Plan ${metrics.configuredChannels.toLocaleString()}`,
+      // Throughput, not a gap to plan — so it is never painted as a deviation.
+      detail: `${metrics.packetRate.toLocaleString()} pkt/s`,
+      detailIsDeviation: false,
       tone: metrics.activeChannels < metrics.configuredChannels ? palette.warning : palette.accent,
     },
     {
+      id: 'gateways',
       label: 'Gateways connected',
       value: String(metrics.connectedGateways),
       unit: `/${metrics.totalGateways}`,
       progress: metrics.totalGateways > 0 ? metrics.connectedGateways / metrics.totalGateways : 0,
       target: 1,
       plan: `Plan ${metrics.totalGateways} · ${metrics.avgLatencyMs} ms latency`,
+      planShort: `Plan ${metrics.totalGateways}`,
+      detail: `${metrics.avgLatencyMs} ms latency`,
+      detailIsDeviation: false,
       tone: metrics.connectedGateways < metrics.totalGateways ? palette.critical : palette.accent,
     },
   ];
+
+  // The KPI strip carries the reading and one short caption — the state, the
+  // rate or the latency. The gap-to-plan lives on the meter as a marker, which
+  // says the same thing without a second row of numbers.
+  const kpiCaptions: Record<string, string> = {
+    health: metrics.healthLabel,
+    machines: `${metrics.machinesOnline} active`,
+    channels: `${metrics.packetRate.toLocaleString('en-US')} pkt/s`,
+    gateways: `${metrics.avgLatencyMs} ms`,
+  };
+
+  const plantKpis: PlantKpi[] = headline.map((entry) => ({
+    id: entry.id,
+    label: entry.label,
+    value: entry.value,
+    unit: entry.unit,
+    progress: entry.progress,
+    target: entry.target,
+    caption: kpiCaptions[entry.id] ?? entry.planShort,
+    tone: entry.tone,
+  }));
 
   const rowClass = cn('gap-3', isCompact ? 'flex-col' : 'flex-row');
   // A row that takes whatever height is left on the page. Stacked layouts fall
@@ -1651,90 +1758,108 @@ export function DashboardOverview({
       // belongs.
       // The plant map is the page here: the canvas runs full bleed and every
       // other panel is docked onto it (KPIs top, analysis right, charts bottom).
-      case 'operations':
+      // The plant is the page: it takes the whole centre, the KPI row states
+      // whether it is worth looking at, and the analytics sit around the edge
+      // where they annotate it rather than compete with it.
+      // The 3D world is the ground of this page, not a component on it: the
+      // canvas spans the whole content area and every panel floats over it.
+      // That is the difference between "a dashboard with a Three.js widget"
+      // and a digital twin you are looking into.
+      case 'operations': {
+        const showChrome = chromeVisible(plantView);
+        const panelWidth = width >= 1600 ? 292 : 258;
         return (
-          <PlantWorkspace
-            dark={isDark}
-            compact={isCompact}
-            title="Plant map"
-            meta={`${plantConfig.scene3d.components.length} components · ${metrics.machinesOnline}/${metrics.machinesTotal} machines online`}
-            live={metrics.live}
-            canEdit={canEditPlant}
-            onEdit={() => setPlantEditorOpen(true)}
-            kpis={headline.map((entry) => ({
-              label: entry.label, value: entry.value, unit: entry.unit,
-              progress: entry.progress, target: entry.target, plan: entry.plan, tone: entry.tone,
-            }))}
-            canvas={<PlantScene3D scene={plantConfig.scene3d} statusColors={plantComponentColors} callouts={plantCallouts} dark={isDark} />}
-            cards={
-              <>
-                <WorkspaceCard
-                  title="Assets on plan"
-                  meta={`${metrics.attention.filter((r) => r.health >= HEALTH_TARGET - 3).length}/${metrics.attention.length}`}
-                  dark={isDark}
-                >
-                  <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-                    {metrics.attention.slice(0, 5).map((row) => {
-                      const gap = row.health - HEALTH_TARGET;
-                      const tone = gap >= -3 ? palette.accent : gap >= -10 ? palette.warning : palette.critical;
-                      return (
-                        <View key={row.id} style={{ paddingVertical: 3 }}>
-                          <View className="flex-row items-center gap-2">
-                            <Text
-                              numberOfLines={1}
-                              className={cn('min-w-0 flex-1 font-body text-[10.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}
-                            >
-                              {row.name}
-                            </Text>
-                            <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row.health}</Text>
-                            <Text className="font-mono text-[9.5px]" style={{ color: tone, width: 28, textAlign: 'right' }}>
-                              {gap >= 0 ? '+' : ''}{gap}
-                            </Text>
-                          </View>
-                          {/* health bar with the plan line marked, so "on plan"
-                              is legible at a glance rather than arithmetic */}
-                          <View
-                            style={{
-                              position: 'relative', marginTop: 3, height: 4, borderRadius: 3,
-                              backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,11,13,0.08)',
-                            }}
-                          >
-                            <View style={{ width: `${Math.max(0, Math.min(100, row.health))}%`, height: '100%', backgroundColor: tone, borderRadius: 3 }} />
-                            <View style={{ position: 'absolute', left: `${HEALTH_TARGET}%`, top: -1, width: 1, height: 6, backgroundColor: isDark ? '#F7F6F2' : '#0A0B0D' }} />
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                </WorkspaceCard>
+          <View style={{ flex: 1, minHeight: 0 }}>
+            {/* Layer 1-5: the world. Fills the region; the overlays sit on top. */}
+            <PlantExperience
+              mode={plantView}
+              onEnter={enterPlant}
+              onExit={exitPlant}
+              scene={plantConfig.scene3d}
+              statusColors={plantComponentColors}
+              callouts={plantCallouts}
+              palette={palette}
+              isDark={isDark}
+              plantName={metrics.plantName}
+              live={metrics.live}
+              assets={analytics.assets}
+              selectedId={selectedAssetId}
+              onSelect={setSelectedAssetId}
+              canEdit={canEditPlant}
+              onEdit={() => setPlantEditorOpen(true)}
+            />
 
-                {/* An alarm chart with nothing in it is a panel asking for space
-                    it has not earned — drop the card entirely when the plant is
-                    quiet and let "Assets on plan" take the corner alone.
-                    Gated on the same count the header pill uses; `metrics.alarms`
-                    is a rolling log that stays populated after alarms clear. */}
-                {openAlarmCount > 0 ? (
-                  <WorkspaceCard
-                    title="Alarms by day"
-                    meta={metrics.criticalCount > 0 ? `${metrics.criticalCount} critical` : `${openAlarmCount} open`}
-                    metaTone={metrics.criticalCount > 0 ? palette.critical : palette.warning}
-                    dark={isDark}
-                  >
-                    {/* Explicit height: FillChart measures its parent, and inside
-                        a fixed-height card that resolved to 0 and drew nothing. */}
-                    <StackedBars
-                      labels={alarmBars.labels}
-                      critical={alarmBars.critical}
-                      warning={alarmBars.warning}
-                      info={alarmBars.info}
-                      height={112}
-                    />
-                  </WorkspaceCard>
-                ) : null}
-              </>
-            }
-          />
+            {/* Layer 6: dashboard overlays. `box-none` so only the panels
+                themselves take the pointer — dragging the gaps still orbits
+                the plant underneath. */}
+            <View
+              pointerEvents="box-none"
+              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5, padding: 12 }}
+            >
+              {/* Inset by the analytics column: the header's actions sit at the
+                  right edge and were landing underneath it. */}
+              <FadeLayer visible={showChrome} translateY={-6} style={{ marginRight: isNarrow ? 0 : panelWidth + 10 }}>
+                <PlantOverviewHeader
+                  title="Plant map"
+                  live={metrics.live}
+                  facts={[
+                    `${plantConfig.scene3d.components.length} components`,
+                    `${metrics.machinesOnline}/${metrics.machinesTotal} machines online`,
+                  ]}
+                  palette={palette}
+                  canEdit={canEditPlant}
+                  onEdit={() => setPlantEditorOpen(true)}
+                  onEnter={enterPlant}
+                />
+              </FadeLayer>
+
+              {/* Everything between the header and the charts is the plant. The
+                  four headline measures moved into the analytics column, which
+                  is what freed this band. */}
+              <View style={{ flex: 1, minHeight: 0 }} pointerEvents="none" />
+
+              <FadeLayer
+                visible={showChrome}
+                translateY={16}
+                style={{ height: 134, flexDirection: 'row', marginRight: isNarrow ? 0 : panelWidth + 10 }}
+              >
+                <PlantBottomAnalytics
+                  analytics={analytics}
+                  alarmBars={alarmBars}
+                  alarmCounts={{
+                    critical: metrics.criticalCount,
+                    warning: metrics.warningCount,
+                    info: metrics.infoCount,
+                  }}
+                  live={metrics.live}
+                  palette={palette}
+                  isDark={isDark}
+                  stacked={false}
+                />
+              </FadeLayer>
+            </View>
+
+            {/* Right analytics column, floating full-height over the world. */}
+            {isNarrow ? null : (
+              <FadeLayer
+                visible={showChrome}
+                translateX={16}
+                style={{
+                  position: 'absolute',
+                  top: 12,
+                  right: 12,
+                  bottom: 12,
+                  width: panelWidth,
+                  zIndex: 6,
+                  flexDirection: 'row',
+                }}
+              >
+                <PlantAnalyticsPanel analytics={analytics} kpis={plantKpis} palette={palette} isDark={isDark} />
+              </FadeLayer>
+            )}
+          </View>
         );
+      }
 
       case 'scorecard':
         return (
@@ -2131,12 +2256,25 @@ export function DashboardOverview({
   };
 
   return (
-    <View className="flex-1" style={{ minHeight: 0, backgroundColor: palette.bg }}>
+    <View
+      className="flex-1"
+      style={{
+        minHeight: 0,
+        backgroundColor: palette.bg,
+        // react-native-web gives every View `z-index: 0`, which makes each one a
+        // stacking context — so the fullscreen canvas can never paint over the
+        // app header from inside this subtree no matter how high its own
+        // z-index is. Raising this branch for the duration of the twin is what
+        // actually lets it cover the chrome; it drops straight back afterwards
+        // so the header's own menus keep working.
+        zIndex: isImmersive(plantView) ? 60 : 0,
+      }}
+    >
       <SectionTabs active={section} onChange={setSection} />
 
-      {/* Operations is the full-bleed plant workspace: it manages its own
-          scrolling inside the docked rails, so it must not sit in the padded
-          page scroller or the canvas would be inset and double-scrolled. */}
+      {/* Operations is full-bleed: the 3D world is the page's ground and the
+          panels float on it, so there is no page padding and no page scroller
+          here — either would inset the world back into a box. */}
       {section === 'operations' ? (
         <View className="flex-1" style={{ minHeight: 0 }}>
           {renderSection()}

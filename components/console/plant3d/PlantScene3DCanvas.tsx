@@ -5,32 +5,19 @@
  * Expo/Metro native bundle can resolve the same import without pulling three.js
  * and @react-three/* into a build that has no WebGL canvas to draw into. The
  * shared wrapper never renders this — it short-circuits on `Platform.OS`.
+ *
+ * The props live in `./types`, which both builds import, so there is nothing
+ * here that can fall out of step with the real implementation.
  */
-import type { PlantScene3DConfig } from '../../../lib/plantScene3d';
+import type { PlantScene3DCanvasProps } from './types';
 
-export type PartNode = { name: string; depth: number; kind: 'mesh' | 'group' | 'port' | 'anchor' };
-
-export type PlantCalloutFacts = {
-  status: string;
-  health?: number;
-  machines?: number;
-  alarms?: number;
-  telemetry?: string;
-};
-
-export type PlantScene3DCanvasProps = {
-  scene: PlantScene3DConfig;
-  statusColors: Record<string, string>;
-  dark: boolean;
-  editable?: boolean;
-  selectedComponentId?: string | null;
-  selectedPart?: string | null;
-  onSelectPart?: (componentId: string, partName: string) => void;
-  onSelectComponent?: (componentId: string) => void;
-  interactionMode?: 'parts' | 'connections';
-  onPartsDiscovered?: (componentId: string, parts: PartNode[]) => void;
-  callouts?: Record<string, PlantCalloutFacts>;
-};
+export type {
+  PartNode,
+  PlantCalloutFacts,
+  PlantCameraCommand,
+  PlantCameraMode,
+  PlantScene3DCanvasProps,
+} from './types';
 
 export default function PlantScene3DCanvas(_props: PlantScene3DCanvasProps): React.ReactElement | null {
   return null;

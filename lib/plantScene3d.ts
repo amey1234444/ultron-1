@@ -110,43 +110,113 @@ export const PART_SCALE_MAX = 4;
 export const COMPONENT_SCALE_MIN = 25;
 export const COMPONENT_SCALE_MAX = 300;
 
+/**
+ * The seeded plant yard.
+ *
+ * Six areas laid out as a real site reads: process and utility blocks to the
+ * west, the manufacturing hall on the centre line, the electrical compound and
+ * its substation to the east, and the gateway house pulled forward on its own so
+ * the network runs fan out from a single visible point.
+ *
+ * Only two models exist, so the areas are differentiated the way a site plan
+ * differentiates them — by footprint, orientation and scale — rather than by
+ * inventing geometry. Spacing is checked against the *overall* extents above:
+ * the power house origin is the centre of its building, and its transformer bay
+ * runs a further ~9.8 m along +X, which is why the two power-house instances are
+ * counter-rotated so their bays face away from each other.
+ */
 export const DEFAULT_PLANT_SCENE_3D: PlantScene3DConfig = {
   enabled: true,
   modelScale: 100,
   showGrid: true,
   showLabels: true,
-  // One instance of each template. The power house origin is the centre of its
-  // building footprint, so its transformer bay extends a further ~9.8 m in +X;
-  // the two are spaced to leave a clear service gap between them.
   components: [
     {
       id: 'utility',
       name: 'Utility Area',
       model: 'utility-building',
-      x: -10,
-      z: 0,
+      x: -26,
+      z: -3,
       rotation: 0,
       scale: 100,
       status: 'auto',
       parts: {},
     },
     {
+      // The hall: the largest footprint on the site and the one the default
+      // camera frames, so it carries the centre line.
+      id: 'manufacturing',
+      name: 'Manufacturing Unit',
+      model: 'utility-building',
+      x: -2,
+      z: 7,
+      rotation: 0,
+      scale: 132,
+      status: 'auto',
+      parts: {},
+    },
+    {
       id: 'power-house',
-      name: 'Power House',
+      name: 'Electrical / Power House',
       model: 'power-house',
-      x: 5,
-      z: 0,
+      x: 18,
+      z: -7,
       rotation: 0,
       scale: 100,
       status: 'auto',
       parts: {},
     },
+    {
+      // Counter-rotated so its transformer bay runs west, back toward the yard,
+      // instead of colliding with the power house bay.
+      id: 'substation',
+      name: 'Substation',
+      model: 'power-house',
+      x: 26,
+      z: 15,
+      rotation: 180,
+      scale: 82,
+      status: 'auto',
+      parts: {},
+    },
+    {
+      // Small, forward and alone: the network hub reads as infrastructure rather
+      // than as another process block.
+      id: 'gateway',
+      name: 'Gateway House',
+      model: 'utility-building',
+      x: 4,
+      z: -18,
+      rotation: 0,
+      scale: 62,
+      status: 'auto',
+      parts: {},
+    },
+    {
+      id: 'cooling',
+      name: 'Cooling System',
+      model: 'utility-building',
+      x: -25,
+      z: 17,
+      rotation: 90,
+      scale: 78,
+      status: 'auto',
+      parts: {},
+    },
   ],
   connections: [
-    // LV distribution leaves the power house switchgear and feeds the utility
-    // building; both ports face each other across the gap.
+    // HV in, LV out: the power house feeds the yard, the substation backs it up.
     { id: 'c-power-utility', fromId: 'power-house', fromPort: 'PORT_POWER_OUT', toId: 'utility', toPort: 'PORT_ELECTRICAL_IN', kind: 'electrical' },
-    { id: 'c-power-network', fromId: 'power-house', fromPort: 'PORT_NETWORK', toId: 'utility', toPort: 'PORT_NETWORK', kind: 'network' },
+    { id: 'c-power-manufacturing', fromId: 'power-house', fromPort: 'PORT_UTILITY', toId: 'manufacturing', toPort: 'PORT_ELECTRICAL_IN', kind: 'electrical' },
+    { id: 'c-substation-power', fromId: 'substation', fromPort: 'PORT_POWER_OUT', toId: 'power-house', toPort: 'PORT_POWER_IN', kind: 'electrical' },
+    { id: 'c-power-cooling', fromId: 'power-house', fromPort: 'PORT_GROUNDING', toId: 'cooling', toPort: 'PORT_ELECTRICAL_IN', kind: 'electrical' },
+    // Every telemetry run terminates at the gateway house — that is the shape
+    // the connection tree in the inspector is meant to show.
+    { id: 'c-gateway-utility', fromId: 'gateway', fromPort: 'PORT_DATA', toId: 'utility', toPort: 'PORT_NETWORK', kind: 'network' },
+    { id: 'c-gateway-manufacturing', fromId: 'gateway', fromPort: 'PORT_NETWORK', toId: 'manufacturing', toPort: 'PORT_NETWORK', kind: 'network' },
+    { id: 'c-gateway-power', fromId: 'gateway', fromPort: 'PORT_UTILITY_OUT', toId: 'power-house', toPort: 'PORT_NETWORK', kind: 'data' },
+    // Compressed air from the utility block to the hall.
+    { id: 'c-utility-manufacturing', fromId: 'utility', fromPort: 'PORT_AIR', toId: 'manufacturing', toPort: 'PORT_AIR', kind: 'air' },
   ],
 };
 

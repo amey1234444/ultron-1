@@ -9,7 +9,7 @@
  * never runs during SSR and never reaches the native bundle.
  */
 import { Html, Line, OrbitControls, useGLTF } from '@react-three/drei';
-import { Canvas, useThree, type ThreeEvent } from '@react-three/fiber';
+import { Canvas, useFrame, useThree, type ThreeEvent } from '@react-three/fiber';
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
@@ -20,33 +20,23 @@ import {
   type PlantPartOverride,
   type PlantScene3DConfig,
 } from '../../../lib/plantScene3d';
+import { GroundPlane } from './GroundPlane';
+import { LabelProjector } from './LabelProjector';
+import type {
+  PartNode,
+  PlantCalloutFacts,
+  PlantCameraCommand,
+  PlantCameraMode,
+  PlantScene3DCanvasProps,
+} from './types';
 
-export type PlantScene3DCanvasProps = {
-  scene: PlantScene3DConfig;
-  /** Resolved status colour per component id (live telemetry for `auto`). */
-  statusColors: Record<string, string>;
-  dark: boolean;
-  /** Editor mode: parts become clickable and the selection is outlined. */
-  editable?: boolean;
-  selectedComponentId?: string | null;
-  selectedPart?: string | null;
-  onSelectPart?: (componentId: string, partName: string) => void;
-  onSelectComponent?: (componentId: string) => void;
-  interactionMode?: 'parts' | 'connections';
-  onPartsDiscovered?: (componentId: string, parts: PartNode[]) => void;
-  callouts?: Record<string, PlantCalloutFacts>;
-};
-
-export type PlantCalloutFacts = {
-  status: string;
-  health?: number;
-  machines?: number;
-  alarms?: number;
-  telemetry?: string;
-};
-
-/** A node of the model tree, flattened for the editor's part list. */
-export type PartNode = { name: string; depth: number; kind: 'mesh' | 'group' | 'port' | 'anchor' };
+export type {
+  PartNode,
+  PlantCalloutFacts,
+  PlantCameraCommand,
+  PlantCameraMode,
+  PlantScene3DCanvasProps,
+} from './types';
 
 // Runs sit on the floor between the raised plinths, so cables read as dropping
 // off a component and crossing the yard rather than floating through the slabs.
@@ -77,6 +67,138 @@ function classify(name: string): PartNode['kind'] {
 }
 
 const SELECT = '#3FBF6A';   // the console's single rationed accent: live / active
+
+const LABEL_MONO = '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace';
+
+/**
+ * Extra height given to an in-scene (`html` mode) label above its anchor.
+ *
+ * Only the editor uses that mode, where one component is in focus at a time.
+ * The dashboard uses `projected` labels, which solve their own placement.
+ */
+const LABEL_LIFT = 1.6;
+
+/** kW under a megawatt, MW above it — nobody reads "1250 kW" as a plant figure. */
+function formatPower(kw: number | undefined): string {
+  if (kw === undefined) return '—';
+  return kw >= 1000 ? `${(kw / 1000).toFixed(2)} MW` : `${Math.round(kw)} kW`;
+}
+
+/**
+ * The floating asset callout.
+ *
+ * Flat and opaque rather than glass: it sits over moving geometry, and a
+ * translucent panel there means the model shows through the numbers exactly
+ * when the operator is trying to read them.
+ *
+ * At rest it states identity and the three facts that decide whether anyone
+ * needs to look closer. Hovering promotes it — accent rim, and the electrical
+ * detail unfolds underneath — which is the tooltip, rather than a second
+ * floating element competing with the label for the same space.
+ */
+function AssetCallout({
+  name, statusColor, callout, fallbackStatus, active, dark,
+}: {
+  name: string;
+  statusColor: string;
+  callout?: PlantCalloutFacts;
+  fallbackStatus: string;
+  active: boolean;
+  dark: boolean;
+}) {
+  const surface = dark ? '#101318' : '#FFFFFF';
+  const border = active ? 'rgba(63,191,106,0.62)' : dark ? 'rgba(255,255,255,0.11)' : 'rgba(10,11,13,0.13)';
+  const ink = dark ? '#F7F6F2' : '#0A0B0D';
+  const faint = dark ? '#747983' : '#6D737C';
+  const hair = dark ? 'rgba(255,255,255,0.075)' : 'rgba(10,11,13,0.09)';
+
+  const rows: [string, string, string?][] = [
+    ['Machines', callout?.machines === undefined ? '—' : String(callout.machines).padStart(2, '0')],
+    [
+      'Alarms',
+      callout?.alarms === undefined ? '—' : String(callout.alarms).padStart(2, '0'),
+      callout?.alarms ? statusColor : undefined,
+    ],
+    ['Telemetry', callout?.telemetry ?? '—', callout?.telemetry === 'OFFLINE' ? faint : undefined],
+  ];
+  const detail: [string, string][] = [
+    ['Power', formatPower(callout?.power)],
+    ['Temp', callout?.temperature === undefined ? '—' : `${callout.temperature.toFixed(1)} °C`],
+    ['Health', callout?.health === undefined ? '—' : `${callout.health}/100`],
+  ];
+
+  const Row = ({ label, value, tone }: { label: string; value: string; tone?: string }) => (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, whiteSpace: 'nowrap' }}>
+      <span style={{ fontFamily: LABEL_MONO, fontSize: 7, letterSpacing: '0.14em', textTransform: 'uppercase', color: faint }}>
+        {label}
+      </span>
+      <span style={{ flex: 1 }} />
+      <span style={{ fontFamily: LABEL_MONO, fontSize: 8.5, color: tone ?? ink }}>{value}</span>
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        width: 162,
+        fontFamily: 'Inter, system-ui, sans-serif',
+        background: surface,
+        border: `1px solid ${border}`,
+        borderRadius: 5,
+        boxShadow: dark ? '0 10px 26px rgba(0,0,0,0.45)' : '0 8px 20px rgba(15,20,30,0.14)',
+        overflow: 'hidden',
+        transition: 'border-color 160ms ease',
+      }}
+    >
+      <div style={{ padding: '6px 9px 6px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span style={{ width: 5, height: 5, borderRadius: 999, background: statusColor, flexShrink: 0 }} />
+          <span
+            style={{
+              minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              fontFamily: LABEL_MONO, fontSize: 8, letterSpacing: '0.11em', textTransform: 'uppercase', color: ink,
+            }}
+          >
+            {name}
+          </span>
+        </div>
+        <div
+          style={{
+            marginTop: 2, marginLeft: 10,
+            fontFamily: LABEL_MONO, fontSize: 7, letterSpacing: '0.14em', textTransform: 'uppercase', color: statusColor,
+          }}
+        >
+          {callout?.status ?? fallbackStatus}
+        </div>
+      </div>
+
+      <div style={{ borderTop: `1px solid ${hair}`, padding: '5px 9px 6px', display: 'grid', gap: 2.5 }}>
+        {rows.map(([label, value, tone]) => (
+          <Row key={label} label={label} value={value} tone={tone} />
+        ))}
+      </div>
+
+      {/* Hover detail. Height-animated so the label grows in place instead of a
+          second card appearing somewhere else on screen. */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateRows: active ? '1fr' : '0fr',
+          transition: 'grid-template-rows 180ms cubic-bezier(0.22,1,0.36,1), opacity 140ms ease',
+          opacity: active ? 1 : 0,
+        }}
+      >
+        <div style={{ overflow: 'hidden', minHeight: 0 }}>
+          <div style={{ borderTop: `1px solid ${hair}`, padding: '5px 9px 6px', display: 'grid', gap: 2.5 }}>
+            {detail.map(([label, value]) => (
+              <Row key={label} label={label} value={value} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /** Soft radial falloff used for the ground glow under an active component. */
 function useGlowTexture() {
@@ -300,6 +422,9 @@ function PlacedComponent({
   showLabel,
   callout,
   dark,
+  interactive,
+  onHover,
+  onBoundsReady,
 }: {
   component: PlantComponent3D;
   statusColor: string;
@@ -315,6 +440,11 @@ function PlacedComponent({
   showLabel: boolean;
   callout?: PlantCalloutFacts;
   dark: boolean;
+  /** Twin mode: the whole component is a click target, parts are not. */
+  interactive: boolean;
+  onHover?: (componentId: string | null) => void;
+  /** World-space bounds, for the screen-space label placement. */
+  onBoundsReady: (componentId: string, box: THREE.Box3) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const model = useModelInstance(PLANT_MODELS[component.model].url);
@@ -426,14 +556,27 @@ function PlacedComponent({
     });
     onPortsReady(component.id, ports);
 
+    // World bounds of the built geometry, for the label overlay's safe zone.
+    // Measured from the model rather than from the registry footprint, so a
+    // rotated component and the power house transformer bay are both covered.
+    const bounds = new THREE.Box3().setFromObject(model.root);
+    if (!bounds.isEmpty()) onBoundsReady(component.id, bounds);
+
     const anchor = model.root.getObjectByName('ANCHOR_LABEL');
     if (anchor) setLabelPos([anchor.position.x, anchor.position.y, anchor.position.z]);
     invalidate();
-  }, [model, component.x, component.z, component.rotation, scale, onPortsReady, component.id, invalidate]);
+  }, [model, component.x, component.z, component.rotation, scale, onPortsReady, onBoundsReady, component.id, invalidate]);
 
   const handleClick = useCallback(
     (event: ThreeEvent<MouseEvent>) => {
-      if (!editable) return;
+      // Twin mode selects the whole asset. Drilling into a named part is an
+      // authoring action, so it stays behind `editable`.
+      if (!editable) {
+        if (!interactive || !onSelectComponent) return;
+        event.stopPropagation();
+        onSelectComponent(component.id);
+        return;
+      }
       event.stopPropagation();
       if (interactionMode === 'connections' && onSelectComponent) {
         onSelectComponent(component.id);
@@ -442,25 +585,39 @@ function PlacedComponent({
       const name = event.object.name;
       if (name && onSelectPart) onSelectPart(component.id, name);
     },
-    [editable, interactionMode, onSelectComponent, onSelectPart, component.id],
+    [editable, interactive, interactionMode, onSelectComponent, onSelectPart, component.id],
   );
 
-  const handlePointerOut = useCallback((event: ThreeEvent<PointerEvent>) => {
-    const group = groupRef.current;
-    if (group) {
-      const stillInside = event.intersections.some((hit) => {
-        let node: THREE.Object3D | null = hit.object;
-        while (node) {
-          if (node === group) return true;
-          node = node.parent;
-        }
-        return false;
-      });
-      if (stillInside) return;
-    }
-    setHovered(false);
-    invalidate();
-  }, [invalidate]);
+  const handlePointerOver = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      event.stopPropagation();
+      setHovered(true);
+      onHover?.(component.id);
+      invalidate();
+    },
+    [component.id, invalidate, onHover],
+  );
+
+  const handlePointerOut = useCallback(
+    (event: ThreeEvent<PointerEvent>) => {
+      const group = groupRef.current;
+      if (group) {
+        const stillInside = event.intersections.some((hit) => {
+          let node: THREE.Object3D | null = hit.object;
+          while (node) {
+            if (node === group) return true;
+            node = node.parent;
+          }
+          return false;
+        });
+        if (stillInside) return;
+      }
+      setHovered(false);
+      onHover?.(null);
+      invalidate();
+    },
+    [component.id, invalidate, onHover],
+  );
 
   const outline = useMemo(() => {
     if (!editable || !isSelectedComponent || !selectedPart) return null;
@@ -478,8 +635,8 @@ function PlacedComponent({
         position={[component.x, 0, component.z]}
         rotation={[0, THREE.MathUtils.degToRad(component.rotation), 0]}
         scale={scale}
-        onPointerDown={editable ? handleClick : undefined}
-        onPointerOver={(e: ThreeEvent<PointerEvent>) => { e.stopPropagation(); setHovered(true); invalidate(); }}
+        onPointerDown={editable || interactive ? handleClick : undefined}
+        onPointerOver={handlePointerOver}
         onPointerOut={handlePointerOut}
       >
         <ComponentPad box={footprint} active={active} dark={dark} glow={glow} wallTex={wallTex} />
@@ -488,9 +645,14 @@ function PlacedComponent({
           <primitive object={model.root} />
           {showLabel ? (
             <>
-              {/* leader line from the roofline up to the callout */}
+              {/* Leader line from the roofline up to the callout. The extra
+                  lift is what stops six labels in a six-building yard sitting
+                  on the roofs and on each other. */}
               <Line
-                points={[[labelPos[0], labelPos[1] - 1.15, labelPos[2]], [labelPos[0], labelPos[1] - 0.16, labelPos[2]]]}
+                points={[
+                  [labelPos[0], labelPos[1] - 1.15, labelPos[2]],
+                  [labelPos[0], labelPos[1] + LABEL_LIFT - 0.55, labelPos[2]],
+                ]}
                 color={active ? SELECT : dark ? '#4A525C' : '#9AA1AA'}
                 lineWidth={1}
                 transparent
@@ -501,58 +663,23 @@ function PlacedComponent({
                 <sphereGeometry args={[0.075, 10, 8]} />
                 <meshBasicMaterial color={active ? SELECT : statusColor} toneMapped={false} />
               </mesh>
-              <Html position={labelPos} center distanceFactor={40} zIndexRange={[20, 0]} pointerEvents="none">
-                <div
-                  style={{
-                    position: 'relative', width: 190, height: 114,
-                    fontFamily: 'Inter, system-ui, sans-serif',
-                    color: dark ? '#F7F6F2' : '#0A0B0D',
-                  }}
-                >
-                  <div style={{
-                    position: 'absolute', insetInline: 0, top: 0, minHeight: 47,
-                    padding: '7px 11px 8px', borderRadius: 9, whiteSpace: 'nowrap',
-                    background: dark
-                      ? 'linear-gradient(157deg, rgba(255,255,255,0.07), rgba(255,255,255,0.015)), rgba(13,15,19,0.82)'
-                      : 'linear-gradient(157deg, rgba(255,255,255,0.94), rgba(255,255,255,0.62)), rgba(255,255,255,0.72)',
-                    border: `1px solid ${active ? 'rgba(63,191,106,0.55)' : dark ? 'rgba(255,255,255,0.10)' : 'rgba(10,11,13,0.12)'}`,
-                    boxShadow: `inset 0 1px 0 ${dark ? 'rgba(255,255,255,0.11)' : 'rgba(255,255,255,0.85)'}, 0 10px 26px rgba(0,0,0,0.30)`,
-                    backdropFilter: 'blur(14px) saturate(150%)', WebkitBackdropFilter: 'blur(14px) saturate(150%)',
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                      <span style={{ width: 6, height: 6, borderRadius: 999, background: statusColor }} />
-                      <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', fontSize: 11, fontWeight: 500, letterSpacing: '-0.01em' }}>{component.name}</span>
-                      <span style={{ marginLeft: 'auto', fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 7.5, color: statusColor, textTransform: 'uppercase' }}>
-                        {callout?.status ?? component.status}
-                      </span>
-                    </div>
-                    <div style={{ marginTop: 4, fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 8, letterSpacing: '0.12em', textTransform: 'uppercase', color: dark ? '#737780' : '#707680' }}>
-                      {PLANT_MODELS[component.model].name}
-                    </div>
-                  </div>
-                  <div aria-hidden={!active} style={{
-                    position: 'absolute', insetInline: 0, top: 51, height: 61, padding: '7px 10px', borderRadius: 8,
-                    display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6,
-                    background: dark ? 'rgba(9,12,16,0.90)' : 'rgba(248,250,251,0.92)',
-                    border: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(10,11,13,0.11)'}`,
-                    boxShadow: '0 8px 20px rgba(0,0,0,0.24)', opacity: active ? 1 : 0,
-                    transform: active ? 'translateY(0)' : 'translateY(-3px)',
-                  }}>
-                    {[
-                      ['Health', callout?.health === undefined ? '—' : `${callout.health}`],
-                      ['Machines', callout?.machines === undefined ? '—' : `${callout.machines}`],
-                      ['Alarms', callout?.alarms === undefined ? '—' : `${callout.alarms}`],
-                    ].map(([label, value]) => (
-                      <div key={label} style={{ minWidth: 0 }}>
-                        <div style={{ fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 6.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: dark ? '#747983' : '#6D737C' }}>{label}</div>
-                        <div style={{ marginTop: 3, fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 10, color: label === 'Alarms' && Number(value) > 0 ? statusColor : dark ? '#F7F6F2' : '#0A0B0D' }}>{value}</div>
-                      </div>
-                    ))}
-                    <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, paddingTop: 3, borderTop: `1px solid ${dark ? 'rgba(255,255,255,0.07)' : 'rgba(10,11,13,0.08)'}`, fontFamily: '"JetBrains Mono", ui-monospace, monospace', fontSize: 6.5, letterSpacing: '0.08em', textTransform: 'uppercase', color: dark ? '#747983' : '#6D737C' }}>
-                      <span>Telemetry</span><span style={{ marginLeft: 'auto', color: dark ? '#D5D8DC' : '#30343A' }}>{callout?.telemetry ?? '—'}</span>
-                    </div>
-                  </div>
-                </div>
+              <Html
+                position={[labelPos[0], labelPos[1] + LABEL_LIFT, labelPos[2]]}
+                center
+                // Smaller on screen than it was: at 40 the callouts were the
+                // dominant object in the frame, which is backwards.
+                distanceFactor={30}
+                zIndexRange={[20, 0]}
+                pointerEvents="none"
+              >
+                <AssetCallout
+                  name={component.name}
+                  statusColor={statusColor}
+                  callout={callout}
+                  fallbackStatus={component.status}
+                  active={active}
+                  dark={dark}
+                />
               </Html>
             </>
           ) : null}
@@ -632,62 +759,42 @@ function Connections({ scene, ports, version }: { scene: PlantScene3DConfig; por
   );
 }
 
-/**
- * Deterministic finite floor grid. Each scale owns distinct line segments, so
- * there is no coplanar overlap for the depth buffer to alternate between while
- * orbiting. The minor grid is intentionally quiet at grazing angles.
- */
-function StableFloorGrid({ scene, dark }: { scene: PlantScene3DConfig; dark: boolean }) {
-  const halfSize = useMemo(() => {
-    const extent = scene.components.reduce((max, component) => {
-      const [w, d] = PLANT_MODELS[component.model].footprint;
-      const scale = (component.scale / 100) * (scene.modelScale / 100);
-      return Math.max(max, Math.abs(component.x) + w * scale, Math.abs(component.z) + d * scale);
-    }, 24);
-    return Math.min(140, Math.max(40, Math.ceil((extent + 18) / 10) * 10));
-  }, [scene.components, scene.modelScale]);
-
-  const geometries = useMemo(() => {
-    const build = (step: number, skipMajor: boolean, y: number) => {
-      const positions: number[] = [];
-      for (let offset = -halfSize; offset <= halfSize + 0.001; offset += step) {
-        if (skipMajor && Math.abs(offset % 10) < 0.001) continue;
-        positions.push(-halfSize, y, offset, halfSize, y, offset);
-        positions.push(offset, y, -halfSize, offset, y, halfSize);
-      }
-      const geometry = new THREE.BufferGeometry();
-      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      return geometry;
-    };
-    return { minor: build(2, true, 0.018), major: build(10, false, 0.026) };
-  }, [halfSize]);
-
-  useEffect(() => () => {
-    geometries.minor.dispose();
-    geometries.major.dispose();
-  }, [geometries]);
-
-  return (
-    <group raycast={() => undefined}>
-      <lineSegments geometry={geometries.minor} raycast={() => undefined}>
-        <lineBasicMaterial color={dark ? '#28313A' : '#BFC5CD'} transparent opacity={dark ? 0.34 : 0.48} depthWrite={false} toneMapped={false} />
-      </lineSegments>
-      <lineSegments geometry={geometries.major} raycast={() => undefined}>
-        <lineBasicMaterial color={dark ? '#3A4652' : '#969FAA'} transparent opacity={dark ? 0.62 : 0.72} depthWrite={false} toneMapped={false} />
-      </lineSegments>
-    </group>
-  );
-}
 
 // ---------------------------------------------------------------------------
 // Scene
 // ---------------------------------------------------------------------------
 
-/** Frames the camera on the placed components whenever their extent changes. */
-function CameraRig({ scene }: { scene: PlantScene3DConfig }) {
-  const { camera } = useThree();
+/**
+ * Camera framing, focus and transitions.
+ *
+ * There is one camera and one scene for the whole product. The dashboard and
+ * the fullscreen twin differ only in where this rig is asked to put that camera,
+ * which is the entire reason entering the plant reads as a move rather than a
+ * navigation: nothing is unmounted, so nothing has to be rebuilt.
+ *
+ * Movement is a goal the rig eases toward, never a jump. Grabbing the mouse
+ * cancels the goal outright — a camera that keeps flying while the operator is
+ * dragging feels broken, and the operator's intent always wins.
+ */
+function CameraRig({
+  scene,
+  viewMode,
+  focusId,
+  command,
+}: {
+  scene: PlantScene3DConfig;
+  viewMode: PlantCameraMode;
+  focusId: string | null;
+  command?: PlantCameraCommand | null;
+}) {
+  const { camera, invalidate, size } = useThree();
   const controls = useRef<any>(null);
+  const goal = useRef<{ pos: THREE.Vector3; tgt: THREE.Vector3 } | null>(null);
+  const settled = useRef(false);
+  /** Set the moment the operator grabs the camera; blocks automatic reframing. */
+  const userMoved = useRef(false);
 
+  /** Extent of the whole yard. Drives the default framing and the zoom limits. */
   const focus = useMemo(() => {
     if (scene.components.length === 0) return { center: new THREE.Vector3(), radius: 14 };
     const box = new THREE.Box3();
@@ -699,20 +806,156 @@ function CameraRig({ scene }: { scene: PlantScene3DConfig }) {
       box.expandByPoint(new THREE.Vector3(c.x + half, PLANT_MODELS[c.model].height * s, c.z + half));
     }
     const center = box.getCenter(new THREE.Vector3());
-    const radius = Math.max(10, box.getSize(new THREE.Vector3()).length() * 0.62);
+    const radius = Math.max(8, box.getBoundingSphere(new THREE.Sphere()).radius);
     return { center, radius };
   }, [scene.components, scene.modelScale]);
 
-  useEffect(() => {
-    // Front-right-high three-quarter view: the angle that reads a plant best.
-    camera.position.set(focus.center.x + focus.radius * 0.85, focus.radius * 0.72, focus.center.z + focus.radius * 1.15);
-    camera.lookAt(focus.center);
-    camera.updateProjectionMatrix();
-    if (controls.current) {
-      controls.current.target.copy(focus.center);
-      controls.current.update();
+  /**
+   * Distance at which a sphere of `radius` fills `fill` of the frame.
+   *
+   * Derived from the live viewport rather than a tuned constant, because the
+   * canvas here is anything from a 292px-wide column on a laptop to a 1920px
+   * fullscreen stage. A fixed multiplier that framed one of those correctly
+   * left the plant as a speck in the other — which is exactly what it did.
+   * Whichever of the two field-of-view axes is tighter is the one that limits.
+   */
+  const frameDistance = useCallback(
+    (radius: number, fill: number) => {
+      const perspective = camera as THREE.PerspectiveCamera;
+      const vertical = THREE.MathUtils.degToRad(perspective.fov || 42);
+      const aspect = perspective.aspect || (size.width || 16) / (size.height || 9);
+      const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect);
+      const limiting = Math.min(vertical, horizontal);
+      return (radius / Math.max(0.08, Math.sin(limiting / 2))) * fill;
+    },
+    [camera, size.height, size.width],
+  );
+
+  /** Where each component sits, and how close is close enough to inspect it. */
+  const centres = useMemo(() => {
+    const map = new Map<string, { center: THREE.Vector3; radius: number }>();
+    for (const c of scene.components) {
+      const model = PLANT_MODELS[c.model];
+      const s = (c.scale / 100) * (scene.modelScale / 100);
+      map.set(c.id, {
+        center: new THREE.Vector3(c.x, model.height * s * 0.45, c.z),
+        radius: Math.max(5, Math.max(model.footprint[0], model.footprint[1]) * s * 0.85),
+      });
     }
-  }, [camera, focus]);
+    return map;
+  }, [scene.components, scene.modelScale]);
+
+  const goalFor = useCallback(
+    (mode: PlantCameraMode, id: string | null) => {
+      // Front-right, elevated: the three-quarter angle that reads a plant best.
+      // Immersive drops the eye line — standing in the yard rather than looking
+      // down at a model of it.
+      const direction = new THREE.Vector3(0.62, mode === 'immersive' ? 0.38 : 0.54, 0.86).normalize();
+
+      const placed = id ? centres.get(id) : undefined;
+      if (placed) {
+        // Close enough to read the building, far enough to keep its neighbours
+        // in frame — an asset with no context around it stops being a plant.
+        const distance = frameDistance(placed.radius, mode === 'immersive' ? 1.15 : 1.4);
+        return {
+          pos: placed.center.clone().add(direction.multiplyScalar(distance)),
+          tgt: placed.center.clone(),
+        };
+      }
+
+      // The plant should hold roughly two thirds of the frame. A bounding
+      // *sphere* around a flat yard is generously oversized, so fitting it
+      // exactly (1.0) leaves the plant looking like a model on a table.
+      const distance = frameDistance(focus.radius, mode === 'immersive' ? 0.46 : 0.66);
+      // Aim slightly above the ground plane so the yard sits in the lower two
+      // thirds and the buildings have sky above them, rather than the plant
+      // being pinned to the middle with dead grid all round.
+      const target = focus.center.clone().setY(focus.center.y * 0.35);
+      return { pos: target.clone().add(direction.multiplyScalar(distance)), tgt: target };
+    },
+    [centres, focus, frameDistance],
+  );
+
+  // Snap on first frame, ease afterwards: an opening animation from an
+  // arbitrary start position is motion with nothing to say.
+  //
+  // Deliberately does NOT depend on `goalFor` (which changes with the viewport):
+  // a deliberate move is a response to the mode or the selection changing, and
+  // reframing is handled separately below.
+  useEffect(() => {
+    const next = goalFor(viewMode, focusId);
+    userMoved.current = false;
+    if (!settled.current) {
+      settled.current = true;
+      camera.position.copy(next.pos);
+      camera.updateProjectionMatrix();
+      if (controls.current) {
+        controls.current.target.copy(next.tgt);
+        controls.current.update();
+      }
+      invalidate();
+      return;
+    }
+    goal.current = next;
+    invalidate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusId, viewMode]);
+
+  /**
+   * Re-frame as the canvas resizes.
+   *
+   * This is what carries the fullscreen move: the layer's bounds animate from
+   * the dashboard cell out to the viewport, and the camera re-fits continuously
+   * against each new aspect, so the plant grows into the frame instead of
+   * jumping once at the end. It stops the moment the operator takes the camera.
+   */
+  useEffect(() => {
+    if (userMoved.current || !settled.current) return;
+    goal.current = goalFor(viewMode, focusId);
+    invalidate();
+  }, [focusId, goalFor, invalidate, size.height, size.width, viewMode]);
+
+  const lastCommand = useRef(0);
+  useEffect(() => {
+    if (!command || command.id === lastCommand.current) return;
+    lastCommand.current = command.id;
+    const orbit = controls.current;
+    if (!orbit) return;
+
+    if (command.kind === 'fit' || command.kind === 'reset') {
+      // Fitting hands the camera back to the rig, so resizing tracks again.
+      userMoved.current = false;
+      goal.current = goalFor(viewMode, command.kind === 'fit' ? null : focusId);
+      invalidate();
+      return;
+    }
+
+    const tgt = orbit.target.clone();
+    const offset = camera.position.clone().sub(tgt);
+    const distance = offset.length();
+    const next = command.kind === 'zoom-in' ? distance * 0.7 : distance * 1.42;
+    offset.setLength(THREE.MathUtils.clamp(next, 4, focus.radius * 5));
+    goal.current = { pos: tgt.clone().add(offset), tgt };
+    invalidate();
+  }, [camera, command, focus.radius, focusId, goalFor, invalidate, viewMode]);
+
+  useFrame(() => {
+    const target = goal.current;
+    const orbit = controls.current;
+    if (!target || !orbit) return;
+    camera.position.lerp(target.pos, 0.085);
+    orbit.target.lerp(target.tgt, 0.085);
+    orbit.update();
+    if (camera.position.distanceTo(target.pos) < 0.06 && orbit.target.distanceTo(target.tgt) < 0.04) {
+      camera.position.copy(target.pos);
+      orbit.target.copy(target.tgt);
+      orbit.update();
+      goal.current = null;
+    }
+    // `frameloop="demand"` only renders when asked, so an in-flight move has to
+    // request its own next frame. Dropping the goal stops the loop dead.
+    invalidate();
+  });
 
   return (
     <OrbitControls
@@ -725,14 +968,43 @@ function CameraRig({ scene }: { scene: PlantScene3DConfig }) {
       maxDistance={focus.radius * 5}
       // Stop the camera dropping under the ground plane.
       maxPolarAngle={Math.PI * 0.49}
+      onStart={() => {
+        goal.current = null;
+        userMoved.current = true;
+      }}
     />
   );
 }
 
 function SceneContents(props: PlantScene3DCanvasProps) {
-  const { scene, statusColors, dark, editable = false, selectedComponentId, selectedPart } = props;
+  const {
+    scene, statusColors, dark, editable = false, selectedComponentId, selectedPart,
+    viewMode = 'overview', onHoverComponent, onBackgroundClick, cameraCommand, labelsVisible = true,
+    labelMode = 'html', onProjectLabels,
+  } = props;
   const portsRef = useRef<PortMap>(new Map());
   const [portVersion, setPortVersion] = useState(0);
+  const boundsRef = useRef<Map<string, THREE.Box3>>(new Map());
+  const [boundsVersion, setBoundsVersion] = useState(0);
+
+  const onBoundsReady = useCallback((componentId: string, box: THREE.Box3) => {
+    boundsRef.current.set(componentId, box);
+    setBoundsVersion((v) => v + 1);
+  }, []);
+  // Twin mode: whole assets are click targets. The editor keeps its own
+  // part-level picking, so the two never both claim a pointer event.
+  const interactive = !editable && Boolean(props.onSelectComponent);
+
+  /** How far the plant reaches, for the ground's falloff distances. */
+  const plantExtent = useMemo(() => {
+    let reach = 24;
+    for (const component of scene.components) {
+      const [w, d] = PLANT_MODELS[component.model].footprint;
+      const s = (component.scale / 100) * (scene.modelScale / 100);
+      reach = Math.max(reach, Math.hypot(component.x, component.z) + Math.max(w, d) * s);
+    }
+    return reach;
+  }, [scene.components, scene.modelScale]);
 
   const onPortsReady = useCallback(
     (componentId: string, ports: Map<string, { pos: THREE.Vector3; dir: THREE.Vector3 }>) => {
@@ -759,27 +1031,26 @@ function SceneContents(props: PlantScene3DCanvasProps) {
 
       {/* Distance fog tinted to the page background: the floor dissolves into
           the panel instead of ending at a hard rim when the camera orbits low. */}
-      <fog attach="fog" args={[dark ? '#08090C' : '#EEEFF1', 48, 175]} />
+      {/* Tinted to the console canvas token, not an approximation of it — a few
+          hex values off and the floor ends in a visible seam against the page
+          instead of dissolving into it. */}
+      <fog attach="fog" args={[dark ? '#08090C' : '#F6F6F4', 52, 190]} />
 
-      {/* Solid floor. It receives shadows itself (no second shadow-catcher
-          plane) and is pushed back with polygonOffset, because a plane sitting a
-          few centimetres under the grid is the classic z-fighting pair — that is
-          what made the grid lines shimmer while orbiting. */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.18, 0]} receiveShadow>
-        <planeGeometry args={[900, 900]} />
-        <meshStandardMaterial
-          color={dark ? '#0A0C10' : '#E4E6EA'}
-          roughness={0.94}
-          metalness={0.04}
-          polygonOffset
-          polygonOffsetFactor={4}
-          polygonOffsetUnits={4}
-        />
+      {scene.showGrid ? <GroundPlane dark={dark} extent={plantExtent} /> : null}
+
+      {/* Invisible pick plane. The floor itself is raycast-disabled (a shader
+          slab the size of a county is a terrible hit target), so background
+          clicks are caught here instead: clicking the yard rather than a
+          building is what enters, and once inside, what deselects. */}
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0, 0]}
+        visible={false}
+        onPointerDown={onBackgroundClick ? () => onBackgroundClick() : undefined}
+      >
+        <planeGeometry args={[600, 600]} />
+        <meshBasicMaterial />
       </mesh>
-
-      {/* Two non-overlapping finite scales avoid the long-distance derivative
-          shimmer of the previous 900 m infinite grid shader. */}
-      {scene.showGrid ? <StableFloorGrid scene={scene} dark={dark} /> : null}
 
       <Suspense fallback={null}>
         {scene.components.map((component) => (
@@ -796,15 +1067,29 @@ function SceneContents(props: PlantScene3DCanvasProps) {
             interactionMode={props.interactionMode ?? 'parts'}
             onPartsDiscovered={props.onPartsDiscovered}
             onPortsReady={onPortsReady}
-            showLabel={scene.showLabels}
+            // In `projected` mode the cards are drawn by the DOM overlay, so
+            // the in-scene label is off entirely rather than drawn twice.
+            showLabel={scene.showLabels && labelsVisible && labelMode === 'html'}
             callout={props.callouts?.[component.id]}
             dark={dark}
+            interactive={interactive}
+            onHover={onHoverComponent}
+            onBoundsReady={onBoundsReady}
           />
         ))}
         <Connections scene={scene} ports={portsRef.current} version={portVersion} />
       </Suspense>
 
-      <CameraRig scene={scene} />
+      {labelMode === 'projected' && onProjectLabels ? (
+        <LabelProjector boxes={boundsRef.current} version={boundsVersion} onProject={onProjectLabels} />
+      ) : null}
+
+      <CameraRig
+        scene={scene}
+        viewMode={viewMode}
+        focusId={editable ? null : selectedComponentId ?? null}
+        command={cameraCommand}
+      />
     </>
   );
 }
