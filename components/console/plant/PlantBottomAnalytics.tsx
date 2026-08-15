@@ -25,7 +25,7 @@ export const UNIT_COLORS = ['#8E86D6', '#4FD1C5', '#7FA0D8'];
 function Delta({ value, palette, suffix }: { value: number; palette: ConsolePalette; suffix: string }) {
   const tone = value > 0 ? palette.accent : value < 0 ? palette.critical : palette.inkFaint;
   return (
-    <Text className="font-mono" style={{ fontSize: 9, color: tone }} numberOfLines={1}>
+    <Text className="font-mono" style={{ fontSize: 11, color: tone }} numberOfLines={1}>
       {value > 0 ? '+' : ''}
       {value}% {suffix}
     </Text>
@@ -43,7 +43,7 @@ function AnalyticsCard({
   headline,
   children,
   flex = 1,
-  minWidth = 208,
+  minWidth = 236,
 }: {
   label: string;
   unit?: string;
@@ -60,19 +60,19 @@ function AnalyticsCard({
     <PlantCard
       palette={palette}
       isDark={isDark}
-      style={{ flex, minWidth, minHeight: 0, padding: STEP * 2.5, paddingBottom: STEP * 1.5 }}
+      style={{ flex, minWidth, minHeight: 0, padding: STEP * 3, paddingBottom: STEP * 2 }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 1.5 }}>
         <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: STEP }}>
           <MicroLabel palette={palette}>{label}</MicroLabel>
           {unit ? (
-            <Text className="font-mono" style={{ fontSize: 8.5, color: palette.inkFaint }}>
+            <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
               {unit}
             </Text>
           ) : null}
         </View>
         {meta ? (
-          <Text className="font-mono" style={{ fontSize: 8.5, color: metaColor ?? palette.inkFaint }} numberOfLines={1}>
+          <Text className="font-mono" style={{ fontSize: 10, color: metaColor ?? palette.inkFaint }} numberOfLines={1}>
             {meta}
           </Text>
         ) : null}
@@ -130,7 +130,7 @@ export function PlantBottomAnalytics({
               value={Math.round(electricityDemand.latest).toLocaleString()}
               unit="kW"
               palette={palette}
-              size={19}
+              size={24}
             />
             <Delta value={electricityDemand.deltaPct} palette={palette} suffix="vs window start" />
           </>
@@ -161,7 +161,7 @@ export function PlantBottomAnalytics({
         headline={
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: STEP * 2 }}>
             <View style={{ minWidth: 0 }}>
-              <MetricValue value={operatingPower.totalMw.toFixed(2)} unit="MW" palette={palette} size={19} />
+              <MetricValue value={operatingPower.totalMw.toFixed(2)} unit="MW" palette={palette} size={24} />
               <Delta value={operatingPower.deltaPct} palette={palette} suffix="vs window start" />
             </View>
             <View style={{ paddingBottom: 2 }}>
@@ -206,7 +206,7 @@ export function PlantBottomAnalytics({
             <MetricValue
               value={`${energyCost.currency} ${Math.round(energyCost.latest).toLocaleString()}`}
               palette={palette}
-              size={19}
+              size={24}
             />
             <Delta value={energyCost.deltaPct} palette={palette} suffix="vs window start" />
           </>
@@ -233,7 +233,7 @@ export function PlantBottomAnalytics({
         metaColor={alarmCounts.critical > 0 ? palette.critical : palette.inkFaint}
         palette={palette}
         isDark={isDark}
-        minWidth={196}
+        minWidth={216}
       >
         <View style={{ flex: 1, minHeight: 0 }}>
           <Measured>

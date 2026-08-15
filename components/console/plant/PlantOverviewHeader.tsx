@@ -24,8 +24,8 @@ function HeaderAction({
       onPress={onPress}
       accessibilityRole="button"
       style={{
-        paddingHorizontal: STEP * 2.5,
-        paddingVertical: STEP,
+        paddingHorizontal: STEP * 3,
+        paddingVertical: STEP * 1.5,
         borderRadius: 4,
         borderWidth: 1,
         borderColor: palette.line,
@@ -34,7 +34,7 @@ function HeaderAction({
     >
       <Text
         className="font-mono"
-        style={{ fontSize: 8.5, letterSpacing: 1.2, textTransform: 'uppercase', color: tone ?? palette.inkMuted }}
+        style={{ fontSize: 10, letterSpacing: 1.3, textTransform: 'uppercase', color: tone ?? palette.inkMuted }}
       >
         {label}
       </Text>
@@ -64,7 +64,7 @@ export function PlantOverviewHeader({
 }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: STEP * 2.5 }}>
-      <Text className="font-heading" style={{ fontSize: 13.5, letterSpacing: -0.15, color: palette.ink }}>
+      <Text className="font-heading" style={{ fontSize: 16, letterSpacing: -0.2, color: palette.ink }}>
         {title}
       </Text>
 
@@ -74,11 +74,11 @@ export function PlantOverviewHeader({
         {facts.map((fact, index) => (
           <View key={fact} style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 1.5 }}>
             {index > 0 ? (
-              <Text style={{ fontSize: 10, color: palette.inkFaint }} accessibilityElementsHidden>
+              <Text style={{ fontSize: 11.5, color: palette.inkFaint }} accessibilityElementsHidden>
                 ·
               </Text>
             ) : null}
-            <Text numberOfLines={1} className="font-body" style={{ fontSize: 10.5, color: palette.inkMuted }}>
+            <Text numberOfLines={1} className="font-body" style={{ fontSize: 12.5, color: palette.inkMuted }}>
               {fact}
             </Text>
           </View>

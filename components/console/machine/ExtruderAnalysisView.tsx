@@ -1,9 +1,31 @@
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+/**
+ * The Analyzer workspace.
+ *
+ * This file is the composition root only: it collects the readings, runs the
+ * pipeline (or a scenario against it), and hands each tab exactly the shape it
+ * needs. Every region it draws lives in `./analyzer/*`, so no single component
+ * owns six unrelated subjects and a tab can be reworked without touching the
+ * data path.
+ *
+ * Layout
+ * ------
+ * Desktop is a two-column workspace: the analysis on the left, the instruments
+ * it was read from in a sticky rail on the right. Those are the two questions an
+ * operator asks in the same breath — "what is wrong" and "what is it actually
+ * reading" — and answering them a scroll apart is what made the previous
+ * version read as a document rather than an instrument. Below ~1180px the rail
+ * falls under the content, which is the only honest thing to do with it.
+ */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text, TextInput, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Path } from 'react-native-svg';
+import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import {
+  buildParameterConnections,
+  relativeAge,
+  summariseConnections,
+  type ConnectivityInput,
+} from '../../../lib/analysis/connectivity';
 import {
   allThresholds,
   analyzeExtruder,
@@ -14,51 +36,48 @@ import {
   scenarioById,
   SCENARIOS,
   TAG_LABELS,
-  type ConstraintCheck,
   type ExtruderAnalysisResult,
   type ExtruderInputReading,
   type ExtruderTag,
-  type FaultAssessmentRecord,
   type ResolvedSignal,
   type Scenario,
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
 import { cn } from '../../../lib/cn';
-import { extruderPointByCode } from '../../../lib/extruderPoints';
 import type { DeviceNode } from '../../../lib/devices';
 import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import {
   Alert,
-  alpha,
   Badge,
   Body,
-  Button,
   Card,
-  CardContent,
   CardHeader,
   CardTitle,
-  Cell,
-  Collapsible,
   consolePalette,
-  DataTable,
   KeyValue,
-  LimitBar,
-  MagnitudeBars,
-  Meter,
   SectionLabel,
   Separator,
-  StatTile,
-  StatusDot,
   Tabs,
-  VerdictBanner,
-  type Column,
-  type ConsolePalette,
-  type IconName,
   type MagnitudeDatum,
   type TabItem,
   type Variant,
 } from '../../ui';
+import { AnalyzerHeader, type HeaderFact } from './analyzer/AnalyzerHeader';
+import { Fact, Section } from './analyzer/AnalyzerParts';
+import { ConnectivityTab } from './analyzer/ConnectivityTab';
+import {
+  ConclusionPanel,
+  DiagnosisSummary,
+  EliminatedList,
+  HypothesisList,
+  MaintenanceGuidance,
+} from './analyzer/DiagnosisTab';
+import { collectEvidence, EvidenceTab } from './analyzer/EvidenceTab';
+import { LimitsTab } from './analyzer/LimitsTab';
+import { LiveInstrumentReadout, type ReadoutRow } from './analyzer/LiveInstrumentReadout';
+import { ModelTab } from './analyzer/ModelTab';
+import { SignalsTab, type SignalHealth, type SignalRow } from './analyzer/SignalsTab';
 import type { MappedChannel } from './RackOccupancyView';
 
 function channelNumber(channelId: string): number {
@@ -174,19 +193,18 @@ const SEVERITY_VARIANT: Record<string, Variant> = {
   none: 'success',
 };
 
-const MATCH_CLASS_VARIANT: Record<string, Variant> = {
-  STRONG_CANDIDATE: 'destructive',
-  CANDIDATE: 'warning',
-  WEAK: 'info',
-  INSUFFICIENT: 'muted',
-  ELIMINATED: 'muted',
-};
-
 const QUALITY_VARIANT: Record<SignalQuality['status'], Variant> = {
   GOOD: 'success',
   DEGRADED: 'warning',
   BAD: 'destructive',
   UNAVAILABLE: 'muted',
+};
+
+const QUALITY_HEALTH: Record<SignalQuality['status'], SignalHealth> = {
+  GOOD: 'healthy',
+  DEGRADED: 'warning',
+  BAD: 'abnormal',
+  UNAVAILABLE: 'unavailable',
 };
 
 const LAYER_NOTE: Record<string, { title: string; detail: string; variant: Variant }> = {
@@ -204,12 +222,6 @@ const LAYER_NOTE: Record<string, { title: string; detail: string; variant: Varia
   },
 };
 
-function constraintVariant(status: ConstraintCheck['status']): Variant {
-  if (status === 'VIOLATION') return 'destructive';
-  if (status === 'PASS') return 'success';
-  return 'muted';
-}
-
 function readinessVariant(score: number): Variant {
   if (score >= 85) return 'success';
   if (score >= 60) return 'warning';
@@ -222,17 +234,11 @@ function stateVariant(state: string): Variant {
   return 'info';
 }
 
-function formatNumber(value: number | null | undefined, digits = 3): string {
-  if (value === null || value === undefined || !Number.isFinite(value)) return '-';
-  const rounded = Math.abs(value) >= 100 ? value.toFixed(1) : Number(value.toPrecision(digits));
-  return String(rounded);
-}
-
 function humanise(value: string): string {
   return value.replace(/_/g, ' ').toLowerCase();
 }
 
-type TabKey = 'diagnosis' | 'limits' | 'evidence' | 'signals' | 'model';
+type TabKey = 'diagnosis' | 'limits' | 'evidence' | 'signals' | 'model' | 'connectivity';
 
 /**
  * What each pilot tag is actually for, in the words a plant operator would use.
@@ -259,314 +265,9 @@ const TAG_PURPOSE: Record<ExtruderTag, string> = {
   'PM1.power_factor': 'How efficiently the drive draws power. Context for the electrical readings.',
 };
 
-/** One wired point, and whether it is actually reaching the model. */
-type WiringRow = {
-  id: string;
-  point: string;
-  channel: string;
-  reading: string;
-  /** Whether this card is locked to an instrument pad, or only name-matched. */
-  lock: string;
-  tag: string;
-  meaning: string;
-  status: string;
-  variant: Variant;
-};
-
 // --------------------------------------------------------------------------------------
-// Sections
+// Scenario library
 // --------------------------------------------------------------------------------------
-
-/**
- * A bounded ring for a 0-100 score.
- *
- * The page's one dial. A readiness figure is the single number the whole result
- * is conditional on, so it gets a mark that reads at a glance from across a
- * control room; every other magnitude on the page stays a bar, where lengths
- * can be compared against each other.
- */
-function ScoreDial({
-  score,
-  variant,
-  palette,
-  size = 92,
-}: {
-  score: number;
-  variant: Variant;
-  palette: ConsolePalette;
-  size?: number;
-}) {
-  const accent =
-    variant === 'success' ? palette.accent : variant === 'warning' ? palette.warning : variant === 'destructive' ? palette.critical : palette.neutral;
-  const stroke = 8;
-  const radius = (size - stroke) / 2;
-  const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(100, score));
-
-  return (
-    <View style={{ width: size, height: size }} className="items-center justify-center">
-      <Svg width={size} height={size} style={{ position: 'absolute' }}>
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={alpha(accent, 0.16)} strokeWidth={stroke} fill="none" />
-        <Circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          stroke={accent}
-          strokeWidth={stroke}
-          strokeLinecap="round"
-          fill="none"
-          strokeDasharray={`${(clamped / 100) * circumference} ${circumference}`}
-          // Start the arc at twelve o'clock rather than three.
-          transform={`rotate(-90 ${size / 2} ${size / 2})`}
-        />
-      </Svg>
-      <Text className="font-body-bold text-[20px] tracking-[-0.03em]" style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}>
-        {Math.round(clamped)}
-      </Text>
-      <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-        percent
-      </Text>
-    </View>
-  );
-}
-
-/**
- * A tag's recent samples, drawn at the size of a line of text.
- *
- * The rolling history the pipeline keeps for its temporal features is already
- * in memory; showing it costs nothing and turns a bare number into a number
- * with a direction. Nulls break the line rather than being interpolated over —
- * a gap in the data is information.
- */
-function TagTrend({ values, colour, width = 74, height = 20 }: { values: (number | null)[]; colour: string; width?: number; height?: number }) {
-  const path = useMemo(() => {
-    const samples = values.slice(-24);
-    const finite = samples.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
-    if (finite.length < 2) return null;
-    const min = Math.min(...finite);
-    const max = Math.max(...finite);
-    const span = max - min || Math.abs(max) || 1;
-    const stepX = samples.length > 1 ? width / (samples.length - 1) : width;
-
-    let d = '';
-    let pen = false;
-    samples.forEach((value, index) => {
-      if (typeof value !== 'number' || !Number.isFinite(value)) {
-        pen = false;
-        return;
-      }
-      const x = index * stepX;
-      const y = height - 2 - ((value - min) / span) * (height - 4);
-      d += `${pen ? ' L' : ' M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      pen = true;
-    });
-    return d.trim() || null;
-  }, [height, values, width]);
-
-  if (!path) {
-    return (
-      <View style={{ width, height }} className="justify-center">
-        <View style={{ height: 1, backgroundColor: alpha(colour, 0.25) }} />
-      </View>
-    );
-  }
-
-  return (
-    <Svg width={width} height={height}>
-      <Path d={path} fill="none" stroke={colour} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  );
-}
-
-/**
- * The live instrument readout.
- *
- * Every tag the model resolved, its current value in the canonical unit, its
- * recent movement and its quality — the answer to "what is the model actually
- * looking at right now", which otherwise takes three tabs to assemble.
- */
-function SignalRail({
-  signals,
-  quality,
-  history,
-  missing,
-  palette,
-}: {
-  signals: ResolvedSignal[];
-  quality: SignalQuality[];
-  history: Partial<Record<ExtruderTag, (number | null)[]>>;
-  missing: { tag: ExtruderTag; label: string; essential: boolean }[];
-  palette: ConsolePalette;
-}) {
-  const qualityByCode = useMemo(() => new Map(quality.map((item) => [item.code, item])), [quality]);
-
-  return (
-    <Card className="gap-3">
-      <CardHeader>
-        <View className="flex-row items-center justify-between gap-2">
-          <CardTitle size="sm">Live instrument readout</CardTitle>
-          <Badge variant={signals.length > 0 ? 'success' : 'muted'} icon="access-point">
-            {signals.length} tag{signals.length === 1 ? '' : 's'}
-          </Badge>
-        </View>
-      </CardHeader>
-      <Separator />
-
-      {signals.length === 0 ? (
-        <Body muted>No mapped point resolved onto a pilot tag, so the model has nothing to read.</Body>
-      ) : (
-        <View className="gap-2.5">
-          {signals.map((signal) => {
-            const status = qualityByCode.get(signal.tag)?.status ?? (signal.value === null ? 'UNAVAILABLE' : 'GOOD');
-            const variant = QUALITY_VARIANT[status];
-            const colour =
-              variant === 'success' ? palette.accent : variant === 'warning' ? palette.warning : variant === 'destructive' ? palette.critical : palette.neutral;
-            return (
-              <View key={`${signal.tag}-${signal.label}`} className="flex-row items-center gap-2.5">
-                <StatusDot variant={variant} />
-                <View className="min-w-0 flex-1">
-                  <Text className="font-mono text-[10.5px]" style={{ color: palette.ink }} numberOfLines={1}>
-                    {signal.tag}
-                  </Text>
-                  <Text className="font-body text-[10.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
-                    {TAG_LABELS[signal.tag]}
-                  </Text>
-                </View>
-                <TagTrend values={history[signal.tag] ?? []} colour={colour} />
-                <View style={{ minWidth: 74 }} className="items-end">
-                  <Text
-                    className="font-mono text-[11.5px]"
-                    style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
-                    numberOfLines={1}
-                  >
-                    {formatNumber(signal.value)}
-                  </Text>
-                  <Text className="font-mono text-[9px] uppercase tracking-[0.1em]" style={{ color: palette.inkFaint }} numberOfLines={1}>
-                    {signal.unit}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </View>
-      )}
-
-      {missing.length > 0 && (
-        <>
-          <Separator />
-          <SectionLabel>Not mapped</SectionLabel>
-          <View className="flex-row flex-wrap gap-1.5">
-            {missing.map((item) => (
-              <Badge key={item.tag} variant={item.essential ? 'warning' : 'muted'} icon={null} outline>
-                {item.tag}
-              </Badge>
-            ))}
-          </View>
-        </>
-      )}
-    </Card>
-  );
-}
-
-function CandidateCard({ assessment, ordinal, maxScore }: { assessment: FaultAssessmentRecord; ordinal: number; maxScore: number }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const variant = MATCH_CLASS_VARIANT[assessment.matchClass] ?? 'info';
-  const evidence = [...assessment.primary, ...assessment.supporting, ...assessment.weak];
-  const [openEvidence, setOpenEvidence] = useState(ordinal === 1);
-
-  return (
-    <Card accent={variant} className="gap-3">
-      <CardHeader>
-        <View className="flex-row flex-wrap items-start justify-between gap-2">
-          <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
-            <View
-              className="h-6 w-6 items-center justify-center rounded-md"
-              style={{ backgroundColor: palette.panelRaised }}
-            >
-              <Text className="font-mono text-[11px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
-                {ordinal}
-              </Text>
-            </View>
-            <CardTitle className="min-w-0 flex-1">{assessment.faultName}</CardTitle>
-          </View>
-          <Badge variant={variant}>{humanise(assessment.matchClass)}</Badge>
-        </View>
-
-        <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-          <KeyValue label="Fault" value={assessment.faultId} />
-          <KeyValue label="Subsystem" value={humanise(assessment.category)} />
-          <KeyValue label="Evidence" value={`${assessment.primary.length} primary · ${assessment.supporting.length} supporting`} />
-        </View>
-      </CardHeader>
-
-      {/* The match score is ordinal, so it is drawn against the strongest
-          candidate on screen rather than as a percentage of anything. */}
-      <View className="gap-1">
-        <View className="flex-row items-center justify-between">
-          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-            Engineering match score — ordinal, not a probability
-          </Text>
-          <Text className="font-mono text-[10.5px]" style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}>
-            {assessment.engineeringMatchScore}
-          </Text>
-        </View>
-        <Meter value={maxScore > 0 ? (assessment.engineeringMatchScore / maxScore) * 100 : 0} variant={variant} height={5} />
-      </View>
-
-      <Separator />
-
-      <Pressable
-        onPress={() => setOpenEvidence((previous) => !previous)}
-        accessibilityRole="button"
-        accessibilityState={{ expanded: openEvidence }}
-        className="flex-row items-center justify-between gap-2"
-      >
-        <SectionLabel>Evidence · {evidence.length}</SectionLabel>
-        <MaterialCommunityIcons name={openEvidence ? 'chevron-up' : 'chevron-down'} size={16} color={palette.inkFaint} />
-      </Pressable>
-
-      {openEvidence && (
-        <CardContent>
-          {evidence.map((item, index) => (
-            <View key={`${item.feature}-${index}`} className="flex-row gap-2">
-              <Badge
-                variant={item.strength === 'PRIMARY_MATCH' ? 'destructive' : item.strength === 'SUPPORTING_MATCH' ? 'warning' : 'muted'}
-                icon={null}
-                outline
-              >
-                {item.strength.replace('_MATCH', '')}
-              </Badge>
-              <View className="min-w-0 flex-1 gap-0.5">
-                <Body>{item.description}</Body>
-                <Body muted mono>
-                  {item.sensor} · {item.feature} = {formatNumber(item.observedValue)} · expected {item.expectedDirection}
-                </Body>
-              </View>
-            </View>
-          ))}
-
-          {assessment.contradicting.length > 0 && (
-            <>
-              <SectionLabel>Contradicting</SectionLabel>
-              {assessment.contradicting.map((item, index) => (
-                <Body key={`${item.feature}-${index}`} muted>
-                  · {item.sensor}: {item.description}
-                </Body>
-              ))}
-            </>
-          )}
-
-          <SectionLabel>Identifiability</SectionLabel>
-          <Body muted>{humanise(assessment.identifiability)}</Body>
-          {assessment.separatingMeasurement ? (
-            <Body muted>Separating measurement required: {assessment.separatingMeasurement}.</Body>
-          ) : null}
-        </CardContent>
-      )}
-    </Card>
-  );
-}
 
 /**
  * Scenario picker - the twin's 61 verified diagnostic cases.
@@ -577,13 +278,7 @@ function CandidateCard({ assessment, ordinal, maxScore }: { assessment: FaultAss
  * than hidden: "this needs a raw waveform" is information, and silently omitting
  * 14 of 61 would misrepresent what the model covers.
  */
-function ScenarioPicker({
-  activeId,
-  onSelect,
-}: {
-  activeId: string | null;
-  onSelect: (id: string | null) => void;
-}) {
+function ScenarioPicker({ activeId, onSelect }: { activeId: string | null; onSelect: (id: string | null) => void }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const [query, setQuery] = useState('');
@@ -618,6 +313,7 @@ function ScenarioPicker({
             onChangeText={setQuery}
             placeholder="Filter by id, name or fault code..."
             placeholderTextColor={palette.inkFaint}
+            accessibilityLabel="Filter scenarios"
             className="font-body text-xs"
             style={{ color: palette.ink, outlineStyle: 'none' } as never}
           />
@@ -636,84 +332,54 @@ function ScenarioPicker({
         ) : null}
       </View>
 
-      {grouped.length === 0 ? <Body muted>No scenario matches "{query}".</Body> : null}
+      {grouped.length === 0 ? <Body muted>No scenario matches &quot;{query}&quot;.</Body> : null}
 
-      {grouped.map(([letter, section]) => (
-        <View key={letter} className="gap-1.5">
-          <SectionLabel>
-            {letter} - {section.title}
-          </SectionLabel>
-          {section.items.map((scenario) => {
-            const active = scenario.id === activeId;
-            const blocked = Boolean(scenario.unsupported);
-            return (
-              <Pressable
-                key={scenario.id}
-                onPress={() => onSelect(scenario.id)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-                className="flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
-                style={{
-                  borderColor: active ? palette.lineStrong : palette.line,
-                  backgroundColor: active ? palette.panelRaised : 'transparent',
-                }}
-              >
-                <Text
-                  className="font-mono text-[10.5px]"
-                  style={{ color: palette.ink, minWidth: 168 }}
-                  numberOfLines={1}
-                >
-                  {scenario.id}
-                </Text>
-                <Text className="min-w-0 flex-1 font-body text-xs" style={{ color: palette.ink }} numberOfLines={1}>
-                  {scenario.name}
-                </Text>
-                {blocked ? (
-                  <Badge variant="muted" icon="waveform">
-                    Needs raw signal
-                  </Badge>
-                ) : scenario.expectedFaultIds.length === 0 ? (
-                  <Badge variant="success">No fault</Badge>
-                ) : (
-                  <Badge variant={scenario.expectedFaultIds.length > 1 ? 'warning' : 'info'} icon={null} outline>
-                    {scenario.expectedFaultIds.join(' / ')}
-                  </Badge>
-                )}
-              </Pressable>
-            );
-          })}
+      <ScrollView style={{ maxHeight: 420 }} showsVerticalScrollIndicator={false}>
+        <View className="gap-3">
+          {grouped.map(([letter, section]) => (
+            <View key={letter} className="gap-1.5">
+              <SectionLabel>
+                {letter} - {section.title}
+              </SectionLabel>
+              {section.items.map((scenario) => {
+                const active = scenario.id === activeId;
+                const blocked = Boolean(scenario.unsupported);
+                return (
+                  <Pressable
+                    key={scenario.id}
+                    onPress={() => onSelect(scenario.id)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    className="flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+                    style={{
+                      borderColor: active ? palette.lineStrong : palette.line,
+                      backgroundColor: active ? palette.panelRaised : 'transparent',
+                    }}
+                  >
+                    <Text className="font-mono text-[10.5px]" style={{ color: palette.ink, minWidth: 168 }} numberOfLines={1}>
+                      {scenario.id}
+                    </Text>
+                    <Text className="min-w-0 flex-1 font-body text-xs" style={{ color: palette.ink }} numberOfLines={1}>
+                      {scenario.name}
+                    </Text>
+                    {blocked ? (
+                      <Badge variant="muted" icon="waveform">
+                        Needs raw signal
+                      </Badge>
+                    ) : scenario.expectedFaultIds.length === 0 ? (
+                      <Badge variant="success">No fault</Badge>
+                    ) : (
+                      <Badge variant={scenario.expectedFaultIds.length > 1 ? 'warning' : 'info'} icon={null} outline>
+                        {scenario.expectedFaultIds.join(' / ')}
+                      </Badge>
+                    )}
+                  </Pressable>
+                );
+              })}
+            </View>
+          ))}
         </View>
-      ))}
-    </View>
-  );
-}
-
-function ConstraintRow({ check }: { check: ConstraintCheck }) {
-  const variant = constraintVariant(check.status);
-  const evaluated = check.value !== null;
-  return (
-    <View className="gap-2 py-2.5">
-      <View className="flex-row flex-wrap items-center justify-between gap-2">
-        <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          <Body>{check.name}</Body>
-          <Badge variant={variant} icon={null} outline>
-            {check.hardSoft}
-          </Badge>
-        </View>
-        <Badge variant={variant}>{check.status === 'NOT_EVALUATED_MISSING_INPUT' ? 'Not evaluated' : check.status}</Badge>
-      </View>
-      {evaluated ? (
-        <>
-          <LimitBar value={check.value as number} limit={check.limit} variant={variant} />
-          <View className="flex-row flex-wrap items-center gap-x-3">
-            <KeyValue label="Value" value={`${formatNumber(check.value)} ${check.unit}`} variant={variant} />
-            <KeyValue label="Limit" value={`${check.operator} ${check.limit} ${check.unit}`} />
-          </View>
-        </>
-      ) : (
-        <Body muted>{check.reason}</Body>
-      )}
-      {evaluated && check.reason ? <Body muted>{check.reason}</Body> : null}
+      </ScrollView>
     </View>
   );
 }
@@ -774,9 +440,10 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     return scenario ? runScenario(scenario) : null;
   }, [scenarioId]);
 
-  const analysis = scenarioRun ? scenarioRun.analysis : liveRun.analysis;
+  const analysis: ExtruderAnalysisResult = scenarioRun ? scenarioRun.analysis : liveRun.analysis;
   const dataMode = liveRun.dataMode;
   const detail = analysis.extruder;
+
   const candidateAssessments = useMemo(
     () => detail.assessments.filter((assessment) => detail.candidateFaults.includes(assessment.faultId)),
     [detail],
@@ -795,38 +462,128 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const verdictVariant: Variant = liveDataUnavailable
     ? 'muted'
     : violations.length > 0
-    ? 'destructive'
-    : hasCandidates
-      ? (SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'warning')
-      : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
-        ? 'info'
-        : 'success';
+      ? 'destructive'
+      : hasCandidates
+        ? (SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'warning')
+        : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
+          ? 'info'
+          : 'success';
   const verdictTitle = liveDataUnavailable
     ? 'No live channel data'
     : hasCandidates
-    ? detail.candidateFaults.length === 1
-      ? (analysis.diagnoses[0]?.title ?? detail.candidateFaults[0])
-      : `${detail.candidateFaults.length} hypotheses the installed sensors cannot separate`
-    : detail.faultCategory === 'MACHINE_STATE_TRANSITION'
-      ? `Machine is in ${humanise(detail.inferredMachineState)}`
-      : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
-        ? 'Something was observed, but it cannot be identified'
-        : 'No controlled fault signature was met';
+      ? detail.candidateFaults.length === 1
+        ? (analysis.diagnoses[0]?.title ?? detail.candidateFaults[0])
+        : `${detail.candidateFaults.length} hypotheses the installed sensors cannot separate`
+      : detail.faultCategory === 'MACHINE_STATE_TRANSITION'
+        ? `Machine is in ${humanise(detail.inferredMachineState)}`
+        : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
+          ? 'Something was observed, but it cannot be identified'
+          : 'No controlled fault signature was met';
   const verdictDetail = liveDataUnavailable
     ? 'No diagnosis is computed until at least one saved mapped channel is receiving current gateway telemetry.'
     : analysis.doctorReport.summary;
 
   const layerNote = LAYER_NOTE[detail.faultLayer];
 
-  const tabs: TabItem<TabKey>[] = [
-    { value: 'diagnosis', label: 'Diagnosis', icon: 'stethoscope', count: candidateAssessments.length, countVariant: verdictVariant },
-    { value: 'limits', label: 'Limits', icon: 'ruler-square', count: violations.length, countVariant: 'destructive' },
-    { value: 'evidence', label: 'Evidence', icon: 'chart-timeline-variant', count: detail.triggeredThresholds.length, countVariant: 'warning' },
-    { value: 'signals', label: 'Signals', icon: 'access-point', count: detail.missingTags.length + unresolved, countVariant: 'info' },
-    { value: 'model', label: 'Model', icon: 'file-document-outline' },
-  ];
+  // --- connectivity ----------------------------------------------------------
+  // Built from the saved canvas mappings and the device hierarchy, and resolved
+  // onto tags by the same function the pipeline itself uses, so the tag column
+  // here can never disagree with the tag the model read.
+  const connections = useMemo(() => {
+    const inputs: ConnectivityInput[] = mappedChannels.map((mapped) => ({
+      id: mapped.id,
+      label: mapped.label,
+      channel: mapped.channel,
+      templatePointCode: mapped.templatePointCode,
+    }));
+    return buildParameterConnections({
+      points: inputs,
+      devices,
+      cards,
+      live,
+      resolveTag: (point) => {
+        const resolution = resolveSignal(point.label, point.templatePointCode, point.channel.unit);
+        return resolution.kind === 'mapped'
+          ? { tag: resolution.tag, label: TAG_LABELS[resolution.tag] ?? resolution.tag }
+          : null;
+      },
+    });
+  }, [cards, devices, live, mappedChannels]);
 
-  // --- anomaly contributors as a magnitude series ----------------------------
+  const connectivitySummary = useMemo(() => summariseConnections(connections), [connections]);
+  const connectionByLabel = useMemo(
+    () => new Map(connections.map((row) => [row.parameter, row])),
+    [connections],
+  );
+
+  const thresholdRegister = useMemo(() => allThresholds(), []);
+  const fieldCalibratedCount = thresholdRegister.filter((threshold) => threshold.fieldCalibrated).length;
+
+  // --- signals ---------------------------------------------------------------
+  const qualityByCode = useMemo(() => new Map(analysis.quality.map((item) => [item.code, item])), [analysis.quality]);
+
+  const signalRows = useMemo<SignalRow[]>(() => {
+    const resolvedRows = detail.resolvedSignals.map((signal: ResolvedSignal) => {
+      const quality = qualityByCode.get(signal.tag);
+      const status = quality?.status ?? (signal.value === null ? 'UNAVAILABLE' : 'GOOD');
+      // The pipeline names a frozen channel in its own quality checks, so the
+      // state is read off the model rather than guessed from the sparkline.
+      const frozen = (quality?.checks ?? []).some((check) => check.toLowerCase().includes('frozen'));
+      const connection = connectionByLabel.get(signal.label);
+      return {
+        key: `${signal.tag}-${signal.label}`,
+        tag: signal.tag,
+        measures: TAG_LABELS[signal.tag] ?? signal.tag,
+        point: signal.label,
+        value: signal.value,
+        unit: signal.unit,
+        health: frozen ? ('frozen' as SignalHealth) : QUALITY_HEALTH[status],
+        note:
+          (quality?.limitations ?? []).join(' ') ||
+          (quality?.checks ?? []).join(', ') ||
+          TAG_PURPOSE[signal.tag] ||
+          'No quality limitation recorded for this signal.',
+        source: signal.source === 'demo' ? 'Simulated' : 'Gateway',
+        channel: connection ? `${connection.channelCode} · ${connection.rackName} · ${connection.channelId}` : '—',
+        lastUpdate: connection ? relativeAge(connection.lastUpdatedAt) : relativeAge(signal.timestamp),
+        history: historyRef.current[signal.tag] ?? [],
+      } satisfies SignalRow;
+    });
+
+    const missingRows = detail.missingTags.map((item) => ({
+      key: `missing-${item.tag}`,
+      tag: item.tag,
+      measures: item.label,
+      point: 'Not mapped to any point on the machine',
+      value: null,
+      unit: '',
+      health: 'unavailable' as SignalHealth,
+      note: item.note ?? TAG_PURPOSE[item.tag] ?? 'No point on this machine resolves onto this tag.',
+      source: '—',
+      channel: '—',
+      lastUpdate: 'never',
+      history: [],
+      missing: { essential: item.essential },
+    })) satisfies SignalRow[];
+
+    return [...resolvedRows, ...missingRows];
+  }, [connectionByLabel, detail.missingTags, detail.resolvedSignals, qualityByCode]);
+
+  const unconsumed = useMemo(
+    () => [
+      ...detail.unconsumedSignals.map((item) => ({ label: item.label, reason: item.reason })),
+      ...detail.rejectedSignals.map((item) => ({ label: item.label, reason: item.error })),
+      ...detail.unrecognisedSignals.map((label) => ({
+        label,
+        reason: 'No diagnostic tag matches this label. Rename the point to the instrument it is actually wired to, or drop its trail onto the matching pad on the machine.',
+      })),
+    ],
+    [detail.rejectedSignals, detail.unconsumedSignals, detail.unrecognisedSignals],
+  );
+
+  // --- evidence --------------------------------------------------------------
+  const evidenceItems = useMemo(() => collectEvidence(detail.assessments), [detail.assessments]);
+
   const contributorData: MagnitudeDatum[] = analysis.anomaly.contributors.map((item) => ({
     key: item.code,
     label: `${item.code} - ${TAG_LABELS[item.code as ExtruderTag] ?? item.code}`,
@@ -835,108 +592,30 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     direction: item.direction,
   }));
 
-  // --- table column definitions ---------------------------------------------
-  const thresholdColumns: Column<(typeof detail.triggeredThresholds)[number]>[] = [
-    { key: 'id', header: 'Threshold', width: 2.2, render: (row) => <Cell mono>{row.thresholdId}</Cell> },
-    // One threshold can be evaluated for several hypotheses - the melt-pressure
-    // signature is checked for both the screen and the die, because P1 sits
-    // upstream of both. Without the fault those rows are indistinguishable.
-    { key: 'fault', header: 'Hypothesis', width: 1.8, render: (row) => <Cell numberOfLines={2}>{faultName(row.faultId)}</Cell> },
-    { key: 'sensor', header: 'Sensor', width: 1.1, render: (row) => <Cell mono muted>{row.sensor}</Cell> },
-    { key: 'feature', header: 'Feature', width: 2.4, render: (row) => <Cell muted numberOfLines={2}>{row.feature}</Cell> },
-    { key: 'observed', header: 'Observed', width: 1, numeric: true, render: (row) => <Cell numeric>{formatNumber(row.observed)}</Cell> },
-    { key: 'expected', header: 'Boundary', width: 1.2, numeric: true, render: (row) => <Cell numeric muted>{row.expectedDirection}</Cell> },
-    {
-      key: 'cal',
-      header: 'Calibrated',
-      width: 1,
-      render: (row) => (
-        <Badge variant={row.fieldCalibrated ? 'success' : 'muted'} icon={null} outline>
-          {row.fieldCalibrated ? 'Field' : 'Dev'}
-        </Badge>
-      ),
-    },
-  ];
+  // --- rail ------------------------------------------------------------------
+  const readoutRows = useMemo<ReadoutRow[]>(
+    () =>
+      detail.resolvedSignals.map((signal) => {
+        const status = qualityByCode.get(signal.tag)?.status ?? (signal.value === null ? 'UNAVAILABLE' : 'GOOD');
+        return {
+          key: `${signal.tag}-${signal.label}`,
+          tag: signal.tag,
+          name: TAG_LABELS[signal.tag] ?? signal.tag,
+          value: signal.value,
+          unit: signal.unit,
+          variant: QUALITY_VARIANT[status],
+          status: humanise(status),
+          history: historyRef.current[signal.tag] ?? [],
+        };
+      }),
+    [detail.resolvedSignals, qualityByCode],
+  );
 
-  const signalColumns: Column<ResolvedSignal>[] = [
-    { key: 'tag', header: 'Tag', width: 0.8, render: (row) => <Cell mono>{row.tag}</Cell> },
-    { key: 'what', header: 'Measures', width: 2, render: (row) => <Cell muted numberOfLines={2}>{TAG_LABELS[row.tag]}</Cell> },
-    { key: 'from', header: 'Mapped point', width: 2.2, render: (row) => <Cell numberOfLines={2}>{row.label}</Cell> },
-    {
-      key: 'value',
-      header: 'Value',
-      width: 1.3,
-      numeric: true,
-      render: (row) => (
-        <Cell numeric>
-          {formatNumber(row.value)} {row.unit}
-        </Cell>
-      ),
-    },
-    {
-      key: 'src',
-      header: 'Source',
-      width: 1.1,
-      render: (row) => (
-        <Badge variant={row.source === 'demo' ? 'muted' : 'success'} icon={null} outline>
-          {row.source === 'demo' ? 'Simulated' : 'Gateway'}
-        </Badge>
-      ),
-    },
-  ];
+  const resolvedCount = detail.resolvedSignals.length;
+  const totalTags = resolvedCount + detail.missingTags.length;
+  const maxMatchScore = Math.max(1, ...candidateAssessments.map((assessment) => assessment.engineeringMatchScore));
 
-  const qualityColumns: Column<SignalQuality>[] = [
-    { key: 'code', header: 'Tag', width: 0.8, render: (row) => <Cell mono>{row.code}</Cell> },
-    {
-      key: 'status',
-      header: 'Status',
-      width: 1.2,
-      render: (row) => <Badge variant={QUALITY_VARIANT[row.status]}>{row.status}</Badge>,
-    },
-    { key: 'checks', header: 'Checks', width: 2, render: (row) => <Cell muted numberOfLines={2}>{row.checks.join(', ')}</Cell> },
-    {
-      key: 'value',
-      header: 'Latest',
-      width: 1.2,
-      numeric: true,
-      render: (row) => (
-        <Cell numeric muted>
-          {formatNumber(row.latestValue)} {row.unit}
-        </Cell>
-      ),
-    },
-  ];
-
-  const baselineColumns: Column<(typeof detail.baseline)[number]>[] = [
-    { key: 'label', header: 'Reference', width: 2, render: (row) => <Cell numberOfLines={2}>{row.label}</Cell> },
-    {
-      key: 'value',
-      header: 'Value',
-      width: 1.2,
-      numeric: true,
-      render: (row) => (
-        <Cell numeric>
-          {formatNumber(row.value)} {row.unit}
-        </Cell>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Basis',
-      width: 1.4,
-      render: (row) => (
-        <Badge variant={row.status === 'SOURCE_BACKED' ? 'success' : row.status === 'DERIVED' ? 'info' : 'muted'} icon={null} outline>
-          {humanise(row.status)}
-        </Badge>
-      ),
-    },
-    { key: 'prov', header: 'Provenance', width: 3.2, render: (row) => <Cell mono muted numberOfLines={3}>{row.provenance}</Cell> },
-  ];
-
-  const { width } = useWindowDimensions();
-  // Two columns only where a 340px rail still leaves a readable main column.
-  const wide = width >= 1180;
-
+  // --- chrome ----------------------------------------------------------------
   const sourceVariant: Variant = scenarioRun
     ? 'warning'
     : dataMode === 'gateway'
@@ -952,809 +631,348 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         ? 'Partial live data'
         : 'No live data';
 
-  // What every Mappable Box on the canvas is doing for the model, one row each.
-  // This is the answer to "I connected the channels — is the analyzer getting
-  // them?", which otherwise has to be inferred from three other tables.
-  const wiringRows = useMemo<WiringRow[]>(() => {
-    return mappedChannels.map((mapped, index) => {
-      const point = liveRun.points[index];
-      const unit = point?.reading.unit || mapped.channel.unit;
-      const resolution = resolveSignal(mapped.label, mapped.templatePointCode, unit);
-      const rejected = liveRun.analysis.extruder.rejectedSignals.find((item) => item.label === mapped.label);
-      const reading = point?.observed !== null && point?.observed !== undefined ? `${formatNumber(point.observed)} ${unit}`.trim() : 'no reading';
-      const pad = extruderPointByCode(mapped.templatePointCode);
-      // Locked to an instrument pad on the drawing, or matched only by what the
-      // card is called. The first is a declaration; the second is a guess that
-      // happened to be right, and the difference is worth stating.
-      const lock = pad
-        ? `Locked to the ${pad.label} point on the machine.`
-        : 'Not locked to a point on the machine — the model matched this by the card\'s name. Drag its trail onto the matching pad to make the connection explicit.';
-      const base = {
-        id: mapped.id,
-        point: mapped.label,
-        channel: `${mapped.channel.code} · ${mapped.channel.deviceName}`,
-        reading,
-        lock,
-      };
-
-      if (rejected) {
-        return { ...base, tag: '—', meaning: rejected.error, status: 'Unit rejected', variant: 'destructive' as Variant };
-      }
-      if (resolution.kind === 'unmodelled') {
-        return { ...base, tag: '—', meaning: resolution.reason, status: 'Not used by the model', variant: 'muted' as Variant };
-      }
-      if (resolution.kind === 'unrecognised') {
-        return {
-          ...base,
-          tag: '—',
-          meaning: 'The model could not tell which instrument this is from its name. Rename the point to the instrument it is wired to, or drop its trail onto the matching pad on the machine.',
-          status: 'Name not recognised',
-          variant: 'warning' as Variant,
-        };
-      }
-      return {
-        ...base,
-        tag: resolution.tag,
-        meaning: TAG_PURPOSE[resolution.tag],
-        status: point?.reporting ? 'Feeding the model' : 'Waiting for data',
-        variant: point?.reporting ? ('success' as Variant) : ('warning' as Variant),
-      };
-    });
-  }, [liveRun, mappedChannels]);
-
-  const feedingCount = wiringRows.filter((row) => row.status === 'Feeding the model').length;
-  const wiringProblems = wiringRows.filter((row) => row.variant === 'warning' || row.variant === 'destructive').length;
-
-  // The whole page in four ordinary sentences. Everything else on this screen
-  // is the working behind these four lines.
-  const plainLines: { icon: IconName; label: string; text: string; variant: Variant }[] = [
+  const headerFacts: HeaderFact[] = [
+    ...(machineId ? [{ label: 'Machine', value: machineId }] : []),
+    { label: 'Model', value: `Single-screw extruder ${analysis.modelVersion}` },
+    { label: 'Recipe', value: detail.recipeId },
+    { label: 'State', value: humanise(detail.inferredMachineState), variant: stateVariant(detail.inferredMachineState) },
     {
-      icon: 'engine-outline',
-      label: 'Right now',
-      variant: stateVariant(detail.inferredMachineState),
-      text: liveDataUnavailable
-        ? 'Nothing is being measured, so the machine\'s condition is unknown.'
-        : `The machine looks like it is ${humanise(detail.inferredMachineState)}. ${detail.stateBasis[0] ?? ''}`.trim(),
+      label: 'Gateways',
+      value: `${connectivitySummary.gateways} · ${connectivitySummary.connected}/${connectivitySummary.total} points live`,
+      variant: connectivitySummary.connected === connectivitySummary.total && connectivitySummary.total > 0 ? 'success' : 'warning',
     },
+    { label: 'Tags', value: `${resolvedCount}/${totalTags} resolved`, variant: readinessVariant(analysis.readiness.score) },
+  ];
+
+  const tabs: TabItem<TabKey>[] = [
+    { value: 'diagnosis', label: 'Diagnosis', icon: 'stethoscope', count: candidateAssessments.length, countVariant: verdictVariant },
+    { value: 'limits', label: 'Limits', icon: 'ruler-square', count: violations.length, countVariant: 'destructive' },
+    { value: 'evidence', label: 'Evidence', icon: 'chart-timeline-variant', count: evidenceItems.length, countVariant: 'warning' },
+    { value: 'signals', label: 'Signals', icon: 'access-point', count: detail.missingTags.length + unresolved, countVariant: 'info' },
+    { value: 'model', label: 'Model', icon: 'file-document-outline' },
     {
-      icon: 'magnify',
-      label: 'What was found',
-      variant: verdictVariant,
-      text: liveDataUnavailable
-        ? 'No diagnosis is offered while no channel is reporting.'
-        : hasCandidates
-          ? detail.candidateFaults.length === 1
-            ? `One likely explanation: ${analysis.diagnoses[0]?.title ?? faultName(detail.candidateFaults[0])}.`
-            : `${detail.candidateFaults.length} possible explanations fit the same readings, and the sensors fitted to this machine cannot tell them apart: ${detail.candidateFaults.map((id) => faultName(id)).join(', ')}.`
-          : 'No known fault pattern matches the current readings. That is not a clean bill of health — it means nothing the model can recognise is happening.',
-    },
-    {
-      icon: 'wrench-outline',
-      label: 'What to do',
-      variant: analysis.maintenance.caseRequired ? 'warning' : 'success',
-      text:
-        violations.length > 0
-          ? `Bring the machine back inside its limits first: ${violations.map((check) => check.name).join(', ')}.`
-          : (analysis.maintenance.recommendedActions[0] ??
-            detail.separatingMeasurements[0] ??
-            'Nothing to act on. Keep running and keep watching.'),
-    },
-    {
-      icon: 'connection',
-      label: 'How much it can see',
-      variant: readinessVariant(analysis.readiness.score),
-      text: `${feedingCount} of ${mappedChannels.length} connected point${mappedChannels.length === 1 ? '' : 's'} ${feedingCount === 1 ? 'is' : 'are'} feeding the model${wiringProblems > 0 ? `, and ${wiringProblems} need${wiringProblems === 1 ? 's' : ''} attention` : ''}. ${analysis.readiness.ready ? 'Every essential instrument is mapped.' : `Missing: ${analysis.readiness.missingEssential.join(', ') || 'none'}.`}`,
+      value: 'connectivity',
+      label: 'Connectivity',
+      icon: 'lan-connect',
+      count: connectivitySummary.unmapped + connectivitySummary.offline,
+      countVariant: 'warning',
     },
   ];
 
-  const wiringColumns: Column<WiringRow>[] = [
-    { key: 'point', header: 'Point on the machine', width: 2, render: (row) => <Cell numberOfLines={2}>{row.point}</Cell> },
-    { key: 'channel', header: 'Rack channel', width: 1.6, render: (row) => <Cell mono muted numberOfLines={2}>{row.channel}</Cell> },
-    { key: 'reading', header: 'Reading', width: 1.1, numeric: true, render: (row) => <Cell numeric>{row.reading}</Cell> },
-    { key: 'tag', header: 'Model tag', width: 0.9, render: (row) => <Cell mono>{row.tag}</Cell> },
-    {
-      key: 'meaning',
-      header: 'What it tells the model',
-      width: 3,
-      render: (row) => (
-        <View className="gap-0.5">
-          <Cell muted numberOfLines={3}>{row.meaning}</Cell>
-          <Cell muted numberOfLines={2}>{row.lock}</Cell>
+  const { width } = useWindowDimensions();
+  // Two columns only where a rail still leaves a readable main column. Below it
+  // the rail drops underneath rather than squeezing the analysis to a gutter.
+  const wide = width >= 1180;
+  const railWidth = width >= 1600 ? 372 : 336;
+
+  const evidenceBasis = useMemo(() => {
+    const lines: string[] = [];
+    if (detail.triggeredThresholds.length > 0) {
+      lines.push(`${detail.triggeredThresholds.length} registered threshold${detail.triggeredThresholds.length === 1 ? '' : 's'} crossed.`);
+    }
+    lines.push(`${resolvedCount} of ${totalTags} diagnostic tags resolved from ${mappedChannels.length} mapped point${mappedChannels.length === 1 ? '' : 's'}.`);
+    if (degradedSignals.length > 0) {
+      lines.push(`${degradedSignals.length} signal${degradedSignals.length === 1 ? '' : 's'} degraded or bad, which narrows what can be concluded.`);
+    }
+    if (violations.length > 0) {
+      lines.push(`${violations.length} hard process limit${violations.length === 1 ? '' : 's'} exceeded, reported separately from the diagnosis.`);
+    }
+    if (lines.length === 1) lines.push('No registered threshold was crossed by the current measurements.');
+    return lines;
+  }, [degradedSignals.length, detail.triggeredThresholds.length, mappedChannels.length, resolvedCount, totalTags, violations.length]);
+
+  const rail = (
+    <View className="gap-3">
+      <LiveInstrumentReadout
+        rows={readoutRows}
+        missing={detail.missingTags.map((item) => ({ tag: item.tag, label: item.label, essential: item.essential }))}
+        maxHeight={wide ? 360 : 300}
+      />
+
+      {/* Where those readings physically come from. The full chain is a tab of
+          its own; this is the one-glance version that sits beside every
+          conclusion drawn from it. */}
+      <Section
+        title="Gateway context"
+        eyebrow="Acquisition"
+        meta="Where the readings above are arriving from."
+        actions={
+          <Badge variant={connectivitySummary.offline > 0 ? 'warning' : 'success'} icon={null} outline>
+            {connectivitySummary.connected}/{connectivitySummary.total}
+          </Badge>
+        }
+      >
+        <View className="gap-2.5">
+          <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+            <Fact label="Source" value={sourceLabel} mono={false} width={120} />
+            <Fact label="Gateways" value={String(connectivitySummary.gateways)} width={78} />
+            <Fact label="Racks" value={String(connectivitySummary.racks)} width={70} />
+            <Fact label="Channels" value={String(connectivitySummary.channels)} width={82} />
+            <Fact
+              label="Silent"
+              value={String(connectivitySummary.offline)}
+              width={70}
+              tone={connectivitySummary.offline > 0 ? palette.warning : undefined}
+            />
+            <Fact
+              label="Unmapped"
+              value={String(connectivitySummary.unmapped)}
+              width={90}
+              tone={connectivitySummary.unmapped > 0 ? palette.warning : undefined}
+            />
+          </View>
+          <Pressable
+            onPress={() => setTab('connectivity')}
+            accessibilityRole="button"
+            accessibilityLabel="Open the connectivity tab"
+            className="flex-row items-center justify-between rounded-lg border px-2.5 py-1.5"
+            style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+          >
+            <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+              Trace the acquisition chain
+            </Text>
+            <Text className="font-mono text-[11px]" style={{ color: palette.inkFaint }}>
+              →
+            </Text>
+          </Pressable>
         </View>
-      ),
-    },
-    { key: 'status', header: 'Status', width: 1.3, render: (row) => <Badge variant={row.variant}>{row.status}</Badge> },
-  ];
-
-  const maxMatchScore = Math.max(1, ...candidateAssessments.map((assessment) => assessment.engineeringMatchScore));
-  const resolvedCount = detail.resolvedSignals.length;
-  const totalTags = resolvedCount + detail.missingTags.length;
-
-  const signalRail = (
-    <SignalRail
-      signals={detail.resolvedSignals}
-      quality={analysis.quality}
-      history={historyRef.current}
-      missing={detail.missingTags}
-      palette={palette}
-    />
+      </Section>
+    </View>
   );
 
   return (
     <View className="min-h-0 flex-1" style={{ backgroundColor: palette.bg }}>
-      {/* --- fixed chrome ---------------------------------------------------
-          Identity and the data source never scroll away: every number below is
-          conditional on which of them is in force, and a reader who has
-          scrolled past "scenario injection" would be reading fabricated
-          measurements as if they were the plant. */}
-      <View
-        className="gap-3 px-5 py-3 md:flex-row md:items-center md:justify-between"
-        style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}
-      >
-        <View className="min-w-0 gap-1.5">
-          <View className="flex-row flex-wrap items-center gap-2">
-            <MaterialCommunityIcons name="stethoscope" size={17} color={palette.accent} />
-            <Text className="font-body-bold text-[18px] tracking-[-0.025em]" style={{ color: palette.ink }}>
-              Analysis layer
-            </Text>
-            <Badge variant="muted" icon="hand-back-right-outline">
-              Advisory only
-            </Badge>
-          </View>
-          <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
-            <KeyValue label="Model" value={`Single-screw extruder ${analysis.modelVersion}`} />
-            {machineId ? <KeyValue label="Machine" value={machineId} /> : null}
-            <KeyValue label="Recipe" value={detail.recipeId} />
-            <KeyValue label="State" value={humanise(detail.inferredMachineState)} variant={stateVariant(detail.inferredMachineState)} />
-          </View>
-        </View>
-
-        <View className="flex-row flex-wrap items-center gap-2">
-          <View
-            className="flex-row items-center gap-2 rounded-lg border px-2.5 py-1.5"
-            style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
-          >
-            <StatusDot variant={sourceVariant} />
-            <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
-              {sourceLabel}
-            </Text>
-          </View>
-          <Button
-            tone={scenarioRun ? 'warning' : 'secondary'}
-            icon="flask-outline"
-            onPress={() => setLibraryOpen((previous) => !previous)}
-            accessibilityLabel="Open the fault scenario library"
-          >
-            {scenarioRun ? scenarioRun.scenario.id : 'Scenarios'}
-          </Button>
-          {scenarioRun ? (
-            <Button tone="secondary" icon="broadcast" onPress={() => setScenarioId(null)} accessibilityLabel="Return to live data">
-              Live data
-            </Button>
-          ) : null}
-        </View>
-      </View>
+      <AnalyzerHeader
+        facts={headerFacts}
+        sourceLabel={sourceLabel}
+        sourceVariant={sourceVariant}
+        scenarioLabel={scenarioRun ? scenarioRun.scenario.id : 'Scenarios'}
+        scenarioActive={Boolean(scenarioRun)}
+        onToggleLibrary={() => setLibraryOpen((previous) => !previous)}
+        onReturnToLive={() => setScenarioId(null)}
+      />
 
       {/* Tab bar — also fixed, so switching views never means scrolling back up. */}
-      <View
-        className="px-5 py-2"
-        style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}
-      >
+      <View className="px-5 py-2" style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}>
         <Tabs items={tabs} value={tab} onChange={setTab} />
       </View>
 
-      <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 56, alignItems: 'center' }}
-      >
-        {/* A measured column: analysis prose is unreadable at 2000px, and the
-            tables inside scroll on their own rather than stretching. */}
-        <View className="w-full gap-4" style={{ maxWidth: 1280 }}>
-
-      {libraryOpen && (
-        <Card className="gap-3">
-          <CardHeader>
-            <View className="flex-row flex-wrap items-center justify-between gap-2">
-              <CardTitle size="sm">Fault scenario library</CardTitle>
-              <Badge variant={scenarioRun ? 'warning' : 'muted'} icon="flask-outline">
-                {SCENARIOS.filter((scenario) => !scenario.unsupported).length}/{SCENARIOS.length} reproducible
-              </Badge>
-            </View>
-            <Body muted>
-              {scenarioRun
-                ? `Running ${scenarioRun.scenario.id} — ${scenarioRun.scenario.name}. Live data is not being analysed.`
-                : 'Verified diagnostic cases from the digital twin. Selecting one drives this same pipeline with that condition instead of live measurements.'}
-            </Body>
-          </CardHeader>
-          <Separator />
-          <ScenarioPicker activeId={scenarioId} onSelect={setScenarioId} />
-        </Card>
-      )}
-
-      {/* Say plainly when the live model has no gateway measurements to read. */}
-      {!scenarioRun && dataMode !== 'gateway' && (
-        <Alert
-          variant="info"
-          icon="access-point-off"
-          title={dataMode === 'none' ? 'No live channel data' : 'Partial live channel data'}
-        >
-          {mappedChannels.length === 0
-            ? 'No saved Mappable Box links exist for this machine. Link boxes to rack channels in Design mode and save the canvas before live analysis can run.'
-            : 'Only channels with current gateway measurements are evaluated. Silent mapped channels stay unavailable and do not receive fallback values.'}
-        </Alert>
-      )}
-
-      {scenarioRun && (
-        <Alert
-          variant={
-            scenarioRun.verdict === 'PASS'
-              ? 'success'
-              : scenarioRun.verdict === 'NOT_REPRODUCIBLE'
-                ? 'muted'
-                : 'destructive'
-          }
-          title={`${scenarioRun.scenario.id} - ${scenarioRun.scenario.name} - ${scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'not reproducible here' : scenarioRun.verdict.toLowerCase()}`}
-        >
-          <View className="gap-1.5">
-            <Body muted>{scenarioRun.rationale}</Body>
-            <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-              <KeyValue
-                label="Injected"
-                value={scenarioRun.expectedFaultIds.join(', ') || 'nothing'}
-              />
-              <KeyValue
-                label="Reported"
-                value={scenarioRun.actualFaultIds.join(', ') || 'nothing'}
-              />
-              <KeyValue label="Acceptance" value={scenarioRun.scenario.acceptance} />
-              {scenarioRun.scenario.severity !== null ? (
-                <KeyValue label="Severity" value={String(scenarioRun.scenario.severity)} />
-              ) : null}
-            </View>
-            <Body muted>
-              The request carried measurements only - no scenario id, fault id or expected result reached the
-              detector. The comparison above scores a diagnosis that had already finished.
-            </Body>
-          </View>
-        </Alert>
-      )}
-
-      {/* --- the verdict -----------------------------------------------------
-          The conclusion and the readiness the conclusion rests on are one
-          block: a strong verdict computed from half the instrument set means
-          something different from the same verdict computed from all of it. */}
-      <View className={cn('gap-4', wide && 'flex-row items-stretch')}>
-        <View className="min-w-0 flex-1">
-          <VerdictBanner
-            variant={verdictVariant}
-            eyebrow={hasCandidates ? `${humanise(detail.faultLayer)} layer · ${humanise(detail.faultCategory)}` : 'No fault signature'}
-            title={verdictTitle}
-            detail={verdictDetail}
-            meta={
-              <>
-                <Badge variant={verdictVariant}>{humanise(detail.identifiability)}</Badge>
-                <Badge variant="muted" icon="flask-outline">
-                  Engineering development
-                </Badge>
-                <Badge variant="muted" icon="scale-balance">
-                  {resolvedCount}/{totalTags} pilot tags resolved
-                </Badge>
-              </>
-            }
-          />
-        </View>
-
-        <Card className="justify-between gap-3" style={wide ? { width: 268 } : undefined}>
-          <View className="flex-row items-center gap-2">
-            <MaterialCommunityIcons name="check-decagram-outline" size={13} color={palette.inkMuted} />
-            <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
-              Evidence readiness
-            </Text>
-          </View>
-          <View className="flex-row items-center gap-3">
-            <ScoreDial score={analysis.readiness.score} variant={readinessVariant(analysis.readiness.score)} palette={palette} />
-            <View className="min-w-0 flex-1 gap-1">
-              <Badge variant={analysis.readiness.ready ? 'success' : 'warning'}>
-                {analysis.readiness.ready ? 'Ready' : 'Not ready'}
-              </Badge>
-              <Text className="font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }} numberOfLines={4}>
-                {analysis.readiness.ready
-                  ? 'Every essential pilot tag is mapped and reporting.'
-                  : `${analysis.readiness.missingEssential.length} essential tag${analysis.readiness.missingEssential.length === 1 ? '' : 's'} not mapped: ${analysis.readiness.missingEssential.join(', ') || '—'}`}
-              </Text>
-            </View>
-          </View>
-        </Card>
-      </View>
-
-      {/* --- the page in four sentences --------------------------------------
-          Everything below this card is the working behind it. A reader who
-          knows nothing about pilot tags, baselines or match classes should be
-          able to stop here and still have the answer. */}
-      <Card className="gap-0">
-        <View className="flex-row items-center gap-2 pb-2">
-          <MaterialCommunityIcons name="text-account" size={14} color={palette.accent} />
-          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
-            In plain words
-          </Text>
-        </View>
-        {plainLines.map((line, index) => (
-          <View key={line.label}>
-            {index > 0 ? <Separator /> : null}
-            <View className="flex-row items-start gap-3 py-2.5">
-              <View className="mt-[1px] h-6 w-6 items-center justify-center rounded-lg" style={{ backgroundColor: palette.panelRaised }}>
-                <MaterialCommunityIcons name={line.icon} size={13} color={palette.inkMuted} />
-              </View>
-              <View className="min-w-0 flex-1 gap-0.5">
-                <View className="flex-row items-center gap-2">
-                  <StatusDot variant={line.variant} />
-                  <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-                    {line.label}
-                  </Text>
-                </View>
-                <Text className="font-body text-[13px] leading-[19px]" style={{ color: palette.ink }}>
-                  {line.text}
-                </Text>
-              </View>
-            </View>
-          </View>
-        ))}
-      </Card>
-
-      {/* A hard-limit breach is the most urgent thing on this page and stays
-          visible regardless of which tab is open. */}
-      {violations.length > 0 && (
-        <Alert variant="destructive" title={`${violations.length} hard process limit${violations.length === 1 ? '' : 's'} exceeded`}>
-          {violations
-            .map((check) => `${check.name} at ${formatNumber(check.value)} ${check.unit} (limit ${check.operator} ${check.limit}).`)
-            .join(' ')}
-        </Alert>
-      )}
-
-      {layerNote && (
-        <Alert variant={layerNote.variant} title={layerNote.title}>
-          {layerNote.detail}
-        </Alert>
-      )}
-
-      {/* --- KPI row --------------------------------------------------------- */}
-      <View className="flex-row flex-wrap gap-3">
-        <StatTile
-          className="min-w-[220px] flex-1"
-          label="Machine state"
-          value={humanise(detail.inferredMachineState)}
-          variant={stateVariant(detail.inferredMachineState)}
-          icon="state-machine"
-          detail={detail.stateBasis[0] ?? 'Derived from speed, zone residuals and zone trend.'}
-        />
-        <StatTile
-          className="min-w-[220px] flex-1"
-          label="Anomaly"
-          value={analysis.anomaly.severity === 'none' ? 'None active' : `${humanise(analysis.anomaly.severity)}`}
-          variant={SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'info'}
-          icon="radar"
-          detail={
-            analysis.anomaly.contributors[0]?.description ??
-            analysis.anomaly.limitations[0] ??
-            'No measurement is outside its consistency band.'
-          }
-        />
-        <StatTile
-          className="min-w-[220px] flex-1"
-          label="Hard limits"
-          value={humanise(detail.constraintStatus)}
-          variant={detail.constraintStatus === 'VIOLATION' ? 'destructive' : detail.constraintStatus === 'PASS' ? 'success' : 'muted'}
-          icon="ruler-square"
-          detail={`${detail.constraints.filter((c) => c.status === 'PASS').length} of ${detail.constraints.length} evaluated and inside limits.`}
-        />
-        <StatTile
-          className="min-w-[220px] flex-1"
-          label="Signal quality"
-          value={degradedSignals.length === 0 ? 'All good' : `${degradedSignals.length} degraded`}
-          variant={degradedSignals.length === 0 ? 'success' : 'warning'}
-          icon="access-point"
-          meter={totalTags > 0 ? (resolvedCount / totalTags) * 100 : 0}
-          detail={`${resolvedCount} of ${totalTags} pilot tags resolved from ${mappedChannels.length} mapped point${mappedChannels.length === 1 ? '' : 's'}.`}
-        />
-      </View>
-
-      {/* --- Diagnosis -------------------------------------------------------
-          The conclusion on the left, the instruments it was read from on the
-          right: the two questions an operator asks in the same breath. */}
-      {tab === 'diagnosis' && (
-        <View className={cn('gap-4', wide && 'flex-row items-start')}>
-          <View className="min-w-0 flex-1 gap-3">
-          {liveDataUnavailable ? (
-            <Card accent="warning">
+      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 48, alignItems: 'center' }}>
+        <View className="w-full gap-3" style={{ maxWidth: 1680 }}>
+          {libraryOpen ? (
+            <Card className="gap-3">
               <CardHeader>
-                <CardTitle size="sm">Diagnosis withheld</CardTitle>
+                <View className="flex-row flex-wrap items-center justify-between gap-2">
+                  <CardTitle size="sm">Fault scenario library</CardTitle>
+                  <Badge variant={scenarioRun ? 'warning' : 'muted'} icon="flask-outline">
+                    {SCENARIOS.filter((scenario) => !scenario.unsupported).length}/{SCENARIOS.length} reproducible
+                  </Badge>
+                </View>
                 <Body muted>
-                  No saved mapped channel is receiving current gateway telemetry. Connect the Mappable Boxes to the correct rack channels and wait for live samples before diagnosing faults.
+                  {scenarioRun
+                    ? `Running ${scenarioRun.scenario.id} — ${scenarioRun.scenario.name}. Live data is not being analysed.`
+                    : 'Verified diagnostic cases from the digital twin. Selecting one drives this same pipeline with that condition instead of live measurements.'}
                 </Body>
               </CardHeader>
+              <Separator />
+              <ScenarioPicker activeId={scenarioId} onSelect={setScenarioId} />
             </Card>
-          ) : (
-            <>
-              <Card>
-                <CardHeader>
-                  <CardTitle size="sm">How this conclusion was reached</CardTitle>
-                  <Body muted>{detail.explanation}</Body>
-                </CardHeader>
-                {detail.separatingMeasurements.length > 0 && (
-                  <>
-                    <Separator className="my-3" />
-                    <CardContent>
-                      <SectionLabel>To collapse this ambiguity</SectionLabel>
-                      {detail.separatingMeasurements.map((item) => (
-                        <Body key={item}>- {item}</Body>
-                      ))}
-                    </CardContent>
-                  </>
-                )}
-              </Card>
+          ) : null}
 
-              {candidateAssessments.map((assessment, index) => (
-                <CandidateCard key={assessment.faultId} assessment={assessment} ordinal={index + 1} maxScore={maxMatchScore} />
-              ))}
-
-              {analysis.maintenance.caseRequired && (
-                <Card accent={analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high' ? 'destructive' : 'warning'}>
-                  <CardHeader>
-                    <View className="flex-row flex-wrap items-center justify-between gap-2">
-                      <CardTitle size="sm">Maintenance guidance</CardTitle>
-                      <Badge
-                        variant={analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high' ? 'destructive' : 'warning'}
-                      >
-                        {analysis.maintenance.priority} priority
-                      </Badge>
-                    </View>
-                  </CardHeader>
-                  <Separator className="my-3" />
-                  <CardContent>
-                    <SectionLabel>Recommended actions</SectionLabel>
-                    {analysis.maintenance.recommendedActions.map((action, index) => (
-                      <Body key={`${action}-${index}`}>- {action}</Body>
-                    ))}
-                  </CardContent>
-                  <Separator className="my-3" />
-                  <CardContent>
-                    <SectionLabel>Verification</SectionLabel>
-                    {analysis.maintenance.verificationSteps.map((step, index) => (
-                      <Body key={`${step}-${index}`} muted>
-                        - {step}
-                      </Body>
-                    ))}
-                  </CardContent>
-                </Card>
-              )}
-
-              {eliminated.length > 0 && (
-                <Collapsible
-                  title="Eliminated hypotheses"
-                  count={eliminated.length}
-                  icon="close-circle-outline"
-                  summary="Ruled out because the measurement that most directly observes the mechanism says it is not acting."
-                >
-                  {eliminated.map((assessment) => (
-                    <View key={assessment.faultId} className="gap-0.5">
-                      <Body>{assessment.faultName}</Body>
-                      <Body muted>{assessment.contradicting[0]?.description ?? 'Primary observable contradicted.'}</Body>
-                    </View>
-                  ))}
-                </Collapsible>
-              )}
-            </>
-          )}
-
-          {/* The page uses precise words because the model does. This is what
-              they mean, so the precision costs the reader nothing. */}
-          <Collapsible
-            title="What the words on this page mean"
-            icon="book-open-outline"
-            summary="Plain definitions for every term the analysis uses."
-          >
-            {[
-              ['Pilot tag', 'The model\'s name for one instrument — P1 is the melt-pressure transducer, T1 the zone 1 thermocouple. Your point names are matched onto these.'],
-              ['Baseline', 'What this machine reads when it is healthy and on recipe. Every judgement is a comparison against it, never against a number invented for the page.'],
-              ['Threshold', 'The boundary at which a reading counts as evidence. All of them are written down in the model with where they came from.'],
-              ['Hypothesis / candidate', 'A fault the model considered. Candidates are the ones the readings actually support; the rest are listed with why they were dropped.'],
-              ['Identifiability', 'Whether the installed sensors can tell the surviving candidates apart. When they cannot, the model says so instead of picking one.'],
-              ['Hard limit', 'A safe-operating boundary. Being inside it is a separate question from being healthy — a machine can be inside every limit and still be failing.'],
-              ['Anomaly band', 'How far a reading has drifted from its healthy reference, measured in consistency bands rather than a severity percentage the model cannot calibrate.'],
-              ['Match score', 'A ranking number for how well evidence fits a fault. It orders candidates; it is not a probability and must not be read as one.'],
-              ['Advisory only', 'Nothing here actuates anything. It is evidence for a human decision, and it has not been field calibrated on this machine.'],
-            ].map(([term, meaning]) => (
-              <View key={term} className="gap-0.5 py-1">
-                <Body>{term}</Body>
-                <Body muted>{meaning}</Body>
-              </View>
-            ))}
-          </Collapsible>
-          </View>
-
-          <View className="gap-3" style={wide ? { width: 340 } : undefined}>
-            {signalRail}
-
-            {detail.separatingMeasurements.length === 0 && detail.blockedOutputs.length > 0 ? (
-              <Card className="gap-2">
-                <CardHeader>
-                  <CardTitle size="sm">Blocked outputs</CardTitle>
-                  <Body muted>Quantities this model refuses to state because it has no calibrated basis for them.</Body>
-                </CardHeader>
-                <View className="flex-row flex-wrap gap-1.5">
-                  {detail.blockedOutputs.map((output) => (
-                    <Badge key={output} variant="muted" icon="cancel">
-                      {humanise(output)}
-                    </Badge>
-                  ))}
-                </View>
-              </Card>
-            ) : null}
-          </View>
-        </View>
-      )}
-
-      {/* --- Limits ---------------------------------------------------------- */}
-      {tab === 'limits' && (
-        <View className="gap-3">
-          <Alert variant="info" title="Limits are reported beside the diagnosis, never folded into it">
-            A constraint answers whether the machine is inside its declared safe operating envelope right now. That is a
-            different question from what is wrong with the machine - an in-limit machine can still have a developing
-            fault, and an out-of-limit machine can be mechanically healthy.
-          </Alert>
-          <Card>
-            {detail.constraints.map((check, index) => (
-              <View key={check.constraintId}>
-                {index > 0 ? <Separator /> : null}
-                <ConstraintRow check={check} />
-              </View>
-            ))}
-          </Card>
-        </View>
-      )}
-
-      {/* --- Evidence -------------------------------------------------------- */}
-      {tab === 'evidence' && (
-        <View className="gap-3">
-          <Card>
-            <CardHeader>
-              <CardTitle size="sm">Departure from the healthy reference</CardTitle>
-              <Body muted>
-                Measured in analytical-redundancy consistency bands - a registered sensitivity value, not a calibrated
-                severity unit. Absolute severity percent is a blocked output for this model.
-              </Body>
-            </CardHeader>
-            <Separator className="my-3" />
-            {contributorData.length > 0 ? (
-              <MagnitudeBars
-                data={contributorData}
-                variant={SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'info'}
-                unitSuffix=" bands"
-              />
-            ) : (
-              <Body muted>{analysis.anomaly.limitations[0]}</Body>
-            )}
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle size="sm">Thresholds crossed</CardTitle>
-              <Body muted>
-                Every boundary is declared in the diagnostic threshold register with its source and calibration state.
-                None of the {allThresholds().length} thresholds in this model is field calibrated.
-              </Body>
-            </CardHeader>
-            <Separator className="my-3" />
-            <DataTable
-              columns={thresholdColumns}
-              rows={detail.triggeredThresholds}
-              keyOf={(row, index) => `${row.thresholdId}-${row.faultId}-${index}`}
-              minWidth={860}
-              emptyLabel="No registered threshold was crossed by the current measurements."
-            />
-          </Card>
-
-          <Collapsible
-            title="Full hypothesis ledger"
-            count={detail.assessments.length}
-            icon="format-list-checks"
-            summary="Every fault the model assessed, including those with insufficient or contradicted evidence."
-          >
-            {detail.assessments.map((assessment) => (
-              <View key={assessment.faultId} className="flex-row flex-wrap items-center gap-2 py-1">
-                <Badge variant={MATCH_CLASS_VARIANT[assessment.matchClass] ?? 'muted'} icon={null} outline>
-                  {humanise(assessment.matchClass)}
-                </Badge>
-                <Body>{assessment.faultName}</Body>
-                <Body muted mono>
-                  {assessment.faultId} - score {assessment.engineeringMatchScore}
-                </Body>
-              </View>
-            ))}
-          </Collapsible>
-        </View>
-      )}
-
-      {/* --- Signals --------------------------------------------------------- */}
-      {tab === 'signals' && (
-        <View className="gap-3">
-          {/* The first question anyone asks after wiring the canvas: did it
-              land? One row per connected point, in the same words the canvas
-              uses, before any tag vocabulary appears. */}
-          <Card accent={wiringProblems > 0 ? 'warning' : 'success'}>
-            <CardHeader>
-              <View className="flex-row flex-wrap items-center justify-between gap-2">
-                <CardTitle size="sm">Your connections, and what each one feeds</CardTitle>
-                <Badge variant={wiringProblems > 0 ? 'warning' : 'success'}>
-                  {feedingCount}/{wiringRows.length} feeding the model
-                </Badge>
-              </View>
-              <Body muted>
-                Every Mappable Box saved on this machine&apos;s canvas. A point only reaches the model once its card is
-                linked to a rack channel, that channel is sending data, and the model recognises the instrument.
-              </Body>
-            </CardHeader>
-            <Separator className="my-3" />
-            <DataTable
-              columns={wiringColumns}
-              rows={wiringRows}
-              keyOf={(row) => row.id}
-              minWidth={900}
-              emptyLabel="No saved connections yet. Link boxes to rack channels in Design mode and press Save Config."
-            />
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle size="sm">Resolved pilot tags</CardTitle>
-              <Body muted>
-                {detail.resolvedSignals.length} of {detail.resolvedSignals.length + detail.missingTags.length} pilot tags
-                resolved from {mappedChannels.length}
-                {expectedPoints ? ` of ${expectedPoints} expected` : ''} mapped points.
-              </Body>
-            </CardHeader>
-            <Separator className="my-3" />
-            <DataTable
-              columns={signalColumns}
-              rows={detail.resolvedSignals}
-              keyOf={(row) => `${row.tag}-${row.label}`}
-              minWidth={680}
-              emptyLabel="No mapped point resolved onto a pilot tag."
-            />
-          </Card>
-
-          {detail.missingTags.length > 0 && (
-            <Card accent="warning">
-              <CardHeader>
-                <CardTitle size="sm">Not mapped</CardTitle>
-                <Body muted>Mapping these widens what the model can separate.</Body>
-              </CardHeader>
-              <Separator className="my-3" />
-              <View className="gap-2.5">
-                {detail.missingTags.map((item) => (
-                  <View key={item.tag} className="gap-1">
-                    <View className="flex-row flex-wrap items-center gap-2">
-                      <Badge variant={item.essential ? 'warning' : 'muted'} icon={null} outline>
-                        {item.essential ? 'Essential' : 'Diagnostic'}
-                      </Badge>
-                      <Body mono>{item.tag}</Body>
-                      <Body muted>{item.label}</Body>
-                    </View>
-                    <Body muted>{item.note ?? TAG_PURPOSE[item.tag]}</Body>
-                  </View>
-                ))}
-              </View>
-            </Card>
-          )}
-
-          <Card>
-            <CardHeader>
-              <CardTitle size="sm">Signal quality</CardTitle>
-              <Body muted>
-                {degradedSignals.length === 0
-                  ? 'No mapped signal is degraded.'
-                  : `${degradedSignals.length} signal(s) degraded or bad.`}
-              </Body>
-            </CardHeader>
-            <Separator className="my-3" />
-            <DataTable
-              columns={qualityColumns}
-              rows={analysis.quality}
-              keyOf={(row) => row.code}
-              minWidth={560}
-            />
-          </Card>
-
-          {unresolved > 0 && (
-            <Collapsible
-              title="Points the model does not consume"
-              count={unresolved}
-              icon="link-variant-off"
+          {/* Say plainly when the live model has no gateway measurements to read. */}
+          {!scenarioRun && dataMode !== 'gateway' ? (
+            <Alert
               variant="info"
-              summary="Mapped points that carry no pilot tag, plus any the model declines by design."
+              icon="access-point-off"
+              title={dataMode === 'none' ? 'No live channel data' : 'Partial live channel data'}
             >
-              {detail.unconsumedSignals.map((item) => (
-                <View key={item.label} className="gap-0.5">
-                  <Body>{item.label}</Body>
-                  <Body muted>{item.reason}</Body>
-                </View>
-              ))}
-              {detail.rejectedSignals.map((item) => (
-                <View key={item.label} className="gap-0.5">
-                  <Body>{item.label}</Body>
-                  <Body muted>{item.error}</Body>
-                </View>
-              ))}
-              {detail.unrecognisedSignals.map((label) => (
-                <View key={label} className="gap-0.5">
-                  <Body>{label}</Body>
-                  <Body muted>
-                    No pilot tag matches this label. Rename the point to the instrument it is actually wired to.
-                  </Body>
-                </View>
-              ))}
-            </Collapsible>
-          )}
-        </View>
-      )}
+              {mappedChannels.length === 0
+                ? 'No saved Mappable Box links exist for this machine. Link boxes to rack channels in Design mode and save the canvas before live analysis can run.'
+                : 'Only channels with current gateway measurements are evaluated. Silent mapped channels stay unavailable and do not receive fallback values.'}
+            </Alert>
+          ) : null}
 
-      {/* --- Model ----------------------------------------------------------- */}
-      {tab === 'model' && (
-        <View className="gap-3">
-          <Alert variant="info" title="Engineering-development baseline - not field validated">
-            {`All ${allThresholds().length} diagnostic thresholds are engineering-development values and none is field calibrated. This model is advisory only: automatic actuation is false, and ${detail.blockedOutputs.join(', ')} are blocked outputs. Machine-specific calibration and real asset-life claims require OEM inputs and field data.`}
-          </Alert>
+          {scenarioRun ? (
+            <Alert
+              variant={scenarioRun.verdict === 'PASS' ? 'success' : scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'muted' : 'destructive'}
+              title={`${scenarioRun.scenario.id} - ${scenarioRun.scenario.name} - ${scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'not reproducible here' : scenarioRun.verdict.toLowerCase()}`}
+            >
+              <View className="gap-1.5">
+                <Body muted>{scenarioRun.rationale}</Body>
+                <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+                  <KeyValue label="Injected" value={scenarioRun.expectedFaultIds.join(', ') || 'nothing'} />
+                  <KeyValue label="Reported" value={scenarioRun.actualFaultIds.join(', ') || 'nothing'} />
+                  <KeyValue label="Acceptance" value={scenarioRun.scenario.acceptance} />
+                  {scenarioRun.scenario.severity !== null ? (
+                    <KeyValue label="Severity" value={String(scenarioRun.scenario.severity)} />
+                  ) : null}
+                </View>
+              </View>
+            </Alert>
+          ) : null}
 
-          <Card>
-            <CardHeader>
-              <CardTitle size="sm">Healthy baseline</CardTitle>
-              <Body muted>
-                Every comparison is made against the machine&apos;s own healthy reference. A value with no controlled
-                source leaves its dependent evidence unevaluated rather than defaulting to zero.
-              </Body>
-            </CardHeader>
-            <Separator className="my-3" />
-            <DataTable
-              columns={baselineColumns}
-              rows={detail.baseline}
-              keyOf={(row) => row.tag}
-              minWidth={760}
-            />
-          </Card>
+          {/* A hard-limit breach is the most urgent thing on this screen and
+              stays visible regardless of which tab is open. */}
+          {violations.length > 0 ? (
+            <Alert variant="destructive" title={`${violations.length} hard process limit${violations.length === 1 ? '' : 's'} exceeded`}>
+              {violations
+                .map((check) => `${check.name} at ${check.value === null ? '—' : check.value} ${check.unit} (limit ${check.operator} ${check.limit}).`)
+                .join(' ')}
+            </Alert>
+          ) : null}
 
-          <Collapsible
-            title="Pipeline execution"
-            icon="sitemap-outline"
-            summary={detail.trace.join(' -> ')}
-          >
-            <SectionLabel>Stages</SectionLabel>
-            <Body muted mono>
-              {detail.trace.join(' -> ')}
+          {layerNote ? (
+            <Alert variant={layerNote.variant} title={layerNote.title}>
+              {layerNote.detail}
+            </Alert>
+          ) : null}
+
+          {/* --- the workspace grid ------------------------------------------
+              Main analysis left, the instruments it was read from right. The
+              rail sticks to the top of the scroller on desktop so a long
+              evidence table never scrolls the readings out of sight. */}
+          <View className={cn('gap-3', wide && 'flex-row items-start')}>
+            <View className="min-w-0 flex-1 gap-3">
+              {tab === 'diagnosis' ? (
+                liveDataUnavailable ? (
+                  <Section title="Diagnosis withheld" eyebrow="No measurements" accent="warning">
+                    <Body muted>
+                      No saved mapped channel is receiving current gateway telemetry. Connect the Mappable Boxes to the
+                      correct rack channels and wait for live samples before diagnosing faults.
+                    </Body>
+                  </Section>
+                ) : (
+                  <>
+                    <DiagnosisSummary
+                      variant={verdictVariant}
+                      headline={verdictTitle}
+                      eyebrow={
+                        hasCandidates ? `${humanise(detail.faultLayer)} layer · ${humanise(detail.faultCategory)}` : 'No fault signature'
+                      }
+                      detail={verdictDetail}
+                      identifiability={humanise(detail.identifiability)}
+                      readiness={{
+                        score: analysis.readiness.score,
+                        ready: analysis.readiness.ready,
+                        variant: readinessVariant(analysis.readiness.score),
+                        missing: analysis.readiness.missingEssential,
+                      }}
+                      machineState={{
+                        label: humanise(detail.inferredMachineState),
+                        variant: stateVariant(detail.inferredMachineState),
+                        basis: detail.stateBasis[0] ?? '',
+                      }}
+                      hypotheses={candidateAssessments.length}
+                      topScore={candidateAssessments[0]?.engineeringMatchScore ?? null}
+                      unresolvedSignals={unresolved}
+                      severity={{
+                        label: analysis.anomaly.severity === 'none' ? 'none active' : humanise(analysis.anomaly.severity),
+                        variant: SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'info',
+                      }}
+                    />
+
+                    <ConclusionPanel
+                      machineState={humanise(detail.inferredMachineState)}
+                      stateBasis={detail.stateBasis}
+                      separatingMeasurements={detail.separatingMeasurements}
+                      hypotheses={candidateAssessments.length}
+                      explanation={detail.explanation}
+                      evidenceBasis={evidenceBasis}
+                    />
+
+                    <HypothesisList assessments={candidateAssessments} maxScore={maxMatchScore} />
+
+                    {analysis.maintenance.caseRequired ? (
+                      <MaintenanceGuidance
+                        priority={analysis.maintenance.priority}
+                        actions={analysis.maintenance.recommendedActions}
+                        verification={analysis.maintenance.verificationSteps}
+                        variant={
+                          analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high'
+                            ? 'destructive'
+                            : 'warning'
+                        }
+                      />
+                    ) : null}
+
+                    <EliminatedList assessments={eliminated} />
+                  </>
+                )
+              ) : null}
+
+              {tab === 'limits' ? <LimitsTab constraints={detail.constraints} fieldCalibrated={fieldCalibratedCount} /> : null}
+
+              {tab === 'evidence' ? (
+                <EvidenceTab
+                  evidence={evidenceItems}
+                  missing={detail.missingTags}
+                  thresholds={detail.triggeredThresholds}
+                  contributors={contributorData}
+                  contributorVariant={SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'info'}
+                  anomalyLimitation={analysis.anomaly.limitations[0] ?? 'No measurement is outside its consistency band.'}
+                  assessments={detail.assessments}
+                  readinessScore={analysis.readiness.score}
+                  thresholdTotal={thresholdRegister.length}
+                />
+              ) : null}
+
+              {tab === 'signals' ? <SignalsTab signals={signalRows} unconsumed={unconsumed} /> : null}
+
+              {tab === 'model' ? (
+                <ModelTab
+                  modelName="Single-screw extruder diagnostic model"
+                  modelVersion={analysis.modelVersion}
+                  recipeId={detail.recipeId}
+                  machineState={humanise(detail.inferredMachineState)}
+                  inputs={detail.resolvedSignals.map((signal) => ({
+                    tag: signal.tag,
+                    label: TAG_LABELS[signal.tag] ?? signal.tag,
+                    value: signal.value,
+                    unit: signal.unit,
+                  }))}
+                  missing={detail.missingTags}
+                  constraintCount={detail.constraints.length}
+                  blockedOutputs={detail.blockedOutputs}
+                  baseline={detail.baseline}
+                  trace={detail.trace}
+                  availability={detail.availability}
+                  caveats={analysis.doctorReport.caveats}
+                  thresholdCount={thresholdRegister.length}
+                  fieldCalibrated={fieldCalibratedCount}
+                />
+              ) : null}
+
+              {tab === 'connectivity' ? <ConnectivityTab connections={connections} /> : null}
+            </View>
+
+            {/* The rail carries the same two panels on every tab: what the model
+                is reading, and where those readings come from. */}
+            <View
+              style={
+                wide
+                  ? ({ width: railWidth, position: 'sticky', top: 0, alignSelf: 'flex-start' } as never)
+                  : undefined
+              }
+            >
+              {rail}
+            </View>
+          </View>
+
+          {/* Kept out of the rail so the page still names the machine's fault
+              vocabulary when the rail has collapsed underneath. */}
+          {expectedPoints && expectedPoints > mappedChannels.length ? (
+            <Body muted>
+              {mappedChannels.length} of {expectedPoints} expected measurement points are mapped on this machine.
             </Body>
-            <Separator className="my-2" />
-            <SectionLabel>Unavailable feature groups</SectionLabel>
-            {Object.entries(detail.availability).filter(([, status]) => status.startsWith('NOT_EVALUATED')).length === 0 ? (
-              <Body muted>All feature groups were evaluated.</Body>
-            ) : (
-              Object.entries(detail.availability)
-                .filter(([, status]) => status.startsWith('NOT_EVALUATED'))
-                .map(([key, status]) => (
-                  <Body key={key} muted mono>
-                    {key}: {humanise(status.replace('NOT_EVALUATED_', ''))}
-                  </Body>
-                ))
-            )}
-          </Collapsible>
+          ) : null}
 
-          <Collapsible title="Caveats" icon="alert-circle-outline" count={analysis.doctorReport.caveats.length} summary="Everything this result depends on that is not yet established.">
-            {analysis.doctorReport.caveats.map((caveat, index) => (
-              <Body key={`${caveat}-${index}`} muted>
-                - {caveat}
-              </Body>
-            ))}
-          </Collapsible>
-        </View>
-      )}
+          {/* Named so the page still says which fault the model would call this,
+              even when the diagnosis tab is not the one open. */}
+          {hasCandidates && tab !== 'diagnosis' ? (
+            <Body muted>
+              Current diagnosis: {detail.candidateFaults.map((id) => faultName(id)).join(', ')}.
+            </Body>
+          ) : null}
         </View>
       </ScrollView>
     </View>

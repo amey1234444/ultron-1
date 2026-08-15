@@ -39,12 +39,23 @@ const MONO = '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace';
  * like "Electrical / Power House" had to be clipped to fit next to its status,
  * and a label that cannot say what it is labelling has no reason to be there.
  */
-const REST = { w: 146, h: 40 };
-const OPEN = { w: 158, h: 100 };
+const REST = { w: 178, h: 50 };
+const OPEN = { w: 200, h: 132 };
 /** Clearance between a card and a model, and between two cards. */
-const CLEAR = 10;
+const CLEAR = 12;
 /** Length of the connector's lead-off from the model. */
-const LEAD = 18;
+const LEAD = 20;
+
+/**
+ * Chrome the solver must stay clear of, in canvas pixels.
+ *
+ * The plant no longer runs edge to edge under floating panels, but the map
+ * region still carries its own header. A label placed under it is a label the
+ * operator cannot read, and "on screen" is not the same test as "visible".
+ */
+export type LabelInsets = { top: number; right: number; bottom: number; left: number };
+
+const NO_INSETS: LabelInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 
 type Rect = { x: number; y: number; w: number; h: number };
 
@@ -104,6 +115,8 @@ export type PlantLabelLayerProps = {
   height: number;
   /** Fades the whole layer out while the frame is moving. */
   visible: boolean;
+  /** Regions of the canvas covered by chrome. Labels never land inside them. */
+  insets?: LabelInsets;
 };
 
 export function PlantLabelLayer({
@@ -119,6 +132,7 @@ export function PlantLabelLayer({
   width,
   height,
   visible,
+  insets = NO_INSETS,
 }: PlantLabelLayerProps) {
   const byId = useMemo(() => {
     const map: Record<string, PlantAssetTelemetry> = {};
@@ -156,7 +170,14 @@ export function PlantLabelLayer({
 
       for (const [dx, dy] of candidates(size)) {
         const rect: Rect = { x: asset.anchorX + dx, y: asset.anchorY + dy, w: size.w, h: size.h };
-        if (rect.x < 4 || rect.y < 4 || rect.x + rect.w > width - 4 || rect.y + rect.h > height - 4) continue;
+        if (
+          rect.x < insets.left + 4 ||
+          rect.y < insets.top + 4 ||
+          rect.x + rect.w > width - insets.right - 4 ||
+          rect.y + rect.h > height - insets.bottom - 4
+        ) {
+          continue;
+        }
         if (models.some((model) => overlaps(rect, model, CLEAR))) continue;
         if (taken.some((placed) => overlaps(rect, placed, CLEAR))) continue;
         chosen = rect;
@@ -168,8 +189,14 @@ export function PlantLabelLayer({
         // keep it on screen — a label half off the edge is worse than one that
         // grazes a roof, and this only happens in a badly crowded frame.
         chosen = {
-          x: Math.min(Math.max(4, asset.anchorX - size.w / 2), width - size.w - 4),
-          y: Math.min(Math.max(4, asset.anchorY - size.h - LEAD), height - size.h - 4),
+          x: Math.min(
+            Math.max(insets.left + 4, asset.anchorX - size.w / 2),
+            Math.max(insets.left + 4, width - insets.right - size.w - 4),
+          ),
+          y: Math.min(
+            Math.max(insets.top + 4, asset.anchorY - size.h - LEAD),
+            Math.max(insets.top + 4, height - insets.bottom - size.h - 4),
+          ),
           w: size.w,
           h: size.h,
         };
@@ -178,7 +205,7 @@ export function PlantLabelLayer({
       taken.push(chosen);
       return { asset, rect: chosen, open };
     });
-  }, [byId, height, hoveredId, projected, selectedId, width]);
+  }, [byId, height, hoveredId, insets, projected, selectedId, width]);
 
   const surface = isDark ? 'rgba(16,19,24,0.92)' : 'rgba(255,255,255,0.94)';
   const hair = isDark ? 'rgba(255,255,255,0.075)' : 'rgba(10,11,13,0.09)';
@@ -229,7 +256,7 @@ export function PlantLabelLayer({
           alignItems: 'baseline',
           gap: 6,
           fontFamily: MONO,
-          fontSize: 8,
+          fontSize: 10,
           whiteSpace: 'nowrap',
         };
         return (
@@ -264,9 +291,9 @@ export function PlantLabelLayer({
               transition: 'border-color 140ms ease, width 160ms ease, height 160ms ease',
             }}
           >
-            <div style={{ padding: '6px 8px 5px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                <span style={{ width: 4.5, height: 4.5, borderRadius: 999, background: tone, flexShrink: 0 }} />
+            <div style={{ padding: '8px 10px 7px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: 999, background: tone, flexShrink: 0 }} />
                 <span
                   style={{
                     minWidth: 0,
@@ -274,8 +301,8 @@ export function PlantLabelLayer({
                     textOverflow: 'ellipsis',
                     whiteSpace: 'nowrap',
                     fontFamily: MONO,
-                    fontSize: 8,
-                    letterSpacing: '0.09em',
+                    fontSize: 10.5,
+                    letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     color: palette.ink,
                   }}
@@ -285,10 +312,10 @@ export function PlantLabelLayer({
               </div>
               <div
                 style={{
-                  marginTop: 3,
-                  marginLeft: 9.5,
+                  marginTop: 4,
+                  marginLeft: 12,
                   fontFamily: MONO,
-                  fontSize: 7,
+                  fontSize: 9,
                   letterSpacing: '0.14em',
                   textTransform: 'uppercase',
                   color: tone,
@@ -299,7 +326,7 @@ export function PlantLabelLayer({
             </div>
 
             {open ? (
-              <div style={{ borderTop: `1px solid ${hair}`, padding: '5px 8px', display: 'grid', gap: 3 }}>
+              <div style={{ borderTop: `1px solid ${hair}`, padding: '6px 10px', display: 'grid', gap: 4 }}>
                 {(
                   [
                     ['Machines', String(telemetry.machines).padStart(2, '0'), undefined],
@@ -319,11 +346,11 @@ export function PlantLabelLayer({
                   ] as [string, string, string | undefined][]
                 ).map(([label, value, valueTone]) => (
                   <div key={label} style={rowStyle}>
-                    <span style={{ fontSize: 7, letterSpacing: '0.12em', textTransform: 'uppercase', color: palette.inkFaint }}>
+                    <span style={{ fontSize: 8.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: palette.inkFaint }}>
                       {label}
                     </span>
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 8.5, color: valueTone ?? palette.ink }}>{value}</span>
+                    <span style={{ fontSize: 10.5, color: valueTone ?? palette.ink }}>{value}</span>
                   </div>
                 ))}
               </div>

@@ -3,7 +3,7 @@
  *
  * These are deliberately not a chart library. Everything the overview plots is
  * small, dense and subordinate to the 3D plant, so each of these draws exactly
- * one thing with a hairline stroke, a quiet grid and 8px axis type — the
+ * one thing with a hairline stroke, a quiet grid and small axis type — the
  * proportions an engineering readout uses, which no chart library default gets
  * right without being fought.
  *
@@ -16,7 +16,7 @@ import Svg, { Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText }
 
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 
-const AXIS_FONT = 8;
+const AXIS_FONT = 9.5;
 
 /**
  * Renders children once the box has a real size.
@@ -108,8 +108,8 @@ export function AreaChart({
   xLabels: string[];
 }) {
   if (values.length < 2) return null;
-  const padLeft = 26;
-  const padBottom = 13;
+  const padLeft = 30;
+  const padBottom = 15;
   const padTop = 4;
   const plotW = Math.max(1, width - padLeft - 2);
   const plotH = Math.max(1, height - padBottom - padTop);
@@ -187,8 +187,8 @@ export function MultiLineChart({
 }) {
   const all = series.flatMap((entry) => entry.values);
   if (all.length === 0) return null;
-  const padLeft = 20;
-  const padBottom = 13;
+  const padLeft = 24;
+  const padBottom = 15;
   const padTop = 4;
   const plotW = Math.max(1, width - padLeft - 2);
   const plotH = Math.max(1, height - padBottom - padTop);
@@ -261,8 +261,8 @@ export function BarChart({
   color: string;
 }) {
   if (values.length === 0) return null;
-  const padLeft = 26;
-  const padBottom = 13;
+  const padLeft = 30;
+  const padBottom = 15;
   const padTop = 4;
   const plotW = Math.max(1, width - padLeft - 2);
   const plotH = Math.max(1, height - padBottom - padTop);
@@ -333,8 +333,8 @@ export function SeverityBars({
   palette: ConsolePalette;
 }) {
   if (labels.length === 0) return null;
-  const padLeft = 20;
-  const padBottom = 13;
+  const padLeft = 24;
+  const padBottom = 15;
   const padTop = 4;
   const plotW = Math.max(1, width - padLeft - 2);
   const plotH = Math.max(1, height - padBottom - padTop);

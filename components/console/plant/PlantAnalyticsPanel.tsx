@@ -78,31 +78,31 @@ function KpiRow({ kpi, palette, first }: { kpi: PlantKpi; palette: ConsolePalett
       }}
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 1.5 }}>
-        <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: kpi.tone }} />
+        <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: kpi.tone }} />
         <View style={{ flex: 1, minWidth: 0 }}>
-          <MicroLabel palette={palette} size={8}>
+          <MicroLabel palette={palette} size={9.5}>
             {kpi.label}
           </MicroLabel>
         </View>
         <Text
           className="font-body tabular-nums"
-          style={{ fontSize: 15, fontWeight: '300', letterSpacing: -0.3, color: palette.ink }}
+          style={{ fontSize: 20, fontWeight: '300', letterSpacing: -0.4, color: palette.ink }}
           numberOfLines={1}
         >
           {kpi.value}
         </Text>
         {kpi.unit ? (
-          <Text className="font-mono" style={{ fontSize: 8.5, color: palette.inkMuted }}>
+          <Text className="font-mono" style={{ fontSize: 10.5, color: palette.inkMuted }}>
             {kpi.unit}
           </Text>
         ) : null}
       </View>
 
-      <View style={{ marginTop: STEP * 1.25 }}>
-        <Meter value={kpi.progress} target={kpi.target} tone={kpi.tone} palette={palette} />
+      <View style={{ marginTop: STEP * 1.5 }}>
+        <Meter value={kpi.progress} target={kpi.target} tone={kpi.tone} palette={palette} height={4} />
       </View>
 
-      <Text className="font-mono" style={{ marginTop: STEP, fontSize: 8, color: palette.inkFaint }} numberOfLines={1}>
+      <Text className="font-mono" style={{ marginTop: STEP * 1.25, fontSize: 10, color: palette.inkFaint }} numberOfLines={1}>
         {kpi.caption}
       </Text>
     </View>

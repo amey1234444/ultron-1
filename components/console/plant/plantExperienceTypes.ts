@@ -28,4 +28,14 @@ export type PlantExperienceProps = {
 
   canEdit?: boolean;
   onEdit?: () => void;
+
+  /**
+   * Regions of the canvas the page's own chrome covers, in pixels.
+   *
+   * The label solver keeps cards out of them: a label placed under the map
+   * header is a label nobody can read, and "on screen" is not the same test as
+   * "visible". Only applies in the docked view — immersive has no chrome over
+   * the world except its own header, which the layer already accounts for.
+   */
+  chromeInsets?: { top: number; right: number; bottom: number; left: number };
 };

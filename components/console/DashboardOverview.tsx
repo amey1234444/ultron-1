@@ -1756,107 +1756,125 @@ export function DashboardOverview({
       // Map first and wide, the scorecard beside it, transport underneath. The
       // action rail moved to History, where a log of what already happened
       // belongs.
-      // The plant map is the page here: the canvas runs full bleed and every
-      // other panel is docked onto it (KPIs top, analysis right, charts bottom).
-      // The plant is the page: it takes the whole centre, the KPI row states
-      // whether it is worth looking at, and the analytics sit around the edge
-      // where they annotate it rather than compete with it.
-      // The 3D world is the ground of this page, not a component on it: the
-      // canvas spans the whole content area and every panel floats over it.
-      // That is the difference between "a dashboard with a Three.js widget"
-      // and a digital twin you are looking into.
+      // The plant is still the subject of this page, but it is no longer the
+      // whole of it.
+      //
+      // The previous pass ran the canvas full bleed and floated every panel over
+      // it. That looked like a digital twin and read like one for about a week —
+      // then the cost showed up. The analytics column had to be narrow enough
+      // not to swallow the yard, the chart strip had to be short enough not to
+      // sit on it, and both had to shrink their type to fit, which is why the
+      // numbers on this page had become unreadable from anywhere but directly in
+      // front of the monitor. A panel that floats over the plant is always
+      // negotiating with the plant for space, and the plant always wins.
+      //
+      // So the three regions now share the page instead of stacking on it: the
+      // map takes the upper-left, the analytics column takes the upper-right at
+      // a width that fits its own type, and the chart strip runs the full width
+      // underneath. The map gives up roughly a quarter of its footprint and
+      // keeps every interaction — the canvas is unchanged, only the box it is
+      // measured against is smaller, so aspect ratio, camera, zoom, pan,
+      // selection and hover are all exactly as they were.
       case 'operations': {
         const showChrome = chromeVisible(plantView);
-        const panelWidth = width >= 1600 ? 292 : 258;
+        // Wide enough for 12px labels and a 20px reading without wrapping. The
+        // old 258/292 column could not carry either.
+        const railWidth = width >= 1600 ? 356 : width >= 1400 ? 324 : 300;
+        // Tall enough for a headline, a delta and a plot with a real axis. The
+        // old 134px strip had 60px of plot after the header. Held back on a
+        // narrow viewport, where the map has no rail to give height back to.
+        const stripHeight = isNarrow ? 176 : width >= 1600 ? 212 : 194;
+        // What the map's own chrome covers, so the label solver never parks a
+        // card under the header or behind the camera controls.
+        const mapInsets = { top: 46, right: 14, bottom: 14, left: 50 };
+
         return (
-          <View style={{ flex: 1, minHeight: 0 }}>
-            {/* Layer 1-5: the world. Fills the region; the overlays sit on top. */}
-            <PlantExperience
-              mode={plantView}
-              onEnter={enterPlant}
-              onExit={exitPlant}
-              scene={plantConfig.scene3d}
-              statusColors={plantComponentColors}
-              callouts={plantCallouts}
-              palette={palette}
-              isDark={isDark}
-              plantName={metrics.plantName}
-              live={metrics.live}
-              assets={analytics.assets}
-              selectedId={selectedAssetId}
-              onSelect={setSelectedAssetId}
-              canEdit={canEditPlant}
-              onEdit={() => setPlantEditorOpen(true)}
-            />
-
-            {/* Layer 6: dashboard overlays. `box-none` so only the panels
-                themselves take the pointer — dragging the gaps still orbits
-                the plant underneath. */}
+          <View style={{ flex: 1, minHeight: 0, gap: 10 }}>
             <View
-              pointerEvents="box-none"
-              style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 5, padding: 12 }}
+              style={{
+                flex: 1,
+                minHeight: 0,
+                flexDirection: isNarrow ? 'column' : 'row',
+                gap: 10,
+              }}
             >
-              {/* Inset by the analytics column: the header's actions sit at the
-                  right edge and were landing underneath it. */}
-              <FadeLayer visible={showChrome} translateY={-6} style={{ marginRight: isNarrow ? 0 : panelWidth + 10 }}>
-                <PlantOverviewHeader
-                  title="Plant map"
-                  live={metrics.live}
-                  facts={[
-                    `${plantConfig.scene3d.components.length} components`,
-                    `${metrics.machinesOnline}/${metrics.machinesTotal} machines online`,
-                  ]}
-                  palette={palette}
-                  canEdit={canEditPlant}
-                  onEdit={() => setPlantEditorOpen(true)}
+              {/* The world. `PlantExperience` measures the region it is given
+                  and pins its canvas layer to it, so bounding the region here is
+                  the whole of the resize — nothing inside the scene changes. */}
+              <View style={{ flex: 1, minWidth: 0, minHeight: 0 }}>
+                <PlantExperience
+                  mode={plantView}
                   onEnter={enterPlant}
-                />
-              </FadeLayer>
-
-              {/* Everything between the header and the charts is the plant. The
-                  four headline measures moved into the analytics column, which
-                  is what freed this band. */}
-              <View style={{ flex: 1, minHeight: 0 }} pointerEvents="none" />
-
-              <FadeLayer
-                visible={showChrome}
-                translateY={16}
-                style={{ height: 134, flexDirection: 'row', marginRight: isNarrow ? 0 : panelWidth + 10 }}
-              >
-                <PlantBottomAnalytics
-                  analytics={analytics}
-                  alarmBars={alarmBars}
-                  alarmCounts={{
-                    critical: metrics.criticalCount,
-                    warning: metrics.warningCount,
-                    info: metrics.infoCount,
-                  }}
-                  live={metrics.live}
+                  onExit={exitPlant}
+                  scene={plantConfig.scene3d}
+                  statusColors={plantComponentColors}
+                  callouts={plantCallouts}
                   palette={palette}
                   isDark={isDark}
-                  stacked={false}
+                  plantName={metrics.plantName}
+                  live={metrics.live}
+                  assets={analytics.assets}
+                  selectedId={selectedAssetId}
+                  onSelect={setSelectedAssetId}
+                  canEdit={canEditPlant}
+                  onEdit={() => setPlantEditorOpen(true)}
+                  chromeInsets={mapInsets}
                 />
-              </FadeLayer>
+
+                {/* The map's own header, over the sky rather than over the
+                    plant. `box-none` so dragging the gap still orbits. */}
+                <View
+                  pointerEvents="box-none"
+                  style={{ position: 'absolute', top: 0, left: 0, right: 0, zIndex: 5, padding: 10 }}
+                >
+                  <FadeLayer visible={showChrome} translateY={-6}>
+                    <PlantOverviewHeader
+                      title="Plant map"
+                      live={metrics.live}
+                      facts={[
+                        `${plantConfig.scene3d.components.length} components`,
+                        `${metrics.machinesOnline}/${metrics.machinesTotal} machines online`,
+                      ]}
+                      palette={palette}
+                      canEdit={canEditPlant}
+                      onEdit={() => setPlantEditorOpen(true)}
+                      onEnter={enterPlant}
+                    />
+                  </FadeLayer>
+                </View>
+              </View>
+
+              {/* Right column. A real column now, not an overlay, so it can be
+                  read without the plant moving behind every number. */}
+              {isNarrow ? null : (
+                <FadeLayer
+                  visible={showChrome}
+                  translateX={16}
+                  style={{ width: railWidth, flexDirection: 'row', minHeight: 0 }}
+                >
+                  <PlantAnalyticsPanel analytics={analytics} kpis={plantKpis} palette={palette} isDark={isDark} />
+                </FadeLayer>
+              )}
             </View>
 
-            {/* Right analytics column, floating full-height over the world. */}
-            {isNarrow ? null : (
-              <FadeLayer
-                visible={showChrome}
-                translateX={16}
-                style={{
-                  position: 'absolute',
-                  top: 12,
-                  right: 12,
-                  bottom: 12,
-                  width: panelWidth,
-                  zIndex: 6,
-                  flexDirection: 'row',
+            {/* Lower strip, full width. It gains the rail's width back and about
+                60px of height, which is the difference between four sparklines
+                and four charts. */}
+            <FadeLayer visible={showChrome} translateY={16} style={{ height: stripHeight, flexDirection: 'row' }}>
+              <PlantBottomAnalytics
+                analytics={analytics}
+                alarmBars={alarmBars}
+                alarmCounts={{
+                  critical: metrics.criticalCount,
+                  warning: metrics.warningCount,
+                  info: metrics.infoCount,
                 }}
-              >
-                <PlantAnalyticsPanel analytics={analytics} kpis={plantKpis} palette={palette} isDark={isDark} />
-              </FadeLayer>
-            )}
+                live={metrics.live}
+                palette={palette}
+                isDark={isDark}
+                stacked={false}
+              />
+            </FadeLayer>
           </View>
         );
       }
@@ -2272,11 +2290,12 @@ export function DashboardOverview({
     >
       <SectionTabs active={section} onChange={setSection} />
 
-      {/* Operations is full-bleed: the 3D world is the page's ground and the
-          panels float on it, so there is no page padding and no page scroller
-          here — either would inset the world back into a box. */}
+      {/* Operations sizes itself to the viewport rather than scrolling: the map,
+          the analytics column and the chart strip are one instrument panel, and
+          a panel you have to scroll to read is three panels. The gutter is the
+          page's, not each region's, so the three share one alignment. */}
       {section === 'operations' ? (
-        <View className="flex-1" style={{ minHeight: 0 }}>
+        <View className="flex-1" style={{ minHeight: 0, padding: 12 }}>
           {renderSection()}
         </View>
       ) : (

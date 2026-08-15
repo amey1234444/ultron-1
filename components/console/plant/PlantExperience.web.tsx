@@ -117,8 +117,8 @@ function ControlButton({
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          width: 26,
-          height: 26,
+          width: 30,
+          height: 30,
           padding: 0,
           cursor: 'pointer',
           background: hover ? (isDark ? 'rgba(255,255,255,0.07)' : 'rgba(10,11,13,0.05)') : 'transparent',
@@ -146,7 +146,7 @@ function ControlButton({
             background: palette.panel,
             border: `1px solid ${palette.line}`,
             fontFamily: MONO,
-            fontSize: 8.5,
+            fontSize: 10,
             letterSpacing: '0.1em',
             textTransform: 'uppercase',
             color: palette.inkMuted,
@@ -238,7 +238,7 @@ function AssetDetails({
         right: 12,
         top: 12,
         bottom: 12,
-        width: 232,
+        width: 268,
         zIndex: 7,
         display: 'flex',
         flexDirection: 'column',
@@ -249,14 +249,14 @@ function AssetDetails({
         boxShadow: isDark ? '0 14px 34px rgba(0,0,0,0.5)' : '0 10px 24px rgba(15,20,30,0.14)',
       }}
     >
-      <div style={{ padding: '9px 11px', borderBottom: `1px solid ${palette.line}` }}>
-        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7 }}>
-          <span style={{ width: 5, height: 5, borderRadius: 999, background: statusColor, marginTop: 5, flexShrink: 0 }} />
+      <div style={{ padding: '11px 13px', borderBottom: `1px solid ${palette.line}` }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+          <span style={{ width: 6, height: 6, borderRadius: 999, background: statusColor, marginTop: 6, flexShrink: 0 }} />
           <div style={{ minWidth: 0, flex: 1 }}>
-            <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.12em', textTransform: 'uppercase', color: palette.ink }}>
+            <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '0.1em', textTransform: 'uppercase', color: palette.ink }}>
               {asset.name}
             </div>
-            <div style={{ marginTop: 3, fontFamily: MONO, fontSize: 8, letterSpacing: '0.14em', textTransform: 'uppercase', color: statusColor }}>
+            <div style={{ marginTop: 4, fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: statusColor }}>
               {asset.status}
             </div>
           </div>
@@ -266,7 +266,7 @@ function AssetDetails({
             onClick={onClose}
             style={{
               border: 'none', background: 'transparent', cursor: 'pointer', padding: 2,
-              color: palette.inkFaint, fontFamily: MONO, fontSize: 12, lineHeight: 1,
+              color: palette.inkFaint, fontFamily: MONO, fontSize: 15, lineHeight: 1,
             }}
           >
             ×
@@ -274,17 +274,17 @@ function AssetDetails({
         </div>
       </div>
 
-      <div style={{ padding: '7px 11px', display: 'grid', gap: 4, overflowY: 'auto' }}>
+      <div style={{ padding: '9px 13px', display: 'grid', gap: 6, overflowY: 'auto' }}>
         {rows.map(([label, value]) => (
           <div key={label} style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
-            <span style={{ fontFamily: MONO, fontSize: 7.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: palette.inkFaint }}>
+            <span style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: palette.inkFaint }}>
               {label}
             </span>
             <span style={{ flex: 1, borderBottom: `1px dotted ${palette.line}`, transform: 'translateY(-2px)' }} />
             <span
               style={{
                 fontFamily: MONO,
-                fontSize: 9.5,
+                fontSize: 11.5,
                 color: label === 'Alarms' && asset.alarms > 0 ? statusColor : palette.ink,
               }}
             >
@@ -295,12 +295,12 @@ function AssetDetails({
       </div>
 
       {asset.areaName ? (
-        <div style={{ marginTop: 'auto', padding: '7px 11px', borderTop: `1px solid ${palette.line}` }}>
+        <div style={{ marginTop: 'auto', padding: '9px 13px', borderTop: `1px solid ${palette.line}` }}>
           {/* Provenance: which telemetry area these numbers actually came from. */}
-          <div style={{ fontFamily: MONO, fontSize: 7.5, letterSpacing: '0.14em', textTransform: 'uppercase', color: palette.inkFaint }}>
+          <div style={{ fontFamily: MONO, fontSize: 9, letterSpacing: '0.14em', textTransform: 'uppercase', color: palette.inkFaint }}>
             Telemetry source
           </div>
-          <div style={{ marginTop: 3, fontFamily: SANS, fontSize: 10.5, color: palette.inkMuted }}>{asset.areaName}</div>
+          <div style={{ marginTop: 4, fontFamily: SANS, fontSize: 12, color: palette.inkMuted }}>{asset.areaName}</div>
         </div>
       ) : null}
     </div>
@@ -325,6 +325,7 @@ export default function PlantExperience({
   assets,
   selectedId,
   onSelect,
+  chromeInsets,
   // `canEdit`/`onEdit` stay in the contract for the native stub and the page
   // header, but the world itself no longer carries an edit button — it was the
   // second one on screen.
@@ -481,6 +482,13 @@ export default function PlantExperience({
           isDark={isDark}
           width={layerSize.width}
           height={layerSize.height}
+          // Immersive covers the viewport and carries only its own header, so
+          // the page's docked chrome no longer applies.
+          insets={
+            immersive
+              ? { top: 44, right: selected ? 280 : 12, bottom: 12, left: 48 }
+              : (chromeInsets ?? { top: 0, right: 0, bottom: 0, left: 48 })
+          }
           // Labels are noise while the frame is moving; they come back the
           // instant the move lands.
           visible={!transitioning}
@@ -518,7 +526,7 @@ export default function PlantExperience({
               border: `1px solid ${palette.line}`,
               color: palette.inkMuted,
               fontFamily: MONO,
-              fontSize: 8.5,
+              fontSize: 10,
               letterSpacing: '0.14em',
               textTransform: 'uppercase',
             }}
@@ -529,7 +537,7 @@ export default function PlantExperience({
           <span
             style={{
               fontFamily: MONO,
-              fontSize: 10,
+              fontSize: 12,
               letterSpacing: '0.16em',
               textTransform: 'uppercase',
               color: palette.ink,
@@ -548,8 +556,8 @@ export default function PlantExperience({
               border: `1px solid ${live ? 'rgba(63,191,106,0.3)' : palette.line}`,
             }}
           >
-            <span style={{ width: 4.5, height: 4.5, borderRadius: 999, background: live ? palette.accent : palette.neutral }} />
-            <span style={{ fontFamily: MONO, fontSize: 8, letterSpacing: '0.14em', color: live ? palette.accent : palette.inkFaint }}>
+            <span style={{ width: 5.5, height: 5.5, borderRadius: 999, background: live ? palette.accent : palette.neutral }} />
+            <span style={{ fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.14em', color: live ? palette.accent : palette.inkFaint }}>
               {live ? 'LIVE' : 'DEMO'}
             </span>
           </span>

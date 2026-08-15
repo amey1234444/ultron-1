@@ -51,12 +51,20 @@ export function PlantCard({
   return <View style={[cardSurface(palette, isDark), { minWidth: 0, minHeight: 0 }, style]}>{children}</View>;
 }
 
-/** Uppercase technical micro-label. The overview's smallest type size. */
+/**
+ * Uppercase technical micro-label. The overview's smallest type size.
+ *
+ * The whole scale in this file was set for panels that floated over the 3D
+ * plant, where every pixel of type was a pixel of the yard obscured. Those
+ * panels now have their own columns, and the constraint that justified 8px
+ * labels is gone — at the viewing distance a control room is actually read
+ * from, they were not legible at all.
+ */
 export function MicroLabel({
   children,
   palette,
   color,
-  size = 8.5,
+  size = 10,
 }: {
   children: ReactNode;
   palette: ConsolePalette;
@@ -109,7 +117,7 @@ export function CardHeader({
         <MicroLabel palette={palette}>{label}</MicroLabel>
       </View>
       {meta ? (
-        <Text className="font-mono" style={{ fontSize: 9, color: metaColor ?? palette.inkFaint }} numberOfLines={1}>
+        <Text className="font-mono" style={{ fontSize: 10.5, color: metaColor ?? palette.inkFaint }} numberOfLines={1}>
           {meta}
         </Text>
       ) : null}
@@ -137,7 +145,7 @@ export function MetricValue({
   color?: string;
 }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
       <Text
         className="font-body"
         style={{
@@ -151,7 +159,7 @@ export function MetricValue({
         {value}
       </Text>
       {unit ? (
-        <Text className="font-mono" style={{ fontSize: Math.max(9, size * 0.38), color: palette.inkMuted }}>
+        <Text className="font-mono" style={{ fontSize: Math.max(11, size * 0.42), color: palette.inkMuted }}>
           {unit}
         </Text>
       ) : null}
@@ -233,12 +241,12 @@ export function PanelSection({
     >
       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: STEP * 2 }}>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <MicroLabel palette={palette} color={palette.inkMuted} size={9}>
+          <MicroLabel palette={palette} color={palette.inkMuted} size={11}>
             {title}
           </MicroLabel>
         </View>
         {unit ? (
-          <Text className="font-mono" style={{ fontSize: 8.5, color: palette.inkFaint }}>
+          <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
             {unit}
           </Text>
         ) : null}
@@ -272,32 +280,32 @@ export function BarRow({
   palette: ConsolePalette;
 }) {
   return (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 2, paddingVertical: 2.5 }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 2, paddingVertical: 3.5 }}>
       {index ? (
-        <Text className="font-mono" style={{ fontSize: 8.5, color: palette.inkFaint, width: 14 }}>
+        <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint, width: 18 }}>
           {index}
         </Text>
       ) : null}
       <Text
         numberOfLines={1}
         className="font-body"
-        style={{ fontSize: 10.5, color: palette.inkMuted, width: index ? 108 : 74, minWidth: 0 }}
+        style={{ fontSize: 12.5, color: palette.inkMuted, width: index ? 118 : 86, minWidth: 0 }}
       >
         {label}
       </Text>
-      <View style={{ flex: 1, minWidth: 20, height: 3, borderRadius: 3, backgroundColor: alpha(palette.ink, 0.08) }}>
+      <View style={{ flex: 1, minWidth: 20, height: 4, borderRadius: 4, backgroundColor: alpha(palette.ink, 0.08) }}>
         <View
           style={{
             width: `${Math.max(0, Math.min(1, share)) * 100}%`,
             height: '100%',
-            borderRadius: 3,
+            borderRadius: 4,
             backgroundColor: tone,
           }}
         />
       </View>
       <Text
         className="font-mono tabular-nums"
-        style={{ fontSize: 9.5, color: palette.ink, textAlign: 'right', minWidth: 46 }}
+        style={{ fontSize: 11.5, color: palette.ink, textAlign: 'right', minWidth: 58 }}
         numberOfLines={1}
       >
         {value}
@@ -320,19 +328,19 @@ export function TelemetryCell({
 }) {
   return (
     <View style={{ flex: 1, minWidth: 0 }}>
-      <MicroLabel palette={palette} size={8}>
+      <MicroLabel palette={palette} size={9.5}>
         {label}
       </MicroLabel>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3, marginTop: 3 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4, marginTop: 4 }}>
         <Text
           className="font-body tabular-nums"
-          style={{ fontSize: 17, fontWeight: '300', letterSpacing: -0.4, color: palette.ink }}
+          style={{ fontSize: 22, fontWeight: '300', letterSpacing: -0.5, color: palette.ink }}
           numberOfLines={1}
         >
           {value}
         </Text>
         {unit ? (
-          <Text className="font-mono" style={{ fontSize: 9, color: palette.inkMuted }}>
+          <Text className="font-mono" style={{ fontSize: 11, color: palette.inkMuted }}>
             {unit}
           </Text>
         ) : null}
@@ -347,8 +355,8 @@ export function Legend({ items, palette }: { items: { color: string; label: stri
     <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: STEP * 2.5 }}>
       {items.map((item) => (
         <View key={item.label} style={{ flexDirection: 'row', alignItems: 'center', gap: STEP }}>
-          <StatusDot color={item.color} size={4.5} />
-          <Text className="font-body" style={{ fontSize: 9, color: palette.inkMuted }}>
+          <StatusDot color={item.color} size={5.5} />
+          <Text className="font-body" style={{ fontSize: 10.5, color: palette.inkMuted }}>
             {item.label}
           </Text>
         </View>
@@ -365,17 +373,17 @@ export function LivePill({ palette, live }: { palette: ConsolePalette; live: boo
       style={{
         flexDirection: 'row',
         alignItems: 'center',
-        gap: STEP * 1.25,
-        paddingHorizontal: STEP * 1.75,
-        paddingVertical: 1.5,
+        gap: STEP * 1.5,
+        paddingHorizontal: STEP * 2,
+        paddingVertical: 2.5,
         borderRadius: 999,
         backgroundColor: alpha(color, 0.12),
         borderWidth: 1,
         borderColor: alpha(color, 0.3),
       }}
     >
-      <StatusDot color={color} size={4.5} />
-      <Text className="font-mono" style={{ fontSize: 8, letterSpacing: 1.2, color }}>
+      <StatusDot color={color} size={5.5} />
+      <Text className="font-mono" style={{ fontSize: 9.5, letterSpacing: 1.3, color }}>
         {live ? 'LIVE' : 'DEMO'}
       </Text>
     </View>
