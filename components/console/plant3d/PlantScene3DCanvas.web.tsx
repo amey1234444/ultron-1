@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import {
   CONNECTION_COLOR,
   PLANT_MODELS,
+  plantComponentScale,
   type PlantComponent3D,
   type PlantPartOverride,
   type PlantScene3DConfig,
@@ -492,7 +493,7 @@ function PlacedComponent({
   // until the next orbit.
   const invalidate = useThree((state) => state.invalidate);
 
-  const scale = (component.scale / 100) * (modelScale / 100);
+  const scale = plantComponentScale(component.model, component.scale, modelScale);
 
   // --- report the model's node tree to the editor once per model
   useEffect(() => {
@@ -826,7 +827,9 @@ function CameraRig({
   command?: PlantCameraCommand | null;
   insets: PlantViewInsets;
 }) {
-  const { camera, invalidate, size } = useThree();
+  // `scene` is already this component's plant config, so the three.js one is
+  // taken under a name that cannot be confused with it.
+  const { camera, invalidate, size, scene: world } = useThree();
   const controls = useRef<any>(null);
   const goal = useRef<{ pos: THREE.Vector3; tgt: THREE.Vector3 } | null>(null);
   const settled = useRef(false);
@@ -908,7 +911,7 @@ function CameraRig({
     const box = new THREE.Box3();
     for (const c of scene.components) {
       const [fx, fz] = PLANT_MODELS[c.model].footprint;
-      const s = (c.scale / 100) * (scene.modelScale / 100);
+      const s = plantComponentScale(c.model, c.scale, scene.modelScale);
       const half = (Math.max(fx, fz) / 2) * s * 1.25;
       box.expandByPoint(new THREE.Vector3(c.x - half, 0, c.z - half));
       box.expandByPoint(new THREE.Vector3(c.x + half, PLANT_MODELS[c.model].height * s, c.z + half));
@@ -949,7 +952,7 @@ function CameraRig({
     const map = new Map<string, { center: THREE.Vector3; radius: number }>();
     for (const c of scene.components) {
       const model = PLANT_MODELS[c.model];
-      const s = (c.scale / 100) * (scene.modelScale / 100);
+      const s = plantComponentScale(c.model, c.scale, scene.modelScale);
       map.set(c.id, {
         center: new THREE.Vector3(c.x, model.height * s * 0.45, c.z),
         radius: Math.max(5, Math.max(model.footprint[0], model.footprint[1]) * s * 0.85),
@@ -1052,8 +1055,55 @@ function CameraRig({
     invalidate();
   }, [camera, command, focus.radius, focusId, goalFor, invalidate, viewMode]);
 
+  /**
+   * Fog and far plane, both measured from where the camera actually is.
+   *
+   * These used to be constants — fog 52 → 190 m, far plane 420 m — tuned for
+   * the one distance the camera sat at when they were written. Zooming out
+   * moved the yard straight through the fog band, so by the time the operator
+   * had the whole site in frame the site had dissolved into the page colour.
+   * The floor needs the fog (it is a 1.4 km slab that has to end by fading, not
+   * by stopping) but the buildings must never be inside it.
+   *
+   * So anchor both to the camera: the plant occupies roughly `d ± radius`, fog
+   * begins just past the middle of it and finishes well behind, and the far
+   * plane sits behind the fog's end — never in front, or it would cut a hard
+   * circle out of the floor that the fog was there to hide. Depth precision
+   * stays as good as it can be, because at the default framing this yields a
+   * closer far plane than the fixed 420 did.
+   */
+  const applyDepth = useCallback(() => {
+    const orbit = controls.current;
+    const centre: THREE.Vector3 = orbit ? orbit.target : focus.center;
+    const distance = camera.position.distanceTo(centre);
+    const radius = Math.max(8, focus.radius);
+
+    // A light haze on the far edge of the yard reads as depth; anything more
+    // reads as weather. The band is a fixed shape relative to the plant, so it
+    // looks the same at every zoom instead of swallowing the site at one end.
+    const near = distance + radius * 0.35;
+    const far = near + Math.max(160, radius * 4.2);
+
+    const fog = world.fog;
+    if (fog instanceof THREE.Fog && (fog.near !== near || fog.far !== far)) {
+      fog.near = near;
+      fog.far = far;
+    }
+
+    const perspective = camera as THREE.PerspectiveCamera;
+    const wanted = far + radius * 0.5 + 30;
+    // Retuned in steps, so a slow orbit does not rebuild the projection matrix
+    // every single frame for a fraction of a metre.
+    if (Math.abs(perspective.far - wanted) > 4) {
+      perspective.far = wanted;
+      perspective.updateProjectionMatrix();
+    }
+  }, [camera, focus.center, focus.radius, world]);
+
   useFrame(() => {
     let moving = false;
+
+    applyDepth();
 
     // --- ease the optical centre toward the visible middle
     const wanted = viewGoal.current;
@@ -1133,7 +1183,7 @@ function SceneContents(props: PlantScene3DCanvasProps) {
     let reach = 24;
     for (const component of scene.components) {
       const [w, d] = PLANT_MODELS[component.model].footprint;
-      const s = (component.scale / 100) * (scene.modelScale / 100);
+      const s = plantComponentScale(component.model, component.scale, scene.modelScale);
       reach = Math.max(reach, Math.hypot(component.x, component.z) + Math.max(w, d) * s);
     }
     return reach;
@@ -1167,6 +1217,9 @@ function SceneContents(props: PlantScene3DCanvasProps) {
       {/* Tinted to the console canvas token, not an approximation of it — a few
           hex values off and the floor ends in a visible seam against the page
           instead of dissolving into it. */}
+      {/* Only the colour is set here. The near/far distances are driven by the
+          camera rig every frame — a fixed band meant the yard zoomed out of
+          visibility — so these two numbers are just the starting state. */}
       <fog attach="fog" args={[dark ? '#08090C' : '#F6F6F4', 52, 190]} />
 
       {scene.showGrid ? <GroundPlane dark={dark} extent={plantExtent} /> : null}

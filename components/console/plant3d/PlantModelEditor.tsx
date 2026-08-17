@@ -27,6 +27,7 @@ import {
   countPartEdits,
   newComponentId,
   newConnectionId,
+  plantComponentScale,
   type PlantComponent3D,
   type PlantComponentStatus,
   type PlantConnectionKind,
@@ -349,9 +350,11 @@ export function PlantModelEditor({
     // power house (with its transformer bay) never lands inside its neighbour.
     const rightEdge = scene.components.reduce((max, c) => {
       const [fx] = PLANT_MODELS[c.model].footprint;
-      return Math.max(max, c.x + (fx / 2) * (c.scale / 100));
+      return Math.max(max, c.x + (fx / 2) * plantComponentScale(c.model, c.scale));
     }, 0);
-    const [nfx] = PLANT_MODELS[model].footprint;
+    const [nfx] = PLANT_MODELS[model].footprint.map(
+      (v) => v * plantComponentScale(model, 100),
+    );
     const component: PlantComponent3D = {
       id: newComponentId(),
       name: PLANT_MODELS[model].name,

@@ -43,6 +43,22 @@ export type PlantModelDef = {
   height: number;
   correction?: PlantModelCorrection;
   /**
+   * Uniform multiplier baked into the model before the component's own scale.
+   *
+   * The yard is drawn at 1 unit = 1 metre and its buildings are 5-6 m, which is
+   * true to life. A cement preheater is also true to life at 139.68 m — nearly
+   * thirty times the tallest shed on the site. Standing it at 1:1 does not read
+   * as a plant, it reads as a tower with some sheds at the bottom, and it drags
+   * the overview camera so far back that everything else becomes a speck.
+   *
+   * So the *map* is not to scale for this one model, and this is where that is
+   * admitted, once, instead of being hidden in a 9% component scale that every
+   * later reader would mistake for a mistake. `footprint` and `height` above
+   * stay honest about the real structure; everything that places or frames the
+   * component multiplies by this.
+   */
+  displayScale?: number;
+  /**
    * `false` keeps the asset out of the canvas's module-scope warm-up, so a
    * model heavy enough to be worth deferring is only fetched when a scene
    * actually places one.
@@ -89,12 +105,33 @@ export const PLANT_MODELS: Record<PlantModelKey, PlantModelDef> = {
       // base from 3.715 m onto y = 0.
       offset: [-28.309, -3.715, 16.4],
     },
+    // Drawn at a tenth of life size: ~14.0 m tall on a 2.6 x 3.9 m base, which
+    // puts it a little over twice the manufacturing hall — the tallest thing on
+    // the site and clearly the process landmark, but still a building among
+    // buildings rather than a skyscraper standing over a village. Raise this
+    // toward 1 if the yard is ever rebuilt at true plant scale.
+    displayScale: 0.1,
     // 6.5 MB of CAD. Fetched when a scene places one, not on canvas warm-up.
     preload: false,
   },
 };
 
 export const PLANT_MODEL_KEYS = Object.keys(PLANT_MODELS) as PlantModelKey[];
+
+/**
+ * The uniform multiplier a placed component is drawn at.
+ *
+ * Single source of truth for the three scales that compose — the component's
+ * own percentage, the scene-wide percentage, and the model's display scale — so
+ * placement, framing, the ground's reach and the editor all agree.
+ */
+export function plantComponentScale(
+  model: PlantModelKey,
+  componentScale: number,
+  modelScale = 100,
+): number {
+  return (componentScale / 100) * (modelScale / 100) * (PLANT_MODELS[model].displayScale ?? 1);
+}
 
 export const PLANT_PART_COLORS = [
   '#B7BCC3', '#6C7480', '#2B3038', '#4E5A66', '#8A9099',
@@ -261,24 +298,21 @@ export const DEFAULT_PLANT_SCENE_3D: PlantScene3DConfig = {
       parts: {},
     },
     {
-      // Pyroprocessing, set back behind the hall on its own ground: the tower is
-      // the tallest thing on the site by a wide margin and needs the clearance,
-      // and (-10, -30) keeps it off the gateway house and the power house.
+      // Pyroprocessing, set back behind the hall on its own ground: the tallest
+      // structure on the site wants the clearance, and (-16, -22) keeps it off
+      // the gateway house and out of the power house's run.
       //
-      // 30% rather than 100%. The registry carries the structure's true 139.68 m
-      // so framing and focus stay honest about what it is, but a real preheater
-      // standing full height next to 5 m sheds forces the overview camera back
-      // more than twice as far and turns the rest of the yard into specks. At
-      // 30% it reads as the landmark it should be — ~42 m, seven times the
-      // buildings — for a ~20% widening of the default frame. Raise this if the
-      // map is ever rebuilt to true plant scale.
+      // 100% like everything else — the model's own `displayScale` is what
+      // brings a 139.68 m tower down to yard scale, so this slider still means
+      // "bigger or smaller than this model normally is" the way it does for
+      // every other component.
       id: 'preheater',
       name: 'Preheater & Calciner',
       model: 'preheater-calciner',
-      x: -10,
-      z: -30,
+      x: -16,
+      z: -22,
       rotation: 0,
-      scale: 30,
+      scale: 100,
       status: 'auto',
       parts: {},
     },
