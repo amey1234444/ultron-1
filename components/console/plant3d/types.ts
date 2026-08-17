@@ -36,6 +36,18 @@ export type ProjectedAsset = {
 /** A node of the model tree, flattened for the editor's part list. */
 export type PartNode = { name: string; depth: number; kind: 'mesh' | 'group' | 'port' | 'anchor' };
 
+/**
+ * Which edges of the canvas are covered by chrome, in CSS px.
+ *
+ * The canvas is deliberately full-bleed — the 3D is the page's ground, not a
+ * card on it — so the analytics column, the chart strip and the rails all float
+ * *over* it. That means the middle of the canvas is not the middle of the map
+ * the operator can actually see, and anything that centres the plant has to
+ * work against this rectangle rather than the raw viewport: the label solver
+ * for where cards may land, and the camera for where the yard sits.
+ */
+export type PlantViewInsets = { top: number; right: number; bottom: number; left: number };
+
 /** Live facts painted onto a component's floating label. */
 export type PlantCalloutFacts = {
   status: string;
@@ -89,6 +101,12 @@ export type PlantScene3DCanvasProps = {
   cameraCommand?: PlantCameraCommand | null;
   /** Suppresses the floating labels while the dashboard is mid-transition. */
   labelsVisible?: boolean;
+  /**
+   * Chrome covering the canvas edges. The camera frames and centres the plant
+   * inside what is left, so the yard sits in the visible map area rather than
+   * behind the panels. Omitted (the editor) means the whole canvas is visible.
+   */
+  insets?: PlantViewInsets;
 
   /**
    * Where asset labels are drawn.

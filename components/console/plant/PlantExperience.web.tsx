@@ -553,6 +553,10 @@ export default function PlantExperience({
           cameraCommand={command}
           labelMode="projected"
           onProjectLabels={setProjected}
+          // The same rectangle the label solver uses. The camera centres and
+          // fits the yard inside it, so the plant sits in the map area the
+          // operator can see rather than half-under the floating panels.
+          insets={labelInsets}
         />
 
         <PlantLabelLayer

@@ -28,6 +28,7 @@ import type {
   PlantCameraCommand,
   PlantCameraMode,
   PlantScene3DCanvasProps,
+  PlantViewInsets,
 } from './types';
 
 export type {
@@ -36,7 +37,11 @@ export type {
   PlantCameraCommand,
   PlantCameraMode,
   PlantScene3DCanvasProps,
+  PlantViewInsets,
 } from './types';
+
+/** The editor renders the canvas bare, so the whole of it is the map. */
+const NO_INSETS: PlantViewInsets = { top: 0, right: 0, bottom: 0, left: 0 };
 
 // Runs sit on the floor between the raised plinths, so cables read as dropping
 // off a component and crossing the yard rather than floating through the slabs.
@@ -447,7 +452,22 @@ function PlacedComponent({
   onBoundsReady: (componentId: string, box: THREE.Box3) => void;
 }) {
   const groupRef = useRef<THREE.Group>(null);
-  const model = useModelInstance(PLANT_MODELS[component.model].url);
+  const definition = PLANT_MODELS[component.model];
+  const model = useModelInstance(definition.url);
+  const correction = definition.correction;
+  /**
+   * The correction as a matrix, for the things measured off the model rather
+   * than rendered through the scene graph — the plinth footprint and the label
+   * anchor are both read in model space and have to be moved with it.
+   */
+  const correctionMatrix = useMemo(() => {
+    if (!correction) return null;
+    return new THREE.Matrix4().compose(
+      new THREE.Vector3(...correction.offset),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(...correction.rotation)),
+      new THREE.Vector3(1, 1, 1),
+    );
+  }, [correction]);
   const overrideMaterials = useRef(new Map<string, THREE.MeshStandardMaterial>());
   const [labelPos, setLabelPos] = useState<[number, number, number]>([0, 5.6, 0]);
   const [hovered, setHovered] = useState(false);
@@ -462,8 +482,11 @@ function PlacedComponent({
     model.root.traverse((n) => {
       if (isMesh(n) && n.visible) box.expandByObject(n);
     });
-    return box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-4, 0, -3), new THREE.Vector3(4, 4, 3)) : box;
-  }, [model]);
+    if (box.isEmpty()) return new THREE.Box3(new THREE.Vector3(-4, 0, -3), new THREE.Vector3(4, 4, 3));
+    // Measured in model space, so it has to be corrected too or a CAD asset
+    // would sit on a plinth cut for its authored frame rather than its placed one.
+    return correctionMatrix ? box.applyMatrix4(correctionMatrix) : box;
+  }, [model, correctionMatrix]);
   // These effects mutate the scene graph directly; on a `demand` frameloop that
   // has to be paired with an explicit redraw request or the edit is invisible
   // until the next orbit.
@@ -563,9 +586,15 @@ function PlacedComponent({
     if (!bounds.isEmpty()) onBoundsReady(component.id, bounds);
 
     const anchor = model.root.getObjectByName('ANCHOR_LABEL');
-    if (anchor) setLabelPos([anchor.position.x, anchor.position.y, anchor.position.z]);
+    if (anchor) {
+      // The callout is a sibling of the correction group, so an anchor read in
+      // model space has to be brought into the corrected frame by hand.
+      const at = anchor.position.clone();
+      if (correctionMatrix) at.applyMatrix4(correctionMatrix);
+      setLabelPos([at.x, at.y, at.z]);
+    }
     invalidate();
-  }, [model, component.x, component.z, component.rotation, scale, onPortsReady, onBoundsReady, component.id, invalidate]);
+  }, [model, component.x, component.z, component.rotation, scale, onPortsReady, onBoundsReady, component.id, invalidate, correctionMatrix]);
 
   const handleClick = useCallback(
     (event: ThreeEvent<MouseEvent>) => {
@@ -642,7 +671,15 @@ function PlacedComponent({
         <ComponentPad box={footprint} active={active} dark={dark} glow={glow} wallTex={wallTex} />
         {/* the model stands ON the plinth */}
         <group position={[0, PLINTH_H, 0]}>
-          <primitive object={model.root} />
+          {/* Model-space correction, kept strictly separate from the placement
+              transform above: the outer group is where the map puts the
+              component, this one is only ever about the asset's own frame. */}
+          <group
+            rotation={correction ? correction.rotation : [0, 0, 0]}
+            position={correction ? correction.offset : [0, 0, 0]}
+          >
+            <primitive object={model.root} />
+          </group>
           {showLabel ? (
             <>
               {/* Leader line from the roofline up to the callout. The extra
@@ -781,11 +818,13 @@ function CameraRig({
   viewMode,
   focusId,
   command,
+  insets,
 }: {
   scene: PlantScene3DConfig;
   viewMode: PlantCameraMode;
   focusId: string | null;
   command?: PlantCameraCommand | null;
+  insets: PlantViewInsets;
 }) {
   const { camera, invalidate, size } = useThree();
   const controls = useRef<any>(null);
@@ -793,6 +832,75 @@ function CameraRig({
   const settled = useRef(false);
   /** Set the moment the operator grabs the camera; blocks automatic reframing. */
   const userMoved = useRef(false);
+
+  /**
+   * The visible map rectangle, and how far its centre is from the canvas centre.
+   *
+   * Each side is clamped to 40% so chrome wider than the canvas — a narrow
+   * viewport with the inspector open — can never collapse the usable area to
+   * nothing and send the framing distance to infinity.
+   */
+  const view = useMemo(() => {
+    const w = Math.max(1, size.width);
+    const h = Math.max(1, size.height);
+    const left = Math.max(0, Math.min(insets.left, w * 0.4));
+    const right = Math.max(0, Math.min(insets.right, w * 0.4));
+    const top = Math.max(0, Math.min(insets.top, h * 0.4));
+    const bottom = Math.max(0, Math.min(insets.bottom, h * 0.4));
+    const usableW = w - left - right;
+    const usableH = h - top - bottom;
+    return {
+      w,
+      h,
+      usableW,
+      usableH,
+      // Where the visible centre sits relative to the canvas centre, in px.
+      dx: left + usableW / 2 - w / 2,
+      dy: top + usableH / 2 - h / 2,
+    };
+  }, [insets, size.width, size.height]);
+
+  /** Eased so opening the inspector slides the yard clear instead of snapping. */
+  const viewGoal = useRef({ dx: 0, dy: 0 });
+  const viewApplied = useRef({ dx: 0, dy: 0 });
+  const viewSettled = useRef(false);
+  const lastSize = useRef({ w: 0, h: 0 });
+
+  /**
+   * Slides the frustum so the camera's target lands on the visible centre.
+   *
+   * `setViewOffset` windows a sub-rectangle out of a larger virtual image;
+   * asking for a window the same size as the canvas but shifted by `-d` moves
+   * the rendered content by `+d` without touching the camera's position, its
+   * target or the projection's scale. The projection matrix carries the shift,
+   * so the label projector and raycasting follow it for free.
+   */
+  const applyViewOffset = useCallback(
+    (dx: number, dy: number) => {
+      const perspective = camera as THREE.PerspectiveCamera;
+      if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) {
+        if (perspective.view?.enabled) perspective.clearViewOffset();
+        return;
+      }
+      // Both of these call updateProjectionMatrix themselves.
+      perspective.setViewOffset(view.w, view.h, -dx, -dy, view.w, view.h);
+    },
+    [camera, view.w, view.h],
+  );
+
+  useEffect(() => {
+    viewGoal.current = { dx: view.dx, dy: view.dy };
+    // A resize is already an animation of the whole layer, and the offset is
+    // measured in the size that just changed, so track it rather than chase it.
+    const resized = lastSize.current.w !== view.w || lastSize.current.h !== view.h;
+    lastSize.current = { w: view.w, h: view.h };
+    if (!viewSettled.current || resized) {
+      viewSettled.current = true;
+      viewApplied.current = { dx: view.dx, dy: view.dy };
+      applyViewOffset(view.dx, view.dy);
+    }
+    invalidate();
+  }, [view, applyViewOffset, invalidate]);
 
   /** Extent of the whole yard. Drives the default framing and the zoom limits. */
   const focus = useMemo(() => {
@@ -823,12 +931,17 @@ function CameraRig({
     (radius: number, fill: number) => {
       const perspective = camera as THREE.PerspectiveCamera;
       const vertical = THREE.MathUtils.degToRad(perspective.fov || 42);
-      const aspect = perspective.aspect || (size.width || 16) / (size.height || 9);
-      const horizontal = 2 * Math.atan(Math.tan(vertical / 2) * aspect);
-      const limiting = Math.min(vertical, horizontal);
+      const aspect = perspective.aspect || view.w / view.h;
+      const tan = Math.tan(vertical / 2);
+      // Against the *visible* rectangle, not the canvas. The floating panels
+      // cover roughly a fifth of the frame; fitting the yard to the full canvas
+      // is what let it spill under the analytics column and the chart strip.
+      const visibleV = 2 * Math.atan(tan * (view.usableH / view.h));
+      const visibleH = 2 * Math.atan(tan * aspect * (view.usableW / view.w));
+      const limiting = Math.min(visibleV, visibleH);
       return (radius / Math.max(0.08, Math.sin(limiting / 2))) * fill;
     },
-    [camera, size.height, size.width],
+    [camera, view.h, view.w, view.usableH, view.usableW],
   );
 
   /** Where each component sits, and how close is close enough to inspect it. */
@@ -940,21 +1053,41 @@ function CameraRig({
   }, [camera, command, focus.radius, focusId, goalFor, invalidate, viewMode]);
 
   useFrame(() => {
+    let moving = false;
+
+    // --- ease the optical centre toward the visible middle
+    const wanted = viewGoal.current;
+    const applied = viewApplied.current;
+    if (Math.abs(applied.dx - wanted.dx) > 0.25 || Math.abs(applied.dy - wanted.dy) > 0.25) {
+      applied.dx += (wanted.dx - applied.dx) * 0.14;
+      applied.dy += (wanted.dy - applied.dy) * 0.14;
+      applyViewOffset(applied.dx, applied.dy);
+      moving = true;
+    } else if (applied.dx !== wanted.dx || applied.dy !== wanted.dy) {
+      applied.dx = wanted.dx;
+      applied.dy = wanted.dy;
+      applyViewOffset(applied.dx, applied.dy);
+    }
+
+    // --- ease the camera toward its goal
     const target = goal.current;
     const orbit = controls.current;
-    if (!target || !orbit) return;
-    camera.position.lerp(target.pos, 0.085);
-    orbit.target.lerp(target.tgt, 0.085);
-    orbit.update();
-    if (camera.position.distanceTo(target.pos) < 0.06 && orbit.target.distanceTo(target.tgt) < 0.04) {
-      camera.position.copy(target.pos);
-      orbit.target.copy(target.tgt);
+    if (target && orbit) {
+      moving = true;
+      camera.position.lerp(target.pos, 0.085);
+      orbit.target.lerp(target.tgt, 0.085);
       orbit.update();
-      goal.current = null;
+      if (camera.position.distanceTo(target.pos) < 0.06 && orbit.target.distanceTo(target.tgt) < 0.04) {
+        camera.position.copy(target.pos);
+        orbit.target.copy(target.tgt);
+        orbit.update();
+        goal.current = null;
+      }
     }
+
     // `frameloop="demand"` only renders when asked, so an in-flight move has to
     // request its own next frame. Dropping the goal stops the loop dead.
-    invalidate();
+    if (moving) invalidate();
   });
 
   return (
@@ -980,7 +1113,7 @@ function SceneContents(props: PlantScene3DCanvasProps) {
   const {
     scene, statusColors, dark, editable = false, selectedComponentId, selectedPart,
     viewMode = 'overview', onHoverComponent, onBackgroundClick, cameraCommand, labelsVisible = true,
-    labelMode = 'html', onProjectLabels,
+    labelMode = 'html', onProjectLabels, insets = NO_INSETS,
   } = props;
   const portsRef = useRef<PortMap>(new Map());
   const [portVersion, setPortVersion] = useState(0);
@@ -1089,6 +1222,7 @@ function SceneContents(props: PlantScene3DCanvasProps) {
         viewMode={viewMode}
         focusId={editable ? null : selectedComponentId ?? null}
         command={cameraCommand}
+        insets={insets}
       />
     </>
   );
@@ -1116,4 +1250,10 @@ export default function PlantScene3DCanvas(props: PlantScene3DCanvasProps) {
   );
 }
 
-for (const model of Object.values(PLANT_MODELS)) useGLTF.preload(model.url);
+// Warm the loader cache for the light models. This module is itself lazily
+// imported the first time the plant map mounts, so nothing here runs on the
+// landing page — but a model big enough to opt out of the warm-up waits until a
+// scene actually places one, and arrives through the Suspense boundary instead.
+for (const model of Object.values(PLANT_MODELS)) {
+  if (model.preload !== false) useGLTF.preload(model.url);
+}

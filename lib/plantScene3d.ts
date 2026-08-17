@@ -9,20 +9,56 @@
 // camera. The Blender master is authored Z-up and converted on export, so the
 // component origin is the centre of the building footprint at ground level and a
 // component placed at (0, 0) sits flat on the ground plane.
+//
+// Models that cannot be re-authored to that convention — CAD exported straight
+// out of Onshape — declare a `correction` instead, and the renderer applies it
+// between the placement transform and the geometry.
 
-export type PlantModelKey = 'utility-building' | 'power-house';
+export type PlantModelKey = 'utility-building' | 'power-house' | 'preheater-calciner';
+
+/**
+ * Local correction from a model's authored frame into the map's frame.
+ *
+ * The hand-authored models are exported to the map's convention already and
+ * need none of this. CAD is different: Onshape writes Z-up, and its origin is
+ * wherever the part studio's origin happened to be, not the centre of the
+ * footprint at ground level. Rather than re-cutting vertices — which would have
+ * to be redone on every re-export — the renderer wraps the model in one
+ * correction group, and the numbers that describe it live here.
+ *
+ * `rotation` is applied first, `offset` second, so the offset is expressed in
+ * the already-uprighted frame.
+ */
+export type PlantModelCorrection = {
+  /** Euler XYZ in radians. */
+  rotation: [number, number, number];
+  /** Metres, in the post-rotation frame. */
+  offset: [number, number, number];
+};
+
+export type PlantModelDef = {
+  name: string;
+  url: string;
+  footprint: [number, number];
+  height: number;
+  correction?: PlantModelCorrection;
+  /**
+   * `false` keeps the asset out of the canvas's module-scope warm-up, so a
+   * model heavy enough to be worth deferring is only fetched when a scene
+   * actually places one.
+   */
+  preload?: boolean;
+};
 
 /**
  * Registry of every component model the plant editor can place.
  *
- * `footprint` / `height` are the model's *overall* extents (including anything
- * that sits outside the building itself, such as the power house transformer
- * bay), because the only thing they drive is camera framing.
+ * `footprint` / `height` are the model's *overall* extents in metres, measured
+ * after `correction` (including anything that sits outside the building itself,
+ * such as the power house transformer bay), because the only thing they drive
+ * is camera framing.
  */
-export const PLANT_MODELS: Record<
-  PlantModelKey,
-  { name: string; url: string; footprint: [number, number]; height: number }
-> = {
+export const PLANT_MODELS: Record<PlantModelKey, PlantModelDef> = {
   'utility-building': {
     name: 'Industrial Utility Building',
     url: '/models/plant/utility-building.glb',
@@ -34,6 +70,27 @@ export const PLANT_MODELS: Record<
     url: '/models/plant/power-house.glb',
     footprint: [15.3, 9.3],
     height: 5.91,
+  },
+  'preheater-calciner': {
+    name: 'Preheater & Calciner',
+    url: '/models/plant/preheater-calciner.glb',
+    // Measured from the asset: 26.38 x 39.20 m on the ground, 139.68 m tall.
+    // That is the real structure at 1:1 — a preheater tower dwarfs every shed
+    // in the yard, which is why the placement below carries a scale well under
+    // 100% rather than the registry lying about the model's size.
+    footprint: [26.38, 39.2],
+    height: 139.68,
+    correction: {
+      // Onshape exports Z-up; -90° about X stands the tower on the XZ plane.
+      rotation: [-Math.PI / 2, 0, 0],
+      // Source bounds are X[15.118, 41.500] Y[-3.200, 36.000] Z[3.715, 143.393].
+      // After the rotation that is X[15.118, 41.500] Y[3.715, 143.393]
+      // Z[-36.000, 3.200]; this recentres X/Z on the footprint and drops the
+      // base from 3.715 m onto y = 0.
+      offset: [-28.309, -3.715, 16.4],
+    },
+    // 6.5 MB of CAD. Fetched when a scene places one, not on canvas warm-up.
+    preload: false,
   },
 };
 
@@ -200,6 +257,28 @@ export const DEFAULT_PLANT_SCENE_3D: PlantScene3DConfig = {
       z: 17,
       rotation: 90,
       scale: 78,
+      status: 'auto',
+      parts: {},
+    },
+    {
+      // Pyroprocessing, set back behind the hall on its own ground: the tower is
+      // the tallest thing on the site by a wide margin and needs the clearance,
+      // and (-10, -30) keeps it off the gateway house and the power house.
+      //
+      // 30% rather than 100%. The registry carries the structure's true 139.68 m
+      // so framing and focus stay honest about what it is, but a real preheater
+      // standing full height next to 5 m sheds forces the overview camera back
+      // more than twice as far and turns the rest of the yard into specks. At
+      // 30% it reads as the landmark it should be — ~42 m, seven times the
+      // buildings — for a ~20% widening of the default frame. Raise this if the
+      // map is ever rebuilt to true plant scale.
+      id: 'preheater',
+      name: 'Preheater & Calciner',
+      model: 'preheater-calciner',
+      x: -10,
+      z: -30,
+      rotation: 0,
+      scale: 30,
       status: 'auto',
       parts: {},
     },
