@@ -159,86 +159,42 @@ export function PlantAnalyticsPanel({
           </View>
         </PanelSection>
 
-        {/* --- 2. SCORE DRIVERS --- */}
-        <PanelSection title="Score Drivers" palette={palette}>
-          <View style={{ gap: STEP * 2 }}>
-            {performance.map((factor) => {
-              const tone =
-                factor.value >= 85
-                  ? palette.accent
-                  : factor.value >= 60
-                  ? palette.warning
-                  : palette.critical;
-              return (
-                <View key={factor.label} style={{ gap: 5 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <MicroLabel palette={palette} size={10}>
-                      {factor.label}
-                    </MicroLabel>
-                    <Text className="font-mono tabular-nums" style={{ fontSize: 12, fontWeight: '600', color: palette.ink }}>
-                      {factor.value}%
-                    </Text>
-                  </View>
-                  {/* Smooth track line instrument */}
-                  <View
-                    style={{
-                      height: 5,
-                      borderRadius: 3,
-                      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    <View
-                      style={{
-                        height: '100%',
-                        width: `${factor.value}%`,
-                        backgroundColor: tone,
-                        borderRadius: 3,
-                      }}
-                    />
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        </PanelSection>
-
-        {/* --- 3. ASSET HEALTH DISTRIBUTION --- */}
+        {/* --- 2. ASSET HEALTH DISTRIBUTION --- */}
         <PanelSection title="Asset Health Distribution" palette={palette}>
           <View style={{ gap: STEP * 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9, color: palette.critical, fontWeight: '700' }}>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.critical, fontWeight: '700' }}>
                   CRITICAL
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 16, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
                   {criticalCount}
                 </Text>
               </View>
 
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9, color: palette.warning, fontWeight: '700' }}>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.warning, fontWeight: '700' }}>
                   AT RISK
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 16, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
                   {atRiskCount}
                 </Text>
               </View>
 
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9, color: palette.neutral, fontWeight: '700' }}>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.neutral, fontWeight: '700' }}>
                   NEUTRAL
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 16, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
                   {neutralCount}
                 </Text>
               </View>
 
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9, color: palette.accent, fontWeight: '700' }}>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.accent, fontWeight: '700' }}>
                   HEALTHY
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.accent, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 16, fontWeight: '700', color: palette.accent, marginTop: 2 }}>
                   {healthyCount}
                 </Text>
               </View>
@@ -254,25 +210,41 @@ export function PlantAnalyticsPanel({
           </View>
         </PanelSection>
 
-        {/* --- 4. THROUGHPUT (PACKETS / S) --- */}
-        <PanelSection title="Throughput (Packets / s)" palette={palette}>
-          <View style={{ gap: STEP * 1.5 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                <Text className="font-display tabular-nums" style={{ fontSize: 26, fontWeight: '700', color: palette.ink }}>
+        {/* --- 3. EXPANDED TELEMETRY THROUGHPUT (PACKETS / S) --- */}
+        <PanelSection title="Throughput Telemetry Pipeline" palette={palette}>
+          <View style={{ gap: STEP * 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+                <Text className="font-display tabular-nums" style={{ fontSize: 32, fontWeight: '700', color: palette.ink }}>
                   {throughputCurrent.toFixed(1)}
                 </Text>
-                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted }}>
+                <Text className="font-mono" style={{ fontSize: 11, color: palette.inkMuted, fontWeight: '600' }}>
                   pkt/s
                 </Text>
               </View>
-              <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
-                03:22 PM
-              </Text>
+
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 5,
+                  paddingHorizontal: 8,
+                  paddingVertical: 3,
+                  borderRadius: 999,
+                  backgroundColor: palette.accentSoft,
+                  borderWidth: 1,
+                  borderColor: 'rgba(16, 185, 129, 0.25)',
+                }}
+              >
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.accent }} />
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.accent, fontWeight: '700' }}>
+                  MQTT STREAM
+                </Text>
+              </View>
             </View>
 
             {/* Gigaton Impulse Chart */}
-            <View style={{ height: 85, marginTop: 4 }}>
+            <View style={{ height: 110, marginTop: 2 }}>
               <Measured>
                 {({ width, height }) => (
                   <ImpulseChart
@@ -287,39 +259,56 @@ export function PlantAnalyticsPanel({
               </Measured>
             </View>
 
-            {/* Integrated Statistical Rail Footer */}
+            {/* In-Depth Statistical Grid */}
             <View
               style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                paddingTop: STEP * 1.5,
-                borderTopWidth: 1,
-                borderTopColor: palette.line,
+                borderRadius: 8,
+                padding: STEP * 2,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                borderWidth: 1,
+                borderColor: palette.line,
+                gap: STEP * 1.5,
               }}
             >
-              <View>
-                <MicroLabel palette={palette} size={8.5}>
-                  AVERAGE
-                </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1, fontWeight: '600' }}>
-                  2.8 pkt/s
-                </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                <View>
+                  <MicroLabel palette={palette} size={9.5}>
+                    AVERAGE RATE
+                  </MicroLabel>
+                  <Text className="font-mono tabular-nums" style={{ fontSize: 12, color: palette.ink, marginTop: 2, fontWeight: '600' }}>
+                    2.8 pkt/s
+                  </Text>
+                </View>
+
+                <View>
+                  <MicroLabel palette={palette} size={9.5}>
+                    PEAK RATE
+                  </MicroLabel>
+                  <Text className="font-mono tabular-nums" style={{ fontSize: 12, color: palette.accent, marginTop: 2, fontWeight: '700' }}>
+                    6.6 pkt/s
+                  </Text>
+                </View>
+
+                <View style={{ alignItems: 'flex-end' }}>
+                  <MicroLabel palette={palette} size={9.5}>
+                    RELIABILITY
+                  </MicroLabel>
+                  <Text className="font-mono tabular-nums" style={{ fontSize: 12, color: palette.accent, marginTop: 2, fontWeight: '700' }}>
+                    99.9%
+                  </Text>
+                </View>
               </View>
 
-              <View>
-                <MicroLabel palette={palette} size={8.5}>
-                  MAXIMUM
-                </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1, fontWeight: '600' }}>
-                  6.6 pkt/s
-                </Text>
-              </View>
+              <View style={{ height: 1, backgroundColor: palette.line }} />
 
-              <View>
-                <MicroLabel palette={palette} size={8.5}>
-                  LAST UPDATE
-                </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1, fontWeight: '600' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
+                  LATENCY: 14ms
+                </Text>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
+                  PACKET LOSS: 0%
+                </Text>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted, fontWeight: '600' }}>
                   03:44 PM
                 </Text>
               </View>

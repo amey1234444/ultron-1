@@ -696,6 +696,18 @@ function TrendChart({
   const gridRatios = [0, 0.25, 0.5, 0.75, 1];
   const gradId = `trendGrad_${color.replace('#', '')}`;
 
+  // Find Maxima & Minima points in measured series
+  let maxIdx = 0;
+  let minIdx = 0;
+  series.forEach((val, i) => {
+    if (val > series[maxIdx]) maxIdx = i;
+    if (val < series[minIdx]) minIdx = i;
+  });
+  const maxPt = points[maxIdx];
+  const minPt = points[minIdx];
+  const maxVal = series[maxIdx];
+  const minVal = series[minIdx];
+
   return (
     <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
       <Defs>
@@ -768,6 +780,30 @@ function TrendChart({
       {projectedD ? (
         <Path d={projectedD} fill="none" stroke={SERIES_B} strokeWidth={1.6} strokeDasharray="3 3" opacity={0.8} />
       ) : null}
+
+      {/* Maxima Callout Badge */}
+      {maxPt && (
+        <G key="max-callout">
+          <Circle cx={maxPt.x} cy={maxPt.y} r={4.5} fill={color} />
+          <Circle cx={maxPt.x} cy={maxPt.y} r={8} stroke={color} strokeWidth={1} fill="none" opacity={0.4} />
+          <Rect x={maxPt.x - 24} y={maxPt.y - 20} width={48} height={16} rx={4} fill={color} opacity={0.92} />
+          <SvgText x={maxPt.x} y={maxPt.y - 9} fontSize={8.5} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
+            MAX {maxVal?.toFixed(1)}
+          </SvgText>
+        </G>
+      )}
+
+      {/* Minima Callout Badge */}
+      {minPt && maxIdx !== minIdx && (
+        <G key="min-callout">
+          <Circle cx={minPt.x} cy={minPt.y} r={4.5} fill={palette.critical} />
+          <Circle cx={minPt.x} cy={minPt.y} r={8} stroke={palette.critical} strokeWidth={1} fill="none" opacity={0.4} />
+          <Rect x={minPt.x - 24} y={minPt.y + 6} width={48} height={16} rx={4} fill={palette.critical} opacity={0.92} />
+          <SvgText x={minPt.x} y={minPt.y + 17} fontSize={8.5} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
+            MIN {minVal?.toFixed(1)}
+          </SvgText>
+        </G>
+      )}
 
       {/* NOW Reference Line */}
       {project ? (

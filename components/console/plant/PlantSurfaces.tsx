@@ -64,7 +64,7 @@ export function MicroLabel({
   children,
   palette,
   color,
-  size = 10,
+  size = 11,
 }: {
   children: ReactNode;
   palette: ConsolePalette;
@@ -77,7 +77,7 @@ export function MicroLabel({
       className="font-mono"
       style={{
         fontSize: size,
-        letterSpacing: size * 0.16,
+        letterSpacing: size * 0.14,
         textTransform: 'uppercase',
         color: color ?? palette.inkFaint,
       }}

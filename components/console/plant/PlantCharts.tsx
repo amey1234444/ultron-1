@@ -544,6 +544,16 @@ export function HealthEnvelopeChart({
   const latestPt = points[points.length - 1] ?? { x: padLeft + plotW, y: scaleY(latestVal, minVal, maxVal, padTop, plotH) };
   const latestTone = latestVal >= target ? palette.accent : latestVal >= critical ? palette.warning : palette.critical;
 
+  // Maxima & Minima points
+  let maxIdx = 0;
+  let minIdx = 0;
+  values.forEach((val, i) => {
+    if (val > values[maxIdx]) maxIdx = i;
+    if (val < values[minIdx]) minIdx = i;
+  });
+  const maxPt = points[maxIdx];
+  const minPt = points[minIdx];
+
   return (
     <Svg width={width} height={height}>
       <Defs>
@@ -588,6 +598,28 @@ export function HealthEnvelopeChart({
 
       {/* Health Trajectory Spline */}
       <Path d={pathD} fill="none" stroke={palette.accent} strokeWidth={2} />
+
+      {/* Maxima Callout */}
+      {maxPt && (
+        <G key="env-max">
+          <Circle cx={maxPt.x} cy={maxPt.y} r={4} fill={palette.accent} />
+          <Rect x={maxPt.x - 22} y={maxPt.y - 18} width={44} height={14} rx={3} fill={palette.accent} opacity={0.9} />
+          <SvgText x={maxPt.x} y={maxPt.y - 8} fontSize={8} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
+            MAX {values[maxIdx]}
+          </SvgText>
+        </G>
+      )}
+
+      {/* Minima Callout */}
+      {minPt && maxIdx !== minIdx && (
+        <G key="env-min">
+          <Circle cx={minPt.x} cy={minPt.y} r={4} fill={palette.critical} />
+          <Rect x={minPt.x - 22} y={minPt.y + 4} width={44} height={14} rx={3} fill={palette.critical} opacity={0.9} />
+          <SvgText x={minPt.x} y={minPt.y + 14} fontSize={8} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
+            MIN {values[minIdx]}
+          </SvgText>
+        </G>
+      )}
 
       {/* Current Endpoint Marker */}
       <Circle cx={latestPt.x} cy={latestPt.y} r={4.5} fill={latestTone} />
