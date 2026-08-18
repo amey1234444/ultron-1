@@ -12,7 +12,7 @@
  */
 import { useCallback, useState, type ReactNode } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
-import Svg, { Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 
@@ -385,3 +385,261 @@ export function SeverityBars({
     </Svg>
   );
 }
+
+// ---------------------------------------------------------------------------
+// Gigaton-inspired Impulse Chart — Throughput Packets/s
+// ---------------------------------------------------------------------------
+
+export function ImpulseChart({
+  values,
+  xLabels = [],
+  width,
+  height,
+  palette,
+  color,
+}: {
+  values: number[];
+  xLabels?: string[];
+  width: number;
+  height: number;
+  palette: ConsolePalette;
+  color?: string;
+}) {
+  if (values.length === 0) return null;
+  const padLeft = 20;
+  const padBottom = 16;
+  const padTop = 6;
+  const padRight = 6;
+  const plotW = Math.max(1, width - padLeft - padRight);
+  const plotH = Math.max(1, height - padBottom - padTop);
+
+  const maxVal = Math.max(1, ...values) * 1.15;
+  const ticks = niceTicks(0, maxVal, 3);
+  const barColor = color ?? palette.accent;
+
+  const barCount = values.length;
+  const slotW = plotW / Math.max(1, barCount);
+  const barW = Math.max(1.5, Math.min(4, slotW * 0.55));
+
+  return (
+    <Svg width={width} height={height}>
+      {/* Horizontal Grid */}
+      {ticks.map((tick) => {
+        const y = scaleY(tick, 0, maxVal, padTop, plotH);
+        return (
+          <G key={tick}>
+            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <SvgText x={padLeft - 4} y={y + 3} fontSize={8.5} fill={palette.inkFaint} textAnchor="end">
+              {formatTick(tick)}
+            </SvgText>
+          </G>
+        );
+      })}
+
+      {/* Impulse Bars */}
+      {values.map((val, idx) => {
+        const cx = padLeft + idx * slotW + slotW / 2;
+        const h = Math.max(val > 0 ? 2 : 0, (val / maxVal) * plotH);
+        const y = padTop + plotH - h;
+        const isPeak = val === Math.max(...values);
+
+        return (
+          <G key={idx}>
+            <Rect
+              x={cx - barW / 2}
+              y={y}
+              width={barW}
+              height={h}
+              fill={barColor}
+              opacity={isPeak ? 1 : val > 0 ? 0.75 : 0.25}
+              rx={1}
+            />
+            {isPeak && (
+              <Circle cx={cx} cy={y - 2} r={1.5} fill={barColor} />
+            )}
+          </G>
+        );
+      })}
+
+      {/* X Labels */}
+      {xLabels.map((lbl, idx) => {
+        const xPos = padLeft + (idx / Math.max(1, xLabels.length - 1)) * plotW;
+        return (
+          <SvgText
+            key={lbl + idx}
+            x={xPos}
+            y={height - 2}
+            fontSize={8.5}
+            fill={palette.inkFaint}
+            textAnchor={idx === 0 ? 'start' : idx === xLabels.length - 1 ? 'end' : 'middle'}
+          >
+            {lbl}
+          </SvgText>
+        );
+      })}
+    </Svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Operational Health Timeline — Target / Critical Envelope Chart
+// ---------------------------------------------------------------------------
+
+export function HealthEnvelopeChart({
+  values,
+  xLabels = [],
+  width,
+  height,
+  palette,
+  target = 90,
+  critical = 60,
+  currentVal,
+}: {
+  values: number[];
+  xLabels?: string[];
+  width: number;
+  height: number;
+  palette: ConsolePalette;
+  target?: number;
+  critical?: number;
+  currentVal?: number;
+}) {
+  if (values.length === 0) return null;
+  const padLeft = 24;
+  const padRight = 68;
+  const padBottom = 16;
+  const padTop = 10;
+  const plotW = Math.max(1, width - padLeft - padRight);
+  const plotH = Math.max(1, height - padBottom - padTop);
+
+  const minVal = 0;
+  const maxVal = 100;
+
+  const points = values.map((v, i) => ({
+    x: padLeft + (i / Math.max(1, values.length - 1)) * plotW,
+    y: scaleY(v, minVal, maxVal, padTop, plotH),
+  }));
+
+  const pathD = spline(points);
+  const targetY = scaleY(target, minVal, maxVal, padTop, plotH);
+  const criticalY = scaleY(critical, minVal, maxVal, padTop, plotH);
+
+  const latestVal = currentVal ?? values[values.length - 1] ?? 76;
+  const latestPt = points[points.length - 1] ?? { x: padLeft + plotW, y: scaleY(latestVal, minVal, maxVal, padTop, plotH) };
+  const latestTone = latestVal >= target ? palette.accent : latestVal >= critical ? palette.warning : palette.critical;
+
+  return (
+    <Svg width={width} height={height}>
+      <Defs>
+        <LinearGradient id="healthGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={palette.accent} stopOpacity={0.15} />
+          <Stop offset="100%" stopColor={palette.accent} stopOpacity={0.0} />
+        </LinearGradient>
+      </Defs>
+
+      {/* Target Reference Line */}
+      <Line
+        x1={padLeft}
+        y1={targetY}
+        x2={padLeft + plotW + 10}
+        y2={targetY}
+        stroke={palette.accent}
+        strokeWidth={1}
+        strokeDasharray="4 4"
+        opacity={0.6}
+      />
+      <SvgText x={padLeft + plotW + 14} y={targetY + 3.5} fontSize={9} fill={palette.accent} fontWeight="600">
+        Target {target}
+      </SvgText>
+
+      {/* Critical Reference Line */}
+      <Line
+        x1={padLeft}
+        y1={criticalY}
+        x2={padLeft + plotW + 10}
+        y2={criticalY}
+        stroke={palette.critical}
+        strokeWidth={1}
+        strokeDasharray="4 4"
+        opacity={0.6}
+      />
+      <SvgText x={padLeft + plotW + 14} y={criticalY + 3.5} fontSize={9} fill={palette.critical} fontWeight="600">
+        Critical {critical}
+      </SvgText>
+
+      {/* Health Trajectory Spline */}
+      <Path d={pathD} fill="none" stroke={palette.accent} strokeWidth={2} />
+
+      {/* Current Endpoint Marker */}
+      <Circle cx={latestPt.x} cy={latestPt.y} r={4} fill={latestTone} />
+      <Circle cx={latestPt.x} cy={latestPt.y} r={7} stroke={latestTone} strokeWidth={1} fill="none" opacity={0.5} />
+      <SvgText x={latestPt.x + 10} y={latestPt.y + 3.5} fontSize={10} fill={palette.ink} fontWeight="700">
+        {latestVal}
+      </SvgText>
+
+      {/* Y Axis Grid/Ticks */}
+      {[0, 25, 50, 75, 100].map((t) => {
+        const y = scaleY(t, minVal, maxVal, padTop, plotH);
+        return (
+          <G key={t}>
+            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={0.5} />
+            <SvgText x={padLeft - 4} y={y + 3} fontSize={8.5} fill={palette.inkFaint} textAnchor="end">
+              {t}
+            </SvgText>
+          </G>
+        );
+      })}
+
+      {/* X Labels */}
+      {xLabels.map((lbl, idx) => {
+        const xPos = padLeft + (idx / Math.max(1, xLabels.length - 1)) * plotW;
+        return (
+          <SvgText
+            key={lbl + idx}
+            x={xPos}
+            y={height - 2}
+            fontSize={8.5}
+            fill={palette.inkFaint}
+            textAnchor={idx === 0 ? 'start' : idx === xLabels.length - 1 ? 'end' : 'middle'}
+          >
+            {lbl}
+          </SvgText>
+        );
+      })}
+    </Svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Micro Sparkline — compact SVG trend line for HUD & priority rows
+// ---------------------------------------------------------------------------
+
+export function MicroSparkline({
+  values,
+  width = 48,
+  height = 14,
+  color = '#3FBF6A',
+}: {
+  values: number[];
+  width?: number;
+  height?: number;
+  color?: string;
+}) {
+  if (!values || values.length < 2) return null;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const span = max - min || 1;
+
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * width;
+    const y = height - 2 - ((v - min) / span) * (height - 4);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  return (
+    <Svg width={width} height={height} style={{ overflow: 'visible' }}>
+      <Path d={`M${points.join(' L')}`} fill="none" stroke={color} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+

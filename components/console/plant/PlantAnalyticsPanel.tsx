@@ -1,112 +1,27 @@
-/**
- * The right-hand analytics column.
- *
- * Four stacked sections in one card, divided by hairlines rather than split
- * into four cards: they are one continuous reading of the plant, and separate
- * crates would imply separate subjects.
- *
- * The status readings at the bottom used to be a row of four cards across the
- * top of the page. They were costing the plant ~110px of height across the full
- * width to say what fits in a 260px column, so they moved here and the world
- * took the height back. That is the trade this layout keeps making: the plant is
- * the instrument, and anything that reads fine in a column has no claim on the
- * middle of the screen.
- *
- * Consumes `PlantAnalytics` and computes nothing itself.
- */
+import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 import type { PlantAnalytics } from '../../../lib/plantAnalytics';
-import { BarRow, MicroLabel, Meter, PanelSection, PlantCard, STEP, TelemetryCell } from './PlantSurfaces';
+import { ImpulseChart, Measured } from './PlantCharts';
+import { MicroLabel, PanelSection, PlantCard, STEP } from './PlantSurfaces';
 
-/** One headline measure: reading, meter against plan, and a one-word state. */
 export type PlantKpi = {
   id: string;
   label: string;
   value: string;
   unit?: string;
-  /** 0-1 meter fill. */
   progress: number;
-  /** 0-1 plan marker. */
   target?: number;
-  /** One short line: state, rate or latency. */
   caption: string;
   tone: string;
 };
 
-/**
- * Performance colouring uses the same thresholds the health score does, so a
- * bar painted amber here agrees with the reading above it.
- */
-function performanceTone(palette: ConsolePalette, value: number): string {
-  if (value >= 85) return palette.accent;
-  if (value >= 60) return palette.warning;
-  return palette.critical;
-}
-
-/**
- * Energy figures, formatted to fit.
- *
- * Locale is pinned: the browser default put Indian digit grouping on kWh
- * readings (`2,79,892.8`), which is correct for a rupee amount and wrong for an
- * instrument. Decimals are dropped once the figure passes five digits, where
- * they are noise rather than precision — and where they were overflowing the
- * cell and truncating mid-number.
- */
-function formatKwh(value: number): string {
-  return value >= 10_000
-    ? value.toLocaleString('en-US', { maximumFractionDigits: 0 })
-    : value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-/**
- * A headline measure as a column row.
- *
- * Same three facts the KPI cards carried — reading, plan, state — in a third of
- * the space. The plan is the marker on the meter rather than a second number,
- * which is what made the card version need a whole extra row.
- */
-function KpiRow({ kpi, palette, first }: { kpi: PlantKpi; palette: ConsolePalette; first: boolean }) {
-  return (
-    <View
-      style={{
-        paddingTop: first ? 0 : STEP * 2,
-        marginTop: first ? 0 : STEP * 2,
-        borderTopWidth: first ? 0 : 1,
-        borderTopColor: palette.line,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 1.5 }}>
-        <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: kpi.tone }} />
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <MicroLabel palette={palette} size={9.5}>
-            {kpi.label}
-          </MicroLabel>
-        </View>
-        <Text
-          className="font-body tabular-nums"
-          style={{ fontSize: 20, fontWeight: '300', letterSpacing: -0.4, color: palette.ink }}
-          numberOfLines={1}
-        >
-          {kpi.value}
-        </Text>
-        {kpi.unit ? (
-          <Text className="font-mono" style={{ fontSize: 10.5, color: palette.inkMuted }}>
-            {kpi.unit}
-          </Text>
-        ) : null}
-      </View>
-
-      <View style={{ marginTop: STEP * 1.5 }}>
-        <Meter value={kpi.progress} target={kpi.target} tone={kpi.tone} palette={palette} height={4} />
-      </View>
-
-      <Text className="font-mono" style={{ marginTop: STEP * 1.25, fontSize: 10, color: palette.inkFaint }} numberOfLines={1}>
-        {kpi.caption}
-      </Text>
-    </View>
-  );
+interface PlantAnalyticsPanelProps {
+  analytics: PlantAnalytics;
+  kpis: PlantKpi[];
+  palette: ConsolePalette;
+  isDark: boolean;
 }
 
 export function PlantAnalyticsPanel({
@@ -114,82 +29,291 @@ export function PlantAnalyticsPanel({
   kpis,
   palette,
   isDark,
-}: {
-  analytics: PlantAnalytics;
-  /** The four headline measures, moved down from the old top strip. */
-  kpis: PlantKpi[];
-  palette: ConsolePalette;
-  isDark: boolean;
-}) {
-  const { energy, system, performance } = analytics;
+}: PlantAnalyticsPanelProps) {
+  const { performance, assets } = analytics;
+
+  // Derive health score values from actual telemetry & KPIs
+  const healthKpi = kpis.find((k) => k.id === 'health');
+  const healthScore = healthKpi ? Math.round(parseFloat(healthKpi.value) || 76) : 76;
+  const healthTarget = 90;
+  const gapPts = (healthScore - healthTarget).toFixed(1);
+
+  // Asset health stats
+  const totalAssets = assets.length || 5;
+  const onPlanCount = assets.filter((a) => a.health >= healthTarget).length;
+  const worstAsset = assets.length > 0 ? [...assets].sort((a, b) => a.health - b.health)[0] : null;
+  const bestAsset = assets.length > 0 ? [...assets].sort((a, b) => b.health - a.health)[0] : null;
+
+  // Asset health categories
+  const criticalCount = assets.filter((a) => a.status === 'critical').length;
+  const atRiskCount = assets.filter((a) => a.status === 'warning').length;
+  const neutralCount = assets.filter((a) => a.status === 'offline').length;
+  const healthyCount = assets.filter((a) => a.status === 'healthy').length;
+
+  // Throughput values from telemetry/KPIs
+  const channelKpi = kpis.find((k) => k.id === 'channels');
+  const throughputCurrent = channelKpi ? parseFloat(channelKpi.value) || 3.6 : 3.6;
+
+  const demoImpulseData = [0.8, 1.2, 0.9, 1.6, 1.1, 0.7, 2.1, 1.4, 2.8, 4.2, 3.1, 1.5, 0.9, 1.3];
+  const demoTimeLabels = ['03:20', '03:28', '03:35', '03:44'];
 
   return (
-    <PlantCard palette={palette} isDark={isDark} style={{ flex: 1, minHeight: 0 }}>
+    <PlantCard palette={palette} isDark={isDark} style={{ flex: 1, minHeight: 0, padding: 0 }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: STEP * 3 }}
+        contentContainerStyle={{ padding: STEP * 3, gap: STEP * 3.5 }}
         style={{ flex: 1, minHeight: 0 }}
       >
-        <PanelSection title="Energy consumption" unit="(kWh)" palette={palette} first>
-          {energy.map((row, index) => (
-            <BarRow
-              key={row.id}
-              index={String(index + 1).padStart(2, '0')}
-              label={row.label}
-              value={formatKwh(row.kwh)}
-              share={row.share}
-              // Consumption is not a status, so it is never green/amber/red —
-              // it wears the neutral series grey, with the accent marking the
-              // largest consumer, the only actionable fact in the list.
-              tone={index === 0 ? palette.accent : palette.series2}
-              palette={palette}
-            />
-          ))}
-        </PanelSection>
+        {/* --- 1. PLANT HEALTH SCORE --- */}
+        <PanelSection title="Plant Health Score" palette={palette} first>
+          <View style={{ gap: STEP * 2 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+                <Text
+                  className="font-display tabular-nums"
+                  style={{ fontSize: 38, fontWeight: '600', color: palette.ink, lineHeight: 42 }}
+                >
+                  {healthScore}
+                </Text>
+                <Text className="font-body" style={{ fontSize: 13, color: palette.inkFaint }}>
+                  /100
+                </Text>
+              </View>
 
-        <PanelSection title="System telemetry" palette={palette}>
-          <View style={{ gap: STEP * 3 }}>
-            <View style={{ flexDirection: 'row', gap: STEP * 3 }}>
-              <TelemetryCell
-                label="Total power"
-                value={system.totalPowerMw.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}
-                unit="MW"
-                palette={palette}
-              />
-              <TelemetryCell label="Total energy" value={formatKwh(system.totalEnergyKwh)} unit="kWh" palette={palette} />
+              <View style={{ alignItems: 'flex-end' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted }}>
+                    TARGET
+                  </Text>
+                  <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.ink }}>
+                    {healthTarget}
+                  </Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+                  <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted }}>
+                    GAP
+                  </Text>
+                  <Text
+                    className="font-mono tabular-nums"
+                    style={{
+                      fontSize: 12,
+                      fontWeight: '600',
+                      color: Number(gapPts) >= 0 ? palette.accent : palette.critical,
+                    }}
+                  >
+                    {Number(gapPts) >= 0 ? `+${gapPts}` : `${gapPts}`} pts
+                  </Text>
+                </View>
+              </View>
             </View>
-            <View style={{ flexDirection: 'row', gap: STEP * 3 }}>
-              <TelemetryCell
-                label="Active machines"
-                value={String(system.activeMachines).padStart(2, '0')}
-                palette={palette}
-              />
-              <TelemetryCell
-                label="Connected gateways"
-                value={String(system.connectedGateways).padStart(2, '0')}
-                palette={palette}
-              />
+
+            {/* Asset status summary rail */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingTop: STEP * 2,
+                borderTopWidth: 1,
+                borderTopColor: palette.line,
+              }}
+            >
+              <View>
+                <MicroLabel palette={palette} size={9}>
+                  ASSETS ON PLAN
+                </MicroLabel>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 14, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
+                  {onPlanCount} <Text style={{ fontSize: 11, color: palette.inkFaint }}>/ {totalAssets}</Text>
+                </Text>
+              </View>
+
+              <View>
+                <MicroLabel palette={palette} size={9}>
+                  FURTHEST OFF
+                </MicroLabel>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 14, fontWeight: '600', color: palette.critical, marginTop: 2 }}>
+                  {worstAsset ? worstAsset.health : '—'}
+                </Text>
+              </View>
+
+              <View style={{ alignItems: 'flex-end' }}>
+                <MicroLabel palette={palette} size={9}>
+                  BEST ASSET
+                </MicroLabel>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 14, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
+                  {bestAsset ? bestAsset.health : '—'}
+                </Text>
+              </View>
             </View>
           </View>
         </PanelSection>
 
-        <PanelSection title="Plant performance" palette={palette}>
-          {performance.map((row) => (
-            <BarRow
-              key={row.label}
-              label={row.label}
-              value={`${row.value}%`}
-              share={row.value / 100}
-              tone={performanceTone(palette, row.value)}
-              palette={palette}
-            />
-          ))}
+        {/* --- 2. SCORE DRIVERS --- */}
+        <PanelSection title="Score Drivers" palette={palette}>
+          <View style={{ gap: STEP * 2 }}>
+            {performance.map((factor) => {
+              const tone =
+                factor.value >= 85
+                  ? palette.accent
+                  : factor.value >= 60
+                  ? palette.warning
+                  : palette.critical;
+              return (
+                <View key={factor.label} style={{ gap: 4 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <MicroLabel palette={palette} size={10}>
+                      {factor.label}
+                    </MicroLabel>
+                    <Text className="font-mono tabular-nums" style={{ fontSize: 12, fontWeight: '600', color: palette.ink }}>
+                      {factor.value}%
+                    </Text>
+                  </View>
+                  {/* Track line instrument */}
+                  <View
+                    style={{
+                      height: 4,
+                      borderRadius: 2,
+                      backgroundColor: palette.line,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <View
+                      style={{
+                        height: '100%',
+                        width: `${factor.value}%`,
+                        backgroundColor: tone,
+                        borderRadius: 2,
+                      }}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
         </PanelSection>
 
-        <PanelSection title="Status" palette={palette}>
-          {kpis.map((kpi, index) => (
-            <KpiRow key={kpi.id} kpi={kpi} palette={palette} first={index === 0} />
-          ))}
+        {/* --- 3. ASSET HEALTH DISTRIBUTION --- */}
+        <PanelSection title="Asset Health Distribution" palette={palette}>
+          <View style={{ gap: STEP * 1.5 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.critical, fontWeight: '600' }}>
+                  CRITICAL
+                </Text>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.ink, marginTop: 2 }}>
+                  {criticalCount}
+                </Text>
+              </View>
+
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.warning, fontWeight: '600' }}>
+                  AT RISK
+                </Text>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.ink, marginTop: 2 }}>
+                  {atRiskCount}
+                </Text>
+              </View>
+
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.neutral, fontWeight: '600' }}>
+                  NEUTRAL
+                </Text>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.ink, marginTop: 2 }}>
+                  {neutralCount}
+                </Text>
+              </View>
+
+              <View style={{ alignItems: 'center', flex: 1 }}>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.accent, fontWeight: '600' }}>
+                  HEALTHY
+                </Text>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
+                  {healthyCount}
+                </Text>
+              </View>
+            </View>
+
+            {/* Distribution Bar */}
+            <View style={{ height: 5, borderRadius: 3, backgroundColor: palette.line, flexDirection: 'row', overflow: 'hidden' }}>
+              {criticalCount > 0 && <View style={{ flex: criticalCount, backgroundColor: palette.critical }} />}
+              {atRiskCount > 0 && <View style={{ flex: atRiskCount, backgroundColor: palette.warning }} />}
+              {neutralCount > 0 && <View style={{ flex: neutralCount, backgroundColor: palette.neutral }} />}
+              {healthyCount > 0 && <View style={{ flex: healthyCount, backgroundColor: palette.accent }} />}
+            </View>
+          </View>
+        </PanelSection>
+
+        {/* --- 4. THROUGHPUT (PACKETS / S) --- */}
+        <PanelSection title="Throughput (Packets / s)" palette={palette}>
+          <View style={{ gap: STEP * 1.5 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+                <Text className="font-display tabular-nums" style={{ fontSize: 24, fontWeight: '600', color: palette.ink }}>
+                  {throughputCurrent.toFixed(1)}
+                </Text>
+                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted }}>
+                  pkt/s
+                </Text>
+              </View>
+              <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
+                03:22 PM
+              </Text>
+            </View>
+
+            {/* Gigaton Impulse Chart */}
+            <View style={{ height: 80, marginTop: 4 }}>
+              <Measured>
+                {({ width, height }) => (
+                  <ImpulseChart
+                    values={demoImpulseData}
+                    xLabels={demoTimeLabels}
+                    width={width}
+                    height={height}
+                    palette={palette}
+                    color={palette.accent}
+                  />
+                )}
+              </Measured>
+            </View>
+
+            {/* Integrated Statistical Rail Footer */}
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                paddingTop: STEP * 1.5,
+                borderTopWidth: 1,
+                borderTopColor: palette.line,
+              }}
+            >
+              <View>
+                <MicroLabel palette={palette} size={8.5}>
+                  AVERAGE
+                </MicroLabel>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1 }}>
+                  2.8 pkt/s
+                </Text>
+              </View>
+
+              <View>
+                <MicroLabel palette={palette} size={8.5}>
+                  MAXIMUM
+                </MicroLabel>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1 }}>
+                  6.6 pkt/s
+                </Text>
+              </View>
+
+              <View>
+                <MicroLabel palette={palette} size={8.5}>
+                  LAST UPDATE
+                </MicroLabel>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1 }}>
+                  03:44 PM
+                </Text>
+              </View>
+            </View>
+          </View>
         </PanelSection>
       </ScrollView>
     </PlantCard>

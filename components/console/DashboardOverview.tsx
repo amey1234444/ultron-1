@@ -39,6 +39,7 @@ import { PlantAnalyticsPanel, type PlantKpi } from './plant/PlantAnalyticsPanel'
 import { PlantBottomAnalytics } from './plant/PlantBottomAnalytics';
 import PlantExperience from './plant/PlantExperience';
 import { PlantOverviewHeader } from './plant/PlantOverviewHeader';
+import { LeftMiniNav } from './plant/LeftMiniNav';
 import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
@@ -1895,8 +1896,7 @@ export function DashboardOverview({
       case 'scorecard':
         return (
           <View className={rowClass} style={{ flex: 1, minHeight: 0 }}>
-            {/* Left rail, open: the numbers that answer "are we on plan", with
-                the factors that produced them directly underneath. */}
+            {/* Left Rail: High-impact scorecard metrics & score factors */}
             <View style={{ flex: isCompact ? undefined : 1, minHeight: 560 }}>
               <OpenSection label="Plant scorecard" meta={`Target ${HEALTH_TARGET}`}>
                 <View className="flex-1 justify-start">
@@ -1953,21 +1953,18 @@ export function DashboardOverview({
                     <Rule />
                   </View>
 
-                  {/* The factors belong with the score they produce, not in a
-                      separate panel two columns away. */}
                   <Text className={cn('mb-3 font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    What the score is made of
+                    Score factors breakdown
                   </Text>
                   {healthFactorBars}
                 </View>
               </OpenSection>
             </View>
 
-            {/* Right: the distributions behind those numbers, each filling its
-                own half of the column rather than sitting on empty space. */}
+            {/* Right Column: Asset Health Distribution & High-Precision Trends */}
             <View className="gap-3" style={{ flex: isCompact ? undefined : 2.5 }}>
-              <View className={rowClass} style={fillRow(282)}>
-                <View style={{ flex: 1, height: isCompact ? 282 : undefined }}>
+              <View className={rowClass} style={fillRow(290)}>
+                <View style={{ flex: 1, height: isCompact ? 290 : undefined }}>
                   <Panel label="Asset health distribution">
                     <View className="flex-1">
                       <FillChart render={(h) => <Histogram values={healthValues} height={h} />} />
@@ -1977,8 +1974,8 @@ export function DashboardOverview({
                     </View>
                   </Panel>
                 </View>
-                <View style={{ flex: 1, height: isCompact ? 282 : undefined }}>
-                  <Panel label="Health score over period" action={<Legend items={[{ color: SERIES_A, label: 'Health score' }]} />}>
+                <View style={{ flex: 1, height: isCompact ? 290 : undefined }}>
+                  <Panel label="Health score over period" action={<Legend items={[{ color: SERIES_A, label: 'Health score' }, { color: palette.accent, label: 'Target (90)' }]} />}>
                     <View className="flex-1">
                       <FillChart
                         render={(h) => (
@@ -1993,8 +1990,8 @@ export function DashboardOverview({
                 </View>
               </View>
 
-              <View style={fillRow(282)}>
-                <Panel label="Throughput over period" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
+              <View style={fillRow(290)}>
+                <Panel label="Throughput impulse rate over period" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
                   <View className="flex-1">
                     <FillChart
                       render={(h) => <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} timeLabels={trendTimeLabels} />}
@@ -2009,15 +2006,15 @@ export function DashboardOverview({
           </View>
         );
 
-      // Trends gets the plant-wide chart to itself, at the size a trend chart
-      // is actually read at.
+      // Trends: Dedicated high-density multi-channel telemetry workbench
       case 'trends':
         return (
           <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            <View style={fillRow(400)}>
+            {/* Main Dual-Axis Plant Telemetry Trend */}
+            <View style={fillRow(420)}>
               <Panel
-                label="Plant trend"
-                meta={metrics.live ? 'Live session' : 'Demo plant'}
+                label="Plant multi-metric trajectory"
+                meta={metrics.live ? 'Live telemetry pipeline' : 'Demo plant'}
                 action={<Legend items={[{ color: SERIES_A, label: 'Health score' }, { color: SERIES_B, label: 'Packets / s' }]} />}
               >
                 <FillChart
@@ -2037,9 +2034,10 @@ export function DashboardOverview({
               </Panel>
             </View>
 
-            <View className={rowClass} style={{ width: '100%', height: 244 }}>
+            {/* Split Telemetry Channels */}
+            <View className={rowClass} style={{ width: '100%', height: 260 }}>
               <View style={{ flex: 1 }}>
-                <OpenSection label="Health score" action={<Legend items={[{ color: SERIES_A, label: 'Health score' }]} />}>
+                <OpenSection label="Health Trajectory Channel" action={<Legend items={[{ color: SERIES_A, label: 'Health score' }]} />}>
                   <FillChart
                     render={(h) => (
                       <TrendChart primary={healthTrend} height={h} leftBands={healthRail(palette)} timeLabels={trendTimeLabels} />
@@ -2047,9 +2045,11 @@ export function DashboardOverview({
                   />
                 </OpenSection>
               </View>
+
               <Rule vertical />
+
               <View style={{ flex: 1 }}>
-                <OpenSection label="Throughput" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
+                <OpenSection label="Throughput Impulse Channel" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
                   <FillChart
                     render={(h) => (
                       <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} timeLabels={trendTimeLabels} project />
@@ -2058,27 +2058,74 @@ export function DashboardOverview({
                 </OpenSection>
               </View>
             </View>
+
+            {/* Integrated Telemetry Channel Footer Stats */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingVertical: 10,
+                paddingHorizontal: 16,
+                borderRadius: 8,
+                backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                borderWidth: 1,
+                borderColor: palette.line,
+              }}
+            >
+              <View>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
+                  HEALTH CURRENT / MEAN
+                </Text>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
+                  {healthTrend[healthTrend.length - 1] ?? 76} / {mean(healthTrend).toFixed(1)}
+                </Text>
+              </View>
+
+              <View style={{ width: 1, height: 18, backgroundColor: palette.line }} />
+
+              <View>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
+                  THROUGHPUT PEAK / AVG
+                </Text>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.series2, marginTop: 2 }}>
+                  {Math.max(...throughputTrend)} / {mean(throughputTrend).toFixed(1)} pkt/s
+                </Text>
+              </View>
+
+              <View style={{ width: 1, height: 18, backgroundColor: palette.line }} />
+
+              <View>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
+                  ALARM DAYS TOTAL
+                </Text>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.warning, marginTop: 2 }}>
+                  {alarmBars.critical.reduce((a, b) => a + b, 0)} critical / {alarmBars.warning.reduce((a, b) => a + b, 0)} warning
+                </Text>
+              </View>
+            </View>
           </View>
         );
 
+      // Diagnostics: Operational fault diagnosis & evidence workbench
       case 'diagnostics':
         return (
           <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
             <View className={rowClass} style={{ width: '100%' }}>
-              <View style={{ flex: isCompact ? undefined : 1.8, height: 356 }}>
+              <View style={{ flex: isCompact ? undefined : 1.8, height: 360 }}>
                 <Findings insights={metrics.insights} />
               </View>
-              <View style={{ flex: isCompact ? undefined : 1, height: 356 }}>
-                <Panel label="Alarm distribution" meta={`${severityTotal} total`}>
+              <View style={{ flex: isCompact ? undefined : 1, height: 360 }}>
+                <Panel label="Alarm severity distribution" meta={`${severityTotal} total events`}>
                   <View className="flex-1 flex-row items-center justify-around gap-3">
-                    <DonutChart segments={severitySegments} total={severityTotal} size={136} />
-                    <View className="gap-2.5">
+                    <DonutChart segments={severitySegments} total={severityTotal} size={140} />
+                    <View className="gap-3">
                       {severitySegments.map((segment) => (
-                        <View key={segment.label} className="flex-row items-center gap-2.5">
-                          <Dot color={segment.color} size={6} />
-                          <Text className={cn('w-[88px] font-body text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{segment.label}</Text>
-                          <Text className={cn('font-mono text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                            {segment.value}
+                        <View key={segment.label} className="flex-row items-center gap-3">
+                          <Dot color={segment.color} size={7} />
+                          <Text className={cn('w-[96px] font-body text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{segment.label}</Text>
+                          <Text className={cn('font-mono text-[12px] tabular-nums', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                            {segment.value} ({severityTotal > 0 ? Math.round((segment.value / severityTotal) * 100) : 0}%)
                           </Text>
                         </View>
                       ))}
@@ -2088,22 +2135,20 @@ export function DashboardOverview({
               </View>
             </View>
 
-            <View style={fillRow(300)}>
-              <AssetTable rows={metrics.attention} onOpenMachine={onOpenMachine} label="Evidence by asset" boxed={false} />
+            <View style={fillRow(320)}>
+              <AssetTable rows={metrics.attention} onOpenMachine={onOpenMachine} label="Asset diagnostic evidence & telemetry" boxed={false} />
             </View>
           </View>
         );
 
-      // Setup is a specification sheet, and a spec sheet is a set of rows. It
-      // reads as one document divided by rules rather than as eight cards
-      // competing for the same page.
+      // Setup: Technical specification sheet & configuration grid
       case 'setup':
         return (
           <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            <View className={rowClass} style={fillRow(320)}>
+            <View className={rowClass} style={fillRow(340)}>
               <View style={{ flex: isCompact ? undefined : 1.4, minHeight: 0 }}>
                 <OpenSection
-                  label="Plant map layout"
+                  label="Plant map 3D component layout"
                   meta={`Scale ${plantConfig.scene3d.modelScale}% · ${plantConfig.scene3d.components.length} components`}
                   action={
                     canEditPlant ? (
@@ -2121,14 +2166,14 @@ export function DashboardOverview({
                         <View key={component.id}>
                           {index > 0 ? <Rule /> : null}
                           <View className="flex-row items-center gap-3 py-2.5">
-                            <Dot color={plantComponentColors[component.id] ?? '#7A7E86'} size={5} />
-                            <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+                            <Dot color={plantComponentColors[component.id] ?? '#7A7E86'} size={6} />
+                            <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[12px] font-medium', isDark ? 'text-ink' : 'text-ink-inverse')}>
                               {component.name}
                             </Text>
-                            <Text className={cn('w-[86px] font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                            <Text className={cn('w-[96px] font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
                               {changed > 0 ? `${changed} part edits` : component.status}
                             </Text>
-                            <Text className={cn('w-[96px] text-right font-mono text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                            <Text className={cn('w-[104px] text-right font-mono text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
                               {Math.round(component.x)} / {Math.round(component.z)} · {component.scale}%
                             </Text>
                           </View>
@@ -2147,7 +2192,7 @@ export function DashboardOverview({
               <Rule vertical />
 
               <View style={{ flex: isCompact ? undefined : 1, minHeight: 0 }}>
-                <OpenSection label="Signal sources" meta={metrics.live ? 'Live pipeline' : 'Demo plant'}>
+                <OpenSection label="Signal sources & pipeline" meta={metrics.live ? 'Live WebSocket pipeline' : 'Demo plant'}>
                   <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
                     <SpecRow first label="Plant" value={metrics.plantName} />
                     <SpecRow label="Projects" value={String(projects.length)} />
@@ -2175,9 +2220,9 @@ export function DashboardOverview({
 
             <Rule />
 
-            <View className={rowClass} style={fillRow(258)}>
+            <View className={rowClass} style={fillRow(270)}>
               <View style={{ flex: isCompact ? undefined : 1.4, minHeight: 0 }}>
-                <OpenSection label="Health model" meta={`Score ${metrics.healthScore}/100 · target ${HEALTH_TARGET}`}>
+                <OpenSection label="Health scoring model" meta={`Score ${metrics.healthScore}/100 · target ${HEALTH_TARGET}`}>
                   <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
                     {metrics.healthFactors.map((factor, index) => (
                       <ContributionRow
@@ -2197,14 +2242,14 @@ export function DashboardOverview({
 
               <View style={{ flex: isCompact ? undefined : 1, minHeight: 0 }}>
                 <OpenSection
-                  label="System status"
+                  label="System microservices health"
                   meta={metrics.services.filter((service) => service.status !== 'healthy').length === 0 ? 'All nominal' : 'Degraded'}
                 >
-                  <View className="flex-row flex-wrap content-start gap-x-5 gap-y-2.5">
+                  <View className="flex-row flex-wrap content-start gap-x-6 gap-y-3 pt-1">
                     {metrics.services.map((service) => (
-                      <View key={service.name} className="min-w-[128px] flex-row items-center gap-2">
-                        <Dot color={statusColor(palette, service.status)} size={5} />
-                        <Text numberOfLines={1} className={cn('font-body text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{service.name}</Text>
+                      <View key={service.name} className="min-w-[136px] flex-row items-center gap-2">
+                        <Dot color={statusColor(palette, service.status)} size={6} />
+                        <Text numberOfLines={1} className={cn('font-body text-[12px] font-medium', isDark ? 'text-ink' : 'text-ink-inverse')}>{service.name}</Text>
                       </View>
                     ))}
                   </View>
@@ -2216,7 +2261,7 @@ export function DashboardOverview({
 
             <View className={rowClass} style={{ width: '100%' }}>
               <View style={{ flex: 1 }}>
-                <OpenSection label="Access">
+                <OpenSection label="Access permissions">
                   <SpecRow first label="Signed in as" value={currentUser?.name || currentUser?.username || 'Admin User'} />
                   <SpecRow label="Role" value={currentUser ? ROLE_LABEL[currentUser.role] : 'Administrator'} />
                   <SpecRow label="Edit plant map" value={canEditPlant ? 'Allowed' : 'Read only'} tint={canEditPlant ? palette.accent : palette.neutral} />
@@ -2226,19 +2271,19 @@ export function DashboardOverview({
               <Rule vertical />
 
               <View style={{ flex: 1 }}>
-                <OpenSection label="Browse">
+                <OpenSection label="Workspace browse">
                   <Pressable
                     onPress={onOpenDevices}
                     accessibilityRole="button"
                     className="flex-row items-center gap-2.5 py-2.5"
                   >
-                    <MaterialCommunityIcons name="server-network" size={15} color={palette.accent} />
-                    <Text className={cn('font-body text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Open the devices table</Text>
+                    <MaterialCommunityIcons name="server-network" size={16} color={palette.accent} />
+                    <Text className={cn('font-body text-[12px] font-medium', isDark ? 'text-ink' : 'text-ink-inverse')}>Open the devices table</Text>
                     <Text className="font-body text-[12px]" style={{ color: palette.accent }}>→</Text>
                   </Pressable>
                   <Rule />
                   <Text className={cn('pt-2.5 font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    Gateways, racks, cards and channels, with their live IPs.
+                    Gateways, racks, cards and channels, with live connection states and IP configurations.
                   </Text>
                 </OpenSection>
               </View>
@@ -2246,13 +2291,14 @@ export function DashboardOverview({
           </View>
         );
 
+      // History: Operational alarm trends & historical incident log
       case 'history':
         return (
           <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            <View className={rowClass} style={{ width: '100%', height: 288 }}>
+            <View className={rowClass} style={{ width: '100%', height: 300 }}>
               <View style={{ flex: isCompact ? undefined : 1.7 }}>
                 <OpenSection
-                  label="Alarm trend"
+                  label="Daily alarm severity trend"
                   meta={metrics.live ? 'Live session' : 'Last 7 days'}
                   action={
                     <Legend
@@ -2267,15 +2313,17 @@ export function DashboardOverview({
                   <FillChart render={(h) => <StackedBars labels={alarmBars.labels} critical={alarmBars.critical} warning={alarmBars.warning} info={alarmBars.info} height={h} />} />
                 </OpenSection>
               </View>
+
               <Rule vertical />
-              <View style={{ flex: isCompact ? undefined : 1, minWidth: isCompact ? undefined : 300 }}>
-                <ActionRail insights={metrics.insights} alarms={metrics.alarms} label="Action log" boxed={false} />
+
+              <View style={{ flex: isCompact ? undefined : 1, minWidth: isCompact ? undefined : 320 }}>
+                <ActionRail insights={metrics.insights} alarms={metrics.alarms} label="Operator action log" boxed={false} />
               </View>
             </View>
 
             <Rule />
 
-            <View style={fillRow(300)}>
+            <View style={fillRow(320)}>
               <AlarmLog alarms={metrics.alarms} boxed={false} />
             </View>
           </View>
@@ -2288,38 +2336,38 @@ export function DashboardOverview({
 
   return (
     <View
-      className="flex-1"
+      className="flex-1 flex-row"
       style={{
         minHeight: 0,
         backgroundColor: palette.bg,
-        // react-native-web gives every View `z-index: 0`, which makes each one a
-        // stacking context — so the fullscreen canvas can never paint over the
-        // app header from inside this subtree no matter how high its own
-        // z-index is. Raising this branch for the duration of the twin is what
-        // actually lets it cover the chrome; it drops straight back afterwards
-        // so the header's own menus keep working.
         zIndex: isImmersive(plantView) ? 60 : 0,
       }}
     >
-      <SectionTabs active={section} onChange={setSection} />
+      {/* Compact vertical icon navigation rail */}
+      <LeftMiniNav
+        activeSection={section}
+        onSectionChange={setSection}
+        palette={palette}
+        isDark={isDark}
+      />
 
-      {/* Operations is full-bleed: the 3D world is the page's ground and the
-          panels float on it, so there is no page padding and no page scroller
-          here — either would inset the world back into a box. */}
-      {section === 'operations' ? (
-        <View className="flex-1" style={{ minHeight: 0 }}>
-          {renderSection()}
-        </View>
-      ) : (
-        <ScrollView
-          className="flex-1"
-          style={{ minHeight: 0 }}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ flexGrow: 1, padding: 14 }}
-        >
-          {renderSection()}
-        </ScrollView>
-      )}
+      {/* Main Workspace Surface */}
+      <View className="flex-1" style={{ minHeight: 0 }}>
+        {section === 'operations' ? (
+          <View className="flex-1" style={{ minHeight: 0 }}>
+            {renderSection()}
+          </View>
+        ) : (
+          <ScrollView
+            className="flex-1"
+            style={{ minHeight: 0 }}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ flexGrow: 1, padding: 14 }}
+          >
+            {renderSection()}
+          </ScrollView>
+        )}
+      </View>
 
       <Sheet visible={plantEditorOpen} title="Edit plant map" onClose={() => setPlantEditorOpen(false)}>
         {plantEditorOpen ? (

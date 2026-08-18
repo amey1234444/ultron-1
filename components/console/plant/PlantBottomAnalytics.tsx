@@ -1,113 +1,38 @@
-/**
- * The five analytical regions under the plant.
- *
- * Subordinate by construction: short, hairline-ruled, 8px axis type, and no
- * chart taller than it needs to be. The plant above is the instrument; these
- * are its margin notes.
- *
- * Series colour
- * -------------
- * Operating Power's three feeders wear violet / teal / blue rather than the
- * green-amber-red of a status readout. The console reserves those three hues
- * for state (see `components/ui/tokens.ts`), and painting "Unit 3" red would
- * assert that Unit 3 is in alarm when it is only the third feeder.
- */
-import { Text, View } from 'react-native';
+import React from 'react';
+import { ScrollView, Text, View } from 'react-native';
 
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 import type { PlantAnalytics } from '../../../lib/plantAnalytics';
-import { AreaChart, BarChart, Measured, MultiLineChart, SeverityBars } from './PlantCharts';
-import { Legend, MicroLabel, MetricValue, PlantCard, STEP } from './PlantSurfaces';
+import { HealthEnvelopeChart, Measured, MicroSparkline } from './PlantCharts';
+import { MicroLabel, PlantCard, STEP } from './PlantSurfaces';
 
-/** Categorical hues for measured series. Deliberately outside the signal set. */
-export const UNIT_COLORS = ['#8E86D6', '#4FD1C5', '#7FA0D8'];
-
-function Delta({ value, palette, suffix }: { value: number; palette: ConsolePalette; suffix: string }) {
-  const tone = value > 0 ? palette.accent : value < 0 ? palette.critical : palette.inkFaint;
-  return (
-    <Text className="font-mono" style={{ fontSize: 11, color: tone }} numberOfLines={1}>
-      {value > 0 ? '+' : ''}
-      {value}% {suffix}
-    </Text>
-  );
-}
-
-/** Shared frame: header, headline reading, then the plot fills what is left. */
-function AnalyticsCard({
-  label,
-  unit,
-  meta,
-  metaColor,
-  palette,
-  isDark,
-  headline,
-  children,
-  flex = 1,
-  minWidth = 236,
-}: {
-  label: string;
-  unit?: string;
-  meta?: string;
-  metaColor?: string;
-  palette: ConsolePalette;
-  isDark: boolean;
-  headline?: React.ReactNode;
-  children: React.ReactNode;
-  flex?: number;
-  minWidth?: number;
-}) {
-  return (
-    <PlantCard
-      palette={palette}
-      isDark={isDark}
-      style={{ flex, minWidth, minHeight: 0, padding: STEP * 3, paddingBottom: STEP * 2 }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 1.5 }}>
-        <View style={{ flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: STEP }}>
-          <MicroLabel palette={palette}>{label}</MicroLabel>
-          {unit ? (
-            <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
-              {unit}
-            </Text>
-          ) : null}
-        </View>
-        {meta ? (
-          <Text className="font-mono" style={{ fontSize: 10, color: metaColor ?? palette.inkFaint }} numberOfLines={1}>
-            {meta}
-          </Text>
-        ) : null}
-      </View>
-      {headline ? <View style={{ marginTop: 2 }}>{headline}</View> : null}
-      <View style={{ flex: 1, minHeight: 0, marginTop: STEP }}>{children}</View>
-    </PlantCard>
-  );
-}
-
-export function PlantBottomAnalytics({
-  analytics,
-  alarmBars,
-  alarmCounts,
-  live,
-  palette,
-  isDark,
-  stacked,
-}: {
+interface PlantBottomAnalyticsProps {
   analytics: PlantAnalytics;
   alarmBars: { labels: string[]; critical: number[]; warning: number[]; info: number[] };
   alarmCounts: { critical: number; warning: number; info: number };
   live: boolean;
   palette: ConsolePalette;
   isDark: boolean;
-  stacked: boolean;
-}) {
-  const { electricityDemand, operatingPower, energyCost } = analytics;
-  const liveMeta = live ? 'Live' : 'Demo';
-  const liveColor = live ? palette.accent : palette.inkFaint;
+  stacked?: boolean;
+}
+
+export function PlantBottomAnalytics({
+  analytics,
+  alarmCounts,
+  live,
+  palette,
+  isDark,
+  stacked = false,
+}: PlantBottomAnalyticsProps) {
+  const { assets } = analytics;
+
+  const demoHealthHistory = [74, 76, 75, 78, 77, 76, 78, 76];
+  const demoTimeLabels = ['03:20 PM', '03:28 PM', '03:35 PM', '03:44 PM'];
+
+  // Needs Attention assets (sorted by health ascending, showing assets that need attention first)
+  const attentionList = [...assets].sort((a, b) => a.health - b.health).slice(0, 3);
 
   return (
-    // `flex: 1` matters: without it the row sizes to its tallest card's content
-    // and spills past the bottom of the page instead of the cards sharing the
-    // fixed strip the dashboard budgeted for them.
     <View
       style={{
         flex: stacked ? undefined : 1,
@@ -116,153 +41,264 @@ export function PlantBottomAnalytics({
         minHeight: 0,
       }}
     >
-      {/* --- electricity demand ------------------------------------------- */}
-      <AnalyticsCard
-        label="Electricity demand"
-        unit="(kW)"
-        meta={liveMeta}
-        metaColor={liveColor}
+      {/* --- PANEL 1: HEALTH SCORE OVER TIME (Operational Health Timeline) --- */}
+      <PlantCard
         palette={palette}
         isDark={isDark}
-        headline={
-          <>
-            <MetricValue
-              value={Math.round(electricityDemand.latest).toLocaleString()}
-              unit="kW"
-              palette={palette}
-              size={24}
-            />
-            <Delta value={electricityDemand.deltaPct} palette={palette} suffix="vs window start" />
-          </>
-        }
+        style={{ flex: 1.4, minWidth: 320, minHeight: 0, padding: STEP * 3, paddingBottom: STEP * 2 }}
       >
-        <Measured>
-          {({ width, height }) => (
-            <AreaChart
-              values={electricityDemand.values}
-              width={width}
-              height={height}
-              palette={palette}
-              color={palette.accent}
-              xLabels={electricityDemand.hourLabels}
-            />
-          )}
-        </Measured>
-      </AnalyticsCard>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <MicroLabel palette={palette} size={10.5}>
+              HEALTH SCORE OVER TIME
+            </MicroLabel>
+          </View>
 
-      {/* --- operating power ---------------------------------------------- */}
-      <AnalyticsCard
-        label="Operating power"
-        unit="(MW)"
-        meta={liveMeta}
-        metaColor={liveColor}
-        palette={palette}
-        isDark={isDark}
-        headline={
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: STEP * 2 }}>
-            <View style={{ minWidth: 0 }}>
-              <MetricValue value={operatingPower.totalMw.toFixed(2)} unit="MW" palette={palette} size={24} />
-              <Delta value={operatingPower.deltaPct} palette={palette} suffix="vs window start" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.accent }} />
+              <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkMuted }}>
+                Health score
+              </Text>
             </View>
-            <View style={{ paddingBottom: 2 }}>
-              <Legend
-                items={operatingPower.units.map((unit, index) => ({
-                  color: UNIT_COLORS[index % UNIT_COLORS.length],
-                  label: unit.label,
-                }))}
-                palette={palette}
-              />
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 10, height: 1, backgroundColor: palette.accent }} />
+              <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkMuted }}>
+                Target (90)
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <View style={{ width: 10, height: 1, backgroundColor: palette.critical }} />
+              <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkMuted }}>
+                Critical (60)
+              </Text>
             </View>
           </View>
-        }
-      >
-        <Measured>
-          {({ width, height }) => (
-            <MultiLineChart
-              series={operatingPower.units.map((unit, index) => ({
-                id: unit.id,
-                values: unit.values,
-                color: UNIT_COLORS[index % UNIT_COLORS.length],
-              }))}
-              width={width}
-              height={height}
-              palette={palette}
-              xLabels={operatingPower.hourLabels}
-            />
-          )}
-        </Measured>
-      </AnalyticsCard>
+        </View>
 
-      {/* --- energy cost --------------------------------------------------- */}
-      <AnalyticsCard
-        label="Energy cost"
-        unit={`(${energyCost.currency})`}
-        meta={liveMeta}
-        metaColor={liveColor}
-        palette={palette}
-        isDark={isDark}
-        headline={
-          <>
-            <MetricValue
-              value={`${energyCost.currency} ${Math.round(energyCost.latest).toLocaleString()}`}
-              palette={palette}
-              size={24}
-            />
-            <Delta value={energyCost.deltaPct} palette={palette} suffix="vs window start" />
-          </>
-        }
-      >
-        <Measured>
-          {({ width, height }) => (
-            <BarChart
-              values={energyCost.values}
-              labels={energyCost.labels}
-              width={width}
-              height={height}
-              palette={palette}
-              color={palette.accent}
-            />
-          )}
-        </Measured>
-      </AnalyticsCard>
-
-      {/* --- alarms -------------------------------------------------------- */}
-      <AnalyticsCard
-        label="Alarms by day"
-        meta={alarmCounts.critical > 0 ? `${alarmCounts.critical} critical` : `${alarmCounts.warning + alarmCounts.info} open`}
-        metaColor={alarmCounts.critical > 0 ? palette.critical : palette.inkFaint}
-        palette={palette}
-        isDark={isDark}
-        minWidth={216}
-      >
-        <View style={{ flex: 1, minHeight: 0 }}>
+        {/* Envelope Chart */}
+        <View style={{ flex: 1, minHeight: 0, marginTop: STEP * 1.5 }}>
           <Measured>
             {({ width, height }) => (
-              <SeverityBars
-                labels={alarmBars.labels}
-                groups={[
-                  { id: 'critical', color: palette.critical, values: alarmBars.critical },
-                  { id: 'warning', color: palette.warning, values: alarmBars.warning },
-                  { id: 'info', color: palette.neutral, values: alarmBars.info },
-                ]}
+              <HealthEnvelopeChart
+                values={demoHealthHistory}
+                xLabels={demoTimeLabels}
                 width={width}
                 height={height}
                 palette={palette}
+                target={90}
+                critical={60}
+                currentVal={76}
               />
             )}
           </Measured>
-          <View style={{ marginTop: STEP }}>
-            <Legend
-              items={[
-                { color: palette.critical, label: 'Critical' },
-                { color: palette.warning, label: 'Warning' },
-                { color: palette.neutral, label: 'Info' },
-              ]}
-              palette={palette}
-            />
+        </View>
+
+        {/* Integrated Statistical Rail */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            paddingTop: STEP * 1.5,
+            marginTop: STEP,
+            borderTopWidth: 1,
+            borderTopColor: palette.line,
+          }}
+        >
+          <View>
+            <MicroLabel palette={palette} size={8.5}>
+              CURRENT
+            </MicroLabel>
+            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+              76 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
+            </Text>
+          </View>
+          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
+
+          <View>
+            <MicroLabel palette={palette} size={8.5}>
+              MEAN
+            </MicroLabel>
+            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+              55.2 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
+            </Text>
+          </View>
+          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
+
+          <View>
+            <MicroLabel palette={palette} size={8.5}>
+              MIN
+            </MicroLabel>
+            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+              48.1 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
+            </Text>
+          </View>
+          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
+
+          <View>
+            <MicroLabel palette={palette} size={8.5}>
+              MAX
+            </MicroLabel>
+            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+              78.3 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
+            </Text>
+          </View>
+          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
+
+          <View>
+            <MicroLabel palette={palette} size={8.5}>
+              STD DEV
+            </MicroLabel>
+            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+              0.64
+            </Text>
           </View>
         </View>
-      </AnalyticsCard>
+      </PlantCard>
+
+      {/* --- PANEL 2: NEEDS ATTENTION (Priority Queue) --- */}
+      <PlantCard
+        palette={palette}
+        isDark={isDark}
+        style={{ flex: 1.1, minWidth: 280, minHeight: 0, padding: STEP * 3 }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <MicroLabel palette={palette} size={10.5}>
+            NEEDS ATTENTION
+          </MicroLabel>
+          <Text className="font-mono" style={{ fontSize: 10, color: palette.accent, fontWeight: '600' }}>
+            View all
+          </Text>
+        </View>
+
+        <View style={{ flex: 1, marginTop: STEP * 2, gap: STEP * 1.5 }}>
+          {attentionList.map((asset, index) => {
+            const gap = asset.health - 90;
+            const tone = asset.health >= 85 ? palette.accent : asset.health >= 75 ? palette.warning : palette.critical;
+            const demoSpark = [asset.health - 5, asset.health - 2, asset.health + 1, asset.health - 3, asset.health];
+
+            return (
+              <View
+                key={asset.id}
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  paddingVertical: STEP * 1.25,
+                  paddingHorizontal: STEP * 1.5,
+                  borderRadius: 6,
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+                  borderLeftWidth: 3,
+                  borderLeftColor: tone,
+                }}
+              >
+                <Text className="font-mono tabular-nums" style={{ fontSize: 11, color: palette.inkFaint, width: 22 }}>
+                  0{index + 1}
+                </Text>
+
+                <View style={{ flex: 1, minWidth: 0, paddingRight: 6 }}>
+                  <Text numberOfLines={1} style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11.5, fontWeight: '600', color: palette.ink }}>
+                    {asset.name}
+                  </Text>
+                  <Text className="font-mono" style={{ fontSize: 9.5, color: tone, marginTop: 1 }}>
+                    {asset.status.toLowerCase()}
+                  </Text>
+                </View>
+
+                {/* Score & Sparkline */}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <MicroSparkline values={demoSpark} width={40} height={12} color={tone} />
+
+                  <View style={{ alignItems: 'flex-end', minWidth: 50 }}>
+                    <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.ink }}>
+                      {asset.health} <Text style={{ fontSize: 9, color: palette.inkFaint }}>/100</Text>
+                    </Text>
+                    <Text className="font-mono tabular-nums" style={{ fontSize: 9.5, color: gap >= 0 ? palette.accent : palette.critical }}>
+                      {gap >= 0 ? `+${gap}` : `${gap}`} pts
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      </PlantCard>
+
+      {/* --- PANEL 3: ACTIVITY & INSIGHTS (Operational Event Stream) --- */}
+      <PlantCard
+        palette={palette}
+        isDark={isDark}
+        style={{ flex: 1, minWidth: 260, minHeight: 0, padding: STEP * 3 }}
+      >
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <MicroLabel palette={palette} size={10.5}>
+            ACTIVITY & INSIGHTS
+          </MicroLabel>
+          <Text className="font-mono" style={{ fontSize: 10, color: palette.accent, fontWeight: '600' }}>
+            View all
+          </Text>
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: STEP * 2 }}>
+          <View style={{ gap: STEP * 2, paddingLeft: 8 }}>
+            {/* Event 1 */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ alignItems: 'center' }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.accent, marginTop: 3 }} />
+                <View style={{ width: 1, flex: 1, backgroundColor: palette.line, marginTop: 4 }} />
+              </View>
+              <View style={{ flex: 1, paddingBottom: STEP }}>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
+                  03:44 PM
+                </Text>
+                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11.5, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+                  Systems normal
+                </Text>
+                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10.5, color: palette.inkMuted, marginTop: 1 }}>
+                  No critical alarms across components
+                </Text>
+              </View>
+            </View>
+
+            {/* Event 2 */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ alignItems: 'center' }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.warning, marginTop: 3 }} />
+                <View style={{ width: 1, flex: 1, backgroundColor: palette.line, marginTop: 4 }} />
+              </View>
+              <View style={{ flex: 1, paddingBottom: STEP }}>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
+                  03:42 PM
+                </Text>
+                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11.5, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+                  Utility Area needs attention
+                </Text>
+                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10.5, color: palette.inkMuted, marginTop: 1 }}>
+                  Health score below target (73/100)
+                </Text>
+              </View>
+            </View>
+
+            {/* Event 3 */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <View style={{ alignItems: 'center' }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.accent, marginTop: 3 }} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
+                  03:32 PM
+                </Text>
+                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11.5, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
+                  Throughput spike detected
+                </Text>
+                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10.5, color: palette.inkMuted, marginTop: 1 }}>
+                  Peak rate reached 4.2 packets/s
+                </Text>
+              </View>
+            </View>
+          </View>
+        </ScrollView>
+      </PlantCard>
     </View>
   );
 }

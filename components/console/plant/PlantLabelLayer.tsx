@@ -39,7 +39,7 @@ const MONO = '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace';
  * like "Electrical / Power House" had to be clipped to fit next to its status,
  * and a label that cannot say what it is labelling has no reason to be there.
  */
-const REST = { w: 178, h: 50 };
+const REST = { w: 184, h: 58 };
 const OPEN = { w: 200, h: 132 };
 /** Clearance between a card and a model, and between two cards. */
 const CLEAR = 12;
@@ -291,37 +291,63 @@ export function PlantLabelLayer({
               transition: 'border-color 140ms ease, width 160ms ease, height 160ms ease',
             }}
           >
-            <div style={{ padding: '8px 10px 7px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: 6, height: 6, borderRadius: 999, background: tone, flexShrink: 0 }} />
+            <div style={{ padding: '7px 9px 6px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
+                  <span style={{ width: 6, height: 6, borderRadius: 999, background: tone, flexShrink: 0 }} />
+                  <span
+                    style={{
+                      minWidth: 0,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                      fontFamily: MONO,
+                      fontSize: 10,
+                      fontWeight: '700',
+                      letterSpacing: '0.06em',
+                      textTransform: 'uppercase',
+                      color: palette.ink,
+                    }}
+                  >
+                    {telemetry.name}
+                  </span>
+                </div>
                 <span
                   style={{
-                    minWidth: 0,
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
                     fontFamily: MONO,
-                    fontSize: 10.5,
-                    letterSpacing: '0.08em',
+                    fontSize: 8.5,
+                    fontWeight: '600',
+                    letterSpacing: '0.1em',
                     textTransform: 'uppercase',
-                    color: palette.ink,
+                    color: tone,
+                    flexShrink: 0,
                   }}
                 >
-                  {telemetry.name}
+                  {telemetry.status}
                 </span>
               </div>
-              <div
-                style={{
-                  marginTop: 4,
-                  marginLeft: 12,
-                  fontFamily: MONO,
-                  fontSize: 9,
-                  letterSpacing: '0.14em',
-                  textTransform: 'uppercase',
-                  color: tone,
-                }}
-              >
-                {telemetry.status}
+
+              {/* Score + Sparkline Row */}
+              <div style={{ marginTop: 5, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+                  <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: '600', color: palette.ink, lineHeight: '18px' }}>
+                    {telemetry.health}
+                  </span>
+                  <span style={{ fontFamily: MONO, fontSize: 9, color: palette.inkFaint }}>/100</span>
+                </div>
+
+                {/* Inline Micro Sparkline */}
+                <svg width={52} height={14} style={{ overflow: 'visible' }}>
+                  <path
+                    d={`M0,${12 - (telemetry.health / 100) * 8} Q13,${14 - (telemetry.health / 100) * 10} 26,${
+                      10 - (telemetry.health / 100) * 6
+                    } T52,${8 - (telemetry.health / 100) * 6}`}
+                    fill="none"
+                    stroke={tone}
+                    strokeWidth={1.4}
+                    strokeLinecap="round"
+                  />
+                </svg>
               </div>
             </div>
 
