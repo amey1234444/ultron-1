@@ -61,17 +61,17 @@ export function PlantAnalyticsPanel({
     <PlantCard palette={palette} isDark={isDark} style={{ flex: 1, minHeight: 0, padding: 0 }}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: STEP * 3, gap: STEP * 3.5 }}
+        contentContainerStyle={{ padding: STEP * 3.5, gap: STEP * 3.5 }}
         style={{ flex: 1, minHeight: 0 }}
       >
         {/* --- 1. PLANT HEALTH SCORE --- */}
         <PanelSection title="Plant Health Score" palette={palette} first>
-          <View style={{ gap: STEP * 2 }}>
+          <View style={{ gap: STEP * 2.5 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 3 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
                 <Text
                   className="font-display tabular-nums"
-                  style={{ fontSize: 38, fontWeight: '600', color: palette.ink, lineHeight: 42 }}
+                  style={{ fontSize: 42, fontWeight: '700', color: palette.ink, lineHeight: 46 }}
                 >
                   {healthScore}
                 </Text>
@@ -89,15 +89,26 @@ export function PlantAnalyticsPanel({
                     {healthTarget}
                   </Text>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
-                  <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 4,
+                    marginTop: 4,
+                    paddingHorizontal: 7,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                    backgroundColor: Number(gapPts) >= 0 ? palette.accentSoft : 'rgba(239, 68, 68, 0.12)',
+                  }}
+                >
+                  <Text className="font-mono" style={{ fontSize: 9, color: palette.inkMuted, fontWeight: '600' }}>
                     GAP
                   </Text>
                   <Text
                     className="font-mono tabular-nums"
                     style={{
-                      fontSize: 12,
-                      fontWeight: '600',
+                      fontSize: 11.5,
+                      fontWeight: '700',
                       color: Number(gapPts) >= 0 ? palette.accent : palette.critical,
                     }}
                   >
@@ -159,7 +170,7 @@ export function PlantAnalyticsPanel({
                   ? palette.warning
                   : palette.critical;
               return (
-                <View key={factor.label} style={{ gap: 4 }}>
+                <View key={factor.label} style={{ gap: 5 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <MicroLabel palette={palette} size={10}>
                       {factor.label}
@@ -168,12 +179,12 @@ export function PlantAnalyticsPanel({
                       {factor.value}%
                     </Text>
                   </View>
-                  {/* Track line instrument */}
+                  {/* Smooth track line instrument */}
                   <View
                     style={{
-                      height: 4,
-                      borderRadius: 2,
-                      backgroundColor: palette.line,
+                      height: 5,
+                      borderRadius: 3,
+                      backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
                       overflow: 'hidden',
                     }}
                   >
@@ -182,7 +193,7 @@ export function PlantAnalyticsPanel({
                         height: '100%',
                         width: `${factor.value}%`,
                         backgroundColor: tone,
-                        borderRadius: 2,
+                        borderRadius: 3,
                       }}
                     />
                   </View>
@@ -194,47 +205,47 @@ export function PlantAnalyticsPanel({
 
         {/* --- 3. ASSET HEALTH DISTRIBUTION --- */}
         <PanelSection title="Asset Health Distribution" palette={palette}>
-          <View style={{ gap: STEP * 1.5 }}>
+          <View style={{ gap: STEP * 2 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.critical, fontWeight: '600' }}>
+                <Text className="font-mono" style={{ fontSize: 9, color: palette.critical, fontWeight: '700' }}>
                   CRITICAL
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.ink, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
                   {criticalCount}
                 </Text>
               </View>
 
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.warning, fontWeight: '600' }}>
+                <Text className="font-mono" style={{ fontSize: 9, color: palette.warning, fontWeight: '700' }}>
                   AT RISK
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.ink, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
                   {atRiskCount}
                 </Text>
               </View>
 
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.neutral, fontWeight: '600' }}>
+                <Text className="font-mono" style={{ fontSize: 9, color: palette.neutral, fontWeight: '700' }}>
                   NEUTRAL
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.ink, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.ink, marginTop: 2 }}>
                   {neutralCount}
                 </Text>
               </View>
 
               <View style={{ alignItems: 'center', flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.accent, fontWeight: '600' }}>
+                <Text className="font-mono" style={{ fontSize: 9, color: palette.accent, fontWeight: '700' }}>
                   HEALTHY
                 </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 15, fontWeight: '700', color: palette.accent, marginTop: 2 }}>
                   {healthyCount}
                 </Text>
               </View>
             </View>
 
             {/* Distribution Bar */}
-            <View style={{ height: 5, borderRadius: 3, backgroundColor: palette.line, flexDirection: 'row', overflow: 'hidden' }}>
+            <View style={{ height: 6, borderRadius: 3, backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)', flexDirection: 'row', overflow: 'hidden' }}>
               {criticalCount > 0 && <View style={{ flex: criticalCount, backgroundColor: palette.critical }} />}
               {atRiskCount > 0 && <View style={{ flex: atRiskCount, backgroundColor: palette.warning }} />}
               {neutralCount > 0 && <View style={{ flex: neutralCount, backgroundColor: palette.neutral }} />}
@@ -248,20 +259,20 @@ export function PlantAnalyticsPanel({
           <View style={{ gap: STEP * 1.5 }}>
             <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' }}>
               <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
-                <Text className="font-display tabular-nums" style={{ fontSize: 24, fontWeight: '600', color: palette.ink }}>
+                <Text className="font-display tabular-nums" style={{ fontSize: 26, fontWeight: '700', color: palette.ink }}>
                   {throughputCurrent.toFixed(1)}
                 </Text>
                 <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted }}>
                   pkt/s
                 </Text>
               </View>
-              <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
+              <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
                 03:22 PM
               </Text>
             </View>
 
             {/* Gigaton Impulse Chart */}
-            <View style={{ height: 80, marginTop: 4 }}>
+            <View style={{ height: 85, marginTop: 4 }}>
               <Measured>
                 {({ width, height }) => (
                   <ImpulseChart
@@ -290,7 +301,7 @@ export function PlantAnalyticsPanel({
                 <MicroLabel palette={palette} size={8.5}>
                   AVERAGE
                 </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1, fontWeight: '600' }}>
                   2.8 pkt/s
                 </Text>
               </View>
@@ -299,7 +310,7 @@ export function PlantAnalyticsPanel({
                 <MicroLabel palette={palette} size={8.5}>
                   MAXIMUM
                 </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1, fontWeight: '600' }}>
                   6.6 pkt/s
                 </Text>
               </View>
@@ -308,7 +319,7 @@ export function PlantAnalyticsPanel({
                 <MicroLabel palette={palette} size={8.5}>
                   LAST UPDATE
                 </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1 }}>
+                <Text className="font-mono tabular-nums" style={{ fontSize: 10.5, color: palette.ink, marginTop: 1, fontWeight: '600' }}>
                   03:44 PM
                 </Text>
               </View>

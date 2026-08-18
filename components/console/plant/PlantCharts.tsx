@@ -1,14 +1,9 @@
 /**
  * Chart primitives for the Plant Overview.
  *
- * These are deliberately not a chart library. Everything the overview plots is
- * small, dense and subordinate to the 3D plant, so each of these draws exactly
- * one thing with a hairline stroke, a quiet grid and small axis type — the
- * proportions an engineering readout uses, which no chart library default gets
- * right without being fought.
- *
- * Rendered with `react-native-svg`, the same as the rest of the console, so they
- * compose into the react-native tree and survive the native build.
+ * Ultra-premium visualization engine using react-native-svg.
+ * Clean grid lines, smooth Catmull-Rom splines, gradient area fills,
+ * and high-contrast telemetry indicators.
  */
 import { useCallback, useState, type ReactNode } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
@@ -18,12 +13,6 @@ import type { ConsolePalette } from '../../../lib/consoleTheme';
 
 const AXIS_FONT = 9.5;
 
-/**
- * Renders children once the box has a real size.
- *
- * Charts need pixel dimensions and the layout is fluid, so every chart here is
- * wrapped in this rather than being handed a guessed width.
- */
 export function Measured({
   children,
   style,
@@ -55,8 +44,8 @@ function scaleY(value: number, min: number, max: number, top: number, height: nu
 /** Catmull-Rom through the samples, emitted as cubic beziers. */
 function spline(points: { x: number; y: number }[], tension = 0.5): string {
   if (points.length === 0) return '';
-  if (points.length < 3) return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x},${p.y}`).join(' ');
-  let path = `M${points[0].x},${points[0].y}`;
+  if (points.length < 3) return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  let path = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
   for (let i = 0; i < points.length - 1; i += 1) {
     const p0 = points[i - 1] ?? points[i];
     const p1 = points[i];
@@ -66,7 +55,7 @@ function spline(points: { x: number; y: number }[], tension = 0.5): string {
     const c1y = p1.y + ((p2.y - p0.y) / 6) * tension;
     const c2x = p2.x - ((p3.x - p1.x) / 6) * tension;
     const c2y = p2.y - ((p3.y - p1.y) / 6) * tension;
-    path += ` C${c1x},${c1y} ${c2x},${c2y} ${p2.x},${p2.y}`;
+    path += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
   }
   return path;
 }
@@ -89,7 +78,7 @@ function formatTick(value: number): string {
 }
 
 // ---------------------------------------------------------------------------
-// Area chart — electricity demand
+// Area chart — electricity demand & general single-metric trend
 // ---------------------------------------------------------------------------
 
 export function AreaChart({
@@ -109,17 +98,15 @@ export function AreaChart({
 }) {
   if (values.length < 2) return null;
   const padLeft = 30;
-  const padBottom = 15;
-  const padTop = 4;
-  const plotW = Math.max(1, width - padLeft - 2);
+  const padBottom = 16;
+  const padTop = 6;
+  const plotW = Math.max(1, width - padLeft - 4);
   const plotH = Math.max(1, height - padBottom - padTop);
 
   const rawMin = Math.min(...values);
   const rawMax = Math.max(...values);
-  // A demand curve read against a zero baseline is a flat line; the window is
-  // padded around the data instead so the shape is legible.
-  const min = Math.max(0, rawMin - (rawMax - rawMin) * 0.55);
-  const max = rawMax + (rawMax - rawMin) * 0.25;
+  const min = Math.max(0, rawMin - (rawMax - rawMin) * 0.4);
+  const max = rawMax + (rawMax - rawMin) * 0.2;
   const ticks = niceTicks(min, max, 3);
 
   const points = values.map((value, index) => ({
@@ -127,14 +114,15 @@ export function AreaChart({
     y: scaleY(value, min, max, padTop, plotH),
   }));
   const line = spline(points);
-  const area = `${line} L${points[points.length - 1].x},${padTop + plotH} L${points[0].x},${padTop + plotH} Z`;
+  const area = `${line} L${points[points.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L${points[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
+  const latestPt = points[points.length - 1];
 
   return (
     <Svg width={width} height={height}>
       <Defs>
-        <LinearGradient id="demandFill" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={color} stopOpacity={0.3} />
-          <Stop offset="1" stopColor={color} stopOpacity={0.02} />
+        <LinearGradient id="areaGradFill" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={color} stopOpacity={0.25} />
+          <Stop offset="100%" stopColor={color} stopOpacity={0.01} />
         </LinearGradient>
       </Defs>
       <G>
@@ -142,16 +130,25 @@ export function AreaChart({
           const y = scaleY(tick, min, max, padTop, plotH);
           return (
             <G key={tick}>
-              <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} />
-              <SvgText x={padLeft - 5} y={y + 3} fontSize={AXIS_FONT} fill={palette.inkFaint} textAnchor="end">
+              <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.6} />
+              <SvgText x={padLeft - 6} y={y + 3} fontSize={AXIS_FONT} fill={palette.inkFaint} textAnchor="end">
                 {formatTick(tick)}
               </SvgText>
             </G>
           );
         })}
       </G>
-      <Path d={area} fill="url(#demandFill)" />
-      <Path d={line} stroke={color} strokeWidth={1.35} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+      <Path d={area} fill="url(#areaGradFill)" />
+      <Path d={line} stroke={color} strokeWidth={1.8} fill="none" strokeLinejoin="round" strokeLinecap="round" />
+      
+      {/* Endpoint pulse dot */}
+      {latestPt && (
+        <G>
+          <Circle cx={latestPt.x} cy={latestPt.y} r={4} fill={color} />
+          <Circle cx={latestPt.x} cy={latestPt.y} r={7} stroke={color} strokeWidth={1} fill="none" opacity={0.4} />
+        </G>
+      )}
+
       {xLabels.map((label, index) => (
         <SvgText
           key={label}
@@ -188,12 +185,12 @@ export function MultiLineChart({
   const all = series.flatMap((entry) => entry.values);
   if (all.length === 0) return null;
   const padLeft = 24;
-  const padBottom = 15;
-  const padTop = 4;
-  const plotW = Math.max(1, width - padLeft - 2);
+  const padBottom = 16;
+  const padTop = 6;
+  const plotW = Math.max(1, width - padLeft - 4);
   const plotH = Math.max(1, height - padBottom - padTop);
   const min = 0;
-  const max = Math.max(...all) * 1.18 || 1;
+  const max = Math.max(...all) * 1.15 || 1;
   const ticks = niceTicks(min, max, 4);
 
   return (
@@ -202,29 +199,30 @@ export function MultiLineChart({
         const y = scaleY(tick, min, max, padTop, plotH);
         return (
           <G key={tick}>
-            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
             <SvgText x={padLeft - 5} y={y + 3} fontSize={AXIS_FONT} fill={palette.inkFaint} textAnchor="end">
               {formatTick(tick)}
             </SvgText>
           </G>
         );
       })}
-      {series.map((entry) => (
-        <Path
-          key={entry.id}
-          d={spline(
-            entry.values.map((value, index) => ({
-              x: padLeft + (index / (entry.values.length - 1)) * plotW,
-              y: scaleY(value, min, max, padTop, plotH),
-            })),
-          )}
-          stroke={entry.color}
-          strokeWidth={1.2}
-          fill="none"
-          strokeLinejoin="round"
-          strokeLinecap="round"
-        />
-      ))}
+      {series.map((entry) => {
+        const pts = entry.values.map((value, index) => ({
+          x: padLeft + (index / (entry.values.length - 1)) * plotW,
+          y: scaleY(value, min, max, padTop, plotH),
+        }));
+        return (
+          <Path
+            key={entry.id}
+            d={spline(pts)}
+            stroke={entry.color}
+            strokeWidth={1.8}
+            fill="none"
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        );
+      })}
       {xLabels.map((label, index) => (
         <SvgText
           key={label}
@@ -262,22 +260,28 @@ export function BarChart({
 }) {
   if (values.length === 0) return null;
   const padLeft = 30;
-  const padBottom = 15;
-  const padTop = 4;
-  const plotW = Math.max(1, width - padLeft - 2);
+  const padBottom = 16;
+  const padTop = 6;
+  const plotW = Math.max(1, width - padLeft - 4);
   const plotH = Math.max(1, height - padBottom - padTop);
   const max = Math.max(...values) * 1.12 || 1;
   const ticks = niceTicks(0, max, 3);
   const slot = plotW / values.length;
-  const barW = Math.max(2, Math.min(11, slot * 0.56));
+  const barW = Math.max(3, Math.min(14, slot * 0.55));
 
   return (
     <Svg width={width} height={height}>
+      <Defs>
+        <LinearGradient id="barGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={color} stopOpacity={0.95} />
+          <Stop offset="100%" stopColor={color} stopOpacity={0.65} />
+        </LinearGradient>
+      </Defs>
       {ticks.map((tick) => {
         const y = scaleY(tick, 0, max, padTop, plotH);
         return (
           <G key={tick}>
-            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
             <SvgText x={padLeft - 5} y={y + 3} fontSize={AXIS_FONT} fill={palette.inkFaint} textAnchor="end">
               {formatTick(tick)}
             </SvgText>
@@ -285,7 +289,7 @@ export function BarChart({
         );
       })}
       {values.map((value, index) => {
-        const h = Math.max(1, ((value / max) * plotH));
+        const h = Math.max(2, (value / max) * plotH);
         return (
           <Rect
             key={index}
@@ -293,8 +297,8 @@ export function BarChart({
             y={padTop + plotH - h}
             width={barW}
             height={h}
-            fill={color}
-            rx={1}
+            fill="url(#barGrad)"
+            rx={3}
           />
         );
       })}
@@ -326,7 +330,6 @@ export function SeverityBars({
   palette,
 }: {
   labels: string[];
-  /** Ordered severities, drawn as adjacent bars within each day's slot. */
   groups: { id: string; color: string; values: number[] }[];
   width: number;
   height: number;
@@ -334,14 +337,14 @@ export function SeverityBars({
 }) {
   if (labels.length === 0) return null;
   const padLeft = 24;
-  const padBottom = 15;
-  const padTop = 4;
-  const plotW = Math.max(1, width - padLeft - 2);
+  const padBottom = 16;
+  const padTop = 6;
+  const plotW = Math.max(1, width - padLeft - 4);
   const plotH = Math.max(1, height - padBottom - padTop);
   const max = Math.max(1, ...groups.flatMap((group) => group.values)) * 1.15;
   const ticks = niceTicks(0, max, 3);
   const slot = plotW / labels.length;
-  const barW = Math.max(1.5, Math.min(4.5, (slot * 0.62) / groups.length));
+  const barW = Math.max(2.5, Math.min(6, (slot * 0.6) / groups.length));
 
   return (
     <Svg width={width} height={height}>
@@ -349,7 +352,7 @@ export function SeverityBars({
         const y = scaleY(tick, 0, max, padTop, plotH);
         return (
           <G key={tick}>
-            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
             <SvgText x={padLeft - 5} y={y + 3} fontSize={AXIS_FONT} fill={palette.inkFaint} textAnchor="end">
               {formatTick(tick)}
             </SvgText>
@@ -357,22 +360,22 @@ export function SeverityBars({
         );
       })}
       {labels.map((label, index) => {
-        const groupW = barW * groups.length + (groups.length - 1);
+        const groupW = barW * groups.length + (groups.length - 1) * 1.5;
         const originX = padLeft + slot * index + (slot - groupW) / 2;
         return (
           <G key={label}>
             {groups.map((group, gIndex) => {
               const value = group.values[index] ?? 0;
-              const h = Math.max(value > 0 ? 1.5 : 0, (value / max) * plotH);
+              const h = Math.max(value > 0 ? 2 : 0, (value / max) * plotH);
               return (
                 <Rect
                   key={group.id}
-                  x={originX + gIndex * (barW + 1)}
+                  x={originX + gIndex * (barW + 1.5)}
                   y={padTop + plotH - h}
                   width={barW}
                   height={h}
                   fill={group.color}
-                  rx={0.75}
+                  rx={2}
                 />
               );
             })}
@@ -387,7 +390,7 @@ export function SeverityBars({
 }
 
 // ---------------------------------------------------------------------------
-// Gigaton-inspired Impulse Chart — Throughput Packets/s
+// Impulse Chart — Throughput Packets/s
 // ---------------------------------------------------------------------------
 
 export function ImpulseChart({
@@ -406,9 +409,9 @@ export function ImpulseChart({
   color?: string;
 }) {
   if (values.length === 0) return null;
-  const padLeft = 20;
+  const padLeft = 22;
   const padBottom = 16;
-  const padTop = 6;
+  const padTop = 8;
   const padRight = 6;
   const plotW = Math.max(1, width - padLeft - padRight);
   const plotH = Math.max(1, height - padBottom - padTop);
@@ -419,16 +422,24 @@ export function ImpulseChart({
 
   const barCount = values.length;
   const slotW = plotW / Math.max(1, barCount);
-  const barW = Math.max(1.5, Math.min(4, slotW * 0.55));
+  const barW = Math.max(2, Math.min(6, slotW * 0.5));
+  const peakVal = Math.max(...values);
 
   return (
     <Svg width={width} height={height}>
+      <Defs>
+        <LinearGradient id="impulseGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={barColor} stopOpacity={0.9} />
+          <Stop offset="100%" stopColor={barColor} stopOpacity={0.4} />
+        </LinearGradient>
+      </Defs>
+
       {/* Horizontal Grid */}
       {ticks.map((tick) => {
         const y = scaleY(tick, 0, maxVal, padTop, plotH);
         return (
           <G key={tick}>
-            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
             <SvgText x={padLeft - 4} y={y + 3} fontSize={8.5} fill={palette.inkFaint} textAnchor="end">
               {formatTick(tick)}
             </SvgText>
@@ -439,9 +450,9 @@ export function ImpulseChart({
       {/* Impulse Bars */}
       {values.map((val, idx) => {
         const cx = padLeft + idx * slotW + slotW / 2;
-        const h = Math.max(val > 0 ? 2 : 0, (val / maxVal) * plotH);
+        const h = Math.max(val > 0 ? 2.5 : 0, (val / maxVal) * plotH);
         const y = padTop + plotH - h;
-        const isPeak = val === Math.max(...values);
+        const isPeak = val === peakVal && val > 0;
 
         return (
           <G key={idx}>
@@ -450,12 +461,15 @@ export function ImpulseChart({
               y={y}
               width={barW}
               height={h}
-              fill={barColor}
+              fill="url(#impulseGrad)"
               opacity={isPeak ? 1 : val > 0 ? 0.75 : 0.25}
-              rx={1}
+              rx={1.5}
             />
             {isPeak && (
-              <Circle cx={cx} cy={y - 2} r={1.5} fill={barColor} />
+              <G>
+                <Circle cx={cx} cy={y - 3} r={2} fill={barColor} />
+                <Circle cx={cx} cy={y - 3} r={5} stroke={barColor} strokeWidth={0.8} fill="none" opacity={0.6} />
+              </G>
             )}
           </G>
         );
@@ -506,7 +520,7 @@ export function HealthEnvelopeChart({
 }) {
   if (values.length === 0) return null;
   const padLeft = 24;
-  const padRight = 68;
+  const padRight = 72;
   const padBottom = 16;
   const padTop = 10;
   const plotW = Math.max(1, width - padLeft - padRight);
@@ -521,6 +535,8 @@ export function HealthEnvelopeChart({
   }));
 
   const pathD = spline(points);
+  const areaD = `${pathD} L${points[points.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L${points[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
+
   const targetY = scaleY(target, minVal, maxVal, padTop, plotH);
   const criticalY = scaleY(critical, minVal, maxVal, padTop, plotH);
 
@@ -531,24 +547,27 @@ export function HealthEnvelopeChart({
   return (
     <Svg width={width} height={height}>
       <Defs>
-        <LinearGradient id="healthGrad" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0%" stopColor={palette.accent} stopOpacity={0.15} />
-          <Stop offset="100%" stopColor={palette.accent} stopOpacity={0.0} />
+        <LinearGradient id="healthEnvGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={palette.accent} stopOpacity={0.2} />
+          <Stop offset="100%" stopColor={palette.accent} stopOpacity={0.01} />
         </LinearGradient>
       </Defs>
+
+      {/* Area Gradient Fill */}
+      <Path d={areaD} fill="url(#healthEnvGrad)" />
 
       {/* Target Reference Line */}
       <Line
         x1={padLeft}
         y1={targetY}
-        x2={padLeft + plotW + 10}
+        x2={padLeft + plotW + 12}
         y2={targetY}
         stroke={palette.accent}
         strokeWidth={1}
         strokeDasharray="4 4"
-        opacity={0.6}
+        opacity={0.65}
       />
-      <SvgText x={padLeft + plotW + 14} y={targetY + 3.5} fontSize={9} fill={palette.accent} fontWeight="600">
+      <SvgText x={padLeft + plotW + 16} y={targetY + 3.5} fontSize={9} fill={palette.accent} fontWeight="600">
         Target {target}
       </SvgText>
 
@@ -556,14 +575,14 @@ export function HealthEnvelopeChart({
       <Line
         x1={padLeft}
         y1={criticalY}
-        x2={padLeft + plotW + 10}
+        x2={padLeft + plotW + 12}
         y2={criticalY}
         stroke={palette.critical}
         strokeWidth={1}
         strokeDasharray="4 4"
-        opacity={0.6}
+        opacity={0.65}
       />
-      <SvgText x={padLeft + plotW + 14} y={criticalY + 3.5} fontSize={9} fill={palette.critical} fontWeight="600">
+      <SvgText x={padLeft + plotW + 16} y={criticalY + 3.5} fontSize={9} fill={palette.critical} fontWeight="600">
         Critical {critical}
       </SvgText>
 
@@ -571,9 +590,9 @@ export function HealthEnvelopeChart({
       <Path d={pathD} fill="none" stroke={palette.accent} strokeWidth={2} />
 
       {/* Current Endpoint Marker */}
-      <Circle cx={latestPt.x} cy={latestPt.y} r={4} fill={latestTone} />
-      <Circle cx={latestPt.x} cy={latestPt.y} r={7} stroke={latestTone} strokeWidth={1} fill="none" opacity={0.5} />
-      <SvgText x={latestPt.x + 10} y={latestPt.y + 3.5} fontSize={10} fill={palette.ink} fontWeight="700">
+      <Circle cx={latestPt.x} cy={latestPt.y} r={4.5} fill={latestTone} />
+      <Circle cx={latestPt.x} cy={latestPt.y} r={8} stroke={latestTone} strokeWidth={1} fill="none" opacity={0.4} />
+      <SvgText x={latestPt.x + 12} y={latestPt.y + 3.5} fontSize={11} fill={palette.ink} fontWeight="700">
         {latestVal}
       </SvgText>
 
@@ -582,8 +601,8 @@ export function HealthEnvelopeChart({
         const y = scaleY(t, minVal, maxVal, padTop, plotH);
         return (
           <G key={t}>
-            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={0.5} />
-            <SvgText x={padLeft - 4} y={y + 3} fontSize={8.5} fill={palette.inkFaint} textAnchor="end">
+            <Line x1={padLeft} y1={y} x2={padLeft + plotW} y2={y} stroke={palette.grid} strokeWidth={0.5} opacity={0.5} />
+            <SvgText x={padLeft - 5} y={y + 3} fontSize={8.5} fill={palette.inkFaint} textAnchor="end">
               {t}
             </SvgText>
           </G>
@@ -618,7 +637,7 @@ export function MicroSparkline({
   values,
   width = 48,
   height = 14,
-  color = '#3FBF6A',
+  color = '#10B981',
 }: {
   values: number[];
   width?: number;
@@ -638,8 +657,7 @@ export function MicroSparkline({
 
   return (
     <Svg width={width} height={height} style={{ overflow: 'visible' }}>
-      <Path d={`M${points.join(' L')}`} fill="none" stroke={color} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={`M${points.join(' L')}`} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }
-

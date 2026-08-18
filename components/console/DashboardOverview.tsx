@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, G, Line, Path, Polyline, Rect, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polyline, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
@@ -429,25 +429,28 @@ function Metric({
  * at a glance and two rows a tick apart are visibly a tick apart. The colour
  * carries the same rank, so the column can be skimmed without reading a number.
  */
-function TickBar({ value, max = 100, ticks = 22, tone }: { value: number; max?: number; ticks?: number; tone?: string }) {
+function TickBar({ value, max = 100, ticks = 20, tone }: { value: number; max?: number; ticks?: number; tone?: string }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const ratio = clamp(value / Math.max(1, max), 0, 1);
   const lit = Math.round(ratio * ticks);
-  const color = tone ?? (ratio >= 0.66 ? SERIES_A : ratio >= 0.33 ? SERIES_B : palette.neutral);
+  const color = tone ?? (ratio >= 0.66 ? palette.accent : ratio >= 0.33 ? palette.warning : palette.critical);
   return (
-    <View className="flex-row items-center gap-[2px]">
-      {Array.from({ length: ticks }, (_, index) => (
-        <View
-          key={index}
-          style={{
-            width: 3,
-            height: 13,
-            borderRadius: 1,
-            backgroundColor: index < lit ? color : palette.grid,
-          }}
-        />
-      ))}
+    <View className="flex-row items-center gap-[2.5px]">
+      {Array.from({ length: ticks }, (_, index) => {
+        const isLit = index < lit;
+        return (
+          <View
+            key={index}
+            style={{
+              width: 3.5,
+              height: 14,
+              borderRadius: 2,
+              backgroundColor: isLit ? color : isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+            }}
+          />
+        );
+      })}
     </View>
   );
 }
@@ -462,7 +465,7 @@ function ContributionRow({ label, value, suffix = '%', max = 100, tone, first = 
         <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
           {label}
         </Text>
-        <Text className={cn('w-[52px] text-right font-mono text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+        <Text className={cn('w-[52px] text-right font-mono text-[12px] font-semibold', isDark ? 'text-ink' : 'text-ink-inverse')}>
           {value.toFixed(1)}
           {suffix}
         </Text>
@@ -484,7 +487,16 @@ function DeviationScale({ gap, palette }: { gap: number; palette: ConsolePalette
   return (
     <View className="flex-row items-center gap-[4px]">
       {[0, 1, 2, 3, 4].map((step) => (
-        <View key={step} style={{ width: 13, height: 7, borderRadius: 4, backgroundColor: step === index ? tint : palette.grid }} />
+        <View
+          key={step}
+          style={{
+            width: 14,
+            height: 7,
+            borderRadius: 3.5,
+            backgroundColor: step === index ? tint : palette.line,
+            opacity: step === index ? 1 : 0.4,
+          }}
+        />
       ))}
     </View>
   );
@@ -625,8 +637,6 @@ function TrendChart({
   const plotH = height - padT - padB;
 
   const series = smooth.length > 1 ? smooth : [smooth[0] ?? 0, smooth[0] ?? 0];
-  // The measured window occupies the left portion; the projection continues into
-  // the remainder, so NOW always sits at the same place on the frame.
   const nowRatio = project ? 0.74 : 1;
   const nowX = padL + plotW * nowRatio;
 
@@ -636,10 +646,30 @@ function TrendChart({
   const xFor = (index: number, count: number) => padL + (index / Math.max(1, count - 1)) * (plotW * nowRatio);
 
   const points = series.map((value, index) => ({ x: xFor(index, series.length), y: yFor(value) }));
-  const line = points.map((point) => `${point.x},${point.y}`).join(' ');
 
-  // Projection: least-squares slope over the recent window, continued past NOW.
-  let projected = '';
+  // Catmull-Rom cubic bezier spline path
+  let pathD = '';
+  if (points.length >= 3) {
+    pathD = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
+    for (let i = 0; i < points.length - 1; i += 1) {
+      const p0 = points[i - 1] ?? points[i];
+      const p1 = points[i];
+      const p2 = points[i + 1];
+      const p3 = points[i + 2] ?? p2;
+      const c1x = p1.x + (p2.x - p0.x) / 6;
+      const c1y = p1.y + (p2.y - p0.y) / 6;
+      const c2x = p2.x - (p3.x - p1.x) / 6;
+      const c2y = p2.y - (p3.y - p1.y) / 6;
+      pathD += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+  } else {
+    pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+  }
+
+  const areaD = `${pathD} L${points[points.length - 1].x.toFixed(1)},${(padT + plotH).toFixed(1)} L${points[0].x.toFixed(1)},${(padT + plotH).toFixed(1)} Z`;
+
+  // Projection logic
+  let projectedD = '';
   if (project && series.length >= 4) {
     const window = series.slice(-Math.min(10, series.length));
     const n = window.length;
@@ -654,33 +684,37 @@ function TrendChart({
     const slope = den === 0 ? 0 : num / den;
     const step = (plotW * (1 - nowRatio)) / 12;
     const last = series[series.length - 1];
-    const tail: string[] = [`${nowX},${yFor(last)}`];
+    const tailPts: { x: number; y: number }[] = [{ x: nowX, y: yFor(last) }];
     for (let i = 1; i <= 12; i += 1) {
-      // Damped, so a steep recent slope does not imply the plant keeps that up.
       const value = clamp(last + slope * i * 0.55, lo, hi);
-      tail.push(`${nowX + i * step},${yFor(value)}`);
+      tailPts.push({ x: nowX + i * step, y: yFor(value) });
     }
-    projected = tail.join(' ');
+    projectedD = tailPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
   }
 
   const rightFor = (value: number) => padT + plotH - ((value - secondMin) / Math.max(1, secondMax - secondMin)) * plotH;
   const gridRatios = [0, 0.25, 0.5, 0.75, 1];
+  const gradId = `trendGrad_${color.replace('#', '')}`;
 
   return (
     <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-      {/* Plot frame */}
-      <Rect x={padL} y={padT} width={plotW} height={plotH} fill="none" stroke={palette.line} strokeWidth={1} />
+      <Defs>
+        <LinearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0%" stopColor={color} stopOpacity={0.25} />
+          <Stop offset="100%" stopColor={color} stopOpacity={0.01} />
+        </LinearGradient>
+      </Defs>
 
       {/* Horizontal grid + left scale */}
       {gridRatios.map((ratio) => {
         const y = padT + plotH - ratio * plotH;
         return (
           <G key={`h-${ratio}`}>
-            <Line x1={padL} x2={padL + plotW} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} />
-            <SvgText x={padL - 20} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
+            <Line x1={padL} x2={padL + plotW} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="4 4" opacity={0.5} />
+            <SvgText x={padL - 14} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
               {Math.round(lo + ratio * (hi - lo))}
             </SvgText>
-            <SvgText x={padL + plotW + 20} y={y + 3} fontSize={9} fill={palette.inkFaint}>
+            <SvgText x={padL + plotW + 14} y={y + 3} fontSize={9} fill={palette.inkFaint}>
               {(secondMin + ratio * (secondMax - secondMin)).toFixed(1)}
             </SvgText>
           </G>
@@ -692,61 +726,77 @@ function TrendChart({
         const x = padL + (index / Math.max(1, all.length - 1)) * plotW;
         return (
           <G key={`v-${label}-${index}`}>
-            <Line x1={x} y1={padT} x2={x} y2={padT + plotH} stroke={palette.grid} strokeWidth={1} opacity={0.55} />
-            <SvgText x={x} y={height - 10} fontSize={8.5} fill={palette.inkFaint} textAnchor="middle">
+            <Line x1={x} y1={padT} x2={x} y2={padT + plotH} stroke={palette.grid} strokeWidth={1} opacity={0.35} strokeDasharray="2 2" />
+            <SvgText x={x} y={height - 8} fontSize={8.5} fill={palette.inkFaint} textAnchor="middle">
               {label}
             </SvgText>
           </G>
         );
       })}
 
-      {/* Colour rails: the bands each axis is judged against, drawn against the
-          scale they apply to. */}
+      {/* Colour rails */}
       {leftBands?.map((band) => (
         <Rect
           key={`lb-${band.from}-${band.color}`}
-          x={padL - 12}
+          x={padL - 8}
           y={padT + plotH - band.to * plotH}
-          width={5}
+          width={4}
           height={Math.max(1, (band.to - band.from) * plotH)}
           fill={band.color}
+          rx={1}
         />
       ))}
       {rightBands?.map((band) => (
         <Rect
           key={`rb-${band.from}-${band.color}`}
-          x={padL + plotW + 7}
+          x={padL + plotW + 4}
           y={padT + plotH - band.to * plotH}
-          width={5}
+          width={4}
           height={Math.max(1, (band.to - band.from) * plotH)}
           fill={band.color}
+          rx={1}
         />
       ))}
 
-      {/* Measured */}
-      <Polyline points={line} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+      {/* Translucent Area Fill */}
+      <Path d={areaD} fill={`url(#${gradId})`} />
 
-      {/* Projected */}
-      {projected ? (
-        <Polyline points={projected} fill="none" stroke={SERIES_B} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+      {/* Measured Spline */}
+      <Path d={pathD} fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+
+      {/* Projected Line */}
+      {projectedD ? (
+        <Path d={projectedD} fill="none" stroke={SERIES_B} strokeWidth={1.6} strokeDasharray="3 3" opacity={0.8} />
       ) : null}
 
-      {/* NOW */}
+      {/* NOW Reference Line */}
       {project ? (
-        <Line x1={nowX} y1={padT} x2={nowX} y2={padT + plotH} stroke={palette.accent} strokeWidth={1.5} />
+        <G>
+          <Line x1={nowX} y1={padT} x2={nowX} y2={padT + plotH} stroke={palette.accent} strokeWidth={1.5} opacity={0.7} />
+          <Circle cx={nowX} cy={points[points.length - 1]?.y ?? padT} r={4} fill={palette.accent} />
+        </G>
       ) : null}
 
-      {/* Sparse readings on the right axis. Pending ones are hollow grey — they
-          are scheduled, not measured, and must not read as data. */}
+      {/* Event markers */}
       {(events ?? []).map((event, index) => (
-        <Circle
-          key={`ev-${index}`}
-          cx={padL + event.at * plotW}
-          cy={rightFor(event.value)}
-          r={3.5}
-          fill={event.pending ? palette.neutral : palette.ink}
-          opacity={event.pending ? 0.55 : 1}
-        />
+        <G key={`ev-${index}`}>
+          <Circle
+            cx={padL + event.at * plotW}
+            cy={rightFor(event.value)}
+            r={4}
+            fill={event.pending ? palette.neutral : palette.ink}
+            opacity={event.pending ? 0.55 : 1}
+          />
+          <Circle
+            cx={padL + event.at * plotW}
+            cy={rightFor(event.value)}
+            r={7}
+            stroke={event.pending ? palette.neutral : palette.ink}
+            strokeWidth={1}
+            fill="none"
+            opacity={0.35}
+          />
+        </G>
       ))}
     </Svg>
   );
@@ -768,14 +818,10 @@ function Histogram({ values, height = 172, min = 0, max = 100, bins }: { values:
   const padT = 10;
   const plotW = width - padL - 14;
   const plotH = height - padT - padB;
-  // Bin count follows the population. Eighteen bins over five assets is five
-  // lonely spikes and thirteen gaps, which says nothing about the distribution.
   const binCount = bins ?? clamp(Math.round(values.length * 1.5), 6, 18);
   const counts = histogram(values, binCount, min, max);
   const peak = Math.max(1, ...counts);
   const barW = plotW / binCount;
-  // Counts are whole assets, so the axis only ever carries whole numbers —
-  // otherwise a peak of 1 prints "1, 1, 0" up the side.
   const ticks = peak <= 4 ? Array.from({ length: peak + 1 }, (_, i) => i / peak) : [0, 0.5, 1];
 
   return (
@@ -784,7 +830,7 @@ function Histogram({ values, height = 172, min = 0, max = 100, bins }: { values:
         const y = padT + plotH - ratio * plotH;
         return (
           <G key={ratio}>
-            <Line x1={padL} x2={padL + plotW} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <Line x1={padL} x2={padL + plotW} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
             <SvgText x={padL - 8} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
               {Math.round(ratio * peak)}
             </SvgText>
@@ -800,11 +846,11 @@ function Histogram({ values, height = 172, min = 0, max = 100, bins }: { values:
             key={index}
             x={padL + index * barW + 1}
             y={padT + plotH - h}
-            width={Math.max(1, barW - 2)}
+            width={Math.max(2, barW - 2)}
             height={h}
-            rx={1.5}
+            rx={3}
             fill={colour}
-            opacity={0.85}
+            opacity={0.9}
           />
         );
       })}
@@ -828,14 +874,16 @@ function StackedBars({ labels, critical, warning, info, height = 190 }: { labels
   const baseY = padT + plotH;
   const max = Math.max(10, ...labels.map((_, index) => (critical[index] ?? 0) + (warning[index] ?? 0) + (info[index] ?? 0)));
   const step = (width - padL - 16) / Math.max(1, labels.length);
-  const barW = Math.min(26, step * 0.5);
+  const barW = Math.min(24, step * 0.48);
+  const infoColor = isDark ? '#6366F1' : '#4F46E5';
+
   return (
     <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
       {[0, 0.5, 1].map((ratio) => {
         const y = baseY - ratio * plotH;
         return (
           <G key={ratio}>
-            <Line x1={padL} x2={width - 16} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} />
+            <Line x1={padL} x2={width - 16} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
             <SvgText x={padL - 8} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
               {Math.round(ratio * max)}
             </SvgText>
@@ -849,9 +897,9 @@ function StackedBars({ labels, critical, warning, info, height = 190 }: { labels
         const iH = ((info[index] ?? 0) / max) * plotH;
         return (
           <G key={`${label}-${index}`}>
-            <Rect x={x} y={baseY - cH} width={barW} height={cH} fill={palette.critical} />
-            <Rect x={x} y={baseY - cH - wH} width={barW} height={wH} fill={palette.warning} />
-            <Rect x={x} y={baseY - cH - wH - iH} width={barW} height={iH} rx={2} fill={palette.neutral} />
+            {cH > 0 && <Rect x={x} y={baseY - cH} width={barW} height={cH} fill={palette.critical} rx={1} />}
+            {wH > 0 && <Rect x={x} y={baseY - cH - wH} width={barW} height={wH} fill={palette.warning} rx={1} />}
+            {iH > 0 && <Rect x={x} y={baseY - cH - wH - iH} width={barW} height={iH} rx={3} fill={infoColor} />}
             <SvgText x={x + barW / 2} y={height - 8} fontSize={9} fill={palette.inkFaint} textAnchor="middle">
               {label}
             </SvgText>
@@ -872,7 +920,7 @@ function DonutChart({ segments, total, size = 148 }: { segments: { label: string
   let offset = 0;
   return (
     <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Circle cx={size / 2} cy={size / 2} r={radius} stroke={palette.grid} strokeWidth={11 * scale} fill="none" />
+      <Circle cx={size / 2} cy={size / 2} r={radius} stroke={isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'} strokeWidth={13 * scale} fill="none" />
       {segments.map((segment) => {
         const length = (segment.value / sum) * circumference;
         const item = (
@@ -882,9 +930,9 @@ function DonutChart({ segments, total, size = 148 }: { segments: { label: string
             cy={size / 2}
             r={radius}
             stroke={segment.color}
-            strokeWidth={11 * scale}
+            strokeWidth={13 * scale}
             fill="none"
-            strokeDasharray={`${Math.max(0, length - 2)} ${circumference - Math.max(0, length - 2)}`}
+            strokeDasharray={`${Math.max(0, length - 3)} ${circumference - Math.max(0, length - 3)}`}
             strokeDashoffset={-offset}
             strokeLinecap="round"
             transform={`rotate(-90 ${size / 2} ${size / 2})`}
@@ -893,10 +941,10 @@ function DonutChart({ segments, total, size = 148 }: { segments: { label: string
         offset += length;
         return item;
       })}
-      <SvgText x={size / 2} y={size / 2 + 2} textAnchor="middle" fontSize={26 * scale} fontWeight="600" fill={palette.ink}>
+      <SvgText x={size / 2} y={size / 2 + 3} textAnchor="middle" fontSize={28 * scale} fontWeight="700" fill={palette.ink}>
         {total}
       </SvgText>
-      <SvgText x={size / 2} y={size / 2 + 18 * scale} textAnchor="middle" fontSize={9 * scale} fill={palette.inkFaint}>
+      <SvgText x={size / 2} y={size / 2 + 20 * scale} textAnchor="middle" fontSize={9 * scale} fontWeight="600" fill={palette.inkFaint} letterSpacing={1}>
         TOTAL
       </SvgText>
     </Svg>
@@ -1902,10 +1950,10 @@ export function DashboardOverview({
                 <View className="flex-1 justify-start">
                   <Text className={cn('font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Assets on plan</Text>
                   <View className="mt-1 flex-row items-baseline gap-1.5">
-                    <Text className="font-display text-[38px] leading-[42px]" style={{ color: palette.accent }}>
+                    <Text className="font-display text-[40px] font-bold leading-[44px]" style={{ color: palette.accent }}>
                       {onPlanCount}
                     </Text>
-                    <Text className={cn('font-body text-[14px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                    <Text className={cn('font-body text-[15px] font-semibold', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
                       / {metrics.attention.length}
                     </Text>
                   </View>
@@ -1914,10 +1962,25 @@ export function DashboardOverview({
                     <Rule />
                   </View>
 
-                  <Text className={cn('font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Average gap to target</Text>
+                  <View className="flex-row items-center justify-between">
+                    <Text className={cn('font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Average gap to target</Text>
+                    <View
+                      className="rounded-md px-2 py-0.5"
+                      style={{
+                        backgroundColor: mean(gaps) >= -3 ? palette.accentSoft : 'rgba(239, 68, 68, 0.12)',
+                      }}
+                    >
+                      <Text
+                        className="font-mono text-[11px] font-bold"
+                        style={{ color: mean(gaps) >= -3 ? palette.accent : palette.critical }}
+                      >
+                        {mean(gaps) >= 0 ? `+${mean(gaps).toFixed(1)}` : `${mean(gaps).toFixed(1)}`} pts
+                      </Text>
+                    </View>
+                  </View>
                   <View className="mt-1 flex-row items-baseline gap-1.5">
                     <Text
-                      className="font-display text-[38px] leading-[42px]"
+                      className="font-display text-[38px] font-bold leading-[42px]"
                       style={{ color: mean(gaps) >= -3 ? palette.accent : mean(gaps) >= -12 ? palette.warning : palette.critical }}
                     >
                       {mean(gaps) >= 0 ? '+' : ''}{mean(gaps).toFixed(1)}
