@@ -13,15 +13,23 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Aurora — three colour fields on long, unequal periods               */
+/* Aurora — three light fields on long, unequal periods                */
 /* ------------------------------------------------------------------ */
 
-/* Radial gradients rather than blurred boxes: a gradient is soft by
+/* Achromatic, and that is the change that matters most on this page.
+   These three fields used to be blue, violet and green at up to 0.16 alpha,
+   which put a permanent colour cast on every surface — and the moment the
+   ground has hue in it, the green figures on the outcome cards stop reading as
+   information and start reading as one more decorative colour among several.
+   The reference ground is a flat near-black lit by soft white blooms; so is
+   this. Every colour left on the page now means something.
+
+   Radial gradients rather than blurred boxes: a gradient is soft by
    construction, so the field costs no filter pass at any viewport size. */
 .aurora {
   position: absolute;
   inset: -20%;
-  /* Drifts against the scroll, which keeps the colour from feeling painted on
+  /* Drifts against the scroll, which keeps the light from feeling painted on
      the viewport while staying far slower than the content. */
   transform: translate3d(0, calc(var(--depth) * -6vh), 0);
 }
@@ -29,34 +37,34 @@
 .glow {
   position: absolute;
   border-radius: 50%;
-  opacity: 0.55;
+  opacity: 0.6;
   will-change: transform;
 }
 
-.glowBlue {
-  top: 2%;
-  left: 6%;
-  width: 62vw;
-  height: 62vw;
-  background: radial-gradient(circle at 50% 50%, rgba(111, 168, 255, 0.16), rgba(111, 168, 255, 0.05) 42%, transparent 68%);
+.glowHigh {
+  top: 0%;
+  left: 10%;
+  width: 66vw;
+  height: 66vw;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.016) 42%, transparent 68%);
   animation: driftA 58s ease-in-out infinite;
 }
 
-.glowViolet {
-  top: 26%;
-  right: 2%;
-  width: 54vw;
-  height: 54vw;
-  background: radial-gradient(circle at 50% 50%, rgba(167, 139, 250, 0.15), rgba(167, 139, 250, 0.05) 40%, transparent 66%);
+.glowMid {
+  top: 24%;
+  right: 0%;
+  width: 56vw;
+  height: 56vw;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.013) 40%, transparent 66%);
   animation: driftB 71s ease-in-out infinite;
 }
 
-.glowGreen {
-  bottom: 4%;
-  left: 28%;
-  width: 48vw;
-  height: 48vw;
-  background: radial-gradient(circle at 50% 50%, rgba(100, 229, 139, 0.1), rgba(100, 229, 139, 0.035) 38%, transparent 64%);
+.glowLow {
+  bottom: 2%;
+  left: 26%;
+  width: 52vw;
+  height: 52vw;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.01) 38%, transparent 64%);
   animation: driftC 47s ease-in-out infinite;
 }
 
@@ -151,7 +159,7 @@
   width: 3px;
   height: 26vh;
   border-radius: 3px;
-  background: linear-gradient(180deg, transparent, rgba(159, 216, 255, 0.5) 42%, rgba(255, 255, 255, 0.75) 72%, transparent);
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.4) 42%, rgba(255, 255, 255, 0.72) 72%, transparent);
   filter: blur(0.4px);
   opacity: 0;
   animation-name: runDown;
@@ -213,7 +221,7 @@
 }
 
 .waveFar path {
-  stroke: rgba(111, 168, 255, 0.3);
+  stroke: rgba(255, 255, 255, 0.16);
 }
 
 .waveNear {
@@ -224,7 +232,7 @@
 }
 
 .waveNear path {
-  stroke: rgba(167, 139, 250, 0.28);
+  stroke: rgba(255, 255, 255, 0.13);
 }
 
 /* The parallax offset lives on the element, so the loop has to be applied to a
@@ -248,7 +256,7 @@
   left: 0;
   right: 0;
   height: 42vh;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.028) 45%, rgba(159, 216, 255, 0.035) 55%, transparent);
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.026) 45%, rgba(255, 255, 255, 0.032) 55%, transparent);
   opacity: 0;
   animation: sweep 17s cubic-bezier(0.5, 0, 0.5, 1) infinite;
   will-change: transform, opacity;

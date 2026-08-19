@@ -1,0 +1,283 @@
+/* Cutover — the four outcome figures.
+
+   No plate: the section is transparent so the single page-wide field runs
+   straight through it. Structure comes from the hairline cards, not from a
+   change of surface. */
+
+.section {
+  position: relative;
+  padding: clamp(96px, 12vw, 168px) var(--u-gutter) clamp(72px, 9vw, 120px);
+  scroll-margin-top: 76px;
+  isolation: isolate;
+  background: transparent;
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+/* The section's name, oversized and barely above the ground. Clipped by the
+   section's own right edge so it reads as a mark on the page rather than as a
+   word someone forgot to delete. */
+.watermark {
+  position: absolute;
+  top: clamp(28px, 5vw, 78px);
+  right: calc(var(--u-gutter) * -0.2);
+  z-index: 0;
+  font-family: var(--u-font-sans);
+  font-size: clamp(96px, 17vw, 250px);
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 0.82;
+  color: rgba(255, 255, 255, 0.022);
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ */
+/* Head                                                                */
+/* ------------------------------------------------------------------ */
+
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 64px);
+  align-items: end;
+}
+
+.headLeft {
+  min-width: 0;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.eyebrowRule {
+  width: 26px;
+  height: 1px;
+  background: var(--u-line-strong);
+}
+
+.title {
+  margin: clamp(18px, 2.2vw, 26px) 0 0;
+  font-size: clamp(34px, 5vw, 62px);
+  font-weight: 600;
+  letter-spacing: -0.046em;
+  line-height: 1.02;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.lead {
+  max-width: 34ch;
+  margin: 0 0 6px;
+  font-size: clamp(13.5px, 1.1vw, 15px);
+  line-height: 1.66;
+  letter-spacing: -0.008em;
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Figures                                                             */
+/* ------------------------------------------------------------------ */
+
+/* Three across, four items — the fourth drops to its own row on the left.
+   That is the reference layout and it is doing something: the last figure is
+   the confirmation rate, and it earns the pause of its own line. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(12px, 1.4vw, 18px);
+  margin-top: clamp(40px, 5vw, 64px);
+}
+
+.card {
+  position: relative;
+  overflow: hidden;
+  padding: clamp(22px, 2.4vw, 30px) clamp(20px, 2.2vw, 28px) clamp(20px, 2.2vw, 26px);
+  border: 1px solid var(--u-line);
+  border-radius: var(--u-radius-card);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.022), rgba(255, 255, 255, 0.006));
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition: opacity 700ms var(--u-ease), transform 700ms var(--u-ease),
+    border-color 300ms ease, background 300ms ease;
+  transition-delay: var(--delay, 0ms);
+}
+
+.gridShown .card {
+  opacity: 1;
+  transform: none;
+}
+
+.card:hover {
+  border-color: var(--u-line-strong);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01));
+}
+
+.cardLabel {
+  margin: 0;
+  max-width: 22ch;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  line-height: 1.6;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.cardValue {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.44em;
+  margin: clamp(26px, 3vw, 40px) 0 0;
+}
+
+/* The one rationed colour on this band. Green here means measured — these are
+   readings taken off live plants, not a forecast. */
+.cardNumber {
+  font-size: clamp(30px, 3.4vw, 42px);
+  font-weight: 600;
+  letter-spacing: -0.048em;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--u-green);
+}
+
+.cardUnit {
+  font-family: var(--u-font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-ink-2);
+}
+
+.cardFrom {
+  margin: 14px 0 0;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.26);
+}
+
+/* A hairline that draws itself along the foot of the card — the measurement
+   rule the figure was read off. */
+.cardBar {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: linear-gradient(90deg, var(--u-green-line), transparent 78%);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 900ms var(--u-ease);
+  transition-delay: calc(var(--delay, 0ms) + 260ms);
+}
+
+.gridShown .cardBar {
+  transform: scaleX(1);
+}
+
+/* ------------------------------------------------------------------ */
+/* Foot                                                                */
+/* ------------------------------------------------------------------ */
+
+.foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-top: clamp(34px, 4vw, 52px);
+}
+
+.note {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.method {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 42px;
+  padding: 0 22px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--u-ink);
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  text-decoration: none;
+  transition: border-color 280ms var(--u-ease), background 280ms var(--u-ease);
+}
+
+.method svg {
+  transition: transform 300ms var(--u-ease);
+}
+
+.method:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.method:hover svg {
+  transform: translateX(3px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 900px) {
+  .head {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .lead {
+    margin: 0;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .foot {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

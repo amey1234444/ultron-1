@@ -58,37 +58,50 @@ export default function UltronHero() {
   return (
     <section className={styles.hero} ref={heroRef}>
       <div className={styles.inner}>
+        <p className={styles.eyebrow}>Condition monitoring for rotating equipment</p>
+
+        {/* Two lines, and the second one is grey. The sentence turns on "after"
+            — setting the consequence back a step is what makes the headline
+            read as a warning rather than as a boast. */}
         <h1 className={styles.title}>
           <span className={styles.titleLine}>
-            <SplitText text="Total Plant" step={95} />
+            <SplitText text="Stop finding out" step={95} />
           </span>
-          <span className={styles.titleLine}>
-            <SplitText text="Context" delay={190} step={95} />
+          <span className={`${styles.titleLine} ${styles.titleMuted}`}>
+            <SplitText text="after it breaks." delay={190} step={95} />
           </span>
         </h1>
 
-        <p className={styles.lead}>
-          Every channel on your floor, reconciled into one live model — and the single instruction
-          that follows from it.
-        </p>
+        <div className={styles.actions}>
+          <a className={styles.demo} href="/contact">
+            Request a demo
+          </a>
 
-        <a className={styles.console} href="/login">
-          Console
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="1.8"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M5 12h13" />
-            <path d="m12 6 6 6-6 6" />
-          </svg>
-        </a>
+          <a className={styles.console} href="/login">
+            Console
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M5 12h13" />
+              <path d="m12 6 6 6-6 6" />
+            </svg>
+          </a>
+        </div>
+      </div>
+
+      {/* The mark, set as ground. It sits under the horizon on purpose: the rim
+          crosses the letterforms, which is what keeps it reading as part of the
+          field rather than as a second logo. */}
+      <div className={styles.wordmark} aria-hidden="true">
+        Ultron
       </div>
 
       {/* Horizon. A ring mask on a very large circle, clipped to its top slice —

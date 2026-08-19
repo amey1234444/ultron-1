@@ -1,171 +1,55 @@
-/* Site footer — four blocks on one hairline, and a wordmark behind them. */
+/* Site footer — one hairline, one line of type either side of it. */
 
 .footer {
   position: relative;
   border-top: 1px solid var(--u-line);
-  background: var(--u-bg);
-  overflow: hidden;
-  isolation: isolate;
+  background: transparent;
 }
 
 .inner {
-  position: relative;
-  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px clamp(20px, 3vw, 40px);
   max-width: var(--u-max);
   margin: 0 auto;
-  padding: clamp(56px, 7vw, 84px) var(--u-gutter) clamp(48px, 6vw, 72px);
-  display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) repeat(2, minmax(120px, 1fr)) minmax(180px, 1fr);
-  gap: 40px clamp(24px, 4vw, 56px);
-  align-items: start;
-}
-
-.brand {
-  display: inline-block;
-  text-decoration: none;
-}
-
-.brandLogo {
-  display: block;
-  width: 106px;
-  height: auto;
-  transition: opacity 220ms ease;
-}
-
-.brand:hover .brandLogo {
-  opacity: 0.78;
-}
-
-/* --------------------------------- links --------------------------------- */
-
-.col {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.colTitle {
-  margin: 0 0 2px;
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
-}
-
-.colLink {
-  width: fit-content;
-  font-size: 14px;
-  letter-spacing: -0.01em;
-  color: var(--u-ink-2);
-  text-decoration: none;
-  transition: color 220ms ease;
-}
-
-.colLink:hover {
-  color: var(--u-ink);
-}
-
-/* -------------------------------- address -------------------------------- */
-
-.address {
-  font-size: 14px;
-  font-style: normal;
-  line-height: 1.72;
-  color: var(--u-ink-2);
-}
-
-.addressLink {
-  color: var(--u-ink);
-  text-decoration: none;
-  transition: opacity 220ms ease;
-}
-
-.addressLink:hover {
-  opacity: 0.7;
-}
-
-/* ---------------------------------- base --------------------------------- */
-
-.base {
-  position: relative;
-  z-index: 1;
-  max-width: var(--u-max);
-  margin: 0 auto;
-  padding: 0 var(--u-gutter) clamp(40px, 5vw, 64px);
-  display: flex;
-  align-items: center;
-  gap: 22px;
-}
-
-.social {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 38px;
-  height: 38px;
-  flex-shrink: 0;
-  border: 1px solid var(--u-line-strong);
-  border-radius: 50%;
-  color: var(--u-ink-2);
-  transition: color 220ms ease, border-color 220ms ease;
-}
-
-.social:hover {
-  color: var(--u-ink);
-  border-color: rgba(255, 255, 255, 0.3);
+  padding: clamp(24px, 3vw, 34px) var(--u-gutter);
 }
 
 .legal {
   margin: 0;
-  font-family: var(--u-font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 13px;
+  letter-spacing: -0.008em;
   color: var(--u-ink-3);
 }
 
-/* -------------------------------- wordmark ------------------------------- */
-
-/* Oversized and cropped by the footer's own bottom edge. Sits behind the
-   content on z-index 0 and is never read aloud. */
-.wordmark {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 0;
-  padding: 0 var(--u-gutter);
-  margin-bottom: -0.24em;
-  font-size: clamp(80px, 19vw, 260px);
-  font-weight: 700;
-  letter-spacing: -0.055em;
-  line-height: 0.8;
-  text-align: center;
-  color: rgba(255, 255, 255, 0.028);
-  pointer-events: none;
-  -webkit-user-select: none;
-  user-select: none;
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: clamp(16px, 2.4vw, 34px);
 }
 
-/* ------------------------------- responsive ------------------------------ */
-
-@media (max-width: 900px) {
-  .inner {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.link {
+  font-size: 13px;
+  letter-spacing: -0.008em;
+  color: var(--u-ink-3);
+  text-decoration: none;
+  transition: color 220ms ease;
 }
 
-@media (max-width: 520px) {
-  .inner {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
-  }
+.link:hover {
+  color: var(--u-ink);
+}
 
-  .base {
+@media (max-width: 560px) {
+  .inner {
     flex-direction: column;
     align-items: flex-start;
-    gap: 16px;
+  }
+
+  .links {
+    gap: 14px 20px;
   }
 }

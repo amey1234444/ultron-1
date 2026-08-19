@@ -2,11 +2,13 @@ import Head from 'next/head';
 
 import Ambience from '../components/home/Ambience';
 import Capabilities from '../components/home/Capabilities';
-import CaseStudy from '../components/home/CaseStudy';
+import Cutover from '../components/home/Cutover';
+import EvidenceCase from '../components/home/EvidenceCase';
 import Industries from '../components/home/Industries';
+import InTheRoom from '../components/home/InTheRoom';
+import NextStep from '../components/home/NextStep';
+import Operators from '../components/home/Operators';
 import ProductStage from '../components/home/ProductStage';
-import Results from '../components/home/Results';
-import SignalBand from '../components/home/SignalBand';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import UltronHero from '../components/hero/UltronHero';
@@ -16,10 +18,10 @@ export default function HomePage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>ULTRON — Total plant context, in real time</title>
+        <title>ULTRON — Condition monitoring for rotating equipment</title>
         <meta
           name="description"
-          content="ULTRON turns plant telemetry into a single auditable health score per asset, and the one instruction that follows from it."
+          content="Stop finding out after it breaks. ULTRON turns plant telemetry into a named component, an evidence trail and a window to take the machine out in."
         />
         <meta name="theme-color" content="#0A0A0A" />
       </Head>
@@ -27,20 +29,33 @@ export default function HomePage() {
       <SiteNav />
       <Ambience />
 
-      {/* The section order is also the tonal order. Consecutive bands step
-          between black and a lifted grey so the page reads as plates laid on one
-          another rather than as one continuous black scroll:
+      {/* One field, one surface. The page used to alternate between black,
+          grey and a single light plate so consecutive sections read as plates
+          laid on each other; every band below is transparent instead and the
+          fixed Ambience field runs from the fold to the footer without a seam.
+          Structure is carried by hairlines and by the two picture plates, which
+          is what the reference does — the ground never changes value, so the
+          only things on the page that step in brightness are the ones that mean
+          something.
 
-            hero      #080808   flat black, the darkest thing on the site
-            stage     #0a0a0a   page black
-            platform  #101011   lifted — the longest section gets its own plate
-            industries#0a0a0a   back to black; its own hairline gaps carry it
-            deployment light    the single inversion on the site
-            results   #101011   steps back down to grey out of the inversion
-            signals   #0a0a0a   black again, so the three white ticks are the
-                                brightest marks in the lower half of the page */}
+          Reading order, and it is an argument rather than a tour:
+
+            hero       what this is for
+            condition  what measurably changes after cutover
+            evidence   one named plant, and what was actually found there
+            platform   the surface it all lands on
+            industries where it runs
+            next step  the ask
+            in the room who opens a finding, and what each of them checks
+            operators  the same thing, in their words                        */}
       <div className={styles.content}>
         <UltronHero />
+
+        {/* Owns `#condition` — the four outcome figures against their baseline. */}
+        <Cutover />
+
+        {/* Owns `#evidence` — Northfield, fourteen months. */}
+        <EvidenceCase />
 
         {/* The console surface, straightening as it comes into view. */}
         <ProductStage />
@@ -51,16 +66,11 @@ export default function HomePage() {
         {/* Owns `#industries` — the five materials, as specimens. */}
         <Industries />
 
-        {/* The flagship deployment, stated as a result rather than a story. */}
-        <CaseStudy />
+        <NextStep />
 
-        {/* Owns `#results` — the dimension rail and the two specifications. */}
-        <Results />
+        <InTheRoom />
 
-        {/* The closer. The protocol strips that used to sit here have moved to
-            /how-it-works, where the wire format is a question the reader has
-            actually arrived at. */}
-        <SignalBand />
+        <Operators />
 
         <SiteFooter />
       </div>

@@ -1,0 +1,181 @@
+/* Operators — two quotes on black, and the way out of the page. */
+
+.section {
+  position: relative;
+  padding: clamp(56px, 7vw, 92px) var(--u-gutter) clamp(96px, 11vw, 150px);
+  scroll-margin-top: 76px;
+  background: transparent;
+}
+
+.inner {
+  position: relative;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 clamp(34px, 4.4vw, 62px);
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.eyebrowRule {
+  width: 26px;
+  height: 1px;
+  background: var(--u-line-strong);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(40px, 6vw, 90px);
+  align-items: start;
+}
+
+.item {
+  margin: 0;
+  opacity: 0;
+  transform: translate3d(0, 18px, 0);
+  transition: opacity 800ms var(--u-ease), transform 800ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.gridShown .item {
+  opacity: 1;
+  transform: none;
+}
+
+/* The second quote is short, so it is set on the right of its own column and
+   dropped a long way down. The pair balance by weight rather than by grid. */
+.item:nth-child(2) {
+  margin-top: clamp(80px, 13vw, 210px);
+  text-align: right;
+}
+
+.quote {
+  margin: 0;
+}
+
+.quoteText {
+  margin: 0;
+  max-width: 20ch;
+  font-size: clamp(22px, 2.7vw, 34px);
+  font-weight: 500;
+  letter-spacing: -0.036em;
+  line-height: 1.22;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.item:nth-child(2) .quoteText {
+  margin-left: auto;
+  max-width: 18ch;
+}
+
+.attribution {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: clamp(20px, 2.4vw, 28px);
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  line-height: 1.7;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.item:nth-child(2) .attribution {
+  justify-content: flex-end;
+}
+
+.attributionRule {
+  flex-shrink: 0;
+  width: 30px;
+  height: 1px;
+  background: var(--u-line-strong);
+}
+
+.item:nth-child(2) .attributionRule {
+  order: 2;
+}
+
+/* ------------------------------------------------------------------ */
+/* Way out                                                             */
+/* ------------------------------------------------------------------ */
+
+.actions {
+  display: flex;
+  justify-content: center;
+  margin-top: clamp(64px, 8vw, 110px);
+}
+
+.industries {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  height: 46px;
+  padding: 0 26px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--u-ink);
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  text-decoration: none;
+  transition: border-color 280ms var(--u-ease), background 280ms var(--u-ease),
+    box-shadow 300ms var(--u-ease);
+}
+
+.industries svg {
+  transition: transform 300ms var(--u-ease);
+}
+
+.industries:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 34px rgba(255, 255, 255, 0.07);
+}
+
+.industries:hover svg {
+  transform: translateX(3px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 760px) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 48px;
+  }
+
+  /* Stacked, the offset and the right-alignment stop describing anything. */
+  .item:nth-child(2) {
+    margin-top: 0;
+    text-align: left;
+  }
+
+  .item:nth-child(2) .attribution {
+    justify-content: flex-start;
+  }
+
+  .item:nth-child(2) .attributionRule {
+    order: 0;
+  }
+
+  .quoteText,
+  .item:nth-child(2) .quoteText {
+    max-width: none;
+  }
+}

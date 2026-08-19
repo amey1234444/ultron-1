@@ -5,7 +5,7 @@
 // a measure) and builds the rest of the environment around it, so the ground
 // reads as a live instrument rather than as ruled paper:
 //
-//   aurora   three very low-alpha colour fields, drifting on long periods
+//   aurora   three very low-alpha white fields, drifting on long periods
 //   mesh     a fine dot matrix that gives the plane texture beyond lines
 //   rules    the existing column grid
 //   pulses   light traces running down individual rules, like data on a bus
@@ -110,9 +110,9 @@ export default function Ambience({
       aria-hidden="true"
     >
       <div className={styles.aurora}>
-        <span className={`${styles.glow} ${styles.glowBlue}`} />
-        <span className={`${styles.glow} ${styles.glowViolet}`} />
-        <span className={`${styles.glow} ${styles.glowGreen}`} />
+        <span className={`${styles.glow} ${styles.glowHigh}`} />
+        <span className={`${styles.glow} ${styles.glowMid}`} />
+        <span className={`${styles.glow} ${styles.glowLow}`} />
       </div>
 
       <div className={styles.mesh} />

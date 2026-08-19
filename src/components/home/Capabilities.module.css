@@ -9,10 +9,11 @@
   padding: clamp(84px, 11vw, 148px) var(--u-gutter) clamp(60px, 8vw, 110px);
   border-top: 1px solid var(--u-line);
   scroll-margin-top: 76px;
-  /* Lifted off the page black. This is the longest section on the site and the
-     one you spend the most time inside, so it gets its own plate rather than
-     dissolving into the section above and below it. */
-  background: var(--u-band-1);
+  /* Transparent, like every other band. This used to be a lifted plate so the
+     longest section on the site had its own surface, but the page now runs one
+     continuous field from the fold to the footer and a plate here was the one
+     seam left in it. The hairline above still marks where the section starts. */
+  background: transparent;
 }
 
 
