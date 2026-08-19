@@ -25,7 +25,7 @@ body {
   /* Surfaces — true black through to a lifted panel grey. Fully achromatic:
      there is no hue anywhere in the base ramp, which is what lets the two
      rationed colours read as information rather than as decoration. */
-  --u-bg: #0a0a0a;
+  --u-bg: #070707;
   --u-bg-soft: #0e0e0f;
   --u-panel: #121213;
   --u-panel-raised: #191919;
@@ -68,6 +68,15 @@ body {
   --u-green: #64e58b;
   --u-green-soft: rgba(100, 229, 139, 0.1);
   --u-green-line: rgba(100, 229, 139, 0.42);
+
+  /* The marketing surface runs a lime rather than the console's mint. It is the
+     same meaning — measured, now — in the value the landing photography was
+     graded against: on the Northfield plate the mint sits too close to the
+     turquoise in the sky and stops reading as a figure. Landing sections only;
+     the console keeps --u-green so the product's live state never shifts hue. */
+  --u-lime: #b6f57e;
+  --u-lime-soft: rgba(182, 245, 126, 0.16);
+  --u-lime-line: rgba(182, 245, 126, 0.42);
   --u-blue: #6fa8ff;
   --u-blue-soft: rgba(111, 168, 255, 0.1);
   --u-blue-line: rgba(111, 168, 255, 0.42);

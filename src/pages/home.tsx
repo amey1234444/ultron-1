@@ -8,7 +8,6 @@ import Industries from '../components/home/Industries';
 import InTheRoom from '../components/home/InTheRoom';
 import NextStep from '../components/home/NextStep';
 import Operators from '../components/home/Operators';
-import ProductStage from '../components/home/ProductStage';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import UltronHero from '../components/hero/UltronHero';
@@ -23,20 +22,22 @@ export default function HomePage() {
           name="description"
           content="Stop finding out after it breaks. ULTRON turns plant telemetry into a named component, an evidence trail and a window to take the machine out in."
         />
-        <meta name="theme-color" content="#0A0A0A" />
+        <meta name="theme-color" content="#070707" />
       </Head>
 
       <SiteNav />
       <Ambience />
 
-      {/* One field, one surface. The page used to alternate between black,
-          grey and a single light plate so consecutive sections read as plates
-          laid on each other; every band below is transparent instead and the
-          fixed Ambience field runs from the fold to the footer without a seam.
-          Structure is carried by hairlines and by the two picture plates, which
-          is what the reference does — the ground never changes value, so the
-          only things on the page that step in brightness are the ones that mean
-          something.
+      {/* One field, one surface. Every band below is transparent and the fixed
+          Ambience layers run from the fold to the footer without a seam. There
+          are no rules between sections: tone rises and falls instead, because
+          alternating bands carry a vertical gradient that starts and ends fully
+          transparent, so a section change is felt rather than drawn.
+
+          The console screenshot that used to sit between evidence and platform
+          is gone. Two photographs carry this page — a works at dusk and two
+          people arguing over a report — and a third picture that was really a
+          product shot diluted both of them.
 
           Reading order, and it is an argument rather than a tour:
 
@@ -56,9 +57,6 @@ export default function HomePage() {
 
         {/* Owns `#evidence` — Northfield, fourteen months. */}
         <EvidenceCase />
-
-        {/* The console surface, straightening as it comes into view. */}
-        <ProductStage />
 
         {/* Owns `#platform` — scrolling copy against a pinned panel. */}
         <Capabilities />

@@ -1,346 +1,81 @@
-/* The animated field behind the public pages. See Ambience.tsx for the layer
-   order and why each one exists. Every animation here is transform/opacity so
-   the whole thing composites off the main thread. */
+/* Ambience — five fixed layers, no motion.
+
+   Order matters and is the order they are declared in: mesh, then the two
+   blooms that light the centre, then the vignette that closes the frame down,
+   then grain over the top of all of it. Grain has to be last because `overlay`
+   composites against whatever is already painted — put it lower in the stack
+   and it dithers nothing. */
 
 .field {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  overflow: hidden;
-  /* Written per scroll frame by the component; 0 until then. */
-  --depth: 0;
 }
 
-/* ------------------------------------------------------------------ */
-/* Aurora — three light fields on long, unequal periods                */
-/* ------------------------------------------------------------------ */
-
-/* Achromatic, and that is the change that matters most on this page.
-   These three fields used to be blue, violet and green at up to 0.16 alpha,
-   which put a permanent colour cast on every surface — and the moment the
-   ground has hue in it, the green figures on the outcome cards stop reading as
-   information and start reading as one more decorative colour among several.
-   The reference ground is a flat near-black lit by soft white blooms; so is
-   this. Every colour left on the page now means something.
-
-   Radial gradients rather than blurred boxes: a gradient is soft by
-   construction, so the field costs no filter pass at any viewport size. */
-.aurora {
-  position: absolute;
-  inset: -20%;
-  /* Drifts against the scroll, which keeps the light from feeling painted on
-     the viewport while staying far slower than the content. */
-  transform: translate3d(0, calc(var(--depth) * -6vh), 0);
-}
-
-.glow {
-  position: absolute;
-  border-radius: 50%;
-  opacity: 0.6;
-  will-change: transform;
-}
-
-.glowHigh {
-  top: 0%;
-  left: 10%;
-  width: 66vw;
-  height: 66vw;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.016) 42%, transparent 68%);
-  animation: driftA 58s ease-in-out infinite;
-}
-
-.glowMid {
-  top: 24%;
-  right: 0%;
-  width: 56vw;
-  height: 56vw;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.042), rgba(255, 255, 255, 0.013) 40%, transparent 66%);
-  animation: driftB 71s ease-in-out infinite;
-}
-
-.glowLow {
-  bottom: 2%;
-  left: 26%;
-  width: 52vw;
-  height: 52vw;
-  background: radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.034), rgba(255, 255, 255, 0.01) 38%, transparent 64%);
-  animation: driftC 47s ease-in-out infinite;
-}
-
-@keyframes driftA {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  33% {
-    transform: translate3d(7vw, 5vh, 0) scale(1.13);
-  }
-  66% {
-    transform: translate3d(-4vw, 9vh, 0) scale(0.94);
-  }
-}
-
-@keyframes driftB {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1.04);
-  }
-  40% {
-    transform: translate3d(-9vw, -6vh, 0) scale(0.9);
-  }
-  70% {
-    transform: translate3d(-3vw, 7vh, 0) scale(1.16);
-  }
-}
-
-@keyframes driftC {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(0.96);
-  }
-  50% {
-    transform: translate3d(6vw, -8vh, 0) scale(1.2);
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Mesh — a fine dot matrix, so the plane has texture, not just lines  */
-/* ------------------------------------------------------------------ */
-
-.mesh {
-  --mesh-tile: 46px;
-  position: absolute;
-  /* Oversized so the diagonal drift never exposes an edge. */
-  inset: -80px;
-  background-image: radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.055) 1px, transparent 0);
-  background-size: var(--mesh-tile) var(--mesh-tile);
-  -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 42%, #000 30%, transparent 78%);
-  mask-image: radial-gradient(ellipse 90% 70% at 50% 42%, #000 30%, transparent 78%);
-  animation: meshDrift 34s linear infinite;
-  will-change: transform;
-}
-
-/* Travels exactly one tile in each axis, so the loop is seamless at whatever
-   tile size the breakpoint sets. */
-@keyframes meshDrift {
-  from {
-    transform: translate3d(0, 0, 0);
-  }
-  to {
-    transform: translate3d(var(--mesh-tile), var(--mesh-tile), 0);
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Pulses — light running down the column rules                        */
-/* ------------------------------------------------------------------ */
-
-/* Mirrors the measure Rules.module.css uses, so a pulse lands on a hairline
-   rather than beside it. */
-.track {
+.layer {
   position: absolute;
   inset: 0;
-  display: flex;
-  justify-content: space-between;
-  width: min(var(--u-max), calc(100% - var(--u-gutter) * 2));
-  margin: 0 auto;
 }
 
-.lane {
-  position: relative;
-  width: 1px;
-  height: 100%;
+/* 1 — the mesh.
+
+   Radially masked rather than faded with opacity, so it is densest just above
+   the optical centre and gone entirely by the edges. A grid that runs to the
+   frame edge reads as graph paper; one that dissolves reads as depth. */
+.grid {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.032) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.032) 1px, transparent 1px);
+  background-size: 56px 56px;
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(
+    100% 70% at 50% 42%,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.16) 48%,
+    transparent 76%
+  );
+  mask-image: radial-gradient(
+    100% 70% at 50% 42%,
+    rgba(0, 0, 0, 0.55) 0%,
+    rgba(0, 0, 0, 0.16) 48%,
+    transparent 76%
+  );
 }
 
-.pulse {
-  position: absolute;
-  left: -1px;
-  width: 3px;
-  height: 26vh;
-  border-radius: 3px;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.4) 42%, rgba(255, 255, 255, 0.72) 72%, transparent);
-  filter: blur(0.4px);
-  opacity: 0;
-  animation-name: runDown;
-  animation-timing-function: cubic-bezier(0.4, 0, 0.5, 1);
-  animation-iteration-count: infinite;
-  will-change: transform, opacity;
+/* 2 — light entering from above the fold. */
+.top {
+  background: radial-gradient(
+    78% 52% at 50% -10%,
+    rgba(255, 255, 255, 0.07) 0%,
+    rgba(255, 255, 255, 0.02) 34%,
+    transparent 66%
+  );
 }
 
-@keyframes runDown {
-  0% {
-    transform: translate3d(0, -30vh, 0);
-    opacity: 0;
-  }
-  12% {
-    opacity: 0.85;
-  }
-  72% {
-    opacity: 0.7;
-  }
-  100% {
-    transform: translate3d(0, 100vh, 0);
-    opacity: 0;
-  }
+/* 3 — the weaker answering bloom from below, which is what stops the lower half
+   of a long page from going dead flat. */
+.bottom {
+  background: radial-gradient(
+    70% 50% at 50% 110%,
+    rgba(255, 255, 255, 0.055) 0%,
+    transparent 60%
+  );
 }
 
-/* ------------------------------------------------------------------ */
-/* Waves — two telemetry traces scrolling at different speeds          */
-/* ------------------------------------------------------------------ */
-
-.waves {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-  mask-image: linear-gradient(90deg, transparent, #000 14%, #000 86%, transparent);
-}
-
-.wave {
-  position: absolute;
-  left: 0;
-  /* The path is drawn twice end to end, so half of this is one full period. */
-  width: 200%;
-  height: 26vh;
-  fill: none;
-  vector-effect: non-scaling-stroke;
-  will-change: transform;
-}
-
-.wave path {
-  stroke-width: 1.15;
-  vector-effect: non-scaling-stroke;
-}
-
-.waveFar {
-  top: 34%;
-  opacity: 0.5;
-  transform: translate3d(0, calc(var(--depth) * 8vh), 0);
-  animation: scrollWave 42s linear infinite;
-}
-
-.waveFar path {
-  stroke: rgba(255, 255, 255, 0.16);
-}
-
-.waveNear {
-  top: 58%;
-  opacity: 0.42;
-  transform: translate3d(0, calc(var(--depth) * -11vh), 0);
-  animation: scrollWave 27s linear infinite reverse;
-}
-
-.waveNear path {
-  stroke: rgba(255, 255, 255, 0.13);
-}
-
-/* The parallax offset lives on the element, so the loop has to be applied to a
-   wrapper-free translate that composes with it — hence translateX only here,
-   expressed as a percentage of the doubled width (50% = one period). */
-@keyframes scrollWave {
-  from {
-    translate: 0 0;
-  }
-  to {
-    translate: -50% 0;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Scan — one slow instrument sweep                                    */
-/* ------------------------------------------------------------------ */
-
-.scan {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 42vh;
-  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.026) 45%, rgba(255, 255, 255, 0.032) 55%, transparent);
-  opacity: 0;
-  animation: sweep 17s cubic-bezier(0.5, 0, 0.5, 1) infinite;
-  will-change: transform, opacity;
-}
-
-@keyframes sweep {
-  0% {
-    transform: translate3d(0, -45vh, 0);
-    opacity: 0;
-  }
-  18%,
-  74% {
-    opacity: 1;
-  }
-  100% {
-    transform: translate3d(0, 100vh, 0);
-    opacity: 0;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Grain + vignette — finish                                           */
-/* ------------------------------------------------------------------ */
-
-/* Wide gradients band badly on 8-bit panels; a little noise breaks the steps. */
-.grain {
-  position: absolute;
-  inset: 0;
-  opacity: 0.038;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
-}
-
-/* Keeps the centre of the page the brightest thing on it, so the field never
-   competes with the copy sitting on top of it. */
+/* 4 — corner vignette. */
 .vignette {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse 78% 62% at 50% 45%, transparent 42%, rgba(6, 6, 7, 0.55) 100%);
+  background: radial-gradient(
+    130% 105% at 50% 42%,
+    transparent 42%,
+    rgba(0, 0, 0, 0.55) 78%,
+    rgba(0, 0, 0, 0.85) 100%
+  );
 }
 
-/* ------------------------------------------------------------------ */
-/* Narrow screens                                                      */
-/* ------------------------------------------------------------------ */
-
-@media (max-width: 760px) {
-  /* The measure collapses to roughly the text column here, so the pulses would
-     stack on top of the copy; the colour field and mesh carry it instead. */
-  .track,
-  .waveNear {
-    display: none;
-  }
-
-  .mesh {
-    --mesh-tile: 38px;
-  }
-}
-
-/* ------------------------------------------------------------------ */
-/* Reduced motion                                                      */
-/* ------------------------------------------------------------------ */
-
-/* The composition is the point, not the movement — so everything holds its
-   first frame rather than disappearing. The sweep is the one layer with no
-   static meaning, so it goes. */
-.still .glow,
-.still .mesh,
-.still .wave,
-.still .pulse {
-  animation: none;
-}
-
-.still .scan {
-  display: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .glow,
-  .mesh,
-  .wave,
-  .pulse {
-    animation: none;
-  }
-
-  .scan {
-    display: none;
-  }
+/* 5 — grain. `overlay` rather than a flat white wash, so it dithers the blooms
+   without lifting the black. */
+.grain {
+  background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+  opacity: 0.05;
+  mix-blend-mode: overlay;
 }

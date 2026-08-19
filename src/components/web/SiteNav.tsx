@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 
 import logoDark from '../../../assets/brand/logo-dark.png';
 import { useAuth } from '../../context/AuthContext';
@@ -8,20 +8,34 @@ import styles from './SiteNav.module.css';
 
 const LOGO_SRC = typeof logoDark === 'string' ? logoDark : logoDark.src;
 
-type NavItem = { label: string; href: string };
+type NavItem =
+  | { label: string; href: string }
+  | { label: string; items: { label: string; href: string; hint: string }[] };
 
-// Flat, five entries, no dropdowns. The panels this bar used to carry were
-// describing a site with more rooms than it has — every destination below is a
-// real page or a section id that exists on the landing page.
+// Every destination in here resolves to something the site actually has: a real
+// page, or a section id that exists on the landing page. The bar never
+// advertises a route that 404s or an anchor that scrolls nowhere.
 const NAV: NavItem[] = [
-  { label: 'Platform', href: '/#platform' },
-  { label: 'Industries', href: '/#industries' },
-  { label: 'Condition', href: '/#condition' },
-  { label: 'Evidence', href: '/#evidence' },
-  { label: 'Company', href: '/about' },
+  {
+    label: 'Platform',
+    items: [
+      { label: 'How it works', href: '/how-it-works', hint: 'Machine to decision, hop by hop' },
+      { label: 'Capabilities', href: '/#platform', hint: 'Adaptive, explainable, predictive' },
+      { label: 'Industries', href: '/#industries', hint: 'Cement, power, boilers, mining, steel' },
+      { label: 'Outcomes', href: '/#condition', hint: 'What changes after cutover' },
+    ],
+  },
+  {
+    label: 'Company',
+    items: [
+      { label: 'About', href: '/about', hint: 'Why we built it this way' },
+      { label: 'FAQ', href: '/about#faq', hint: 'What evaluators ask us' },
+    ],
+  },
+  { label: 'Contact', href: '/contact' },
 ];
 
-function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
+function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' | 'chevron' }) {
   const shared = {
     width: 15,
     height: 15,
@@ -49,6 +63,12 @@ function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
           <path d="M14 12H4" />
         </svg>
       );
+    case 'chevron':
+      return (
+        <svg {...shared} width={13} height={13} strokeWidth={2.2}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      );
     case 'menu':
       return (
         <svg {...shared} width={17} height={17}>
@@ -64,6 +84,80 @@ function Icon({ name }: { name: 'arrow' | 'login' | 'menu' | 'close' }) {
         </svg>
       );
   }
+}
+
+/**
+ * A top-level entry that owns a panel.
+ *
+ * Opens on hover for pointers and on click for everything else, and closes on
+ * Escape or on focus leaving the group — so the panel is reachable by keyboard
+ * without the hover intent trapping anyone inside it.
+ */
+function NavGroup({
+  label,
+  items,
+  onNavigate,
+}: {
+  label: string;
+  items: { label: string; href: string; hint: string }[];
+  onNavigate: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const panelId = useId();
+  const groupRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open]);
+
+  return (
+    <div
+      ref={groupRef}
+      className={styles.group}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onBlur={(event) => {
+        if (!groupRef.current?.contains(event.relatedTarget as Node | null)) setOpen(false);
+      }}
+    >
+      <button
+        type="button"
+        className={`${styles.link} ${styles.linkButton} ${open ? styles.linkOpen : ''}`}
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {label}
+        <span className={styles.chevron}>
+          <Icon name="chevron" />
+        </span>
+      </button>
+
+      <div className={`${styles.panel} ${open ? styles.panelOpen : ''}`} id={panelId}>
+        <div className={styles.panelInner}>
+          {items.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={styles.panelItem}
+              onClick={() => {
+                setOpen(false);
+                onNavigate();
+              }}
+            >
+              <span className={styles.panelItemLabel}>{item.label}</span>
+              <span className={styles.panelItemHint}>{item.hint}</span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function SiteNav() {
@@ -106,34 +200,32 @@ export default function SiteNav() {
         <div className={styles.inner}>
           <Link href="/home" className={styles.brand} aria-label="ULTRON home" onClick={close}>
             <img src={LOGO_SRC} alt="ULTRON" className={styles.brandLogo} />
-            {/* The one place green appears in the chrome, and it means what it
-                means everywhere else on the site: measured, now. */}
-            <span className={styles.live}>
-              <span className={styles.liveDot} aria-hidden="true" />
-              Live
-            </span>
           </Link>
 
           <nav className={styles.nav} aria-label="Primary">
-            {NAV.map((item) => (
-              <Link
-                key={item.label}
-                href={item.href}
-                className={`${styles.link} ${isCurrent(item.href) ? styles.linkActive : ''}`}
-                aria-current={isCurrent(item.href) ? 'page' : undefined}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {NAV.map((item) =>
+              'items' in item ? (
+                <NavGroup key={item.label} label={item.label} items={item.items} onNavigate={close} />
+              ) : (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className={`${styles.link} ${isCurrent(item.href) ? styles.linkActive : ''}`}
+                  aria-current={isCurrent(item.href) ? 'page' : undefined}
+                >
+                  {item.label}
+                </Link>
+              ),
+            )}
           </nav>
 
           <div className={styles.actions}>
             <Link href={consoleHref} className={styles.ghost}>
               {user ? 'Console' : 'Sign in'}
             </Link>
-            <Link href="/contact" className={styles.cta}>
-              Request a demo
-              <Icon name="arrow" />
+            <Link href={user ? '/' : '/signup'} className={styles.cta}>
+              {user ? 'Open console' : 'Request access'}
+              <Icon name={user ? 'arrow' : 'login'} />
             </Link>
             <button
               type="button"
@@ -150,7 +242,7 @@ export default function SiteNav() {
 
       {open && (
         <div className={styles.sheet} role="dialog" aria-modal="true" aria-label="Menu">
-          {NAV.map((item, index) => (
+          {NAV.flatMap((item) => ('items' in item ? item.items : [item])).map((item, index) => (
             <Link
               key={item.href}
               href={item.href}
@@ -163,14 +255,15 @@ export default function SiteNav() {
             </Link>
           ))}
           <div className={styles.sheetActions}>
-            <Link href="/contact" className={styles.cta} onClick={close}>
-              Request a demo
-              <Icon name="arrow" />
-            </Link>
-            <Link href={consoleHref} className={styles.ghost} onClick={close}>
+            <Link href={consoleHref} className={styles.cta} onClick={close}>
               <Icon name={user ? 'arrow' : 'login'} />
               {user ? 'Open console' : 'Sign in'}
             </Link>
+            {!user && (
+              <Link href="/signup" className={styles.ghost} onClick={close}>
+                Request access
+              </Link>
+            )}
           </div>
         </div>
       )}

@@ -37,7 +37,6 @@
 .brand {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
   flex-shrink: 0;
   text-decoration: none;
   border-radius: 8px;
@@ -54,51 +53,6 @@
   opacity: 0.78;
 }
 
-/* Status, not decoration: the bar is telling you the platform is receiving.
-   Same green as every other "measured now" mark on the site. */
-.live {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 3px 8px 3px 6px;
-  border: 1px solid var(--u-green-line);
-  border-radius: 999px;
-  background: var(--u-green-soft);
-  font-family: var(--u-font-mono);
-  font-size: 8.5px;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--u-green);
-  white-space: nowrap;
-}
-
-.liveDot {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--u-green);
-  animation: livePulse 2.4s ease-in-out infinite;
-}
-
-@keyframes livePulse {
-  0%,
-  100% {
-    opacity: 1;
-    box-shadow: 0 0 0 0 rgba(100, 229, 139, 0.45);
-  }
-  55% {
-    opacity: 0.55;
-    box-shadow: 0 0 0 4px rgba(100, 229, 139, 0);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .liveDot {
-    animation: none;
-  }
-}
-
 /* ---------------------------------- nav ---------------------------------- */
 
 .nav {
@@ -106,6 +60,10 @@
   align-items: center;
   gap: 2px;
   margin-right: auto;
+}
+
+.group {
+  position: relative;
 }
 
 .link {
@@ -125,14 +83,96 @@
   transition: color 200ms ease, background 200ms ease;
 }
 
+.linkButton {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 .link:hover,
-.link:focus-visible {
+.link:focus-visible,
+.linkOpen {
   color: var(--u-ink);
   background: rgba(255, 255, 255, 0.045);
 }
 
 .linkActive {
   color: var(--u-ink);
+}
+
+.chevron {
+  display: inline-flex;
+  color: var(--u-ink-3);
+  transition: transform 280ms var(--u-ease), color 200ms ease;
+}
+
+.linkOpen .chevron {
+  transform: rotate(180deg);
+  color: var(--u-ink-2);
+}
+
+/* -------------------------------- dropdown ------------------------------- */
+
+/* The panel keeps its box in the layout at all times and animates opacity and
+   lift, so opening it never reflows the bar. `visibility` is what stops a
+   closed panel from swallowing clicks. */
+.panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 268px;
+  padding: 6px;
+  border: 1px solid var(--u-line-strong);
+  border-radius: 14px;
+  background: rgba(14, 14, 15, 0.96);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  opacity: 0;
+  visibility: hidden;
+  transform: translate3d(0, -6px, 0);
+  transition: opacity 200ms ease, transform 260ms var(--u-ease), visibility 0s linear 260ms;
+}
+
+.panelOpen {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition: opacity 200ms ease, transform 260ms var(--u-ease), visibility 0s;
+}
+
+.panelInner {
+  display: flex;
+  flex-direction: column;
+}
+
+.panelItem {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 9px;
+  text-decoration: none;
+  transition: background 200ms ease;
+}
+
+.panelItem:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.panelItemLabel {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  color: var(--u-ink);
+}
+
+.panelItemHint {
+  display: block;
+  margin-top: 3px;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--u-ink-3);
 }
 
 /* -------------------------------- actions -------------------------------- */
@@ -173,26 +213,15 @@
   border-color: rgba(255, 255, 255, 0.24);
 }
 
-/* Solid white, like every "request a demo" on the site. One filled block per
-   surface, and this is the bar's. */
 .cta {
-  border: 1px solid #ffffff;
-  background: #ffffff;
-  color: #0a0a0a;
-  font-weight: 600;
-}
-
-.cta svg {
-  transition: transform 280ms var(--u-ease);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #1b1b1c;
+  color: #ffffff;
 }
 
 .cta:hover {
-  background: #ececea;
-  border-color: #ececea;
-}
-
-.cta:hover svg {
-  transform: translateX(2px);
+  background: #262627;
+  border-color: rgba(255, 255, 255, 0.24);
 }
 
 .burger {
@@ -305,24 +334,12 @@
   }
 }
 
-/* The demo button is the ask, so it is the one that survives the squeeze; the
-   sign-in link is a row inside the sheet instead. */
-@media (max-width: 620px) {
-  .actions .ghost {
-    display: none;
-  }
-
-  .sheetActions .ghost {
-    display: inline-flex;
-  }
-}
-
-@media (max-width: 430px) {
-  .live {
-    display: none;
-  }
-
+@media (max-width: 560px) {
   .actions .cta {
-    padding: 0 12px;
+    display: none;
+  }
+
+  .sheetActions .cta {
+    display: inline-flex;
   }
 }

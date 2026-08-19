@@ -1,8 +1,8 @@
 // Landing hero.
 //
-// One sentence on the page's centre axis, one link, and a horizon behind it.
-// Nothing else — no eyebrow, no protocol rail, no second button competing with
-// the first. The symmetry is the composition.
+// A classification line, one sentence on the page's centre axis, one link, and
+// a horizon behind it. Nothing else — no wordmark, no protocol rail, no second
+// button competing with the first. The symmetry is the composition.
 //
 // The only motion is scroll-driven: the horizon rises and opens as you move
 // down the fold while the copy settles back. Values are written straight onto
@@ -72,11 +72,8 @@ export default function UltronHero() {
           </span>
         </h1>
 
+        {/* One button, on the axis. The fold asks for exactly one thing. */}
         <div className={styles.actions}>
-          <a className={styles.demo} href="/contact">
-            Request a demo
-          </a>
-
           <a className={styles.console} href="/login">
             Console
             <svg
@@ -95,13 +92,6 @@ export default function UltronHero() {
             </svg>
           </a>
         </div>
-      </div>
-
-      {/* The mark, set as ground. It sits under the horizon on purpose: the rim
-          crosses the letterforms, which is what keeps it reading as part of the
-          field rather than as a second logo. */}
-      <div className={styles.wordmark} aria-hidden="true">
-        Ultron
       </div>
 
       {/* Horizon. A ring mask on a very large circle, clipped to its top slice —

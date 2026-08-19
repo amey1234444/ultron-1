@@ -6,9 +6,10 @@
 // also why the ranges are ranges and not point estimates — a single figure
 // would be the more confident-looking thing to print and the less honest one.
 //
-// The word "Cutover" is set oversized and nearly black behind the grid. It is
-// the section's own name used as ground rather than as a label, which is what
-// lets the eyebrow stay small enough to read as an index entry.
+// The word "Cutover" is set oversized behind the grid, filled with a lime
+// gradient that fades to nothing before it reaches the cards. The section's own
+// name used as ground rather than as a label, which is what lets the head stay
+// small enough to read as a statement instead of a banner.
 
 import Link from 'next/link';
 
@@ -18,7 +19,7 @@ import { Arrow, useInView } from './primitives';
 type Metric = {
   /** What was measured. */
   label: string;
-  /** The observed range after cutover — the only green thing in the card. */
+  /** The observed range after cutover — the only lime thing in the card. */
   value: string;
   unit: string;
   /** The twelve-month baseline the range is measured against. */
@@ -26,24 +27,9 @@ type Metric = {
 };
 
 const METRICS: Metric[] = [
-  {
-    label: 'Unplanned downtime',
-    value: '210–265',
-    unit: 'hrs / yr',
-    from: 'From 380 hrs / yr',
-  },
-  {
-    label: 'Mean time between failures',
-    value: '9–14',
-    unit: 'months',
-    from: 'From 4.5 months',
-  },
-  {
-    label: 'Warning before failure',
-    value: '7–14',
-    unit: 'days',
-    from: 'From none reactive',
-  },
+  { label: 'Unplanned downtime', value: '210–265', unit: 'hrs / yr', from: 'From 380 hrs / yr' },
+  { label: 'Mean time between failures', value: '9–14', unit: 'months', from: 'From 4.5 months' },
+  { label: 'Warning before failure', value: '7–14', unit: 'days', from: 'From none, reactive' },
   {
     label: 'Findings confirmed on inspection',
     value: '95',
@@ -58,47 +44,36 @@ export default function Cutover() {
   return (
     <section id="condition" className={styles.section}>
       {/* Decorative: the section signs itself behind the figures. */}
-      <span className={styles.watermark} aria-hidden="true">
+      <span className={styles.ghost} aria-hidden="true">
         Cutover
       </span>
 
       <div className={styles.inner}>
         <header className={styles.head}>
-          <div className={styles.headLeft}>
-            <p className={styles.eyebrow}>
-              <span className={styles.eyebrowRule} aria-hidden="true" />
-              Cutover
-            </p>
-            <h2 className={styles.title}>
-              What changes
-              <br />
-              after cutover
-            </h2>
-          </div>
-
+          <h2 className={styles.title}>What changes after cutover</h2>
           <p className={styles.lead}>
             Measured against the twelve months before monitoring went live.
           </p>
         </header>
 
-        <div ref={ref} className={`${styles.grid} ${inView ? styles.gridShown : ''}`}>
+        <div ref={ref} className={`${styles.cards} ${inView ? styles.shown : ''}`}>
           {METRICS.map((metric, index) => (
             <article
               key={metric.label}
               className={styles.card}
-              style={{ ['--delay' as string]: `${index * 110}ms` }}
+              style={{ ['--delay' as string]: `${index * 90}ms` }}
             >
               <h3 className={styles.cardLabel}>{metric.label}</h3>
 
-              <p className={styles.cardValue}>
-                <span className={styles.cardNumber}>{metric.value}</span>
-                <span className={styles.cardUnit}>{metric.unit}</span>
-              </p>
-
-              <p className={styles.cardFrom}>{metric.from}</p>
-
-              {/* The step off the baseline, drawn once on entry. */}
-              <span className={styles.cardBar} aria-hidden="true" />
+              {/* Pushed to the foot of the card so all four figures sit on one
+                  line however long the label above them wraps. */}
+              <div className={styles.cardFoot}>
+                <p className={styles.cardFigure}>
+                  <b className={styles.cardValue}>{metric.value}</b>
+                  <span className={styles.cardUnit}>{metric.unit}</span>
+                </p>
+                <p className={styles.cardFrom}>{metric.from}</p>
+              </div>
             </article>
           ))}
         </div>
