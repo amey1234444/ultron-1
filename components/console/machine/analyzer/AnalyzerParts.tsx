@@ -1,11 +1,9 @@
 /**
  * Shared furniture for the Analyzer workspace.
  *
- * The Analyzer was a single scrolling document: six subjects stacked one under
- * another, each in a full-width card, each with its own idea of how a heading,
- * a filter row and a summary should look. These are the pieces every tab now
- * builds from, so the six tabs read as one instrument rather than six pages
- * that happen to share a tab bar.
+ * These are the pieces every analysis screen builds from, so Diagnosis, Advance
+ * Diagnosis and Signal read as one instrument rather than three pages that
+ * happen to share a tab bar.
  *
  * Nothing here introduces a colour or a size that is not already in the console
  * kit — they resolve out of `ConsolePalette` exactly like `components/ui`.
@@ -17,7 +15,7 @@ import { Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { alpha, consolePalette, variantStyle, type ConsolePalette, type IconName, type Variant } from '../../../ui';
+import { consolePalette, variantStyle, type IconName, type Variant } from '../../../ui';
 
 // ---------------------------------------------------------------------------
 // Section shell
@@ -291,56 +289,6 @@ export function FilterChips<T extends string>({
   );
 }
 
-/** Sort control: press the active key again to reverse it. */
-export function SortButton<T extends string>({
-  options,
-  value,
-  descending,
-  onChange,
-}: {
-  options: { value: T; label: string }[];
-  value: T;
-  descending: boolean;
-  onChange: (value: T, descending: boolean) => void;
-}) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  return (
-    <View
-      className="flex-row items-center gap-0.5 rounded-lg border p-0.5"
-      style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
-    >
-      {options.map((option) => {
-        const active = option.value === value;
-        return (
-          <Pressable
-            key={option.value}
-            onPress={() => onChange(option.value, active ? !descending : true)}
-            accessibilityRole="button"
-            accessibilityLabel={`Sort by ${option.label}${active ? (descending ? ', descending' : ', ascending') : ''}`}
-            className="flex-row items-center gap-1 rounded-md px-2 py-[3px]"
-            style={active ? { backgroundColor: palette.panel, borderWidth: 1, borderColor: palette.lineStrong } : undefined}
-          >
-            <Text
-              className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
-              style={{ color: active ? palette.ink : palette.inkMuted }}
-            >
-              {option.label}
-            </Text>
-            {active ? (
-              <MaterialCommunityIcons
-                name={descending ? 'arrow-down' : 'arrow-up'}
-                size={10}
-                color={palette.inkMuted}
-              />
-            ) : null}
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Rows
 // ---------------------------------------------------------------------------
@@ -348,9 +296,9 @@ export function SortButton<T extends string>({
 /**
  * A dense record row that expands in place.
  *
- * Used by Limits, Signals, Evidence and Connectivity so a row behaves the same
- * way in all four, and so a narrow viewport gets a card without a second
- * implementation of the same content.
+ * Used by the Signal table so a row behaves the same way everywhere it appears,
+ * and so a narrow viewport gets a card without a second implementation of the
+ * same content.
  */
 export function ExpandableRow({
   expanded,
@@ -467,33 +415,6 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
     <Text className="py-4 text-center font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
       {children}
     </Text>
-  );
-}
-
-/** Tinted well used for the connection-path steps and topology nodes. */
-export function Node({
-  label,
-  value,
-  tone,
-  palette,
-}: {
-  label: string;
-  value: string;
-  tone?: string;
-  palette: ConsolePalette;
-}) {
-  return (
-    <View
-      className="min-w-0 rounded-lg border px-2.5 py-1.5"
-      style={{ borderColor: tone ? alpha(tone, 0.4) : palette.line, backgroundColor: palette.panelRaised }}
-    >
-      <Text className="font-mono text-[8px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
-        {label}
-      </Text>
-      <Text className="mt-0.5 font-mono text-[11.5px]" style={{ color: palette.ink }} numberOfLines={1}>
-        {value}
-      </Text>
-    </View>
   );
 }
 

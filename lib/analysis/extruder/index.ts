@@ -50,7 +50,43 @@ export {
   TAG_LABELS,
   type ExtruderTag,
 } from './signalMap';
-export { allThresholds, faultName, PROCESS_CONSTRAINTS, type Threshold } from './registers';
+export { allThresholds, faultName, getFault, PROCESS_CONSTRAINTS, type Threshold } from './registers';
+export {
+  contextPartsForTag,
+  KIND_LABEL,
+  PART_DESCRIPTION,
+  PART_FLOW,
+  PART_ORDER,
+  PART_STATE_LABEL,
+  partForFault,
+  partForTag,
+  partsForConstraint,
+  relatedParts,
+  signalKindForTag,
+  tagsForConstraint,
+  TOOLS_FOR_KIND,
+  worsePartState,
+  type AnalysisTool,
+  type MachinePart,
+  type PartState,
+  type SignalKind,
+} from './machineParts';
+export {
+  BEHAVIOUR_LABEL,
+  buildKeyChanges,
+  buildPartViews,
+  classifyBehaviour,
+  matchClassLabel,
+  resolveSignalStatus,
+  type BehaviourResult,
+  type KeyChange,
+  type PartCause,
+  type PartView,
+  type ReasoningStep,
+  type SignalBehaviour,
+  type SignalStatus,
+  type SignalView,
+} from './partView';
 export {
   reproducibleScenarios,
   scenarioById,

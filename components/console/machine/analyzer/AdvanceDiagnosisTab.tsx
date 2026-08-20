@@ -1,0 +1,847 @@
+/**
+ * ADVANCE DIAGNOSIS — the machine-part deep dive.
+ *
+ * Diagnosis answers *what is wrong*. This screen answers *why, and where*, and
+ * it is organised by the physical machine rather than by the model's tags: an
+ * operator walks to the gearbox, not to `V2`.
+ *
+ * Two things used to be pages of their own and are now contextual here, which
+ * is the whole point of the redesign:
+ *
+ *  - **Evidence.** The reasoning behind a conclusion belongs beside the
+ *    conclusion, not in a separate tab a user has to know to open.
+ *  - **Signal analysis.** Trend, waveform, spectrum, envelope and the
+ *    engineering features appear inside the part that owns the signal, and the
+ *    tools offered depend on what kind of measurement it is. A temperature
+ *    channel is structurally unable to show an FFT, so it is offered thermal
+ *    tools instead of vibration tools greyed out.
+ *
+ * This component performs no analysis. Every state, cause, reasoning step and
+ * behaviour string is computed in `lib/analysis/extruder/partView.ts` and
+ * rendered here verbatim.
+ */
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useMemo, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
+
+import { useAppTheme } from '../../../../hooks/useAppTheme';
+import {
+  BEHAVIOUR_LABEL,
+  KIND_LABEL,
+  matchClassLabel,
+  PART_FLOW,
+  PART_ORDER,
+  PART_STATE_LABEL,
+  TOOLS_FOR_KIND,
+  type AnalysisTool,
+  type MachinePart,
+  type PartState,
+  type PartView,
+  type SignalView,
+} from '../../../../lib/analysis/extruder';
+import { cn } from '../../../../lib/cn';
+import { alpha, Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
+import { EmptyNote, Fact, Section } from './AnalyzerParts';
+import { TagTrend } from './LiveInstrumentReadout';
+
+const STATE_VARIANT: Record<PartState, Variant> = {
+  NORMAL: 'success',
+  WATCH: 'warning',
+  ATTENTION: 'warning',
+  ALARM: 'destructive',
+  FAULT: 'destructive',
+  UNAVAILABLE: 'muted',
+};
+
+function formatValue(value: number | null, unit: string): string {
+  if (value === null || !Number.isFinite(value)) return '—';
+  const decimals = Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2;
+  return `${value.toFixed(decimals)}${unit ? ` ${unit}` : ''}`;
+}
+
+// ---------------------------------------------------------------------------
+// Part navigation
+// ---------------------------------------------------------------------------
+
+/** A dot in the part's own state colour, so the chip row is scannable at a glance. */
+function StateDot({ state, size = 6 }: { state: PartState; size?: number }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const accent = variantStyle(palette, STATE_VARIANT[state]).accent;
+  return <View style={{ width: size, height: size, borderRadius: size, backgroundColor: accent }} />;
+}
+
+function PartChips({
+  parts,
+  selected,
+  onSelect,
+}: {
+  parts: PartView[];
+  selected: MachinePart | null;
+  onSelect: (part: MachinePart | null) => void;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const byPart = new Map(parts.map((view) => [view.part, view]));
+
+  const chip = (key: string, label: string, active: boolean, state: PartState | null, onPress: () => void) => (
+    <Pressable
+      key={key}
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      className="flex-row items-center gap-1.5 rounded-lg border px-2.5 py-1.5"
+      style={{
+        borderColor: active ? palette.lineStrong : palette.line,
+        backgroundColor: active ? palette.panelRaised : 'transparent',
+      }}
+    >
+      {state ? <StateDot state={state} /> : null}
+      <Text
+        className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+        style={{ color: active ? palette.ink : palette.inkMuted }}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, alignItems: 'center' }}>
+      {chip('all', 'All parts', selected === null, null, () => onSelect(null))}
+      {PART_ORDER.map((part) =>
+        chip(part, part, selected === part, byPart.get(part)?.state ?? 'UNAVAILABLE', () => onSelect(part)),
+      )}
+    </ScrollView>
+  );
+}
+
+/**
+ * The material path, drawn as the machine rather than as a list.
+ *
+ * Hopper → Motor → Gearbox → Screw / Drive → Barrel → Melt / Process is the
+ * order material actually travels, so a fault upstream of another one reads as
+ * upstream. Electrical / Power is not in the path — it supplies the machine —
+ * and is shown beside the strip instead of being forced into it.
+ */
+function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (part: MachinePart) => void }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const byPart = new Map(parts.map((view) => [view.part, view]));
+  const supply = byPart.get('Electrical / Power');
+
+  return (
+    <View className="gap-2.5">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'center', gap: 0 }}>
+        {PART_FLOW.map((part, index) => {
+          const view = byPart.get(part);
+          const state = view?.state ?? 'UNAVAILABLE';
+          const style = variantStyle(palette, STATE_VARIANT[state]);
+          return (
+            <View key={part} className="flex-row items-center">
+              {index > 0 ? (
+                <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} style={{ marginHorizontal: 5 }} />
+              ) : null}
+              <Pressable
+                onPress={() => onSelect(part)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${part}, ${PART_STATE_LABEL[state]}`}
+                className="min-w-[112px] rounded-lg border px-2.5 py-2"
+                style={{
+                  borderColor: state === 'NORMAL' ? palette.line : alpha(style.accent, 0.4),
+                  backgroundColor: palette.panelRaised,
+                }}
+              >
+                <Text className="font-body-bold text-[11.5px]" style={{ color: palette.ink }} numberOfLines={1}>
+                  {part}
+                </Text>
+                <View className="mt-1 flex-row items-center gap-1.5">
+                  <StateDot state={state} size={5} />
+                  <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: style.accent }}>
+                    {PART_STATE_LABEL[state]}
+                  </Text>
+                </View>
+              </Pressable>
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {supply ? (
+        <Pressable
+          onPress={() => onSelect('Electrical / Power')}
+          accessibilityRole="button"
+          className="flex-row items-center gap-2 self-start rounded-lg border px-2.5 py-1.5"
+          style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+        >
+          <MaterialCommunityIcons name="flash-outline" size={13} color={palette.inkFaint} />
+          <Text className="font-body text-[11px]" style={{ color: palette.ink }}>
+            Electrical / Power
+          </Text>
+          <StateDot state={supply.state} size={5} />
+          <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: palette.inkMuted }}>
+            {PART_STATE_LABEL[supply.state]} · supplies the machine
+          </Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
+
+/** One part's condition, as a card on the entry screen. */
+function PartCard({ view, onOpen }: { view: PartView; onOpen: () => void }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const style = variantStyle(palette, STATE_VARIANT[view.state]);
+  const reporting = view.signals.filter((signal) => signal.value !== null).length;
+
+  return (
+    <Pressable
+      onPress={onOpen}
+      accessibilityRole="button"
+      accessibilityLabel={`Open ${view.part} deep dive`}
+      className="min-w-[240px] flex-1 rounded-xl border px-3.5 py-3"
+      style={{
+        borderColor: view.state === 'NORMAL' ? palette.line : alpha(style.accent, 0.4),
+        backgroundColor: palette.panel,
+      }}
+    >
+      <View className="flex-row items-start justify-between gap-2">
+        <Text className="min-w-0 flex-1 font-body-bold text-[13px]" style={{ color: palette.ink }} numberOfLines={1}>
+          {view.part}
+        </Text>
+        <Badge variant={STATE_VARIANT[view.state]} icon={null} outline>
+          {PART_STATE_LABEL[view.state]}
+        </Badge>
+      </View>
+
+      <Text className="mt-1.5 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }} numberOfLines={2}>
+        {view.headline ?? 'No local fault pattern detected.'}
+      </Text>
+
+      <View className="mt-2.5 flex-row flex-wrap items-center gap-x-3 gap-y-1">
+        <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+          {reporting}/{view.signals.length} signals live
+        </Text>
+        {view.faultCount > 0 ? (
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.critical }}>
+            {view.faultCount} fault{view.faultCount === 1 ? '' : 's'}
+          </Text>
+        ) : null}
+        {view.alarmCount > 0 ? (
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.critical }}>
+            {view.alarmCount} limit{view.alarmCount === 1 ? '' : 's'}
+          </Text>
+        ) : null}
+        {view.warningCount > 0 ? (
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.warning }}>
+            {view.warningCount} boundar{view.warningCount === 1 ? 'y' : 'ies'}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Deep dive
+// ---------------------------------------------------------------------------
+
+/** The five stages, laid out as the chain they are rather than as a list. */
+function ReasoningChain({ view }: { view: PartView }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'stretch', gap: 0 }}>
+      {view.reasoning.map((step, index) => (
+        <View key={step.key} className="flex-row items-center">
+          {index > 0 ? (
+            <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} style={{ marginHorizontal: 5 }} />
+          ) : null}
+          <View
+            className="min-w-[164px] max-w-[230px] flex-1 rounded-lg border px-2.5 py-2"
+            style={{
+              borderColor: palette.line,
+              backgroundColor: palette.panelRaised,
+              opacity: step.evaluated ? 1 : 0.6,
+            }}
+          >
+            <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+              {step.label}
+            </Text>
+            <Text className="mt-0.5 font-body-bold text-[12px]" style={{ color: palette.ink }} numberOfLines={2}>
+              {step.value}
+            </Text>
+            <Text className="mt-1 font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkMuted }}>
+              {step.detail}
+            </Text>
+          </View>
+        </View>
+      ))}
+    </ScrollView>
+  );
+}
+
+/**
+ * The ranked hypotheses for this part.
+ *
+ * The score is an ORDINAL ENGINEERING MATCH SCORE and is never rendered as a
+ * percentage: this machine has no calibrated fault-probability model, so a
+ * number with a % sign beside it would be a fabricated confidence. The match
+ * class carries the meaning; the score only orders the list.
+ */
+function CauseList({ view }: { view: PartView }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+
+  if (view.causes.length === 0) {
+    return <EmptyNote>No controlled fault signature is met on this part by the current measurements.</EmptyNote>;
+  }
+
+  const top = Math.max(1, ...view.causes.map((cause) => cause.score));
+
+  return (
+    <View>
+      {view.causes.map((cause, index) => {
+        const variant: Variant =
+          cause.matchClass === 'STRONG_CANDIDATE' ? 'destructive' : cause.matchClass === 'CANDIDATE' ? 'warning' : 'muted';
+        const accent = variantStyle(palette, variant).accent;
+        return (
+          <View
+            key={cause.faultId}
+            className="py-2.5"
+            style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
+          >
+            <View className="flex-row items-start justify-between gap-3">
+              <View className="min-w-0 flex-1">
+                <Text className="font-body-bold text-[12.5px]" style={{ color: palette.ink }}>
+                  {cause.name}
+                </Text>
+                <Text className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                  {cause.faultId}
+                </Text>
+              </View>
+              <Badge variant={variant} icon={null} outline>
+                {matchClassLabel(cause.matchClass)}
+              </Badge>
+            </View>
+
+            {/* Rank bar, not a confidence bar. Width is share-of-top-score. */}
+            <View className="mt-2 h-[3px] overflow-hidden rounded-full" style={{ backgroundColor: palette.panelRaised }}>
+              <View style={{ width: `${Math.round((cause.score / top) * 100)}%`, height: '100%', backgroundColor: accent }} />
+            </View>
+
+            {cause.primaryEvidence.length > 0 ? (
+              <View className="mt-2 gap-1">
+                {cause.primaryEvidence.slice(0, 3).map((line, evidenceIndex) => (
+                  <View key={evidenceIndex} className="flex-row items-start gap-1.5">
+                    <MaterialCommunityIcons name="chevron-right" size={12} color={palette.inkFaint} style={{ marginTop: 2 }} />
+                    <Text className="min-w-0 flex-1 font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+                      {line}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {cause.contradicting.length > 0 ? (
+              <Text className="mt-1.5 font-body text-[10.5px] leading-[14px]" style={{ color: palette.warning }}>
+                Against it: {cause.contradicting[0]}
+              </Text>
+            ) : null}
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Contextual signal analysis
+// ---------------------------------------------------------------------------
+
+/**
+ * A tool's own read-out.
+ *
+ * Every tool that can be computed from scalar telemetry computes from the
+ * session history the pipeline already keeps. Every tool that cannot says
+ * exactly what it would need — that sentence is the useful output, because an
+ * operator who does not know a spectrum is unavailable may read its absence as
+ * "no bearing fault".
+ */
+function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+
+  const stats = useMemo(() => {
+    const usable = signal.history.filter((value): value is number => value !== null && Number.isFinite(value));
+    if (usable.length === 0) return null;
+    const min = Math.min(...usable);
+    const max = Math.max(...usable);
+    const mean = usable.reduce((sum, value) => sum + value, 0) / usable.length;
+    const spread = max - min;
+    const variance = usable.length > 1 ? usable.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (usable.length - 1) : 0;
+    return { min, max, mean, spread, sd: Math.sqrt(variance), count: usable.length };
+  }, [signal.history]);
+
+  if (!tool.available) {
+    return (
+      <View className="gap-1.5 rounded-lg border px-3 py-3" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
+        <View className="flex-row items-center gap-1.5">
+          <MaterialCommunityIcons name="lock-outline" size={13} color={palette.inkFaint} />
+          <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+            {tool.label} not available on this machine
+          </Text>
+        </View>
+        <Text className="font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+          {tool.note}
+        </Text>
+      </View>
+    );
+  }
+
+  const accent = signal.status === 'ALARM' ? palette.critical : signal.status === 'WARNING' ? palette.warning : palette.accent;
+
+  return (
+    <View className="gap-2.5">
+      <Text className="font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+        {tool.note}
+      </Text>
+
+      <View className="items-start rounded-lg border px-3 py-3" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
+        <TagTrend values={signal.history} colour={accent} width={360} height={64} />
+      </View>
+
+      {stats ? (
+        <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+          {tool.key === 'trend' || tool.key === 'level' || tool.key === 'load' ? (
+            <>
+              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
+              <Fact label="Mean" value={formatValue(stats.mean, signal.unit)} width={104} />
+              <Fact label="Min" value={formatValue(stats.min, signal.unit)} width={92} />
+              <Fact label="Max" value={formatValue(stats.max, signal.unit)} width={92} />
+            </>
+          ) : null}
+          {tool.key === 'rate' ? (
+            <>
+              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
+              <Fact label="Change" value={formatValue(stats.max - stats.min, signal.unit)} width={110} />
+              <Fact label="Direction" value={BEHAVIOUR_LABEL[signal.behaviour]} mono={false} width={116} />
+            </>
+          ) : null}
+          {tool.key === 'stability' || tool.key === 'variation' || tool.key === 'consumption' ? (
+            <>
+              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
+              <Fact label="Spread" value={formatValue(stats.spread, signal.unit)} width={104} />
+              <Fact label="Std dev" value={formatValue(stats.sd, signal.unit)} width={104} />
+              <Fact label="Samples" value={String(stats.count)} width={84} />
+            </>
+          ) : null}
+          {tool.key === 'setpoint' ? (
+            <>
+              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
+              <Fact label="Setpoint" value={formatValue(signal.reference, signal.unit)} width={110} />
+              <Fact
+                label="Deviation"
+                value={
+                  signal.value !== null && signal.reference !== null ? formatValue(signal.value - signal.reference, signal.unit) : '—'
+                }
+                width={110}
+              />
+            </>
+          ) : null}
+        </View>
+      ) : (
+        <EmptyNote>No sample has been recorded for this signal yet.</EmptyNote>
+      )}
+
+      {tool.key === 'setpoint' && signal.reference === null ? (
+        <Text className="font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkFaint }}>
+          {signal.referenceNote}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/**
+ * Signal detail for the selected part.
+ *
+ * This is where Signal Analysis lives now. The signal selector lists only the
+ * part's own signals plus the ones that inform it, and the tool row is built
+ * from the signal's measurement kind, so what is offered is always what this
+ * measurement can actually support.
+ */
+function SignalDetail({ signals }: { signals: SignalView[] }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [toolKey, setToolKey] = useState<string | null>(null);
+
+  const signal = signals.find((entry) => entry.tag === selectedTag) ?? signals[0] ?? null;
+  const tools = signal ? TOOLS_FOR_KIND[signal.kind] : [];
+  const tool = tools.find((entry) => entry.key === toolKey) ?? tools[0] ?? null;
+
+  if (!signal) {
+    return <EmptyNote>No signal on this machine is mapped to this part, so there is nothing to analyse here.</EmptyNote>;
+  }
+
+  return (
+    <View className="gap-3">
+      {/* Which signal */}
+      {signals.length > 1 ? (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+          {signals.map((entry) => {
+            const active = entry.tag === signal.tag;
+            return (
+              <Pressable
+                key={entry.tag}
+                onPress={() => {
+                  setSelectedTag(entry.tag);
+                  setToolKey(null);
+                }}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: active }}
+                className="rounded-lg border px-2.5 py-1.5"
+                style={{
+                  borderColor: active ? palette.lineStrong : palette.line,
+                  backgroundColor: active ? palette.panelRaised : 'transparent',
+                }}
+              >
+                <Text className="font-body text-[11px]" style={{ color: active ? palette.ink : palette.inkMuted }}>
+                  {entry.measures}
+                </Text>
+                <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                  {entry.tag} · {KIND_LABEL[entry.kind]}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
+
+      {/* Headline numbers for the selected signal */}
+      <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+        <Fact label="Current" value={formatValue(signal.value, signal.unit)} width={118} />
+        <Fact label="Reference" value={formatValue(signal.reference, signal.unit)} width={118} />
+        <Fact label="Behaviour" value={BEHAVIOUR_LABEL[signal.behaviour]} mono={false} width={126} />
+        <Fact label="Data quality" value={signal.quality.toLowerCase()} mono={false} width={112} />
+        <Fact label="Point" value={signal.point} mono={false} width={168} />
+      </View>
+
+      {/* Which tool — built from the measurement kind, not from a fixed list */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+        {tools.map((entry) => {
+          const active = entry.key === tool?.key;
+          return (
+            <Pressable
+              key={entry.key}
+              onPress={() => setToolKey(entry.key)}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: active }}
+              className="flex-row items-center gap-1.5 rounded-lg border px-2.5 py-1.5"
+              style={{
+                borderColor: active ? palette.lineStrong : palette.line,
+                backgroundColor: active ? palette.panelRaised : 'transparent',
+                opacity: entry.available ? 1 : 0.55,
+              }}
+            >
+              <Text
+                className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+                style={{ color: active ? palette.ink : palette.inkMuted }}
+              >
+                {entry.label}
+              </Text>
+              {!entry.available ? <MaterialCommunityIcons name="lock-outline" size={11} color={palette.inkFaint} /> : null}
+            </Pressable>
+          );
+        })}
+      </ScrollView>
+
+      {tool ? <ToolPanel signal={signal} tool={tool} /> : null}
+
+      <Text className="font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkFaint }}>
+        {signal.behaviourDetail}
+      </Text>
+    </View>
+  );
+}
+
+/**
+ * The barrel's thermal profile.
+ *
+ * The barrel is the one part whose signals are only meaningful as a *set*: three
+ * zone temperatures are a profile, and a profile that stops rising is a
+ * different fault from any single zone being high. So the barrel deep-dive
+ * leads with the profile and the per-zone behaviour before it offers the
+ * per-signal tools.
+ */
+const PROFILE_HEIGHT = 68;
+
+function ThermalProfile({ signals }: { signals: SignalView[] }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const zones = signals.filter((signal) => signal.kind === 'temperature');
+
+  if (zones.length < 2) return null;
+
+  const values = zones.map((zone) => zone.value).filter((value): value is number => value !== null);
+  const min = values.length > 0 ? Math.min(...values) : 0;
+  const max = values.length > 0 ? Math.max(...values) : 1;
+  const span = max - min || 1;
+  const gradual = zones.every(
+    (zone, index) => index === 0 || zone.value === null || zones[index - 1].value === null || zone.value >= (zones[index - 1].value ?? 0),
+  );
+
+  return (
+    <View className="gap-3">
+      <View className="flex-row items-end justify-between gap-2">
+        {zones.map((zone) => (
+          <View key={zone.tag} className="min-w-0 flex-1 items-center">
+            <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }} numberOfLines={1}>
+              {zone.measures.replace(/ temperature$/i, '')}
+            </Text>
+            <Text className="mt-0.5 font-body text-[20px] leading-[24px]" style={{ color: palette.ink, fontWeight: '300' }}>
+              {formatValue(zone.value, zone.unit)}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* The profile itself: one node per zone, each sitting at a height set by
+          its own temperature. That is the point of drawing it at all — a flat
+          or inverted profile is a different fault from any single hot zone, and
+          it is visible here as a shape before any number is read. */}
+      <View style={{ height: PROFILE_HEIGHT }} className="flex-row items-stretch">
+        {zones.map((zone) => {
+          const share = zone.value === null ? 0 : (zone.value - min) / span;
+          const accent =
+            zone.status === 'ALARM' ? palette.critical : zone.status === 'WARNING' ? palette.warning : palette.accent;
+          return (
+            <View key={zone.tag} className="min-w-0 flex-1 items-center justify-end">
+              <View
+                style={{
+                  width: 1,
+                  height: 6 + share * (PROFILE_HEIGHT - 18),
+                  backgroundColor: palette.line,
+                }}
+              />
+              <View
+                style={{
+                  width: 11,
+                  height: 11,
+                  borderRadius: 6,
+                  marginTop: -6,
+                  backgroundColor: zone.value === null ? palette.inkFaint : accent,
+                }}
+              />
+              <View style={{ height: 6 }} />
+            </View>
+          );
+        })}
+      </View>
+      <View style={{ height: 1, backgroundColor: palette.line, marginTop: -7 }} />
+
+      <Text className="text-center font-body text-[10.5px]" style={{ color: palette.inkMuted }}>
+        {values.length < zones.length
+          ? 'Part of the profile is not reporting, so the progression cannot be assessed.'
+          : gradual
+            ? 'Gradual increase along the screw, as the profile expects.'
+            : 'The profile does not rise gradually along the screw — a zone is out of sequence.'}
+      </Text>
+
+      <View>
+        {zones.map((zone, index) => {
+          const variant: Variant = zone.status === 'ALARM' ? 'destructive' : zone.status === 'WARNING' ? 'warning' : 'success';
+          return (
+            <View
+              key={zone.tag}
+              className="flex-row items-center justify-between gap-3 py-1.5"
+              style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
+            >
+              <Text className="min-w-0 flex-1 font-body text-[11.5px]" style={{ color: palette.ink }} numberOfLines={1}>
+                {zone.measures}
+              </Text>
+              <Text className="font-body text-[11px]" style={{ color: palette.inkMuted }}>
+                {BEHAVIOUR_LABEL[zone.behaviour]}
+              </Text>
+              <Badge variant={variant} icon={null} outline>
+                {zone.status === 'UNAVAILABLE' ? 'No data' : zone.status.toLowerCase()}
+              </Badge>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Screen
+// ---------------------------------------------------------------------------
+
+export function AdvanceDiagnosisTab({
+  parts,
+  selectedPart,
+  onSelectPart,
+}: {
+  parts: PartView[];
+  selectedPart: MachinePart | null;
+  onSelectPart: (part: MachinePart | null) => void;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const view = selectedPart ? (parts.find((entry) => entry.part === selectedPart) ?? null) : null;
+
+  return (
+    <View className="gap-3">
+      <Section
+        title={view ? view.part : 'Machine-part diagnosis'}
+        eyebrow="Advance diagnosis"
+        meta={
+          view
+            ? view.description
+            : 'Select a part to understand its condition and open only the analysis relevant to that part.'
+        }
+        accent={view ? STATE_VARIANT[view.state] : undefined}
+        actions={
+          view ? (
+            <Badge variant={STATE_VARIANT[view.state]} icon={null} outline>
+              {PART_STATE_LABEL[view.state]}
+            </Badge>
+          ) : undefined
+        }
+      >
+        <PartChips parts={parts} selected={selectedPart} onSelect={onSelectPart} />
+      </Section>
+
+      {view === null ? (
+        <>
+          <Section title="Machine condition by part" eyebrow="Process order" meta="Material travels left to right.">
+            <ConditionStrip parts={parts} onSelect={onSelectPart} />
+          </Section>
+
+          <View className="flex-row flex-wrap gap-3">
+            {parts.map((entry) => (
+              <PartCard key={entry.part} view={entry} onOpen={() => onSelectPart(entry.part)} />
+            ))}
+          </View>
+        </>
+      ) : (
+        <>
+          {view.headline ? (
+            <Section title={view.headline} eyebrow="Condition" accent={STATE_VARIANT[view.state]}>
+              <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+                <Fact label="Signals" value={`${view.signals.filter((s) => s.value !== null).length}/${view.signals.length} live`} width={104} />
+                <Fact
+                  label="Faults"
+                  value={String(view.faultCount)}
+                  width={78}
+                  tone={view.faultCount > 0 ? palette.critical : undefined}
+                />
+                <Fact
+                  label="Limits"
+                  value={String(view.alarmCount)}
+                  width={78}
+                  tone={view.alarmCount > 0 ? palette.critical : undefined}
+                />
+                <Fact
+                  label="Boundaries"
+                  value={String(view.warningCount)}
+                  width={96}
+                  tone={view.warningCount > 0 ? palette.warning : undefined}
+                />
+                {view.causes[0] ? (
+                  <Fact label="Ranked first" value={matchClassLabel(view.causes[0].matchClass)} mono={false} width={132} />
+                ) : null}
+              </View>
+            </Section>
+          ) : null}
+
+          <Section
+            title="How ULTRON reached this conclusion"
+            eyebrow="Reasoning"
+            meta="Each stage is the pipeline's own, in the order it ran. A stage the measurements could not support says so."
+          >
+            <ReasoningChain view={view} />
+          </Section>
+
+          {view.part === 'Barrel' ? (
+            <Section
+              title="Barrel temperature profile"
+              eyebrow="Thermal"
+              meta="The zones are read as one profile, because a flat or inverted profile is a different fault from any single hot zone."
+            >
+              <ThermalProfile signals={view.signals} />
+            </Section>
+          ) : null}
+
+          <View className="gap-3 lg:flex-row lg:items-start">
+            <View className="min-w-0 flex-1">
+              <Section
+                title="Possible causes"
+                eyebrow="Hypotheses"
+                meta="Ranked by engineering match. The rank orders the list; it is not a probability."
+                footnote="This machine has no calibrated fault-probability model, so no percentage confidence is reported. Ambiguity is kept wherever the installed sensors cannot separate two candidates, and the measurement that would separate them is named."
+              >
+                <CauseList view={view} />
+              </Section>
+            </View>
+
+            <View className="min-w-0 flex-1">
+              <Section
+                title={`Signal detail · ${view.part}`}
+                eyebrow="Contextual analysis"
+                meta="The tools offered are the ones this kind of measurement can actually support."
+                footnote="Signal analysis is no longer a separate page — it appears inside the part that owns the signal."
+              >
+                <SignalDetail signals={[...view.signals, ...view.contextSignals]} />
+              </Section>
+            </View>
+          </View>
+
+          {view.ruledOut.length > 0 ? (
+            <Section
+              title="Ruled out"
+              eyebrow="Considered"
+              meta="Hypotheses the current measurements actively contradict, so they do not need re-checking."
+            >
+              <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+                {view.ruledOut.map((cause) => (
+                  <View key={cause.faultId} style={{ minWidth: 240 }} className="flex-1">
+                    <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
+                      {cause.name}
+                    </Text>
+                    <Text className="mt-0.5 font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkFaint }}>
+                      {cause.contradicting[0] ?? 'A primary contradiction eliminated this hypothesis.'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </Section>
+          ) : null}
+
+          {view.contextSignals.length > 0 ? (
+            <Section
+              title="Signals that inform this part"
+              eyebrow="Context"
+              meta="Owned by another part, but genuine evidence when reasoning about this one."
+            >
+              <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+                {view.contextSignals.map((signal) => (
+                  <Fact
+                    key={signal.tag}
+                    label={`${signal.measures} · ${signal.part}`}
+                    value={formatValue(signal.value, signal.unit)}
+                    width={180}
+                  />
+                ))}
+              </View>
+            </Section>
+          ) : null}
+        </>
+      )}
+    </View>
+  );
+}

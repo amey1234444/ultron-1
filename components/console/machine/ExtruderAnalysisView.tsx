@@ -16,7 +16,7 @@
  * version read as a document rather than an instrument. Below ~1180px the rail
  * falls under the content, which is the only honest thing to do with it.
  */
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -30,17 +30,30 @@ import {
   allThresholds,
   analyzeExtruder,
   appendHistory,
+  buildKeyChanges,
+  buildPartViews,
+  classifyBehaviour,
   faultName,
+  matchClassLabel,
+  partForFault,
+  partForTag,
+  partsForConstraint,
+  PROCESS_CONSTRAINTS,
   resolveSignal,
+  resolveSignalStatus,
   runScenario,
   scenarioById,
   SCENARIOS,
+  signalKindForTag,
   TAG_LABELS,
+  tagsForConstraint,
   type ExtruderAnalysisResult,
   type ExtruderInputReading,
   type ExtruderTag,
+  type MachinePart,
   type ResolvedSignal,
   type Scenario,
+  type SignalView,
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
 import { cn } from '../../../lib/cn';
@@ -59,25 +72,15 @@ import {
   SectionLabel,
   Separator,
   Tabs,
-  type MagnitudeDatum,
   type TabItem,
   type Variant,
 } from '../../ui';
+import { AdvanceDiagnosisTab } from './analyzer/AdvanceDiagnosisTab';
 import { AnalyzerHeader, type HeaderFact } from './analyzer/AnalyzerHeader';
 import { Fact, Section } from './analyzer/AnalyzerParts';
-import { ConnectivityTab } from './analyzer/ConnectivityTab';
-import {
-  ConclusionPanel,
-  DiagnosisSummary,
-  EliminatedList,
-  HypothesisList,
-  MaintenanceGuidance,
-} from './analyzer/DiagnosisTab';
-import { collectEvidence, EvidenceTab } from './analyzer/EvidenceTab';
-import { LimitsTab } from './analyzer/LimitsTab';
+import { ConclusionTab, type AttentionItem, type CurrentDiagnosis } from './analyzer/ConclusionTab';
 import { LiveInstrumentReadout, type ReadoutRow } from './analyzer/LiveInstrumentReadout';
-import { ModelTab } from './analyzer/ModelTab';
-import { SignalsTab, type SignalHealth, type SignalRow } from './analyzer/SignalsTab';
+import { SignalTab } from './analyzer/SignalTab';
 import type { MappedChannel } from './RackOccupancyView';
 
 function channelNumber(channelId: string): number {
@@ -200,13 +203,6 @@ const QUALITY_VARIANT: Record<SignalQuality['status'], Variant> = {
   UNAVAILABLE: 'muted',
 };
 
-const QUALITY_HEALTH: Record<SignalQuality['status'], SignalHealth> = {
-  GOOD: 'healthy',
-  DEGRADED: 'warning',
-  BAD: 'abnormal',
-  UNAVAILABLE: 'unavailable',
-};
-
 const LAYER_NOTE: Record<string, { title: string; detail: string; variant: Variant }> = {
   DATA_QUALITY: {
     title: 'The data stream is broken - machine condition is not being reported',
@@ -238,7 +234,19 @@ function humanise(value: string): string {
   return value.replace(/_/g, ' ').toLowerCase();
 }
 
-type TabKey = 'diagnosis' | 'limits' | 'evidence' | 'signals' | 'model' | 'connectivity';
+/**
+ * Three screens, three questions.
+ *
+ * Diagnosis: what is wrong. Advance Diagnosis: why, and where on the machine.
+ * Signal: what the sensors read and whether they are inside their limits.
+ *
+ * What used to be six tabs collapsed into these. Evidence was never really a
+ * subject of its own — it is the reasoning behind a conclusion and belongs
+ * beside it. Limits answered half of the Signal question and is now the other
+ * half of that table. Model and Connectivity were provenance, and provenance
+ * belongs where the number it qualifies is shown, not on a page of its own.
+ */
+type TabKey = 'diagnosis' | 'advance' | 'signal';
 
 /**
  * What each pilot tag is actually for, in the words a plant operator would use.
@@ -401,6 +409,10 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const [tab, setTab] = useState<TabKey>('diagnosis');
+  // null = the Advance Diagnosis entry screen (all parts). Held here rather than
+  // inside the tab so that following a finding from Diagnosis or a signal from
+  // the Signal table lands on the right part, not on the part picker.
+  const [selectedPart, setSelectedPart] = useState<MachinePart | null>(null);
   const [scenarioId, setScenarioId] = useState<string | null>(null);
   // The scenario library is a drawer opened from the header rather than a
   // section in the flow: it is a testing instrument, not part of the reading.
@@ -448,13 +460,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     () => detail.assessments.filter((assessment) => detail.candidateFaults.includes(assessment.faultId)),
     [detail],
   );
-  const eliminated = useMemo(
-    () => detail.assessments.filter((assessment) => assessment.matchClass === 'ELIMINATED'),
-    [detail],
-  );
   const violations = detail.constraints.filter((check) => check.status === 'VIOLATION');
-  const degradedSignals = analysis.quality.filter((item) => item.status === 'BAD' || item.status === 'DEGRADED');
-  const unresolved = detail.unconsumedSignals.length + detail.unrecognisedSignals.length + detail.rejectedSignals.length;
   const liveDataUnavailable = !scenarioRun && dataMode === 'none';
 
   // --- verdict ---------------------------------------------------------------
@@ -479,6 +485,18 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
           ? 'Something was observed, but it cannot be identified'
           : 'No controlled fault signature was met';
+  // One word for the status tile. Deliberately not the verdict headline, which
+  // is a sentence: the tile answers "how is the machine", the headline answers
+  // "what is wrong", and the tile has to be readable across a control room.
+  const verdictStatusWord = liveDataUnavailable
+    ? 'No data'
+    : violations.length > 0
+      ? 'Critical'
+      : hasCandidates
+        ? 'Warning'
+        : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
+          ? 'Unclear'
+          : 'Normal';
   const verdictDetail = liveDataUnavailable
     ? 'No diagnosis is computed until at least one saved mapped channel is receiving current gateway telemetry.'
     : analysis.doctorReport.summary;
@@ -522,52 +540,118 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // --- signals ---------------------------------------------------------------
   const qualityByCode = useMemo(() => new Map(analysis.quality.map((item) => [item.code, item])), [analysis.quality]);
 
-  const signalRows = useMemo<SignalRow[]>(() => {
-    const resolvedRows = detail.resolvedSignals.map((signal: ResolvedSignal) => {
+  // --- signals ---------------------------------------------------------------
+  // One view model per tag, joined here because this is the only layer that
+  // knows all three sources: the pipeline's resolved signal, the rack channel's
+  // configured limits, and the acquisition chain the reading arrived through.
+  // Everything derived FROM that join - behaviour, severity, part ownership -
+  // is computed in lib/analysis/extruder/partView.ts, not in a component.
+  const mappedByLabel = useMemo(
+    () => new Map(mappedChannels.map((mapped) => [mapped.label.trim(), mapped])),
+    [mappedChannels],
+  );
+  const baselineByTag = useMemo(() => new Map(detail.baseline.map((entry) => [entry.tag, entry])), [detail.baseline]);
+  const constraintByTag = useMemo(() => {
+    const map = new Map<ExtruderTag, (typeof PROCESS_CONSTRAINTS)[number]>();
+    for (const constraint of PROCESS_CONSTRAINTS) {
+      for (const tag of tagsForConstraint(constraint.constraintId)) {
+        if (!map.has(tag)) map.set(tag, constraint);
+      }
+    }
+    return map;
+  }, []);
+
+  const signalViews = useMemo<SignalView[]>(() => {
+    const resolved = detail.resolvedSignals.map((signal: ResolvedSignal) => {
       const quality = qualityByCode.get(signal.tag);
-      const status = quality?.status ?? (signal.value === null ? 'UNAVAILABLE' : 'GOOD');
-      // The pipeline names a frozen channel in its own quality checks, so the
-      // state is read off the model rather than guessed from the sparkline.
-      const frozen = (quality?.checks ?? []).some((check) => check.toLowerCase().includes('frozen'));
       const connection = connectionByLabel.get(signal.label);
+      const mapped = mappedByLabel.get(signal.label);
+      const baseline = baselineByTag.get(signal.tag);
+      const constraint = constraintByTag.get(signal.tag);
+      const history = historyRef.current[signal.tag] ?? [];
+
+      const reference = baseline?.value ?? null;
+      // The learned normal band is the right yardstick for "has this moved
+      // meaningfully"; without one, classifyBehaviour falls back to the
+      // signal's own observed spread rather than to an invented constant.
+      const behaviour = classifyBehaviour(history, reference !== null ? Math.abs(reference) * 0.2 : null);
+
+      const warningLimit = mapped?.channel.alarmWarning ?? null;
+      const criticalLimit = mapped?.channel.alarmCritical ?? null;
+
       return {
-        key: `${signal.tag}-${signal.label}`,
         tag: signal.tag,
         measures: TAG_LABELS[signal.tag] ?? signal.tag,
         point: signal.label,
+        kind: signalKindForTag(signal.tag),
+        part: partForTag(signal.tag),
         value: signal.value,
         unit: signal.unit,
-        health: frozen ? ('frozen' as SignalHealth) : QUALITY_HEALTH[status],
-        note:
-          (quality?.limitations ?? []).join(' ') ||
-          (quality?.checks ?? []).join(', ') ||
-          TAG_PURPOSE[signal.tag] ||
-          'No quality limitation recorded for this signal.',
+        reference,
+        referenceNote:
+          baseline?.provenance ??
+          'No learned or configured normal value exists for this signal yet, so no reference is shown.',
+        behaviour: behaviour.behaviour,
+        behaviourDetail: behaviour.detail,
+        warningLimit,
+        criticalLimit,
+        processLimit: constraint
+          ? { name: constraint.name, operator: constraint.operator, limit: constraint.upper, unit: constraint.unit }
+          : null,
+        status: resolveSignalStatus(signal.value, warningLimit, criticalLimit),
+        quality: quality?.status ?? (signal.value === null ? 'UNAVAILABLE' : 'GOOD'),
+        qualityNotes: [
+          ...(quality?.limitations ?? []),
+          ...(quality?.checks ?? []),
+          ...(TAG_PURPOSE[signal.tag] ? [TAG_PURPOSE[signal.tag]] : []),
+        ],
+        updated: connection ? relativeAge(connection.lastUpdatedAt) : relativeAge(signal.timestamp),
         source: signal.source === 'demo' ? 'Simulated' : 'Gateway',
-        channel: connection ? `${connection.channelCode} · ${connection.rackName} · ${connection.channelId}` : '—',
-        lastUpdate: connection ? relativeAge(connection.lastUpdatedAt) : relativeAge(signal.timestamp),
-        history: historyRef.current[signal.tag] ?? [],
-      } satisfies SignalRow;
+        channel: connection
+          ? `${connection.channelCode} · ${connection.rackName} · slot ${String(connection.slot).padStart(2, '0')} · ${connection.channelId}`
+          : 'Not traced to a rack channel',
+        history,
+      } satisfies SignalView;
     });
 
-    const missingRows = detail.missingTags.map((item) => ({
-      key: `missing-${item.tag}`,
+    // A tag with no point mapped to it is listed, not omitted. "Nothing is
+    // measuring the gearbox" is the single most important thing this screen can
+    // say, and an absent row says the opposite.
+    const missing = detail.missingTags.map((item) => ({
       tag: item.tag,
       measures: item.label,
       point: 'Not mapped to any point on the machine',
+      kind: signalKindForTag(item.tag),
+      part: partForTag(item.tag),
       value: null,
       unit: '',
-      health: 'unavailable' as SignalHealth,
-      note: item.note ?? TAG_PURPOSE[item.tag] ?? 'No point on this machine resolves onto this tag.',
+      reference: null,
+      referenceNote: 'No reference exists for a tag nothing is mapped to.',
+      behaviour: 'UNAVAILABLE' as const,
+      behaviourDetail: item.note ?? 'No point on this machine resolves onto this tag.',
+      warningLimit: null,
+      criticalLimit: null,
+      processLimit: null,
+      status: 'NOT_MAPPED' as const,
+      quality: 'UNAVAILABLE',
+      qualityNotes: [item.note ?? TAG_PURPOSE[item.tag] ?? 'No point on this machine resolves onto this tag.'],
+      updated: 'never',
       source: '—',
-      channel: '—',
-      lastUpdate: 'never',
+      channel: 'Not traced to a rack channel',
       history: [],
-      missing: { essential: item.essential },
-    })) satisfies SignalRow[];
+      missing: { essential: item.essential, note: item.note ?? '' },
+    })) satisfies SignalView[];
 
-    return [...resolvedRows, ...missingRows];
-  }, [connectionByLabel, detail.missingTags, detail.resolvedSignals, qualityByCode]);
+    return [...resolved, ...missing];
+  }, [
+    baselineByTag,
+    connectionByLabel,
+    constraintByTag,
+    detail.missingTags,
+    detail.resolvedSignals,
+    mappedByLabel,
+    qualityByCode,
+  ]);
 
   const unconsumed = useMemo(
     () => [
@@ -581,16 +665,63 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     [detail.rejectedSignals, detail.unconsumedSignals, detail.unrecognisedSignals],
   );
 
-  // --- evidence --------------------------------------------------------------
-  const evidenceItems = useMemo(() => collectEvidence(detail.assessments), [detail.assessments]);
+  // --- machine parts ---------------------------------------------------------
+  const partViews = useMemo(() => buildPartViews({ analysis, signals: signalViews }), [analysis, signalViews]);
+  const keyChanges = useMemo(() => buildKeyChanges(signalViews), [signalViews]);
 
-  const contributorData: MagnitudeDatum[] = analysis.anomaly.contributors.map((item) => ({
-    key: item.code,
-    label: `${item.code} - ${TAG_LABELS[item.code as ExtruderTag] ?? item.code}`,
-    value: item.score,
-    display: item.score.toFixed(1),
-    direction: item.direction,
-  }));
+  // --- conclusion ------------------------------------------------------------
+  // Everything raised on this machine, in one list, worst first. The three kinds
+  // come from the three things the pipeline actually raises, and stay distinct:
+  // a fault is a root-cause inference, not the rung above an alarm.
+  const attentionItems = useMemo<AttentionItem[]>(() => {
+    const faults: AttentionItem[] = candidateAssessments.map((assessment) => ({
+      key: `fault-${assessment.faultId}`,
+      kind: 'FAULT',
+      message: `Possible ${assessment.faultName.toLowerCase()}`,
+      reference: assessment.faultId,
+      part: partForFault(assessment.faultId),
+    }));
+    const alarms: AttentionItem[] = violations.map((check) => ({
+      key: `alarm-${check.constraintId}`,
+      kind: 'ALARM',
+      message: `${check.name} is past its hard process limit`,
+      reference: `${check.constraintId} · ${check.operator} ${check.limit} ${check.unit}`,
+      part: partsForConstraint(check.constraintId)[0] ?? null,
+    }));
+    const warnings: AttentionItem[] = detail.triggeredThresholds.map((threshold) => ({
+      key: `warning-${threshold.thresholdId}-${threshold.sensor}`,
+      kind: 'WARNING',
+      message: `${TAG_LABELS[threshold.sensor as ExtruderTag] ?? threshold.sensor} crossed a registered boundary`,
+      reference: `${threshold.thresholdId} · ${threshold.feature}`,
+      part: threshold.sensor in TAG_LABELS ? partForTag(threshold.sensor as ExtruderTag) : null,
+    }));
+    return [...faults, ...alarms, ...warnings];
+  }, [candidateAssessments, detail.triggeredThresholds, violations]);
+
+  const currentDiagnosis = useMemo<CurrentDiagnosis | null>(() => {
+    const top = candidateAssessments[0];
+    if (!top) return null;
+    const part = partForFault(top.faultId);
+    const record = analysis.diagnoses.find((entry) => entry.code === top.faultId);
+    return {
+      likelyCause: top.faultName,
+      affectedPart: part ?? 'Not localised to one part',
+      ranking:
+        candidateAssessments.length > 1
+          ? `${matchClassLabel(top.matchClass)} of ${candidateAssessments.length}`
+          : matchClassLabel(top.matchClass),
+      cannotConfirm: [
+        ...(top.separatingMeasurement ? [top.separatingMeasurement] : []),
+        ...(record?.limitations ?? []),
+        ...analysis.doctorReport.caveats,
+      ],
+    };
+  }, [analysis.diagnoses, analysis.doctorReport.caveats, candidateAssessments]);
+
+  const nextAction = analysis.maintenance.caseRequired
+    ? { priority: humanise(analysis.maintenance.priority), steps: analysis.maintenance.recommendedActions }
+    : null;
+
 
   // --- rail ------------------------------------------------------------------
   const readoutRows = useMemo<ReadoutRow[]>(
@@ -613,7 +744,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
 
   const resolvedCount = detail.resolvedSignals.length;
   const totalTags = resolvedCount + detail.missingTags.length;
-  const maxMatchScore = Math.max(1, ...candidateAssessments.map((assessment) => assessment.engineeringMatchScore));
 
   // --- chrome ----------------------------------------------------------------
   const sourceVariant: Variant = scenarioRun
@@ -644,42 +774,56 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     { label: 'Tags', value: `${resolvedCount}/${totalTags} resolved`, variant: readinessVariant(analysis.readiness.score) },
   ];
 
+  // Counts are what each tab is FOR, not how many rows it happens to hold:
+  // Diagnosis counts what is raised, Advance Diagnosis counts parts that are not
+  // normal, Signal counts readings outside their limits.
+  const partsNotNormal = partViews.filter((view) => view.state !== 'NORMAL' && view.state !== 'UNAVAILABLE').length;
+  const signalsOutsideLimits = signalViews.filter(
+    (signal) => signal.status === 'WARNING' || signal.status === 'ALARM',
+  ).length;
+
   const tabs: TabItem<TabKey>[] = [
-    { value: 'diagnosis', label: 'Diagnosis', icon: 'stethoscope', count: candidateAssessments.length, countVariant: verdictVariant },
-    { value: 'limits', label: 'Limits', icon: 'ruler-square', count: violations.length, countVariant: 'destructive' },
-    { value: 'evidence', label: 'Evidence', icon: 'chart-timeline-variant', count: evidenceItems.length, countVariant: 'warning' },
-    { value: 'signals', label: 'Signals', icon: 'access-point', count: detail.missingTags.length + unresolved, countVariant: 'info' },
-    { value: 'model', label: 'Model', icon: 'file-document-outline' },
     {
-      value: 'connectivity',
-      label: 'Connectivity',
-      icon: 'lan-connect',
-      count: connectivitySummary.unmapped + connectivitySummary.offline,
-      countVariant: 'warning',
+      value: 'diagnosis',
+      label: 'Diagnosis',
+      icon: 'stethoscope',
+      count: attentionItems.length,
+      countVariant: verdictVariant,
+    },
+    {
+      value: 'advance',
+      label: 'Advance Diagnosis',
+      icon: 'cog-outline',
+      count: partsNotNormal,
+      countVariant: partsNotNormal > 0 ? 'warning' : 'muted',
+    },
+    {
+      value: 'signal',
+      label: 'Signal',
+      icon: 'access-point',
+      count: signalsOutsideLimits,
+      countVariant: signalsOutsideLimits > 0 ? 'warning' : 'muted',
     },
   ];
+
+  /**
+   * The one navigation the redesign depends on.
+   *
+   * Diagnosis names a problem; Advance Diagnosis explains it. Every finding on
+   * Diagnosis and every row on Signal carries the part it belongs to, so both
+   * can hand the user straight to the part deep-dive instead of leaving them to
+   * find it in a picker.
+   */
+  const openPart = useCallback((part: MachinePart) => {
+    setSelectedPart(part);
+    setTab('advance');
+  }, []);
 
   const { width } = useWindowDimensions();
   // Two columns only where a rail still leaves a readable main column. Below it
   // the rail drops underneath rather than squeezing the analysis to a gutter.
   const wide = width >= 1180;
   const railWidth = width >= 1600 ? 372 : 336;
-
-  const evidenceBasis = useMemo(() => {
-    const lines: string[] = [];
-    if (detail.triggeredThresholds.length > 0) {
-      lines.push(`${detail.triggeredThresholds.length} registered threshold${detail.triggeredThresholds.length === 1 ? '' : 's'} crossed.`);
-    }
-    lines.push(`${resolvedCount} of ${totalTags} diagnostic tags resolved from ${mappedChannels.length} mapped point${mappedChannels.length === 1 ? '' : 's'}.`);
-    if (degradedSignals.length > 0) {
-      lines.push(`${degradedSignals.length} signal${degradedSignals.length === 1 ? '' : 's'} degraded or bad, which narrows what can be concluded.`);
-    }
-    if (violations.length > 0) {
-      lines.push(`${violations.length} hard process limit${violations.length === 1 ? '' : 's'} exceeded, reported separately from the diagnosis.`);
-    }
-    if (lines.length === 1) lines.push('No registered threshold was crossed by the current measurements.');
-    return lines;
-  }, [degradedSignals.length, detail.triggeredThresholds.length, mappedChannels.length, resolvedCount, totalTags, violations.length]);
 
   const rail = (
     <View className="gap-3">
@@ -721,10 +865,13 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
               tone={connectivitySummary.unmapped > 0 ? palette.warning : undefined}
             />
           </View>
+          {/* Connectivity was a tab of its own; it is provenance, and provenance
+              belongs next to the number it qualifies. The full chain for any one
+              signal now lives in that signal's row on the Signal screen. */}
           <Pressable
-            onPress={() => setTab('connectivity')}
+            onPress={() => setTab('signal')}
             accessibilityRole="button"
-            accessibilityLabel="Open the connectivity tab"
+            accessibilityLabel="Open the Signal screen to trace the acquisition chain"
             className="flex-row items-center justify-between rounded-lg border px-2.5 py-1.5"
             style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
           >
@@ -828,9 +975,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           ) : null}
 
           {/* --- the workspace grid ------------------------------------------
-              Main analysis left, the instruments it was read from right. The
-              rail sticks to the top of the scroller on desktop so a long
-              evidence table never scrolls the readings out of sight. */}
+              The analysis on the left, the instruments it was read from on the
+              right. The rail sticks to the top of the scroller on desktop so a
+              long part deep-dive never scrolls the live readings out of sight. */}
           <View className={cn('gap-3', wide && 'flex-row items-start')}>
             <View className="min-w-0 flex-1 gap-3">
               {tab === 'diagnosis' ? (
@@ -842,107 +989,29 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
                     </Body>
                   </Section>
                 ) : (
-                  <>
-                    <DiagnosisSummary
-                      variant={verdictVariant}
-                      headline={verdictTitle}
-                      eyebrow={
-                        hasCandidates ? `${humanise(detail.faultLayer)} layer · ${humanise(detail.faultCategory)}` : 'No fault signature'
-                      }
-                      detail={verdictDetail}
-                      identifiability={humanise(detail.identifiability)}
-                      readiness={{
-                        score: analysis.readiness.score,
-                        ready: analysis.readiness.ready,
-                        variant: readinessVariant(analysis.readiness.score),
-                        missing: analysis.readiness.missingEssential,
-                      }}
-                      machineState={{
-                        label: humanise(detail.inferredMachineState),
-                        variant: stateVariant(detail.inferredMachineState),
-                        basis: detail.stateBasis[0] ?? '',
-                      }}
-                      hypotheses={candidateAssessments.length}
-                      topScore={candidateAssessments[0]?.engineeringMatchScore ?? null}
-                      unresolvedSignals={unresolved}
-                      severity={{
-                        label: analysis.anomaly.severity === 'none' ? 'none active' : humanise(analysis.anomaly.severity),
-                        variant: SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'info',
-                      }}
-                    />
-
-                    <ConclusionPanel
-                      machineState={humanise(detail.inferredMachineState)}
-                      stateBasis={detail.stateBasis}
-                      separatingMeasurements={detail.separatingMeasurements}
-                      hypotheses={candidateAssessments.length}
-                      explanation={detail.explanation}
-                      evidenceBasis={evidenceBasis}
-                    />
-
-                    <HypothesisList assessments={candidateAssessments} maxScore={maxMatchScore} />
-
-                    {analysis.maintenance.caseRequired ? (
-                      <MaintenanceGuidance
-                        priority={analysis.maintenance.priority}
-                        actions={analysis.maintenance.recommendedActions}
-                        verification={analysis.maintenance.verificationSteps}
-                        variant={
-                          analysis.maintenance.priority === 'critical' || analysis.maintenance.priority === 'high'
-                            ? 'destructive'
-                            : 'warning'
-                        }
-                      />
-                    ) : null}
-
-                    <EliminatedList assessments={eliminated} />
-                  </>
+                  <ConclusionTab
+                    status={verdictStatusWord}
+                    statusVariant={verdictVariant}
+                    statusDetail={humanise(detail.inferredMachineState)}
+                    warningCount={detail.triggeredThresholds.length}
+                    alarmCount={violations.length}
+                    faultCount={candidateAssessments.length}
+                    attention={attentionItems}
+                    changes={keyChanges}
+                    diagnosis={currentDiagnosis}
+                    action={nextAction}
+                    onOpenPart={openPart}
+                  />
                 )
               ) : null}
 
-              {tab === 'limits' ? <LimitsTab constraints={detail.constraints} fieldCalibrated={fieldCalibratedCount} /> : null}
-
-              {tab === 'evidence' ? (
-                <EvidenceTab
-                  evidence={evidenceItems}
-                  missing={detail.missingTags}
-                  thresholds={detail.triggeredThresholds}
-                  contributors={contributorData}
-                  contributorVariant={SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'info'}
-                  anomalyLimitation={analysis.anomaly.limitations[0] ?? 'No measurement is outside its consistency band.'}
-                  assessments={detail.assessments}
-                  readinessScore={analysis.readiness.score}
-                  thresholdTotal={thresholdRegister.length}
-                />
+              {tab === 'advance' ? (
+                <AdvanceDiagnosisTab parts={partViews} selectedPart={selectedPart} onSelectPart={setSelectedPart} />
               ) : null}
 
-              {tab === 'signals' ? <SignalsTab signals={signalRows} unconsumed={unconsumed} /> : null}
-
-              {tab === 'model' ? (
-                <ModelTab
-                  modelName="Single-screw extruder diagnostic model"
-                  modelVersion={analysis.modelVersion}
-                  recipeId={detail.recipeId}
-                  machineState={humanise(detail.inferredMachineState)}
-                  inputs={detail.resolvedSignals.map((signal) => ({
-                    tag: signal.tag,
-                    label: TAG_LABELS[signal.tag] ?? signal.tag,
-                    value: signal.value,
-                    unit: signal.unit,
-                  }))}
-                  missing={detail.missingTags}
-                  constraintCount={detail.constraints.length}
-                  blockedOutputs={detail.blockedOutputs}
-                  baseline={detail.baseline}
-                  trace={detail.trace}
-                  availability={detail.availability}
-                  caveats={analysis.doctorReport.caveats}
-                  thresholdCount={thresholdRegister.length}
-                  fieldCalibrated={fieldCalibratedCount}
-                />
+              {tab === 'signal' ? (
+                <SignalTab signals={signalViews} unconsumed={unconsumed} wide={wide} onOpenPart={openPart} />
               ) : null}
-
-              {tab === 'connectivity' ? <ConnectivityTab connections={connections} /> : null}
             </View>
 
             {/* The rail carries the same two panels on every tab: what the model
@@ -958,16 +1027,21 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
             </View>
           </View>
 
-          {/* Kept out of the rail so the page still names the machine's fault
-              vocabulary when the rail has collapsed underneath. */}
-          {expectedPoints && expectedPoints > mappedChannels.length ? (
-            <Body muted>
-              {mappedChannels.length} of {expectedPoints} expected measurement points are mapped on this machine.
-            </Body>
-          ) : null}
+          {/* Provenance. This is what the Model tab existed to say, and it says
+              it in one line beside the analysis it qualifies rather than on a
+              page an operator has to know to open. */}
+          <Body muted>
+            Single-screw extruder diagnostic model {analysis.modelVersion} · recipe {detail.recipeId} ·{' '}
+            {thresholdRegister.length} registered thresholds, {fieldCalibratedCount} field-calibrated ·{' '}
+            {resolvedCount}/{totalTags} diagnostic tags resolved
+            {expectedPoints && expectedPoints > mappedChannels.length
+              ? ` · ${mappedChannels.length} of ${expectedPoints} expected measurement points mapped`
+              : ''}
+            .
+          </Body>
 
           {/* Named so the page still says which fault the model would call this,
-              even when the diagnosis tab is not the one open. */}
+              even when Diagnosis is not the tab that is open. */}
           {hasCandidates && tab !== 'diagnosis' ? (
             <Body muted>
               Current diagnosis: {detail.candidateFaults.map((id) => faultName(id)).join(', ')}.
