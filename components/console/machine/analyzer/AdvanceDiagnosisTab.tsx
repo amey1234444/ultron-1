@@ -41,8 +41,8 @@ import {
 } from '../../../../lib/analysis/extruder';
 import { cn } from '../../../../lib/cn';
 import { alpha, Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { EmptyNote, Fact, Section } from './AnalyzerParts';
-import { TagTrend } from './LiveInstrumentReadout';
+import { EmptyNote, Fact, Section, TagTrend } from './AnalyzerParts';
+
 
 const STATE_VARIANT: Record<PartState, Variant> = {
   NORMAL: 'success',
@@ -188,23 +188,26 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
   );
 }
 
-/** One part's condition, as a card on the entry screen. */
+/**
+ * One part that is not normal, as a card on the entry screen.
+ *
+ * Only the parts that need a decision get a card. The strip above already
+ * states every part's condition, so giving all seven a card printed the same
+ * seven states twice on one screen; the cards now carry the thing the strip
+ * cannot - what is actually wrong, in a sentence.
+ */
 function PartCard({ view, onOpen }: { view: PartView; onOpen: () => void }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const style = variantStyle(palette, STATE_VARIANT[view.state]);
-  const reporting = view.signals.filter((signal) => signal.value !== null).length;
 
   return (
     <Pressable
       onPress={onOpen}
       accessibilityRole="button"
       accessibilityLabel={`Open ${view.part} deep dive`}
-      className="min-w-[240px] flex-1 rounded-xl border px-3.5 py-3"
-      style={{
-        borderColor: view.state === 'NORMAL' ? palette.line : alpha(style.accent, 0.4),
-        backgroundColor: palette.panel,
-      }}
+      className="min-w-[260px] flex-1 rounded-xl border px-3.5 py-3"
+      style={{ borderColor: alpha(style.accent, 0.4), backgroundColor: palette.panel }}
     >
       <View className="flex-row items-start justify-between gap-2">
         <Text className="min-w-0 flex-1 font-body-bold text-[13px]" style={{ color: palette.ink }} numberOfLines={1}>
@@ -214,34 +217,53 @@ function PartCard({ view, onOpen }: { view: PartView; onOpen: () => void }) {
           {PART_STATE_LABEL[view.state]}
         </Badge>
       </View>
-
       <Text className="mt-1.5 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }} numberOfLines={2}>
         {view.headline ?? 'No local fault pattern detected.'}
       </Text>
-
-      <View className="mt-2.5 flex-row flex-wrap items-center gap-x-3 gap-y-1">
-        <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-          {reporting}/{view.signals.length} signals live
-        </Text>
-        {view.faultCount > 0 ? (
-          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.critical }}>
-            {view.faultCount} fault{view.faultCount === 1 ? '' : 's'}
-          </Text>
-        ) : null}
-        {view.alarmCount > 0 ? (
-          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.critical }}>
-            {view.alarmCount} limit{view.alarmCount === 1 ? '' : 's'}
-          </Text>
-        ) : null}
-        {view.warningCount > 0 ? (
-          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.warning }}>
-            {view.warningCount} boundar{view.warningCount === 1 ? 'y' : 'ies'}
-          </Text>
-        ) : null}
-      </View>
     </Pressable>
   );
 }
+
+/**
+ * A group of parts that need no card, collapsed onto one line.
+ *
+ * Parts with nothing to report and parts with nothing measuring them both take
+ * one line each instead of a card each. Seven cards on a healthy machine was
+ * seven restatements of the strip directly above them.
+ */
+function PartGroupLine({
+  parts,
+  title,
+  badge,
+  variant,
+}: {
+  parts: PartView[];
+  title: string;
+  badge: string;
+  variant: Variant;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  if (parts.length === 0) return null;
+
+  return (
+    <View
+      className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3.5 py-2.5"
+      style={{ borderColor: palette.line, backgroundColor: palette.panel }}
+    >
+      <Badge variant={variant} icon={null} outline>
+        {badge}
+      </Badge>
+      <Text className="font-body-bold text-[12px]" style={{ color: palette.ink }}>
+        {parts.length} {title}
+      </Text>
+      <Text className="min-w-0 flex-1 font-body text-[11.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
+        {parts.map((view) => view.part).join(', ')}
+      </Text>
+    </View>
+  );
+}
+
 
 // ---------------------------------------------------------------------------
 // Deep dive
@@ -295,7 +317,7 @@ function CauseList({ view }: { view: PartView }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
 
-  if (view.causes.length === 0) {
+  if (view.causes.length === 0 && view.ruledOut.length === 0) {
     return <EmptyNote>No controlled fault signature is met on this part by the current measurements.</EmptyNote>;
   }
 
@@ -303,6 +325,9 @@ function CauseList({ view }: { view: PartView }) {
 
   return (
     <View>
+      {view.causes.length === 0 ? (
+        <EmptyNote>No controlled fault signature is met on this part by the current measurements.</EmptyNote>
+      ) : null}
       {view.causes.map((cause, index) => {
         const variant: Variant =
           cause.matchClass === 'STRONG_CANDIDATE' ? 'destructive' : cause.matchClass === 'CANDIDATE' ? 'warning' : 'muted';
@@ -353,6 +378,26 @@ function CauseList({ view }: { view: PartView }) {
           </View>
         );
       })}
+
+      {/* Ruled out lives here rather than in a section of its own: it is the
+          tail of the same ranked list, and "considered and eliminated" is only
+          meaningful next to what was not. */}
+      {view.ruledOut.length > 0 ? (
+        <View className="pt-2.5" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
+          <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+            Ruled out
+          </Text>
+          {view.ruledOut.map((cause) => (
+            <Text
+              key={cause.faultId}
+              className="mt-1 font-body text-[11px] leading-[15px]"
+              style={{ color: palette.inkMuted }}
+            >
+              {cause.name} — {cause.contradicting[0] ?? 'a primary contradiction eliminated this hypothesis.'}
+            </Text>
+          ))}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -415,24 +460,25 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
 
       {stats ? (
         <View className="flex-row flex-wrap gap-x-5 gap-y-2">
+          {/* The current value is stated once, in the header row above this
+              panel. Every tool adds only what IT computes on top of it. */}
           {tool.key === 'trend' || tool.key === 'level' || tool.key === 'load' ? (
             <>
-              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
               <Fact label="Mean" value={formatValue(stats.mean, signal.unit)} width={104} />
               <Fact label="Min" value={formatValue(stats.min, signal.unit)} width={92} />
               <Fact label="Max" value={formatValue(stats.max, signal.unit)} width={92} />
+              <Fact label="Samples" value={String(stats.count)} width={84} />
             </>
           ) : null}
           {tool.key === 'rate' ? (
             <>
-              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
               <Fact label="Change" value={formatValue(stats.max - stats.min, signal.unit)} width={110} />
               <Fact label="Direction" value={BEHAVIOUR_LABEL[signal.behaviour]} mono={false} width={116} />
+              <Fact label="Samples" value={String(stats.count)} width={84} />
             </>
           ) : null}
           {tool.key === 'stability' || tool.key === 'variation' || tool.key === 'consumption' ? (
             <>
-              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
               <Fact label="Spread" value={formatValue(stats.spread, signal.unit)} width={104} />
               <Fact label="Std dev" value={formatValue(stats.sd, signal.unit)} width={104} />
               <Fact label="Samples" value={String(stats.count)} width={84} />
@@ -440,14 +486,16 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
           ) : null}
           {tool.key === 'setpoint' ? (
             <>
-              <Fact label="Now" value={formatValue(signal.value, signal.unit)} width={104} tone={accent} />
               <Fact label="Setpoint" value={formatValue(signal.reference, signal.unit)} width={110} />
               <Fact
                 label="Deviation"
                 value={
-                  signal.value !== null && signal.reference !== null ? formatValue(signal.value - signal.reference, signal.unit) : '—'
+                  signal.value !== null && signal.reference !== null
+                    ? formatValue(signal.value - signal.reference, signal.unit)
+                    : '—'
                 }
                 width={110}
+                tone={accent}
               />
             </>
           ) : null}
@@ -473,7 +521,7 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
  * from the signal's measurement kind, so what is offered is always what this
  * measurement can actually support.
  */
-function SignalDetail({ signals }: { signals: SignalView[] }) {
+function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachinePart }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const [selectedTag, setSelectedTag] = useState<string | null>(null);
@@ -513,7 +561,7 @@ function SignalDetail({ signals }: { signals: SignalView[] }) {
                   {entry.measures}
                 </Text>
                 <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-                  {entry.tag} · {KIND_LABEL[entry.kind]}
+                  {entry.tag} · {entry.part === part ? KIND_LABEL[entry.kind] : `context · ${entry.part}`}
                 </Text>
               </Pressable>
             );
@@ -685,104 +733,83 @@ export function AdvanceDiagnosisTab({
   parts,
   selectedPart,
   onSelectPart,
+  wide,
 }: {
   parts: PartView[];
   selectedPart: MachinePart | null;
   onSelectPart: (part: MachinePart | null) => void;
+  wide: boolean;
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const view = selectedPart ? (parts.find((entry) => entry.part === selectedPart) ?? null) : null;
+  // Only a part that needs a decision earns a card. Normal parts and parts
+  // nothing is measuring are each worth one line, not one card apiece.
+  const needsDecision = parts.filter((entry) => entry.state !== 'NORMAL' && entry.state !== 'UNAVAILABLE');
+  const healthy = parts.filter((entry) => entry.state === 'NORMAL');
+  const unmeasured = parts.filter((entry) => entry.state === 'UNAVAILABLE');
 
   return (
-    <View className="gap-3">
-      <Section
-        title={view ? view.part : 'Machine-part diagnosis'}
-        eyebrow="Advance diagnosis"
-        meta={
-          view
-            ? view.description
-            : 'Select a part to understand its condition and open only the analysis relevant to that part.'
-        }
-        accent={view ? STATE_VARIANT[view.state] : undefined}
-        actions={
-          view ? (
-            <Badge variant={STATE_VARIANT[view.state]} icon={null} outline>
-              {PART_STATE_LABEL[view.state]}
-            </Badge>
-          ) : undefined
-        }
-      >
-        <PartChips parts={parts} selected={selectedPart} onSelect={onSelectPart} />
-      </Section>
+    <View className="gap-2.5">
+      {/* The part picker is the screen's navigation, not a panel of its own. It
+          sits bare above the content so the first card the eye lands on is the
+          machine, not a title telling it that a machine is below. */}
+      <PartChips parts={parts} selected={selectedPart} onSelect={onSelectPart} />
 
       {view === null ? (
         <>
-          <Section title="Machine condition by part" eyebrow="Process order" meta="Material travels left to right.">
+          <Section title="Machine condition by part" meta="Material travels left to right. Select a part to open it.">
             <ConditionStrip parts={parts} onSelect={onSelectPart} />
           </Section>
 
-          <View className="flex-row flex-wrap gap-3">
-            {parts.map((entry) => (
-              <PartCard key={entry.part} view={entry} onOpen={() => onSelectPart(entry.part)} />
-            ))}
-          </View>
+          {needsDecision.length > 0 ? (
+            <View className={cn('gap-2.5', wide && 'flex-row flex-wrap')}>
+              {needsDecision.map((entry) => (
+                <PartCard key={entry.part} view={entry} onOpen={() => onSelectPart(entry.part)} />
+              ))}
+            </View>
+          ) : null}
+
+          <PartGroupLine parts={healthy} title="parts normal" badge="Normal" variant="success" />
+          <PartGroupLine parts={unmeasured} title="parts not measured" badge="No data" variant="muted" />
         </>
       ) : (
         <>
-          {view.headline ? (
-            <Section title={view.headline} eyebrow="Condition" accent={STATE_VARIANT[view.state]}>
-              <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-                <Fact label="Signals" value={`${view.signals.filter((s) => s.value !== null).length}/${view.signals.length} live`} width={104} />
-                <Fact
-                  label="Faults"
-                  value={String(view.faultCount)}
-                  width={78}
-                  tone={view.faultCount > 0 ? palette.critical : undefined}
-                />
-                <Fact
-                  label="Limits"
-                  value={String(view.alarmCount)}
-                  width={78}
-                  tone={view.alarmCount > 0 ? palette.critical : undefined}
-                />
-                <Fact
-                  label="Boundaries"
-                  value={String(view.warningCount)}
-                  width={96}
-                  tone={view.warningCount > 0 ? palette.warning : undefined}
-                />
-                {view.causes[0] ? (
-                  <Fact label="Ranked first" value={matchClassLabel(view.causes[0].matchClass)} mono={false} width={132} />
-                ) : null}
-              </View>
-            </Section>
-          ) : null}
-
+          {/* One header for the part: what it is, how it is, and what is wrong.
+              The counts that used to sit here repeated the strip and the card
+              above, so the headline keeps the sentence and drops the tally. */}
           <Section
-            title="How ULTRON reached this conclusion"
-            eyebrow="Reasoning"
-            meta="Each stage is the pipeline's own, in the order it ran. A stage the measurements could not support says so."
+            title={view.part}
+            meta={view.headline ?? view.description}
+            accent={STATE_VARIANT[view.state]}
+            actions={
+              <Badge variant={STATE_VARIANT[view.state]} icon={null} outline>
+                {PART_STATE_LABEL[view.state]}
+              </Badge>
+            }
           >
-            <ReasoningChain view={view} />
+            <View className="gap-2">
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+                How ULTRON reached this conclusion
+              </Text>
+              <ReasoningChain view={view} />
+            </View>
           </Section>
 
           {view.part === 'Barrel' ? (
             <Section
               title="Barrel temperature profile"
-              eyebrow="Thermal"
-              meta="The zones are read as one profile, because a flat or inverted profile is a different fault from any single hot zone."
+              meta="The zones are read as one profile: a flat or inverted profile is a different fault from any single hot zone."
             >
               <ThermalProfile signals={view.signals} />
             </Section>
           ) : null}
 
-          <View className="gap-3 lg:flex-row lg:items-start">
+          <View className={cn('gap-2.5', wide && 'flex-row items-start')}>
             <View className="min-w-0 flex-1">
               <Section
                 title="Possible causes"
-                eyebrow="Hypotheses"
-                meta="Ranked by engineering match. The rank orders the list; it is not a probability."
+                meta="Ranked by engineering match, which orders the list but is not a probability."
                 footnote="This machine has no calibrated fault-probability model, so no percentage confidence is reported. Ambiguity is kept wherever the installed sensors cannot separate two candidates, and the measurement that would separate them is named."
               >
                 <CauseList view={view} />
@@ -791,55 +818,13 @@ export function AdvanceDiagnosisTab({
 
             <View className="min-w-0 flex-1">
               <Section
-                title={`Signal detail · ${view.part}`}
-                eyebrow="Contextual analysis"
-                meta="The tools offered are the ones this kind of measurement can actually support."
-                footnote="Signal analysis is no longer a separate page — it appears inside the part that owns the signal."
+                title="Signal detail"
+                meta="Signals this part owns, plus the ones that inform it. The tools offered are the ones this kind of measurement can support."
               >
-                <SignalDetail signals={[...view.signals, ...view.contextSignals]} />
+                <SignalDetail signals={[...view.signals, ...view.contextSignals]} part={view.part} />
               </Section>
             </View>
           </View>
-
-          {view.ruledOut.length > 0 ? (
-            <Section
-              title="Ruled out"
-              eyebrow="Considered"
-              meta="Hypotheses the current measurements actively contradict, so they do not need re-checking."
-            >
-              <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-                {view.ruledOut.map((cause) => (
-                  <View key={cause.faultId} style={{ minWidth: 240 }} className="flex-1">
-                    <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
-                      {cause.name}
-                    </Text>
-                    <Text className="mt-0.5 font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkFaint }}>
-                      {cause.contradicting[0] ?? 'A primary contradiction eliminated this hypothesis.'}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </Section>
-          ) : null}
-
-          {view.contextSignals.length > 0 ? (
-            <Section
-              title="Signals that inform this part"
-              eyebrow="Context"
-              meta="Owned by another part, but genuine evidence when reasoning about this one."
-            >
-              <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-                {view.contextSignals.map((signal) => (
-                  <Fact
-                    key={signal.tag}
-                    label={`${signal.measures} · ${signal.part}`}
-                    value={formatValue(signal.value, signal.unit)}
-                    width={180}
-                  />
-                ))}
-              </View>
-            </Section>
-          ) : null}
         </>
       )}
     </View>

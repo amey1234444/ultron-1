@@ -25,8 +25,8 @@ import {
   type SignalView,
 } from '../../../../lib/analysis/extruder';
 import { Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { EmptyNote, ExpandableRow, Fact, FilterChips, SearchField, Section, SummaryStrip } from './AnalyzerParts';
-import { TagTrend } from './LiveInstrumentReadout';
+import { EmptyNote, ExpandableRow, Fact, FilterChips, SearchField, Section, TagTrend } from './AnalyzerParts';
+
 
 const STATUS_VARIANT: Record<SignalStatus, Variant> = {
   NORMAL: 'success',
@@ -67,7 +67,7 @@ function HeaderRow({ wide }: { wide: boolean }) {
 
   return (
     <View
-      className="flex-row items-center gap-2.5 px-3 py-1.5"
+      className="flex-row items-center gap-2.5 px-3.5 py-1.5"
       style={{ backgroundColor: palette.panelRaised, borderBottomWidth: 1, borderBottomColor: palette.line }}
     >
       <Text className={cell} style={{ color: palette.inkFaint, width: 176 }}>
@@ -259,12 +259,21 @@ export function SignalTab({
   unconsumed,
   wide,
   onOpenPart,
+  provenance,
 }: {
   signals: SignalView[];
   /** Mapped points the model could not use, with the reason. */
   unconsumed: { label: string; reason: string }[];
   wide: boolean;
   onOpenPart: (part: MachinePart) => void;
+  /**
+   * Model, rule-set and acquisition provenance, as one line.
+   *
+   * It is stated here and nowhere else. Acquisition is what this screen is
+   * about, so the sentence that qualifies every number in the table belongs
+   * under the table rather than repeated in the header of all three screens.
+   */
+  provenance: string;
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
@@ -273,13 +282,12 @@ export function SignalTab({
   const [expanded, setExpanded] = useState<string | null>(null);
 
   const counts = useMemo(() => {
-    const normal = signals.filter((signal) => signal.status === 'NORMAL').length;
     const attention = signals.filter((signal) => signal.status === 'WARNING' || signal.status === 'ALARM').length;
     const noLimit = signals.filter(
       (signal) => !signal.missing && signal.warningLimit === null && signal.criticalLimit === null,
     ).length;
     const unmapped = signals.filter((signal) => signal.status === 'NOT_MAPPED').length;
-    return { normal, attention, noLimit, unmapped };
+    return { attention, noLimit, unmapped };
   }, [signals]);
 
   const visible = useMemo(() => {
@@ -296,21 +304,15 @@ export function SignalTab({
     });
   }, [filter, query, signals]);
 
+  // The four counts used to head this screen as a strip of tiles AND sit inside
+  // the filter chips underneath. They are the same four numbers, so only the
+  // chips keep them - a count you can press to act on it beats a count you
+  // cannot.
   return (
-    <View className="gap-3">
-      <SummaryStrip
-        items={[
-          { key: 'normal', label: 'Normal', value: String(counts.normal), variant: 'success' },
-          { key: 'attention', label: 'Need attention', value: String(counts.attention), variant: counts.attention > 0 ? 'warning' : 'muted' },
-          { key: 'nolimit', label: 'No limits set', value: String(counts.noLimit), variant: 'muted' },
-          { key: 'unmapped', label: 'Not mapped', value: String(counts.unmapped), variant: counts.unmapped > 0 ? 'info' : 'muted' },
-        ]}
-      />
-
+    <View className="gap-2.5">
       <Section
         title="Live signals"
-        eyebrow="Monitoring"
-        meta="Current values, references, behaviour and configured limits in one place."
+        meta="Current value, reference, behaviour and configured limits. Open a row for its limits, quality and acquisition chain."
         padded={false}
         actions={
           <>
@@ -328,7 +330,7 @@ export function SignalTab({
             />
           </>
         }
-        footnote="Severity and data quality are separate columns on purpose: a reading can be inside every limit and still not be trustworthy."
+        footnote={provenance}
       >
         <HeaderRow wide={wide} />
         {visible.length === 0 ? (
@@ -356,8 +358,7 @@ export function SignalTab({
       {unconsumed.length > 0 ? (
         <Section
           title="Mapped points the model did not read"
-          eyebrow="Not consumed"
-          meta="These are wired on the canvas but do not resolve onto a diagnostic tag, so nothing on this machine is measuring what they were meant to."
+          meta="Wired on the canvas but not resolved onto a diagnostic tag, so nothing on this machine is measuring what they were meant to."
           accent="warning"
         >
           <View>

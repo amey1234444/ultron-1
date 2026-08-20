@@ -22,14 +22,15 @@ import { EmptyNote, Section, StepRow, SummaryStrip } from './AnalyzerParts';
 /**
  * One line in Needs attention.
  *
- * `kind` mirrors the engine's own three registries — a crossed decision
- * boundary is a WARNING, a breached hard process limit is an ALARM, and a
- * matched fault signature is a FAULT. Severity and inference are parallel axes:
- * a fault is a root-cause inference, not the rung above alarm.
+ * `kind` mirrors the engine's own registries: a crossed decision boundary is a
+ * WARNING, a breached hard process limit is an ALARM. Faults are the third
+ * registry and are deliberately absent here — severity and inference are
+ * parallel axes, a fault is a root-cause inference rather than the rung above
+ * an alarm, and it is stated once in the conclusion panel below this list.
  */
 export type AttentionItem = {
   key: string;
-  kind: 'WARNING' | 'ALARM' | 'FAULT';
+  kind: 'WARNING' | 'ALARM';
   /** Plain-language line. No rule ids. */
   message: string;
   /** The traceable id, shown small underneath. */
@@ -40,6 +41,10 @@ export type AttentionItem = {
 export type CurrentDiagnosis = {
   likelyCause: string;
   affectedPart: string;
+  /** The part to open when the reader wants the reasoning. */
+  part: MachinePart | null;
+  /** Hypotheses beyond the top one that the installed sensors cannot separate. */
+  alternatives: number;
   /**
    * How the candidate ranked, in words. Never a percentage: this machine has no
    * calibrated fault-probability model, and a number with a % sign beside it
@@ -52,13 +57,11 @@ export type CurrentDiagnosis = {
 const KIND_VARIANT: Record<AttentionItem['kind'], Variant> = {
   WARNING: 'warning',
   ALARM: 'destructive',
-  FAULT: 'destructive',
 };
 
 const KIND_LABEL: Record<AttentionItem['kind'], string> = {
   WARNING: 'Warning',
   ALARM: 'Alarm',
-  FAULT: 'Fault',
 };
 
 const DIRECTION_ICON: Record<KeyChange['direction'], 'arrow-up' | 'arrow-down' | 'minus'> = {
@@ -98,7 +101,7 @@ export function ConclusionTab({
   const palette = consolePalette(isDark);
 
   return (
-    <View className="gap-3">
+    <View className="gap-2.5">
       <SummaryStrip
         items={[
           { key: 'status', label: 'Machine status', value: status, variant: statusVariant, detail: statusDetail },
@@ -118,7 +121,7 @@ export function ConclusionTab({
           },
           {
             key: 'faults',
-            label: 'Detected problems',
+            label: 'Faults',
             value: String(faultCount),
             variant: faultCount > 0 ? 'destructive' : 'muted',
             detail: 'Matched fault signatures',
@@ -126,16 +129,20 @@ export function ConclusionTab({
         ]}
       />
 
-      <View className="gap-3 lg:flex-row lg:items-start">
+      <View className="gap-2.5 lg:flex-row lg:items-start">
         <View className="min-w-0 flex-1">
+          {/* Faults are deliberately NOT in this list. The conclusion panel below
+              owns the fault - it names it, localises it and says what cannot be
+              confirmed - and printing it here as well made one finding appear
+              twice on one screen. This list is what is raised *besides* the
+              conclusion. */}
           <Section
             title="Needs attention"
-            eyebrow="Now"
-            meta="Everything currently raised on this machine. Faults first, then breached limits, then crossed boundaries."
+            meta="Limits and boundaries currently raised on this machine."
             padded={false}
           >
             {attention.length === 0 ? (
-              <EmptyNote>Nothing is currently raised on this machine.</EmptyNote>
+              <EmptyNote>No limit or boundary is currently raised on this machine.</EmptyNote>
             ) : (
               attention.map((item, index) => (
                 <Pressable
@@ -144,7 +151,7 @@ export function ConclusionTab({
                   disabled={!item.part}
                   accessibilityRole={item.part ? 'button' : undefined}
                   accessibilityLabel={item.part ? `${item.message}. Open ${item.part}.` : item.message}
-                  className="flex-row items-center gap-3 px-4 py-2.5"
+                  className="flex-row items-center gap-3 px-3.5 py-2.5"
                   style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
                 >
                   <View className="min-w-0 flex-1">
@@ -170,8 +177,7 @@ export function ConclusionTab({
         <View className="min-w-0 flex-1">
           <Section
             title="Key changes"
-            eyebrow="This session"
-            meta="What has actually moved, from where to where."
+            meta="What has actually moved this session, from where to where."
             padded={false}
             footnote="Signals without enough history are left out rather than listed as unchanged, which the data could not support."
           >
@@ -181,7 +187,7 @@ export function ConclusionTab({
               changes.map((change, index) => (
                 <View
                   key={change.tag}
-                  className="flex-row items-center gap-3 px-4 py-2.5"
+                  className="flex-row items-center gap-3 px-3.5 py-2.5"
                   style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
                 >
                   <Text className="min-w-0 flex-1 font-body text-[12px]" style={{ color: palette.ink }} numberOfLines={1}>
@@ -213,8 +219,22 @@ export function ConclusionTab({
 
       <Section
         title="Current diagnosis"
-        eyebrow="Conclusion"
         accent={diagnosis ? 'warning' : 'success'}
+        actions={
+          diagnosis?.part ? (
+            <Pressable
+              onPress={() => onOpenPart(diagnosis.part as MachinePart)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open ${diagnosis.part} in Advance Diagnosis`}
+              className="flex-row items-center gap-1.5"
+            >
+              <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+                Why
+              </Text>
+              <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} />
+            </Pressable>
+          ) : undefined
+        }
         footnote="No percentage confidence is reported for this machine: it has no calibrated fault-probability model, so the ranking is an ordinal engineering match rather than a probability."
       >
         {diagnosis === null ? (
@@ -246,6 +266,12 @@ export function ConclusionTab({
               <Text className="mt-1 font-body-bold text-[14px]" style={{ color: palette.ink }}>
                 {diagnosis.ranking}
               </Text>
+              {diagnosis.alternatives > 0 ? (
+                <Text className="mt-0.5 font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+                  {diagnosis.alternatives} other hypothes{diagnosis.alternatives === 1 ? 'is' : 'es'} the installed sensors
+                  cannot separate from it.
+                </Text>
+              ) : null}
             </View>
             <View style={{ minWidth: 240 }} className="flex-1">
               <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
@@ -260,7 +286,7 @@ export function ConclusionTab({
       </Section>
 
       {action ? (
-        <Section title="What to do" eyebrow={`Priority · ${action.priority}`} accent="warning">
+        <Section title="What to do" meta={`Priority: ${action.priority}.`} accent="warning">
           <View className="gap-2">
             {action.steps.slice(0, 4).map((step, index) => (
               <StepRow key={index} index={index + 1} text={step} />

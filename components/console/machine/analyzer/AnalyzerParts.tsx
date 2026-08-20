@@ -10,12 +10,13 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type React from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { consolePalette, variantStyle, type IconName, type Variant } from '../../../ui';
+import { alpha, consolePalette, variantStyle, type IconName, type Variant } from '../../../ui';
 
 // ---------------------------------------------------------------------------
 // Section shell
@@ -97,9 +98,9 @@ export function Section({
       {footnote ? (
         <>
           <View style={{ height: 1, backgroundColor: palette.line }} />
-          <View className="px-4 py-2" style={{ backgroundColor: palette.panelRaised }}>
+          <View className="px-3.5 py-1.5" style={{ backgroundColor: palette.panelRaised }}>
             {typeof footnote === 'string' ? (
-              <Text className="font-body text-[10.5px] leading-[15px]" style={{ color: palette.inkFaint }}>
+              <Text className="font-body text-[10px] leading-[14px]" style={{ color: palette.inkFaint }}>
                 {footnote}
               </Text>
             ) : (
@@ -289,6 +290,65 @@ export function FilterChips<T extends string>({
   );
 }
 
+/**
+ * A tag's recent samples, drawn at the height of a line of text.
+ *
+ * The rolling history the pipeline already keeps for its temporal features
+ * costs nothing to draw and turns a bare number into a number with a direction.
+ * Nulls break the line rather than being interpolated across — a gap in the
+ * data is information, and joining over it would draw a measurement that was
+ * never taken.
+ */
+export function TagTrend({
+  values,
+  colour,
+  width = 62,
+  height = 22,
+}: {
+  values: (number | null)[];
+  colour: string;
+  width?: number;
+  height?: number;
+}) {
+  const path = useMemo(() => {
+    const samples = values.slice(-24);
+    const finite = samples.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    if (finite.length < 2) return null;
+    const min = Math.min(...finite);
+    const max = Math.max(...finite);
+    const span = max - min || Math.abs(max) || 1;
+    const stepX = samples.length > 1 ? width / (samples.length - 1) : width;
+
+    let d = '';
+    let pen = false;
+    samples.forEach((value, index) => {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        pen = false;
+        return;
+      }
+      const x = index * stepX;
+      const y = height - 2 - ((value - min) / span) * (height - 4);
+      d += `${pen ? ' L' : ' M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
+      pen = true;
+    });
+    return d.trim() || null;
+  }, [height, values, width]);
+
+  if (!path) {
+    return (
+      <View style={{ width, height }} className="justify-center">
+        <View style={{ height: 1, backgroundColor: alpha(colour, 0.25) }} />
+      </View>
+    );
+  }
+
+  return (
+    <Svg width={width} height={height}>
+      <Path d={path} fill="none" stroke={colour} strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Rows
 // ---------------------------------------------------------------------------
@@ -335,7 +395,7 @@ export function ExpandableRow({
         accessibilityLabel={accessibilityLabel}
         onHoverIn={() => setHover(true)}
         onHoverOut={() => setHover(false)}
-        className="flex-row items-center gap-2.5 px-3 py-2"
+        className="flex-row items-center gap-2.5 px-3.5 py-2"
         style={[
           hover || expanded ? { backgroundColor: palette.panelRaised } : null,
           tone ? { borderLeftWidth: 2, borderLeftColor: tone, paddingLeft: 10 } : null,
@@ -347,7 +407,7 @@ export function ExpandableRow({
         ) : null}
       </Pressable>
       {expanded && detail ? (
-        <View className="px-3 pb-3 pt-0.5" style={{ backgroundColor: palette.panelRaised }}>
+        <View className="px-3.5 pb-3 pt-0.5" style={{ backgroundColor: palette.panelRaised }}>
           {detail}
         </View>
       ) : null}

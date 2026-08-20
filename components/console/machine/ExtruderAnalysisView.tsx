@@ -77,9 +77,8 @@ import {
 } from '../../ui';
 import { AdvanceDiagnosisTab } from './analyzer/AdvanceDiagnosisTab';
 import { AnalyzerHeader, type HeaderFact } from './analyzer/AnalyzerHeader';
-import { Fact, Section } from './analyzer/AnalyzerParts';
+import { Section } from './analyzer/AnalyzerParts';
 import { ConclusionTab, type AttentionItem, type CurrentDiagnosis } from './analyzer/ConclusionTab';
-import { LiveInstrumentReadout, type ReadoutRow } from './analyzer/LiveInstrumentReadout';
 import { SignalTab } from './analyzer/SignalTab';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -674,13 +673,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // come from the three things the pipeline actually raises, and stay distinct:
   // a fault is a root-cause inference, not the rung above an alarm.
   const attentionItems = useMemo<AttentionItem[]>(() => {
-    const faults: AttentionItem[] = candidateAssessments.map((assessment) => ({
-      key: `fault-${assessment.faultId}`,
-      kind: 'FAULT',
-      message: `Possible ${assessment.faultName.toLowerCase()}`,
-      reference: assessment.faultId,
-      part: partForFault(assessment.faultId),
-    }));
     const alarms: AttentionItem[] = violations.map((check) => ({
       key: `alarm-${check.constraintId}`,
       kind: 'ALARM',
@@ -695,8 +687,8 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       reference: `${threshold.thresholdId} · ${threshold.feature}`,
       part: threshold.sensor in TAG_LABELS ? partForTag(threshold.sensor as ExtruderTag) : null,
     }));
-    return [...faults, ...alarms, ...warnings];
-  }, [candidateAssessments, detail.triggeredThresholds, violations]);
+    return [...alarms, ...warnings];
+  }, [detail.triggeredThresholds, violations]);
 
   const currentDiagnosis = useMemo<CurrentDiagnosis | null>(() => {
     const top = candidateAssessments[0];
@@ -706,6 +698,8 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     return {
       likelyCause: top.faultName,
       affectedPart: part ?? 'Not localised to one part',
+      part,
+      alternatives: candidateAssessments.length - 1,
       ranking:
         candidateAssessments.length > 1
           ? `${matchClassLabel(top.matchClass)} of ${candidateAssessments.length}`
@@ -722,25 +716,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     ? { priority: humanise(analysis.maintenance.priority), steps: analysis.maintenance.recommendedActions }
     : null;
 
-
-  // --- rail ------------------------------------------------------------------
-  const readoutRows = useMemo<ReadoutRow[]>(
-    () =>
-      detail.resolvedSignals.map((signal) => {
-        const status = qualityByCode.get(signal.tag)?.status ?? (signal.value === null ? 'UNAVAILABLE' : 'GOOD');
-        return {
-          key: `${signal.tag}-${signal.label}`,
-          tag: signal.tag,
-          name: TAG_LABELS[signal.tag] ?? signal.tag,
-          value: signal.value,
-          unit: signal.unit,
-          variant: QUALITY_VARIANT[status],
-          status: humanise(status),
-          history: historyRef.current[signal.tag] ?? [],
-        };
-      }),
-    [detail.resolvedSignals, qualityByCode],
-  );
 
   const resolvedCount = detail.resolvedSignals.length;
   const totalTags = resolvedCount + detail.missingTags.length;
@@ -761,17 +736,12 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         ? 'Partial live data'
         : 'No live data';
 
+  // Identity only. Everything else that used to live up here - model, recipe,
+  // tag count, gateway count - is provenance, and provenance is stated once, in
+  // the footer of the Signal screen where the acquisition chain already is.
   const headerFacts: HeaderFact[] = [
     ...(machineId ? [{ label: 'Machine', value: machineId }] : []),
-    { label: 'Model', value: `Single-screw extruder ${analysis.modelVersion}` },
-    { label: 'Recipe', value: detail.recipeId },
     { label: 'State', value: humanise(detail.inferredMachineState), variant: stateVariant(detail.inferredMachineState) },
-    {
-      label: 'Gateways',
-      value: `${connectivitySummary.gateways} · ${connectivitySummary.connected}/${connectivitySummary.total} points live`,
-      variant: connectivitySummary.connected === connectivitySummary.total && connectivitySummary.total > 0 ? 'success' : 'warning',
-    },
-    { label: 'Tags', value: `${resolvedCount}/${totalTags} resolved`, variant: readinessVariant(analysis.readiness.score) },
   ];
 
   // Counts are what each tab is FOR, not how many rows it happens to hold:
@@ -820,72 +790,50 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   }, []);
 
   const { width } = useWindowDimensions();
-  // Two columns only where a rail still leaves a readable main column. Below it
-  // the rail drops underneath rather than squeezing the analysis to a gutter.
-  const wide = width >= 1180;
-  const railWidth = width >= 1600 ? 372 : 336;
+  // The one breakpoint the layer has: above it a screen may split into two
+  // readable columns, below it everything stacks. Nothing else in the analysis
+  // layer branches on width, so there is one number to change.
+  const wide = width >= 1120;
 
-  const rail = (
-    <View className="gap-3">
-      <LiveInstrumentReadout
-        rows={readoutRows}
-        missing={detail.missingTags.map((item) => ({ tag: item.tag, label: item.label, essential: item.essential }))}
-        maxHeight={wide ? 360 : 300}
+  // One column. The analyzer used to run a sticky rail of live readings beside
+  // every tab, which is the same data the Signal screen is - so the rail was
+  // showing a second copy of a whole screen on the other two. The Signal tab is
+  // the live readings now, and the layout is a single readable column.
+  const screen =
+    tab === 'diagnosis' ? (
+      liveDataUnavailable ? (
+        <Section title="Diagnosis withheld" accent="warning">
+          <Body muted>
+            No saved mapped channel is receiving current gateway telemetry. Connect the Mappable Boxes to the correct
+            rack channels and wait for live samples before diagnosing faults.
+          </Body>
+        </Section>
+      ) : (
+        <ConclusionTab
+          status={verdictStatusWord}
+          statusVariant={verdictVariant}
+          statusDetail={humanise(detail.inferredMachineState)}
+          warningCount={detail.triggeredThresholds.length}
+          alarmCount={violations.length}
+          faultCount={candidateAssessments.length}
+          attention={attentionItems}
+          changes={keyChanges}
+          diagnosis={currentDiagnosis}
+          action={nextAction}
+          onOpenPart={openPart}
+        />
+      )
+    ) : tab === 'advance' ? (
+      <AdvanceDiagnosisTab parts={partViews} selectedPart={selectedPart} onSelectPart={setSelectedPart} wide={wide} />
+    ) : (
+      <SignalTab
+        signals={signalViews}
+        unconsumed={unconsumed}
+        wide={wide}
+        onOpenPart={openPart}
+        provenance={`Single-screw extruder model ${analysis.modelVersion} · recipe ${detail.recipeId} · ${thresholdRegister.length} registered thresholds (${fieldCalibratedCount} field-calibrated) · ${resolvedCount}/${totalTags} diagnostic tags resolved from ${mappedChannels.length} mapped point${mappedChannels.length === 1 ? '' : 's'} · ${connectivitySummary.gateways} gateway${connectivitySummary.gateways === 1 ? '' : 's'}, ${connectivitySummary.connected}/${connectivitySummary.total} points live`}
       />
-
-      {/* Where those readings physically come from. The full chain is a tab of
-          its own; this is the one-glance version that sits beside every
-          conclusion drawn from it. */}
-      <Section
-        title="Gateway context"
-        eyebrow="Acquisition"
-        meta="Where the readings above are arriving from."
-        actions={
-          <Badge variant={connectivitySummary.offline > 0 ? 'warning' : 'success'} icon={null} outline>
-            {connectivitySummary.connected}/{connectivitySummary.total}
-          </Badge>
-        }
-      >
-        <View className="gap-2.5">
-          <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-            <Fact label="Source" value={sourceLabel} mono={false} width={120} />
-            <Fact label="Gateways" value={String(connectivitySummary.gateways)} width={78} />
-            <Fact label="Racks" value={String(connectivitySummary.racks)} width={70} />
-            <Fact label="Channels" value={String(connectivitySummary.channels)} width={82} />
-            <Fact
-              label="Silent"
-              value={String(connectivitySummary.offline)}
-              width={70}
-              tone={connectivitySummary.offline > 0 ? palette.warning : undefined}
-            />
-            <Fact
-              label="Unmapped"
-              value={String(connectivitySummary.unmapped)}
-              width={90}
-              tone={connectivitySummary.unmapped > 0 ? palette.warning : undefined}
-            />
-          </View>
-          {/* Connectivity was a tab of its own; it is provenance, and provenance
-              belongs next to the number it qualifies. The full chain for any one
-              signal now lives in that signal's row on the Signal screen. */}
-          <Pressable
-            onPress={() => setTab('signal')}
-            accessibilityRole="button"
-            accessibilityLabel="Open the Signal screen to trace the acquisition chain"
-            className="flex-row items-center justify-between rounded-lg border px-2.5 py-1.5"
-            style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
-          >
-            <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
-              Trace the acquisition chain
-            </Text>
-            <Text className="font-mono text-[11px]" style={{ color: palette.inkFaint }}>
-              →
-            </Text>
-          </Pressable>
-        </View>
-      </Section>
-    </View>
-  );
+    );
 
   return (
     <View className="min-h-0 flex-1" style={{ backgroundColor: palette.bg }}>
@@ -899,13 +847,19 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         onReturnToLive={() => setScenarioId(null)}
       />
 
-      {/* Tab bar — also fixed, so switching views never means scrolling back up. */}
-      <View className="px-5 py-2" style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}>
+      {/* Tab bar - fixed, so switching screens never means scrolling back up. */}
+      <View
+        className="px-5 py-2"
+        style={{ backgroundColor: palette.panel, borderBottomWidth: 1, borderBottomColor: palette.line }}
+      >
         <Tabs items={tabs} value={tab} onChange={setTab} />
       </View>
 
-      <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 48, alignItems: 'center' }}>
-        <View className="w-full gap-3" style={{ maxWidth: 1680 }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 14, paddingBottom: 40, alignItems: 'center' }}
+      >
+        <View className="w-full gap-2.5" style={{ maxWidth: 1180 }}>
           {libraryOpen ? (
             <Card className="gap-3">
               <CardHeader>
@@ -917,7 +871,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
                 </View>
                 <Body muted>
                   {scenarioRun
-                    ? `Running ${scenarioRun.scenario.id} — ${scenarioRun.scenario.name}. Live data is not being analysed.`
+                    ? `Running ${scenarioRun.scenario.id} · ${scenarioRun.scenario.name}. Live data is not being analysed.`
                     : 'Verified diagnostic cases from the digital twin. Selecting one drives this same pipeline with that condition instead of live measurements.'}
                 </Body>
               </CardHeader>
@@ -926,8 +880,28 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
             </Card>
           ) : null}
 
-          {/* Say plainly when the live model has no gateway measurements to read. */}
-          {!scenarioRun && dataMode !== 'gateway' ? (
+          {/* A running scenario invalidates every number below it, on every
+              screen, so this is the one banner that is not scoped to a tab. */}
+          {scenarioRun ? (
+            <Alert
+              variant={scenarioRun.verdict === 'PASS' ? 'success' : scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'muted' : 'destructive'}
+              title={`${scenarioRun.scenario.id} · ${scenarioRun.scenario.name} · ${scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'not reproducible here' : scenarioRun.verdict.toLowerCase()}`}
+            >
+              <View className="gap-1.5">
+                <Body muted>{scenarioRun.rationale}</Body>
+                <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
+                  <KeyValue label="Injected" value={scenarioRun.expectedFaultIds.join(', ') || 'nothing'} />
+                  <KeyValue label="Reported" value={scenarioRun.actualFaultIds.join(', ') || 'nothing'} />
+                  <KeyValue label="Acceptance" value={scenarioRun.scenario.acceptance} />
+                </View>
+              </View>
+            </Alert>
+          ) : null}
+
+          {/* Scoped to Diagnosis on purpose. The other two screens already say
+              this per row and per part - "No reading", "No data" - so repeating
+              it as a banner there was the same fact three times over. */}
+          {tab === 'diagnosis' && !scenarioRun && dataMode !== 'gateway' ? (
             <Alert
               variant="info"
               icon="access-point-off"
@@ -939,114 +913,13 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
             </Alert>
           ) : null}
 
-          {scenarioRun ? (
-            <Alert
-              variant={scenarioRun.verdict === 'PASS' ? 'success' : scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'muted' : 'destructive'}
-              title={`${scenarioRun.scenario.id} - ${scenarioRun.scenario.name} - ${scenarioRun.verdict === 'NOT_REPRODUCIBLE' ? 'not reproducible here' : scenarioRun.verdict.toLowerCase()}`}
-            >
-              <View className="gap-1.5">
-                <Body muted>{scenarioRun.rationale}</Body>
-                <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1 pt-0.5">
-                  <KeyValue label="Injected" value={scenarioRun.expectedFaultIds.join(', ') || 'nothing'} />
-                  <KeyValue label="Reported" value={scenarioRun.actualFaultIds.join(', ') || 'nothing'} />
-                  <KeyValue label="Acceptance" value={scenarioRun.scenario.acceptance} />
-                  {scenarioRun.scenario.severity !== null ? (
-                    <KeyValue label="Severity" value={String(scenarioRun.scenario.severity)} />
-                  ) : null}
-                </View>
-              </View>
-            </Alert>
-          ) : null}
-
-          {/* A hard-limit breach is the most urgent thing on this screen and
-              stays visible regardless of which tab is open. */}
-          {violations.length > 0 ? (
-            <Alert variant="destructive" title={`${violations.length} hard process limit${violations.length === 1 ? '' : 's'} exceeded`}>
-              {violations
-                .map((check) => `${check.name} at ${check.value === null ? '—' : check.value} ${check.unit} (limit ${check.operator} ${check.limit}).`)
-                .join(' ')}
-            </Alert>
-          ) : null}
-
-          {layerNote ? (
+          {tab === 'diagnosis' && layerNote ? (
             <Alert variant={layerNote.variant} title={layerNote.title}>
               {layerNote.detail}
             </Alert>
           ) : null}
 
-          {/* --- the workspace grid ------------------------------------------
-              The analysis on the left, the instruments it was read from on the
-              right. The rail sticks to the top of the scroller on desktop so a
-              long part deep-dive never scrolls the live readings out of sight. */}
-          <View className={cn('gap-3', wide && 'flex-row items-start')}>
-            <View className="min-w-0 flex-1 gap-3">
-              {tab === 'diagnosis' ? (
-                liveDataUnavailable ? (
-                  <Section title="Diagnosis withheld" eyebrow="No measurements" accent="warning">
-                    <Body muted>
-                      No saved mapped channel is receiving current gateway telemetry. Connect the Mappable Boxes to the
-                      correct rack channels and wait for live samples before diagnosing faults.
-                    </Body>
-                  </Section>
-                ) : (
-                  <ConclusionTab
-                    status={verdictStatusWord}
-                    statusVariant={verdictVariant}
-                    statusDetail={humanise(detail.inferredMachineState)}
-                    warningCount={detail.triggeredThresholds.length}
-                    alarmCount={violations.length}
-                    faultCount={candidateAssessments.length}
-                    attention={attentionItems}
-                    changes={keyChanges}
-                    diagnosis={currentDiagnosis}
-                    action={nextAction}
-                    onOpenPart={openPart}
-                  />
-                )
-              ) : null}
-
-              {tab === 'advance' ? (
-                <AdvanceDiagnosisTab parts={partViews} selectedPart={selectedPart} onSelectPart={setSelectedPart} />
-              ) : null}
-
-              {tab === 'signal' ? (
-                <SignalTab signals={signalViews} unconsumed={unconsumed} wide={wide} onOpenPart={openPart} />
-              ) : null}
-            </View>
-
-            {/* The rail carries the same two panels on every tab: what the model
-                is reading, and where those readings come from. */}
-            <View
-              style={
-                wide
-                  ? ({ width: railWidth, position: 'sticky', top: 0, alignSelf: 'flex-start' } as never)
-                  : undefined
-              }
-            >
-              {rail}
-            </View>
-          </View>
-
-          {/* Provenance. This is what the Model tab existed to say, and it says
-              it in one line beside the analysis it qualifies rather than on a
-              page an operator has to know to open. */}
-          <Body muted>
-            Single-screw extruder diagnostic model {analysis.modelVersion} · recipe {detail.recipeId} ·{' '}
-            {thresholdRegister.length} registered thresholds, {fieldCalibratedCount} field-calibrated ·{' '}
-            {resolvedCount}/{totalTags} diagnostic tags resolved
-            {expectedPoints && expectedPoints > mappedChannels.length
-              ? ` · ${mappedChannels.length} of ${expectedPoints} expected measurement points mapped`
-              : ''}
-            .
-          </Body>
-
-          {/* Named so the page still says which fault the model would call this,
-              even when Diagnosis is not the tab that is open. */}
-          {hasCandidates && tab !== 'diagnosis' ? (
-            <Body muted>
-              Current diagnosis: {detail.candidateFaults.map((id) => faultName(id)).join(', ')}.
-            </Body>
-          ) : null}
+          {screen}
         </View>
       </ScrollView>
     </View>
