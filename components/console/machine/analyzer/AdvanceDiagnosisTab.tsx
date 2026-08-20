@@ -41,7 +41,7 @@ import {
 } from '../../../../lib/analysis/extruder';
 import { cn } from '../../../../lib/cn';
 import { alpha, Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { Block, EmptyNote, Fact, PressSurface, TagTrend } from './AnalyzerParts';
+import { Block, EmptyState, Fact, HoverLift, PressSurface, RangeRail, TrendChart } from './AnalyzerParts';
 
 
 /**
@@ -400,76 +400,157 @@ function ReasoningChain({ view }: { view: PartView }) {
 }
 
 /**
+ * A signal's severity against its own configured limits.
+ *
+ * Deliberately not its data quality: a reading can sit comfortably inside every
+ * limit and still be untrustworthy, and one colour cannot say both.
+ */
+const SIGNAL_VARIANT: Record<string, Variant> = {
+  NORMAL: 'success',
+  WARNING: 'warning',
+  ALARM: 'destructive',
+  UNAVAILABLE: 'muted',
+};
+
+/** A signed change, with the sign kept even when it is positive. */
+function formatDelta(value: number, unit: string): string {
+  const decimals = Math.abs(value) >= 100 ? 0 : Math.abs(value) >= 10 ? 1 : 2;
+  return `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(decimals)}${unit ? ` ${unit}` : ''}`;
+}
+
+/**
  * The ranked hypotheses for this part.
  *
  * The score is an ORDINAL ENGINEERING MATCH SCORE and is never rendered as a
  * percentage: this machine has no calibrated fault-probability model, so a
  * number with a % sign beside it would be a fabricated confidence. The match
  * class carries the meaning; the score only orders the list.
+ *
+ * Each hypothesis is a card rather than a row on a rule. A cause is not one
+ * fact — it is a name, a strength, the observations that support it and, often,
+ * an observation that argues against it — and four stacked facts separated only
+ * by a hairline from the next four read as one long list rather than as three
+ * competing explanations. The rank numeral is what makes the ordering explicit:
+ * a bar alone says "this one is longer", not "this one is first".
  */
 function CauseList({ view }: { view: PartView }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
+  const measured = view.signals.filter((signal) => signal.value !== null).length;
 
   if (view.causes.length === 0 && view.ruledOut.length === 0) {
-    return <EmptyNote>No controlled fault signature is met on this part by the current measurements.</EmptyNote>;
+    return (
+      <EmptyState
+        icon="shield-check-outline"
+        variant={view.state === 'NORMAL' ? 'success' : 'muted'}
+        title="No fault signature matched"
+        detail="Every controlled fault pattern this model holds for this part was tested against the current measurements, and none of them is met. That is a result, not an absence of one."
+        meta={`${measured} measurement${measured === 1 ? '' : 's'} evaluated`}
+      />
+    );
   }
 
   const top = Math.max(1, ...view.causes.map((cause) => cause.score));
 
   return (
-    <View>
+    <View style={{ gap: 8 }}>
       {view.causes.length === 0 ? (
-        <EmptyNote>No controlled fault signature is met on this part by the current measurements.</EmptyNote>
+        <EmptyState
+          icon="filter-remove-outline"
+          title="Every candidate was eliminated"
+          detail="Fault patterns for this part were tested and each one is contradicted by a measurement. What was ruled out, and why, is listed below."
+          meta={`${view.ruledOut.length} hypothes${view.ruledOut.length === 1 ? 'is' : 'es'} eliminated`}
+        />
       ) : null}
+
       {view.causes.map((cause, index) => {
         const variant: Variant =
           cause.matchClass === 'STRONG_CANDIDATE' ? 'destructive' : cause.matchClass === 'CANDIDATE' ? 'warning' : 'muted';
         const accent = variantStyle(palette, variant).accent;
+        const share = Math.round((cause.score / top) * 100);
+
         return (
-          <View
-            key={cause.faultId}
-            className="py-2.5"
-            style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
-          >
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="min-w-0 flex-1">
-                <Text className="font-body-bold text-[12.5px]" style={{ color: palette.ink }}>
-                  {cause.name}
-                </Text>
-                <Text className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-                  {cause.faultId}
+          <HoverLift key={cause.faultId} accent={alpha(accent, 0.55)} radius={14} rise={2}>
+            <View
+              className="rounded-[14px] border px-3.5 py-3"
+              style={{
+                borderColor: index === 0 ? alpha(accent, 0.34) : palette.line,
+                backgroundColor: index === 0 ? alpha(accent, 0.05) : palette.panel,
+              }}
+            >
+              <View className="flex-row items-start gap-2.5">
+                {/* The rank. An ordinal, because the list is ordered and the
+                    bar below only says "longer than the next one". */}
+                <View
+                  className="h-[22px] w-[22px] items-center justify-center rounded-lg"
+                  style={{ backgroundColor: alpha(accent, 0.14) }}
+                >
+                  <Text className="font-mono text-[10px]" style={{ color: accent, fontVariant: ['tabular-nums'] }}>
+                    {index + 1}
+                  </Text>
+                </View>
+
+                <View className="min-w-0 flex-1">
+                  <View className="flex-row items-start justify-between gap-2.5">
+                    <Text className="min-w-0 flex-1 font-body-bold text-[12.5px]" style={{ color: palette.ink }}>
+                      {cause.name}
+                    </Text>
+                    <Badge variant={variant} icon={null} outline>
+                      {matchClassLabel(cause.matchClass)}
+                    </Badge>
+                  </View>
+                  <Text className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                    {cause.faultId}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Rank bar, not a confidence bar. Width is share-of-top-score,
+                  and it is labelled as such so it cannot be read as a percent
+                  likelihood — which is the one thing this machine cannot say. */}
+              <View className="mt-2.5 flex-row items-center gap-2">
+                <View className="h-[4px] flex-1 overflow-hidden rounded-full" style={{ backgroundColor: palette.panelRaised }}>
+                  <View style={{ width: `${share}%`, height: '100%', borderRadius: 4, backgroundColor: accent }} />
+                </View>
+                <Text className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                  {index === 0 ? 'best match' : `${share}% of best`}
                 </Text>
               </View>
-              <Badge variant={variant} icon={null} outline>
-                {matchClassLabel(cause.matchClass)}
-              </Badge>
-            </View>
 
-            {/* Rank bar, not a confidence bar. Width is share-of-top-score. */}
-            <View className="mt-2 h-[3px] overflow-hidden rounded-full" style={{ backgroundColor: palette.panelRaised }}>
-              <View style={{ width: `${Math.round((cause.score / top) * 100)}%`, height: '100%', backgroundColor: accent }} />
-            </View>
+              {cause.primaryEvidence.length > 0 ? (
+                <View className="mt-2.5 gap-1.5">
+                  {cause.primaryEvidence.slice(0, 3).map((line, evidenceIndex) => (
+                    <View key={evidenceIndex} className="flex-row items-start gap-2">
+                      <MaterialCommunityIcons name="check" size={11} color={accent} style={{ marginTop: 2.5 }} />
+                      <Text className="min-w-0 flex-1 font-body text-[11px] leading-[15.5px]" style={{ color: palette.inkMuted }}>
+                        {line}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
 
-            {cause.primaryEvidence.length > 0 ? (
-              <View className="mt-2 gap-1">
-                {cause.primaryEvidence.slice(0, 3).map((line, evidenceIndex) => (
-                  <View key={evidenceIndex} className="flex-row items-start gap-1.5">
-                    <MaterialCommunityIcons name="chevron-right" size={12} color={palette.inkFaint} style={{ marginTop: 2 }} />
-                    <Text className="min-w-0 flex-1 font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
-                      {line}
+              {/* A contradiction is not a footnote on the evidence — it is the
+                  reason this candidate might be the wrong one, so it gets its
+                  own tinted strip instead of a coloured sentence in the flow. */}
+              {cause.contradicting.length > 0 ? (
+                <View
+                  className="mt-2.5 flex-row items-start gap-2 rounded-lg px-2.5 py-2"
+                  style={{ backgroundColor: alpha(palette.warning, 0.1) }}
+                >
+                  <MaterialCommunityIcons name="alert-outline" size={12} color={palette.warning} style={{ marginTop: 1.5 }} />
+                  <View className="min-w-0 flex-1">
+                    <Text className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: palette.warning }}>
+                      Argues against
+                    </Text>
+                    <Text className="mt-0.5 font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+                      {cause.contradicting[0]}
                     </Text>
                   </View>
-                ))}
-              </View>
-            ) : null}
-
-            {cause.contradicting.length > 0 ? (
-              <Text className="mt-1.5 font-body text-[10.5px] leading-[14px]" style={{ color: palette.warning }}>
-                Against it: {cause.contradicting[0]}
-              </Text>
-            ) : null}
-          </View>
+                </View>
+              ) : null}
+            </View>
+          </HoverLift>
         );
       })}
 
@@ -477,19 +558,22 @@ function CauseList({ view }: { view: PartView }) {
           tail of the same ranked list, and "considered and eliminated" is only
           meaningful next to what was not. */}
       {view.ruledOut.length > 0 ? (
-        <View className="pt-2.5" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
+        <View className="mt-1 pt-3" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
           <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
-            Ruled out
+            Ruled out · {view.ruledOut.length}
           </Text>
-          {view.ruledOut.map((cause) => (
-            <Text
-              key={cause.faultId}
-              className="mt-1 font-body text-[11px] leading-[15px]"
-              style={{ color: palette.inkMuted }}
-            >
-              {cause.name} — {cause.contradicting[0] ?? 'a primary contradiction eliminated this hypothesis.'}
-            </Text>
-          ))}
+          <View className="mt-1.5 gap-1.5">
+            {view.ruledOut.map((cause) => (
+              <View key={cause.faultId} className="flex-row items-start gap-2">
+                <MaterialCommunityIcons name="close-circle-outline" size={12} color={palette.inkFaint} style={{ marginTop: 2 }} />
+                <Text className="min-w-0 flex-1 font-body text-[11px] leading-[15.5px]" style={{ color: palette.inkMuted }}>
+                  <Text style={{ color: palette.ink }}>{cause.name}</Text>
+                  {' — '}
+                  {cause.contradicting[0] ?? 'a primary contradiction eliminated this hypothesis.'}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       ) : null}
     </View>
@@ -501,6 +585,88 @@ function CauseList({ view }: { view: PartView }) {
 // ---------------------------------------------------------------------------
 
 /**
+ * The reading itself, before any tool is applied to it.
+ *
+ * This used to be a row of five equal-weight `Fact` cells, which made the
+ * current value — the one number the reader opened the panel for — exactly as
+ * loud as the string "degraded". A measurement has a subject, a value and a set
+ * of qualifiers, and they are not the same size: the value is set at display
+ * scale, its status sits beside it as a pill, and reference, quality and point
+ * drop to the caption rail underneath where qualifiers belong.
+ */
+function ReadingHero({ signal }: { signal: SignalView }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const variant = SIGNAL_VARIANT[signal.status] ?? 'muted';
+  const style = variantStyle(palette, variant);
+  const rising = signal.behaviour === 'INCREASING';
+  const falling = signal.behaviour === 'DECREASING';
+
+  return (
+    <View
+      className="overflow-hidden rounded-2xl border"
+      style={{ borderColor: palette.line, backgroundColor: palette.panel }}
+    >
+      <View className="px-3.5 pb-3 pt-3">
+        <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
+          <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: style.accent }} />
+          <Text className="min-w-0 font-body-bold text-[12px]" style={{ color: palette.ink }} numberOfLines={1}>
+            {signal.measures}
+          </Text>
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+            {signal.tag} · {KIND_LABEL[signal.kind]}
+          </Text>
+        </View>
+
+        <View className="mt-1.5 flex-row flex-wrap items-end gap-x-3 gap-y-1.5">
+          <Text
+            className="font-body text-[30px] leading-[34px] tracking-[-0.03em]"
+            style={{ color: palette.ink, fontWeight: '300', fontVariant: ['tabular-nums'] }}
+          >
+            {signal.value === null ? '—' : formatValue(signal.value, '')}
+          </Text>
+          <Text className="pb-[5px] font-mono text-[10.5px] uppercase tracking-[0.12em]" style={{ color: palette.inkMuted }}>
+            {signal.unit || 'unitless'}
+          </Text>
+
+          <View className="flex-1 flex-row flex-wrap items-center justify-end gap-1.5">
+            <View
+              className="flex-row items-center gap-1.5 rounded-full border px-2 py-[3px]"
+              style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+            >
+              <MaterialCommunityIcons
+                name={rising ? 'trending-up' : falling ? 'trending-down' : 'trending-neutral'}
+                size={12}
+                color={palette.inkMuted}
+              />
+              <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: palette.inkMuted }}>
+                {BEHAVIOUR_LABEL[signal.behaviour]}
+              </Text>
+            </View>
+            <Badge variant={variant} icon={null} outline>
+              {signal.status === 'UNAVAILABLE' ? 'No data' : signal.status.toLowerCase()}
+            </Badge>
+          </View>
+        </View>
+      </View>
+
+      {/* The qualifiers. Below the rule because they qualify the number above
+          it — reading them first tells you nothing. */}
+      <View
+        className="flex-row flex-wrap gap-x-5 gap-y-2 px-3.5 py-2.5"
+        style={{ borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.panelRaised }}
+      >
+        <Fact label="Reference" value={formatValue(signal.reference, signal.unit)} width={108} />
+        <Fact label="Warning at" value={formatValue(signal.warningLimit, signal.unit)} width={104} />
+        <Fact label="Alarm at" value={formatValue(signal.criticalLimit, signal.unit)} width={104} />
+        <Fact label="Data quality" value={signal.quality.toLowerCase()} mono={false} width={102} />
+        <Fact label="Point" value={signal.point} mono={false} width={150} />
+      </View>
+    </View>
+  );
+}
+
+/**
  * A tool's own read-out.
  *
  * Every tool that can be computed from scalar telemetry computes from the
@@ -508,6 +674,12 @@ function CauseList({ view }: { view: PartView }) {
  * exactly what it would need — that sentence is the useful output, because an
  * operator who does not know a spectrum is unavailable may read its absence as
  * "no bearing fault".
+ *
+ * The chart is the panel's subject, so it is framed as an instrument window: a
+ * headline stating the change the tool found, the plot itself against a ruled
+ * matrix, and a footer rail placing the current reading inside the range the
+ * session has seen. The numbers underneath are only what the *tool* adds on top
+ * of that — min, max and mean are read off the rail rather than restated.
  */
 function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool }) {
   const { isDark } = useAppTheme();
@@ -521,7 +693,8 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
     const mean = usable.reduce((sum, value) => sum + value, 0) / usable.length;
     const spread = max - min;
     const variance = usable.length > 1 ? usable.reduce((sum, value) => sum + (value - mean) ** 2, 0) / (usable.length - 1) : 0;
-    return { min, max, mean, spread, sd: Math.sqrt(variance), count: usable.length };
+    const delta = usable.length > 1 ? usable[usable.length - 1] - usable[0] : null;
+    return { min, max, mean, spread, sd: Math.sqrt(variance), count: usable.length, delta };
   }, [signal.history]);
 
   if (!tool.available) {
@@ -541,6 +714,12 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
   }
 
   const accent = signal.status === 'ALARM' ? palette.critical : signal.status === 'WARNING' ? palette.warning : palette.accent;
+  const deltaColour =
+    stats?.delta === null || stats?.delta === undefined || Math.abs(stats.delta) < 1e-9
+      ? palette.inkMuted
+      : signal.status === 'NORMAL'
+        ? palette.inkMuted
+        : accent;
 
   return (
     <View className="gap-2.5">
@@ -548,19 +727,88 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
         {tool.note}
       </Text>
 
-      <View className="items-start rounded-lg border px-3 py-3" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
-        <TagTrend values={signal.history} colour={accent} width={360} height={64} />
+      {/* The instrument window. */}
+      <View
+        className="overflow-hidden rounded-2xl border"
+        style={{ borderColor: palette.line, backgroundColor: palette.panel }}
+      >
+        <View
+          className="flex-row flex-wrap items-center justify-between gap-x-3 gap-y-1.5 px-3.5 py-2.5"
+          style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
+        >
+          <View className="flex-row items-center gap-2">
+            <View style={{ width: 14, height: 2, borderRadius: 2, backgroundColor: accent }} />
+            <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
+              {tool.label} · session history
+            </Text>
+          </View>
+
+          {stats && stats.delta !== null ? (
+            <View
+              className="flex-row items-center gap-1.5 rounded-full border px-2 py-[3px]"
+              style={{ borderColor: alpha(deltaColour, 0.3), backgroundColor: palette.panelRaised }}
+            >
+              <MaterialCommunityIcons
+                name={stats.delta > 0 ? 'arrow-top-right' : stats.delta < 0 ? 'arrow-bottom-right' : 'arrow-right'}
+                size={11}
+                color={deltaColour}
+              />
+              <Text
+                className="font-mono text-[9.5px]"
+                style={{ color: deltaColour, fontVariant: ['tabular-nums'] }}
+              >
+                {formatDelta(stats.delta, signal.unit)}
+              </Text>
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.12em]" style={{ color: palette.inkFaint }}>
+                over {stats.count}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
+        <View className="px-3 pb-1 pt-2">
+          <TrendChart
+            values={signal.history}
+            colour={accent}
+            unit={signal.unit}
+            reference={signal.reference}
+            warningLimit={signal.warningLimit}
+            criticalLimit={signal.criticalLimit}
+            footLeft={stats ? `${stats.count} samples` : 'oldest'}
+            footRight="latest"
+          />
+        </View>
+
+        {/* Where the current reading sits inside everything this session has
+            seen. The chart says how it got here; the rail says whether here is
+            high, and that is a different question. */}
+        {stats && stats.spread > 0 ? (
+          <View className="px-3.5 pb-3 pt-1.5" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
+            <RangeRail min={stats.min} max={stats.max} mean={stats.mean} value={signal.value} colour={accent} />
+            <View className="mt-1 flex-row items-center justify-between">
+              <Text className="font-mono text-[8.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+                {formatValue(stats.min, signal.unit)}
+              </Text>
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                mean {formatValue(stats.mean, signal.unit)}
+              </Text>
+              <Text className="font-mono text-[8.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+                {formatValue(stats.max, signal.unit)}
+              </Text>
+            </View>
+          </View>
+        ) : null}
       </View>
 
       {stats ? (
         <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-          {/* The current value is stated once, in the header row above this
-              panel. Every tool adds only what IT computes on top of it. */}
+          {/* The current value is stated once, in the reading above this panel,
+              and min/max/mean are read off the rail. Every tool adds only what
+              IT computes on top of those. */}
           {tool.key === 'trend' || tool.key === 'level' || tool.key === 'load' ? (
             <>
-              <Fact label="Mean" value={formatValue(stats.mean, signal.unit)} width={104} />
-              <Fact label="Min" value={formatValue(stats.min, signal.unit)} width={92} />
-              <Fact label="Max" value={formatValue(stats.max, signal.unit)} width={92} />
+              <Fact label="Std dev" value={formatValue(stats.sd, signal.unit)} width={104} />
+              <Fact label="Direction" value={BEHAVIOUR_LABEL[signal.behaviour]} mono={false} width={116} />
               <Fact label="Samples" value={String(stats.count)} width={84} />
             </>
           ) : null}
@@ -591,11 +839,16 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
                 width={110}
                 tone={accent}
               />
+              <Fact label="Samples" value={String(stats.count)} width={84} />
             </>
           ) : null}
         </View>
       ) : (
-        <EmptyNote>No sample has been recorded for this signal yet.</EmptyNote>
+        <EmptyState
+          icon="chart-line-variant"
+          title="No sample recorded yet"
+          detail="This signal has produced no reading in the session held for this machine, so there is nothing for this tool to compute from."
+        />
       )}
 
       {tool.key === 'setpoint' && signal.reference === null ? (
@@ -614,6 +867,10 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
  * part's own signals plus the ones that inform it, and the tool row is built
  * from the signal's measurement kind, so what is offered is always what this
  * measurement can actually support.
+ *
+ * The three things stack in the order a reader needs them: which signal, what
+ * it currently reads, and only then which tool to point at it. Choosing a tool
+ * before knowing the reading is choosing an answer before hearing the question.
  */
 function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachinePart }) {
   const { isDark } = useAppTheme();
@@ -626,16 +883,24 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
   const tool = tools.find((entry) => entry.key === toolKey) ?? tools[0] ?? null;
 
   if (!signal) {
-    return <EmptyNote>No signal on this machine is mapped to this part, so there is nothing to analyse here.</EmptyNote>;
+    return (
+      <EmptyState
+        icon="access-point-off"
+        title="Nothing measures this part"
+        detail="No signal on this machine is mapped to this part, so there is no measurement to analyse here. Link a point to it in Design mode to give the model something to read."
+      />
+    );
   }
 
   return (
     <View className="gap-3">
-      {/* Which signal */}
+      {/* Which signal. Each carries its own state dot, so the choice is made
+          on condition rather than on name alone. */}
       {signals.length > 1 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
           {signals.map((entry) => {
             const active = entry.tag === signal.tag;
+            const entryStyle = variantStyle(palette, SIGNAL_VARIANT[entry.status] ?? 'muted');
             return (
               <PressSurface
                 key={entry.tag}
@@ -652,10 +917,13 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
                   backgroundColor: active ? palette.panelRaised : palette.panel,
                 }}
               >
-                <Text className="font-body text-[11px]" style={{ color: active ? palette.ink : palette.inkMuted }}>
-                  {entry.measures}
-                </Text>
-                <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                <View className="flex-row items-center gap-1.5">
+                  <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: entryStyle.accent }} />
+                  <Text className="font-body text-[11px]" style={{ color: active ? palette.ink : palette.inkMuted }}>
+                    {entry.measures}
+                  </Text>
+                </View>
+                <Text className="mt-0.5 font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
                   {entry.tag} · {entry.part === part ? KIND_LABEL[entry.kind] : `context · ${entry.part}`}
                 </Text>
               </PressSurface>
@@ -664,17 +932,10 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
         </ScrollView>
       ) : null}
 
-      {/* Headline numbers for the selected signal */}
-      <View className="flex-row flex-wrap gap-x-5 gap-y-2">
-        <Fact label="Current" value={formatValue(signal.value, signal.unit)} width={118} />
-        <Fact label="Reference" value={formatValue(signal.reference, signal.unit)} width={118} />
-        <Fact label="Behaviour" value={BEHAVIOUR_LABEL[signal.behaviour]} mono={false} width={126} />
-        <Fact label="Data quality" value={signal.quality.toLowerCase()} mono={false} width={112} />
-        <Fact label="Point" value={signal.point} mono={false} width={168} />
-      </View>
+      <ReadingHero signal={signal} />
 
       {/* Which tool — built from the measurement kind, not from a fixed list */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, paddingVertical: 2 }}>
         {tools.map((entry) => {
           const active = entry.key === tool?.key;
           return (
@@ -918,8 +1179,14 @@ export function AdvanceDiagnosisTab({
               <Block
                 first
                 title="Possible causes"
-                meta="Ranked by engineering match, which orders the list but is not a probability."
-                footnote="This machine has no calibrated fault-probability model, so no percentage confidence is reported. Ambiguity is kept wherever the installed sensors cannot separate two candidates, and the measurement that would separate them is named."
+                meta="Ranked by engineering match. The order is a judgement about fit, not a probability."
+                actions={
+                  <Badge variant={view.causes.length > 0 ? 'warning' : 'muted'} icon={null} outline>
+                    {view.causes.length} candidate{view.causes.length === 1 ? '' : 's'}
+                    {view.ruledOut.length > 0 ? ` · ${view.ruledOut.length} ruled out` : ''}
+                  </Badge>
+                }
+                footnote="No calibrated fault-probability model exists for this machine, so no percentage confidence is reported. Where the installed sensors cannot separate two candidates the ambiguity is kept, and the measurement that would settle it is named."
               >
                 <CauseList view={view} />
               </Block>
@@ -934,6 +1201,12 @@ export function AdvanceDiagnosisTab({
                 first
                 title="Signal detail"
                 meta="Signals this part owns, plus the ones that inform it. The tools offered are the ones this kind of measurement can support."
+                actions={
+                  <Badge variant="muted" icon={null} outline>
+                    {view.signals.length + view.contextSignals.length} signal
+                    {view.signals.length + view.contextSignals.length === 1 ? '' : 's'}
+                  </Badge>
+                }
               >
                 <SignalDetail signals={[...view.signals, ...view.contextSignals]} part={view.part} />
               </Block>

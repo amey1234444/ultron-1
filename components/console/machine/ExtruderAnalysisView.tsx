@@ -212,12 +212,6 @@ const LAYER_NOTE: Record<string, { title: string; detail: string; variant: Varia
       'A transport fault owns this answer. A plant diagnosis computed from these numbers would not be trustworthy, so it is withheld until the stream is fixed. The plant hypotheses are still assessed and visible under Evidence.',
     variant: 'destructive',
   },
-  INSTRUMENTATION: {
-    title: 'A sensor is misreporting - machine condition is not being reported',
-    detail:
-      'A measurement moved without any physically coupled measurement moving with it, so the measurement chain is the more likely explanation than a machine condition. Verify the sensor before acting on the reading.',
-    variant: 'warning',
-  },
 };
 
 function readinessVariant(score: number): Variant {
@@ -872,7 +866,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           title: layerNote.title,
           detail: layerNote.detail,
           variant: layerNote.variant,
-          actionLabel: 'Verify sensor',
+          actionLabel: 'Open signals',
           onAction: () => setTab('signal'),
           onDismiss: () => setNoticeDismissed(true),
         }
@@ -964,7 +958,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       >
         <AnalyzerHeader
           modelName="Single-screw extruder diagnostic model"
-          modelVersion={analysis.modelVersion}
           sourceLabel={sourceLabel}
           sourceVariant={sourceVariant}
           scenarioLabel={scenarioRun ? scenarioRun.scenario.id : 'Scenarios'}

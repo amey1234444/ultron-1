@@ -11,6 +11,15 @@
  * carries the model, recipe, rule-set and tag provenance the numbers depend on.
  * A strip restating them under the title was chrome, not information.
  *
+ * The model's version string and its "advisory only" pill went the same way.
+ * Both are provenance — they qualify the numbers rather than name the screen —
+ * and both are already stated where the numbers they qualify are: the version
+ * and the field-calibration count in the Signal screen's provenance footer, and
+ * the "no calibrated probability model, so this is an engineering match rather
+ * than a confidence" caveat under the ranked findings on Diagnosis. Two pills
+ * at the top of a page disclaiming content further down is a disclaimer, not a
+ * header, and it is read once and then never again.
+ *
  * What it deliberately does NOT say is "Analysis layer". The machine header
  * above already names the machine, and the nav beside it already has ANALYSIS
  * lit — a third statement of the same thing was a heading spending 40px to
@@ -25,8 +34,6 @@ import { alpha, Button, consolePalette, variantStyle, type Variant } from '../..
 
 export function AnalyzerHeader({
   modelName,
-  modelVersion,
-  advisory = true,
   sourceLabel,
   sourceVariant,
   scenarioLabel,
@@ -37,8 +44,6 @@ export function AnalyzerHeader({
 }: {
   /** The diagnostic model, not the machine template. */
   modelName: string;
-  modelVersion: string;
-  advisory?: boolean;
   sourceLabel: string;
   sourceVariant: Variant;
   /** Button label — the running scenario's id, or "Scenarios". */
@@ -85,25 +90,6 @@ export function AnalyzerHeader({
           <Text className="font-body-bold text-[14px] tracking-[-0.015em]" style={{ color: palette.ink }} numberOfLines={1}>
             {modelName}
           </Text>
-          <View
-            className="rounded-full border px-2 py-[2px]"
-            style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
-          >
-            <Text className="font-mono text-[9px] tracking-[0.06em]" style={{ color: palette.inkMuted }} numberOfLines={1}>
-              {modelVersion}
-            </Text>
-          </View>
-          {advisory ? (
-            <View
-              className="flex-row items-center gap-1.5 rounded-full border px-2 py-[3px]"
-              style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
-            >
-              <MaterialCommunityIcons name="hand-back-right-outline" size={10} color={palette.inkMuted} />
-              <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
-                Advisory only
-              </Text>
-            </View>
-          ) : null}
         </View>
 
         <View className="flex-row items-center gap-2">

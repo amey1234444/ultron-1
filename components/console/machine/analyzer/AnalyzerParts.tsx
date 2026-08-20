@@ -10,9 +10,9 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type React from 'react';
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
@@ -498,3 +498,556 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
   );
 }
 
+
+// ---------------------------------------------------------------------------
+// Hover
+// ---------------------------------------------------------------------------
+
+/**
+ * A card that answers to the cursor without being a control.
+ *
+ * `PressSurface` is for things you can choose. This is for things you only
+ * read — a status tile, a ranked cause — where the lift exists to say "this
+ * one, under your cursor" while you scan a row of near-identical cards, not to
+ * promise a click.
+ *
+ * The two must not be confused, so the motion is deliberately different in
+ * kind: `PressSurface` scales, this one rises and warms. A card that rises
+ * without scaling reads as paper lifting off the page; a card that scales reads
+ * as a button under a finger. Only the second one would be a lie here.
+ *
+ * `react-native-web` routes hover through `useHover`, which it switches off
+ * whenever the `Pressable` is disabled — so this never sets `disabled`, and
+ * simply omits `onPress` when there is nothing to press.
+ */
+export function HoverLift({
+  onPress,
+  accessibilityLabel,
+  /** Border and glow colour at full hover. Defaults to the palette's strong line. */
+  accent,
+  /** How far the card rises, in px. */
+  rise = 3,
+  /** Corner radius of the glow ring. Must match the child's own radius. */
+  radius = 16,
+  style,
+  className,
+  children,
+}: {
+  onPress?: () => void;
+  accessibilityLabel?: string;
+  accent?: string;
+  rise?: number;
+  radius?: number;
+  style?: StyleProp<ViewStyle>;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const hover = useRef(new Animated.Value(0)).current;
+
+  const to = (value: number) =>
+    Animated.timing(hover, {
+      toValue: value,
+      duration: value === 0 ? 220 : 160,
+      easing: Easing.bezier(0.2, 0, 0, 1),
+      useNativeDriver: false,
+    }).start();
+
+  const glow = accent ?? palette.lineStrong;
+
+  return (
+    <Animated.View
+      style={[
+        style as never,
+        { transform: [{ translateY: hover.interpolate({ inputRange: [0, 1], outputRange: [0, -rise] }) }] },
+        {
+          shadowColor: palette.shadow,
+          shadowOpacity: hover.interpolate({ inputRange: [0, 1], outputRange: [0, isDark ? 0.55 : 0.13] }),
+          shadowRadius: hover.interpolate({ inputRange: [0, 1], outputRange: [0, 18] }),
+          shadowOffset: { width: 0, height: 6 },
+        } as never,
+      ]}
+    >
+      <Pressable
+        onPress={onPress}
+        accessibilityRole={onPress ? 'button' : undefined}
+        accessibilityLabel={accessibilityLabel}
+        onHoverIn={() => to(1)}
+        onHoverOut={() => to(0)}
+        onPressIn={() => to(1)}
+        className={className}
+        style={{ flex: 1 }}
+      >
+        {children}
+        {/* The warm edge. A separate absolutely-positioned ring rather than an
+            animated `borderColor`: the card underneath already owns its border,
+            and animating that one would make the resting state depend on which
+            card last had the cursor. */}
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            top: 0,
+            right: 0,
+            bottom: 0,
+            left: 0,
+            borderRadius: radius,
+            borderWidth: 1,
+            borderColor: glow,
+            opacity: hover.interpolate({ inputRange: [0, 1], outputRange: [0, 0.9] }),
+          }}
+        />
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Charting
+// ---------------------------------------------------------------------------
+
+/** Plot geometry. The left gutter holds the value scale, the foot holds time. */
+const PLOT = { left: 48, right: 14, top: 16, bottom: 20, rows: 4, cols: 8 };
+
+type Guide = { y: number; colour: string; label: string };
+
+/**
+ * A measurement over its session history, drawn the way an instrument reads it.
+ *
+ * The analyzer used to draw this as a bare polyline in a box — a shape with no
+ * scale, no baseline and no reference, which tells a reader that something
+ * changed but never how much, or whether it mattered. A trend is only worth
+ * drawing if it can be *measured* off the page, so this one carries:
+ *
+ *   - a ruled matrix, so a slope can be read as a rate rather than a mood;
+ *   - a value scale in the left gutter, so a height is a number;
+ *   - the reference and the configured limits as their own lines, so "high"
+ *     is a position relative to something rather than an adjective;
+ *   - a filled area under the trace, which is what makes the direction of
+ *     travel legible at a glance instead of on inspection;
+ *   - a marked latest sample, because that is the value the reader came for
+ *     and it is otherwise just the right-hand end of a line.
+ *
+ * Gaps stay gaps. A null is a sample that was never taken, and interpolating
+ * across it would draw a measurement this machine never made — so the trace and
+ * the fill both break and resume.
+ *
+ * The domain comes from the data, then admits a reference or a limit only when
+ * it is near enough to sit inside the frame. A critical limit an order of
+ * magnitude above the reading would otherwise flatten the whole trace into the
+ * bottom pixel row to make space for a line nothing is near.
+ */
+export function TrendChart({
+  values,
+  colour,
+  unit,
+  reference = null,
+  warningLimit = null,
+  criticalLimit = null,
+  height = 158,
+  footLeft = 'oldest',
+  footRight = 'latest',
+}: {
+  values: (number | null)[];
+  colour: string;
+  unit: string;
+  reference?: number | null;
+  warningLimit?: number | null;
+  criticalLimit?: number | null;
+  height?: number;
+  footLeft?: string;
+  footRight?: string;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const gradientId = useId().replace(/:/g, '');
+  const [width, setWidth] = useState(0);
+
+  const model = useMemo(() => {
+    if (width <= PLOT.left + PLOT.right + 40) return null;
+    const samples = values.slice(-72);
+    const finite = samples.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
+    if (finite.length < 2) return null;
+
+    const plotW = width - PLOT.left - PLOT.right;
+    const plotH = height - PLOT.top - PLOT.bottom;
+
+    let low = Math.min(...finite);
+    let high = Math.max(...finite);
+    const dataSpan = high - low || Math.abs(high) || 1;
+
+    // A guide is admitted to the domain only if it is within one data-span of
+    // the data. Anything further away is a line the reading is nowhere near,
+    // and letting it set the scale would cost the trace all of its resolution.
+    const admit = (guide: number | null) => {
+      if (guide === null || !Number.isFinite(guide)) return;
+      if (guide < low - dataSpan || guide > high + dataSpan) return;
+      low = Math.min(low, guide);
+      high = Math.max(high, guide);
+    };
+    admit(reference);
+    admit(warningLimit);
+    admit(criticalLimit);
+
+    const pad = (high - low || Math.abs(high) || 1) * 0.12;
+    const min = low - pad;
+    const max = high + pad;
+    const span = max - min || 1;
+
+    const xAt = (index: number) =>
+      PLOT.left + (samples.length > 1 ? (index / (samples.length - 1)) * plotW : plotW / 2);
+    const yAt = (value: number) => PLOT.top + plotH - ((value - min) / span) * plotH;
+
+    // Contiguous runs of real samples. One path per run keeps the gaps honest.
+    const runs: { x: number; y: number }[][] = [];
+    let run: { x: number; y: number }[] = [];
+    samples.forEach((value, index) => {
+      if (typeof value !== 'number' || !Number.isFinite(value)) {
+        if (run.length > 0) runs.push(run);
+        run = [];
+        return;
+      }
+      run.push({ x: xAt(index), y: yAt(value) });
+    });
+    if (run.length > 0) runs.push(run);
+
+    const floor = PLOT.top + plotH;
+    const line = runs.map((points) =>
+      points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' '),
+    );
+    const area = runs
+      .filter((points) => points.length > 1)
+      .map(
+        (points) =>
+          `M ${points[0].x.toFixed(1)} ${floor.toFixed(1)} ` +
+          points.map((point) => `L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ') +
+          ` L ${points[points.length - 1].x.toFixed(1)} ${floor.toFixed(1)} Z`,
+      );
+
+    const guides: Guide[] = [];
+    const push = (value: number | null, guideColour: string, label: string) => {
+      if (value === null || !Number.isFinite(value) || value < min || value > max) return;
+      guides.push({ y: yAt(value), colour: guideColour, label });
+    };
+    push(reference, palette.neutral, 'ref');
+    push(warningLimit, palette.warning, 'warn');
+    push(criticalLimit, palette.critical, 'alarm');
+
+    const lastRun = runs[runs.length - 1];
+    const latest = lastRun && lastRun.length > 0 ? lastRun[lastRun.length - 1] : null;
+
+    return { min, max, plotW, plotH, line, area, guides, latest, floor };
+  }, [criticalLimit, height, palette.critical, palette.neutral, palette.warning, reference, values, warningLimit, width]);
+
+  const tick = (value: number) => {
+    const magnitude = Math.abs(value);
+    return value.toFixed(magnitude >= 100 ? 0 : magnitude >= 10 ? 1 : 2);
+  };
+
+  return (
+    <View onLayout={(event) => setWidth(Math.round(event.nativeEvent.layout.width))} style={{ height, width: '100%' }}>
+      {model ? (
+        <>
+          <Svg width={width} height={height}>
+            <Defs>
+              <LinearGradient id={`trend${gradientId}`} x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={colour} stopOpacity={isDark ? 0.36 : 0.24} />
+                <Stop offset="1" stopColor={colour} stopOpacity={0} />
+              </LinearGradient>
+            </Defs>
+
+            {/* The matrix. Verticals are the sampling grid, horizontals the
+                value grid; both sit under everything else so the trace can
+                never be mistaken for one of them. */}
+            {Array.from({ length: PLOT.cols + 1 }, (_, index) => {
+              const gx = PLOT.left + (index / PLOT.cols) * model.plotW;
+              const edge = index === 0 || index === PLOT.cols;
+              return (
+                <Line
+                  key={`v${index}`}
+                  x1={gx}
+                  y1={PLOT.top}
+                  x2={gx}
+                  y2={model.floor}
+                  stroke={palette.line}
+                  strokeWidth={1}
+                  opacity={edge ? 0.95 : 0.5}
+                />
+              );
+            })}
+            {Array.from({ length: PLOT.rows + 1 }, (_, index) => {
+              const gy = PLOT.top + (index / PLOT.rows) * model.plotH;
+              const edge = index === 0 || index === PLOT.rows;
+              return (
+                <Line
+                  key={`h${index}`}
+                  x1={PLOT.left}
+                  y1={gy}
+                  x2={PLOT.left + model.plotW}
+                  y2={gy}
+                  stroke={palette.line}
+                  strokeWidth={1}
+                  strokeDasharray={edge ? undefined : '2 5'}
+                  opacity={edge ? 0.95 : 0.7}
+                />
+              );
+            })}
+
+            {/* Reference and limits, each in the colour of what it means. */}
+            {model.guides.map((guide) => (
+              <Line
+                key={guide.label}
+                x1={PLOT.left}
+                y1={guide.y}
+                x2={PLOT.left + model.plotW}
+                y2={guide.y}
+                stroke={guide.colour}
+                strokeWidth={1}
+                strokeDasharray="5 4"
+                opacity={0.8}
+              />
+            ))}
+
+            {model.area.map((path, index) => (
+              <Path key={`a${index}`} d={path} fill={`url(#trend${gradientId})`} />
+            ))}
+            {model.line.map((path, index) => (
+              <Path
+                key={`l${index}`}
+                d={path}
+                fill="none"
+                stroke={colour}
+                strokeWidth={1.9}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            ))}
+
+            {/* The latest sample: a dropline to the floor, a halo, and a ring
+                in the panel colour so the dot never merges with the trace. */}
+            {model.latest ? (
+              <>
+                <Line
+                  x1={model.latest.x}
+                  y1={model.latest.y}
+                  x2={model.latest.x}
+                  y2={model.floor}
+                  stroke={colour}
+                  strokeWidth={1}
+                  strokeDasharray="2 3"
+                  opacity={0.5}
+                />
+                <Circle cx={model.latest.x} cy={model.latest.y} r={7} fill={colour} opacity={0.16} />
+                <Circle cx={model.latest.x} cy={model.latest.y} r={4.2} fill={palette.panel} />
+                <Circle cx={model.latest.x} cy={model.latest.y} r={2.6} fill={colour} />
+              </>
+            ) : null}
+
+            {/* Corner brackets. An instrument frames its window; a plain
+                rectangle reads as a text box that happens to hold a line. */}
+            {[
+              [PLOT.left, PLOT.top, 1],
+              [PLOT.left + model.plotW - 9, PLOT.top, 1],
+              [PLOT.left, model.floor - 1, -1],
+              [PLOT.left + model.plotW - 9, model.floor - 1, -1],
+            ].map(([bx, by], index) => (
+              <Rect key={`c${index}`} x={bx} y={by} width={9} height={1.4} fill={palette.lineStrong} />
+            ))}
+          </Svg>
+
+          {/* Scale and time as real text rather than SVG glyphs: the console's
+              mono face is loaded for the DOM, and naming the family again
+              inside the SVG would mean maintaining it in two type systems. */}
+          <View pointerEvents="none" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
+            {[0, 0.5, 1].map((fraction) => (
+              <Text
+                key={fraction}
+                className="absolute font-mono text-[8.5px]"
+                style={{
+                  color: palette.inkFaint,
+                  left: 0,
+                  width: PLOT.left - 8,
+                  textAlign: 'right',
+                  top: PLOT.top + fraction * model.plotH - 5,
+                  fontVariant: ['tabular-nums'],
+                }}
+                numberOfLines={1}
+              >
+                {tick(model.max - fraction * (model.max - model.min))}
+              </Text>
+            ))}
+            <Text
+              className="absolute font-mono text-[8px] uppercase tracking-[0.14em]"
+              style={{ color: palette.inkFaint, left: 0, width: PLOT.left - 8, textAlign: 'right', top: 1 }}
+              numberOfLines={1}
+            >
+              {unit || 'value'}
+            </Text>
+
+            <Text
+              className="absolute font-mono text-[8.5px] uppercase tracking-[0.14em]"
+              style={{ color: palette.inkFaint, left: PLOT.left, bottom: 2 }}
+            >
+              {footLeft}
+            </Text>
+            <Text
+              className="absolute font-mono text-[8.5px] uppercase tracking-[0.14em]"
+              style={{ color: palette.inkFaint, right: PLOT.right, bottom: 2 }}
+            >
+              {footRight}
+            </Text>
+
+            {/* A legend appears only for the guides that were actually drawn. */}
+            {model.guides.length > 0 ? (
+              <View className="absolute flex-row items-center gap-2.5" style={{ right: PLOT.right, top: 1 }}>
+                {model.guides.map((guide) => (
+                  <View key={guide.label} className="flex-row items-center gap-1">
+                    <View style={{ width: 9, height: 1.5, backgroundColor: guide.colour, opacity: 0.85 }} />
+                    <Text className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                      {guide.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+          </View>
+        </>
+      ) : (
+        <View className="flex-1 items-center justify-center">
+          <Text className="font-body text-[11px]" style={{ color: palette.inkFaint }}>
+            At least two samples are needed before a trend can be drawn.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+/**
+ * Where the current reading sits inside the range this session has seen.
+ *
+ * The min/max/mean facts under a chart are three numbers a reader has to hold
+ * in their head to answer one question — "is this reading high for today?".
+ * The rail answers it as a position instead: the span is the track, the marker
+ * is now, and the mean is a tick the marker sits visibly one side of.
+ */
+export function RangeRail({
+  min,
+  max,
+  mean,
+  value,
+  colour,
+}: {
+  min: number;
+  max: number;
+  mean: number;
+  value: number | null;
+  colour: string;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const span = max - min || 1;
+  const at = (point: number) => `${Math.min(100, Math.max(0, ((point - min) / span) * 100))}%` as `${number}%`;
+
+  return (
+    <View className="h-[14px] justify-center">
+      <View className="h-[4px] rounded-full" style={{ backgroundColor: palette.panelRaised }}>
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            top: 0,
+            bottom: 0,
+            width: value === null ? 0 : at(value),
+            borderRadius: 4,
+            backgroundColor: alpha(colour, 0.4),
+          }}
+        />
+      </View>
+      <View
+        style={{
+          position: 'absolute',
+          left: at(mean),
+          width: 1,
+          height: 11,
+          marginLeft: -0.5,
+          backgroundColor: palette.lineStrong,
+        }}
+      />
+      {value !== null ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: at(value),
+            width: 9,
+            height: 9,
+            marginLeft: -4.5,
+            borderRadius: 9,
+            backgroundColor: colour,
+            borderWidth: 2,
+            borderColor: palette.panel,
+          }}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Empty
+// ---------------------------------------------------------------------------
+
+/**
+ * A section with nothing in it, said properly.
+ *
+ * `EmptyNote` is one grey sentence floating in white space, which across half
+ * of a two-column screen reads as a panel that failed to load rather than as an
+ * answer. An empty result here is a real finding — "nothing matched" is what
+ * the model concluded — so it gets a frame, a glyph, and where the caller has
+ * one, the count of what was checked to reach it.
+ */
+export function EmptyState({
+  icon,
+  title,
+  detail,
+  meta,
+  variant = 'muted',
+}: {
+  icon: keyof typeof MaterialCommunityIcons.glyphMap;
+  title: string;
+  detail: string;
+  meta?: string;
+  variant?: Variant;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const style = variantStyle(palette, variant);
+
+  return (
+    <View
+      className="items-center gap-2 rounded-2xl border px-5 py-6"
+      style={{ borderColor: palette.line, borderStyle: 'dashed', backgroundColor: palette.panelRaised }}
+    >
+      <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: style.tint }}>
+        <MaterialCommunityIcons name={icon} size={18} color={style.accent} />
+      </View>
+      <Text className="text-center font-body-bold text-[12.5px]" style={{ color: palette.ink }}>
+        {title}
+      </Text>
+      <Text className="max-w-[420px] text-center font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
+        {detail}
+      </Text>
+      {meta ? (
+        <View
+          className="mt-0.5 rounded-full border px-2.5 py-[3px]"
+          style={{ borderColor: palette.line, backgroundColor: palette.panel }}
+        >
+          <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+            {meta}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}

@@ -10,12 +10,19 @@
  * The status tile carries a tint; the three counts do not. Four tinted cards in
  * a row is a traffic light with nothing to say — the tint has to mean "this one
  * is the state of the machine".
+ *
+ * Each tile rises under the cursor. They are read, not pressed, so the motion
+ * is `HoverLift` rather than `PressSurface`: a card that lifts and warms says
+ * "this is the one you are looking at" without promising a click that four
+ * summary numbers do not have. The lift also does real work at this size —
+ * four cards of identical shape in one row are hard to keep your place in, and
+ * the raised one is the answer to "which number am I reading".
  */
 import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { alpha, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { TagTrend } from './AnalyzerParts';
+import { HoverLift, TagTrend } from './AnalyzerParts';
 
 export type StatTile = {
   key: string;
@@ -42,61 +49,68 @@ export function StatTiles({ tiles, wide }: { tiles: StatTile[]; wide: boolean })
         const style = variantStyle(palette, tile.variant);
         const filled = Boolean(tile.filled);
         return (
-          <View
+          <HoverLift
             key={tile.key}
-            className="justify-between rounded-2xl border px-4 py-3.5"
+            accent={alpha(style.accent, 0.55)}
+            radius={16}
             style={{
               flexGrow: 1,
               flexBasis: wide ? 0 : '46%',
               minWidth: wide ? 190 : 150,
-              backgroundColor: filled ? style.tint : palette.panel,
-              borderColor: filled ? alpha(style.accent, 0.28) : palette.line,
             }}
           >
-            <View className="flex-row items-center gap-1.5">
-              <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: style.accent }} />
-              <Text
-                numberOfLines={1}
-                className="min-w-0 flex-1 font-mono text-[8.5px] uppercase tracking-[0.18em]"
-                style={{ color: filled ? style.accent : palette.inkFaint }}
-              >
-                {tile.label}
-              </Text>
-            </View>
-
-            <View className="mt-2 flex-row items-end justify-between gap-2">
-              <Text
-                numberOfLines={1}
-                className="min-w-0 flex-1 font-body text-[30px] leading-[34px] tracking-[-0.03em]"
-                style={{
-                  color: filled ? style.accent : tile.variant === 'muted' ? palette.ink : style.accent,
-                  fontWeight: '300',
-                  fontVariant: ['tabular-nums'],
-                }}
-              >
-                {tile.value}
-              </Text>
-
-              {tile.note ? (
-                <View
-                  className="rounded-full border px-2 py-[3px]"
-                  style={{ borderColor: alpha(style.accent, 0.3), backgroundColor: style.tint }}
+            <View
+              className="flex-1 justify-between rounded-2xl border px-4 py-3.5"
+              style={{
+                backgroundColor: filled ? style.tint : palette.panel,
+                borderColor: filled ? alpha(style.accent, 0.28) : palette.line,
+              }}
+            >
+              <View className="flex-row items-center gap-1.5">
+                <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: style.accent }} />
+                <Text
+                  numberOfLines={1}
+                  className="min-w-0 flex-1 font-mono text-[8.5px] uppercase tracking-[0.18em]"
+                  style={{ color: filled ? style.accent : palette.inkFaint }}
                 >
-                  <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: style.accent }}>
-                    {tile.note}
-                  </Text>
-                </View>
-              ) : tile.history && tile.history.length > 1 ? (
-                <View className="pb-1">
-                  <TagTrend values={tile.history} colour={style.accent} width={72} height={24} />
-                </View>
-              ) : null}
-            </View>
+                  {tile.label}
+                </Text>
+              </View>
 
-            <Text numberOfLines={1} className="mt-1.5 font-body text-[11px]" style={{ color: palette.inkMuted }}>
-              {tile.detail}
-            </Text>
-          </View>
+              <View className="mt-2 flex-row items-end justify-between gap-2">
+                <Text
+                  numberOfLines={1}
+                  className="min-w-0 flex-1 font-body text-[30px] leading-[34px] tracking-[-0.03em]"
+                  style={{
+                    color: filled ? style.accent : tile.variant === 'muted' ? palette.ink : style.accent,
+                    fontWeight: '300',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  {tile.value}
+                </Text>
+
+                {tile.note ? (
+                  <View
+                    className="rounded-full border px-2 py-[3px]"
+                    style={{ borderColor: alpha(style.accent, 0.3), backgroundColor: style.tint }}
+                  >
+                    <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: style.accent }}>
+                      {tile.note}
+                    </Text>
+                  </View>
+                ) : tile.history && tile.history.length > 1 ? (
+                  <View className="pb-1">
+                    <TagTrend values={tile.history} colour={style.accent} width={72} height={24} />
+                  </View>
+                ) : null}
+              </View>
+
+              <Text numberOfLines={1} className="mt-1.5 font-body text-[11px]" style={{ color: palette.inkMuted }}>
+                {tile.detail}
+              </Text>
+            </View>
+          </HoverLift>
         );
       })}
     </View>
