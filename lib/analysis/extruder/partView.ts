@@ -232,6 +232,41 @@ export function resolveSignalStatus(
   return 'NORMAL';
 }
 
+/**
+ * One physical boundary crossing.
+ *
+ * The pipeline emits a `TriggeredThreshold` once per fault hypothesis a
+ * crossing supports, because that is what evidence fusion consumes. Presented
+ * to a reader unchanged, one measurement crossing one boundary appears as three
+ * separate findings — identical text, identical id, three rows apart — and the
+ * warning count inflates to match.
+ *
+ * Collapsing on `thresholdId + sensor + feature` restores one row per event.
+ * The hypotheses it feeds ride along on `faultIds` rather than multiplying the
+ * row, so nothing is lost: the evidence trail is still complete, it is just no
+ * longer the unit of display.
+ */
+export type BoundaryCrossing = {
+  key: string;
+  threshold: TriggeredThreshold;
+  /** Every fault hypothesis this one crossing contributes evidence to. */
+  faultIds: string[];
+};
+
+export function boundaryCrossings(thresholds: TriggeredThreshold[]): BoundaryCrossing[] {
+  const byCrossing = new Map<string, BoundaryCrossing>();
+  for (const threshold of thresholds) {
+    const key = `${threshold.thresholdId}|${threshold.sensor}|${threshold.feature}`;
+    const entry = byCrossing.get(key);
+    if (entry) {
+      if (threshold.faultId && !entry.faultIds.includes(threshold.faultId)) entry.faultIds.push(threshold.faultId);
+      continue;
+    }
+    byCrossing.set(key, { key, threshold, faultIds: threshold.faultId ? [threshold.faultId] : [] });
+  }
+  return [...byCrossing.values()];
+}
+
 // ---------------------------------------------------------------------------
 // Part view model
 // ---------------------------------------------------------------------------
@@ -428,6 +463,7 @@ export function buildPartViews({ analysis, signals }: BuildPartViewsArgs): PartV
   const anomalyTags = new Set(
     analysis.anomaly.contributors.filter((item) => item.direction !== 'normal').map((item) => item.code),
   );
+  const crossings = boundaryCrossings(detail.triggeredThresholds);
 
   return PART_ORDER.map((part) => {
     const owned = signals.filter((signal) => signal.part === part && !signal.missing);
@@ -441,9 +477,11 @@ export function buildPartViews({ analysis, signals }: BuildPartViewsArgs): PartV
     const violations = detail.constraints.filter(
       (check) => check.status === 'VIOLATION' && partsForConstraint(check.constraintId).includes(part),
     );
-    const thresholds = detail.triggeredThresholds.filter(
-      (threshold) => threshold.sensor in TAG_LABELS && partForTag(threshold.sensor as ExtruderTag) === part,
-    );
+    // De-duplicated first, so a part's warning count is a count of crossings
+    // rather than of the evidence entries each crossing produced.
+    const thresholds = crossings
+      .filter(({ threshold }) => threshold.sensor in TAG_LABELS && partForTag(threshold.sensor as ExtruderTag) === part)
+      .map(({ threshold }) => threshold);
     const watched = owned.filter((signal) => anomalyTags.has(signal.tag));
 
     // Mapped from what the pipeline decided — never a second opinion on it.

@@ -30,6 +30,7 @@ import {
   allThresholds,
   analyzeExtruder,
   appendHistory,
+  boundaryCrossings,
   buildKeyChanges,
   buildPartViews,
   classifyBehaviour,
@@ -223,12 +224,6 @@ function readinessVariant(score: number): Variant {
   if (score >= 85) return 'success';
   if (score >= 60) return 'warning';
   return 'destructive';
-}
-
-function stateVariant(state: string): Variant {
-  if (state === 'PRODUCING') return 'success';
-  if (state === 'UNDETERMINED') return 'muted';
-  return 'info';
 }
 
 function humanise(value: string): string {
@@ -669,26 +664,44 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const keyChanges = useMemo(() => buildKeyChanges(signalViews), [signalViews]);
 
   // --- conclusion ------------------------------------------------------------
+  // One row per physical crossing. See `boundaryCrossings` for why.
+  const crossings = useMemo(() => boundaryCrossings(detail.triggeredThresholds), [detail.triggeredThresholds]);
+
   // Everything raised on this machine, in one list, worst first. The three kinds
   // come from the three things the pipeline actually raises, and stay distinct:
   // a fault is a root-cause inference, not the rung above an alarm.
   const attentionItems = useMemo<AttentionItem[]>(() => {
-    const alarms: AttentionItem[] = violations.map((check) => ({
-      key: `alarm-${check.constraintId}`,
-      kind: 'ALARM',
-      message: `${check.name} is past its hard process limit`,
-      reference: `${check.constraintId} · ${check.operator} ${check.limit} ${check.unit}`,
-      part: partsForConstraint(check.constraintId)[0] ?? null,
-    }));
-    const warnings: AttentionItem[] = detail.triggeredThresholds.map((threshold) => ({
-      key: `warning-${threshold.thresholdId}-${threshold.sensor}`,
-      kind: 'WARNING',
-      message: `${TAG_LABELS[threshold.sensor as ExtruderTag] ?? threshold.sensor} crossed a registered boundary`,
-      reference: `${threshold.thresholdId} · ${threshold.feature}`,
-      part: threshold.sensor in TAG_LABELS ? partForTag(threshold.sensor as ExtruderTag) : null,
-    }));
+    const alarms: AttentionItem[] = violations.map((check) => {
+      const part = partsForConstraint(check.constraintId)[0] ?? null;
+      return {
+        key: `alarm-${check.constraintId}`,
+        kind: 'ALARM' as const,
+        message: `${check.name} is past its hard process limit`,
+        reference: [check.constraintId, `limit ${check.operator} ${check.limit} ${check.unit}`, part]
+          .filter(Boolean)
+          .join(' · '),
+        part,
+      };
+    });
+    const warnings: AttentionItem[] = crossings.map(({ key, threshold, faultIds }) => {
+      const part = threshold.sensor in TAG_LABELS ? partForTag(threshold.sensor as ExtruderTag) : null;
+      return {
+        key: `warning-${key}`,
+        kind: 'WARNING' as const,
+        message: `${TAG_LABELS[threshold.sensor as ExtruderTag] ?? threshold.sensor} crossed a registered boundary`,
+        reference: [
+          threshold.thresholdId,
+          humanise(threshold.feature),
+          part,
+          faultIds.length > 1 ? `feeds ${faultIds.length} hypotheses` : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        part,
+      };
+    });
     return [...alarms, ...warnings];
-  }, [detail.triggeredThresholds, violations]);
+  }, [crossings, violations]);
 
   const currentDiagnosis = useMemo<CurrentDiagnosis | null>(() => {
     const top = candidateAssessments[0];
@@ -788,24 +801,14 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const wide = width >= 1120;
   const hasRail = width >= 1400;
   const RAIL_WIDTH = 344;
+  // Matches the machine header's own gutter above this screen, so the analysis
+  // cards start on the same vertical as the machine's name rather than a few
+  // pixels inside it.
+  const gutter = width >= 768 ? 20 : 12;
 
   // --- shell furniture -------------------------------------------------------
-  const headerFacts: HeaderFact[] = [
-    ...(machineId ? [{ label: 'Machine', value: machineId }] : []),
-    { label: 'Model', value: `Single-screw extruder ${analysis.modelVersion}` },
-    { label: 'Recipe', value: detail.recipeId },
-    { label: 'State', value: humanise(detail.inferredMachineState), variant: stateVariant(detail.inferredMachineState) },
-    {
-      label: 'Gateways',
-      value: `${connectivitySummary.gateways} · ${connectivitySummary.connected}/${connectivitySummary.total} live`,
-      variant:
-        connectivitySummary.connected === connectivitySummary.total && connectivitySummary.total > 0
-          ? 'success'
-          : 'warning',
-    },
-    { label: 'Tags', value: `${resolvedCount}/${totalTags} resolved`, variant: readinessVariant(analysis.readiness.score) },
-  ];
-
+  // How long this analysis has been running. Recomputed whenever the pipeline
+  // produces a new result, which is the only moment the band redraws anyway.
   const sessionLabel = useMemo(() => {
     const minutes = Math.max(0, Math.round((Date.now() - sessionStart) / 60000));
     const started = new Date(sessionStart);
@@ -813,6 +816,35 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     const elapsed = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} m` : `${minutes} m`;
     return `${elapsed} · since ${clock}`;
   }, [analysis.generatedAt, sessionStart]);
+
+  /**
+   * The rail's cells: provenance only.
+   *
+   * What is being analysed, what it is being analysed against, and how much of
+   * it is actually being measured. Deliberately no condition — the machine's
+   * state and how identifiable that state is belong to the status tile
+   * directly below, and carrying them in both places printed the same two facts
+   * twice within 80px of each other. The model names the card on the line
+   * above, so it is not a cell either.
+   */
+  const headerFacts: HeaderFact[] = [
+    ...(machineId ? [{ label: 'Machine', value: machineId }] : []),
+    { label: 'Recipe', value: detail.recipeId },
+    { label: 'Tags resolved', value: `${resolvedCount}/${totalTags}`, variant: readinessVariant(analysis.readiness.score) },
+    {
+      label: 'Points live',
+      value: `${connectivitySummary.connected}/${connectivitySummary.total}`,
+      variant:
+        connectivitySummary.connected === connectivitySummary.total && connectivitySummary.total > 0
+          ? 'success'
+          : 'warning',
+    },
+    {
+      label: 'Gateways',
+      value: `${connectivitySummary.gateways} · ${connectivitySummary.racks} rack${connectivitySummary.racks === 1 ? '' : 's'}`,
+    },
+    { label: 'Session', value: sessionLabel },
+  ];
 
   // The four numbers that describe the machine, not the screen. They stay above
   // the tab bar so the answer to "how is this machine" does not change shape
@@ -829,9 +861,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     {
       key: 'warnings',
       label: 'Warnings',
-      value: String(detail.triggeredThresholds.length),
+      value: String(crossings.length),
       detail: 'Registered boundaries crossed',
-      variant: detail.triggeredThresholds.length > 0 ? 'warning' : 'success',
+      variant: crossings.length > 0 ? 'warning' : 'success',
       history: keyChanges[0] ? signalViews.find((signal) => signal.tag === keyChanges[0].tag)?.history : undefined,
     },
     {
@@ -973,10 +1005,14 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
 
   return (
     <View className="min-h-0 flex-1" style={{ backgroundColor: palette.bg }}>
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 14, gap: 12 }}>
+      <ScrollView
+        className="flex-1"
+        contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 14, paddingBottom: 32, gap: 12 }}
+      >
         <AnalyzerHeader
+          modelName="Single-screw extruder diagnostic model"
+          modelVersion={analysis.modelVersion}
           facts={headerFacts}
-          session={sessionLabel}
           sourceLabel={sourceLabel}
           sourceVariant={sourceVariant}
           scenarioLabel={scenarioRun ? scenarioRun.scenario.id : 'Scenarios'}
@@ -1064,7 +1100,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           </View>
 
           {hasRail ? (
-            <View style={{ width: RAIL_WIDTH, position: 'sticky', top: 14, alignSelf: 'flex-start' } as never}>
+            <View style={{ width: RAIL_WIDTH, position: 'sticky', top: 0, alignSelf: 'flex-start' } as never}>
               <InstrumentRail
                 rows={instrumentRows}
                 missing={detail.missingTags.length}

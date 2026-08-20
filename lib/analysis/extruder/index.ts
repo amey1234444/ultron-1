@@ -73,12 +73,14 @@ export {
 } from './machineParts';
 export {
   BEHAVIOUR_LABEL,
+  boundaryCrossings,
   buildKeyChanges,
   buildPartViews,
   classifyBehaviour,
   matchClassLabel,
   resolveSignalStatus,
   type BehaviourResult,
+  type BoundaryCrossing,
   type KeyChange,
   type PartCause,
   type PartView,

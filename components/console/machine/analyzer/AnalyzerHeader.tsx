@@ -1,52 +1,76 @@
 /**
- * The analysis layer's fact bar.
+ * The analysis layer's identity band.
  *
- * One band, directly under the machine's own header, carrying the conditions
- * every number on the screen is valid under: which model is running, against
- * which recipe, in which machine state, off how many resolved tags, from where,
- * and for how long. A reader who has scrolled past "scenario injection" would
- * be reading fabricated measurements as if they were the plant, so this never
- * scrolls away with the content — it is the first thing under the title and it
- * is stated exactly once in the whole layer.
+ * Two lines, one card, spanning the full width of the page.
  *
- * The band used to carry a second "Analysis layer" title of its own. The
- * machine header immediately above already names the machine and the screen, so
- * that line was a duplicate heading and a wasted 44px; the advisory badge that
- * mattered moved into this row instead.
+ *   line 1  what is running, and the controls that change it
+ *   line 2  the conditions every number below is valid under, as a divided rail
+ *
+ * It used to be a title, a badge and a loose row of label/value pairs, which
+ * read as three different treatments stacked on top of each other — a pill, a
+ * heading and a data strip, none of them agreeing on alignment or weight. The
+ * facts are now one rail of equal cells separated by hairlines, so they stretch
+ * edge to edge and line up with the stat tiles directly beneath them.
+ *
+ * What it deliberately does NOT say is "Analysis layer". The machine header
+ * above already names the machine, and the nav beside it already has ANALYSIS
+ * lit — a third statement of the same thing was a heading spending 40px to
+ * repeat the two things either side of it. The line carries the *diagnostic
+ * model* instead, which is the one identity nothing else on screen states.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { alpha, Badge, Button, consolePalette, variantStyle, type Variant } from '../../../ui';
+import { alpha, Button, consolePalette, variantStyle, type Variant } from '../../../ui';
 
 export type HeaderFact = { label: string; value: string; variant?: Variant };
 
-/** A label above its value, in the fact bar's one type pairing. */
-function Fact({ fact }: { fact: HeaderFact }) {
+/**
+ * One cell of the fact rail.
+ *
+ * Every cell flexes equally and carries its own leading hairline, so the rail
+ * fills whatever width the page has instead of bunching its content at the left
+ * and leaving the rest of the band empty.
+ */
+function FactCell({ fact, first }: { fact: HeaderFact; first: boolean }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const accent = fact.variant ? variantStyle(palette, fact.variant).accent : palette.ink;
+  const accent = fact.variant ? variantStyle(palette, fact.variant).accent : undefined;
 
   return (
-    <View className="min-w-0" style={{ maxWidth: 300 }}>
-      <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
+    <View
+      className="min-w-0 px-4 py-2.5"
+      style={{
+        flexGrow: 1,
+        flexShrink: 1,
+        flexBasis: 0,
+        minWidth: 132,
+        borderLeftWidth: first ? 0 : 1,
+        borderLeftColor: palette.line,
+      }}
+    >
+      <Text className="font-mono text-[8.5px] uppercase tracking-[0.2em]" style={{ color: palette.inkFaint }} numberOfLines={1}>
         {fact.label}
       </Text>
-      <Text
-        className="mt-1 font-mono text-[11.5px]"
-        style={{ color: accent, fontVariant: ['tabular-nums'] }}
-        numberOfLines={1}
-      >
-        {fact.value}
-      </Text>
+      <View className="mt-1 flex-row items-center gap-1.5">
+        {accent ? <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: accent }} /> : null}
+        <Text
+          className="min-w-0 flex-1 font-mono text-[11.5px]"
+          style={{ color: accent ?? palette.ink, fontVariant: ['tabular-nums'] }}
+          numberOfLines={1}
+        >
+          {fact.value}
+        </Text>
+      </View>
     </View>
   );
 }
 
 export function AnalyzerHeader({
+  modelName,
+  modelVersion,
   facts,
-  session,
   advisory = true,
   sourceLabel,
   sourceVariant,
@@ -56,9 +80,10 @@ export function AnalyzerHeader({
   onReturnToLive,
   notice,
 }: {
+  /** The diagnostic model, not the machine template. */
+  modelName: string;
+  modelVersion: string;
   facts: HeaderFact[];
-  /** Elapsed analysis session, e.g. "3 h 12 m · since 11:28". */
-  session: string;
   advisory?: boolean;
   sourceLabel: string;
   sourceVariant: Variant;
@@ -70,10 +95,10 @@ export function AnalyzerHeader({
   /**
    * The one standing caveat about the reading, when there is one.
    *
-   * It lives inside this card rather than as a banner of its own because it
-   * qualifies the facts beside it, and because a dismissible strip stacked
-   * above the content pushed the whole screen down every time the integrity
-   * layer had something to say.
+   * It closes this card rather than opening the page as a banner of its own,
+   * because it qualifies the facts directly above it — and because a dismissible
+   * strip above the content pushed the whole screen down every time the
+   * integrity layer had something to say.
    */
   notice?: {
     title: string;
@@ -86,51 +111,59 @@ export function AnalyzerHeader({
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
+  const source = variantStyle(palette, sourceVariant);
   const noticeStyle = notice ? variantStyle(palette, notice.variant) : null;
 
   return (
     <View
-      className="overflow-hidden rounded-2xl border"
+      className="w-full overflow-hidden rounded-2xl border"
       style={{ backgroundColor: palette.panel, borderColor: palette.line }}
     >
-      <View className="flex-row flex-wrap items-center justify-between gap-x-8 gap-y-3 px-4 py-3">
-        <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-x-8 gap-y-3">
+      {/* Line 1 — what is running, and what changes it. */}
+      <View className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2.5 px-4 pb-2.5 pt-3">
+        <View className="min-w-0 flex-1 flex-row flex-wrap items-center gap-2">
+          <View
+            className="h-6 w-6 items-center justify-center rounded-lg"
+            style={{ backgroundColor: palette.accentSoft }}
+          >
+            <MaterialCommunityIcons name="stethoscope" size={13} color={palette.accent} />
+          </View>
+          <Text className="font-body-bold text-[14px] tracking-[-0.015em]" style={{ color: palette.ink }} numberOfLines={1}>
+            {modelName}
+          </Text>
+          <View
+            className="rounded-full border px-2 py-[2px]"
+            style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+          >
+            <Text className="font-mono text-[9px] tracking-[0.06em]" style={{ color: palette.inkMuted }} numberOfLines={1}>
+              {modelVersion}
+            </Text>
+          </View>
           {advisory ? (
-            <Badge variant="muted" icon="hand-back-right-outline">
-              Advisory only
-            </Badge>
+            <View
+              className="flex-row items-center gap-1.5 rounded-full border px-2 py-[3px]"
+              style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+            >
+              <MaterialCommunityIcons name="hand-back-right-outline" size={10} color={palette.inkMuted} />
+              <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
+                Advisory only
+              </Text>
+            </View>
           ) : null}
-          {facts.map((fact) => (
-            <Fact key={fact.label} fact={fact} />
-          ))}
         </View>
 
         <View className="flex-row items-center gap-2">
-          <Fact fact={{ label: 'Session', value: session }} />
           <View
             className="flex-row items-center gap-2 rounded-full border px-2.5 py-1.5"
-            style={{
-              borderColor: alpha(variantStyle(palette, sourceVariant).accent, 0.32),
-              backgroundColor: variantStyle(palette, sourceVariant).tint,
-            }}
+            style={{ borderColor: alpha(source.accent, 0.32), backgroundColor: source.tint }}
           >
-            <View
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: 6,
-                backgroundColor: variantStyle(palette, sourceVariant).accent,
-              }}
-            />
-            <Text
-              className="font-mono text-[9.5px] uppercase tracking-[0.16em]"
-              style={{ color: variantStyle(palette, sourceVariant).accent }}
-            >
+            <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: source.accent }} />
+            <Text className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: source.accent }}>
               {sourceLabel}
             </Text>
           </View>
           <Button
-            tone={scenarioActive ? 'warning' : 'primary'}
+            tone={scenarioActive ? 'warning' : 'secondary'}
             icon="flask-outline"
             onPress={onToggleLibrary}
             accessibilityLabel="Open the fault scenario library"
@@ -143,6 +176,16 @@ export function AnalyzerHeader({
             </Button>
           ) : null}
         </View>
+      </View>
+
+      {/* Line 2 — the fact rail. Equal cells, hairline-divided, full width. */}
+      <View
+        className="flex-row flex-wrap"
+        style={{ borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.panelRaised }}
+      >
+        {facts.map((fact, index) => (
+          <FactCell key={fact.label} fact={fact} first={index === 0} />
+        ))}
       </View>
 
       {notice && noticeStyle ? (
