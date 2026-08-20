@@ -15,12 +15,12 @@
  * when the reader moves to another screen.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import type { KeyChange, MachinePart } from '../../../../lib/analysis/extruder';
 import { alpha, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { Block, EmptyNote, StepRow } from './AnalyzerParts';
+import { Block, EmptyNote, PressSurface } from './AnalyzerParts';
 
 /**
  * One raised finding.
@@ -91,6 +91,14 @@ export function filterAttention(items: AttentionItem[], filter: AttentionFilter)
   return kind === null ? items : items.filter((item) => item.kind === kind);
 }
 
+/** Maintenance priority drives the section's accent, so urgency is visible before it is read. */
+const PRIORITY_VARIANT: Record<string, Variant> = {
+  critical: 'destructive',
+  high: 'destructive',
+  medium: 'warning',
+  low: 'info',
+};
+
 const DIRECTION_ICON: Record<KeyChange['direction'], 'arrow-up' | 'arrow-down' | 'minus'> = {
   UP: 'arrow-up',
   DOWN: 'arrow-down',
@@ -122,12 +130,11 @@ function AttentionRow({ item, onOpenPart }: { item: AttentionItem; onOpenPart: (
   const style = variantStyle(palette, KIND_VARIANT[item.kind]);
 
   return (
-    <Pressable
+    <PressSurface
       onPress={item.part ? () => onOpenPart(item.part as MachinePart) : undefined}
-      disabled={!item.part}
-      accessibilityRole={item.part ? 'button' : undefined}
+      accent={style.accent}
       accessibilityLabel={item.part ? `${item.message}. Open ${item.part}.` : item.message}
-      className="flex-row items-center gap-3 px-4 py-2.5"
+      className="mx-2 flex-row items-center gap-3 rounded-xl px-2 py-2.5"
     >
       <View style={{ width: 7, height: 7, borderRadius: 7, backgroundColor: style.accent }} />
       <View className="min-w-0 flex-1">
@@ -148,7 +155,7 @@ function AttentionRow({ item, onOpenPart }: { item: AttentionItem; onOpenPart: (
         </Text>
       </View>
       {item.part ? <MaterialCommunityIcons name="chevron-right" size={15} color={palette.inkFaint} /> : null}
-    </Pressable>
+    </PressSurface>
   );
 }
 
@@ -167,8 +174,8 @@ export function ConclusionTab({
   attentionTotal: number;
   changes: KeyChange[];
   diagnosis: CurrentDiagnosis | null;
-  /** The single next step, when the model has one. */
-  action: { priority: string; steps: string[] } | null;
+  /** The work the model recommends, and how to confirm it worked. */
+  action: { priority: string; steps: string[]; verification: string[] } | null;
   wide: boolean;
   onOpenPart: (part: MachinePart) => void;
 }) {
@@ -284,9 +291,8 @@ export function ConclusionTab({
         accent={diagnosis ? 'warning' : 'success'}
         actions={
           diagnosis?.part ? (
-            <Pressable
+            <PressSurface
               onPress={() => onOpenPart(diagnosis.part as MachinePart)}
-              accessibilityRole="button"
               accessibilityLabel={`Open ${diagnosis.part} in Advance Diagnosis`}
               className="flex-row items-center gap-1.5 rounded-full border px-2.5 py-1"
               style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
@@ -295,7 +301,7 @@ export function ConclusionTab({
                 Why
               </Text>
               <MaterialCommunityIcons name="arrow-right" size={12} color={palette.inkFaint} />
-            </Pressable>
+            </PressSurface>
           ) : undefined
         }
         footnote="No percentage confidence is reported for this machine: it has no calibrated fault-probability model, so the ranking is an ordinal engineering match rather than a probability."
@@ -350,11 +356,83 @@ export function ConclusionTab({
       </Block>
 
       {action ? (
-        <Block title="What to do" meta={`Priority: ${action.priority}.`} accent="warning">
-          <View style={{ gap: 8 }}>
-            {action.steps.slice(0, 4).map((step, index) => (
-              <StepRow key={index} index={index + 1} text={step} />
-            ))}
+        <Block
+          title="What to do"
+          accent={PRIORITY_VARIANT[action.priority] ?? 'warning'}
+          meta="The work the model recommends, and the checks that confirm it worked."
+          actions={
+            <View
+              className="flex-row items-center gap-1.5 rounded-full px-2.5 py-1"
+              style={{ backgroundColor: variantStyle(palette, PRIORITY_VARIANT[action.priority] ?? 'warning').tint }}
+            >
+              <MaterialCommunityIcons
+                name="flag-variant-outline"
+                size={11}
+                color={variantStyle(palette, PRIORITY_VARIANT[action.priority] ?? 'warning').accent}
+              />
+              <Text
+                className="font-mono text-[9px] uppercase tracking-[0.14em]"
+                style={{ color: variantStyle(palette, PRIORITY_VARIANT[action.priority] ?? 'warning').accent }}
+              >
+                {action.priority} priority
+              </Text>
+            </View>
+          }
+        >
+          <View className={wide ? 'flex-row items-start' : undefined} style={{ gap: wide ? 20 : 14 }}>
+            {/* Do this — ordered, because the order is part of the instruction. */}
+            <View className="min-w-0 flex-1" style={{ gap: 8 }}>
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
+                Do this
+              </Text>
+              {action.steps.slice(0, 5).map((step, index) => (
+                <View
+                  key={index}
+                  className="flex-row items-start gap-2.5 rounded-xl border px-3 py-2.5"
+                  style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+                >
+                  <View
+                    className="h-5 w-5 items-center justify-center rounded-full"
+                    style={{ backgroundColor: palette.ink }}
+                  >
+                    <Text
+                      className="font-mono text-[9px]"
+                      style={{ color: palette.panel, fontVariant: ['tabular-nums'] }}
+                    >
+                      {index + 1}
+                    </Text>
+                  </View>
+                  <Text className="min-w-0 flex-1 font-body text-[12px] leading-[17px]" style={{ color: palette.ink }}>
+                    {step}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            {/* Then confirm — unordered checks, so they take ticks, not numbers. */}
+            {action.verification.length > 0 ? (
+              <View className="min-w-0 flex-1" style={{ gap: 8 }}>
+                <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
+                  Then confirm
+                </Text>
+                {action.verification.slice(0, 5).map((step, index) => (
+                  <View key={index} className="flex-row items-start gap-2.5 px-1 py-1">
+                    <MaterialCommunityIcons
+                      name="check-circle-outline"
+                      size={15}
+                      color={palette.accent}
+                      style={{ marginTop: 1 }}
+                    />
+                    <Text
+                      className="min-w-0 flex-1 font-body text-[12px] leading-[17px]"
+                      style={{ color: palette.inkMuted }}
+                    >
+                      {step}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
           </View>
         </Block>
       ) : null}

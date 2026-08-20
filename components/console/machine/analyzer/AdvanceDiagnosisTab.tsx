@@ -22,7 +22,7 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import {
@@ -41,8 +41,25 @@ import {
 } from '../../../../lib/analysis/extruder';
 import { cn } from '../../../../lib/cn';
 import { alpha, Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { Block, EmptyNote, Fact, TagTrend } from './AnalyzerParts';
+import { Block, EmptyNote, Fact, PressSurface, TagTrend } from './AnalyzerParts';
 
+
+/**
+ * A glyph per part.
+ *
+ * The part list was seven identical text chips; on a screen an operator scans
+ * for "the gearbox", a shape is found faster than a word, and the icon is what
+ * makes the row navigable at a glance rather than readable at a stop.
+ */
+const PART_ICON: Record<MachinePart, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  Motor: 'engine-outline',
+  Gearbox: 'cog-outline',
+  'Screw / Drive': 'rotate-right',
+  Hopper: 'silo-outline',
+  Barrel: 'thermometer',
+  'Melt / Process': 'water-outline',
+  'Electrical / Power': 'flash-outline',
+};
 
 const STATE_VARIANT: Record<PartState, Variant> = {
   NORMAL: 'success',
@@ -84,33 +101,48 @@ function PartChips({
   const palette = consolePalette(isDark);
   const byPart = new Map(parts.map((view) => [view.part, view]));
 
-  const chip = (key: string, label: string, active: boolean, state: PartState | null, onPress: () => void) => (
-    <Pressable
-      key={key}
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      className="flex-row items-center gap-1.5 rounded-lg border px-2.5 py-1.5"
-      style={{
-        borderColor: active ? palette.lineStrong : palette.line,
-        backgroundColor: active ? palette.panelRaised : 'transparent',
-      }}
-    >
-      {state ? <StateDot state={state} /> : null}
-      <Text
-        className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
-        style={{ color: active ? palette.ink : palette.inkMuted }}
+  const chip = (
+    key: string,
+    label: string,
+    active: boolean,
+    state: PartState | null,
+    icon: keyof typeof MaterialCommunityIcons.glyphMap,
+    onPress: () => void,
+  ) => {
+    const accent = state ? variantStyle(palette, STATE_VARIANT[state]).accent : palette.inkMuted;
+    return (
+      <PressSurface
+        key={key}
+        onPress={onPress}
+        selected={active}
+        accessibilityRole="tab"
+        accessibilityLabel={state ? `${label}, ${PART_STATE_LABEL[state]}` : label}
+        accent={palette.lineStrong}
+        className="flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5"
+        style={{
+          borderColor: active ? palette.lineStrong : palette.line,
+          backgroundColor: active ? palette.panelRaised : palette.panel,
+        }}
       >
-        {label}
-      </Text>
-    </Pressable>
-  );
+        <MaterialCommunityIcons name={icon} size={13} color={active ? palette.ink : accent} />
+        <Text
+          className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+          style={{ color: active ? palette.ink : palette.inkMuted }}
+        >
+          {label}
+        </Text>
+        {state ? <StateDot state={state} size={5} /> : null}
+      </PressSurface>
+    );
+  };
 
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, alignItems: 'center' }}>
-      {chip('all', 'All parts', selected === null, null, () => onSelect(null))}
+      {chip('all', 'All parts', selected === null, null, 'view-grid-outline', () => onSelect(null))}
       {PART_ORDER.map((part) =>
-        chip(part, part, selected === part, byPart.get(part)?.state ?? 'UNAVAILABLE', () => onSelect(part)),
+        chip(part, part, selected === part, byPart.get(part)?.state ?? 'UNAVAILABLE', PART_ICON[part], () =>
+          onSelect(part),
+        ),
       )}
     </ScrollView>
   );
@@ -142,37 +174,43 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
               {index > 0 ? (
                 <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} style={{ marginHorizontal: 5 }} />
               ) : null}
-              <Pressable
+              <PressSurface
                 onPress={() => onSelect(part)}
-                accessibilityRole="button"
+                accent={style.accent}
                 accessibilityLabel={`Open ${part}, ${PART_STATE_LABEL[state]}`}
-                className="min-w-[112px] rounded-lg border px-2.5 py-2"
+                className="min-w-[124px] rounded-xl border px-3 py-2.5"
                 style={{
                   borderColor: state === 'NORMAL' ? palette.line : alpha(style.accent, 0.4),
-                  backgroundColor: palette.panelRaised,
+                  backgroundColor: palette.panel,
                 }}
               >
-                <Text className="font-body-bold text-[11.5px]" style={{ color: palette.ink }} numberOfLines={1}>
+                <View
+                  className="h-7 w-7 items-center justify-center rounded-lg"
+                  style={{ backgroundColor: state === 'NORMAL' ? palette.panelRaised : alpha(style.accent, 0.12) }}
+                >
+                  <MaterialCommunityIcons name={PART_ICON[part]} size={15} color={style.accent} />
+                </View>
+                <Text className="mt-2 font-body-bold text-[11.5px]" style={{ color: palette.ink }} numberOfLines={1}>
                   {part}
                 </Text>
-                <View className="mt-1 flex-row items-center gap-1.5">
+                <View className="mt-0.5 flex-row items-center gap-1.5">
                   <StateDot state={state} size={5} />
                   <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: style.accent }}>
                     {PART_STATE_LABEL[state]}
                   </Text>
                 </View>
-              </Pressable>
+              </PressSurface>
             </View>
           );
         })}
       </ScrollView>
 
       {supply ? (
-        <Pressable
+        <PressSurface
           onPress={() => onSelect('Electrical / Power')}
-          accessibilityRole="button"
-          className="flex-row items-center gap-2 self-start rounded-lg border px-2.5 py-1.5"
-          style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+          accessibilityLabel="Open Electrical / Power"
+          className="flex-row items-center gap-2 self-start rounded-xl border px-2.5 py-1.5"
+          style={{ borderColor: palette.line, backgroundColor: palette.panel }}
         >
           <MaterialCommunityIcons name="flash-outline" size={13} color={palette.inkFaint} />
           <Text className="font-body text-[11px]" style={{ color: palette.ink }}>
@@ -182,7 +220,7 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
           <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: palette.inkMuted }}>
             {PART_STATE_LABEL[supply.state]} · supplies the machine
           </Text>
-        </Pressable>
+        </PressSurface>
       ) : null}
     </View>
   );
@@ -202,25 +240,39 @@ function PartCard({ view, onOpen }: { view: PartView; onOpen: () => void }) {
   const style = variantStyle(palette, STATE_VARIANT[view.state]);
 
   return (
-    <Pressable
+    <PressSurface
       onPress={onOpen}
-      accessibilityRole="button"
+      accent={style.accent}
       accessibilityLabel={`Open ${view.part} deep dive`}
-      className="min-w-[260px] flex-1 rounded-xl border px-3.5 py-3"
+      className="min-w-[260px] flex-1 rounded-2xl border px-3.5 py-3"
       style={{ borderColor: alpha(style.accent, 0.4), backgroundColor: palette.panel }}
     >
-      <View className="flex-row items-start justify-between gap-2">
-        <Text className="min-w-0 flex-1 font-body-bold text-[13px]" style={{ color: palette.ink }} numberOfLines={1}>
-          {view.part}
-        </Text>
-        <Badge variant={STATE_VARIANT[view.state]} icon={null} outline>
-          {PART_STATE_LABEL[view.state]}
-        </Badge>
+      <View className="flex-row items-start gap-2.5">
+        <View
+          className="h-8 w-8 items-center justify-center rounded-xl"
+          style={{ backgroundColor: alpha(style.accent, 0.12) }}
+        >
+          <MaterialCommunityIcons name={PART_ICON[view.part]} size={16} color={style.accent} />
+        </View>
+        <View className="min-w-0 flex-1">
+          <View className="flex-row items-start justify-between gap-2">
+            <Text className="min-w-0 flex-1 font-body-bold text-[13px]" style={{ color: palette.ink }} numberOfLines={1}>
+              {view.part}
+            </Text>
+            <Badge variant={STATE_VARIANT[view.state]} icon={null} outline>
+              {PART_STATE_LABEL[view.state]}
+            </Badge>
+          </View>
+          <Text
+            className="mt-1 font-body text-[11.5px] leading-[16px]"
+            style={{ color: palette.inkMuted }}
+            numberOfLines={2}
+          >
+            {view.headline ?? 'No local fault pattern detected.'}
+          </Text>
+        </View>
       </View>
-      <Text className="mt-1.5 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }} numberOfLines={2}>
-        {view.headline ?? 'No local fault pattern detected.'}
-      </Text>
-    </Pressable>
+    </PressSurface>
   );
 }
 
@@ -269,39 +321,81 @@ function PartGroupLine({
 // Deep dive
 // ---------------------------------------------------------------------------
 
-/** The five stages, laid out as the chain they are rather than as a list. */
+/**
+ * The five stages, drawn as the chain they are.
+ *
+ * It was a horizontally scrolling row, which clipped the conclusion — the one
+ * stage a reader most wants — off the right edge on any window narrower than
+ * the whole chain. The stages now wrap: each is a numbered node on a rail, and
+ * a stage the measurements could not support is drawn hollow rather than faded,
+ * so "not evaluated" is a state you can see rather than a low-contrast guess.
+ */
 function ReasoningChain({ view }: { view: PartView }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
+  const last = view.reasoning.length - 1;
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ alignItems: 'stretch', gap: 0 }}>
-      {view.reasoning.map((step, index) => (
-        <View key={step.key} className="flex-row items-center">
-          {index > 0 ? (
-            <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} style={{ marginHorizontal: 5 }} />
-          ) : null}
+    <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+      {view.reasoning.map((step, index) => {
+        const conclusion = index === last;
+        const accent = conclusion && step.evaluated ? palette.accent : palette.inkMuted;
+        return (
           <View
-            className="min-w-[164px] max-w-[230px] flex-1 rounded-lg border px-2.5 py-2"
+            key={step.key}
+            className="rounded-xl border px-3 py-2.5"
             style={{
-              borderColor: palette.line,
-              backgroundColor: palette.panelRaised,
-              opacity: step.evaluated ? 1 : 0.6,
+              flexGrow: 1,
+              flexShrink: 1,
+              flexBasis: 200,
+              minWidth: 180,
+              borderColor: conclusion ? alpha(accent, 0.35) : palette.line,
+              backgroundColor: conclusion ? alpha(accent, 0.06) : palette.panelRaised,
             }}
           >
-            <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
-              {step.label}
-            </Text>
-            <Text className="mt-0.5 font-body-bold text-[12px]" style={{ color: palette.ink }} numberOfLines={2}>
+            <View className="flex-row items-center gap-2">
+              {/* Filled node = the stage ran. Hollow = it could not be evaluated. */}
+              <View
+                className="h-4 w-4 items-center justify-center rounded-full"
+                style={
+                  step.evaluated
+                    ? { backgroundColor: accent }
+                    : { borderWidth: 1, borderColor: palette.lineStrong, backgroundColor: 'transparent' }
+                }
+              >
+                <Text
+                  className="font-mono text-[8px]"
+                  style={{ color: step.evaluated ? palette.panel : palette.inkFaint, fontVariant: ['tabular-nums'] }}
+                >
+                  {index + 1}
+                </Text>
+              </View>
+              <Text
+                className="min-w-0 flex-1 font-mono text-[8.5px] uppercase tracking-[0.16em]"
+                style={{ color: palette.inkFaint }}
+                numberOfLines={1}
+              >
+                {step.label}
+              </Text>
+              {index < last ? (
+                <MaterialCommunityIcons name="arrow-right" size={12} color={palette.inkFaint} />
+              ) : null}
+            </View>
+
+            <Text
+              className="mt-1.5 font-body-bold text-[12.5px] tracking-[-0.01em]"
+              style={{ color: step.evaluated ? palette.ink : palette.inkMuted }}
+              numberOfLines={2}
+            >
               {step.value}
             </Text>
             <Text className="mt-1 font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkMuted }}>
               {step.detail}
             </Text>
           </View>
-        </View>
-      ))}
-    </ScrollView>
+        );
+      })}
+    </View>
   );
 }
 
@@ -543,18 +637,19 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
           {signals.map((entry) => {
             const active = entry.tag === signal.tag;
             return (
-              <Pressable
+              <PressSurface
                 key={entry.tag}
                 onPress={() => {
                   setSelectedTag(entry.tag);
                   setToolKey(null);
                 }}
+                selected={active}
                 accessibilityRole="tab"
-                accessibilityState={{ selected: active }}
-                className="rounded-lg border px-2.5 py-1.5"
+                accessibilityLabel={entry.measures}
+                className="rounded-xl border px-2.5 py-1.5"
                 style={{
                   borderColor: active ? palette.lineStrong : palette.line,
-                  backgroundColor: active ? palette.panelRaised : 'transparent',
+                  backgroundColor: active ? palette.panelRaised : palette.panel,
                 }}
               >
                 <Text className="font-body text-[11px]" style={{ color: active ? palette.ink : palette.inkMuted }}>
@@ -563,7 +658,7 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
                 <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
                   {entry.tag} · {entry.part === part ? KIND_LABEL[entry.kind] : `context · ${entry.part}`}
                 </Text>
-              </Pressable>
+              </PressSurface>
             );
           })}
         </ScrollView>
@@ -583,15 +678,16 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
         {tools.map((entry) => {
           const active = entry.key === tool?.key;
           return (
-            <Pressable
+            <PressSurface
               key={entry.key}
               onPress={() => setToolKey(entry.key)}
+              selected={active}
               accessibilityRole="tab"
-              accessibilityState={{ selected: active }}
-              className="flex-row items-center gap-1.5 rounded-lg border px-2.5 py-1.5"
+              accessibilityLabel={entry.available ? entry.label : `${entry.label}, not available on this machine`}
+              className="flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5"
               style={{
                 borderColor: active ? palette.lineStrong : palette.line,
-                backgroundColor: active ? palette.panelRaised : 'transparent',
+                backgroundColor: active ? palette.panelRaised : palette.panel,
                 opacity: entry.available ? 1 : 0.55,
               }}
             >
@@ -602,7 +698,7 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
                 {entry.label}
               </Text>
               {!entry.available ? <MaterialCommunityIcons name="lock-outline" size={11} color={palette.inkFaint} /> : null}
-            </Pressable>
+            </PressSurface>
           );
         })}
       </ScrollView>

@@ -77,7 +77,7 @@ import {
   type Variant,
 } from '../../ui';
 import { AdvanceDiagnosisTab } from './analyzer/AdvanceDiagnosisTab';
-import { AnalyzerHeader, type HeaderFact } from './analyzer/AnalyzerHeader';
+import { AnalyzerHeader } from './analyzer/AnalyzerHeader';
 import { Block, FilterChips, SearchField } from './analyzer/AnalyzerParts';
 import {
   ATTENTION_FILTERS,
@@ -87,7 +87,7 @@ import {
   type AttentionItem,
   type CurrentDiagnosis,
 } from './analyzer/ConclusionTab';
-import { InstrumentRail, type InstrumentRow } from './analyzer/InstrumentRail';
+import { ConnectivityTab } from './analyzer/ConnectivityTab';
 import { signalFilterCounts, SIGNAL_FILTERS, SignalTab, type SignalFilter } from './analyzer/SignalTab';
 import { StatTiles, type StatTile } from './analyzer/StatTiles';
 import type { MappedChannel } from './RackOccupancyView';
@@ -235,6 +235,7 @@ function humanise(value: string): string {
  *
  * Diagnosis: what is wrong. Advance Diagnosis: why, and where on the machine.
  * Signal: what the sensors read and whether they are inside their limits.
+ * Connectivity: which piece of hardware produces each of those readings.
  *
  * What used to be six tabs collapsed into these. Evidence was never really a
  * subject of its own — it is the reasoning behind a conclusion and belongs
@@ -242,7 +243,7 @@ function humanise(value: string): string {
  * half of that table. Model and Connectivity were provenance, and provenance
  * belongs where the number it qualifies is shown, not on a page of its own.
  */
-type TabKey = 'diagnosis' | 'advance' | 'signal';
+type TabKey = 'diagnosis' | 'advance' | 'signal' | 'connectivity';
 
 /**
  * What each pilot tag is actually for, in the words a plant operator would use.
@@ -726,7 +727,11 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   }, [analysis.diagnoses, analysis.doctorReport.caveats, candidateAssessments]);
 
   const nextAction = analysis.maintenance.caseRequired
-    ? { priority: humanise(analysis.maintenance.priority), steps: analysis.maintenance.recommendedActions }
+    ? {
+        priority: humanise(analysis.maintenance.priority),
+        steps: analysis.maintenance.recommendedActions,
+        verification: analysis.maintenance.verificationSteps,
+      }
     : null;
 
 
@@ -779,6 +784,13 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       count: signalsOutsideLimits,
       countVariant: signalsOutsideLimits > 0 ? 'warning' : 'muted',
     },
+    {
+      value: 'connectivity',
+      label: 'Connectivity',
+      icon: 'lan-connect',
+      count: connectivitySummary.unmapped + connectivitySummary.offline,
+      countVariant: connectivitySummary.unmapped + connectivitySummary.offline > 0 ? 'warning' : 'muted',
+    },
   ];
 
   /**
@@ -795,12 +807,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   }, []);
 
   const { width } = useWindowDimensions();
-  // Two breakpoints, and only two. `wide` is where a screen may split into two
-  // readable columns; `hasRail` is where the instrument rail still leaves the
-  // analysis a full-width column beside it rather than a gutter.
+  // One breakpoint, and only one: where a screen may split into two readable
+  // columns. Nothing else in the layer branches on width.
   const wide = width >= 1120;
-  const hasRail = width >= 1400;
-  const RAIL_WIDTH = 344;
   // Matches the machine header's own gutter above this screen, so the analysis
   // cards start on the same vertical as the machine's name rather than a few
   // pixels inside it.
@@ -816,35 +825,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     const elapsed = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} m` : `${minutes} m`;
     return `${elapsed} · since ${clock}`;
   }, [analysis.generatedAt, sessionStart]);
-
-  /**
-   * The rail's cells: provenance only.
-   *
-   * What is being analysed, what it is being analysed against, and how much of
-   * it is actually being measured. Deliberately no condition — the machine's
-   * state and how identifiable that state is belong to the status tile
-   * directly below, and carrying them in both places printed the same two facts
-   * twice within 80px of each other. The model names the card on the line
-   * above, so it is not a cell either.
-   */
-  const headerFacts: HeaderFact[] = [
-    ...(machineId ? [{ label: 'Machine', value: machineId }] : []),
-    { label: 'Recipe', value: detail.recipeId },
-    { label: 'Tags resolved', value: `${resolvedCount}/${totalTags}`, variant: readinessVariant(analysis.readiness.score) },
-    {
-      label: 'Points live',
-      value: `${connectivitySummary.connected}/${connectivitySummary.total}`,
-      variant:
-        connectivitySummary.connected === connectivitySummary.total && connectivitySummary.total > 0
-          ? 'success'
-          : 'warning',
-    },
-    {
-      label: 'Gateways',
-      value: `${connectivitySummary.gateways} · ${connectivitySummary.racks} rack${connectivitySummary.racks === 1 ? '' : 's'}`,
-    },
-    { label: 'Session', value: sessionLabel },
-  ];
 
   // The four numbers that describe the machine, not the screen. They stay above
   // the tab bar so the answer to "how is this machine" does not change shape
@@ -882,35 +862,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       note: candidateAssessments.length > 0 ? humanise(detail.faultLayer).replace('_', ' ') : undefined,
     },
   ];
-
-  const instrumentRows: InstrumentRow[] = useMemo(
-    () =>
-      signalViews
-        .filter((signal) => !signal.missing)
-        .map((signal) => {
-          const frozen = signal.qualityNotes.some((note) => note.toLowerCase().includes('frozen'));
-          const variant: Variant =
-            signal.status === 'ALARM'
-              ? 'destructive'
-              : signal.status === 'WARNING' || signal.quality === 'DEGRADED'
-                ? 'warning'
-                : signal.value === null
-                  ? 'muted'
-                  : 'success';
-          return {
-            key: `${signal.tag}-${signal.point}`,
-            tag: signal.tag,
-            name: signal.measures,
-            value: signal.value,
-            unit: signal.unit,
-            variant,
-            flag: frozen ? 'flatline' : signal.value === null ? 'no reading' : undefined,
-            history: signal.history,
-          } satisfies InstrumentRow;
-        }),
-    [signalViews],
-  );
-  const goodInstruments = instrumentRows.filter((row) => row.variant === 'success').length;
 
   // The integrity layer's standing caveat. It qualifies the facts it sits under,
   // so it renders inside the header card rather than as one more banner pushing
@@ -991,6 +942,8 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       )
     ) : tab === 'advance' ? (
       <AdvanceDiagnosisTab parts={partViews} selectedPart={selectedPart} onSelectPart={setSelectedPart} wide={wide} />
+    ) : tab === 'connectivity' ? (
+      <ConnectivityTab connections={connections} devices={devices} cards={cards} live={live} />
     ) : (
       <SignalTab
         signals={signalViews}
@@ -999,7 +952,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         onOpenPart={openPart}
         filter={signalFilter}
         query={signalQuery}
-        provenance={`Single-screw extruder model ${analysis.modelVersion} · recipe ${detail.recipeId} · ${thresholdRegister.length} registered thresholds (${fieldCalibratedCount} field-calibrated) · ${resolvedCount}/${totalTags} diagnostic tags resolved from ${mappedChannels.length} mapped point${mappedChannels.length === 1 ? '' : 's'}`}
+        provenance={`Single-screw extruder model ${analysis.modelVersion} · recipe ${detail.recipeId} · ${thresholdRegister.length} registered thresholds (${fieldCalibratedCount} field-calibrated) · ${resolvedCount}/${totalTags} diagnostic tags resolved from ${mappedChannels.length} mapped point${mappedChannels.length === 1 ? '' : 's'} · ${connectivitySummary.connected}/${connectivitySummary.total} points live across ${connectivitySummary.gateways} gateway${connectivitySummary.gateways === 1 ? '' : 's'}`}
       />
     );
 
@@ -1012,7 +965,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         <AnalyzerHeader
           modelName="Single-screw extruder diagnostic model"
           modelVersion={analysis.modelVersion}
-          facts={headerFacts}
           sourceLabel={sourceLabel}
           sourceVariant={sourceVariant}
           scenarioLabel={scenarioRun ? scenarioRun.scenario.id : 'Scenarios'}
@@ -1075,11 +1027,11 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           </Alert>
         ) : null}
 
-        {/* The workspace: analysis left, the instruments it was read off right.
-            The rail is not the Signal screen in miniature - it carries no
-            limits and no status column - so the two never print one fact
-            twice. */}
-        <View className={cn(hasRail && 'flex-row items-start')} style={{ gap: 12 }}>
+        {/* One column, full width. The instrument rail that used to sit in the
+            gutter was the Signal screen in miniature; the half of that subject
+            it could not carry - the acquisition chain behind each reading - is
+            a screen of its own now. */}
+        <View style={{ gap: 12 }}>
           <View className="min-w-0 flex-1" style={{ gap: 12 }}>
             <StatTiles tiles={tiles} wide={wide} />
 
@@ -1099,18 +1051,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
             </View>
           </View>
 
-          {hasRail ? (
-            <View style={{ width: RAIL_WIDTH, position: 'sticky', top: 0, alignSelf: 'flex-start' } as never}>
-              <InstrumentRail
-                rows={instrumentRows}
-                missing={detail.missingTags.length}
-                goodCount={goodInstruments}
-                updatedLabel={instrumentRows.length > 0 ? relativeAge(analysis.generatedAt) : 'never'}
-                onOpenSignals={() => setTab('signal')}
-                maxHeight={520}
-              />
-            </View>
-          ) : null}
         </View>
       </ScrollView>
     </View>

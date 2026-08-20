@@ -1,16 +1,15 @@
 /**
  * The analysis layer's identity band.
  *
- * Two lines, one card, spanning the full width of the page.
+ * One line: what diagnostic model is running, whether its readings are live,
+ * and the control that swaps live data for a scenario. Plus the integrity
+ * layer's standing caveat, when it has one.
  *
- *   line 1  what is running, and the controls that change it
- *   line 2  the conditions every number below is valid under, as a divided rail
- *
- * It used to be a title, a badge and a loose row of label/value pairs, which
- * read as three different treatments stacked on top of each other — a pill, a
- * heading and a data strip, none of them agreeing on alignment or weight. The
- * facts are now one rail of equal cells separated by hairlines, so they stretch
- * edge to edge and line up with the stat tiles directly beneath them.
+ * It used to carry a rail of machine/recipe/tag/gateway/session facts too. Every
+ * one of those was stated somewhere else as well — the machine header names the
+ * machine, the status tile carries its state, and the Signal screen's footer
+ * carries the model, recipe, rule-set and tag provenance the numbers depend on.
+ * A strip restating them under the title was chrome, not information.
  *
  * What it deliberately does NOT say is "Analysis layer". The machine header
  * above already names the machine, and the nav beside it already has ANALYSIS
@@ -24,53 +23,9 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { alpha, Button, consolePalette, variantStyle, type Variant } from '../../../ui';
 
-export type HeaderFact = { label: string; value: string; variant?: Variant };
-
-/**
- * One cell of the fact rail.
- *
- * Every cell flexes equally and carries its own leading hairline, so the rail
- * fills whatever width the page has instead of bunching its content at the left
- * and leaving the rest of the band empty.
- */
-function FactCell({ fact, first }: { fact: HeaderFact; first: boolean }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const accent = fact.variant ? variantStyle(palette, fact.variant).accent : undefined;
-
-  return (
-    <View
-      className="min-w-0 px-4 py-2.5"
-      style={{
-        flexGrow: 1,
-        flexShrink: 1,
-        flexBasis: 0,
-        minWidth: 132,
-        borderLeftWidth: first ? 0 : 1,
-        borderLeftColor: palette.line,
-      }}
-    >
-      <Text className="font-mono text-[8.5px] uppercase tracking-[0.2em]" style={{ color: palette.inkFaint }} numberOfLines={1}>
-        {fact.label}
-      </Text>
-      <View className="mt-1 flex-row items-center gap-1.5">
-        {accent ? <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: accent }} /> : null}
-        <Text
-          className="min-w-0 flex-1 font-mono text-[11.5px]"
-          style={{ color: accent ?? palette.ink, fontVariant: ['tabular-nums'] }}
-          numberOfLines={1}
-        >
-          {fact.value}
-        </Text>
-      </View>
-    </View>
-  );
-}
-
 export function AnalyzerHeader({
   modelName,
   modelVersion,
-  facts,
   advisory = true,
   sourceLabel,
   sourceVariant,
@@ -83,7 +38,6 @@ export function AnalyzerHeader({
   /** The diagnostic model, not the machine template. */
   modelName: string;
   modelVersion: string;
-  facts: HeaderFact[];
   advisory?: boolean;
   sourceLabel: string;
   sourceVariant: Variant;
@@ -176,16 +130,6 @@ export function AnalyzerHeader({
             </Button>
           ) : null}
         </View>
-      </View>
-
-      {/* Line 2 — the fact rail. Equal cells, hairline-divided, full width. */}
-      <View
-        className="flex-row flex-wrap"
-        style={{ borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.panelRaised }}
-      >
-        {facts.map((fact, index) => (
-          <FactCell key={fact.label} fact={fact} first={index === 0} />
-        ))}
       </View>
 
       {notice && noticeStyle ? (

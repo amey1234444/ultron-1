@@ -10,13 +10,119 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type React from 'react';
-import { useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
+import { useMemo, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import { alpha, consolePalette, variantStyle, type Variant } from '../../../ui';
+
+// ---------------------------------------------------------------------------
+// Motion
+// ---------------------------------------------------------------------------
+
+/**
+ * A surface that answers when you touch it.
+ *
+ * Everything selectable in this layer — a part chip, a finding row, a signal, a
+ * tool — is one of these, so the whole screen responds the same way instead of
+ * each control inventing its own feedback. Three states, and only three:
+ *
+ *   hover     lifts a little, so what is under the cursor is obvious
+ *   press     grows very slightly and casts a shadow, so the tap lands
+ *   selected  holds the lift with a ring, so the choice stays visible
+ *
+ * The scale is deliberately small. A control that jumps reads as a bug on a
+ * plant console; 2% and a shadow is enough to feel deliberate at arm's length
+ * without moving the numbers next to it. Both values run on the JS driver:
+ * shadow cannot be driven natively, and mixing drivers on one node buys nothing
+ * on a web-first console.
+ */
+export function PressSurface({
+  onPress,
+  selected = false,
+  disabled = false,
+  accessibilityLabel,
+  accessibilityRole = 'button',
+  /** Ring colour when selected or pressed. Defaults to the palette's strong line. */
+  accent,
+  style,
+  className,
+  children,
+}: {
+  onPress?: () => void;
+  selected?: boolean;
+  disabled?: boolean;
+  accessibilityLabel?: string;
+  accessibilityRole?: 'button' | 'tab';
+  accent?: string;
+  style?: StyleProp<ViewStyle>;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const scale = useRef(new Animated.Value(1)).current;
+  const lift = useRef(new Animated.Value(0)).current;
+  const [hovered, setHovered] = useState(false);
+
+  const animate = (toScale: number, toLift: number) => {
+    Animated.parallel([
+      Animated.timing(scale, {
+        toValue: toScale,
+        duration: 130,
+        easing: Easing.bezier(0.2, 0, 0, 1),
+        useNativeDriver: false,
+      }),
+      Animated.timing(lift, {
+        toValue: toLift,
+        duration: 130,
+        easing: Easing.bezier(0.2, 0, 0, 1),
+        useNativeDriver: false,
+      }),
+    ]).start();
+  };
+
+  const ring = accent ?? palette.lineStrong;
+  const active = selected || hovered;
+
+  return (
+    <Animated.View
+      style={[
+        { transform: [{ scale }] },
+        {
+          shadowColor: palette.shadow,
+          shadowOpacity: lift.interpolate({ inputRange: [0, 1], outputRange: [0, isDark ? 0.5 : 0.14] }),
+          shadowRadius: lift.interpolate({ inputRange: [0, 1], outputRange: [0, 14] }),
+          shadowOffset: { width: 0, height: 4 },
+        } as never,
+      ]}
+    >
+      <Pressable
+        onPress={disabled ? undefined : onPress}
+        disabled={disabled || !onPress}
+        accessibilityRole={onPress ? accessibilityRole : undefined}
+        accessibilityState={accessibilityRole === 'tab' ? { selected } : undefined}
+        accessibilityLabel={accessibilityLabel}
+        onHoverIn={() => {
+          setHovered(true);
+          if (!disabled) animate(1.01, 0.55);
+        }}
+        onHoverOut={() => {
+          setHovered(false);
+          animate(1, selected ? 0.4 : 0);
+        }}
+        onPressIn={() => animate(1.02, 1)}
+        onPressOut={() => animate(1, selected || hovered ? 0.5 : 0)}
+        className={className}
+        style={[style, active || selected ? { borderColor: ring } : null]}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
+  );
+}
 
 /**
  * One region inside a screen's card.

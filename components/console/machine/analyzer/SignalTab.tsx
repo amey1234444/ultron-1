@@ -14,7 +14,7 @@
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import {
@@ -25,7 +25,7 @@ import {
   type SignalView,
 } from '../../../../lib/analysis/extruder';
 import { Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { Block, EmptyNote, ExpandableRow, Fact, TagTrend } from './AnalyzerParts';
+import { Block, EmptyNote, ExpandableRow, Fact, PressSurface, TagTrend } from './AnalyzerParts';
 
 
 const STATUS_VARIANT: Record<SignalStatus, Variant> = {
@@ -261,18 +261,17 @@ function SignalRowDetail({ signal, onOpenPart }: { signal: SignalView; onOpenPar
 
       {/* The only handoff on this screen. Monitoring asks "is it in limits";
           the answer to "why" lives one tab across, on the part that owns it. */}
-      <Pressable
+      <PressSurface
         onPress={() => onOpenPart(signal.part)}
-        accessibilityRole="button"
         accessibilityLabel={`Open ${signal.part} in Advance Diagnosis`}
-        className="flex-row items-center justify-between self-start rounded-lg border px-2.5 py-1.5"
+        className="flex-row items-center justify-between self-start rounded-xl border px-2.5 py-1.5"
         style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
       >
         <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
           Open {signal.part} in Advance Diagnosis
         </Text>
         <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} style={{ marginLeft: 8 }} />
-      </Pressable>
+      </PressSurface>
     </View>
   );
 }
