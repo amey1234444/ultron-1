@@ -41,7 +41,7 @@ import {
 } from '../../../../lib/analysis/extruder';
 import { cn } from '../../../../lib/cn';
 import { alpha, Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { EmptyNote, Fact, Section, TagTrend } from './AnalyzerParts';
+import { Block, EmptyNote, Fact, TagTrend } from './AnalyzerParts';
 
 
 const STATE_VARIANT: Record<PartState, Variant> = {
@@ -750,35 +750,47 @@ export function AdvanceDiagnosisTab({
   const unmeasured = parts.filter((entry) => entry.state === 'UNAVAILABLE');
 
   return (
-    <View className="gap-2.5">
-      {/* The part picker is the screen's navigation, not a panel of its own. It
-          sits bare above the content so the first card the eye lands on is the
-          machine, not a title telling it that a machine is below. */}
-      <PartChips parts={parts} selected={selectedPart} onSelect={onSelectPart} />
+    <View>
+      {/* The part picker is the screen's navigation, not a region of its own. It
+          sits bare at the top of the card so the first thing the eye lands on is
+          the machine, not a heading announcing that a machine is below. */}
+      <View className="px-4 pb-1 pt-3.5">
+        <PartChips parts={parts} selected={selectedPart} onSelect={onSelectPart} />
+      </View>
 
       {view === null ? (
         <>
-          <Section title="Machine condition by part" meta="Material travels left to right. Select a part to open it.">
+          <Block
+            first
+            title="Machine condition by part"
+            meta="Material travels left to right. Select a part to open it."
+          >
             <ConditionStrip parts={parts} onSelect={onSelectPart} />
-          </Section>
+          </Block>
 
-          {needsDecision.length > 0 ? (
-            <View className={cn('gap-2.5', wide && 'flex-row flex-wrap')}>
-              {needsDecision.map((entry) => (
-                <PartCard key={entry.part} view={entry} onOpen={() => onSelectPart(entry.part)} />
-              ))}
-            </View>
+          {needsDecision.length > 0 || healthy.length > 0 || unmeasured.length > 0 ? (
+            <Block title="What each part is reporting" padded={false}>
+              <View className="px-4 pb-4" style={{ gap: 10 }}>
+                {needsDecision.length > 0 ? (
+                  <View className={cn(wide && 'flex-row flex-wrap')} style={{ gap: 10 }}>
+                    {needsDecision.map((entry) => (
+                      <PartCard key={entry.part} view={entry} onOpen={() => onSelectPart(entry.part)} />
+                    ))}
+                  </View>
+                ) : null}
+                <PartGroupLine parts={healthy} title="parts normal" badge="Normal" variant="success" />
+                <PartGroupLine parts={unmeasured} title="parts not measured" badge="No data" variant="muted" />
+              </View>
+            </Block>
           ) : null}
-
-          <PartGroupLine parts={healthy} title="parts normal" badge="Normal" variant="success" />
-          <PartGroupLine parts={unmeasured} title="parts not measured" badge="No data" variant="muted" />
         </>
       ) : (
         <>
           {/* One header for the part: what it is, how it is, and what is wrong.
               The counts that used to sit here repeated the strip and the card
               above, so the headline keeps the sentence and drops the tally. */}
-          <Section
+          <Block
+            first
             title={view.part}
             meta={view.headline ?? view.description}
             accent={STATE_VARIANT[view.state]}
@@ -794,35 +806,41 @@ export function AdvanceDiagnosisTab({
               </Text>
               <ReasoningChain view={view} />
             </View>
-          </Section>
+          </Block>
 
           {view.part === 'Barrel' ? (
-            <Section
+            <Block
               title="Barrel temperature profile"
               meta="The zones are read as one profile: a flat or inverted profile is a different fault from any single hot zone."
             >
               <ThermalProfile signals={view.signals} />
-            </Section>
+            </Block>
           ) : null}
 
-          <View className={cn('gap-2.5', wide && 'flex-row items-start')}>
+          <View className={cn(wide && 'flex-row items-stretch')} style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
             <View className="min-w-0 flex-1">
-              <Section
+              <Block
+                first
                 title="Possible causes"
                 meta="Ranked by engineering match, which orders the list but is not a probability."
                 footnote="This machine has no calibrated fault-probability model, so no percentage confidence is reported. Ambiguity is kept wherever the installed sensors cannot separate two candidates, and the measurement that would separate them is named."
               >
                 <CauseList view={view} />
-              </Section>
+              </Block>
             </View>
 
+            <View
+              style={wide ? { width: 1, backgroundColor: palette.line } : { height: 1, backgroundColor: palette.line }}
+            />
+
             <View className="min-w-0 flex-1">
-              <Section
+              <Block
+                first
                 title="Signal detail"
                 meta="Signals this part owns, plus the ones that inform it. The tools offered are the ones this kind of measurement can support."
               >
                 <SignalDetail signals={[...view.signals, ...view.contextSignals]} part={view.part} />
-              </Section>
+              </Block>
             </View>
           </View>
         </>

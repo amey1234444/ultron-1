@@ -25,7 +25,7 @@ import {
   type SignalView,
 } from '../../../../lib/analysis/extruder';
 import { Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
-import { EmptyNote, ExpandableRow, Fact, FilterChips, SearchField, Section, TagTrend } from './AnalyzerParts';
+import { Block, EmptyNote, ExpandableRow, Fact, TagTrend } from './AnalyzerParts';
 
 
 const STATUS_VARIANT: Record<SignalStatus, Variant> = {
@@ -44,7 +44,30 @@ const STATUS_LABEL: Record<SignalStatus, string> = {
   NOT_MAPPED: 'Not mapped',
 };
 
-type Filter = 'all' | 'attention' | 'nolimit' | 'unmapped';
+export type SignalFilter = 'all' | 'attention' | 'nolimit' | 'unmapped';
+
+export const SIGNAL_FILTERS: { value: SignalFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'attention', label: 'Attention' },
+  { value: 'nolimit', label: 'No limit' },
+  { value: 'unmapped', label: 'Unmapped' },
+];
+
+/**
+ * How many rows each filter would show.
+ *
+ * Computed here rather than in the shell so the counts on the chips and the
+ * rows they reveal can never disagree — one predicate, used by both.
+ */
+export function signalFilterCounts(signals: SignalView[]): Record<SignalFilter, number> {
+  return {
+    all: signals.length,
+    attention: signals.filter((signal) => signal.status === 'WARNING' || signal.status === 'ALARM').length,
+    nolimit: signals.filter((signal) => !signal.missing && signal.warningLimit === null && signal.criticalLimit === null)
+      .length,
+    unmapped: signals.filter((signal) => signal.status === 'NOT_MAPPED').length,
+  };
+}
 
 function formatValue(value: number | null, unit: string): string {
   if (value === null || !Number.isFinite(value)) return '—';
@@ -260,12 +283,23 @@ export function SignalTab({
   wide,
   onOpenPart,
   provenance,
+  filter,
+  query,
 }: {
   signals: SignalView[];
   /** Mapped points the model could not use, with the reason. */
   unconsumed: { label: string; reason: string }[];
   wide: boolean;
   onOpenPart: (part: MachinePart) => void;
+  /**
+   * Driven from the shell's toolbar row, beside the tabs.
+   *
+   * Every screen's controls sit in that one row, so a reader looks in one place
+   * whichever screen is open — and this table keeps its full width instead of
+   * spending a header band on its own controls.
+   */
+  filter: SignalFilter;
+  query: string;
   /**
    * Model, rule-set and acquisition provenance, as one line.
    *
@@ -277,18 +311,7 @@ export function SignalTab({
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const [filter, setFilter] = useState<Filter>('all');
-  const [query, setQuery] = useState('');
   const [expanded, setExpanded] = useState<string | null>(null);
-
-  const counts = useMemo(() => {
-    const attention = signals.filter((signal) => signal.status === 'WARNING' || signal.status === 'ALARM').length;
-    const noLimit = signals.filter(
-      (signal) => !signal.missing && signal.warningLimit === null && signal.criticalLimit === null,
-    ).length;
-    const unmapped = signals.filter((signal) => signal.status === 'NOT_MAPPED').length;
-    return { attention, noLimit, unmapped };
-  }, [signals]);
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -309,27 +332,12 @@ export function SignalTab({
   // chips keep them - a count you can press to act on it beats a count you
   // cannot.
   return (
-    <View className="gap-2.5">
-      <Section
+    <View>
+      <Block
+        first
         title="Live signals"
         meta="Current value, reference, behaviour and configured limits. Open a row for its limits, quality and acquisition chain."
         padded={false}
-        actions={
-          <>
-            <SearchField value={query} onChange={setQuery} placeholder="Filter signals..." width={190} />
-            <FilterChips
-              label="Filter signals"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: 'all', label: 'All', count: signals.length },
-                { value: 'attention', label: 'Attention', count: counts.attention, variant: 'warning' },
-                { value: 'nolimit', label: 'No limit', count: counts.noLimit },
-                { value: 'unmapped', label: 'Unmapped', count: counts.unmapped, variant: 'info' },
-              ]}
-            />
-          </>
-        }
         footnote={provenance}
       >
         <HeaderRow wide={wide} />
@@ -353,10 +361,10 @@ export function SignalTab({
             );
           })
         )}
-      </Section>
+      </Block>
 
       {unconsumed.length > 0 ? (
-        <Section
+        <Block
           title="Mapped points the model did not read"
           meta="Wired on the canvas but not resolved onto a diagnostic tag, so nothing on this machine is measuring what they were meant to."
           accent="warning"
@@ -377,7 +385,7 @@ export function SignalTab({
               </View>
             ))}
           </View>
-        </Section>
+        </Block>
       ) : null}
     </View>
   );

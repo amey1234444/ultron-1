@@ -11,172 +11,86 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type React from 'react';
 import { useMemo, useState } from 'react';
-import { Pressable, Text, TextInput, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { alpha, consolePalette, variantStyle, type IconName, type Variant } from '../../../ui';
-
-// ---------------------------------------------------------------------------
-// Section shell
-// ---------------------------------------------------------------------------
+import { alpha, consolePalette, variantStyle, type Variant } from '../../../ui';
 
 /**
- * One analytical region: a titled plate with an optional right-hand control
- * slot and an optional footnote.
+ * One region inside a screen's card.
  *
- * Deliberately not `Card` + `CardHeader` + `Separator` assembled by hand at
- * every call site — that is what let the old page drift into eight different
- * header treatments.
+ * The analyzer used to build every region as its own bordered card, which meant
+ * a screen was six cards stacked on a page and, once each screen moved inside
+ * one card of its own, cards nested inside cards. A region is a rule and a
+ * heading, not a box: `Block` draws the hairline, the heading and the padding,
+ * and nothing else.
+ *
+ * `accent` is a dot beside the title rather than a tinted border. Inside a card
+ * a coloured edge reads as a second card; a dot reads as a state.
  */
-export function Section({
+export function Block({
   title,
-  eyebrow,
   meta,
   actions,
   accent,
   footnote,
   children,
   padded = true,
-  className,
-  style,
+  first = false,
 }: {
-  title: string;
-  /** Small uppercase kicker above the title, for the subject the panel serves. */
-  eyebrow?: string;
+  title?: string;
   /** One short line under the title. */
   meta?: string;
   /** Filters, counts, toggles — anything that operates on the content. */
   actions?: React.ReactNode;
   accent?: Variant;
-  /** Small print under the rule at the bottom: caveats, provenance, advisory. */
+  /** Small print at the foot of the region: caveats, provenance, advisory. */
   footnote?: React.ReactNode;
   children: React.ReactNode;
   padded?: boolean;
-  className?: string;
-  style?: StyleProp<ViewStyle>;
+  /** Suppresses the top hairline for the first region in a card. */
+  first?: boolean;
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const rail = accent ? variantStyle(palette, accent).accent : undefined;
+  const dot = accent ? variantStyle(palette, accent).accent : undefined;
 
   return (
-    <View
-      className={cn('overflow-hidden rounded-xl border', className)}
-      style={[
-        { backgroundColor: palette.panel, borderColor: palette.line },
-        rail ? { borderLeftWidth: 3, borderLeftColor: rail } : null,
-        style,
-      ]}
-    >
-      <View
-        className="flex-row flex-wrap items-start justify-between gap-x-4 gap-y-2 px-4 pb-2.5 pt-3"
-      >
-        <View className="min-w-0 flex-1">
-          {eyebrow ? (
-            <Text className="font-mono text-[8.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
-              {eyebrow}
-            </Text>
-          ) : null}
-          <Text className="font-body-bold text-[13.5px] tracking-[-0.015em]" style={{ color: palette.ink }}>
-            {title}
-          </Text>
-          {meta ? (
-            <Text className="mt-0.5 font-body text-[11px] leading-[16px]" style={{ color: palette.inkMuted }}>
-              {meta}
-            </Text>
-          ) : null}
-        </View>
-        {actions ? <View className="flex-row flex-wrap items-center gap-1.5">{actions}</View> : null}
-      </View>
-
-      <View style={{ height: 1, backgroundColor: palette.line }} />
-
-      <View className={cn(padded && 'px-4 py-3')}>{children}</View>
-
-      {footnote ? (
-        <>
-          <View style={{ height: 1, backgroundColor: palette.line }} />
-          <View className="px-3.5 py-1.5" style={{ backgroundColor: palette.panelRaised }}>
-            {typeof footnote === 'string' ? (
-              <Text className="font-body text-[10px] leading-[14px]" style={{ color: palette.inkFaint }}>
-                {footnote}
-              </Text>
-            ) : (
-              footnote
-            )}
-          </View>
-        </>
-      ) : null}
-    </View>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Summary strip
-// ---------------------------------------------------------------------------
-
-export type SummaryItem = {
-  key: string;
-  label: string;
-  value: string;
-  variant?: Variant;
-  /** Optional second line — a unit, a share, a qualifier. */
-  detail?: string;
-};
-
-/**
- * A row of counted facts, ruled rather than boxed.
- *
- * Every tab opens with one of these because every tab answers the same first
- * question: how much of this is there, and how much of it needs attention. Four
- * separate `StatTile` cards said the same thing in three times the height.
- */
-export function SummaryStrip({ items, className }: { items: SummaryItem[]; className?: string }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-
-  return (
-    <View
-      className={cn('flex-row flex-wrap overflow-hidden rounded-xl border', className)}
-      style={{ backgroundColor: palette.panel, borderColor: palette.line }}
-    >
-      {items.map((item, index) => {
-        const accent = item.variant ? variantStyle(palette, item.variant).accent : palette.ink;
-        return (
-          <View
-            key={item.key}
-            className="min-w-[128px] flex-1 px-3.5 py-2.5"
-            style={index === 0 ? undefined : { borderLeftWidth: 1, borderLeftColor: palette.line }}
-          >
-            <View className="flex-row items-center gap-1.5">
-              {item.variant ? (
-                <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: accent }} />
-              ) : null}
-              <Text
-                numberOfLines={1}
-                className="min-w-0 flex-1 font-mono text-[8.5px] uppercase tracking-[0.15em]"
-                style={{ color: palette.inkFaint }}
-              >
-                {item.label}
+    <View style={first ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}>
+      {title ? (
+        <View className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 pb-1 pt-3.5">
+          <View className="min-w-0 flex-1">
+            <View className="flex-row items-center gap-2">
+              {dot ? <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: dot }} /> : null}
+              <Text className="min-w-0 font-body-bold text-[14px] tracking-[-0.015em]" style={{ color: palette.ink }}>
+                {title}
               </Text>
             </View>
-            <Text
-              className="mt-1 font-body text-[19px] leading-[22px]"
-              style={{ color: item.variant ? accent : palette.ink, fontWeight: '300', fontVariant: ['tabular-nums'] }}
-              numberOfLines={1}
-            >
-              {item.value}
-            </Text>
-            {item.detail ? (
-              <Text numberOfLines={1} className="mt-0.5 font-body text-[10px]" style={{ color: palette.inkMuted }}>
-                {item.detail}
+            {meta ? (
+              <Text className="mt-1 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
+                {meta}
               </Text>
             ) : null}
           </View>
-        );
-      })}
+          {actions ? <View className="flex-row flex-wrap items-center gap-1.5">{actions}</View> : null}
+        </View>
+      ) : null}
+
+      <View className={cn(padded && 'px-4 pb-4 pt-2.5')}>{children}</View>
+
+      {footnote ? (
+        <View className="px-4 pb-3.5">
+          {typeof footnote === 'string' ? (
+            <Text className="font-body text-[10px] leading-[14px]" style={{ color: palette.inkFaint }}>
+              {footnote}
+            </Text>
+          ) : (
+            footnote
+          )}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -478,4 +392,3 @@ export function EmptyNote({ children }: { children: React.ReactNode }) {
   );
 }
 
-export type { IconName };

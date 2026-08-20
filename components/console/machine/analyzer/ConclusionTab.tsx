@@ -1,68 +1,95 @@
 /**
  * DIAGNOSIS — the fast overall conclusion.
  *
- * This is the page a plant operator opens first and often only. It answers four
- * questions in the order they are actually asked: what is the machine's status,
- * what needs attention, what changed, and what does ULTRON think is wrong.
+ * The page a plant operator opens first and often only. What is raised, what
+ * has moved, what ULTRON concludes, and what to do about it.
  *
- * It is deliberately the *simplest* screen in the layer. Rule ids, evidence
- * classes, engine layers and match scores are all real and all traceable — and
- * none of them belong here, because a page that leads with `WRN-GBX-002` makes
- * an operator do the translating. They surface one tab across, in Advance
- * Diagnosis, beside the reasoning they belong to.
+ * Deliberately the simplest screen in the layer. Rule ids and match scores are
+ * real and traceable, so every finding carries its id in small mono type — but
+ * the line read first is a sentence, never `WP3-FROZEN`. The reasoning behind
+ * the conclusion is one tab across, in Advance Diagnosis, beside the part it
+ * belongs to.
+ *
+ * The machine's four headline counts are NOT here. They live in the shell's
+ * tile row above the tab bar, because "how is this machine" does not change
+ * when the reader moves to another screen.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import type { KeyChange, MachinePart } from '../../../../lib/analysis/extruder';
-import { Badge, consolePalette, type Variant } from '../../../ui';
-import { EmptyNote, Section, StepRow, SummaryStrip } from './AnalyzerParts';
+import { alpha, consolePalette, variantStyle, type Variant } from '../../../ui';
+import { Block, EmptyNote, StepRow } from './AnalyzerParts';
 
 /**
- * One line in Needs attention.
+ * One raised finding.
  *
- * `kind` mirrors the engine's own registries: a crossed decision boundary is a
- * WARNING, a breached hard process limit is an ALARM. Faults are the third
- * registry and are deliberately absent here — severity and inference are
- * parallel axes, a fault is a root-cause inference rather than the rung above
- * an alarm, and it is stated once in the conclusion panel below this list.
+ * `kind` mirrors the engine's three registries exactly: a matched fault
+ * signature is a FAULT, a breached hard process limit is an ALARM, a crossed
+ * decision boundary is a WARNING. Severity and inference are parallel axes — a
+ * fault is a root-cause inference, not the rung above an alarm — which is why
+ * these are grouped side by side rather than merged into one severity ladder.
  */
 export type AttentionItem = {
   key: string;
-  kind: 'WARNING' | 'ALARM';
+  kind: 'FAULT' | 'ALARM' | 'WARNING';
   /** Plain-language line. No rule ids. */
   message: string;
-  /** The traceable id, shown small underneath. */
+  /** Traceable identity, shown small underneath: id · feature · part. */
   reference: string;
   part: MachinePart | null;
 };
+
+export type AttentionFilter = 'all' | 'faults' | 'limits' | 'boundaries';
 
 export type CurrentDiagnosis = {
   likelyCause: string;
   affectedPart: string;
   /** The part to open when the reader wants the reasoning. */
   part: MachinePart | null;
-  /** Hypotheses beyond the top one that the installed sensors cannot separate. */
-  alternatives: number;
   /**
    * How the candidate ranked, in words. Never a percentage: this machine has no
    * calibrated fault-probability model, and a number with a % sign beside it
    * would be a fabricated confidence.
    */
   ranking: string;
+  /** Hypotheses beyond the top one that the installed sensors cannot separate. */
+  alternatives: number;
   cannotConfirm: string[];
 };
 
 const KIND_VARIANT: Record<AttentionItem['kind'], Variant> = {
-  WARNING: 'warning',
+  FAULT: 'destructive',
   ALARM: 'destructive',
+  WARNING: 'warning',
 };
 
 const KIND_LABEL: Record<AttentionItem['kind'], string> = {
-  WARNING: 'Warning',
+  FAULT: 'Fault',
   ALARM: 'Alarm',
+  WARNING: 'Warning',
 };
+
+const KIND_GROUP: Record<AttentionItem['kind'], string> = {
+  FAULT: 'Faults',
+  ALARM: 'Limits exceeded',
+  WARNING: 'Boundaries crossed',
+};
+
+const GROUP_ORDER: AttentionItem['kind'][] = ['FAULT', 'ALARM', 'WARNING'];
+
+export const ATTENTION_FILTERS: { value: AttentionFilter; label: string; kind: AttentionItem['kind'] | null }[] = [
+  { value: 'all', label: 'All', kind: null },
+  { value: 'faults', label: 'Faults', kind: 'FAULT' },
+  { value: 'limits', label: 'Limits', kind: 'ALARM' },
+  { value: 'boundaries', label: 'Boundaries', kind: 'WARNING' },
+];
+
+export function filterAttention(items: AttentionItem[], filter: AttentionFilter): AttentionItem[] {
+  const kind = ATTENTION_FILTERS.find((entry) => entry.value === filter)?.kind ?? null;
+  return kind === null ? items : items.filter((item) => item.kind === kind);
+}
 
 const DIRECTION_ICON: Record<KeyChange['direction'], 'arrow-up' | 'arrow-down' | 'minus'> = {
   UP: 'arrow-up',
@@ -70,154 +97,189 @@ const DIRECTION_ICON: Record<KeyChange['direction'], 'arrow-up' | 'arrow-down' |
   FLAT: 'minus',
 };
 
+/** The small rule that opens each severity group. */
+function GroupHeading({ kind, count }: { kind: AttentionItem['kind']; count: number }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const accent = variantStyle(palette, KIND_VARIANT[kind]).accent;
+
+  return (
+    <View className="flex-row items-center gap-2 px-4 pb-1 pt-4">
+      <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: accent }} />
+      <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
+        {KIND_GROUP[kind]}
+      </Text>
+      <Text className="font-mono text-[8.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+        {count}
+      </Text>
+    </View>
+  );
+}
+
+function AttentionRow({ item, onOpenPart }: { item: AttentionItem; onOpenPart: (part: MachinePart) => void }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const style = variantStyle(palette, KIND_VARIANT[item.kind]);
+
+  return (
+    <Pressable
+      onPress={item.part ? () => onOpenPart(item.part as MachinePart) : undefined}
+      disabled={!item.part}
+      accessibilityRole={item.part ? 'button' : undefined}
+      accessibilityLabel={item.part ? `${item.message}. Open ${item.part}.` : item.message}
+      className="flex-row items-center gap-3 px-4 py-2.5"
+    >
+      <View style={{ width: 7, height: 7, borderRadius: 7, backgroundColor: style.accent }} />
+      <View className="min-w-0 flex-1">
+        <Text className="font-body-bold text-[12.5px]" style={{ color: palette.ink }} numberOfLines={1}>
+          {item.message}
+        </Text>
+        <Text
+          className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em]"
+          style={{ color: palette.inkFaint }}
+          numberOfLines={1}
+        >
+          {item.reference}
+        </Text>
+      </View>
+      <View className="rounded-full px-2 py-[3px]" style={{ backgroundColor: style.tint }}>
+        <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: style.accent }}>
+          {KIND_LABEL[item.kind]}
+        </Text>
+      </View>
+      {item.part ? <MaterialCommunityIcons name="chevron-right" size={15} color={palette.inkFaint} /> : null}
+    </Pressable>
+  );
+}
+
 export function ConclusionTab({
-  status,
-  statusVariant,
-  statusDetail,
-  warningCount,
-  alarmCount,
-  faultCount,
   attention,
+  attentionTotal,
   changes,
   diagnosis,
   action,
+  wide,
   onOpenPart,
 }: {
-  /** One word: Normal, Warning, Critical, No data. */
-  status: string;
-  statusVariant: Variant;
-  statusDetail: string;
-  warningCount: number;
-  alarmCount: number;
-  faultCount: number;
+  /** Already filtered by the shell's toolbar. */
   attention: AttentionItem[];
+  /** Unfiltered count, so the heading can say "3 of 13". */
+  attentionTotal: number;
   changes: KeyChange[];
   diagnosis: CurrentDiagnosis | null;
   /** The single next step, when the model has one. */
   action: { priority: string; steps: string[] } | null;
+  wide: boolean;
   onOpenPart: (part: MachinePart) => void;
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
 
-  return (
-    <View className="gap-2.5">
-      <SummaryStrip
-        items={[
-          { key: 'status', label: 'Machine status', value: status, variant: statusVariant, detail: statusDetail },
-          {
-            key: 'warnings',
-            label: 'Warnings',
-            value: String(warningCount),
-            variant: warningCount > 0 ? 'warning' : 'muted',
-            detail: 'Registered boundaries crossed',
-          },
-          {
-            key: 'alarms',
-            label: 'Alarms',
-            value: String(alarmCount),
-            variant: alarmCount > 0 ? 'destructive' : 'muted',
-            detail: 'Hard process limits exceeded',
-          },
-          {
-            key: 'faults',
-            label: 'Faults',
-            value: String(faultCount),
-            variant: faultCount > 0 ? 'destructive' : 'muted',
-            detail: 'Matched fault signatures',
-          },
-        ]}
-      />
+  const grouped = GROUP_ORDER.map((kind) => ({ kind, items: attention.filter((item) => item.kind === kind) })).filter(
+    (group) => group.items.length > 0,
+  );
 
-      <View className="gap-2.5 lg:flex-row lg:items-start">
-        <View className="min-w-0 flex-1">
-          {/* Faults are deliberately NOT in this list. The conclusion panel below
-              owns the fault - it names it, localises it and says what cannot be
-              confirmed - and printing it here as well made one finding appear
-              twice on one screen. This list is what is raised *besides* the
-              conclusion. */}
-          <Section
-            title="Needs attention"
-            meta="Limits and boundaries currently raised on this machine."
-            padded={false}
-          >
-            {attention.length === 0 ? (
-              <EmptyNote>No limit or boundary is currently raised on this machine.</EmptyNote>
-            ) : (
-              attention.map((item, index) => (
-                <Pressable
-                  key={item.key}
-                  onPress={item.part ? () => onOpenPart(item.part as MachinePart) : undefined}
-                  disabled={!item.part}
-                  accessibilityRole={item.part ? 'button' : undefined}
-                  accessibilityLabel={item.part ? `${item.message}. Open ${item.part}.` : item.message}
-                  className="flex-row items-center gap-3 px-3.5 py-2.5"
-                  style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
-                >
-                  <View className="min-w-0 flex-1">
-                    <Text className="font-body-bold text-[12.5px]" style={{ color: palette.ink }}>
-                      {item.message}
-                    </Text>
-                    <Text className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-                      {[item.reference, item.part].filter(Boolean).join(' · ')}
-                    </Text>
-                  </View>
-                  <Badge variant={KIND_VARIANT[item.kind]} icon={null} outline>
-                    {KIND_LABEL[item.kind]}
-                  </Badge>
-                  {item.part ? (
-                    <MaterialCommunityIcons name="chevron-right" size={15} color={palette.inkFaint} />
-                  ) : null}
-                </Pressable>
-              ))
-            )}
-          </Section>
+  return (
+    <View>
+      {/* The two halves of "what is happening right now": what is raised, and
+          what has moved. Ruled apart rather than boxed apart, so the pair reads
+          as one region with two columns instead of two cards competing. */}
+      <View className={wide ? 'flex-row items-stretch' : undefined}>
+        <View className="min-w-0 flex-1 pb-3">
+          <View className="px-4 pb-1 pt-3.5">
+            <View className="flex-row items-baseline gap-2">
+              <Text className="font-body-bold text-[14px] tracking-[-0.015em]" style={{ color: palette.ink }}>
+                Needs attention
+              </Text>
+              <Text className="font-mono text-[9.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+                {attention.length === attentionTotal ? attentionTotal : `${attention.length} of ${attentionTotal}`}
+              </Text>
+            </View>
+            <Text className="mt-1 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
+              Faults first, then breached limits, then crossed boundaries.
+            </Text>
+          </View>
+
+          {grouped.length === 0 ? (
+            <EmptyNote>Nothing is currently raised on this machine.</EmptyNote>
+          ) : (
+            grouped.map((group) => (
+              <View key={group.kind}>
+                <GroupHeading kind={group.kind} count={group.items.length} />
+                {group.items.map((item) => (
+                  <AttentionRow key={item.key} item={item} onOpenPart={onOpenPart} />
+                ))}
+              </View>
+            ))
+          )}
         </View>
 
+        <View
+          style={
+            wide
+              ? { width: 1, backgroundColor: palette.line }
+              : { height: 1, backgroundColor: palette.line }
+          }
+        />
+
         <View className="min-w-0 flex-1">
-          <Section
-            title="Key changes"
-            meta="What has actually moved this session, from where to where."
-            padded={false}
-            footnote="Signals without enough history are left out rather than listed as unchanged, which the data could not support."
-          >
-            {changes.length === 0 ? (
-              <EmptyNote>Not enough history has been collected this session to report a change.</EmptyNote>
-            ) : (
-              changes.map((change, index) => (
-                <View
-                  key={change.tag}
-                  className="flex-row items-center gap-3 px-3.5 py-2.5"
-                  style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
-                >
-                  <Text className="min-w-0 flex-1 font-body text-[12px]" style={{ color: palette.ink }} numberOfLines={1}>
-                    {change.label}
-                  </Text>
-                  <Text
-                    className="font-mono text-[11.5px]"
-                    style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
-                    numberOfLines={1}
+          <View className="px-4 pb-1 pt-3.5">
+            <Text className="font-body-bold text-[14px] tracking-[-0.015em]" style={{ color: palette.ink }}>
+              Key changes
+            </Text>
+            <Text className="mt-1 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
+              What has actually moved, this session.
+            </Text>
+          </View>
+
+          {changes.length === 0 ? (
+            <EmptyNote>Not enough history has been collected this session to report a change.</EmptyNote>
+          ) : (
+            <View className="px-4 pt-2.5" style={{ gap: 8 }}>
+              {changes.map((change) => {
+                const moving = change.direction !== 'FLAT';
+                const accent = moving ? palette.warning : palette.inkMuted;
+                return (
+                  <View
+                    key={change.tag}
+                    className="flex-row items-center gap-3 rounded-xl border px-3 py-2.5"
+                    style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
                   >
-                    {change.from} → {change.to}
-                  </Text>
-                  <View className="flex-row items-center gap-1" style={{ width: 104 }}>
-                    <MaterialCommunityIcons
-                      name={DIRECTION_ICON[change.direction]}
-                      size={12}
-                      color={change.direction === 'FLAT' ? palette.inkFaint : palette.warning}
-                    />
-                    <Text className="font-body text-[10.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
-                      {change.note}
-                    </Text>
+                    <View className="min-w-0 flex-1">
+                      <Text className="font-body-bold text-[12px]" style={{ color: palette.ink }} numberOfLines={1}>
+                        {change.label}
+                      </Text>
+                      <Text
+                        className="mt-0.5 font-mono text-[11px]"
+                        style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}
+                        numberOfLines={1}
+                      >
+                        {change.from} → {change.to}
+                      </Text>
+                    </View>
+                    <View
+                      className="flex-row items-center gap-1 rounded-full px-2 py-[3px]"
+                      style={{ backgroundColor: moving ? alpha(accent, 0.12) : palette.panel }}
+                    >
+                      <MaterialCommunityIcons name={DIRECTION_ICON[change.direction]} size={11} color={accent} />
+                      <Text className="font-mono text-[9.5px]" style={{ color: accent, fontVariant: ['tabular-nums'] }}>
+                        {change.note}
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              ))
-            )}
-          </Section>
+                );
+              })}
+            </View>
+          )}
+
+          <Text className="px-4 pb-3.5 pt-3 font-body text-[10px] leading-[14px]" style={{ color: palette.inkFaint }}>
+            Signals without enough history are left out rather than listed as unchanged, which the data could not
+            support.
+          </Text>
         </View>
       </View>
 
-      <Section
+      <Block
         title="Current diagnosis"
         accent={diagnosis ? 'warning' : 'success'}
         actions={
@@ -226,12 +288,13 @@ export function ConclusionTab({
               onPress={() => onOpenPart(diagnosis.part as MachinePart)}
               accessibilityRole="button"
               accessibilityLabel={`Open ${diagnosis.part} in Advance Diagnosis`}
-              className="flex-row items-center gap-1.5"
+              className="flex-row items-center gap-1.5 rounded-full border px-2.5 py-1"
+              style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
             >
-              <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+              <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
                 Why
               </Text>
-              <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} />
+              <MaterialCommunityIcons name="arrow-right" size={12} color={palette.inkFaint} />
             </Pressable>
           ) : undefined
         }
@@ -239,60 +302,61 @@ export function ConclusionTab({
       >
         {diagnosis === null ? (
           <Text className="font-body text-[12px] leading-[17px]" style={{ color: palette.inkMuted }}>
-            No controlled fault signature is met by the current measurements. Nothing on this machine needs a decision right now.
+            No controlled fault signature is met by the current measurements. Nothing on this machine needs a decision
+            right now.
           </Text>
         ) : (
-          <View className="flex-row flex-wrap gap-x-8 gap-y-3">
-            <View style={{ minWidth: 220 }} className="flex-1">
-              <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+          <View className="flex-row flex-wrap" style={{ gap: 24 }}>
+            <View style={{ minWidth: 210, flexGrow: 1, flexBasis: 0 }}>
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
                 Likely cause
               </Text>
-              <Text className="mt-1 font-body-bold text-[14px]" style={{ color: palette.ink }}>
+              <Text className="mt-1.5 font-body-bold text-[15px] tracking-[-0.015em]" style={{ color: palette.ink }}>
                 {diagnosis.likelyCause}
               </Text>
             </View>
-            <View style={{ minWidth: 150 }} className="flex-1">
-              <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+            <View style={{ minWidth: 140, flexGrow: 1, flexBasis: 0 }}>
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
                 Affected part
               </Text>
-              <Text className="mt-1 font-body-bold text-[14px]" style={{ color: palette.ink }}>
+              <Text className="mt-1.5 font-body-bold text-[15px] tracking-[-0.015em]" style={{ color: palette.ink }}>
                 {diagnosis.affectedPart}
               </Text>
             </View>
-            <View style={{ minWidth: 170 }} className="flex-1">
-              <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+            <View style={{ minWidth: 160, flexGrow: 1, flexBasis: 0 }}>
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
                 How it ranked
               </Text>
-              <Text className="mt-1 font-body-bold text-[14px]" style={{ color: palette.ink }}>
+              <Text className="mt-1.5 font-body-bold text-[15px] tracking-[-0.015em]" style={{ color: palette.ink }}>
                 {diagnosis.ranking}
               </Text>
               {diagnosis.alternatives > 0 ? (
-                <Text className="mt-0.5 font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
-                  {diagnosis.alternatives} other hypothes{diagnosis.alternatives === 1 ? 'is' : 'es'} the installed sensors
-                  cannot separate from it.
+                <Text className="mt-1 font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+                  {diagnosis.alternatives} other hypothes{diagnosis.alternatives === 1 ? 'is' : 'es'} the installed
+                  sensors cannot separate from it.
                 </Text>
               ) : null}
             </View>
-            <View style={{ minWidth: 240 }} className="flex-1">
-              <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+            <View style={{ minWidth: 230, flexGrow: 1, flexBasis: 0 }}>
+              <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
                 What ULTRON cannot confirm
               </Text>
-              <Text className="mt-1 font-body text-[12.5px] leading-[17px]" style={{ color: palette.ink }}>
+              <Text className="mt-1.5 font-body text-[12.5px] leading-[17px]" style={{ color: palette.ink }}>
                 {diagnosis.cannotConfirm[0] ?? 'Nothing further is outstanding on this conclusion.'}
               </Text>
             </View>
           </View>
         )}
-      </Section>
+      </Block>
 
       {action ? (
-        <Section title="What to do" meta={`Priority: ${action.priority}.`} accent="warning">
-          <View className="gap-2">
+        <Block title="What to do" meta={`Priority: ${action.priority}.`} accent="warning">
+          <View style={{ gap: 8 }}>
             {action.steps.slice(0, 4).map((step, index) => (
               <StepRow key={index} index={index + 1} text={step} />
             ))}
           </View>
-        </Section>
+        </Block>
       ) : null}
     </View>
   );
