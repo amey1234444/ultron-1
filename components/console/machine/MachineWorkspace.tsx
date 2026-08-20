@@ -22,7 +22,7 @@ import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
-import { CanvasGrid, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
+import { CanvasGrid, stageBoundsForCanvas, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
 import { TrendView } from './TrendView';
 
@@ -229,6 +229,14 @@ export function MachineWorkspace({
   // views disagree and could crop cards near the stage edges; keeping a single
   // shared scale guarantees 1:1 geometry parity.
   const stageScale = canvasSize ? Math.min(canvasSize.width / STAGE_WIDTH, canvasSize.height / STAGE_HEIGHT) : 1;
+  // The stage is only the reference frame. Whatever the "contain" fit leaves
+  // over — a band down each side on a wide window, top and bottom on a tall one
+  // — is the same drawable surface, so cards and trails are bounded by the
+  // canvas, not by the 16:9 stage rectangle.
+  const stageBounds = useMemo(
+    () => stageBoundsForCanvas(canvasSize?.width ?? 0, canvasSize?.height ?? 0, stageScale),
+    [canvasSize?.width, canvasSize?.height, stageScale],
+  );
   const stageStyle = canvasSize
     ? {
         position: 'absolute' as const,
@@ -386,6 +394,7 @@ export function MachineWorkspace({
         onSaveTemplate={onSaveTemplate}
         stageStyle={stageStyle}
         stageScale={stageScale}
+        stageBounds={stageBounds}
         readOnly={readOnlyCanvas}
         hideUnlink={readOnlyCanvas}
         canSaveTemplate={canSaveTemplate}
@@ -408,7 +417,7 @@ export function MachineWorkspace({
       {header(actualSubTabs)}
 
       {isActual && actualTab === 'rack' && (
-        <RackOccupancyView devices={devices} cards={cards} mappedChannels={mappedChannels} expectedPoints={expectedPoints} />
+        <RackOccupancyView devices={devices} cards={cards} live={live} mappedChannels={mappedChannels} expectedPoints={expectedPoints} />
       )}
 
       {isActual && actualTab === 'overview' && (

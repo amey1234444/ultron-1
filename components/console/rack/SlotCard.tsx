@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useId, useMemo, useRef } from 'react';
 import {
   Platform,
   Pressable,
@@ -252,20 +252,29 @@ function ModuleGlyph({ kind, accent, size }: { kind: VisualKind; accent: string;
 }
 
 function PeakWaistBackground({
-  slot,
   accent,
   isDark,
   width,
   height,
   empty = false,
 }: {
-  slot: number;
   accent: string;
   isDark: boolean;
   width: number;
   height: number;
   empty?: boolean;
 }) {
+  // Gradient ids land in the document's global id space, so keying them by slot
+  // number collides as soon as two racks are on screen at once (the machine
+  // workspace stacks a faceplate per mapped rack) — every `url(#…)` then
+  // resolves to whichever card mounted first, and empty slots pick up an
+  // installed card's face. A per-instance id keeps each card's fills its own.
+  // Non-alphanumerics are stripped because React's id delimiters are not safe
+  // inside a funcIRI reference.
+  const uid = useId().replace(/[^a-zA-Z0-9]/g, '');
+  const frameId = `outer-frame-${uid}`;
+  const faceId = `inner-face-${uid}`;
+
   // A grey/silver face reads as real brushed-metal hardware, regardless of
   // the app's light/dark theme — like a photographed module.
   const faceStart = empty ? (isDark ? '#171C23' : '#D9DCE0') : '#D6D9DC';
@@ -274,22 +283,22 @@ function PeakWaistBackground({
   return (
     <Svg width={width} height={height} viewBox={`0 0 ${BASE_WIDTH} ${BASE_HEIGHT}`} style={{ position: 'absolute', left: 0, top: 0 }} pointerEvents="none">
       <Defs>
-        <LinearGradient id={`outer-frame-${slot}`} x1="0" y1="0" x2="1" y2="1">
+        <LinearGradient id={frameId} x1="0" y1="0" x2="1" y2="1">
           <Stop offset="0" stopColor="#4D535B" />
           <Stop offset="0.45" stopColor="#171B20" />
           <Stop offset="1" stopColor="#080A0D" />
         </LinearGradient>
-        <LinearGradient id={`inner-face-${slot}`} x1="0" y1="0" x2="0" y2="1">
+        <LinearGradient id={faceId} x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={faceStart} />
           <Stop offset="1" stopColor={faceEnd} />
         </LinearGradient>
       </Defs>
 
-      <Path d={OUTER_CARD_PATH} fill={`url(#outer-frame-${slot})`} stroke={empty ? '#59616B' : '#717780'} strokeWidth={1} />
+      <Path d={OUTER_CARD_PATH} fill={`url(#${frameId})`} stroke={empty ? '#59616B' : '#717780'} strokeWidth={1} />
 
       <Path
         d={INNER_CARD_PATH}
-        fill={`url(#inner-face-${slot})`}
+        fill={`url(#${faceId})`}
         stroke={empty ? '#59616B' : '#C5C9CE'}
         strokeWidth={1}
         strokeDasharray={empty ? '4 3' : undefined}
@@ -324,7 +333,7 @@ function EmptySlotCard({
       onPress={editable ? onPress : undefined}
       style={({ pressed }) => ({ width, height, opacity: pressed ? 0.7 : 1, transform: [{ scale: pressed ? 0.98 : 1 }] })}
     >
-      <PeakWaistBackground slot={slot} accent="#64748B" isDark={isDark} width={width} height={height} empty />
+      <PeakWaistBackground accent="#64748B" isDark={isDark} width={width} height={height} empty />
 
       {editable && <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' }}>
         <View
@@ -421,7 +430,7 @@ function InstalledSlotCard({
           elevation: 5,
         })}
       >
-      <PeakWaistBackground slot={slot} accent={textColour} isDark={isDark} width={width} height={height} />
+      <PeakWaistBackground accent={textColour} isDark={isDark} width={width} height={height} />
 
       <Screw top={18 * s} left={12 * s} size={9 * s} />
       <Screw top={18 * s} right={12 * s} size={9 * s} />

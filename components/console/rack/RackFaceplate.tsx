@@ -6,7 +6,7 @@ import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
-import { TOTAL_SLOTS } from '../../../lib/rack';
+import { slotKind, TOTAL_SLOTS } from '../../../lib/rack';
 import { SlotCard } from './SlotCard';
 
 type RackFaceplateProps = {
@@ -14,6 +14,19 @@ type RackFaceplateProps = {
   cards: CardNode[];
   live?: LiveState;
   editable?: boolean;
+  /**
+   * Which slot numbers the chassis renders, in order. Defaults to the full
+   * 14-slot rack. The machine workspace passes a subset so the faceplate shows
+   * only the slots that machine is actually wired to.
+   */
+  slots?: number[];
+  /**
+   * When set, any rendered slot outside this list is dimmed rather than hidden
+   * — used to show one machine's footprint inside the complete rack.
+   */
+  activeSlots?: number[] | null;
+  /** Fill the parent (default). Set false to size to content inside a ScrollView. */
+  fill?: boolean;
   onPressEmpty: (slot: number, x: number, y: number) => void;
   onPressCard: (card: CardNode, x: number, y: number) => void;
 };
@@ -99,11 +112,20 @@ export function RackFaceplate({
   cards,
   live,
   editable = true,
+  slots,
+  activeSlots = null,
+  fill = true,
   onPressEmpty,
   onPressCard,
 }: RackFaceplateProps) {
   const { isDark } = useAppTheme();
   const [chassisWidth, setChassisWidth] = useState<number | null>(null);
+
+  const slotNumbers = useMemo(
+    () => (slots && slots.length > 0 ? [...slots].sort((a, b) => a - b) : SLOT_NUMBERS),
+    [slots],
+  );
+  const activeSet = useMemo(() => (activeSlots ? new Set(activeSlots) : null), [activeSlots]);
 
   const cardBySlot = useMemo(
     () => new Map(cards.map((card) => [card.slot, card])),
@@ -118,9 +140,10 @@ export function RackFaceplate({
   // Fit all 14 slots (plus handles + divider) into the measured chassis width
   // instead of relying on horizontal scroll, so the whole rack stays visible
   // no matter how much room the left panel leaves.
-  const availableWidth = chassisWidth ?? BASE_CARD_WIDTH * TOTAL_SLOTS;
+  const slotCount = Math.max(1, slotNumbers.length);
+  const availableWidth = chassisWidth ?? BASE_CARD_WIDTH * slotCount;
   const fixedChrome = SCROLL_PADDING + 2 * (HANDLE_WIDTH + HANDLE_MARGIN) + DIVIDER_SPACE;
-  const widthPerSlot = (availableWidth - fixedChrome) / TOTAL_SLOTS - SLOT_MARGIN * 2;
+  const widthPerSlot = (availableWidth - fixedChrome) / slotCount - SLOT_MARGIN * 2;
   const cardWidth = clamp(widthPerSlot, MIN_CARD_WIDTH, MAX_CARD_WIDTH);
   const cardHeight = cardWidth * (BASE_CARD_HEIGHT / BASE_CARD_WIDTH);
   const scale = cardWidth / BASE_CARD_WIDTH;
@@ -132,7 +155,7 @@ export function RackFaceplate({
   };
 
   return (
-    <View className="flex-1 items-center justify-center px-6 py-6">
+    <View className={fill ? 'flex-1 items-center justify-center px-6 py-6' : 'w-full items-center justify-center px-6 py-6'}>
       <View
         onLayout={handleLayout}
         style={{
@@ -190,16 +213,23 @@ export function RackFaceplate({
               <RackHandle isDark={isDark} width={HANDLE_WIDTH} height={handleHeight} />
             </View>
 
-            {SLOT_NUMBERS.map((slot, index) => {
+            {slotNumbers.map((slot, index) => {
               const card = cardBySlot.get(slot) ?? null;
+              // A slot outside the active set is still real hardware — it is
+              // just not this machine's, so it recedes instead of disappearing.
+              const dimmed = activeSet ? !activeSet.has(slot) : false;
+              const previousSlot = slotNumbers[index - 1];
 
               return (
                 <View
                   key={slot}
                   className="flex-row items-center"
+                  style={dimmed ? { opacity: 0.26 } : undefined}
                 >
-                  {/* Visual separator before controller slots 13–14 */}
-                  {index === 12 && (
+                  {/* Visual separator where the acquisition slots hand over to
+                      the controller slots (13–14), whenever both sides are on
+                      screen — a slot subset may not contain the boundary. */}
+                  {slotKind(slot) === 'controller' && previousSlot !== undefined && slotKind(previousSlot) === 'acquisition' && (
                     <View
                       style={{
                         width: 1,
@@ -229,7 +259,7 @@ export function RackFaceplate({
                       device={device}
                       live={live}
                       width={cardWidth}
-                      editable={editable}
+                      editable={editable && !dimmed}
                       onPressEmpty={(x, y) =>
                         onPressEmpty(slot, x, y)
                       }

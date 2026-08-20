@@ -10,6 +10,33 @@ import { useAppTheme } from '../../../hooks/useAppTheme';
 export const STAGE_WIDTH = 1600;
 export const STAGE_HEIGHT = 900;
 
+/**
+ * The usable design area, in stage units.
+ *
+ * The 1600×900 stage is only the *reference* frame that keeps saved layouts
+ * resolution-independent; the canvas it sits in is almost always taller or
+ * wider than 16:9, and that surrounding space is drawn as the same work
+ * surface. These bounds describe the whole of it, so a card or a trail bend
+ * can be dragged right out to the canvas edge instead of stopping at an
+ * invisible wall partway across the grid. Coordinates outside 0…STAGE are
+ * legal and simply save as negative / over-size stage units.
+ */
+export type StageBounds = { minX: number; minY: number; maxX: number; maxY: number };
+
+export const DEFAULT_STAGE_BOUNDS: StageBounds = { minX: 0, minY: 0, maxX: STAGE_WIDTH, maxY: STAGE_HEIGHT };
+
+/**
+ * Convert a measured canvas (container pixels) plus the current stage scale
+ * into those bounds. `transform: scale` scales about the centre, so the extra
+ * room is split evenly on both sides of each axis.
+ */
+export function stageBoundsForCanvas(width: number, height: number, scale: number): StageBounds {
+  if (!(width > 0) || !(height > 0) || !(scale > 0)) return DEFAULT_STAGE_BOUNDS;
+  const bleedX = Math.max(0, (width / scale - STAGE_WIDTH) / 2);
+  const bleedY = Math.max(0, (height / scale - STAGE_HEIGHT) / 2);
+  return { minX: -bleedX, minY: -bleedY, maxX: STAGE_WIDTH + bleedX, maxY: STAGE_HEIGHT + bleedY };
+}
+
 const MINOR_STEP = 50;
 const MAJOR_STEP = 250;
 
@@ -70,7 +97,7 @@ export function CanvasGrid({ width, height, scale }: { width: number; height: nu
   const minorColour = isDark ? 'rgba(255,255,255,0.045)' : 'rgba(10,10,10,0.055)';
   const majorColour = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(10,10,10,0.11)';
 
-  const { minorPath, majorPath, stage } = useMemo(() => {
+  const { minorPath, majorPath } = useMemo(() => {
     const step = MINOR_STEP * scale;
     const major = MAJOR_STEP * scale;
     const originX = (width - STAGE_WIDTH * scale) / 2;
@@ -98,16 +125,7 @@ export function CanvasGrid({ width, height, scale }: { width: number; height: nu
     for (let x = firstMajorX; x <= width; x += major) majorLines += `M ${x.toFixed(1)} 0 L ${x.toFixed(1)} ${height} `;
     for (let y = firstMajorY; y <= height; y += major) majorLines += `M 0 ${y.toFixed(1)} L ${width} ${y.toFixed(1)} `;
 
-    return {
-      minorPath: minor.trim(),
-      majorPath: majorLines.trim(),
-      stage: {
-        x: originX,
-        y: originY,
-        width: STAGE_WIDTH * scale,
-        height: STAGE_HEIGHT * scale,
-      },
-    };
+    return { minorPath: minor.trim(), majorPath: majorLines.trim() };
   }, [height, scale, width]);
 
   if (width <= 0 || height <= 0 || scale <= 0) return null;
@@ -116,12 +134,15 @@ export function CanvasGrid({ width, height, scale }: { width: number; height: nu
     <Svg pointerEvents="none" width={width} height={height} style={{ position: 'absolute', left: 0, top: 0 }}>
       <Path d={minorPath} stroke={minorColour} strokeWidth={1} />
       <Path d={majorPath} stroke={majorColour} strokeWidth={1} />
-      {/* The stage boundary stays marked — it is where a saved layout ends. */}
+      {/* The only boundary drawn is the canvas itself. The 16:9 stage used to
+          be framed here, which read as a wall cards were not allowed past —
+          but the whole canvas is placeable area, so the frame belongs at its
+          edges. */}
       <Rect
-        x={stage.x + 0.5}
-        y={stage.y + 0.5}
-        width={Math.max(0, stage.width - 1)}
-        height={Math.max(0, stage.height - 1)}
+        x={0.5}
+        y={0.5}
+        width={Math.max(0, width - 1)}
+        height={Math.max(0, height - 1)}
         fill="none"
         stroke={majorColour}
         strokeWidth={1}

@@ -29,6 +29,7 @@ import {
   type MachineConnector,
 } from './machineConnectors';
 import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH, UNLINKED_BOX_WIDTH } from './MappableBox';
+import { DEFAULT_STAGE_BOUNDS, type StageBounds } from './StageGrid';
 import { createTemplateDefaultLayout, hasDefaultLayout } from './templateDefaultLayouts';
 
 export type Anchor = { rx: number; ry: number };
@@ -97,6 +98,10 @@ type TrailBoardProps = {
   // any screen. The toolbar renders outside this transform, unscaled.
   stageStyle: StyleProp<ViewStyle>;
   stageScale: number;
+  // The placeable area in stage units. The stage container is a fixed 1600×900,
+  // but the canvas around it is the same work surface, so cards and trails are
+  // bounded by the canvas rather than by the stage.
+  stageBounds?: StageBounds;
   // Actual View: clean dashboard-monitor rendering — no toolbar, no selection,
   // no dragging/editing. Live values and status colours keep updating.
   readOnly?: boolean;
@@ -340,6 +345,7 @@ export function TrailBoard({
   machineTemplate,
   stageStyle,
   stageScale,
+  stageBounds = DEFAULT_STAGE_BOUNDS,
   readOnly = false,
   hideUnlink = false,
   initialLayout = null,
@@ -1220,8 +1226,7 @@ export function TrailBoard({
             points={trail.points}
             selected={trail.id === selectedId}
             status={worseStatus(boxStatus(trail.startBoxId), boxStatus(trail.endBoxId))}
-            canvasWidth={boardSize.width}
-            canvasHeight={boardSize.height}
+            bounds={stageBounds}
             stageScale={stageScale}
             interactive={!readOnly}
             showControlPoints={!readOnly}
@@ -1257,8 +1262,7 @@ export function TrailBoard({
               channels={channels}
               pickableChannels={pickableChannels}
               devices={devices}
-              canvasWidth={boardSize.width}
-              canvasHeight={boardSize.height}
+              bounds={stageBounds}
               stageScale={stageScale}
               readOnly={readOnly}
               hideUnlink={hideUnlink}

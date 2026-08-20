@@ -7,6 +7,7 @@ import { gatewayForRack, racksForGateway, type DeviceNode } from '../../../lib/d
 import { useLiveMeasurement } from '../../../lib/liveMeasurementBus';
 import type { ChannelRef } from '../../../lib/rack';
 import type { TrailStatus } from './AdjustableTrail';
+import { DEFAULT_STAGE_BOUNDS, type StageBounds } from './StageGrid';
 import { useLiveChannelReading } from '../../../lib/liveChannelValue';
 import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT } from './liveValue';
 import { PointCard18, POINT_CARD_HEIGHT, POINT_CARD_WIDTH } from './PointCard18';
@@ -54,8 +55,10 @@ export type MappableBoxProps = {
   channels: ChannelRef[];
   pickableChannels?: ChannelRef[];
   devices?: DeviceNode[];
-  canvasWidth: number;
-  canvasHeight: number;
+  // Draggable area in stage units. Defaults to the bare 1600×900 stage; the
+  // workspace passes the full canvas so a card can be parked anywhere on the
+  // visible work surface, including the bands outside the 16:9 stage.
+  bounds?: StageBounds;
   // Current stage scale — converts screen-pixel gesture deltas to stage units.
   stageScale?: number;
   // Actual View: no dragging, no editing, no delete/unlink — just the label or
@@ -88,8 +91,7 @@ export function MappableBox({
   channels,
   pickableChannels,
   devices = [],
-  canvasWidth,
-  canvasHeight,
+  bounds = DEFAULT_STAGE_BOUNDS,
   stageScale = 1,
   readOnly = false,
   hideUnlink = false,
@@ -176,8 +178,8 @@ export function MappableBox({
 
   const pointRef = useRef({ x, y });
   pointRef.current = { x, y };
-  const boundsRef = useRef({ canvasWidth, canvasHeight });
-  boundsRef.current = { canvasWidth, canvasHeight };
+  const boundsRef = useRef(bounds);
+  boundsRef.current = bounds;
   const renderedWidthRef = useRef(renderedWidth);
   renderedWidthRef.current = renderedWidth;
   // Gesture dx/dy arrive in screen pixels; box coordinates live in stage units
@@ -200,11 +202,18 @@ export function MappableBox({
         dragOrigin.current = pointRef.current;
       },
       onPanResponderMove: (_evt, gesture) => {
-        const { canvasWidth: cw, canvasHeight: ch } = boundsRef.current;
+        const { minX, minY, maxX, maxY } = boundsRef.current;
         const s = scaleRef.current || 1;
+        // Keep the card inside the canvas rather than inside the stage: the
+        // limits are the visible surface, less enough margin that the card
+        // body and its label stay fully on screen.
+        const left = minX + 8;
+        const right = Math.max(left, maxX - renderedWidthRef.current - 24);
+        const top = minY + 24;
+        const bottom = Math.max(top, maxY - 24);
         onDragRef.current({
-          x: clamp(dragOrigin.current.x + gesture.dx / s, 8, Math.max(8, cw - renderedWidthRef.current - 24)),
-          y: clamp(dragOrigin.current.y + gesture.dy / s, 24, Math.max(24, ch - 24)),
+          x: clamp(dragOrigin.current.x + gesture.dx / s, left, right),
+          y: clamp(dragOrigin.current.y + gesture.dy / s, top, bottom),
         });
       },
     }),

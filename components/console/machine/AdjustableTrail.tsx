@@ -3,6 +3,7 @@ import { PanResponder, Pressable, View, type ViewStyle } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import { DEFAULT_STAGE_BOUNDS, type StageBounds } from './StageGrid';
 
 export type Point = { x: number; y: number };
 
@@ -23,6 +24,17 @@ function statusColourFor(status: TrailStatus, isDark: boolean): string {
 
 function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
+}
+
+// Drag limits are the full canvas (in stage units), not the 1600×900 stage, so
+// a bend or an endpoint can be pulled out into the bands beside the stage. Half
+// the handle is kept inside so it never becomes unreachable at an edge.
+function clampToBounds(origin: Point, dx: number, dy: number, limits: { bounds: StageBounds; size: number }): Point {
+  const { bounds, size } = limits;
+  return {
+    x: clamp(origin.x + dx, bounds.minX + size / 2, bounds.maxX - size / 2),
+    y: clamp(origin.y + dy, bounds.minY + size / 2, bounds.maxY - size / 2),
+  };
 }
 
 function createRoundedPath(points: Point[], radius = 10) {
@@ -96,8 +108,7 @@ function DraggablePoint({
   isEndpoint,
   colour,
   selected,
-  canvasWidth,
-  canvasHeight,
+  bounds,
   stageScale,
   onMove,
   onGrab,
@@ -108,8 +119,7 @@ function DraggablePoint({
   isEndpoint: boolean;
   colour: string;
   selected: boolean;
-  canvasWidth: number;
-  canvasHeight: number;
+  bounds: StageBounds;
   stageScale: number;
   onMove: (index: number, point: Point) => void;
   onGrab: () => void;
@@ -124,8 +134,8 @@ function DraggablePoint({
   // web responder system's gesture tracking and stalls the drag after ~1 frame.
   const pointRef = useRef(point);
   pointRef.current = point;
-  const boundsRef = useRef({ canvasWidth, canvasHeight, size });
-  boundsRef.current = { canvasWidth, canvasHeight, size };
+  const boundsRef = useRef({ bounds, size });
+  boundsRef.current = { bounds, size };
   // Gesture dx/dy arrive in screen pixels; point coordinates live in stage units
   // under a scale transform, so deltas must be divided by the current stage scale.
   const scaleRef = useRef(stageScale);
@@ -149,20 +159,12 @@ function DraggablePoint({
         onGrabRef.current();
       },
       onPanResponderMove: (_evt, gesture) => {
-        const { canvasWidth: cw, canvasHeight: ch, size: sz } = boundsRef.current;
         const s = scaleRef.current || 1;
-        onMoveRef.current(index, {
-          x: clamp(dragOrigin.current.x + gesture.dx / s, sz / 2, cw - sz / 2),
-          y: clamp(dragOrigin.current.y + gesture.dy / s, sz / 2, ch - sz / 2),
-        });
+        onMoveRef.current(index, clampToBounds(dragOrigin.current, gesture.dx / s, gesture.dy / s, boundsRef.current));
       },
       onPanResponderRelease: (_evt, gesture) => {
-        const { canvasWidth: cw, canvasHeight: ch, size: sz } = boundsRef.current;
         const s = scaleRef.current || 1;
-        onReleaseRef.current?.({
-          x: clamp(dragOrigin.current.x + gesture.dx / s, sz / 2, cw - sz / 2),
-          y: clamp(dragOrigin.current.y + gesture.dy / s, sz / 2, ch - sz / 2),
-        });
+        onReleaseRef.current?.(clampToBounds(dragOrigin.current, gesture.dx / s, gesture.dy / s, boundsRef.current));
       },
     }),
   ).current;
@@ -224,8 +226,9 @@ export type AdjustableTrailProps = {
   status?: TrailStatus;
   selected?: boolean;
   showControlPoints?: boolean;
-  canvasWidth: number;
-  canvasHeight: number;
+  // Drawable/draggable area in stage units — the whole canvas, which extends
+  // past the 16:9 stage on the axis that has room to spare.
+  bounds?: StageBounds;
   // Current stage scale — converts screen-pixel gesture deltas to stage units.
   stageScale?: number;
   // false = display-only (Actual View): path + endpoint/bend nodes, no drag
@@ -242,8 +245,7 @@ export function AdjustableTrail({
   status = 'normal',
   selected = false,
   showControlPoints = true,
-  canvasWidth,
-  canvasHeight,
+  bounds = DEFAULT_STAGE_BOUNDS,
   stageScale = 1,
   interactive = true,
   onPointsChange,
@@ -259,13 +261,31 @@ export function AdjustableTrail({
 
   const path = useMemo(() => createRoundedPath(points, 12), [points]);
 
+  // The trail layer is a child of the stage container, whose own box is only
+  // 1600×900. Anything drawn outside that (a trail routed into the side bands)
+  // would be clipped by the SVG viewport, so the viewport is offset to the
+  // bounds' origin and given a matching viewBox — 1:1, just shifted — which
+  // makes negative stage coordinates paintable.
+  const surface = {
+    left: bounds.minX,
+    top: bounds.minY,
+    width: Math.max(1, bounds.maxX - bounds.minX),
+    height: Math.max(1, bounds.maxY - bounds.minY),
+  };
+
   const movePoint = (index: number, nextPoint: Point) => {
     onPointsChange(points.map((point, pointIndex) => (pointIndex === index ? nextPoint : point)));
   };
 
   return (
     <>
-      <Svg pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, width: canvasWidth, height: canvasHeight }}>
+      <Svg
+        pointerEvents="box-none"
+        width={surface.width}
+        height={surface.height}
+        viewBox={`${surface.left} ${surface.top} ${surface.width} ${surface.height}`}
+        style={{ position: 'absolute', left: surface.left, top: surface.top, width: surface.width, height: surface.height }}
+      >
         {selected && <Path d={path} fill="none" stroke="rgba(110,240,138,0.15)" strokeWidth={8} strokeLinecap="round" strokeLinejoin="round" />}
 
         <Path d={path} fill="none" stroke={trailColour} strokeWidth={2} strokeDasharray="7 6" strokeLinecap="round" strokeLinejoin="round" />
@@ -311,8 +331,7 @@ export function AdjustableTrail({
               isEndpoint={isEndpoint}
               colour={trailColour}
               selected={selected}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
+              bounds={bounds}
               stageScale={stageScale}
               onMove={movePoint}
               onGrab={() => {

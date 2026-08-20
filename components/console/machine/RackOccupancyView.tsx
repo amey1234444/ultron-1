@@ -1,11 +1,14 @@
-﻿import { ScrollView, Text, View } from 'react-native';
+﻿import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import type { DeviceNode } from '../../../lib/devices';
+import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
+import type { LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode, ChannelRef } from '../../../lib/rack';
 import { useChannelReading } from '../../../lib/liveChannelValue';
+import { RackFaceplate } from '../rack/RackFaceplate';
 import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT } from './liveValue';
 
 const LIVE_COLOUR = '#3FBF6A';
@@ -20,6 +23,10 @@ const CRITICAL_COLOUR = '#D64545';
 // real V1 channels), and keying list items by `channel.id` in that case
 // produces React's "two children with the same key" warning.
 export type MappedChannel = { id: string; channel: ChannelRef; label: string; templatePointCode?: string };
+
+// Which slots the faceplate draws: only the ones this machine is wired to, or
+// the complete chassis with everything else dimmed behind it.
+type RackScope = 'machine' | 'full';
 
 function statusColour(channel: ChannelRef, value: number): string {
   if (channel.alarmCritical !== undefined && value >= channel.alarmCritical) return CRITICAL_COLOUR;
@@ -86,64 +93,254 @@ function SlotOccupancyCard({
   );
 }
 
+// One bordered track, selected segment filled — the same segmented control the
+// workspace header uses for its sub-tabs, so the two read as one instrument.
+function Segment({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  const { isDark } = useAppTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+      className={cn('rounded-full px-3 py-1.5', active && (isDark ? 'bg-ink' : 'bg-ink-inverse'))}
+    >
+      <Text
+        className={cn(
+          'font-mono text-[10px] uppercase tracking-[0.16em]',
+          active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
+        )}
+      >
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function SegmentedTrack({ children }: { children: ReactNode }) {
+  const { isDark } = useAppTheme();
+  return (
+    <View className={cn('flex-row items-center gap-1 rounded-full border p-1', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}>
+      {children}
+    </View>
+  );
+}
+
+type RackGroup = {
+  rackId: string;
+  rack: DeviceNode | undefined;
+  gatewayName: string | null;
+  channels: MappedChannel[];
+  slots: number[];
+  bySlot: Map<number, MappedChannel[]>;
+};
+
+// The physical rack, as drawn in the asset hierarchy, for one machine.
+function RackSection({
+  group,
+  cards,
+  devices,
+  live,
+  scope,
+}: {
+  group: RackGroup;
+  cards: CardNode[];
+  devices: DeviceNode[];
+  live?: LiveState;
+  scope: RackScope;
+}) {
+  const { isDark } = useAppTheme();
+  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const { rack, slots, bySlot } = group;
+
+  const rackCards = useMemo(() => cards.filter((card) => card.deviceId === group.rackId), [cards, group.rackId]);
+  // The rack's own status can be overridden by an unconfigured gateway above it,
+  // exactly as in the device tree — the faceplate LEDs must agree with it.
+  const rackWithState = useMemo(
+    () => (rack ? deviceWithGatewayConnectionState(rack, devices) : undefined),
+    [rack, devices],
+  );
+
+  const online = rackWithState?.status === 'Online';
+
+  return (
+    <View className={cn('overflow-hidden rounded-2xl border', lineClass, isDark ? 'bg-white/[0.02]' : 'bg-white')}>
+      <View className="flex-row flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottomWidth: 1, borderBottomColor: isDark ? '#252525' : '#E5E5E5' }}>
+        <View className="min-w-0 flex-row items-center gap-2.5">
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: online ? LIVE_COLOUR : NO_DATA_COLOUR,
+            }}
+          />
+          <View className="min-w-0">
+            <Text numberOfLines={1} className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              {rack?.name ?? 'Unknown rack'}
+            </Text>
+            <Text numberOfLines={1} className={cn('font-mono text-[9.5px] uppercase tracking-[0.18em]', mutedClass)}>
+              {[rack?.model, group.gatewayName ? `via ${group.gatewayName}` : null, rackWithState?.status]
+                .filter(Boolean)
+                .join(' · ')}
+            </Text>
+          </View>
+        </View>
+
+        <Text className={cn('font-body text-[11px]', mutedClass)}>
+          {group.channels.length} channel{group.channels.length === 1 ? '' : 's'} on slot{slots.length === 1 ? '' : 's'}{' '}
+          {slots.map((slot) => String(slot).padStart(2, '0')).join(', ')}
+        </Text>
+      </View>
+
+      {/* The rack itself. Read-only here: this is a "where does this machine's
+          data physically come from" reference, not the rack configurator. A
+          mapping can only name a rack that exists, so the missing-device case is
+          a stale-layout guard rather than an expected state. */}
+      {rackWithState ? (
+        <RackFaceplate
+          device={rackWithState}
+          cards={rackCards}
+          live={live}
+          editable={false}
+          fill={false}
+          slots={scope === 'machine' ? slots : undefined}
+          activeSlots={slots}
+          onPressEmpty={() => {}}
+          onPressCard={() => {}}
+        />
+      ) : (
+        <Text className={cn('px-6 py-8 text-center font-body text-xs', mutedClass)}>
+          This rack is no longer in the device tree — only the last known channel readings are shown.
+        </Text>
+      )}
+
+      <View className="flex-row flex-wrap gap-3 px-6 pb-6">
+        {slots.map((slot) => (
+          <View key={slot} style={{ width: 260 }}>
+            <SlotOccupancyCard
+              slot={slot}
+              card={rackCards.find((card) => card.slot === slot) ?? null}
+              channels={bySlot.get(slot)!}
+              devices={devices}
+            />
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 export type RackOccupancyViewProps = {
   devices: DeviceNode[];
   cards: CardNode[];
+  live?: LiveState;
   mappedChannels: MappedChannel[];
   expectedPoints: number;
 };
 
-// Actual View → Rack: shows only the physical rack slots/channels this machine
-// is actually mapped to (not the whole rack's occupancy) — a quick "where does
-// this machine's data physically come from" reference for the floor.
-export function RackOccupancyView({ devices, cards, mappedChannels, expectedPoints }: RackOccupancyViewProps) {
+// Actual View → Rack: the physical rack, drawn exactly as the asset hierarchy
+// draws it, but carrying only the racks and channels this machine is configured
+// against. A machine wired across several racks gets one faceplate per rack,
+// stacked in a single scroll, plus a picker to jump straight to one.
+export function RackOccupancyView({ devices, cards, live, mappedChannels, expectedPoints }: RackOccupancyViewProps) {
   const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
-  const rackIds = Array.from(new Set(mappedChannels.map((m) => m.channel.rackId)));
+  const groups = useMemo<RackGroup[]>(() => {
+    const order: string[] = [];
+    const byRack = new Map<string, MappedChannel[]>();
+    for (const mapped of mappedChannels) {
+      const rackId = mapped.channel.rackId;
+      if (!byRack.has(rackId)) {
+        byRack.set(rackId, []);
+        order.push(rackId);
+      }
+      byRack.get(rackId)!.push(mapped);
+    }
 
-  if (rackIds.length === 0) {
+    return order.map((rackId) => {
+      const channels = byRack.get(rackId)!;
+      const rack = devices.find((device) => device.id === rackId);
+      const bySlot = new Map<number, MappedChannel[]>();
+      for (const mapped of channels) {
+        const list = bySlot.get(mapped.channel.slot) ?? [];
+        list.push(mapped);
+        bySlot.set(mapped.channel.slot, list);
+      }
+      return {
+        rackId,
+        rack,
+        gatewayName: rack ? gatewayForRack(rack, devices)?.name ?? null : null,
+        channels,
+        slots: Array.from(bySlot.keys()).sort((a, b) => a - b),
+        bySlot,
+      };
+    });
+  }, [mappedChannels, devices]);
+
+  const [scope, setScope] = useState<RackScope>('machine');
+  // null = every rack, stacked. Otherwise a single rack is isolated.
+  const [focusedRackId, setFocusedRackId] = useState<string | null>(null);
+  // A rack can drop out of the mapping while its chip is selected (a box was
+  // unlinked, a rack archived) — fall back to the full stack rather than
+  // rendering an empty pane.
+  useEffect(() => {
+    if (focusedRackId && !groups.some((group) => group.rackId === focusedRackId)) setFocusedRackId(null);
+  }, [groups, focusedRackId]);
+
+  if (groups.length === 0) {
     return <EmptyState title="No racks mapped" description="Rack occupancy follows saved mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
-  return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
-      {expectedPoints > 0 && (
-        <Text className={cn('font-body text-[11px]', mutedClass)}>
-          {mappedChannels.length} of {expectedPoints} expected points mapped
-        </Text>
-      )}
-      {rackIds.map((rackId) => {
-        const rack = devices.find((d) => d.id === rackId);
-        const bySlot = new Map<number, MappedChannel[]>();
-        mappedChannels
-          .filter((m) => m.channel.rackId === rackId)
-          .forEach((m) => {
-            const list = bySlot.get(m.channel.slot) ?? [];
-            list.push(m);
-            bySlot.set(m.channel.slot, list);
-          });
-        const slots = Array.from(bySlot.keys()).sort((a, b) => a - b);
+  const visible = focusedRackId ? groups.filter((group) => group.rackId === focusedRackId) : groups;
 
-        return (
-          <View key={rackId} className="gap-3">
-            <View className="flex-row items-baseline gap-2">
-              <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>{rack?.name ?? 'Unknown rack'}</Text>
-              {rack && <Text className={cn('font-body text-xs', mutedClass)}>{rack.model}</Text>}
-            </View>
-            <View className={cn('border', lineClass)} style={{ borderColor: 'transparent' }}>
-              <View className="flex-row flex-wrap gap-3">
-                {slots.map((slot) => (
-                  <View key={slot} style={{ width: 260 }}>
-                    <SlotOccupancyCard slot={slot} card={cards.find((c) => c.deviceId === rackId && c.slot === slot) ?? null} channels={bySlot.get(slot)!} devices={devices} />
-                  </View>
-                ))}
-              </View>
-            </View>
-          </View>
-        );
-      })}
-    </ScrollView>
+  return (
+    <View className="flex-1">
+      <View
+        className="flex-row flex-wrap items-center justify-between gap-3 px-6 py-3"
+        style={{ borderBottomWidth: 1, borderBottomColor: isDark ? '#252525' : '#E5E5E5' }}
+      >
+        <Text className={cn('font-body text-[11px]', mutedClass)}>
+          {mappedChannels.length}
+          {expectedPoints > 0 ? ` of ${expectedPoints} expected points` : ' points'} mapped across {groups.length} rack
+          {groups.length === 1 ? '' : 's'}
+        </Text>
+
+        <SegmentedTrack>
+          <Segment label="This machine" active={scope === 'machine'} onPress={() => setScope('machine')} />
+          <Segment label="Full rack" active={scope === 'full'} onPress={() => setScope('full')} />
+        </SegmentedTrack>
+      </View>
+
+      {/* Rack picker — only earns its space once the machine spans more than one
+          rack. "All racks" keeps the stacked scroll, which is the default. */}
+      {groups.length > 1 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 10, gap: 8, alignItems: 'center' }}
+          style={{ flexGrow: 0, borderBottomWidth: 1, borderBottomColor: isDark ? '#252525' : '#E5E5E5' }}
+        >
+          <SegmentedTrack>
+            <Segment label={`All racks · ${groups.length}`} active={focusedRackId === null} onPress={() => setFocusedRackId(null)} />
+            {groups.map((group) => (
+              <Segment
+                key={group.rackId}
+                label={`${group.rack?.name ?? 'Unknown'} · ${group.channels.length}`}
+                active={focusedRackId === group.rackId}
+                onPress={() => setFocusedRackId(group.rackId)}
+              />
+            ))}
+          </SegmentedTrack>
+        </ScrollView>
+      )}
+
+      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
+        {visible.map((group) => (
+          <RackSection key={group.rackId} group={group} cards={cards} devices={devices} live={live} scope={scope} />
+        ))}
+      </ScrollView>
+    </View>
   );
 }
