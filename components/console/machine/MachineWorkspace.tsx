@@ -289,12 +289,17 @@ export function MachineWorkspace({
     </View>
   );
 
+  // Sized down from the old text-2xl: this band is chrome above the canvas, and
+  // every pixel it takes is a pixel the machine loses. It steps up only once
+  // there is width to spend on it.
   const nameBlock = (
-    <View>
-      <Text className={cn('font-body-bold text-2xl tracking-[-0.025em]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+    <View className="min-w-0">
+      <Text numberOfLines={1} className={cn('font-body-bold text-base leading-tight tracking-[-0.025em] md:text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>
         {machine.name}
       </Text>
-      <Text className={cn('font-mono text-[9.5px] uppercase tracking-[0.2em]', mutedClass)}>{machine.template}</Text>
+      <Text numberOfLines={1} className={cn('font-mono text-[9px] uppercase leading-tight tracking-[0.18em]', mutedClass)}>
+        {machine.template}
+      </Text>
     </View>
   );
 
@@ -326,10 +331,10 @@ export function MachineWorkspace({
   // which is what lets the stage run to the left, right and bottom edges.
   const header = (controls: ReactNode) => (
     <View
-      className="gap-3 px-4 py-3 md:flex-row md:items-center md:justify-between md:gap-6 md:px-6"
+      className="gap-2 px-3 py-2 md:flex-row md:items-center md:justify-between md:gap-4 md:px-5"
       style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
     >
-      <View className="min-w-0 flex-row items-center gap-3">
+      <View className="min-w-0 flex-row items-center gap-2.5">
         {backButton}
         {nameBlock}
       </View>
@@ -417,7 +422,7 @@ export function MachineWorkspace({
       {header(actualSubTabs)}
 
       {isActual && actualTab === 'rack' && (
-        <RackOccupancyView devices={devices} cards={cards} live={live} mappedChannels={mappedChannels} expectedPoints={expectedPoints} />
+        <RackOccupancyView devices={devices} cards={cards} live={live} mappedChannels={mappedChannels} />
       )}
 
       {isActual && actualTab === 'overview' && (

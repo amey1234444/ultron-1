@@ -834,10 +834,12 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       : undefined;
   const editingDevice = editingDeviceId ? (storedDevices.find((d) => d.id === editingDeviceId) ?? devices.find((d) => d.id === editingDeviceId)) : null;
   const deleteDeviceInfo = deleteDeviceId ? (storedDevices.find((d) => d.id === deleteDeviceId) ?? devices.find((d) => d.id === deleteDeviceId)) : null;
+  // Clearance for the floating controls that sit over this pane's top-left
+  // corner while the sidebar is collapsed. The machine workspace is excluded:
+  // its own header starts at the very top of the pane and nothing overlaps it,
+  // so the band was pure dead space that grew the moment the sidebar shrank.
   const detailTopClearance =
-    leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'machine' || selected.kind === 'device' || selected.kind === 'simulation')
-      ? 44
-      : 0;
+    leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'device' || selected.kind === 'simulation') ? 44 : 0;
 
   // The top-bar switcher owns the three top-level destinations; the selection
   // is still the single source of truth, so the control reads back out of it.

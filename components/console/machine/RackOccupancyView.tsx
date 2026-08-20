@@ -1,5 +1,5 @@
-﻿import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+﻿import { useMemo } from 'react';
+import { ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -23,10 +23,6 @@ const CRITICAL_COLOUR = '#D64545';
 // real V1 channels), and keying list items by `channel.id` in that case
 // produces React's "two children with the same key" warning.
 export type MappedChannel = { id: string; channel: ChannelRef; label: string; templatePointCode?: string };
-
-// Which slots the faceplate draws: only the ones this machine is wired to, or
-// the complete chassis with everything else dimmed behind it.
-type RackScope = 'machine' | 'full';
 
 function statusColour(channel: ChannelRef, value: number): string {
   if (channel.alarmCritical !== undefined && value >= channel.alarmCritical) return CRITICAL_COLOUR;
@@ -93,38 +89,6 @@ function SlotOccupancyCard({
   );
 }
 
-// One bordered track, selected segment filled — the same segmented control the
-// workspace header uses for its sub-tabs, so the two read as one instrument.
-function Segment({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
-  const { isDark } = useAppTheme();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="tab"
-      accessibilityState={{ selected: active }}
-      className={cn('rounded-full px-3 py-1.5', active && (isDark ? 'bg-ink' : 'bg-ink-inverse'))}
-    >
-      <Text
-        className={cn(
-          'font-mono text-[10px] uppercase tracking-[0.16em]',
-          active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
-        )}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function SegmentedTrack({ children }: { children: ReactNode }) {
-  const { isDark } = useAppTheme();
-  return (
-    <View className={cn('flex-row items-center gap-1 rounded-full border p-1', isDark ? 'border-line-dark bg-white/5' : 'border-line-light bg-white')}>
-      {children}
-    </View>
-  );
-}
-
 type RackGroup = {
   rackId: string;
   rack: DeviceNode | undefined;
@@ -140,13 +104,11 @@ function RackSection({
   cards,
   devices,
   live,
-  scope,
 }: {
   group: RackGroup;
   cards: CardNode[];
   devices: DeviceNode[];
   live?: LiveState;
-  scope: RackScope;
 }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -204,8 +166,7 @@ function RackSection({
           live={live}
           editable={false}
           fill={false}
-          slots={scope === 'machine' ? slots : undefined}
-          activeSlots={slots}
+          slots={slots}
           onPressEmpty={() => {}}
           onPressCard={() => {}}
         />
@@ -236,17 +197,13 @@ export type RackOccupancyViewProps = {
   cards: CardNode[];
   live?: LiveState;
   mappedChannels: MappedChannel[];
-  expectedPoints: number;
 };
 
 // Actual View → Rack: the physical rack, drawn exactly as the asset hierarchy
 // draws it, but carrying only the racks and channels this machine is configured
 // against. A machine wired across several racks gets one faceplate per rack,
-// stacked in a single scroll, plus a picker to jump straight to one.
-export function RackOccupancyView({ devices, cards, live, mappedChannels, expectedPoints }: RackOccupancyViewProps) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-
+// stacked in a single scroll.
+export function RackOccupancyView({ devices, cards, live, mappedChannels }: RackOccupancyViewProps) {
   const groups = useMemo<RackGroup[]>(() => {
     const order: string[] = [];
     const byRack = new Map<string, MappedChannel[]>();
@@ -279,68 +236,15 @@ export function RackOccupancyView({ devices, cards, live, mappedChannels, expect
     });
   }, [mappedChannels, devices]);
 
-  const [scope, setScope] = useState<RackScope>('machine');
-  // null = every rack, stacked. Otherwise a single rack is isolated.
-  const [focusedRackId, setFocusedRackId] = useState<string | null>(null);
-  // A rack can drop out of the mapping while its chip is selected (a box was
-  // unlinked, a rack archived) — fall back to the full stack rather than
-  // rendering an empty pane.
-  useEffect(() => {
-    if (focusedRackId && !groups.some((group) => group.rackId === focusedRackId)) setFocusedRackId(null);
-  }, [groups, focusedRackId]);
-
   if (groups.length === 0) {
     return <EmptyState title="No racks mapped" description="Rack occupancy follows saved mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
-  const visible = focusedRackId ? groups.filter((group) => group.rackId === focusedRackId) : groups;
-
   return (
-    <View className="flex-1">
-      <View
-        className="flex-row flex-wrap items-center justify-between gap-3 px-6 py-3"
-        style={{ borderBottomWidth: 1, borderBottomColor: isDark ? '#252525' : '#E5E5E5' }}
-      >
-        <Text className={cn('font-body text-[11px]', mutedClass)}>
-          {mappedChannels.length}
-          {expectedPoints > 0 ? ` of ${expectedPoints} expected points` : ' points'} mapped across {groups.length} rack
-          {groups.length === 1 ? '' : 's'}
-        </Text>
-
-        <SegmentedTrack>
-          <Segment label="This machine" active={scope === 'machine'} onPress={() => setScope('machine')} />
-          <Segment label="Full rack" active={scope === 'full'} onPress={() => setScope('full')} />
-        </SegmentedTrack>
-      </View>
-
-      {/* Rack picker — only earns its space once the machine spans more than one
-          rack. "All racks" keeps the stacked scroll, which is the default. */}
-      {groups.length > 1 && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={{ paddingHorizontal: 24, paddingVertical: 10, gap: 8, alignItems: 'center' }}
-          style={{ flexGrow: 0, borderBottomWidth: 1, borderBottomColor: isDark ? '#252525' : '#E5E5E5' }}
-        >
-          <SegmentedTrack>
-            <Segment label={`All racks · ${groups.length}`} active={focusedRackId === null} onPress={() => setFocusedRackId(null)} />
-            {groups.map((group) => (
-              <Segment
-                key={group.rackId}
-                label={`${group.rack?.name ?? 'Unknown'} · ${group.channels.length}`}
-                active={focusedRackId === group.rackId}
-                onPress={() => setFocusedRackId(group.rackId)}
-              />
-            ))}
-          </SegmentedTrack>
-        </ScrollView>
-      )}
-
-      <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
-        {visible.map((group) => (
-          <RackSection key={group.rackId} group={group} cards={cards} devices={devices} live={live} scope={scope} />
-        ))}
-      </ScrollView>
-    </View>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
+      {groups.map((group) => (
+        <RackSection key={group.rackId} group={group} cards={cards} devices={devices} live={live} />
+      ))}
+    </ScrollView>
   );
 }

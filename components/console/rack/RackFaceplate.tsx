@@ -20,11 +20,6 @@ type RackFaceplateProps = {
    * only the slots that machine is actually wired to.
    */
   slots?: number[];
-  /**
-   * When set, any rendered slot outside this list is dimmed rather than hidden
-   * — used to show one machine's footprint inside the complete rack.
-   */
-  activeSlots?: number[] | null;
   /** Fill the parent (default). Set false to size to content inside a ScrollView. */
   fill?: boolean;
   onPressEmpty: (slot: number, x: number, y: number) => void;
@@ -113,7 +108,6 @@ export function RackFaceplate({
   live,
   editable = true,
   slots,
-  activeSlots = null,
   fill = true,
   onPressEmpty,
   onPressCard,
@@ -125,7 +119,6 @@ export function RackFaceplate({
     () => (slots && slots.length > 0 ? [...slots].sort((a, b) => a - b) : SLOT_NUMBERS),
     [slots],
   );
-  const activeSet = useMemo(() => (activeSlots ? new Set(activeSlots) : null), [activeSlots]);
 
   const cardBySlot = useMemo(
     () => new Map(cards.map((card) => [card.slot, card])),
@@ -215,16 +208,12 @@ export function RackFaceplate({
 
             {slotNumbers.map((slot, index) => {
               const card = cardBySlot.get(slot) ?? null;
-              // A slot outside the active set is still real hardware — it is
-              // just not this machine's, so it recedes instead of disappearing.
-              const dimmed = activeSet ? !activeSet.has(slot) : false;
               const previousSlot = slotNumbers[index - 1];
 
               return (
                 <View
                   key={slot}
                   className="flex-row items-center"
-                  style={dimmed ? { opacity: 0.26 } : undefined}
                 >
                   {/* Visual separator where the acquisition slots hand over to
                       the controller slots (13–14), whenever both sides are on
@@ -259,7 +248,7 @@ export function RackFaceplate({
                       device={device}
                       live={live}
                       width={cardWidth}
-                      editable={editable && !dimmed}
+                      editable={editable}
                       onPressEmpty={(x, y) =>
                         onPressEmpty(slot, x, y)
                       }
