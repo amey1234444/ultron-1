@@ -8,7 +8,17 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AppLoader } from '../components/web/AppLoader';
 import { AuthProvider } from '../context/AuthContext';
+import { startSmoothScroll } from '../lib/smoothScroll';
 import { loadWebFonts } from '../lib/webFonts';
+
+/**
+ * Routes that scroll as one long document, and so get inertial wheel easing.
+ *
+ * Everything not on this list keeps native scrolling. That is the console —
+ * `/` — plus the short auth forms, where a page that eases has nothing to ease
+ * and an interceptor is pure cost. See `lib/smoothScroll.ts`.
+ */
+const SMOOTH_SCROLL_ROUTES = new Set(['/home', '/how-it-works', '/about', '/contact']);
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
@@ -17,6 +27,13 @@ export default function App({ Component, pageProps }: AppProps) {
   useEffect(() => {
     loadWebFonts();
   }, []);
+
+  // Re-armed per route: the listener is torn down and rebuilt on navigation, so
+  // leaving a marketing page for the console hands the wheel straight back.
+  useEffect(() => {
+    if (!SMOOTH_SCROLL_ROUTES.has(router.pathname)) return;
+    return startSmoothScroll();
+  }, [router.pathname]);
 
   // Page-to-page navigation. These bundles are large enough that without this
   // the old screen simply sits there, and the click reads as having done

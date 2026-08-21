@@ -3,10 +3,6 @@
 @tailwind utilities;
 
 
-html {
-  scroll-behavior: smooth;
-}
-
 html,
 body {
   min-width: 320px;
@@ -219,4 +215,149 @@ body {
 .font-mono {
   font-family: var(--font-mono) !important;
   font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------------------------------- */
+/* Scrolling                                                                 */
+/*                                                                           */
+/* Most of what reads as "premium scrolling" is not motion at all — it is the */
+/* absence of the four things that make scrolling feel cheap:                 */
+/*                                                                           */
+/*   1. the OS scrollbar, which on Windows is a 17px grey trough with square  */
+/*      arrow buttons and belongs to 2009;                                    */
+/*   2. scroll chaining, where hitting the bottom of a list silently hands    */
+/*      the wheel to the page behind it and the whole screen lurches;         */
+/*   3. rubber-band overscroll on the document, which on a fixed-height app   */
+/*      shell exposes the background behind the UI.                          */
+/*                                                                           */
+/* `scrollbar-gutter: stable` would fix a fourth — the horizontal jump when a */
+/* scrollbar appears between routes — but it is not used here. The property   */
+/* reserves the gutter on any element whose overflow is `auto`, which `html`  */
+/* is everywhere, so the console would carry a permanent 11px dead strip down */
+/* its edge to spare the marketing pages a shift. Wrong trade.                */
+/*                                                                           */
+/* The inertial easing people usually mean by "smooth scroll" is handled in   */
+/* `src/lib/smoothScroll.ts`, and deliberately only on the marketing pages —  */
+/* see the note there for why the console keeps native scrolling.            */
+/* ------------------------------------------------------------------------- */
+
+:root {
+  /* A neutral grey rather than a tinted one, because this same thumb has to
+     read on the near-black landing pages and on the light console without a
+     class to tell them apart. At 38% a mid-grey has contrast against both. */
+  --u-scroll-thumb: rgba(130, 132, 136, 0.38);
+  --u-scroll-thumb-hover: rgba(130, 132, 136, 0.62);
+  --u-scroll-size: 11px;
+  /* The transparent border that insets the thumb inside its track. This is
+     what makes the bar read as a floating pill rather than as a filled
+     channel — the single biggest difference between a styled scrollbar and a
+     default one. */
+  --u-scroll-inset: 3px;
+}
+
+html.dark {
+  --u-scroll-thumb: rgba(255, 255, 255, 0.16);
+  --u-scroll-thumb-hover: rgba(255, 255, 255, 0.32);
+}
+
+/* Firefox. No pseudo-elements, one declaration, and it has to sit on every
+   scroll container rather than just the document — the console is a tree of
+   nested scrollers. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--u-scroll-thumb) transparent;
+}
+
+/* WebKit / Chromium / Edge. */
+::-webkit-scrollbar {
+  width: var(--u-scroll-size);
+  height: var(--u-scroll-size);
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: var(--u-scroll-thumb);
+  border-radius: 999px;
+  /* `background-clip: content-box` is what lets a transparent border act as
+     padding: the thumb paints inside the inset instead of over it. */
+  border: var(--u-scroll-inset) solid transparent;
+  background-clip: content-box;
+  transition: background-color 160ms ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--u-scroll-thumb-hover);
+}
+
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--u-scroll-thumb-hover);
+}
+
+/* Kill the stepper buttons outright. Nobody has clicked one on purpose in a
+   decade and they cost the thumb 34px of travel. */
+::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+/*
+ * Scroll chaining.
+ *
+ * `:where()` so this carries zero specificity and any component can override
+ * it without a fight. On a non-scrolling element the property is inert, so a
+ * universal selector is the honest way to reach a tree of scroll containers
+ * that react-native-web generates with no stable class names.
+ *
+ * `contain` and not `none`: nested lists stop handing the wheel to the page
+ * behind them, but the browser's own gestures — pull-to-refresh, back-swipe —
+ * still work where the platform provides them.
+ */
+:where(*) {
+  overscroll-behavior: contain;
+}
+
+/*
+ * The document itself does not rubber-band.
+ *
+ * The console is a fixed-height shell; bouncing it reveals the page background
+ * behind a UI that is meant to fill the viewport, which is the single most
+ * "unfinished" thing a web app can do on a trackpad.
+ */
+html,
+body {
+  overscroll-behavior: none;
+}
+
+/* Touch momentum needs no declaration. `-webkit-overflow-scrolling: touch` used
+   to live here; every engine shipping today does momentum natively and none of
+   them still read the property. */
+
+/*
+ * Anchor and programmatic scrolling ease; the wheel does not.
+ *
+ * `scroll-behavior: smooth` on the document only affects `scrollIntoView`,
+ * `scrollTo` and in-page anchors. It never touches the wheel, which is why it
+ * is safe to leave on everywhere — and why it is not, on its own, the thing
+ * people mean when they ask for smooth scrolling.
+ *
+ * `scroll-padding-top` keeps an anchored heading clear of the fixed site nav
+ * instead of landing underneath it.
+ */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+}
+
+/* Scroll-linked reveals must not fight the OS setting. The global
+   reduced-motion block above already flattens transitions; this adds the
+   scroller's own opt-out, read by `smoothScroll.ts`. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }
