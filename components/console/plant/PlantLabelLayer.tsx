@@ -284,11 +284,22 @@ export function PlantLabelLayer({
               overflow: 'hidden',
               background: surface,
               border: `1px solid ${active ? 'rgba(63,191,106,0.55)' : hair}`,
-              borderRadius: 4,
-              boxShadow: isDark ? '0 6px 18px rgba(0,0,0,0.4)' : '0 4px 12px rgba(15,20,30,0.12)',
+              borderRadius: 6,
+              // The callout lifts with the building it belongs to. It already
+              // grows and takes an accent edge on hover — the deeper shadow is
+              // what makes those read as one card coming forward rather than as
+              // a box changing size in place.
+              boxShadow: active
+                ? isDark
+                  ? '0 14px 30px rgba(0,0,0,0.55)'
+                  : '0 10px 22px rgba(15,20,30,0.20)'
+                : isDark
+                  ? '0 6px 18px rgba(0,0,0,0.4)'
+                  : '0 4px 12px rgba(15,20,30,0.12)',
               backdropFilter: 'blur(6px)',
               WebkitBackdropFilter: 'blur(6px)',
-              transition: 'border-color 140ms ease, width 160ms ease, height 160ms ease',
+              transition:
+                'border-color 140ms ease, box-shadow 200ms ease, width 160ms cubic-bezier(0.22, 1, 0.36, 1), height 160ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
             <div style={{ padding: '7px 9px 6px' }}>

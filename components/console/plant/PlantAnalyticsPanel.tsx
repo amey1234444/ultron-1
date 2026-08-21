@@ -2,8 +2,8 @@ import React from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import type { ConsolePalette } from '../../../lib/consoleTheme';
+import type { Insight } from '../../../lib/dashboardMetrics';
 import type { PlantAnalytics } from '../../../lib/plantAnalytics';
-import { ImpulseChart, Measured } from './PlantCharts';
 import { MicroLabel, PanelSection, PlantCard, STEP } from './PlantSurfaces';
 
 export type PlantKpi = {
@@ -20,13 +20,96 @@ export type PlantKpi = {
 interface PlantAnalyticsPanelProps {
   analytics: PlantAnalytics;
   kpis: PlantKpi[];
+  /** Open recommendations, ranked. Fills the slot the throughput pipeline vacated. */
+  insights: Insight[];
   palette: ConsolePalette;
   isDark: boolean;
+}
+
+/**
+ * One open recommendation.
+ *
+ * Findings used to live on a Diagnostics page nobody arrived at without going
+ * looking. They belong on the plant view: the thing a reader wants after "how
+ * is the plant" is "so what should I do about it", and that answer has no
+ * business being a click away on a tab of its own.
+ *
+ * The priority is a rail down the left rather than a word on the right. In a
+ * narrow column a coloured edge is readable at a glance from the top of the
+ * list to the bottom, which is what ranking is for; a right-aligned word has to
+ * be read one row at a time.
+ */
+function FindingRow({
+  insight,
+  palette,
+  isDark,
+}: {
+  insight: Insight;
+  palette: ConsolePalette;
+  isDark: boolean;
+}) {
+  const tone =
+    insight.priority === 'High' ? palette.critical : insight.priority === 'Medium' ? palette.warning : palette.accent;
+
+  return (
+    <View
+      style={{
+        paddingVertical: STEP * 1.5,
+        paddingLeft: STEP * 1.5,
+        paddingRight: STEP,
+        borderRadius: 6,
+        backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
+        borderLeftWidth: 3,
+        borderLeftColor: tone,
+      }}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Text
+          numberOfLines={1}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontFamily: 'Inter, system-ui, sans-serif',
+            fontSize: 12.5,
+            fontWeight: '600',
+            color: palette.ink,
+          }}
+        >
+          {insight.subject}
+        </Text>
+        <Text className="font-mono" style={{ fontSize: 9, letterSpacing: 1.2, color: tone, fontWeight: '700' }}>
+          {insight.priority.toUpperCase()}
+        </Text>
+      </View>
+
+      <Text
+        style={{
+          fontFamily: 'Inter, system-ui, sans-serif',
+          fontSize: 11,
+          lineHeight: 15,
+          color: palette.inkMuted,
+          marginTop: 3,
+        }}
+      >
+        {insight.finding}. {insight.recommendation}.
+      </Text>
+
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 5 }}>
+        <Text numberOfLines={1} className="font-mono" style={{ flex: 1, minWidth: 0, fontSize: 9.5, color: palette.inkFaint }}>
+          {insight.evidence}
+        </Text>
+        <Text className="font-mono tabular-nums" style={{ fontSize: 9.5, color: palette.inkMuted, fontWeight: '600' }}>
+          {insight.confidence}
+        </Text>
+      </View>
+    </View>
+  );
 }
 
 export function PlantAnalyticsPanel({
   analytics,
   kpis,
+  insights,
   palette,
   isDark,
 }: PlantAnalyticsPanelProps) {
@@ -49,13 +132,6 @@ export function PlantAnalyticsPanel({
   const atRiskCount = assets.filter((a) => a.status === 'warning').length;
   const neutralCount = assets.filter((a) => a.status === 'offline').length;
   const healthyCount = assets.filter((a) => a.status === 'healthy').length;
-
-  // Throughput values from telemetry/KPIs
-  const channelKpi = kpis.find((k) => k.id === 'channels');
-  const throughputCurrent = channelKpi ? parseFloat(channelKpi.value) || 3.6 : 3.6;
-
-  const demoImpulseData = [0.8, 1.2, 0.9, 1.6, 1.1, 0.7, 2.1, 1.4, 2.8, 4.2, 3.1, 1.5, 0.9, 1.3];
-  const demoTimeLabels = ['03:20', '03:28', '03:35', '03:44'];
 
   return (
     <PlantCard palette={palette} isDark={isDark} style={{ flex: 1, minHeight: 0, padding: 0 }}>
@@ -210,110 +286,27 @@ export function PlantAnalyticsPanel({
           </View>
         </PanelSection>
 
-        {/* --- 3. EXPANDED TELEMETRY THROUGHPUT (PACKETS / S) --- */}
-        <PanelSection title="Throughput Telemetry Pipeline" palette={palette}>
-          <View style={{ gap: STEP * 2 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
-                <Text className="font-display tabular-nums" style={{ fontSize: 32, fontWeight: '700', color: palette.ink }}>
-                  {throughputCurrent.toFixed(1)}
-                </Text>
-                <Text className="font-mono" style={{ fontSize: 11, color: palette.inkMuted, fontWeight: '600' }}>
-                  pkt/s
-                </Text>
-              </View>
-
-              <View
-                style={{
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 5,
-                  paddingHorizontal: 8,
-                  paddingVertical: 3,
-                  borderRadius: 999,
-                  backgroundColor: palette.accentSoft,
-                  borderWidth: 1,
-                  borderColor: 'rgba(16, 185, 129, 0.25)',
-                }}
-              >
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: palette.accent }} />
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.accent, fontWeight: '700' }}>
-                  MQTT STREAM
-                </Text>
-              </View>
-            </View>
-
-            {/* Gigaton Impulse Chart */}
-            <View style={{ height: 110, marginTop: 2 }}>
-              <Measured>
-                {({ width, height }) => (
-                  <ImpulseChart
-                    values={demoImpulseData}
-                    xLabels={demoTimeLabels}
-                    width={width}
-                    height={height}
-                    palette={palette}
-                    color={palette.accent}
-                  />
-                )}
-              </Measured>
-            </View>
-
-            {/* In-Depth Statistical Grid */}
-            <View
+        {/* --- 3. FINDINGS --- */}
+        <PanelSection title="Findings" palette={palette} unit={`${insights.length} open`}>
+          {insights.length === 0 ? (
+            <Text
               style={{
-                borderRadius: 8,
-                padding: STEP * 2,
-                backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                borderWidth: 1,
-                borderColor: palette.line,
-                gap: STEP * 1.5,
+                fontFamily: 'Inter, system-ui, sans-serif',
+                fontSize: 11.5,
+                color: palette.inkMuted,
+                paddingVertical: STEP * 3,
+                textAlign: 'center',
               }}
             >
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <View>
-                  <MicroLabel palette={palette} size={9.5}>
-                    AVERAGE RATE
-                  </MicroLabel>
-                  <Text className="font-mono tabular-nums" style={{ fontSize: 12, color: palette.ink, marginTop: 2, fontWeight: '600' }}>
-                    2.8 pkt/s
-                  </Text>
-                </View>
-
-                <View>
-                  <MicroLabel palette={palette} size={9.5}>
-                    PEAK RATE
-                  </MicroLabel>
-                  <Text className="font-mono tabular-nums" style={{ fontSize: 12, color: palette.accent, marginTop: 2, fontWeight: '700' }}>
-                    6.6 pkt/s
-                  </Text>
-                </View>
-
-                <View style={{ alignItems: 'flex-end' }}>
-                  <MicroLabel palette={palette} size={9.5}>
-                    RELIABILITY
-                  </MicroLabel>
-                  <Text className="font-mono tabular-nums" style={{ fontSize: 12, color: palette.accent, marginTop: 2, fontWeight: '700' }}>
-                    99.9%
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{ height: 1, backgroundColor: palette.line }} />
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
-                  LATENCY: 14ms
-                </Text>
-                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkFaint }}>
-                  PACKET LOSS: 0%
-                </Text>
-                <Text className="font-mono" style={{ fontSize: 10, color: palette.inkMuted, fontWeight: '600' }}>
-                  03:44 PM
-                </Text>
-              </View>
+              No recommendations right now
+            </Text>
+          ) : (
+            <View style={{ gap: STEP * 1.5 }}>
+              {insights.map((insight) => (
+                <FindingRow key={insight.id} insight={insight} palette={palette} isDark={isDark} />
+              ))}
             </View>
-          </View>
+          )}
         </PanelSection>
       </ScrollView>
     </PlantCard>

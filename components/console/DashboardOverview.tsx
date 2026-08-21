@@ -1,7 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
-import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Polyline, Rect, Stop, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
@@ -14,7 +14,6 @@ import {
 import {
   buildDashboardMetrics,
   pushSample,
-  type AttentionRow,
   type DashboardAlarm,
   type Insight,
 } from '../../lib/dashboardMetrics';
@@ -39,7 +38,6 @@ import { PlantAnalyticsPanel, type PlantKpi } from './plant/PlantAnalyticsPanel'
 import { PlantBottomAnalytics } from './plant/PlantBottomAnalytics';
 import PlantExperience from './plant/PlantExperience';
 import { PlantOverviewHeader } from './plant/PlantOverviewHeader';
-import { LeftMiniNav } from './plant/LeftMiniNav';
 import { PlantOverviewEditor } from './PlantOverviewEditor';
 
 type DashboardOverviewProps = {
@@ -55,20 +53,14 @@ type DashboardOverviewProps = {
 };
 
 /**
- * Five workspaces, not one scroll: what is happening now, how we are
- * performing, why the system says so, what it is set up to do, what already
- * happened. Each fits a screen.
+ * One workspace: the plant as it is right now.
+ *
+ * There were six. See the note on `renderSection` for what went and why. The
+ * type survives as a single member rather than being deleted outright because
+ * the switch it drives is the seam a second workspace would come back through,
+ * and a one-member union documents that better than a removed one.
  */
-type Section = 'operations' | 'scorecard' | 'diagnostics' | 'setup' | 'trends' | 'history';
-
-const SECTIONS: { id: Section; label: string }[] = [
-  { id: 'operations', label: 'Operations' },
-  { id: 'scorecard', label: 'Scorecard' },
-  { id: 'diagnostics', label: 'Diagnostics' },
-  { id: 'setup', label: 'Setup' },
-  { id: 'trends', label: 'Trends' },
-  { id: 'history', label: 'History' },
-];
+type Section = 'operations';
 
 /**
  * Measured series get their own hues.
@@ -91,10 +83,6 @@ const DEMO_ALARM_BARS = {
 };
 /** Health target every asset is scored against. */
 const HEALTH_TARGET = 90;
-/** Where the health score leaves the amber band and becomes an alarm. */
-const HEALTH_ALERT = 70;
-/** Mirrors the weighting in `buildDashboardMetrics` — availability and reliability carry the score. */
-const HEALTH_WEIGHTS = ['30%', '20%', '30%', '20%'];
 /** How often the dashboard resamples. Also the clock tick — see the note in the component. */
 const SAMPLE_MS = 5_000;
 
@@ -106,28 +94,11 @@ function severityColor(palette: ConsolePalette, severity: DashboardAlarm['severi
   return severityToneColor(palette, severity);
 }
 
-/** Colour bands the health axis is read against, low to high. */
-function healthBands(palette: ConsolePalette) {
-  return [
-    { from: 0, to: 0.5, color: palette.critical },
-    { from: 0.5, to: 0.7, color: palette.warning },
-    { from: 0.7, to: 1, color: palette.accent },
-  ];
-}
-
 function mean(values: number[]) {
   if (values.length === 0) return 0;
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-function stddev(values: number[]) {
-  if (values.length < 2) return 0;
-  const m = mean(values);
-  return Math.sqrt(values.reduce((sum, value) => sum + (value - m) ** 2, 0) / (values.length - 1));
-}
-
-/** Stable identity for "no second series", so the easing hook isn't handed a fresh array each render. */
-const EMPTY_SERIES: number[] = [];
 
 /** Samples a series at `length` evenly spaced positions, interpolating between them. */
 function resample(values: number[], length: number): number[] {
@@ -221,17 +192,6 @@ function useDemoWalk(seed: number[], enabled: boolean, min: number, max: number,
   return series;
 }
 
-/** Bins `values` into `count` buckets spanning [min, max]. */
-function histogram(values: number[], count: number, min: number, max: number) {
-  const bins = Array.from({ length: count }, () => 0);
-  const span = Math.max(1, max - min);
-  for (const value of values) {
-    const index = clamp(Math.floor(((value - min) / span) * count), 0, count - 1);
-    bins[index] += 1;
-  }
-  return bins;
-}
-
 // ---------------------------------------------------------------------------
 // Surface primitives
 //
@@ -253,51 +213,6 @@ function Chip({ children, tone }: { children: string; tone?: string }) {
       >
         {children}
       </Text>
-    </View>
-  );
-}
-
-function Panel({
-  label,
-  labelTone,
-  meta,
-  action,
-  children,
-  padded = true,
-  style,
-}: {
-  label?: string;
-  labelTone?: string;
-  meta?: string;
-  action?: ReactNode;
-  children: ReactNode;
-  /** Off for panels whose content runs edge to edge (tables, the map). */
-  padded?: boolean;
-  style?: object;
-}) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  return (
-    <View
-      className={cn('h-full overflow-hidden rounded-xl border', isDark ? 'border-line-dark' : 'border-line-light')}
-      style={[{ backgroundColor: palette.panel }, style] as never}
-    >
-      {label || action ? (
-        <View className={cn('flex-row items-center gap-3', padded ? 'px-4 pt-3.5' : 'px-4 py-3.5')}>
-          {label ? <Chip tone={labelTone}>{label}</Chip> : null}
-          <View className="min-w-0 flex-1 flex-row items-center justify-end gap-3">
-            {meta ? (
-              <Text numberOfLines={1} className={cn('font-mono text-[9.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                {meta}
-              </Text>
-            ) : null}
-            {action}
-          </View>
-        </View>
-      ) : null}
-      <View className={cn('flex-1', padded && 'px-4 pb-3.5 pt-2')} style={{ minHeight: 0 }}>
-        {children}
-      </View>
     </View>
   );
 }
@@ -356,10 +271,6 @@ function Rule({ vertical = false }: { vertical?: boolean }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   return <View style={vertical ? { width: 1, alignSelf: 'stretch', backgroundColor: palette.line } : { height: 1, backgroundColor: palette.line }} />;
-}
-
-function Dot({ color, size = 6 }: { color: string; size?: number }) {
-  return <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: color }} />;
 }
 
 /**
@@ -475,111 +386,11 @@ function ContributionRow({ label, value, suffix = '%', max = 100, tone, first = 
   );
 }
 
-/**
- * Deviation, as five steps centred on zero.
- *
- * Rounded segments rather than blocks: the scale is a reading, not a grid.
- */
-function DeviationScale({ gap, palette }: { gap: number; palette: ConsolePalette }) {
-  const magnitude = Math.min(2, Math.round(Math.abs(gap) / 6));
-  const index = gap === 0 ? 2 : gap < 0 ? 2 - magnitude : 2 + magnitude;
-  const tint = Math.abs(gap) <= 3 ? palette.accent : Math.abs(gap) <= 12 ? palette.warning : palette.critical;
-  return (
-    <View className="flex-row items-center gap-[4px]">
-      {[0, 1, 2, 3, 4].map((step) => (
-        <View
-          key={step}
-          style={{
-            width: 14,
-            height: 7,
-            borderRadius: 3.5,
-            backgroundColor: step === index ? tint : palette.line,
-            opacity: step === index ? 1 : 0.4,
-          }}
-        />
-      ))}
-    </View>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Charts
 // ---------------------------------------------------------------------------
 
 type Point = { x: number; y: number };
-
-/**
- * Catmull-Rom through the samples, emitted as cubic beziers.
- *
- * A polyline turns every sample into a corner, so a reading that drifts looks
- * like a reading that jumped. The spline passes through every point — it does
- * not invent values — while showing the shape of the movement between them.
- */
-function splinePath(points: Point[], tension = 0.5): string {
-  if (points.length < 2) return '';
-  if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
-  let d = `M ${points[0].x} ${points[0].y}`;
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[i - 1] ?? points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2] ?? p2;
-    const c1x = p1.x + ((p2.x - p0.x) / 6) * tension * 2;
-    const c1y = p1.y + ((p2.y - p0.y) / 6) * tension * 2;
-    const c2x = p2.x - ((p3.x - p1.x) / 6) * tension * 2;
-    const c2y = p2.y - ((p3.y - p1.y) / 6) * tension * 2;
-    d += ` C ${c1x} ${c1y} ${c2x} ${c2y} ${p2.x} ${p2.y}`;
-  }
-  return d;
-}
-
-/**
- * Indices where the series turns hardest.
- *
- * A trend line answers "what is it doing"; the turns answer "when did it start
- * doing that", which is the question an operator actually opens a chart with.
- * Scored by second difference, and only the sharpest few are marked so the
- * chart does not turn into a picket fence.
- */
-function inflections(values: number[], count = 2): number[] {
-  if (values.length < 5) return [];
-  const spread = Math.max(1, Math.max(...values) - Math.min(...values));
-  const scored = values
-    .slice(1, -1)
-    .map((value, index) => ({
-      index: index + 1,
-      score: Math.abs(values[index] - 2 * value + values[index + 2]) / spread,
-    }))
-    .filter((entry) => entry.score > 0.18)
-    .sort((a, b) => b.score - a.score);
-
-  // Keep the marks apart: two neighbouring samples on the same turn are one
-  // event, not two.
-  const chosen: number[] = [];
-  for (const entry of scored) {
-    if (chosen.length >= count) break;
-    if (chosen.every((index) => Math.abs(index - entry.index) > values.length / 6)) chosen.push(entry.index);
-  }
-  return chosen;
-}
-
-/** Gauge rail for the health axis: the bands the score is judged against. */
-function healthRail(palette: ConsolePalette): GaugeBand[] {
-  return [
-    { from: 0, to: 0.5, color: palette.critical },
-    { from: 0.5, to: 0.7, color: palette.warning },
-    { from: 0.7, to: 1, color: palette.accent },
-  ];
-}
-
-/** Gauge rail for open alarms: few is good, many is not. */
-function alarmRail(palette: ConsolePalette): GaugeBand[] {
-  return [
-    { from: 0, to: 0.35, color: palette.accent },
-    { from: 0.35, to: 0.65, color: palette.warning },
-    { from: 0.65, to: 1, color: palette.critical },
-  ];
-}
 
 /** A gauge rail segment: `from`/`to` are fractions of the axis, low to high. */
 type GaugeBand = { from: number; to: number; color: string };
@@ -838,551 +649,9 @@ function TrendChart({
   );
 }
 
-/**
- * Distribution of a population, banded by the same thresholds as the gauge.
- *
- * A mean alone hides the shape: twelve assets averaging 78 could be twelve at
- * 78 or six at 95 and six at 61, and those need different work. The histogram
- * shows which, and the summary line under it carries the numbers.
- */
-function Histogram({ values, height = 172, min = 0, max = 100, bins }: { values: number[]; height?: number; min?: number; max?: number; bins?: number }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const width = 520;
-  const padL = 30;
-  const padB = 22;
-  const padT = 10;
-  const plotW = width - padL - 14;
-  const plotH = height - padT - padB;
-  const binCount = bins ?? clamp(Math.round(values.length * 1.5), 6, 18);
-  const counts = histogram(values, binCount, min, max);
-  const peak = Math.max(1, ...counts);
-  const barW = plotW / binCount;
-  const ticks = peak <= 4 ? Array.from({ length: peak + 1 }, (_, i) => i / peak) : [0, 0.5, 1];
-
-  return (
-    <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-      {ticks.map((ratio) => {
-        const y = padT + plotH - ratio * plotH;
-        return (
-          <G key={ratio}>
-            <Line x1={padL} x2={padL + plotW} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
-            <SvgText x={padL - 8} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
-              {Math.round(ratio * peak)}
-            </SvgText>
-          </G>
-        );
-      })}
-      {counts.map((count, index) => {
-        const centre = min + ((index + 0.5) / binCount) * (max - min);
-        const colour = centre >= 70 ? palette.accent : centre >= 50 ? palette.warning : palette.critical;
-        const h = (count / peak) * plotH;
-        return (
-          <Rect
-            key={index}
-            x={padL + index * barW + 1}
-            y={padT + plotH - h}
-            width={Math.max(2, barW - 2)}
-            height={h}
-            rx={3}
-            fill={colour}
-            opacity={0.9}
-          />
-        );
-      })}
-      {[0, 0.5, 1].map((ratio) => (
-        <SvgText key={ratio} x={padL + ratio * plotW} y={height - 6} fontSize={9} fill={palette.inkFaint} textAnchor="middle">
-          {Math.round(min + ratio * (max - min))}
-        </SvgText>
-      ))}
-    </Svg>
-  );
-}
-
-function StackedBars({ labels, critical, warning, info, height = 190 }: { labels: string[]; critical: number[]; warning: number[]; info: number[]; height?: number }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const width = 620;
-  const padL = 32;
-  const padB = 24;
-  const padT = 10;
-  const plotH = height - padT - padB;
-  const baseY = padT + plotH;
-  const max = Math.max(10, ...labels.map((_, index) => (critical[index] ?? 0) + (warning[index] ?? 0) + (info[index] ?? 0)));
-  const step = (width - padL - 16) / Math.max(1, labels.length);
-  const barW = Math.min(24, step * 0.48);
-  const infoColor = isDark ? '#6366F1' : '#4F46E5';
-
-  return (
-    <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-      {[0, 0.5, 1].map((ratio) => {
-        const y = baseY - ratio * plotH;
-        return (
-          <G key={ratio}>
-            <Line x1={padL} x2={width - 16} y1={y} y2={y} stroke={palette.grid} strokeWidth={1} strokeDasharray="3 3" opacity={0.5} />
-            <SvgText x={padL - 8} y={y + 3} fontSize={9} fill={palette.inkFaint} textAnchor="end">
-              {Math.round(ratio * max)}
-            </SvgText>
-          </G>
-        );
-      })}
-      {labels.map((label, index) => {
-        const x = padL + index * step + (step - barW) / 2;
-        const cH = ((critical[index] ?? 0) / max) * plotH;
-        const wH = ((warning[index] ?? 0) / max) * plotH;
-        const iH = ((info[index] ?? 0) / max) * plotH;
-        return (
-          <G key={`${label}-${index}`}>
-            {cH > 0 && <Rect x={x} y={baseY - cH} width={barW} height={cH} fill={palette.critical} rx={1} />}
-            {wH > 0 && <Rect x={x} y={baseY - cH - wH} width={barW} height={wH} fill={palette.warning} rx={1} />}
-            {iH > 0 && <Rect x={x} y={baseY - cH - wH - iH} width={barW} height={iH} rx={3} fill={infoColor} />}
-            <SvgText x={x + barW / 2} y={height - 8} fontSize={9} fill={palette.inkFaint} textAnchor="middle">
-              {label}
-            </SvgText>
-          </G>
-        );
-      })}
-    </Svg>
-  );
-}
-
-function DonutChart({ segments, total, size = 148 }: { segments: { label: string; value: number; color: string }[]; total: number; size?: number }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const scale = size / 150;
-  const radius = 48 * scale;
-  const circumference = 2 * Math.PI * radius;
-  const sum = Math.max(1, total);
-  let offset = 0;
-  return (
-    <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-      <Circle cx={size / 2} cy={size / 2} r={radius} stroke={isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'} strokeWidth={13 * scale} fill="none" />
-      {segments.map((segment) => {
-        const length = (segment.value / sum) * circumference;
-        const item = (
-          <Circle
-            key={segment.label}
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke={segment.color}
-            strokeWidth={13 * scale}
-            fill="none"
-            strokeDasharray={`${Math.max(0, length - 3)} ${circumference - Math.max(0, length - 3)}`}
-            strokeDashoffset={-offset}
-            strokeLinecap="round"
-            transform={`rotate(-90 ${size / 2} ${size / 2})`}
-          />
-        );
-        offset += length;
-        return item;
-      })}
-      <SvgText x={size / 2} y={size / 2 + 3} textAnchor="middle" fontSize={28 * scale} fontWeight="700" fill={palette.ink}>
-        {total}
-      </SvgText>
-      <SvgText x={size / 2} y={size / 2 + 20 * scale} textAnchor="middle" fontSize={9 * scale} fontWeight="600" fill={palette.inkFaint} letterSpacing={1}>
-        TOTAL
-      </SvgText>
-    </Svg>
-  );
-}
-
-/** Series legend + summary, in the row form the reference uses under a chart. */
-function SeriesTable({ rows }: { rows: { color: string; name: string; mean: string; spread: string }[] }) {
-  const { isDark } = useAppTheme();
-  const headCell = cn('font-mono text-[8.5px] uppercase tracking-[0.14em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted');
-  return (
-    <View className="mt-1">
-      <View className="flex-row items-center pb-1.5">
-        <Text className={cn(headCell, 'flex-1')}>Name</Text>
-        <Text className={cn(headCell, 'w-[80px] text-right')}>Mean</Text>
-        <Text className={cn(headCell, 'w-[80px] text-right')}>Stddev</Text>
-      </View>
-      <Rule />
-      {rows.map((row) => (
-        <View key={row.name} className="flex-row items-center pt-2">
-          <View className="min-w-0 flex-1 flex-row items-center gap-2">
-            <View style={{ width: 10, height: 2, borderRadius: 1, backgroundColor: row.color }} />
-            <Text numberOfLines={1} className={cn('font-body text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row.name}</Text>
-          </View>
-          <Text className={cn('w-[80px] text-right font-mono text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row.mean}</Text>
-          <Text className={cn('w-[80px] text-right font-mono text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{row.spread}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-/**
- * Gives a chart whatever height its panel has left.
- *
- * The charts draw into a fixed viewBox, so stretching the SVG would stretch the
- * type and the stroke weights with it. Measuring the slot and handing the chart
- * a real pixel height keeps every line the weight it was drawn at, at any panel
- * size.
- */
-function FillChart({ render, min = 90 }: { render: (height: number) => ReactNode; min?: number }) {
-  const [height, setHeight] = useState(0);
-  return (
-    <View
-      className="flex-1"
-      style={{ minHeight: 0 }}
-      onLayout={(event) => {
-        const next = Math.round(event.nativeEvent.layout.height);
-        setHeight((current) => (Math.abs(current - next) > 1 ? next : current));
-      }}
-    >
-      {height >= min ? render(height) : null}
-    </View>
-  );
-}
-
-function Legend({ items }: { items: { color: string; label: string }[] }) {
-  const { isDark } = useAppTheme();
-  return (
-    <View className="flex-row items-center gap-4">
-      {items.map((item) => (
-        <View key={item.label} className="flex-row items-center gap-1.5">
-          <View style={{ width: 10, height: 2, borderRadius: 1, backgroundColor: item.color }} />
-          <Text className={cn('font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{item.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Panels
 // ---------------------------------------------------------------------------
-
-/**
- * Asset performance against plan.
- *
- * The row an operator reads first, so it states target, actual and the gap
- * between them side by side, and tints the whole row when an asset is off
- * plan — the deviation is a property of the asset, not of one cell.
- */
-function AssetTable({
-  rows,
-  onOpenMachine,
-  label = 'Asset scorecard',
-  boxed = true,
-}: {
-  rows: AttentionRow[];
-  onOpenMachine: (id: string) => void;
-  label?: string;
-  boxed?: boolean;
-}) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const headCell = cn('font-mono text-[8.5px] uppercase tracking-[0.14em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted');
-  const onPlan = rows.filter((row) => row.health >= HEALTH_TARGET - 3).length;
-  const Wrapper = boxed ? Panel : OpenSection;
-  // The open variant sits on the page, so it drops the panel's inner gutter.
-  const gutter = boxed ? 'px-4' : 'px-0';
-
-  return (
-    <Wrapper label={label} meta={`${onPlan}/${rows.length} on plan`} padded={false}>
-      <View className={cn('flex-row items-center gap-2 pb-2', gutter)}>
-        <Text className={cn(headCell, 'flex-[2]')}>Asset</Text>
-        <Text className={cn(headCell, 'w-[88px]')}>Deviation</Text>
-        <Text className={cn(headCell, 'w-[52px] text-right')}>Target</Text>
-        <Text className={cn(headCell, 'w-[52px] text-right')}>Actual</Text>
-        <Text className={cn(headCell, 'w-[46px] text-right')}>Gap</Text>
-        <Text className={cn(headCell, 'flex-[1.5] pl-3')}>System intent</Text>
-      </View>
-      <Rule />
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        {rows.length === 0 ? (
-          <View className="items-center py-10">
-            <Text className={cn('font-body text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Every asset is on plan</Text>
-          </View>
-        ) : (
-          rows.map((row) => {
-            const gap = row.health - HEALTH_TARGET;
-            const tint = gap >= -3 ? palette.accent : gap >= -12 ? palette.warning : palette.critical;
-            const offPlan = gap < -3;
-            // Only a material miss earns a tinted row. Highlighting every asset
-            // that is a point or two under plan turns the whole table into one
-            // coloured block, which highlights nothing.
-            const flagged = gap < -12;
-            return (
-              <Pressable
-                key={row.id}
-                disabled={!row.machineId}
-                onPress={() => row.machineId && onOpenMachine(row.machineId)}
-                accessibilityRole="button"
-                accessibilityLabel={`${row.name}, health ${row.health} against target ${HEALTH_TARGET}. ${row.action}`}
-                className={cn('flex-row items-center gap-2 py-2.5', gutter)}
-                style={
-                  flagged
-                    ? {
-                        // Lighter on white: the same alpha that reads as a
-                        // whisper on near-black reads as a pink block on paper.
-                        backgroundColor: `${tint}${isDark ? '14' : '0B'}`,
-                        borderLeftWidth: 2,
-                        borderLeftColor: tint,
-                        paddingLeft: boxed ? 14 : 10,
-                      }
-                    : undefined
-                }
-              >
-                <View className="min-w-0 flex-[2] flex-row items-center gap-2.5">
-                  <Dot color={tint} />
-                  <View className="min-w-0 flex-1">
-                    <Text numberOfLines={1} className={cn('font-body text-[12.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{row.name}</Text>
-                    <Text numberOfLines={1} className={cn('mt-0.5 font-body text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                      {row.area}
-                    </Text>
-                  </View>
-                </View>
-                <View className="w-[88px]">
-                  <DeviationScale gap={gap} palette={palette} />
-                </View>
-                <Text className={cn('w-[52px] text-right font-mono text-[12px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{HEALTH_TARGET}</Text>
-                <Text className="w-[52px] text-right font-mono text-[12px]" style={{ color: offPlan ? tint : palette.ink }}>{row.health}</Text>
-                <Text className="w-[46px] text-right font-mono text-[12px]" style={{ color: tint }}>
-                  {gap > 0 ? `+${gap}` : gap}
-                </Text>
-                <Text numberOfLines={1} className={cn('flex-[1.5] pl-3 font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                  {row.action}
-                </Text>
-              </Pressable>
-            );
-          })
-        )}
-      </ScrollView>
-    </Wrapper>
-  );
-}
-
-/**
- * What the platform has done, newest first.
- *
- * Every other panel answers "what is the plant doing". This one answers "what
- * did ULTRON do about it", which is the difference between a dashboard you
- * watch and one you trust.
- */
-function ActionRail({
-  insights,
-  alarms,
-  label = 'Recent actions',
-  boxed = true,
-}: {
-  insights: Insight[];
-  alarms: DashboardAlarm[];
-  label?: string;
-  boxed?: boolean;
-}) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-
-  const entries = [
-    ...insights.slice(0, 5).map((insight) => ({
-      id: `i-${insight.id}`,
-      time: insight.confidence,
-      tag: insight.subject,
-      title: insight.recommendation,
-      meta: insight.finding,
-      tone: insight.priority === 'High' ? palette.critical : insight.priority === 'Medium' ? palette.warning : palette.accent,
-    })),
-    ...alarms.slice(0, 5).map((alarm) => ({
-      id: `a-${alarm.id}`,
-      time: alarm.age,
-      tag: alarm.source,
-      title: alarm.message,
-      meta: `${alarm.value} · threshold ${alarm.threshold}`,
-      tone: severityColor(palette, alarm.severity),
-    })),
-  ];
-
-  // Open variant: a spine with a dot per entry. A log is a sequence, and a
-  // continuous line says that where a stack of separate cards does not.
-  if (!boxed) {
-    return (
-      <OpenSection label={label} meta={`${entries.length} entries`}>
-        <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-          {entries.length === 0 ? (
-            <Text className={cn('py-8 text-center font-body text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-              Nothing to report
-            </Text>
-          ) : (
-            entries.map((entry, index) => (
-              <View key={entry.id} className="flex-row gap-3">
-                <View className="items-center" style={{ width: 12 }}>
-                  <View style={{ width: 1, height: 7, backgroundColor: index === 0 ? 'transparent' : palette.line }} />
-                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: entry.tone }} />
-                  <View style={{ width: 1, flex: 1, backgroundColor: palette.line }} />
-                </View>
-                <View className="min-w-0 flex-1 pb-3.5">
-                  <View className="flex-row items-center justify-between gap-2">
-                    <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body-medium text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                      {entry.title}
-                    </Text>
-                    <Text className={cn('font-mono text-[9.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{entry.time}</Text>
-                  </View>
-                  <Text numberOfLines={1} className={cn('mt-1 font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    {entry.tag} - {entry.meta}
-                  </Text>
-                </View>
-              </View>
-            ))
-          )}
-        </ScrollView>
-      </OpenSection>
-    );
-  }
-
-  return (
-    <Panel label={label} padded={false}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12, gap: 8 }} showsVerticalScrollIndicator={false}>
-        {entries.length === 0 ? (
-          <Text className={cn('px-2 py-8 text-center font-body text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            Nothing to report
-          </Text>
-        ) : (
-          entries.map((entry, index) => (
-            <View
-              key={entry.id}
-              className={cn('rounded-lg border px-3 py-2.5', isDark ? 'border-line-dark' : 'border-line-light')}
-              // Older entries recede down the rail — recency without a
-              // timestamp column taking up width.
-              style={{ backgroundColor: palette.panelRaised, opacity: 1 - Math.min(0.5, index * 0.09) }}
-            >
-              <View className="flex-row items-center justify-between gap-2">
-                <Text className={cn('font-mono text-[9.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{entry.time}</Text>
-                <View className="flex-row items-center gap-1.5">
-                  <Dot color={entry.tone} size={5} />
-                  <Text numberOfLines={1} className={cn('max-w-[120px] font-mono text-[8.5px] uppercase tracking-[0.12em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    {entry.tag}
-                  </Text>
-                </View>
-              </View>
-              <Text numberOfLines={2} className={cn('mt-1.5 font-body-medium text-[12px] leading-[16px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                {entry.title}
-              </Text>
-              <Text numberOfLines={1} className={cn('mt-1 font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                {entry.meta}
-              </Text>
-            </View>
-          ))
-        )}
-      </ScrollView>
-    </Panel>
-  );
-}
-
-function AlarmLog({ alarms, boxed = true }: { alarms: DashboardAlarm[]; boxed?: boolean }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const headCell = cn('font-mono text-[8.5px] uppercase tracking-[0.14em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted');
-  const Wrapper = boxed ? Panel : OpenSection;
-  const gutter = boxed ? 'px-4' : 'px-0';
-  return (
-    <Wrapper label="Alarm log" meta={`${alarms.length} open`} padded={false}>
-      <View className={cn('flex-row items-center pb-2', gutter)}>
-        <Text className={cn(headCell, 'w-[72px]')}>Severity</Text>
-        <Text className={cn(headCell, 'min-w-0 flex-[1.4]')}>Alarm</Text>
-        <Text className={cn(headCell, 'min-w-0 flex-1')}>Source</Text>
-        <Text className={cn(headCell, 'w-[92px]')}>Value</Text>
-        <Text className={cn(headCell, 'w-[84px]')}>Time</Text>
-        <Text className={cn(headCell, 'w-[56px] text-right')}>State</Text>
-      </View>
-      <Rule />
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        {alarms.length === 0 ? (
-          <View className="items-center py-10">
-            <Text className={cn('font-body text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>No active alarms</Text>
-          </View>
-        ) : (
-          alarms.map((alarm) => {
-            const color = severityColor(palette, alarm.severity);
-            return (
-              <View key={alarm.id} className={cn('flex-row items-center py-2.5', gutter)}>
-                <View className="w-[72px] flex-row items-center gap-2">
-                  <Dot color={color} size={5} />
-                  <Text className="font-body text-[10.5px]" style={{ color }}>{alarm.severity}</Text>
-                </View>
-                <Text numberOfLines={1} className={cn('min-w-0 flex-[1.4] font-body text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm.message}</Text>
-                <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm.source}</Text>
-                <Text numberOfLines={1} className={cn('w-[92px] font-mono text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{alarm.value}</Text>
-                <Text numberOfLines={1} className={cn('w-[84px] font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{alarm.time}</Text>
-                <Text className={cn('w-[56px] text-right font-body text-[10.5px]', alarm.state === 'Ack' ? 'text-accent' : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                  {alarm.state}
-                </Text>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
-    </Wrapper>
-  );
-}
-
-function Findings({ insights }: { insights: Insight[] }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  return (
-    <Panel label="Findings" meta={`${insights.length} open`} padded={false}>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 14 }} showsVerticalScrollIndicator={false}>
-        {insights.length === 0 ? (
-          <Text className={cn('py-10 text-center font-body text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            No recommendations right now
-          </Text>
-        ) : (
-          insights.map((insight, index) => {
-            const color = insight.priority === 'High' ? palette.critical : insight.priority === 'Medium' ? palette.warning : palette.accent;
-            return (
-              <View key={insight.id}>
-                {index > 0 ? <Rule /> : null}
-                <View className="py-3">
-                  <View className="flex-row items-center gap-2">
-                    <Dot color={color} size={5} />
-                    <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body-medium text-[12.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                      {insight.subject}
-                    </Text>
-                    <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color }}>{insight.priority}</Text>
-                  </View>
-                  <Text className={cn('mt-1.5 font-body text-[12px] leading-[17px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    {insight.finding}. {insight.recommendation}.
-                  </Text>
-                  <View className="mt-2 flex-row items-center gap-3">
-                    <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-mono text-[10px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                      {insight.evidence}
-                    </Text>
-                    <Text className={cn('font-mono text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Conf {insight.confidence}</Text>
-                  </View>
-                </View>
-              </View>
-            );
-          })
-        )}
-      </ScrollView>
-    </Panel>
-  );
-}
-
-/** Label/value line used by the configuration plates. */
-function SpecRow({ label, value, tint, first = false }: { label: string; value: string; tint?: string; first?: boolean }) {
-  const { isDark } = useAppTheme();
-  return (
-    <View>
-      {!first ? <Rule /> : null}
-      <View className="flex-row items-center justify-between gap-3 py-2.5">
-        <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[11.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          {label}
-        </Text>
-        <Text
-          numberOfLines={1}
-          className={cn('font-mono text-[11.5px]', !tint && (isDark ? 'text-ink' : 'text-ink-inverse'))}
-          style={tint ? { color: tint } : undefined}
-        >
-          {value}
-        </Text>
-      </View>
-    </View>
-  );
-}
 
 /** Full-screen sheet, used by the plant map editor. */
 function Sheet({ visible, title, onClose, children }: { visible: boolean; title: string; onClose: () => void; children: ReactNode }) {
@@ -1408,46 +677,6 @@ function Sheet({ visible, title, onClose, children }: { visible: boolean; title:
         </View>
       </View>
     </Modal>
-  );
-}
-
-/**
- * The section switcher.
- *
- * Plain text on a single baseline, the active one underlined in the accent.
- * No pills, no cells, no borders between items — the underline is the whole
- * control, which is why it reads as navigation rather than as five buttons.
- */
-function SectionTabs({ active, onChange }: { active: Section; onChange: (section: Section) => void }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  return (
-    <View className={cn('border-b', isDark ? 'border-line-dark' : 'border-line-light')}>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', paddingHorizontal: 16 }}>
-        {SECTIONS.map((section) => {
-          const isActive = section.id === active;
-          return (
-            <Pressable
-              key={section.id}
-              onPress={() => onChange(section.id)}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: isActive }}
-              className="mr-7 h-10 justify-center"
-              style={{ borderBottomWidth: 2, borderBottomColor: isActive ? palette.accent : 'transparent', marginBottom: -1 }}
-            >
-              <Text
-                className={cn(
-                  'font-body text-[12.5px]',
-                  isActive ? (isDark ? 'text-ink' : 'text-ink-inverse') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
-                )}
-              >
-                {section.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
   );
 }
 
@@ -1834,6 +1063,21 @@ export function DashboardOverview({
     </View>
   );
 
+  /**
+   * The plant overview, and only the plant overview.
+   *
+   * This used to be six workspaces behind an icon rail: Operations, Scorecard,
+   * Diagnostics, Setup, Trends and History. Five of them are gone. Scorecard,
+   * Trends and History were plant-wide summaries of numbers the machine screens
+   * already own per machine, and a plant-level average of a per-machine reading
+   * is a number nobody can act on. Diagnostics held Findings, which is the one
+   * thing on any of those pages a reader wanted — it now sits in the analytics
+   * column beside the plant it is about. Setup was configuration, which belongs
+   * with the thing being configured.
+   *
+   * With one workspace left there is nothing for a switcher to switch, so the
+   * rail went too, and the map got the 52px back.
+   */
   const renderSection = () => {
     switch (section) {
       // Headline and scorecard run together as one open surface; the map and
@@ -1880,7 +1124,7 @@ export function DashboardOverview({
           top: headerBand,
           right: isNarrow ? pad : railWidth + pad * 2,
           bottom: stripHeight + pad * 2,
-          left: 52,
+          left: pad,
         };
 
         return (
@@ -1970,463 +1214,18 @@ export function DashboardOverview({
                   flexDirection: 'row',
                 }}
               >
-                <PlantAnalyticsPanel analytics={analytics} kpis={plantKpis} palette={palette} isDark={isDark} />
+                <PlantAnalyticsPanel
+                  analytics={analytics}
+                  kpis={plantKpis}
+                  insights={metrics.insights}
+                  palette={palette}
+                  isDark={isDark}
+                />
               </FadeLayer>
             )}
           </View>
         );
       }
-
-      case 'scorecard':
-        return (
-          <View className={rowClass} style={{ flex: 1, minHeight: 0 }}>
-            {/* Left Rail: High-impact scorecard metrics & score factors */}
-            <View style={{ flex: isCompact ? undefined : 1, minHeight: 560 }}>
-              <OpenSection label="Plant scorecard" meta={`Target ${HEALTH_TARGET}`}>
-                <View className="flex-1 justify-start">
-                  <Text className={cn('font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Assets on plan</Text>
-                  <View className="mt-1 flex-row items-baseline gap-1.5">
-                    <Text className="font-display text-[40px] font-bold leading-[44px]" style={{ color: palette.accent }}>
-                      {onPlanCount}
-                    </Text>
-                    <Text className={cn('font-body text-[15px] font-semibold', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                      / {metrics.attention.length}
-                    </Text>
-                  </View>
-
-                  <View className="my-4">
-                    <Rule />
-                  </View>
-
-                  <View className="flex-row items-center justify-between">
-                    <Text className={cn('font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Average gap to target</Text>
-                    <View
-                      className="rounded-md px-2 py-0.5"
-                      style={{
-                        backgroundColor: mean(gaps) >= -3 ? palette.accentSoft : 'rgba(239, 68, 68, 0.12)',
-                      }}
-                    >
-                      <Text
-                        className="font-mono text-[11px] font-bold"
-                        style={{ color: mean(gaps) >= -3 ? palette.accent : palette.critical }}
-                      >
-                        {mean(gaps) >= 0 ? `+${mean(gaps).toFixed(1)}` : `${mean(gaps).toFixed(1)}`} pts
-                      </Text>
-                    </View>
-                  </View>
-                  <View className="mt-1 flex-row items-baseline gap-1.5">
-                    <Text
-                      className="font-display text-[38px] font-bold leading-[42px]"
-                      style={{ color: mean(gaps) >= -3 ? palette.accent : mean(gaps) >= -12 ? palette.warning : palette.critical }}
-                    >
-                      {mean(gaps) >= 0 ? '+' : ''}{mean(gaps).toFixed(1)}
-                    </Text>
-                    <Text className={cn('font-body text-[14px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>pts</Text>
-                  </View>
-
-                  <View className="my-4">
-                    <Rule />
-                  </View>
-
-                  <View className="flex-row">
-                    <View className="flex-1 pr-3">
-                      <Text numberOfLines={2} className={cn('font-body text-[11.5px] leading-[15px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                        Furthest off plan{'\n'}{worstAsset?.name ?? '—'}
-                      </Text>
-                      <Text className="mt-1.5 font-display text-[26px]" style={{ color: palette.critical }}>
-                        {worstAsset ? worstAsset.health : '—'}
-                      </Text>
-                    </View>
-                    <Rule vertical />
-                    <View className="flex-1 pl-3">
-                      <Text numberOfLines={2} className={cn('font-body text-[11.5px] leading-[15px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                        Best performing{'\n'}{bestAsset?.name ?? '—'}
-                      </Text>
-                      <Text className="mt-1.5 font-display text-[26px]" style={{ color: palette.accent }}>
-                        {bestAsset ? bestAsset.health : '—'}
-                      </Text>
-                    </View>
-                  </View>
-
-                  <View className="my-4">
-                    <Rule />
-                  </View>
-
-                  <Text className={cn('mb-3 font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    Score factors breakdown
-                  </Text>
-                  {healthFactorBars}
-                </View>
-              </OpenSection>
-            </View>
-
-            {/* Right Column: Asset Health Distribution & High-Precision Trends */}
-            <View className="gap-3" style={{ flex: isCompact ? undefined : 2.5 }}>
-              <View className={rowClass} style={fillRow(290)}>
-                <View style={{ flex: 1, height: isCompact ? 290 : undefined }}>
-                  <Panel label="Asset health distribution">
-                    <View className="flex-1">
-                      <FillChart render={(h) => <Histogram values={healthValues} height={h} />} />
-                      <SeriesTable
-                        rows={[{ color: palette.accent, name: 'Asset health', mean: mean(healthValues).toFixed(1), spread: stddev(healthValues).toFixed(2) }]}
-                      />
-                    </View>
-                  </Panel>
-                </View>
-                <View style={{ flex: 1, height: isCompact ? 290 : undefined }}>
-                  <Panel label="Health score over period" action={<Legend items={[{ color: SERIES_A, label: 'Health score' }, { color: palette.accent, label: 'Target (90)' }]} />}>
-                    <View className="flex-1">
-                      <FillChart
-                        render={(h) => (
-                          <TrendChart primary={healthTrend} height={h} leftBands={healthRail(palette)} timeLabels={trendTimeLabels} />
-                        )}
-                      />
-                      <SeriesTable
-                        rows={[{ color: SERIES_A, name: 'Health score', mean: mean(healthTrend).toFixed(1), spread: stddev(healthTrend).toFixed(2) }]}
-                      />
-                    </View>
-                  </Panel>
-                </View>
-              </View>
-
-              <View style={fillRow(290)}>
-                <Panel label="Throughput impulse rate over period" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
-                  <View className="flex-1">
-                    <FillChart
-                      render={(h) => <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} timeLabels={trendTimeLabels} />}
-                    />
-                    <SeriesTable
-                      rows={[{ color: SERIES_B, name: 'Packets / s', mean: mean(throughputTrend).toFixed(0), spread: stddev(throughputTrend).toFixed(2) }]}
-                    />
-                  </View>
-                </Panel>
-              </View>
-            </View>
-          </View>
-        );
-
-      // Trends: Dedicated high-density multi-channel telemetry workbench
-      case 'trends':
-        return (
-          <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            {/* Main Dual-Axis Plant Telemetry Trend */}
-            <View style={fillRow(420)}>
-              <Panel
-                label="Plant multi-metric trajectory"
-                meta={metrics.live ? 'Live telemetry pipeline' : 'Demo plant'}
-                action={<Legend items={[{ color: SERIES_A, label: 'Health score' }, { color: SERIES_B, label: 'Packets / s' }]} />}
-              >
-                <FillChart
-                  render={(h) => (
-                    <TrendChart
-                      primary={healthTrend}
-                      events={alarmEvents}
-                      height={h}
-                      leftBands={healthRail(palette)}
-                      rightBands={alarmRail(palette)}
-                      secondMax={alarmAxisMax}
-                      timeLabels={trendTimeLabels}
-                      project
-                    />
-                  )}
-                />
-              </Panel>
-            </View>
-
-            {/* Split Telemetry Channels */}
-            <View className={rowClass} style={{ width: '100%', height: 260 }}>
-              <View style={{ flex: 1 }}>
-                <OpenSection label="Health Trajectory Channel" action={<Legend items={[{ color: SERIES_A, label: 'Health score' }]} />}>
-                  <FillChart
-                    render={(h) => (
-                      <TrendChart primary={healthTrend} height={h} leftBands={healthRail(palette)} timeLabels={trendTimeLabels} />
-                    )}
-                  />
-                </OpenSection>
-              </View>
-
-              <Rule vertical />
-
-              <View style={{ flex: 1 }}>
-                <OpenSection label="Throughput Impulse Channel" action={<Legend items={[{ color: SERIES_B, label: 'Packets / s' }]} />}>
-                  <FillChart
-                    render={(h) => (
-                      <TrendChart primary={throughputTrend} height={h} primaryMax={Math.max(10, ...throughputTrend)} color={SERIES_B} timeLabels={trendTimeLabels} project />
-                    )}
-                  />
-                </OpenSection>
-              </View>
-            </View>
-
-            {/* Integrated Telemetry Channel Footer Stats */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingVertical: 10,
-                paddingHorizontal: 16,
-                borderRadius: 8,
-                backgroundColor: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                borderWidth: 1,
-                borderColor: palette.line,
-              }}
-            >
-              <View>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
-                  HEALTH CURRENT / MEAN
-                </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
-                  {healthTrend[healthTrend.length - 1] ?? 76} / {mean(healthTrend).toFixed(1)}
-                </Text>
-              </View>
-
-              <View style={{ width: 1, height: 18, backgroundColor: palette.line }} />
-
-              <View>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
-                  THROUGHPUT PEAK / AVG
-                </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.series2, marginTop: 2 }}>
-                  {Math.max(...throughputTrend)} / {mean(throughputTrend).toFixed(1)} pkt/s
-                </Text>
-              </View>
-
-              <View style={{ width: 1, height: 18, backgroundColor: palette.line }} />
-
-              <View>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
-                  ALARM DAYS TOTAL
-                </Text>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '600', color: palette.warning, marginTop: 2 }}>
-                  {alarmBars.critical.reduce((a, b) => a + b, 0)} critical / {alarmBars.warning.reduce((a, b) => a + b, 0)} warning
-                </Text>
-              </View>
-            </View>
-          </View>
-        );
-
-      // Diagnostics: Operational fault diagnosis & evidence workbench
-      case 'diagnostics':
-        return (
-          <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            <View className={rowClass} style={{ width: '100%' }}>
-              <View style={{ flex: isCompact ? undefined : 1.8, height: 360 }}>
-                <Findings insights={metrics.insights} />
-              </View>
-              <View style={{ flex: isCompact ? undefined : 1, height: 360 }}>
-                <Panel label="Alarm severity distribution" meta={`${severityTotal} total events`}>
-                  <View className="flex-1 flex-row items-center justify-around gap-3">
-                    <DonutChart segments={severitySegments} total={severityTotal} size={140} />
-                    <View className="gap-3">
-                      {severitySegments.map((segment) => (
-                        <View key={segment.label} className="flex-row items-center gap-3">
-                          <Dot color={segment.color} size={7} />
-                          <Text className={cn('w-[96px] font-body text-[12px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{segment.label}</Text>
-                          <Text className={cn('font-mono text-[12px] tabular-nums', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                            {segment.value} ({severityTotal > 0 ? Math.round((segment.value / severityTotal) * 100) : 0}%)
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </Panel>
-              </View>
-            </View>
-
-            <View style={fillRow(320)}>
-              <AssetTable rows={metrics.attention} onOpenMachine={onOpenMachine} label="Asset diagnostic evidence & telemetry" boxed={false} />
-            </View>
-          </View>
-        );
-
-      // Setup: Technical specification sheet & configuration grid
-      case 'setup':
-        return (
-          <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            <View className={rowClass} style={fillRow(340)}>
-              <View style={{ flex: isCompact ? undefined : 1.4, minHeight: 0 }}>
-                <OpenSection
-                  label="Plant map 3D component layout"
-                  meta={`Scale ${plantConfig.scene3d.modelScale}% · ${plantConfig.scene3d.components.length} components`}
-                  action={
-                    canEditPlant ? (
-                      <Pressable onPress={() => setPlantEditorOpen(true)} accessibilityRole="button" className="rounded-md px-2 py-1">
-                        <Text className="font-body text-[10.5px] text-accent">Edit map</Text>
-                      </Pressable>
-                    ) : null
-                  }
-                >
-                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                    {plantConfig.scene3d.components.map((component, index) => {
-                      const edits = countPartEdits(component.parts);
-                      const changed = edits.hidden + edits.colored + edits.resized;
-                      return (
-                        <View key={component.id}>
-                          {index > 0 ? <Rule /> : null}
-                          <View className="flex-row items-center gap-3 py-2.5">
-                            <Dot color={plantComponentColors[component.id] ?? '#7A7E86'} size={6} />
-                            <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body text-[12px] font-medium', isDark ? 'text-ink' : 'text-ink-inverse')}>
-                              {component.name}
-                            </Text>
-                            <Text className={cn('w-[96px] font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                              {changed > 0 ? `${changed} part edits` : component.status}
-                            </Text>
-                            <Text className={cn('w-[104px] text-right font-mono text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                              {Math.round(component.x)} / {Math.round(component.z)} · {component.scale}%
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })}
-                    {!canEditPlant ? (
-                      <Text className={cn('pt-3 font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                        The map layout is shared. Only a super admin can change the 3D plant.
-                      </Text>
-                    ) : null}
-                  </ScrollView>
-                </OpenSection>
-              </View>
-
-              <Rule vertical />
-
-              <View style={{ flex: isCompact ? undefined : 1, minHeight: 0 }}>
-                <OpenSection label="Signal sources & pipeline" meta={metrics.live ? 'Live WebSocket pipeline' : 'Demo plant'}>
-                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                    <SpecRow first label="Plant" value={metrics.plantName} />
-                    <SpecRow label="Projects" value={String(projects.length)} />
-                    <SpecRow
-                      label="Areas"
-                      value={String(folders.filter((folder) => folder.type === 'Area' || folder.type === 'Unit' || folder.type === 'System').length)}
-                    />
-                    <SpecRow label="Machines defined" value={String(machines.length)} />
-                    <SpecRow label="Devices" value={String(devices.filter((device) => !device.archived).length)} />
-                    <SpecRow label="I/O cards" value={String(cards.length)} />
-                    <SpecRow
-                      label="Gateways connected"
-                      value={`${metrics.connectedGateways} / ${metrics.totalGateways}`}
-                      tint={metrics.connectedGateways < metrics.totalGateways ? palette.critical : palette.accent}
-                    />
-                    <SpecRow
-                      label="Transport"
-                      value={metrics.streamHealthy ? 'MQTT · healthy' : 'MQTT · stale'}
-                      tint={metrics.streamHealthy ? palette.accent : palette.warning}
-                    />
-                  </ScrollView>
-                </OpenSection>
-              </View>
-            </View>
-
-            <Rule />
-
-            <View className={rowClass} style={fillRow(270)}>
-              <View style={{ flex: isCompact ? undefined : 1.4, minHeight: 0 }}>
-                <OpenSection label="Health scoring model" meta={`Score ${metrics.healthScore}/100 · target ${HEALTH_TARGET}`}>
-                  <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-                    {metrics.healthFactors.map((factor, index) => (
-                      <ContributionRow
-                        key={factor.label}
-                        first={index === 0}
-                        label={`${factor.label}  ·  weight ${HEALTH_WEIGHTS[index] ?? '—'}`}
-                        value={factor.value}
-                        tone={factor.value >= 75 ? palette.accent : factor.value >= 50 ? palette.warning : palette.critical}
-                      />
-                    ))}
-                    <SpecRow label="Sampling interval" value={`${SAMPLE_MS / 1000} s`} />
-                  </ScrollView>
-                </OpenSection>
-              </View>
-
-              <Rule vertical />
-
-              <View style={{ flex: isCompact ? undefined : 1, minHeight: 0 }}>
-                <OpenSection
-                  label="System microservices health"
-                  meta={metrics.services.filter((service) => service.status !== 'healthy').length === 0 ? 'All nominal' : 'Degraded'}
-                >
-                  <View className="flex-row flex-wrap content-start gap-x-6 gap-y-3 pt-1">
-                    {metrics.services.map((service) => (
-                      <View key={service.name} className="min-w-[136px] flex-row items-center gap-2">
-                        <Dot color={statusColor(palette, service.status)} size={6} />
-                        <Text numberOfLines={1} className={cn('font-body text-[12px] font-medium', isDark ? 'text-ink' : 'text-ink-inverse')}>{service.name}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </OpenSection>
-              </View>
-            </View>
-
-            <Rule />
-
-            <View className={rowClass} style={{ width: '100%' }}>
-              <View style={{ flex: 1 }}>
-                <OpenSection label="Access permissions">
-                  <SpecRow first label="Signed in as" value={currentUser?.name || currentUser?.username || 'Admin User'} />
-                  <SpecRow label="Role" value={currentUser ? ROLE_LABEL[currentUser.role] : 'Administrator'} />
-                  <SpecRow label="Edit plant map" value={canEditPlant ? 'Allowed' : 'Read only'} tint={canEditPlant ? palette.accent : palette.neutral} />
-                </OpenSection>
-              </View>
-
-              <Rule vertical />
-
-              <View style={{ flex: 1 }}>
-                <OpenSection label="Workspace browse">
-                  <Pressable
-                    onPress={onOpenDevices}
-                    accessibilityRole="button"
-                    className="flex-row items-center gap-2.5 py-2.5"
-                  >
-                    <MaterialCommunityIcons name="server-network" size={16} color={palette.accent} />
-                    <Text className={cn('font-body text-[12px] font-medium', isDark ? 'text-ink' : 'text-ink-inverse')}>Open the devices table</Text>
-                    <Text className="font-body text-[12px]" style={{ color: palette.accent }}>→</Text>
-                  </Pressable>
-                  <Rule />
-                  <Text className={cn('pt-2.5 font-body text-[10.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    Gateways, racks, cards and channels, with live connection states and IP configurations.
-                  </Text>
-                </OpenSection>
-              </View>
-            </View>
-          </View>
-        );
-
-      // History: Operational alarm trends & historical incident log
-      case 'history':
-        return (
-          <View className="gap-3" style={{ flex: 1, minHeight: 0 }}>
-            <View className={rowClass} style={{ width: '100%', height: 300 }}>
-              <View style={{ flex: isCompact ? undefined : 1.7 }}>
-                <OpenSection
-                  label="Daily alarm severity trend"
-                  meta={metrics.live ? 'Live session' : 'Last 7 days'}
-                  action={
-                    <Legend
-                      items={[
-                        { color: palette.critical, label: 'Critical' },
-                        { color: palette.warning, label: 'Warning' },
-                        { color: palette.neutral, label: 'Info' },
-                      ]}
-                    />
-                  }
-                >
-                  <FillChart render={(h) => <StackedBars labels={alarmBars.labels} critical={alarmBars.critical} warning={alarmBars.warning} info={alarmBars.info} height={h} />} />
-                </OpenSection>
-              </View>
-
-              <Rule vertical />
-
-              <View style={{ flex: isCompact ? undefined : 1, minWidth: isCompact ? undefined : 320 }}>
-                <ActionRail insights={metrics.insights} alarms={metrics.alarms} label="Operator action log" boxed={false} />
-              </View>
-            </View>
-
-            <Rule />
-
-            <View style={fillRow(320)}>
-              <AlarmLog alarms={metrics.alarms} boxed={false} />
-            </View>
-          </View>
-        );
 
       default:
         return null;
@@ -2442,30 +1241,9 @@ export function DashboardOverview({
         zIndex: isImmersive(plantView) ? 60 : 0,
       }}
     >
-      {/* Compact vertical icon navigation rail */}
-      <LeftMiniNav
-        activeSection={section}
-        onSectionChange={setSection}
-        palette={palette}
-        isDark={isDark}
-      />
-
-      {/* Main Workspace Surface */}
+      {/* One workspace, full bleed. No icon rail: it had one destination left. */}
       <View className="flex-1" style={{ minHeight: 0 }}>
-        {section === 'operations' ? (
-          <View className="flex-1" style={{ minHeight: 0 }}>
-            {renderSection()}
-          </View>
-        ) : (
-          <ScrollView
-            className="flex-1"
-            style={{ minHeight: 0 }}
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ flexGrow: 1, padding: 14 }}
-          >
-            {renderSection()}
-          </ScrollView>
-        )}
+        {renderSection()}
       </View>
 
       <Sheet visible={plantEditorOpen} title="Edit plant map" onClose={() => setPlantEditorOpen(false)}>

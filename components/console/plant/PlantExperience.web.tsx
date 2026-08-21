@@ -271,18 +271,57 @@ function ExitButton({
 }
 
 /** Contextual inspector for the selected asset. */
+/**
+ * Keeps a panel mounted long enough to animate out.
+ *
+ * A panel that unmounts the instant its data goes away can only ever animate
+ * in, which is the half of the transition nobody notices missing until the
+ * other half is there. `rendered` holds the node through the exit; `shown` is
+ * the flag the styles interpolate on, flipped a frame after mount so the
+ * browser has a "before" to transition from.
+ */
+function useMountTransition(active: boolean, exitMs: number) {
+  const [rendered, setRendered] = useState(active);
+  const [shown, setShown] = useState(false);
+
+  useEffect(() => {
+    if (active) {
+      setRendered(true);
+      const frame = requestAnimationFrame(() => setShown(true));
+      return () => cancelAnimationFrame(frame);
+    }
+    setShown(false);
+    const timer = setTimeout(() => setRendered(false), exitMs);
+    return () => clearTimeout(timer);
+  }, [active, exitMs]);
+
+  return { rendered, shown };
+}
+
 function AssetDetails({
   asset,
   palette,
   isDark,
   statusColor,
   onClose,
+  shown,
+  /**
+   * Docks to the left edge instead of the right.
+   *
+   * On the plant page the right edge is the analytics column, and this panel
+   * lives inside the 3D layer — a lower stacking context — so a right-docked
+   * inspector would open underneath it. Immersive has no such column, so it
+   * keeps the right.
+   */
+  dockLeft = false,
 }: {
   asset: PlantAssetTelemetry;
   palette: ConsolePalette;
   isDark: boolean;
   statusColor: string;
   onClose: () => void;
+  shown: boolean;
+  dockLeft?: boolean;
 }) {
   const rows: [string, string][] = [
     ['Machines', String(asset.machines).padStart(2, '0')],
@@ -296,20 +335,32 @@ function AssetDetails({
   ];
   return (
     <div
+      role="dialog"
+      aria-label={`${asset.name} details`}
       style={{
         position: 'absolute',
-        right: 12,
-        top: 12,
-        bottom: 12,
+        ...(dockLeft ? { left: 12, top: 56 } : { right: 12, top: 12, bottom: 12 }),
+        ...(dockLeft ? { maxHeight: 'calc(100% - 260px)' } : null),
         width: 268,
         zIndex: 7,
         display: 'flex',
         flexDirection: 'column',
-        borderRadius: 5,
+        borderRadius: 6,
         overflow: 'hidden',
         background: palette.panel,
         border: `1px solid ${palette.line}`,
         boxShadow: isDark ? '0 14px 34px rgba(0,0,0,0.5)' : '0 10px 24px rgba(15,20,30,0.14)',
+        // The entrance. It arrives from the edge it is docked to, so the motion
+        // points back at where it came from, and it settles rather than
+        // stopping — the slight overshoot in the easing is what makes a panel
+        // feel placed instead of teleported.
+        opacity: shown ? 1 : 0,
+        transform: shown
+          ? 'translateX(0) scale(1)'
+          : `translateX(${dockLeft ? '-14px' : '14px'}) scale(0.97)`,
+        transformOrigin: dockLeft ? 'left center' : 'right center',
+        transition: `opacity 200ms ${EASE}, transform 280ms cubic-bezier(0.22, 1, 0.36, 1)`,
+        willChange: 'opacity, transform',
       }}
     >
       <div style={{ padding: '11px 13px', borderBottom: `1px solid ${palette.line}` }}>
@@ -495,6 +546,14 @@ export default function PlantExperience({
 
   const selected = selectedId ? assets.find((asset) => asset.id === selectedId) ?? null : null;
 
+  // The inspector outlives the selection by one animation. `detailsAsset` is
+  // the last non-null selection, so the panel keeps its contents while it
+  // slides out instead of emptying first and then leaving.
+  const { rendered: detailsRendered, shown: detailsShown } = useMountTransition(Boolean(selected), 300);
+  const lastSelected = useRef<PlantAssetTelemetry | null>(null);
+  if (selected) lastSelected.current = selected;
+  const detailsAsset = selected ?? lastSelected.current;
+
   // Which parts of the canvas are under chrome, so the label solver can keep
   // every callout in the yard the operator can actually see. Memoised because
   // the solver re-runs whenever this identity changes, and it re-runs on every
@@ -632,14 +691,21 @@ export default function PlantExperience({
           </span>
         </div>
 
-        {/* --- asset inspector, immersive only --- */}
-        {immersive && selected ? (
+        {/* --- asset inspector ---
+            Used to be immersive-only, which meant clicking a component on the
+            plant page selected it, highlighted it, and then told you nothing.
+            Selecting a thing should show you the thing. `detailsAsset` holds
+            the last selection through the exit animation so the panel does not
+            blank its own contents on the way out. */}
+        {detailsRendered && detailsAsset ? (
           <AssetDetails
-            asset={selected}
+            asset={detailsAsset}
             palette={palette}
             isDark={isDark}
-            statusColor={statusColors[selected.id] ?? palette.accent}
+            statusColor={statusColors[detailsAsset.id] ?? palette.accent}
             onClose={() => onSelect(null)}
+            shown={detailsShown}
+            dockLeft={!immersive}
           />
         ) : null}
       </div>

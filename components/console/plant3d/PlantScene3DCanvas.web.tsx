@@ -289,6 +289,18 @@ function SelectionWall({
 export const PLINTH_H = 0.42;
 
 /**
+ * How far a component rises under the cursor, and how much it grows.
+ *
+ * Both deliberately small. These are buildings in a yard seen from a distance,
+ * and a building that jumps half its own height when a cursor crosses it reads
+ * as a bug in the physics rather than as feedback. A third of the plinth's
+ * height and two percent is enough to register as movement at a glance without
+ * ever looking like the model has come loose.
+ */
+const HOVER_LIFT = 0.14;
+const HOVER_SWELL = 0.02;
+
+/**
  * The raised plinth every component stands on, plus its boundary.
  *
  * It is a real slab sitting ON the floor (0 → PLINTH_H) with the model on top,
@@ -473,6 +485,10 @@ function PlacedComponent({
   const [labelPos, setLabelPos] = useState<[number, number, number]>([0, 5.6, 0]);
   const [hovered, setHovered] = useState(false);
   const active = hovered || isSelectedComponent;
+  /** The model's own group — lifted and swelled on hover. See `useFrame` below. */
+  const modelRef = useRef<THREE.Group>(null);
+  /** Eased 0→1 hover amount. A ref, not state: it changes every frame. */
+  const hoverEase = useRef(0);
   const glow = useGlowTexture();
   const wallTex = useWallGradient();
   // Footprint measured from the model itself, so the plinth fits a utility
@@ -494,6 +510,44 @@ function PlacedComponent({
   const invalidate = useThree((state) => state.invalidate);
 
   const scale = plantComponentScale(component.model, component.scale, modelScale);
+
+  /**
+   * The hover response: the building rises off its plinth and swells slightly.
+   *
+   * Only the model moves. The plinth stays planted, because a pad that lifts
+   * off the ground with the building it is supporting reads as the whole
+   * object detaching from the yard rather than as one component answering the
+   * cursor — and the pad is already doing its own job, brightening its rim and
+   * lighting the ground glow underneath.
+   *
+   * The easing is exponential toward the target and frame-rate independent, so
+   * it feels identical at 30fps and 120fps. This canvas runs a `demand`
+   * frameloop, so each animating frame has to request the next one; the guard
+   * at the top stops requesting as soon as the value has settled, which is what
+   * keeps a still scene at zero frames instead of spinning forever.
+   */
+  useFrame((_, delta) => {
+    const node = modelRef.current;
+    if (!node) return;
+    const target = active ? 1 : 0;
+    const current = hoverEase.current;
+
+    if (Math.abs(target - current) < 0.0015) {
+      if (current !== target) {
+        hoverEase.current = target;
+        node.position.y = PLINTH_H + target * HOVER_LIFT;
+        node.scale.setScalar(1 + target * HOVER_SWELL);
+        invalidate();
+      }
+      return;
+    }
+
+    const next = current + (target - current) * (1 - Math.exp(-delta * 13));
+    hoverEase.current = next;
+    node.position.y = PLINTH_H + next * HOVER_LIFT;
+    node.scale.setScalar(1 + next * HOVER_SWELL);
+    invalidate();
+  });
 
   // --- report the model's node tree to the editor once per model
   useEffect(() => {
@@ -671,7 +725,7 @@ function PlacedComponent({
       >
         <ComponentPad box={footprint} active={active} dark={dark} glow={glow} wallTex={wallTex} />
         {/* the model stands ON the plinth */}
-        <group position={[0, PLINTH_H, 0]}>
+        <group ref={modelRef} position={[0, PLINTH_H, 0]}>
           {/* Model-space correction, kept strictly separate from the placement
               transform above: the outer group is where the map puts the
               component, this one is only ever about the asset's own frame. */}

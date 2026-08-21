@@ -41,7 +41,7 @@ export function PlantBottomAnalytics({
         minHeight: 0,
       }}
     >
-      {/* --- PANEL 1: HEALTH SCORE OVER TIME (Operational Health Timeline) --- */}
+      {/* --- PANEL 1: HEALTH SCORE --- */}
       <PlantCard
         palette={palette}
         isDark={isDark}
@@ -50,12 +50,16 @@ export function PlantBottomAnalytics({
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
             <MicroLabel palette={palette} size={11}>
-              HEALTH SCORE OVER TIME
+              HEALTH SCORE
             </MicroLabel>
           </View>
         </View>
 
-        {/* Envelope Chart */}
+        {/* Envelope Chart. The statistical rail that used to close this card —
+            current, mean, min, max, std dev — is gone: the chart already draws
+            the current value at its endpoint and labels its own maximum and
+            minimum, so the rail was the same four numbers restated as text
+            directly under the picture of them. */}
         <View style={{ flex: 1, minHeight: 0, marginTop: STEP * 1.5 }}>
           <Measured>
             {({ width, height }) => (
@@ -71,68 +75,6 @@ export function PlantBottomAnalytics({
               />
             )}
           </Measured>
-        </View>
-
-        {/* Integrated Statistical Rail */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            paddingTop: STEP * 1.5,
-            marginTop: STEP,
-            borderTopWidth: 1,
-            borderTopColor: palette.line,
-          }}
-        >
-          <View>
-            <MicroLabel palette={palette} size={9.5}>
-              CURRENT
-            </MicroLabel>
-            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '700', color: palette.ink, marginTop: 1 }}>
-              76 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
-            </Text>
-          </View>
-          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
-
-          <View>
-            <MicroLabel palette={palette} size={9.5}>
-              MEAN
-            </MicroLabel>
-            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '700', color: palette.ink, marginTop: 1 }}>
-              76.2 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
-            </Text>
-          </View>
-          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
-
-          <View>
-            <MicroLabel palette={palette} size={9.5}>
-              MIN
-            </MicroLabel>
-            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '700', color: palette.ink, marginTop: 1 }}>
-              74.0 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
-            </Text>
-          </View>
-          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
-
-          <View>
-            <MicroLabel palette={palette} size={9.5}>
-              MAX
-            </MicroLabel>
-            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '700', color: palette.ink, marginTop: 1 }}>
-              78.0 <Text style={{ fontSize: 9.5, color: palette.inkFaint }}>/100</Text>
-            </Text>
-          </View>
-          <View style={{ width: 1, height: 16, backgroundColor: palette.line }} />
-
-          <View>
-            <MicroLabel palette={palette} size={9.5}>
-              STD DEV
-            </MicroLabel>
-            <Text className="font-mono tabular-nums" style={{ fontSize: 13, fontWeight: '700', color: palette.ink, marginTop: 1 }}>
-              1.24
-            </Text>
-          </View>
         </View>
       </PlantCard>
 

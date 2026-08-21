@@ -596,13 +596,18 @@ export function HealthEnvelopeChart({
         Critical {critical}
       </SvgText>
 
-      {/* Health Trajectory Spline */}
-      <Path d={pathD} fill="none" stroke={palette.accent} strokeWidth={2} />
+      {/* Health Trajectory Spline.
+          Slim on purpose. A 2px stroke on a chart this size reads as a
+          highlighter mark — it sits on top of the grid rather than in it, and
+          it swallows the small vertical movements that are the entire point of
+          a health line whose range is 74 to 78. At 1.25 the line is a
+          measurement again. */}
+      <Path d={pathD} fill="none" stroke={palette.accent} strokeWidth={1.25} strokeLinecap="round" strokeLinejoin="round" />
 
       {/* Maxima Callout */}
       {maxPt && (
         <G key="env-max">
-          <Circle cx={maxPt.x} cy={maxPt.y} r={4} fill={palette.accent} />
+          <Circle cx={maxPt.x} cy={maxPt.y} r={3} fill={palette.accent} />
           <Rect x={maxPt.x - 22} y={maxPt.y - 18} width={44} height={14} rx={3} fill={palette.accent} opacity={0.9} />
           <SvgText x={maxPt.x} y={maxPt.y - 8} fontSize={8} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
             MAX {values[maxIdx]}
@@ -613,7 +618,7 @@ export function HealthEnvelopeChart({
       {/* Minima Callout */}
       {minPt && maxIdx !== minIdx && (
         <G key="env-min">
-          <Circle cx={minPt.x} cy={minPt.y} r={4} fill={palette.critical} />
+          <Circle cx={minPt.x} cy={minPt.y} r={3} fill={palette.critical} />
           <Rect x={minPt.x - 22} y={minPt.y + 4} width={44} height={14} rx={3} fill={palette.critical} opacity={0.9} />
           <SvgText x={minPt.x} y={minPt.y + 14} fontSize={8} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
             MIN {values[minIdx]}
@@ -622,8 +627,8 @@ export function HealthEnvelopeChart({
       )}
 
       {/* Current Endpoint Marker */}
-      <Circle cx={latestPt.x} cy={latestPt.y} r={4.5} fill={latestTone} />
-      <Circle cx={latestPt.x} cy={latestPt.y} r={8} stroke={latestTone} strokeWidth={1} fill="none" opacity={0.4} />
+      <Circle cx={latestPt.x} cy={latestPt.y} r={3.4} fill={latestTone} />
+      <Circle cx={latestPt.x} cy={latestPt.y} r={7} stroke={latestTone} strokeWidth={0.9} fill="none" opacity={0.4} />
       <SvgText x={latestPt.x + 12} y={latestPt.y + 3.5} fontSize={11} fill={palette.ink} fontWeight="700">
         {latestVal}
       </SvgText>
