@@ -454,7 +454,7 @@ export function MachineWorkspace({
       )}
 
       {isActual && actualTab === 'trend' && (
-        <TrendView mappedChannels={mappedChannels} devices={devices} machineId={machine.id} expectedPoints={expectedPoints} />
+        <TrendView mappedChannels={mappedChannels} devices={devices} machineId={machine.id} />
       )}
 
     </View>
