@@ -9,12 +9,12 @@
  *
  * Layout
  * ------
- * Desktop is a two-column workspace: the analysis on the left, the instruments
- * it was read from in a sticky rail on the right. Those are the two questions an
- * operator asks in the same breath — "what is wrong" and "what is it actually
- * reading" — and answering them a scroll apart is what made the previous
- * version read as a document rather than an instrument. Below ~1180px the rail
- * falls under the content, which is the only honest thing to do with it.
+ * One column, two objects. The status band answers "how is this machine" and
+ * stays put; the card below it answers "show me", and its tab bar is the only
+ * navigation between the three ways of being shown. There used to be a sticky
+ * instrument rail down the right-hand side as well — it was the Signals table
+ * in miniature, and the half of that subject it could not carry, the
+ * acquisition chain behind each reading, is now inside the Signals row itself.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
@@ -57,7 +57,6 @@ import {
   type SignalView,
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
-import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
 import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
@@ -87,7 +86,6 @@ import {
   type AttentionItem,
   type CurrentDiagnosis,
 } from './analyzer/ConclusionTab';
-import { ConnectivityTab } from './analyzer/ConnectivityTab';
 import { signalFilterCounts, SIGNAL_FILTERS, SignalTab, type SignalFilter } from './analyzer/SignalTab';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -226,17 +224,20 @@ function humanise(value: string): string {
 /**
  * Three screens, three questions.
  *
- * Diagnosis: what is wrong. Advance Diagnosis: why, and where on the machine.
- * Signal: what the sensors read and whether they are inside their limits.
- * Connectivity: which piece of hardware produces each of those readings.
+ * Diagnosis: what is wrong, and what to do. Advance Diagnosis: why, and where
+ * on the machine. Signals: what every sensor reads, whether that is inside its
+ * limits, and which piece of hardware produced it.
  *
  * What used to be six tabs collapsed into these. Evidence was never really a
  * subject of its own — it is the reasoning behind a conclusion and belongs
- * beside it. Limits answered half of the Signal question and is now the other
- * half of that table. Model and Connectivity were provenance, and provenance
- * belongs where the number it qualifies is shown, not on a page of its own.
+ * beside it. Limits answered half of the Signal question and became the other
+ * half of that table. Connectivity answered the question directly underneath a
+ * reading and is now the second half of the row that shows it: one row per
+ * sensor, rather than the same sensor findable twice, once by what it measures
+ * and once by where it is wired. Model provenance is a footnote under the table
+ * whose numbers it qualifies.
  */
-type TabKey = 'diagnosis' | 'advance' | 'signal' | 'connectivity';
+type TabKey = 'diagnosis' | 'advance' | 'signal';
 
 /**
  * What each pilot tag is actually for, in the words a plant operator would use.
@@ -771,17 +772,12 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
     },
     {
       value: 'signal',
-      label: 'Signal',
+      label: 'Signals',
       icon: 'access-point',
-      count: signalsOutsideLimits,
-      countVariant: signalsOutsideLimits > 0 ? 'warning' : 'muted',
-    },
-    {
-      value: 'connectivity',
-      label: 'Connectivity',
-      icon: 'lan-connect',
-      count: connectivitySummary.unmapped + connectivitySummary.offline,
-      countVariant: connectivitySummary.unmapped + connectivitySummary.offline > 0 ? 'warning' : 'muted',
+      // Rows that need a decision on this screen: a reading outside its limits,
+      // or a mapped point the model could not read at all.
+      count: signalsOutsideLimits + unconsumed.length,
+      countVariant: signalsOutsideLimits + unconsumed.length > 0 ? 'warning' : 'muted',
     },
   ];
 
@@ -953,7 +949,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         <ConclusionTab
           attention={visibleAttention}
           attentionTotal={attentionItems.length}
-          changes={keyChanges}
           diagnosis={currentDiagnosis}
           action={nextAction}
           wide={wide}
@@ -962,12 +957,14 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       )
     ) : tab === 'advance' ? (
       <AdvanceDiagnosisTab parts={partViews} selectedPart={selectedPart} onSelectPart={setSelectedPart} wide={wide} />
-    ) : tab === 'connectivity' ? (
-      <ConnectivityTab connections={connections} devices={devices} cards={cards} live={live} />
     ) : (
       <SignalTab
         signals={signalViews}
         unconsumed={unconsumed}
+        connectionByPoint={connectionByLabel}
+        devices={devices}
+        cards={cards}
+        live={live}
         wide={wide}
         onOpenPart={openPart}
         filter={signalFilter}
@@ -987,7 +984,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           statusVariant={verdictVariant}
           statusContext={humanise(detail.inferredMachineState)}
           verdictLine={verdictLine}
-          modelName="Single-screw extruder diagnostic model"
           sourceLabel={sourceLabel}
           sourceVariant={sourceVariant}
           scenarioLabel={scenarioRun ? scenarioRun.scenario.id : 'Scenarios'}

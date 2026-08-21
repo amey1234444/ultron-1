@@ -40,7 +40,7 @@ import {
   type SignalView,
 } from '../../../../lib/analysis/extruder';
 import { cn } from '../../../../lib/cn';
-import { alpha, Badge, consolePalette, variantStyle, type Variant } from '../../../ui';
+import { alpha, Badge, consolePalette, displayWeight, tabular, text, variantStyle, type Variant } from '../../../ui';
 import { Block, EmptyState, Fact, HoverLift, PressSurface, RangeRail, TrendChart } from './AnalyzerParts';
 
 
@@ -118,7 +118,7 @@ function PartChips({
         accessibilityRole="tab"
         accessibilityLabel={state ? `${label}, ${PART_STATE_LABEL[state]}` : label}
         accent={palette.lineStrong}
-        className="flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5"
+        className="flex-row items-center gap-1.5 rounded-[10px] border px-2.5 py-1.5"
         style={{
           borderColor: active ? palette.lineStrong : palette.line,
           backgroundColor: active ? palette.panelRaised : palette.panel,
@@ -126,7 +126,7 @@ function PartChips({
       >
         <MaterialCommunityIcons name={icon} size={13} color={active ? palette.ink : accent} />
         <Text
-          className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+          className={text.label}
           style={{ color: active ? palette.ink : palette.inkMuted }}
         >
           {label}
@@ -178,24 +178,24 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
                 onPress={() => onSelect(part)}
                 accent={style.accent}
                 accessibilityLabel={`Open ${part}, ${PART_STATE_LABEL[state]}`}
-                className="min-w-[124px] rounded-xl border px-3 py-2.5"
+                className="min-w-[124px] rounded-[10px] border px-3 py-2.5"
                 style={{
                   borderColor: state === 'NORMAL' ? palette.line : alpha(style.accent, 0.4),
                   backgroundColor: palette.panel,
                 }}
               >
                 <View
-                  className="h-7 w-7 items-center justify-center rounded-lg"
+                  className="h-7 w-7 items-center justify-center rounded-[6px]"
                   style={{ backgroundColor: state === 'NORMAL' ? palette.panelRaised : alpha(style.accent, 0.12) }}
                 >
                   <MaterialCommunityIcons name={PART_ICON[part]} size={15} color={style.accent} />
                 </View>
-                <Text className="mt-2 font-body-bold text-[11.5px]" style={{ color: palette.ink }} numberOfLines={1}>
+                <Text className={cn('mt-2', text.bodyStrong)} style={{ color: palette.ink }} numberOfLines={1}>
                   {part}
                 </Text>
                 <View className="mt-0.5 flex-row items-center gap-1.5">
                   <StateDot state={state} size={5} />
-                  <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: style.accent }}>
+                  <Text className={text.label} style={{ color: style.accent }}>
                     {PART_STATE_LABEL[state]}
                   </Text>
                 </View>
@@ -209,15 +209,15 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
         <PressSurface
           onPress={() => onSelect('Electrical / Power')}
           accessibilityLabel="Open Electrical / Power"
-          className="flex-row items-center gap-2 self-start rounded-xl border px-2.5 py-1.5"
+          className="flex-row items-center gap-2 self-start rounded-[10px] border px-2.5 py-1.5"
           style={{ borderColor: palette.line, backgroundColor: palette.panel }}
         >
           <MaterialCommunityIcons name="flash-outline" size={13} color={palette.inkFaint} />
-          <Text className="font-body text-[11px]" style={{ color: palette.ink }}>
+          <Text className={text.body} style={{ color: palette.ink }}>
             Electrical / Power
           </Text>
           <StateDot state={supply.state} size={5} />
-          <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: palette.inkMuted }}>
+          <Text className={text.label} style={{ color: palette.inkMuted }}>
             {PART_STATE_LABEL[supply.state]} · supplies the machine
           </Text>
         </PressSurface>
@@ -244,19 +244,19 @@ function PartCard({ view, onOpen }: { view: PartView; onOpen: () => void }) {
       onPress={onOpen}
       accent={style.accent}
       accessibilityLabel={`Open ${view.part} deep dive`}
-      className="min-w-[260px] flex-1 rounded-2xl border px-3.5 py-3"
+      className="min-w-[260px] flex-1 rounded-[14px] border px-3.5 py-3"
       style={{ borderColor: alpha(style.accent, 0.4), backgroundColor: palette.panel }}
     >
       <View className="flex-row items-start gap-2.5">
         <View
-          className="h-8 w-8 items-center justify-center rounded-xl"
+          className="h-8 w-8 items-center justify-center rounded-[10px]"
           style={{ backgroundColor: alpha(style.accent, 0.12) }}
         >
           <MaterialCommunityIcons name={PART_ICON[view.part]} size={16} color={style.accent} />
         </View>
         <View className="min-w-0 flex-1">
           <View className="flex-row items-start justify-between gap-2">
-            <Text className="min-w-0 flex-1 font-body-bold text-[13px]" style={{ color: palette.ink }} numberOfLines={1}>
+            <Text className={cn('min-w-0 flex-1', text.title)} style={{ color: palette.ink }} numberOfLines={1}>
               {view.part}
             </Text>
             <Badge variant={STATE_VARIANT[view.state]} icon={null} outline>
@@ -264,7 +264,7 @@ function PartCard({ view, onOpen }: { view: PartView; onOpen: () => void }) {
             </Badge>
           </View>
           <Text
-            className="mt-1 font-body text-[11.5px] leading-[16px]"
+            className={cn('mt-1', text.body)}
             style={{ color: palette.inkMuted }}
             numberOfLines={2}
           >
@@ -300,16 +300,16 @@ function PartGroupLine({
 
   return (
     <View
-      className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5 rounded-xl border px-3.5 py-2.5"
+      className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5 rounded-[10px] border px-3.5 py-2.5"
       style={{ borderColor: palette.line, backgroundColor: palette.panel }}
     >
       <Badge variant={variant} icon={null} outline>
         {badge}
       </Badge>
-      <Text className="font-body-bold text-[12px]" style={{ color: palette.ink }}>
+      <Text className={text.bodyStrong} style={{ color: palette.ink }}>
         {parts.length} {title}
       </Text>
-      <Text className="min-w-0 flex-1 font-body text-[11.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
+      <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.inkMuted }} numberOfLines={1}>
         {parts.map((view) => view.part).join(', ')}
       </Text>
     </View>
@@ -343,7 +343,7 @@ function ReasoningChain({ view }: { view: PartView }) {
         return (
           <View
             key={step.key}
-            className="rounded-xl border px-3 py-2.5"
+            className="rounded-[10px] border px-3 py-2.5"
             style={{
               flexGrow: 1,
               flexShrink: 1,
@@ -364,14 +364,14 @@ function ReasoningChain({ view }: { view: PartView }) {
                 }
               >
                 <Text
-                  className="font-mono text-[8px]"
+                  className={text.label}
                   style={{ color: step.evaluated ? palette.panel : palette.inkFaint, fontVariant: ['tabular-nums'] }}
                 >
                   {index + 1}
                 </Text>
               </View>
               <Text
-                className="min-w-0 flex-1 font-mono text-[8.5px] uppercase tracking-[0.16em]"
+                className={cn('min-w-0 flex-1', text.label)}
                 style={{ color: palette.inkFaint }}
                 numberOfLines={1}
               >
@@ -383,13 +383,13 @@ function ReasoningChain({ view }: { view: PartView }) {
             </View>
 
             <Text
-              className="mt-1.5 font-body-bold text-[12.5px] tracking-[-0.01em]"
+              className={cn('mt-1.5', text.bodyStrong)}
               style={{ color: step.evaluated ? palette.ink : palette.inkMuted }}
               numberOfLines={2}
             >
               {step.value}
             </Text>
-            <Text className="mt-1 font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkMuted }}>
+            <Text className={cn('mt-1', text.micro)} style={{ color: palette.inkMuted }}>
               {step.detail}
             </Text>
           </View>
@@ -482,24 +482,24 @@ function CauseList({ view }: { view: PartView }) {
                 {/* The rank. An ordinal, because the list is ordered and the
                     bar below only says "longer than the next one". */}
                 <View
-                  className="h-[22px] w-[22px] items-center justify-center rounded-lg"
+                  className="h-[22px] w-[22px] items-center justify-center rounded-[6px]"
                   style={{ backgroundColor: alpha(accent, 0.14) }}
                 >
-                  <Text className="font-mono text-[10px]" style={{ color: accent, fontVariant: ['tabular-nums'] }}>
+                  <Text className={text.data} style={{ color: accent, fontVariant: ['tabular-nums'] }}>
                     {index + 1}
                   </Text>
                 </View>
 
                 <View className="min-w-0 flex-1">
                   <View className="flex-row items-start justify-between gap-2.5">
-                    <Text className="min-w-0 flex-1 font-body-bold text-[12.5px]" style={{ color: palette.ink }}>
+                    <Text className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: palette.ink }}>
                       {cause.name}
                     </Text>
                     <Badge variant={variant} icon={null} outline>
                       {matchClassLabel(cause.matchClass)}
                     </Badge>
                   </View>
-                  <Text className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                  <Text className={cn('mt-0.5', text.label)} style={{ color: palette.inkFaint }}>
                     {cause.faultId}
                   </Text>
                 </View>
@@ -510,9 +510,9 @@ function CauseList({ view }: { view: PartView }) {
                   likelihood — which is the one thing this machine cannot say. */}
               <View className="mt-2.5 flex-row items-center gap-2">
                 <View className="h-[4px] flex-1 overflow-hidden rounded-full" style={{ backgroundColor: palette.panelRaised }}>
-                  <View style={{ width: `${share}%`, height: '100%', borderRadius: 4, backgroundColor: accent }} />
+                  <View style={{ width: `${share}%`, height: '100%', borderRadius: 6, backgroundColor: accent }} />
                 </View>
-                <Text className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                <Text className={text.label} style={{ color: palette.inkFaint }}>
                   {index === 0 ? 'best match' : `${share}% of best`}
                 </Text>
               </View>
@@ -522,7 +522,7 @@ function CauseList({ view }: { view: PartView }) {
                   {cause.primaryEvidence.slice(0, 3).map((line, evidenceIndex) => (
                     <View key={evidenceIndex} className="flex-row items-start gap-2">
                       <MaterialCommunityIcons name="check" size={11} color={accent} style={{ marginTop: 2.5 }} />
-                      <Text className="min-w-0 flex-1 font-body text-[11px] leading-[15.5px]" style={{ color: palette.inkMuted }}>
+                      <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.inkMuted }}>
                         {line}
                       </Text>
                     </View>
@@ -535,15 +535,15 @@ function CauseList({ view }: { view: PartView }) {
                   own tinted strip instead of a coloured sentence in the flow. */}
               {cause.contradicting.length > 0 ? (
                 <View
-                  className="mt-2.5 flex-row items-start gap-2 rounded-lg px-2.5 py-2"
+                  className="mt-2.5 flex-row items-start gap-2 rounded-[6px] px-2.5 py-2"
                   style={{ backgroundColor: alpha(palette.warning, 0.1) }}
                 >
                   <MaterialCommunityIcons name="alert-outline" size={12} color={palette.warning} style={{ marginTop: 1.5 }} />
                   <View className="min-w-0 flex-1">
-                    <Text className="font-mono text-[8px] uppercase tracking-[0.15em]" style={{ color: palette.warning }}>
+                    <Text className={text.label} style={{ color: palette.warning }}>
                       Argues against
                     </Text>
-                    <Text className="mt-0.5 font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+                    <Text className={cn('mt-0.5', text.body)} style={{ color: palette.inkMuted }}>
                       {cause.contradicting[0]}
                     </Text>
                   </View>
@@ -559,14 +559,14 @@ function CauseList({ view }: { view: PartView }) {
           meaningful next to what was not. */}
       {view.ruledOut.length > 0 ? (
         <View className="mt-1 pt-3" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
-          <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+          <Text className={text.label} style={{ color: palette.inkFaint }}>
             Ruled out · {view.ruledOut.length}
           </Text>
           <View className="mt-1.5 gap-1.5">
             {view.ruledOut.map((cause) => (
               <View key={cause.faultId} className="flex-row items-start gap-2">
                 <MaterialCommunityIcons name="close-circle-outline" size={12} color={palette.inkFaint} style={{ marginTop: 2 }} />
-                <Text className="min-w-0 flex-1 font-body text-[11px] leading-[15.5px]" style={{ color: palette.inkMuted }}>
+                <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.inkMuted }}>
                   <Text style={{ color: palette.ink }}>{cause.name}</Text>
                   {' — '}
                   {cause.contradicting[0] ?? 'a primary contradiction eliminated this hypothesis.'}
@@ -604,28 +604,28 @@ function ReadingHero({ signal }: { signal: SignalView }) {
 
   return (
     <View
-      className="overflow-hidden rounded-2xl border"
+      className="overflow-hidden rounded-[14px] border"
       style={{ borderColor: palette.line, backgroundColor: palette.panel }}
     >
       <View className="px-3.5 pb-3 pt-3">
         <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
           <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: style.accent }} />
-          <Text className="min-w-0 font-body-bold text-[12px]" style={{ color: palette.ink }} numberOfLines={1}>
+          <Text className={cn('min-w-0', text.bodyStrong)} style={{ color: palette.ink }} numberOfLines={1}>
             {signal.measures}
           </Text>
-          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+          <Text className={text.label} style={{ color: palette.inkFaint }}>
             {signal.tag} · {KIND_LABEL[signal.kind]}
           </Text>
         </View>
 
         <View className="mt-1.5 flex-row flex-wrap items-end gap-x-3 gap-y-1.5">
           <Text
-            className="font-body text-[30px] leading-[34px] tracking-[-0.03em]"
-            style={{ color: palette.ink, fontWeight: '300', fontVariant: ['tabular-nums'] }}
+            className={text.display}
+            style={[displayWeight, tabular, { color: palette.ink }]}
           >
             {signal.value === null ? '—' : formatValue(signal.value, '')}
           </Text>
-          <Text className="pb-[5px] font-mono text-[10.5px] uppercase tracking-[0.12em]" style={{ color: palette.inkMuted }}>
+          <Text className={cn('pb-[5px]', text.label)} style={{ color: palette.inkMuted }}>
             {signal.unit || 'unitless'}
           </Text>
 
@@ -639,7 +639,7 @@ function ReadingHero({ signal }: { signal: SignalView }) {
                 size={12}
                 color={palette.inkMuted}
               />
-              <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: palette.inkMuted }}>
+              <Text className={text.label} style={{ color: palette.inkMuted }}>
                 {BEHAVIOUR_LABEL[signal.behaviour]}
               </Text>
             </View>
@@ -699,14 +699,14 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
 
   if (!tool.available) {
     return (
-      <View className="gap-1.5 rounded-lg border px-3 py-3" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
+      <View className="gap-1.5 rounded-[6px] border px-3 py-3" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
         <View className="flex-row items-center gap-1.5">
           <MaterialCommunityIcons name="lock-outline" size={13} color={palette.inkFaint} />
-          <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+          <Text className={text.label} style={{ color: palette.inkMuted }}>
             {tool.label} not available on this machine
           </Text>
         </View>
-        <Text className="font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+        <Text className={text.body} style={{ color: palette.inkMuted }}>
           {tool.note}
         </Text>
       </View>
@@ -723,13 +723,13 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
 
   return (
     <View className="gap-2.5">
-      <Text className="font-body text-[11px] leading-[15px]" style={{ color: palette.inkMuted }}>
+      <Text className={text.body} style={{ color: palette.inkMuted }}>
         {tool.note}
       </Text>
 
       {/* The instrument window. */}
       <View
-        className="overflow-hidden rounded-2xl border"
+        className="overflow-hidden rounded-[14px] border"
         style={{ borderColor: palette.line, backgroundColor: palette.panel }}
       >
         <View
@@ -738,7 +738,7 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
         >
           <View className="flex-row items-center gap-2">
             <View style={{ width: 14, height: 2, borderRadius: 2, backgroundColor: accent }} />
-            <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
+            <Text className={text.label} style={{ color: palette.inkMuted }}>
               {tool.label} · session history
             </Text>
           </View>
@@ -754,12 +754,12 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
                 color={deltaColour}
               />
               <Text
-                className="font-mono text-[9.5px]"
+                className={text.label}
                 style={{ color: deltaColour, fontVariant: ['tabular-nums'] }}
               >
                 {formatDelta(stats.delta, signal.unit)}
               </Text>
-              <Text className="font-mono text-[8.5px] uppercase tracking-[0.12em]" style={{ color: palette.inkFaint }}>
+              <Text className={text.label} style={{ color: palette.inkFaint }}>
                 over {stats.count}
               </Text>
             </View>
@@ -786,13 +786,13 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
           <View className="px-3.5 pb-3 pt-1.5" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
             <RangeRail min={stats.min} max={stats.max} mean={stats.mean} value={signal.value} colour={accent} />
             <View className="mt-1 flex-row items-center justify-between">
-              <Text className="font-mono text-[8.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+              <Text className={text.label} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
                 {formatValue(stats.min, signal.unit)}
               </Text>
-              <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+              <Text className={text.label} style={{ color: palette.inkFaint }}>
                 mean {formatValue(stats.mean, signal.unit)}
               </Text>
-              <Text className="font-mono text-[8.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+              <Text className={text.label} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
                 {formatValue(stats.max, signal.unit)}
               </Text>
             </View>
@@ -852,7 +852,7 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
       )}
 
       {tool.key === 'setpoint' && signal.reference === null ? (
-        <Text className="font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkFaint }}>
+        <Text className={text.micro} style={{ color: palette.inkFaint }}>
           {signal.referenceNote}
         </Text>
       ) : null}
@@ -911,19 +911,19 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
                 selected={active}
                 accessibilityRole="tab"
                 accessibilityLabel={entry.measures}
-                className="rounded-xl border px-2.5 py-1.5"
+                className="rounded-[10px] border px-2.5 py-1.5"
                 style={{
                   borderColor: active ? palette.lineStrong : palette.line,
                   backgroundColor: active ? palette.panelRaised : palette.panel,
                 }}
               >
                 <View className="flex-row items-center gap-1.5">
-                  <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: entryStyle.accent }} />
-                  <Text className="font-body text-[11px]" style={{ color: active ? palette.ink : palette.inkMuted }}>
+                  <View style={{ width: 5, height: 5, borderRadius: 6, backgroundColor: entryStyle.accent }} />
+                  <Text className={text.body} style={{ color: active ? palette.ink : palette.inkMuted }}>
                     {entry.measures}
                   </Text>
                 </View>
-                <Text className="mt-0.5 font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                <Text className={cn('mt-0.5', text.label)} style={{ color: palette.inkFaint }}>
                   {entry.tag} · {entry.part === part ? KIND_LABEL[entry.kind] : `context · ${entry.part}`}
                 </Text>
               </PressSurface>
@@ -945,7 +945,7 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
               selected={active}
               accessibilityRole="tab"
               accessibilityLabel={entry.available ? entry.label : `${entry.label}, not available on this machine`}
-              className="flex-row items-center gap-1.5 rounded-xl border px-2.5 py-1.5"
+              className="flex-row items-center gap-1.5 rounded-[10px] border px-2.5 py-1.5"
               style={{
                 borderColor: active ? palette.lineStrong : palette.line,
                 backgroundColor: active ? palette.panelRaised : palette.panel,
@@ -953,7 +953,7 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
               }}
             >
               <Text
-                className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+                className={text.label}
                 style={{ color: active ? palette.ink : palette.inkMuted }}
               >
                 {entry.label}
@@ -966,7 +966,7 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
 
       {tool ? <ToolPanel signal={signal} tool={tool} /> : null}
 
-      <Text className="font-body text-[10.5px] leading-[14px]" style={{ color: palette.inkFaint }}>
+      <Text className={text.micro} style={{ color: palette.inkFaint }}>
         {signal.behaviourDetail}
       </Text>
     </View>
@@ -1004,10 +1004,10 @@ function ThermalProfile({ signals }: { signals: SignalView[] }) {
       <View className="flex-row items-end justify-between gap-2">
         {zones.map((zone) => (
           <View key={zone.tag} className="min-w-0 flex-1 items-center">
-            <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }} numberOfLines={1}>
+            <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
               {zone.measures.replace(/ temperature$/i, '')}
             </Text>
-            <Text className="mt-0.5 font-body text-[20px] leading-[24px]" style={{ color: palette.ink, fontWeight: '300' }}>
+            <Text className={cn('mt-0.5', text.dataLg)} style={[tabular, { color: palette.ink }]}>
               {formatValue(zone.value, zone.unit)}
             </Text>
           </View>
@@ -1048,7 +1048,7 @@ function ThermalProfile({ signals }: { signals: SignalView[] }) {
       </View>
       <View style={{ height: 1, backgroundColor: palette.line, marginTop: -7 }} />
 
-      <Text className="text-center font-body text-[10.5px]" style={{ color: palette.inkMuted }}>
+      <Text className={cn('text-center', text.micro)} style={{ color: palette.inkMuted }}>
         {values.length < zones.length
           ? 'Part of the profile is not reporting, so the progression cannot be assessed.'
           : gradual
@@ -1065,10 +1065,10 @@ function ThermalProfile({ signals }: { signals: SignalView[] }) {
               className="flex-row items-center justify-between gap-3 py-1.5"
               style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}
             >
-              <Text className="min-w-0 flex-1 font-body text-[11.5px]" style={{ color: palette.ink }} numberOfLines={1}>
+              <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.ink }} numberOfLines={1}>
                 {zone.measures}
               </Text>
-              <Text className="font-body text-[11px]" style={{ color: palette.inkMuted }}>
+              <Text className={text.body} style={{ color: palette.inkMuted }}>
                 {BEHAVIOUR_LABEL[zone.behaviour]}
               </Text>
               <Badge variant={variant} icon={null} outline>
@@ -1163,7 +1163,7 @@ export function AdvanceDiagnosisTab({
             }
           >
             <View className="gap-2">
-              <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }}>
+              <Text className={text.label} style={{ color: palette.inkFaint }}>
                 How ULTRON reached this conclusion
               </Text>
               <ReasoningChain view={view} />

@@ -16,7 +16,7 @@ import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop } from 'react
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { alpha, consolePalette, variantStyle, type Variant } from '../../../ui';
+import { alpha, consolePalette, tabular, text, variantStyle, type Variant } from '../../../ui';
 
 // ---------------------------------------------------------------------------
 // Motion
@@ -170,12 +170,12 @@ export function Block({
           <View className="min-w-0 flex-1">
             <View className="flex-row items-center gap-2">
               {dot ? <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: dot }} /> : null}
-              <Text className="min-w-0 font-body-bold text-[14px] tracking-[-0.015em]" style={{ color: palette.ink }}>
+              <Text className={cn('min-w-0', text.title)} style={{ color: palette.ink }}>
                 {title}
               </Text>
             </View>
             {meta ? (
-              <Text className="mt-1 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
+              <Text className={cn('mt-1', text.body)} style={{ color: palette.inkMuted }}>
                 {meta}
               </Text>
             ) : null}
@@ -189,7 +189,7 @@ export function Block({
       {footnote ? (
         <View className="px-4 pb-3.5">
           {typeof footnote === 'string' ? (
-            <Text className="font-body text-[10px] leading-[14px]" style={{ color: palette.inkFaint }}>
+            <Text className={text.micro} style={{ color: palette.inkFaint }}>
               {footnote}
             </Text>
           ) : (
@@ -221,7 +221,7 @@ export function SearchField({
   const palette = consolePalette(isDark);
   return (
     <View
-      className="min-w-[150px] flex-row items-center gap-1.5 rounded-lg border px-2 py-1"
+      className="min-w-[150px] flex-row items-center gap-1.5 rounded-[6px] border px-2 py-1"
       style={{ borderColor: palette.line, backgroundColor: palette.panelRaised, width }}
     >
       <MaterialCommunityIcons name="magnify" size={13} color={palette.inkFaint} />
@@ -231,7 +231,7 @@ export function SearchField({
         placeholder={placeholder}
         placeholderTextColor={palette.inkFaint}
         accessibilityLabel={placeholder}
-        className="min-w-0 flex-1 font-body text-[11px]"
+        className={cn('min-w-0 flex-1', text.body)}
         style={{ color: palette.ink, outlineStyle: 'none' } as never}
       />
       {value ? (
@@ -270,7 +270,7 @@ export function FilterChips<T extends string>({
     <View
       accessibilityRole="tablist"
       accessibilityLabel={label}
-      className="flex-row items-center gap-0.5 rounded-lg border p-0.5"
+      className="flex-row items-center gap-0.5 rounded-[6px] border p-0.5"
       style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
     >
       {options.map((option) => {
@@ -283,21 +283,21 @@ export function FilterChips<T extends string>({
             accessibilityRole="tab"
             accessibilityState={{ selected: active }}
             accessibilityLabel={option.count === undefined ? option.label : `${option.label}, ${option.count}`}
-            className="flex-row items-center gap-1 rounded-md px-2 py-[3px]"
+            className="flex-row items-center gap-1 rounded-[6px] px-2 py-[3px]"
             style={active ? { backgroundColor: palette.panel, borderWidth: 1, borderColor: palette.lineStrong } : undefined}
           >
             {option.variant && !active ? (
-              <View style={{ width: 4.5, height: 4.5, borderRadius: 5, backgroundColor: style?.accent }} />
+              <View style={{ width: 4.5, height: 4.5, borderRadius: 6, backgroundColor: style?.accent }} />
             ) : null}
             <Text
-              className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+              className={text.label}
               style={{ color: active ? palette.ink : palette.inkMuted }}
             >
               {option.label}
             </Text>
             {option.count !== undefined ? (
               <Text
-                className="font-mono text-[9.5px]"
+                className={text.label}
                 style={{ color: active ? (style?.accent ?? palette.inkMuted) : palette.inkFaint, fontVariant: ['tabular-nums'] }}
               >
                 {option.count}
@@ -453,11 +453,11 @@ export function Fact({
   const palette = consolePalette(isDark);
   return (
     <View style={{ minWidth: width }}>
-      <Text className="font-mono text-[8.5px] uppercase tracking-[0.15em]" style={{ color: palette.inkFaint }} numberOfLines={1}>
+      <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
         {label}
       </Text>
       <Text
-        className={cn('mt-0.5', mono ? 'font-mono text-[11px]' : 'font-body text-[11.5px]')}
+        className={cn('mt-0.5', mono ? text.data : text.body)}
         style={{ color: tone ?? palette.ink, fontVariant: mono ? ['tabular-nums'] : undefined }}
       >
         {value}
@@ -466,37 +466,7 @@ export function Fact({
   );
 }
 
-/** A numbered instruction step. Ordered work reads as a list, not a paragraph. */
-export function StepRow({ index, text, muted = false }: { index: number; text: string; muted?: boolean }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  return (
-    <View className="flex-row items-start gap-2.5">
-      <View
-        className="mt-[1px] h-[18px] w-[22px] items-center justify-center rounded"
-        style={{ backgroundColor: palette.panelRaised }}
-      >
-        <Text className="font-mono text-[9.5px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
-          {String(index).padStart(2, '0')}
-        </Text>
-      </View>
-      <Text className="min-w-0 flex-1 font-body text-[12px] leading-[17px]" style={{ color: muted ? palette.inkMuted : palette.ink }}>
-        {text}
-      </Text>
-    </View>
-  );
-}
 
-/** Empty state inside a section. One sentence, no illustration. */
-export function EmptyNote({ children }: { children: React.ReactNode }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  return (
-    <Text className="py-4 text-center font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
-      {children}
-    </Text>
-  );
-}
 
 
 // ---------------------------------------------------------------------------
@@ -863,7 +833,7 @@ export function TrendChart({
             {[0, 0.5, 1].map((fraction) => (
               <Text
                 key={fraction}
-                className="absolute font-mono text-[8.5px]"
+                className={cn('absolute', text.label)}
                 style={{
                   color: palette.inkFaint,
                   left: 0,
@@ -878,7 +848,7 @@ export function TrendChart({
               </Text>
             ))}
             <Text
-              className="absolute font-mono text-[8px] uppercase tracking-[0.14em]"
+              className={cn('absolute', text.label)}
               style={{ color: palette.inkFaint, left: 0, width: PLOT.left - 8, textAlign: 'right', top: 1 }}
               numberOfLines={1}
             >
@@ -886,13 +856,13 @@ export function TrendChart({
             </Text>
 
             <Text
-              className="absolute font-mono text-[8.5px] uppercase tracking-[0.14em]"
+              className={cn('absolute', text.label)}
               style={{ color: palette.inkFaint, left: PLOT.left, bottom: 2 }}
             >
               {footLeft}
             </Text>
             <Text
-              className="absolute font-mono text-[8.5px] uppercase tracking-[0.14em]"
+              className={cn('absolute', text.label)}
               style={{ color: palette.inkFaint, right: PLOT.right, bottom: 2 }}
             >
               {footRight}
@@ -904,7 +874,7 @@ export function TrendChart({
                 {model.guides.map((guide) => (
                   <View key={guide.label} className="flex-row items-center gap-1">
                     <View style={{ width: 9, height: 1.5, backgroundColor: guide.colour, opacity: 0.85 }} />
-                    <Text className="font-mono text-[8px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                    <Text className={text.label} style={{ color: palette.inkFaint }}>
                       {guide.label}
                     </Text>
                   </View>
@@ -915,7 +885,7 @@ export function TrendChart({
         </>
       ) : (
         <View className="flex-1 items-center justify-center">
-          <Text className="font-body text-[11px]" style={{ color: palette.inkFaint }}>
+          <Text className={text.body} style={{ color: palette.inkFaint }}>
             At least two samples are needed before a trend can be drawn.
           </Text>
         </View>
@@ -960,7 +930,7 @@ export function RangeRail({
             top: 0,
             bottom: 0,
             width: value === null ? 0 : at(value),
-            borderRadius: 4,
+            borderRadius: 6,
             backgroundColor: alpha(colour, 0.4),
           }}
         />
@@ -983,7 +953,7 @@ export function RangeRail({
             width: 9,
             height: 9,
             marginLeft: -4.5,
-            borderRadius: 9,
+            borderRadius: 10,
             backgroundColor: colour,
             borderWidth: 2,
             borderColor: palette.panel,
@@ -1001,7 +971,7 @@ export function RangeRail({
 /**
  * A section with nothing in it, said properly.
  *
- * `EmptyNote` is one grey sentence floating in white space, which across half
+ * This replaced a bare grey sentence centred in the region, which across half
  * of a two-column screen reads as a panel that failed to load rather than as an
  * answer. An empty result here is a real finding — "nothing matched" is what
  * the model concluded — so it gets a frame, a glyph, and where the caller has
@@ -1026,16 +996,16 @@ export function EmptyState({
 
   return (
     <View
-      className="items-center gap-2 rounded-2xl border px-5 py-6"
+      className="items-center gap-2 rounded-[14px] border px-5 py-6"
       style={{ borderColor: palette.line, borderStyle: 'dashed', backgroundColor: palette.panelRaised }}
     >
-      <View className="h-9 w-9 items-center justify-center rounded-xl" style={{ backgroundColor: style.tint }}>
+      <View className="h-9 w-9 items-center justify-center rounded-[10px]" style={{ backgroundColor: style.tint }}>
         <MaterialCommunityIcons name={icon} size={18} color={style.accent} />
       </View>
-      <Text className="text-center font-body-bold text-[12.5px]" style={{ color: palette.ink }}>
+      <Text className={cn('text-center', text.bodyStrong)} style={{ color: palette.ink }}>
         {title}
       </Text>
-      <Text className="max-w-[420px] text-center font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
+      <Text className={cn('max-w-[420px] text-center', text.body)} style={{ color: palette.inkMuted }}>
         {detail}
       </Text>
       {meta ? (
@@ -1043,11 +1013,146 @@ export function EmptyState({
           className="mt-0.5 rounded-full border px-2.5 py-[3px]"
           style={{ borderColor: palette.line, backgroundColor: palette.panel }}
         >
-          <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+          <Text className={text.label} style={{ color: palette.inkFaint }}>
             {meta}
           </Text>
         </View>
       ) : null}
+    </View>
+  );
+}
+
+/**
+ * Where a reading sits between where it has been and where it must not go.
+ *
+ * This is the one thing a monitoring table cannot say in numbers. Two columns
+ * of limits tell a reader that vibration is 3.2 and the warning is 4.5, and
+ * leave them to do the arithmetic on every row, for every row, every time they
+ * scan the table. The bar does it once and draws the answer: the track is the
+ * span the session has actually seen extended to include the limits, the ticks
+ * are the limits themselves, and the marker is now. A row whose marker is
+ * crowding its ticks is visible from across the table without a single number
+ * being read.
+ *
+ * The domain is the signal's own history, not a fixed scale. A fixed scale
+ * would put a 200 °C reading with a 210 °C limit at 95% of the track on a
+ * perfectly healthy machine, which is exactly the false alarm this is meant to
+ * prevent.
+ *
+ * A channel with no limits configured gets a track and a marker but no ticks,
+ * drawn faint: it still says where the reading sits in its own range, and it
+ * says plainly that nothing is judging it. That distinction is the whole reason
+ * the Signals table has a "no limit" filter.
+ */
+export function MarginBar({
+  value,
+  history,
+  warningLimit,
+  criticalLimit,
+  variant,
+}: {
+  value: number | null;
+  /** Session samples, which set the domain along with the limits. */
+  history: (number | null)[];
+  warningLimit: number | null;
+  criticalLimit: number | null;
+  /** Drives the marker and fill colour — the row's own status. */
+  variant: Variant;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const accent = variantStyle(palette, variant).accent;
+  const graded = warningLimit !== null || criticalLimit !== null;
+
+  const domain = useMemo(() => {
+    const seen = history.filter((entry): entry is number => typeof entry === 'number' && Number.isFinite(entry));
+    const anchors = [...seen, ...(value !== null ? [value] : [])];
+    if (anchors.length === 0) return null;
+    let lo = Math.min(...anchors);
+    let hi = Math.max(...anchors);
+    for (const limit of [warningLimit, criticalLimit]) {
+      if (limit !== null && Number.isFinite(limit)) hi = Math.max(hi, limit);
+    }
+    const pad = (hi - lo || Math.abs(hi) || 1) * 0.08;
+    lo -= pad;
+    hi += pad;
+    return { lo, hi, span: hi - lo || 1 };
+  }, [criticalLimit, history, value, warningLimit]);
+
+  if (!domain || value === null) {
+    return (
+      <View className="h-[14px] justify-center">
+        <View style={{ height: 2, borderRadius: 2, backgroundColor: palette.line }} />
+      </View>
+    );
+  }
+
+  const at = (point: number) =>
+    `${Math.min(100, Math.max(0, ((point - domain.lo) / domain.span) * 100))}%` as `${number}%`;
+
+  return (
+    <View className="h-[14px] justify-center">
+      {/* The track: the whole domain, quiet. */}
+      <View
+        style={{
+          height: 3,
+          borderRadius: 3,
+          backgroundColor: graded ? palette.panelRaised : 'transparent',
+          borderWidth: graded ? 0 : 1,
+          borderColor: palette.line,
+          borderStyle: graded ? 'solid' : 'dashed',
+        }}
+      />
+      {/* Filled to the reading, so the eye lands on length before position. */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          width: at(value),
+          height: 3,
+          borderRadius: 3,
+          backgroundColor: alpha(accent, 0.4),
+        }}
+      />
+      {/* The limits, each in its own meaning's colour. */}
+      {warningLimit !== null && Number.isFinite(warningLimit) ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: at(warningLimit),
+            marginLeft: -0.5,
+            width: 1,
+            height: 10,
+            backgroundColor: palette.warning,
+          }}
+        />
+      ) : null}
+      {criticalLimit !== null && Number.isFinite(criticalLimit) ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: at(criticalLimit),
+            marginLeft: -0.5,
+            width: 1,
+            height: 10,
+            backgroundColor: palette.critical,
+          }}
+        />
+      ) : null}
+      {/* Now. Ringed in the panel colour so it never merges with a tick. */}
+      <View
+        style={{
+          position: 'absolute',
+          left: at(value),
+          marginLeft: -4,
+          width: 8,
+          height: 8,
+          borderRadius: 6,
+          backgroundColor: accent,
+          borderWidth: 1.5,
+          borderColor: palette.panel,
+        }}
+      />
     </View>
   );
 }

@@ -29,7 +29,8 @@ import { useRef, useState } from 'react';
 import { Animated, Easing, Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { alpha, Button, consolePalette, variantStyle, type Variant } from '../../../ui';
+import { cn } from '../../../../lib/cn';
+import { alpha, Button, consolePalette, displayWeight, tabular, text, variantStyle, type Variant } from '../../../ui';
 import { TagTrend } from './AnalyzerParts';
 
 export type StatusCount = {
@@ -106,10 +107,10 @@ function MetricCell({
       />
 
       <View className="flex-row items-center gap-1.5">
-        <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: style.accent }} />
+        <View style={{ width: 5, height: 5, borderRadius: 6, backgroundColor: style.accent }} />
         <Text
           numberOfLines={1}
-          className="min-w-0 flex-1 font-mono text-[8.5px] uppercase tracking-[0.18em]"
+          className={cn('min-w-0 flex-1', text.label)}
           style={{ color: palette.inkFaint }}
         >
           {count.label}
@@ -124,8 +125,8 @@ function MetricCell({
       <View className="mt-1.5 flex-row items-end justify-between gap-2">
         <Text
           numberOfLines={1}
-          className="min-w-0 font-body text-[26px] leading-[30px] tracking-[-0.03em]"
-          style={{ color: style.accent, fontWeight: '300', fontVariant: ['tabular-nums'] }}
+          className={cn('min-w-0', text.dataLg)}
+          style={[tabular, { color: style.accent }]}
         >
           {count.value}
         </Text>
@@ -136,7 +137,7 @@ function MetricCell({
         ) : null}
       </View>
 
-      <Text numberOfLines={1} className="mt-1 font-body text-[11px]" style={{ color: palette.inkMuted }}>
+      <Text numberOfLines={1} className={cn('mt-1', text.body)} style={{ color: palette.inkMuted }}>
         {count.detail}
       </Text>
     </Pressable>
@@ -148,7 +149,6 @@ export function StatusBand({
   statusVariant,
   statusContext,
   verdictLine,
-  modelName,
   sourceLabel,
   sourceVariant,
   scenarioLabel,
@@ -166,8 +166,6 @@ export function StatusBand({
   statusContext?: string;
   /** One sentence: the model's conclusion, in an operator's words. */
   verdictLine: string;
-  /** The diagnostic model, not the machine template. */
-  modelName: string;
   sourceLabel: string;
   sourceVariant: Variant;
   /** Button label — the running scenario's id, or "Scenarios". */
@@ -202,35 +200,33 @@ export function StatusBand({
 
   return (
     <View
-      className="w-full overflow-hidden rounded-2xl border"
+      className="w-full overflow-hidden rounded-[14px] border"
       style={{ backgroundColor: palette.panel, borderColor: palette.line }}
     >
       {/* The verdict. */}
       <View className="flex-row flex-wrap items-start justify-between gap-x-5 gap-y-3 px-5 pb-4 pt-4">
         <View className="min-w-[260px] flex-1 flex-row items-start gap-3.5">
-          <View
-            className="h-[42px] w-[42px] items-center justify-center rounded-2xl"
-            style={{ backgroundColor: status.tint, borderWidth: 1, borderColor: alpha(status.accent, 0.28) }}
-          >
-            <MaterialCommunityIcons name={status.icon} size={20} color={status.accent} />
-          </View>
+          {/* No well, no border, no tint behind the glyph. A boxed icon beside
+              a coloured word is the same state said twice in two decorations;
+              the glyph alone is what carries the meaning into greyscale. */}
+          <MaterialCommunityIcons name={status.icon} size={22} color={status.accent} style={{ marginTop: 12 }} />
 
           <View className="min-w-0 flex-1">
-            <Text className="font-mono text-[8.5px] uppercase tracking-[0.2em]" style={{ color: palette.inkFaint }}>
+            <Text className={text.label} style={{ color: palette.inkFaint }}>
               Machine status{statusContext ? ` · ${statusContext}` : ''}
             </Text>
+            {/* The one largest thing in the layer, and it is set light. A plant
+                console that shouts on a normal day has nothing left for a bad
+                one; the colour is doing the work, so the weight need not. */}
             <Text
-              className="mt-0.5 font-body-bold text-[22px] leading-[26px] tracking-[-0.03em]"
-              style={{ color: status.accent }}
+              className={cn('mt-1', text.display)}
+              style={[displayWeight, { color: status.accent }]}
               numberOfLines={1}
             >
               {statusWord}
             </Text>
-            <Text className="mt-1 font-body text-[13px] leading-[18.5px]" style={{ color: palette.ink }}>
+            <Text className={cn('mt-1.5', text.lede)} style={{ color: palette.ink }}>
               {verdictLine}
-            </Text>
-            <Text className="mt-1.5 font-body text-[10.5px]" style={{ color: palette.inkFaint }} numberOfLines={1}>
-              {modelName}
             </Text>
           </View>
         </View>
@@ -241,7 +237,7 @@ export function StatusBand({
             style={{ borderColor: alpha(source.accent, 0.32), backgroundColor: source.tint }}
           >
             <View style={{ width: 6, height: 6, borderRadius: 6, backgroundColor: source.accent }} />
-            <Text className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: source.accent }}>
+            <Text className={text.label} style={{ color: source.accent }}>
               {sourceLabel}
             </Text>
           </View>
@@ -285,10 +281,10 @@ export function StatusBand({
             <MaterialCommunityIcons name={noticeStyle.icon} size={15} color={noticeStyle.accent} />
           </View>
           <View className="min-w-[220px] flex-1">
-            <Text className="font-body-bold text-[12px]" style={{ color: palette.ink }}>
+            <Text className={text.bodyStrong} style={{ color: palette.ink }}>
               {notice.title}
             </Text>
-            <Text className="mt-0.5 font-body text-[11.5px] leading-[16px]" style={{ color: palette.inkMuted }}>
+            <Text className={cn('mt-0.5', text.body)} style={{ color: palette.inkMuted }}>
               {notice.detail}
             </Text>
           </View>

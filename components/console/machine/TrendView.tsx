@@ -83,8 +83,9 @@ import {
   liveMeasurementKeyForChannel,
   useLiveChannelHistory,
 } from '../../../lib/liveChannelValue';
+import { cn } from '../../../lib/cn';
 import type { ChannelRef } from '../../../lib/rack';
-import { alpha, consolePalette, type ConsolePalette } from '../../ui';
+import { alpha, consolePalette, displayWeight, tabular, text, type ConsolePalette } from '../../ui';
 import { EmptyState, FilterChips, PressSurface } from './analyzer/AnalyzerParts';
 import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
@@ -267,8 +268,8 @@ function Pill({
   palette: ConsolePalette;
 }) {
   return (
-    <View className="rounded-md px-2 py-[3px]" style={{ backgroundColor: tint ?? palette.panelRaised }}>
-      <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: accent ?? palette.inkMuted }}>
+    <View className="rounded-[6px] px-2 py-[3px]" style={{ backgroundColor: tint ?? palette.panelRaised }}>
+      <Text className={text.label} style={{ color: accent ?? palette.inkMuted }}>
         {children}
       </Text>
     </View>
@@ -288,8 +289,8 @@ function Tag({
   palette: ConsolePalette;
 }) {
   return (
-    <View className="rounded-md px-2.5 py-1" style={{ backgroundColor: tint ?? palette.panelRaised }}>
-      <Text className="font-mono text-[10.5px]" style={{ color: accent ?? palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+    <View className="rounded-[6px] px-2.5 py-1" style={{ backgroundColor: tint ?? palette.panelRaised }}>
+      <Text className={text.data} style={{ color: accent ?? palette.inkMuted, fontVariant: ['tabular-nums'] }}>
         {children}
       </Text>
     </View>
@@ -323,14 +324,14 @@ function Stat({
     >
       <Text
         numberOfLines={1}
-        className="font-mono text-[9px] uppercase tracking-[0.16em]"
+        className={text.label}
         style={{ color: palette.inkFaint }}
       >
         {label}
       </Text>
       <Text
         numberOfLines={1}
-        className="mt-1 font-mono text-[13px]"
+        className={cn('mt-1', text.data)}
         style={{ color: accent ?? palette.ink, fontVariant: ['tabular-nums'] }}
       >
         {value}
@@ -584,11 +585,11 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
           app's own: the window chips move into this toolbar and keep driving
           the same window state. */}
       <View className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
-        <Text className="font-body-bold text-[15px] tracking-[-0.02em]" style={{ color: palette.ink }}>
+        <Text className={text.title} style={{ color: palette.ink }}>
           Live trends
         </Text>
         <View className="flex-row flex-wrap items-center gap-2.5">
-          <Text className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+          <Text className={text.label} style={{ color: palette.inkFaint }}>
             Window
           </Text>
           <FilterChips label="Window length in samples" options={windowOptions} value={windowKey} onChange={setWindowKey} />
@@ -598,7 +599,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
 
       {focused ? (
         <View
-          className="overflow-hidden rounded-xl border"
+          className="overflow-hidden rounded-[10px] border"
           style={{ borderColor: palette.line, backgroundColor: palette.panel }}
         >
           {/* ── card head ─────────────────────────────────────────────── */}
@@ -606,7 +607,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
             <View className="min-w-[240px] flex-1">
               <View className="flex-row flex-wrap items-center gap-2.5">
                 <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: focused.colour }} />
-                <Text className="font-body-bold text-[19px] tracking-[-0.025em]" style={{ color: palette.ink }} numberOfLines={1}>
+                <Text className={text.title} style={{ color: palette.ink }} numberOfLines={1}>
                   {focused.label}
                 </Text>
                 <Pill palette={palette}>{`${focused.code} · ${KIND_LABEL[focused.letter]}`}</Pill>
@@ -614,7 +615,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                   {verdict.text}
                 </Pill>
               </View>
-              <Text className="mt-[7px] font-body text-[12.5px] leading-[17px]" style={{ color: palette.inkMuted }}>
+              <Text className={cn('mt-[7px]', text.lede)} style={{ color: palette.inkMuted }}>
                 {focused.channel.deviceName} · expected band {band ? `${fmt(band.min)} – ${fmt(band.max)} ${focused.unit}` : '—'}
                 {references.length > 0
                   ? ` · ${references.map((reference) => `${reference.label} ${fmt(reference.value)}`).join(' · ')}`
@@ -623,17 +624,17 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
             </View>
 
             <View className="items-end">
-              <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+              <Text className={text.label} style={{ color: palette.inkFaint }}>
                 {cursor === null ? 'latest sample' : 'at cursor'}
               </Text>
               <View className="mt-[5px] flex-row items-baseline gap-[7px]">
                 <Text
-                  className="font-mono text-[34px] leading-[36px] tracking-[-0.04em]"
+                  className={text.display}
                   style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
                 >
                   {shown === null ? '—' : fmt(shown)}
                 </Text>
-                <Text className="font-mono text-[12px] uppercase tracking-[0.1em]" style={{ color: palette.inkMuted }}>
+                <Text className={text.label} style={{ color: palette.inkMuted }}>
                   {focused.unit}
                 </Text>
               </View>
@@ -681,7 +682,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
           <View className="flex-row px-5 pt-[18px]">
             <View style={{ width: Y_COL, height: PLOT_H }}>
               <Text
-                className="absolute font-mono text-[9px] uppercase tracking-[0.16em]"
+                className={cn('absolute', text.label)}
                 style={{ color: palette.inkFaint, right: 10, top: -14 }}
               >
                 {focused.unit}
@@ -690,7 +691,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                 ? ticks.map((tick) => (
                     <Text
                       key={tick}
-                      className="absolute font-mono text-[10px]"
+                      className={cn('absolute', text.label)}
                       style={{ color: palette.inkFaint, right: 10, top: y(tick) - 7, fontVariant: ['tabular-nums'] }}
                       numberOfLines={1}
                     >
@@ -701,10 +702,10 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
               {/* The cursor's own value, bubbled onto the axis it belongs to. */}
               {ready && cursor !== null && shown !== null ? (
                 <View
-                  className="absolute rounded px-1.5 py-[2px]"
+                  className="absolute rounded-[6px] px-1.5 py-[2px]"
                   style={{ right: 6, top: y(shown) - 9, backgroundColor: palette.ink }}
                 >
-                  <Text className="font-mono text-[10px]" style={{ color: palette.panel, fontVariant: ['tabular-nums'] }}>
+                  <Text className={text.label} style={{ color: palette.panel, fontVariant: ['tabular-nums'] }}>
                     {fmt(shown)}
                   </Text>
                 </View>
@@ -821,14 +822,14 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                       return (
                         <View
                           key={`chip${event.index}${index}`}
-                          className="absolute rounded-[5px] px-2 py-[3px]"
+                          className="absolute rounded-[6px] px-2 py-[3px]"
                           style={{
                             top: 4 + (index % 2) * 20,
                             ...(flip ? { right: plotWidth - x + 4 } : { left: x + 4 }),
                             backgroundColor: event.tint,
                           }}
                         >
-                          <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: event.colour }}>
+                          <Text className={text.label} style={{ color: event.colour }}>
                             {event.label}
                           </Text>
                         </View>
@@ -848,14 +849,14 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                           backgroundColor: palette.panel,
                         }}
                       >
-                        <Text className="font-mono text-[9.5px]" style={{ color: reference.colour }}>
+                        <Text className={text.label} style={{ color: reference.colour }}>
                           {reference.label} {fmt(reference.value)} {focused.unit}
                         </Text>
                       </View>
                     ))}
 
                     <View
-                      className="absolute rounded-[5px] px-[7px] py-[2px]"
+                      className="absolute rounded-[6px] px-[7px] py-[2px]"
                       style={{
                         ...(xOf(minIndex) > plotWidth * 0.6
                           ? { right: plotWidth - xOf(minIndex) + 6 }
@@ -864,12 +865,12 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                         backgroundColor: palette.panelRaised,
                       }}
                     >
-                      <Text className="font-mono text-[9.5px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+                      <Text className={text.label} style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
                         min {fmt(win[minIndex])}
                       </Text>
                     </View>
                     <View
-                      className="absolute rounded-[5px] px-[7px] py-[2px]"
+                      className="absolute rounded-[6px] px-[7px] py-[2px]"
                       style={{
                         ...(xOf(maxIndex) > plotWidth * 0.6
                           ? { right: plotWidth - xOf(maxIndex) + 6 }
@@ -878,7 +879,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                         backgroundColor: palette.panelRaised,
                       }}
                     >
-                      <Text className="font-mono text-[9.5px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+                      <Text className={text.label} style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
                         max {fmt(win[maxIndex])}
                       </Text>
                     </View>
@@ -891,7 +892,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                           top: y(shown) - 4.5,
                           width: 9,
                           height: 9,
-                          borderRadius: 9,
+                          borderRadius: 10,
                           backgroundColor: focused.colour,
                           borderWidth: 2,
                           borderColor: palette.panel,
@@ -901,7 +902,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
 
                     {cursor !== null && shown !== null ? (
                       <View
-                        className="absolute rounded-[9px] border px-3 py-2.5"
+                        className="absolute rounded-[10px] border px-3 py-2.5"
                         style={{
                           ...(cursorX > plotWidth * 0.6
                             ? { right: plotWidth - cursorX + 12 }
@@ -916,28 +917,28 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                           shadowOffset: { width: 0, height: 8 },
                         }}
                       >
-                        <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+                        <Text className={text.label} style={{ color: palette.inkFaint }}>
                           {samplesBack(n - 1 - cursorIndex)}
                         </Text>
                         <View className="mt-1.5 flex-row items-baseline gap-[5px]">
                           <Text
-                            className="font-mono text-[17px] tracking-[-0.02em]"
+                            className={text.dataLg}
                             style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
                           >
                             {fmt(shown)}
                           </Text>
-                          <Text className="font-mono text-[9.5px] uppercase tracking-[0.1em]" style={{ color: palette.inkMuted }}>
+                          <Text className={text.label} style={{ color: palette.inkMuted }}>
                             {focused.unit}
                           </Text>
                         </View>
                         <View className="mt-[7px]" style={{ gap: 4 }}>
                           {nearest && margin !== null ? (
                             <View className="flex-row items-center justify-between gap-2.5">
-                              <Text className="font-mono text-[10px]" style={{ color: palette.inkMuted }}>
+                              <Text className={text.label} style={{ color: palette.inkMuted }}>
                                 to {nearest.label}
                               </Text>
                               <Text
-                                className="font-mono text-[10px]"
+                                className={text.label}
                                 style={{ color: margin <= 0 ? nearest.colour : palette.ink, fontVariant: ['tabular-nums'] }}
                               >
                                 {margin >= 0 ? '' : '−'}
@@ -946,10 +947,10 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                             </View>
                           ) : null}
                           <View className="flex-row items-center justify-between gap-2.5">
-                            <Text className="font-mono text-[10px]" style={{ color: palette.inkMuted }}>
+                            <Text className={text.label} style={{ color: palette.inkMuted }}>
                               state
                             </Text>
-                            <Text className="font-mono text-[10px]" style={{ color: verdict.accent }}>
+                            <Text className={text.label} style={{ color: verdict.accent }}>
                               {verdict.text.toLowerCase()}
                             </Text>
                           </View>
@@ -961,7 +962,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
               ) : (
                 <View className="flex-1 items-center justify-center">
                   <Text
-                    className="font-mono text-[11px] uppercase tracking-[0.14em]"
+                    className={text.label}
                     style={{ color: palette.inkFaint }}
                   >
                     {n === 0 ? 'this channel has not reported yet' : n < 2 ? 'no samples in window' : 'sizing the plot'}
@@ -973,11 +974,11 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
             <View style={{ width: FLAG_COL, paddingLeft: 10 }}>
               {ready && latest !== null ? (
                 <View
-                  className="absolute rounded-[5px] px-2 py-[3px]"
+                  className="absolute rounded-[6px] px-2 py-[3px]"
                   style={{ left: 4, top: flagY - 10, backgroundColor: focused.colour }}
                 >
                   <Text
-                    className="font-mono text-[10.5px]"
+                    className={text.data}
                     style={{ color: inkOn(focused.colour), fontVariant: ['tabular-nums'] }}
                   >
                     {fmt(latest)}
@@ -996,7 +997,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                 return (
                   <Text
                     key={index}
-                    className="font-mono text-[9.5px] uppercase tracking-[0.14em]"
+                    className={text.label}
                     style={{ color: palette.inkFaint }}
                   >
                     {samplesBack((1 - fraction) * Math.max(0, n - 1))}
@@ -1013,7 +1014,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
             style={{ borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.panelRaised }}
           >
             <View style={{ width: Y_COL, paddingRight: 10 }}>
-              <Text className="text-right font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+              <Text className={cn('text-right', text.label)} style={{ color: palette.inkFaint }}>
                 Session
               </Text>
             </View>
@@ -1053,7 +1054,7 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
               ) : null}
             </View>
             <View style={{ width: FLAG_COL }}>
-              <Text className="text-right font-mono text-[9.5px] uppercase tracking-[0.1em]" style={{ color: palette.inkMuted }}>
+              <Text className={cn('text-right', text.label)} style={{ color: palette.inkMuted }}>
                 {session.length} · {n}
               </Text>
             </View>
@@ -1064,31 +1065,31 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
             className="flex-row flex-wrap items-center gap-x-3.5 gap-y-2 px-5 pb-3 pt-2.5"
             style={{ borderTopWidth: 1, borderTopColor: palette.line }}
           >
-            <Text className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+            <Text className={text.label} style={{ color: palette.inkFaint }}>
               Legend
             </Text>
             <View className="flex-row items-center gap-[7px]">
               <View style={{ width: 14, height: 2, backgroundColor: focused.colour }} />
-              <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+              <Text className={text.body} style={{ color: palette.inkMuted }}>
                 measured
               </Text>
             </View>
             <View className="flex-row items-center gap-[7px]">
               <View style={{ width: 14, height: 8, backgroundColor: alpha(palette.accent, 0.14) }} />
-              <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+              <Text className={text.body} style={{ color: palette.inkMuted }}>
                 expected band
               </Text>
             </View>
             {references.map((reference) => (
               <View key={`key${reference.label}`} className="flex-row items-center gap-[7px]">
                 <View style={{ width: 14, height: 0, borderTopWidth: 1, borderStyle: 'dashed', borderColor: reference.colour }} />
-                <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+                <Text className={text.body} style={{ color: palette.inkMuted }}>
                   {reference.label}
                 </Text>
               </View>
             ))}
             <View className="min-w-0 flex-1" />
-            <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+            <Text className={text.body} style={{ color: palette.inkMuted }}>
               Axis in {focused.unit}, true scale — this chart plots one series only.
             </Text>
           </View>
@@ -1098,17 +1099,17 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
       {/* The picker. Not a legend: only one series is ever on the chart, so a
           row here chooses the subject rather than toggling a line on and off. */}
       <View
-        className="overflow-hidden rounded-xl border"
+        className="overflow-hidden rounded-[10px] border"
         style={{ borderColor: palette.line, backgroundColor: palette.panel }}
       >
         <View
           className="flex-row items-center justify-between px-5 py-2.5"
           style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
         >
-          <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+          <Text className={text.label} style={{ color: palette.inkFaint }}>
             Signals
           </Text>
-          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+          <Text className={text.label} style={{ color: palette.inkFaint }}>
             {filtered.length} mapped
           </Text>
         </View>
@@ -1132,16 +1133,16 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
               >
                 <View style={{ width: 14, height: 2.5, borderRadius: 2, backgroundColor: meta.colour }} />
                 <Text
-                  className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+                  className={text.label}
                   style={{ color: palette.inkFaint, width: 46 }}
                 >
                   {meta.code}
                 </Text>
-                <Text numberOfLines={1} className="min-w-0 flex-1 font-body text-[12px]" style={{ color: palette.ink }}>
+                <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.ink }}>
                   {meta.label}
                 </Text>
                 <Text
-                  className="font-mono text-[11.5px]"
+                  className={text.data}
                   style={{ color: entry.latest === undefined ? palette.inkFaint : palette.ink, fontVariant: ['tabular-nums'] }}
                 >
                   {entry.latest === undefined ? '—' : `${entry.latest.toFixed(meta.decimals)} ${meta.unit}`}
