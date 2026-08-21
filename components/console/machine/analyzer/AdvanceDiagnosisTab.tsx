@@ -1108,14 +1108,13 @@ export function AdvanceDiagnosisTab({
 
   return (
     <View>
-      {/* The part picker is the screen's navigation, not a region of its own. It
-          sits bare at the top of the card so the first thing the eye lands on is
-          the machine, not a heading announcing that a machine is below. */}
-      <View className="px-4 pb-1 pt-3.5">
-        <PartChips parts={parts} selected={selectedPart} onSelect={onSelectPart} />
-      </View>
-
       {view === null ? (
+        /* No chip row here. The strip below already lists every part, with its
+           condition and a way in — a row of chips above it was the same seven
+           names twice, and the reader had to work out which of the two lists
+           was the navigation. On the entry screen the machine IS the
+           navigation; the chips appear once a part is open, where they are the
+           only way to move between parts. */
         <>
           <Block
             first
@@ -1143,6 +1142,12 @@ export function AdvanceDiagnosisTab({
         </>
       ) : (
         <>
+          {/* The part switcher, including the "All parts" chip that is the way
+              back to the machine view. */}
+          <View className="px-4 pb-1 pt-3.5">
+            <PartChips parts={parts} selected={selectedPart} onSelect={onSelectPart} />
+          </View>
+
           {/* One header for the part: what it is, how it is, and what is wrong.
               The counts that used to sit here repeated the strip and the card
               above, so the headline keeps the sentence and drops the tally. */}

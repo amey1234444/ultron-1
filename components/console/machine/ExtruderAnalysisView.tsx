@@ -77,7 +77,7 @@ import {
   type Variant,
 } from '../../ui';
 import { AdvanceDiagnosisTab } from './analyzer/AdvanceDiagnosisTab';
-import { AnalyzerHeader } from './analyzer/AnalyzerHeader';
+import { StatusBand, type StatusCount } from './analyzer/StatusBand';
 import { Block, FilterChips, SearchField } from './analyzer/AnalyzerParts';
 import {
   ATTENTION_FILTERS,
@@ -89,7 +89,6 @@ import {
 } from './analyzer/ConclusionTab';
 import { ConnectivityTab } from './analyzer/ConnectivityTab';
 import { signalFilterCounts, SIGNAL_FILTERS, SignalTab, type SignalFilter } from './analyzer/SignalTab';
-import { StatTiles, type StatTile } from './analyzer/StatTiles';
 import type { MappedChannel } from './RackOccupancyView';
 
 function channelNumber(channelId: string): number {
@@ -417,7 +416,6 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const [noticeDismissed, setNoticeDismissed] = useState(false);
   // When this analysis session began, for the header's elapsed fact. A ref so
   // it survives re-renders without becoming a dependency of anything.
-  const sessionStart = useRef(Date.now()).current;
   // The scenario library is a drawer opened from the header rather than a
   // section in the flow: it is a testing instrument, not part of the reading.
   const [libraryOpen, setLibraryOpen] = useState(false);
@@ -810,28 +808,36 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   const gutter = width >= 768 ? 20 : 12;
 
   // --- shell furniture -------------------------------------------------------
-  // How long this analysis has been running. Recomputed whenever the pipeline
-  // produces a new result, which is the only moment the band redraws anyway.
-  const sessionLabel = useMemo(() => {
-    const minutes = Math.max(0, Math.round((Date.now() - sessionStart) / 60000));
-    const started = new Date(sessionStart);
-    const clock = `${String(started.getHours()).padStart(2, '0')}:${String(started.getMinutes()).padStart(2, '0')}`;
-    const elapsed = minutes >= 60 ? `${Math.floor(minutes / 60)} h ${minutes % 60} m` : `${minutes} m`;
-    return `${elapsed} · since ${clock}`;
-  }, [analysis.generatedAt, sessionStart]);
+  /**
+   * The machine's state as one sentence, for the top of the band.
+   *
+   * The status word answers "how is it"; this answers "why do you say that", and
+   * it is the only place in the layer that answers it before a tab is chosen.
+   * It is assembled from what the pipeline already concluded rather than
+   * written per case, so it can never disagree with the screen below it.
+   */
+  const verdictLine = liveDataUnavailable
+    ? 'No gateway measurement is reaching this machine, so no condition can be reported.'
+    : violations.length > 0
+      ? `${violations.length} hard process limit${violations.length === 1 ? '' : 's'} exceeded${
+          currentDiagnosis ? ` · ${currentDiagnosis.likelyCause} on ${currentDiagnosis.affectedPart}` : ''
+        }.`
+      : currentDiagnosis
+        ? `${currentDiagnosis.likelyCause} on ${currentDiagnosis.affectedPart}.`
+        : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
+          ? 'The installed sensors cannot separate the remaining explanations, so no single conclusion is reported.'
+          : 'No controlled fault signature is met by the current measurements.';
 
-  // The four numbers that describe the machine, not the screen. They stay above
-  // the tab bar so the answer to "how is this machine" does not change shape
-  // when the reader moves between Diagnosis, Advance Diagnosis and Signal.
-  const tiles: StatTile[] = [
-    {
-      key: 'status',
-      label: 'Machine status',
-      value: verdictStatusWord,
-      detail: `${humanise(detail.inferredMachineState)} · ${humanise(detail.identifiability)}`,
-      variant: verdictVariant,
-      filled: true,
-    },
+  /**
+   * The three numbers that describe the machine, not the screen.
+   *
+   * The status word used to be a fourth tile here and is now the band's own
+   * headline — a tinted card reading "Warning" beside a sentence reading
+   * "Warning" was the same fact twice at two sizes. Each of these three opens
+   * the screen that holds the rows it counts, so the number is a way in rather
+   * than a fact to memorise.
+   */
+  const counts: StatusCount[] = [
     {
       key: 'warnings',
       label: 'Warnings',
@@ -839,6 +845,13 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       detail: 'Registered boundaries crossed',
       variant: crossings.length > 0 ? 'warning' : 'success',
       history: keyChanges[0] ? signalViews.find((signal) => signal.tag === keyChanges[0].tag)?.history : undefined,
+      onPress:
+        crossings.length > 0
+          ? () => {
+              setAttentionFilter('boundaries');
+              setTab('diagnosis');
+            }
+          : undefined,
     },
     {
       key: 'alarms',
@@ -846,6 +859,13 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       value: String(violations.length),
       detail: 'Hard process limits exceeded',
       variant: violations.length > 0 ? 'destructive' : 'success',
+      onPress:
+        violations.length > 0
+          ? () => {
+              setAttentionFilter('limits');
+              setTab('diagnosis');
+            }
+          : undefined,
     },
     {
       key: 'faults',
@@ -853,13 +873,19 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       value: String(candidateAssessments.length),
       detail: 'Matched fault signatures',
       variant: candidateAssessments.length > 0 ? 'destructive' : 'success',
-      note: candidateAssessments.length > 0 ? humanise(detail.faultLayer).replace('_', ' ') : undefined,
+      onPress:
+        candidateAssessments.length > 0
+          ? () => {
+              setAttentionFilter('faults');
+              setTab('diagnosis');
+            }
+          : undefined,
     },
   ];
 
-  // The integrity layer's standing caveat. It qualifies the facts it sits under,
-  // so it renders inside the header card rather than as one more banner pushing
-  // the whole screen down.
+  // The integrity layer's standing caveat. It qualifies the status it sits
+  // under, so it closes the band rather than being one more banner pushing the
+  // whole screen down.
   const notice =
     layerNote && !noticeDismissed
       ? {
@@ -956,7 +982,11 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         className="flex-1"
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 14, paddingBottom: 32, gap: 12 }}
       >
-        <AnalyzerHeader
+        <StatusBand
+          statusWord={verdictStatusWord}
+          statusVariant={verdictVariant}
+          statusContext={humanise(detail.inferredMachineState)}
+          verdictLine={verdictLine}
           modelName="Single-screw extruder diagnostic model"
           sourceLabel={sourceLabel}
           sourceVariant={sourceVariant}
@@ -964,7 +994,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           scenarioActive={Boolean(scenarioRun)}
           onToggleLibrary={() => setLibraryOpen((previous) => !previous)}
           onReturnToLive={() => setScenarioId(null)}
+          counts={counts}
           notice={notice}
+          wide={wide}
         />
 
         {libraryOpen ? (
@@ -1020,30 +1052,22 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           </Alert>
         ) : null}
 
-        {/* One column, full width. The instrument rail that used to sit in the
-            gutter was the Signal screen in miniature; the half of that subject
-            it could not carry - the acquisition chain behind each reading - is
-            a screen of its own now. */}
-        <View style={{ gap: 12 }}>
-          <View className="min-w-0 flex-1" style={{ gap: 12 }}>
-            <StatTiles tiles={tiles} wide={wide} />
-
-            <View
-              className="overflow-hidden rounded-2xl border"
-              style={{ backgroundColor: palette.panel, borderColor: palette.line }}
-            >
-              <View
-                className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3.5 py-2.5"
-                style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
-              >
-                <Tabs items={tabs} value={tab} onChange={setTab} />
-                {toolbar}
-              </View>
-
-              {screen}
-            </View>
+        {/* One column, full width, and one card. The band above answers "how is
+            this machine"; this answers "show me", and the tab bar is the only
+            navigation between the four ways of being shown. */}
+        <View
+          className="overflow-hidden rounded-2xl border"
+          style={{ backgroundColor: palette.panel, borderColor: palette.line }}
+        >
+          <View
+            className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3.5 py-2.5"
+            style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
+          >
+            <Tabs items={tabs} value={tab} onChange={setTab} />
+            {toolbar}
           </View>
 
+          {screen}
         </View>
       </ScrollView>
     </View>
