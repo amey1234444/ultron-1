@@ -1,16 +1,14 @@
 import React from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 import type { PlantAnalytics } from '../../../lib/plantAnalytics';
-import { HealthEnvelopeChart, Measured, MicroSparkline } from './PlantCharts';
+import { HealthEnvelopeChart, Measured } from './PlantCharts';
 import { MicroLabel, PlantCard, STEP } from './PlantSurfaces';
 
 interface PlantBottomAnalyticsProps {
   analytics: PlantAnalytics;
   alarmBars: { labels: string[]; critical: number[]; warning: number[]; info: number[] };
-  alarmCounts: { critical: number; warning: number; info: number };
-  live: boolean;
   palette: ConsolePalette;
   isDark: boolean;
   stacked?: boolean;
@@ -18,8 +16,6 @@ interface PlantBottomAnalyticsProps {
 
 export function PlantBottomAnalytics({
   analytics,
-  alarmCounts,
-  live,
   palette,
   isDark,
   stacked = false,
@@ -140,81 +136,12 @@ export function PlantBottomAnalytics({
         </View>
       </PlantCard>
 
-      {/* --- PANEL 3: ACTIVITY & INSIGHTS (Operational Event Stream) --- */}
-      <PlantCard
-        palette={palette}
-        isDark={isDark}
-        style={{ flex: 1, minWidth: 260, minHeight: 0, padding: STEP * 3 }}
-      >
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <MicroLabel palette={palette} size={10.5}>
-            ACTIVITY & INSIGHTS
-          </MicroLabel>
-          <Text className="font-mono" style={{ fontSize: 10, color: palette.accent, fontWeight: '600' }}>
-            View all
-          </Text>
-        </View>
-
-        <ScrollView showsVerticalScrollIndicator={false} style={{ flex: 1, marginTop: STEP * 2 }}>
-          <View style={{ gap: STEP * 2, paddingLeft: 6 }}>
-            {/* Event 1 */}
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ alignItems: 'center' }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.accent, marginTop: 3 }} />
-                <View style={{ width: 1, flex: 1, backgroundColor: palette.line, marginTop: 4 }} />
-              </View>
-              <View style={{ flex: 1, paddingBottom: STEP }}>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
-                  03:44 PM
-                </Text>
-                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11.5, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
-                  Systems normal
-                </Text>
-                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10.5, color: palette.inkMuted, marginTop: 1 }}>
-                  No critical alarms across components
-                </Text>
-              </View>
-            </View>
-
-            {/* Event 2 */}
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ alignItems: 'center' }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.warning, marginTop: 3 }} />
-                <View style={{ width: 1, flex: 1, backgroundColor: palette.line, marginTop: 4 }} />
-              </View>
-              <View style={{ flex: 1, paddingBottom: STEP }}>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
-                  03:42 PM
-                </Text>
-                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11.5, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
-                  Utility Area needs attention
-                </Text>
-                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10.5, color: palette.inkMuted, marginTop: 1 }}>
-                  Health score below target (73/100)
-                </Text>
-              </View>
-            </View>
-
-            {/* Event 3 */}
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              <View style={{ alignItems: 'center' }}>
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: palette.accent, marginTop: 3 }} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text className="font-mono" style={{ fontSize: 9.5, color: palette.inkFaint }}>
-                  03:32 PM
-                </Text>
-                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 11.5, fontWeight: '600', color: palette.ink, marginTop: 1 }}>
-                  Throughput spike detected
-                </Text>
-                <Text style={{ fontFamily: 'Inter, system-ui, sans-serif', fontSize: 10.5, color: palette.inkMuted, marginTop: 1 }}>
-                  Peak rate reached 4.2 packets/s
-                </Text>
-              </View>
-            </View>
-          </View>
-        </ScrollView>
-      </PlantCard>
+      {/* There was a third panel here — "Activity & insights", an event stream.
+          Every one of its entries was a literal in this file: three hardcoded
+          times and three hardcoded sentences that never changed no matter what
+          the plant was doing. A fabricated log on an operations screen is worse
+          than no log, because a reader has no way to tell it apart from a real
+          one. It is gone until there is an event stream behind it. */}
     </View>
   );
 }

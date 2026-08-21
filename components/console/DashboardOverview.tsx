@@ -1186,12 +1186,6 @@ export function DashboardOverview({
                 <PlantBottomAnalytics
                   analytics={analytics}
                   alarmBars={alarmBars}
-                  alarmCounts={{
-                    critical: metrics.criticalCount,
-                    warning: metrics.warningCount,
-                    info: metrics.infoCount,
-                  }}
-                  live={metrics.live}
                   palette={palette}
                   isDark={isDark}
                   stacked={false}

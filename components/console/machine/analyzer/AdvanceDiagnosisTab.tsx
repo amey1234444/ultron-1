@@ -40,6 +40,7 @@ import {
   type SignalView,
 } from '../../../../lib/analysis/extruder';
 import { cn } from '../../../../lib/cn';
+import { severityRamp, type Severity } from '../../../../lib/severity';
 import { alpha, Badge, consolePalette, displayWeight, tabular, text, variantStyle, type Variant } from '../../../ui';
 import { Block, EmptyState, Fact, HoverLift, PressSurface, RangeRail, TrendChart } from './AnalyzerParts';
 
@@ -60,6 +61,41 @@ const PART_ICON: Record<MachinePart, keyof typeof MaterialCommunityIcons.glyphMa
   'Melt / Process': 'water-outline',
   'Electrical / Power': 'flash-outline',
 };
+
+/**
+ * A part's condition, on the analysis layer's severity ramp.
+ *
+ * WATCH and ATTENTION both used to resolve to amber, which collapsed the one
+ * distinction the two words exist to make: WATCH is "keep an eye on this",
+ * ATTENTION is "this is out of bounds". Slate and amber separate them, and it
+ * is the same slate the findings list uses for a crossed reference — a part on
+ * watch is a part with references exceeded, so the colours agree by
+ * construction rather than by coincidence.
+ */
+const STATE_SEVERITY: Record<PartState, Severity | null> = {
+  NORMAL: 'advisory',
+  WATCH: 'boundary',
+  ATTENTION: 'limit',
+  ALARM: 'fault',
+  FAULT: 'fault',
+  UNAVAILABLE: null,
+};
+
+/** Tones for a part state, with the palette's muted ink standing in for "no data". */
+function stateTones(isDark: boolean, state: PartState) {
+  const severity = STATE_SEVERITY[state];
+  const palette = consolePalette(isDark);
+  if (!severity) {
+    return {
+      dot: palette.inkFaint,
+      wash: 'transparent',
+      head: palette.panelRaised,
+      edge: palette.line,
+      text: palette.inkMuted,
+    };
+  }
+  return severityRamp(isDark)[severity];
+}
 
 const STATE_VARIANT: Record<PartState, Variant> = {
   NORMAL: 'success',
@@ -84,7 +120,7 @@ function formatValue(value: number | null, unit: string): string {
 function StateDot({ state, size = 6 }: { state: PartState; size?: number }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const accent = variantStyle(palette, STATE_VARIANT[state]).accent;
+  const accent = stateTones(isDark, state).dot;
   return <View style={{ width: size, height: size, borderRadius: size, backgroundColor: accent }} />;
 }
 
@@ -109,7 +145,7 @@ function PartChips({
     icon: keyof typeof MaterialCommunityIcons.glyphMap,
     onPress: () => void,
   ) => {
-    const accent = state ? variantStyle(palette, STATE_VARIANT[state]).accent : palette.inkMuted;
+    const accent = state ? stateTones(isDark, state).dot : palette.inkMuted;
     return (
       <PressSurface
         key={key}
@@ -168,7 +204,7 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
         {PART_FLOW.map((part, index) => {
           const view = byPart.get(part);
           const state = view?.state ?? 'UNAVAILABLE';
-          const style = variantStyle(palette, STATE_VARIANT[state]);
+          const style = stateTones(isDark, state);
           return (
             <View key={part} className="flex-row items-center">
               {index > 0 ? (
@@ -176,26 +212,26 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
               ) : null}
               <PressSurface
                 onPress={() => onSelect(part)}
-                accent={style.accent}
+                accent={style.dot}
                 accessibilityLabel={`Open ${part}, ${PART_STATE_LABEL[state]}`}
                 className="min-w-[124px] rounded-[10px] border px-3 py-2.5"
                 style={{
-                  borderColor: state === 'NORMAL' ? palette.line : alpha(style.accent, 0.4),
+                  borderColor: state === 'NORMAL' ? palette.line : style.edge,
                   backgroundColor: palette.panel,
                 }}
               >
                 <View
                   className="h-7 w-7 items-center justify-center rounded-[6px]"
-                  style={{ backgroundColor: state === 'NORMAL' ? palette.panelRaised : alpha(style.accent, 0.12) }}
+                  style={{ backgroundColor: state === 'NORMAL' ? palette.panelRaised : style.head }}
                 >
-                  <MaterialCommunityIcons name={PART_ICON[part]} size={15} color={style.accent} />
+                  <MaterialCommunityIcons name={PART_ICON[part]} size={15} color={style.dot} />
                 </View>
                 <Text className={cn('mt-2', text.bodyStrong)} style={{ color: palette.ink }} numberOfLines={1}>
                   {part}
                 </Text>
                 <View className="mt-0.5 flex-row items-center gap-1.5">
                   <StateDot state={state} size={5} />
-                  <Text className={text.label} style={{ color: style.accent }}>
+                  <Text className={text.label} style={{ color: style.dot }}>
                     {PART_STATE_LABEL[state]}
                   </Text>
                 </View>
@@ -237,22 +273,22 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
 function PartCard({ view, onOpen }: { view: PartView; onOpen: () => void }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const style = variantStyle(palette, STATE_VARIANT[view.state]);
+  const style = stateTones(isDark, view.state);
 
   return (
     <PressSurface
       onPress={onOpen}
-      accent={style.accent}
+      accent={style.dot}
       accessibilityLabel={`Open ${view.part} deep dive`}
       className="min-w-[260px] flex-1 rounded-[14px] border px-3.5 py-3"
-      style={{ borderColor: alpha(style.accent, 0.4), backgroundColor: palette.panel }}
+      style={{ borderColor: style.edge, backgroundColor: palette.panel }}
     >
       <View className="flex-row items-start gap-2.5">
         <View
           className="h-8 w-8 items-center justify-center rounded-[10px]"
-          style={{ backgroundColor: alpha(style.accent, 0.12) }}
+          style={{ backgroundColor: style.head }}
         >
-          <MaterialCommunityIcons name={PART_ICON[view.part]} size={16} color={style.accent} />
+          <MaterialCommunityIcons name={PART_ICON[view.part]} size={16} color={style.dot} />
         </View>
         <View className="min-w-0 flex-1">
           <View className="flex-row items-start justify-between gap-2">
@@ -464,9 +500,16 @@ function CauseList({ view }: { view: PartView }) {
       ) : null}
 
       {view.causes.map((cause, index) => {
+        // A strong candidate IS a matched signature, so it takes the fault
+        // ramp — the same red the findings list uses for the same claim. A
+        // weaker candidate is a hypothesis the evidence has not settled, which
+        // is a slate-coloured statement, not an amber one.
+        const severity: Severity =
+          cause.matchClass === 'STRONG_CANDIDATE' ? 'fault' : cause.matchClass === 'CANDIDATE' ? 'limit' : 'boundary';
+        const tones = severityRamp(isDark)[severity];
+        const accent = tones.dot;
         const variant: Variant =
           cause.matchClass === 'STRONG_CANDIDATE' ? 'destructive' : cause.matchClass === 'CANDIDATE' ? 'warning' : 'muted';
-        const accent = variantStyle(palette, variant).accent;
         const share = Math.round((cause.score / top) * 100);
 
         return (
@@ -474,8 +517,8 @@ function CauseList({ view }: { view: PartView }) {
             <View
               className="rounded-[14px] border px-3.5 py-3"
               style={{
-                borderColor: index === 0 ? alpha(accent, 0.34) : palette.line,
-                backgroundColor: index === 0 ? alpha(accent, 0.05) : palette.panel,
+                borderColor: index === 0 ? tones.edge : palette.line,
+                backgroundColor: index === 0 ? tones.wash : palette.panel,
               }}
             >
               <View className="flex-row items-start gap-2.5">
@@ -483,7 +526,7 @@ function CauseList({ view }: { view: PartView }) {
                     bar below only says "longer than the next one". */}
                 <View
                   className="h-[22px] w-[22px] items-center justify-center rounded-[6px]"
-                  style={{ backgroundColor: alpha(accent, 0.14) }}
+                  style={{ backgroundColor: tones.head }}
                 >
                   <Text className={text.data} style={{ color: accent, fontVariant: ['tabular-nums'] }}>
                     {index + 1}

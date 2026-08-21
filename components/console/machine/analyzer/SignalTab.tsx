@@ -35,9 +35,32 @@ import { cn } from '../../../../lib/cn';
 import type { DeviceNode } from '../../../../lib/devices';
 import type { LiveState } from '../../../../lib/liveTelemetry';
 import type { CardNode } from '../../../../lib/rack';
+import { severityRamp, type Severity } from '../../../../lib/severity';
 import { alpha, Badge, consolePalette, tabular, text, variantStyle, type Variant } from '../../../ui';
 import { SlotCard } from '../../rack/SlotCard';
 import { Block, EmptyState, ExpandableRow, Fact, MarginBar, PressSurface, TagTrend } from './AnalyzerParts';
+
+/**
+ * A reading's status, on the analysis layer's severity ramp.
+ *
+ * The findings list uses the ramp to classify what *kind of claim* is being
+ * made — a matched signature is red, a breached hard limit amber, a crossed
+ * reference slate. This table is not making claims; it is reporting readings
+ * against the limits configured on their own channels, so it uses the same
+ * hues as a severity ladder: critical limit red, warning limit amber, inside
+ * limits green. Slate does not appear here because a channel limit is a limit,
+ * not a reference.
+ *
+ * A reading with no severity at all — never mapped, or not reporting — takes
+ * no ramp. `null` is the honest answer, and the palette's muted ink renders it.
+ */
+const STATUS_SEVERITY: Record<SignalStatus, Severity | null> = {
+  NORMAL: 'advisory',
+  WARNING: 'limit',
+  ALARM: 'fault',
+  UNAVAILABLE: null,
+  NOT_MAPPED: null,
+};
 
 const STATUS_VARIANT: Record<SignalStatus, Variant> = {
   NORMAL: 'success',
@@ -46,6 +69,19 @@ const STATUS_VARIANT: Record<SignalStatus, Variant> = {
   UNAVAILABLE: 'muted',
   NOT_MAPPED: 'muted',
 };
+
+/**
+ * The 2px status edge on a table row.
+ *
+ * Only rows that are actually outside a limit get one. Painting the edge on a
+ * normal row would put a coloured stripe down every line of the table, and a
+ * marker that is always present marks nothing.
+ */
+function rowTone(isDark: boolean, status: SignalStatus): string | undefined {
+  const severity = STATUS_SEVERITY[status];
+  if (!severity || severity === 'advisory') return undefined;
+  return severityRamp(isDark)[severity].dot;
+}
 
 const STATUS_LABEL: Record<SignalStatus, string> = {
   NORMAL: 'Normal',
@@ -303,7 +339,10 @@ function SignalRowSummary({
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const variant = STATUS_VARIANT[signal.status];
-  const accent = variantStyle(palette, variant).accent;
+  // The severity ramp owns the hue; `variant` survives only for the Badge,
+  // which is a kit component with its own variant vocabulary.
+  const severity = STATUS_SEVERITY[signal.status];
+  const accent = severity ? severityRamp(isDark)[severity].dot : palette.inkFaint;
   const valueColour = signal.status === 'NORMAL' || signal.status === 'UNAVAILABLE' ? palette.ink : accent;
 
   // Where it is wired, in the shortest form that still locates it: the rack's
@@ -574,7 +613,7 @@ export function SignalTab({
                 expanded={expanded === key}
                 onToggle={() => setExpanded((current) => (current === key ? null : key))}
                 accessibilityLabel={`${signal.measures}, ${STATUS_LABEL[signal.status]}`}
-                tone={signal.status === 'NORMAL' || signal.status === 'UNAVAILABLE' ? undefined : variantStyle(palette, variant).accent}
+                tone={rowTone(isDark, signal.status)}
                 summary={<SignalRowSummary signal={signal} connection={connection} wide={wide} />}
                 detail={
                   <SignalRowDetail

@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 import type { Insight } from '../../../lib/dashboardMetrics';
 import type { PlantAnalytics } from '../../../lib/plantAnalytics';
-import { MicroLabel, PanelSection, PlantCard, STEP } from './PlantSurfaces';
+import { PanelSection, PlantCard, STEP } from './PlantSurfaces';
 
 export type PlantKpi = {
   id: string;
@@ -113,19 +113,13 @@ export function PlantAnalyticsPanel({
   palette,
   isDark,
 }: PlantAnalyticsPanelProps) {
-  const { performance, assets } = analytics;
+  const { assets } = analytics;
 
   // Derive health score values from actual telemetry & KPIs
   const healthKpi = kpis.find((k) => k.id === 'health');
   const healthScore = healthKpi ? Math.round(parseFloat(healthKpi.value) || 76) : 76;
   const healthTarget = 90;
   const gapPts = (healthScore - healthTarget).toFixed(1);
-
-  // Asset health stats
-  const totalAssets = assets.length || 5;
-  const onPlanCount = assets.filter((a) => a.health >= healthTarget).length;
-  const worstAsset = assets.length > 0 ? [...assets].sort((a, b) => a.health - b.health)[0] : null;
-  const bestAsset = assets.length > 0 ? [...assets].sort((a, b) => b.health - a.health)[0] : null;
 
   // Asset health categories
   const criticalCount = assets.filter((a) => a.status === 'critical').length;
@@ -194,44 +188,13 @@ export function PlantAnalyticsPanel({
               </View>
             </View>
 
-            {/* Asset status summary rail */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingTop: STEP * 2,
-                borderTopWidth: 1,
-                borderTopColor: palette.line,
-              }}
-            >
-              <View>
-                <MicroLabel palette={palette} size={9}>
-                  ASSETS ON PLAN
-                </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 14, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
-                  {onPlanCount} <Text style={{ fontSize: 11, color: palette.inkFaint }}>/ {totalAssets}</Text>
-                </Text>
-              </View>
-
-              <View>
-                <MicroLabel palette={palette} size={9}>
-                  FURTHEST OFF
-                </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 14, fontWeight: '600', color: palette.critical, marginTop: 2 }}>
-                  {worstAsset ? worstAsset.health : '—'}
-                </Text>
-              </View>
-
-              <View style={{ alignItems: 'flex-end' }}>
-                <MicroLabel palette={palette} size={9}>
-                  BEST ASSET
-                </MicroLabel>
-                <Text className="font-mono tabular-nums" style={{ fontSize: 14, fontWeight: '600', color: palette.accent, marginTop: 2 }}>
-                  {bestAsset ? bestAsset.health : '—'}
-                </Text>
-              </View>
-            </View>
+            {/* The "assets on plan / furthest off / best asset" rail that used
+                to close this section is gone. All three were the fleet stated a
+                third time: the distribution below counts every asset by
+                category, and Needs Attention on the strip lists the worst ones
+                by name — "furthest off" was that list's first row as a bare
+                number. "Best asset" was the only one that was not a repeat, and
+                nobody has ever acted on it. */}
           </View>
         </PanelSection>
 

@@ -78,14 +78,9 @@ import {
 import { AdvanceDiagnosisTab } from './analyzer/AdvanceDiagnosisTab';
 import { StatusBand, type StatusCount } from './analyzer/StatusBand';
 import { Block, FilterChips, SearchField } from './analyzer/AnalyzerParts';
-import {
-  ATTENTION_FILTERS,
-  ConclusionTab,
-  filterAttention,
-  type AttentionFilter,
-  type AttentionItem,
-  type CurrentDiagnosis,
-} from './analyzer/ConclusionTab';
+import { ConclusionTab, type CurrentDiagnosis } from './analyzer/ConclusionTab';
+import type { FindingCluster } from './analyzer/Findings';
+import { SEVERITY_LABEL, SEVERITY_ORDER, type Severity } from '../../../lib/severity';
 import { signalFilterCounts, SIGNAL_FILTERS, SignalTab, type SignalFilter } from './analyzer/SignalTab';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -194,12 +189,13 @@ function buildPoints(
 // Presentation mappings
 // --------------------------------------------------------------------------------------
 
-const SEVERITY_VARIANT: Record<string, Variant> = {
-  critical: 'destructive',
-  high: 'destructive',
-  medium: 'warning',
-  low: 'warning',
-  none: 'success',
+/** The anomaly layer's own severity words, onto the findings ramp. */
+const SEVERITY_FOR_ANOMALY: Record<string, Severity> = {
+  critical: 'fault',
+  high: 'fault',
+  medium: 'limit',
+  low: 'boundary',
+  none: 'advisory',
 };
 
 const LAYER_NOTE: Record<string, { title: string; detail: string; variant: Variant }> = {
@@ -408,7 +404,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // Which kinds of finding the Diagnosis list is showing. Held in the shell
   // because the control that drives it lives in the shell's toolbar row, beside
   // the tabs, rather than inside the screen it filters.
-  const [attentionFilter, setAttentionFilter] = useState<AttentionFilter>('all');
+  const [severityFilter, setSeverityFilter] = useState<Severity | 'all'>('all');
   const [signalFilter, setSignalFilter] = useState<SignalFilter>('all');
   const [signalQuery, setSignalQuery] = useState('');
   // The standing integrity caveat is dismissible per session: it is a condition
@@ -468,15 +464,15 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
 
   // --- verdict ---------------------------------------------------------------
   const hasCandidates = detail.candidateFaults.length > 0;
-  const verdictVariant: Variant = liveDataUnavailable
-    ? 'muted'
+  const verdictSeverity: Severity = liveDataUnavailable
+    ? 'boundary'
     : violations.length > 0
-      ? 'destructive'
+      ? 'limit'
       : hasCandidates
-        ? (SEVERITY_VARIANT[analysis.anomaly.severity] ?? 'warning')
+        ? (SEVERITY_FOR_ANOMALY[analysis.anomaly.severity] ?? 'limit')
         : detail.faultCategory === 'INSUFFICIENT_DIAGNOSTIC_EVIDENCE'
-          ? 'info'
-          : 'success';
+          ? 'boundary'
+          : 'advisory';
   // One word for the status tile. Deliberately not the verdict headline, which
   // is a sentence: the tile answers "how is the machine", the headline answers
   // "what is wrong", and the tile has to be readable across a control room.
@@ -661,41 +657,105 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // One row per physical crossing. See `boundaryCrossings` for why.
   const crossings = useMemo(() => boundaryCrossings(detail.triggeredThresholds), [detail.triggeredThresholds]);
 
-  // Everything raised on this machine, in one list, worst first. The three kinds
-  // come from the three things the pipeline actually raises, and stay distinct:
-  // a fault is a root-cause inference, not the rung above an alarm.
-  const attentionItems = useMemo<AttentionItem[]>(() => {
-    const alarms: AttentionItem[] = violations.map((check) => {
+  /**
+   * Everything raised on this machine, grouped by the signal it was raised on.
+   *
+   * The list used to be one row per rule, which printed the same sentence three
+   * times when one point tripped three thresholds. One cluster is one signal;
+   * its rules are the table inside it. See `analyzer/Findings.tsx`.
+   *
+   * Severities come from what the pipeline actually raises, and stay distinct:
+   *
+   *   limit      a hard process constraint is violated       amber
+   *   boundary   a registered threshold is crossed           slate
+   *
+   * A crossed threshold is NOT amber. It is a registered reference being
+   * exceeded, and a machine with twelve of them is not a machine with twelve
+   * warnings — that conflation is the thing this grouping exists to undo.
+   */
+  const findingClusters = useMemo<FindingCluster[]>(() => {
+    /** The registered bound behind a triggered threshold, joined by id. */
+    const registered = new Map(thresholdRegister.map((entry) => [entry.thresholdId, entry]));
+
+    const limits: FindingCluster[] = violations.map((check) => {
       const part = partsForConstraint(check.constraintId)[0] ?? null;
+      // Both sides are on the same scale and in the same unit, so the ratio is
+      // a real multiple rather than an invented one.
+      const ratio =
+        check.value !== null && Number.isFinite(check.value) && check.limit !== 0
+          ? Math.abs(check.value / check.limit)
+          : null;
       return {
-        key: `alarm-${check.constraintId}`,
-        kind: 'ALARM' as const,
-        message: `${check.name} is past its hard process limit`,
-        reference: [check.constraintId, `limit ${check.operator} ${check.limit} ${check.unit}`, part]
-          .filter(Boolean)
-          .join(' · '),
+        id: `limit-${check.constraintId}`,
+        severity: 'limit' as const,
+        title: `${check.name} is past its hard process limit`,
+        signal: [check.constraintId, part, check.unit].filter(Boolean).join(' · '),
+        note:
+          check.reason ??
+          'A registered hard process limit is exceeded. This is a bound on the process itself, not a reference the model learned.',
         part,
+        rules: [
+          {
+            code: check.constraintId,
+            rule: check.name,
+            reference: `${check.operator} ${check.limit} ${check.unit}`.trim(),
+            observed: check.value === null ? '—' : `${check.value} ${check.unit}`.trim(),
+            ratio,
+          },
+        ],
       };
     });
-    const warnings: AttentionItem[] = crossings.map(({ key, threshold, faultIds }) => {
-      const part = threshold.sensor in TAG_LABELS ? partForTag(threshold.sensor as ExtruderTag) : null;
-      return {
-        key: `warning-${key}`,
-        kind: 'WARNING' as const,
-        message: `${TAG_LABELS[threshold.sensor as ExtruderTag] ?? threshold.sensor} crossed a registered boundary`,
-        reference: [
-          threshold.thresholdId,
-          humanise(threshold.feature),
-          part,
-          faultIds.length > 1 ? `feeds ${faultIds.length} hypotheses` : null,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        part,
+
+    // One cluster per sensor, however many of its thresholds fired.
+    const bySensor = new Map<string, FindingCluster>();
+    for (const { threshold, faultIds } of crossings) {
+      const sensor = threshold.sensor;
+      const part = sensor in TAG_LABELS ? partForTag(sensor as ExtruderTag) : null;
+      const label = TAG_LABELS[sensor as ExtruderTag] ?? sensor;
+      const bound = registered.get(threshold.thresholdId);
+
+      // Only divide when there is a registered value to divide by, and it is
+      // not zero. Everything else reports "not comparable" rather than a
+      // number nobody can defend.
+      const ratio =
+        bound && threshold.observed !== null && Number.isFinite(threshold.observed) && bound.value !== 0
+          ? Math.abs(threshold.observed / bound.value)
+          : null;
+
+      const rule = {
+        code: threshold.thresholdId,
+        rule: humanise(threshold.feature),
+        reference: bound ? `${bound.operator} ${bound.value} ${bound.unit}`.trim() : 'not registered',
+        observed:
+          threshold.observed === null
+            ? '—'
+            : `${Number(threshold.observed.toFixed(Math.abs(threshold.observed) >= 10 ? 1 : 2))} ${bound?.unit ?? ''}`.trim(),
+        ratio,
       };
-    });
-    return [...alarms, ...warnings];
-  }, [crossings, violations]);
+
+      const existing = bySensor.get(sensor);
+      if (existing) {
+        existing.rules.push(rule);
+        continue;
+      }
+
+      bySensor.set(sensor, {
+        id: `boundary-${sensor}`,
+        severity: 'boundary' as const,
+        title: `${label} crossed a registered boundary`,
+        signal: [sensor, label.toLowerCase(), bound?.unit].filter(Boolean).join(' · '),
+        note:
+          faultIds.length > 1
+            ? `This point feeds ${faultIds.length} hypotheses the installed sensors cannot separate, so a crossing here narrows the field without naming a cause.`
+            : threshold.notes ||
+              'A registered reference for this point is exceeded. That is a boundary, not a breach of a hard process limit.',
+        part,
+        rules: [rule],
+      });
+    }
+
+    return [...limits, ...bySensor.values()];
+  }, [crossings, thresholdRegister, violations]);
 
   const currentDiagnosis = useMemo<CurrentDiagnosis | null>(() => {
     const top = candidateAssessments[0];
@@ -760,8 +820,10 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       value: 'diagnosis',
       label: 'Diagnosis',
       icon: 'stethoscope',
-      count: attentionItems.length,
-      countVariant: verdictVariant,
+      // Rules, not clusters: the tab badge has to agree with the filter counts
+      // on the card underneath it, and those count rules.
+      count: findingClusters.reduce((total, cluster) => total + cluster.rules.length, 0),
+      countVariant: violations.length > 0 ? 'destructive' : crossings.length > 0 ? 'warning' : 'muted',
     },
     {
       value: 'advance',
@@ -825,59 +887,74 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           : 'No controlled fault signature is met by the current measurements.';
 
   /**
-   * The three numbers that describe the machine, not the screen.
+   * The counters, machine-wide.
    *
-   * The status word used to be a fourth tile here and is now the band's own
-   * headline — a tinted card reading "Warning" beside a sentence reading
-   * "Warning" was the same fact twice at two sizes. Each of these three opens
-   * the screen that holds the rows it counts, so the number is a way in rather
-   * than a fact to memorise.
+   * They say "this machine" on every row, because the severity mix beside them
+   * is scoped to what is in view and the two must not be mistaken for each
+   * other. Both derive from the same arrays, so the numbers cannot disagree.
+   *
+   * Each one opens the findings list already filtered to what it counted — a
+   * count you cannot press is a number the reader has to go and find the
+   * meaning of somewhere else.
    */
+  const openFindings = useCallback(
+    (severity: Severity) => {
+      setSeverityFilter(severity);
+      setTab('diagnosis');
+    },
+    [],
+  );
+
   const counts: StatusCount[] = [
     {
-      key: 'warnings',
-      label: 'Warnings',
-      value: String(crossings.length),
-      detail: 'Registered boundaries crossed',
-      variant: crossings.length > 0 ? 'warning' : 'success',
-      history: keyChanges[0] ? signalViews.find((signal) => signal.tag === keyChanges[0].tag)?.history : undefined,
-      onPress:
-        crossings.length > 0
-          ? () => {
-              setAttentionFilter('boundaries');
-              setTab('diagnosis');
-            }
-          : undefined,
-    },
-    {
-      key: 'alarms',
-      label: 'Alarms',
-      value: String(violations.length),
-      detail: 'Hard process limits exceeded',
-      variant: violations.length > 0 ? 'destructive' : 'success',
-      onPress:
-        violations.length > 0
-          ? () => {
-              setAttentionFilter('limits');
-              setTab('diagnosis');
-            }
-          : undefined,
-    },
-    {
       key: 'faults',
-      label: 'Detected problems',
+      label: 'Detected faults',
       value: String(candidateAssessments.length),
       detail: 'Matched fault signatures',
-      variant: candidateAssessments.length > 0 ? 'destructive' : 'success',
-      onPress:
-        candidateAssessments.length > 0
-          ? () => {
-              setAttentionFilter('faults');
-              setTab('diagnosis');
-            }
-          : undefined,
+      severity: 'fault',
+      scope: 'this machine',
+      onPress: candidateAssessments.length > 0 ? () => openFindings('fault') : undefined,
+    },
+    {
+      key: 'limits',
+      label: SEVERITY_LABEL.limit,
+      value: String(violations.length),
+      detail: 'Above a hard registered process limit',
+      severity: 'limit',
+      scope: 'this machine',
+      onPress: violations.length > 0 ? () => openFindings('limit') : undefined,
+    },
+    {
+      key: 'boundaries',
+      label: SEVERITY_LABEL.boundary,
+      value: String(crossings.length),
+      detail: 'Registered references exceeded',
+      severity: 'boundary',
+      scope: 'this machine',
+      onPress: crossings.length > 0 ? () => openFindings('boundary') : undefined,
+    },
+    {
+      key: 'unread',
+      label: 'Points not read',
+      value: String(unconsumed.length),
+      detail: 'Mapped but not resolved onto a tag',
+      severity: 'advisory',
+      scope: unconsumed.length === 0 ? 'none' : 'this machine',
+      onPress: unconsumed.length > 0 ? () => setTab('signal') : undefined,
     },
   ];
+
+  /** Severity shares for the mix, scoped to the findings list in view. */
+  const severityShares = useMemo(
+    () =>
+      SEVERITY_ORDER.map((severity) => ({
+        severity,
+        count: findingClusters
+          .filter((cluster) => cluster.severity === severity)
+          .reduce((total, cluster) => total + cluster.rules.length, 0),
+      })),
+    [findingClusters],
+  );
 
   // The integrity layer's standing caveat. It qualifies the status it sits
   // under, so it closes the band rather than being one more banner pushing the
@@ -894,32 +971,18 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         }
       : null;
 
-  const visibleAttention = filterAttention(attentionItems, attentionFilter);
   const signalCounts = useMemo(() => signalFilterCounts(signalViews), [signalViews]);
 
   /**
    * The toolbar that shares the tab row.
    *
-   * One row, one place for a screen's controls. Diagnosis filters its findings;
-   * Signal searches and filters its table; Advance Diagnosis navigates by part
-   * chips inside its own body, because those carry a state dot each and are
-   * navigation rather than a filter.
+   * Diagnosis no longer puts anything here: its findings card carries its own
+   * severity filters, in the severity hues, right above the rows they scope.
+   * A filter a card's width away from the list it filters is a filter you have
+   * to remember you set.
    */
   const toolbar =
-    tab === 'diagnosis' ? (
-      <FilterChips
-        label="Filter findings"
-        value={attentionFilter}
-        onChange={setAttentionFilter}
-        options={ATTENTION_FILTERS.map((entry) => ({
-          value: entry.value,
-          label: entry.label,
-          count:
-            entry.kind === null ? attentionItems.length : attentionItems.filter((item) => item.kind === entry.kind).length,
-          variant: entry.kind === 'WARNING' ? ('warning' as const) : entry.kind === null ? undefined : ('destructive' as const),
-        }))}
-      />
-    ) : tab === 'signal' ? (
+    tab === 'signal' ? (
       <>
         <SearchField value={signalQuery} onChange={setSignalQuery} placeholder="Filter signals..." width={186} />
         <FilterChips
@@ -947,8 +1010,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
         </Block>
       ) : (
         <ConclusionTab
-          attention={visibleAttention}
-          attentionTotal={attentionItems.length}
+          clusters={findingClusters}
+          filter={severityFilter}
+          onFilter={setSeverityFilter}
           diagnosis={currentDiagnosis}
           action={nextAction}
           wide={wide}
@@ -981,8 +1045,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       >
         <StatusBand
           statusWord={verdictStatusWord}
-          statusVariant={verdictVariant}
+          statusSeverity={verdictSeverity}
           statusContext={humanise(detail.inferredMachineState)}
+          statusChip={currentDiagnosis?.affectedPart}
           verdictLine={verdictLine}
           sourceLabel={sourceLabel}
           sourceVariant={sourceVariant}
@@ -991,6 +1056,12 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
           onToggleLibrary={() => setLibraryOpen((previous) => !previous)}
           onReturnToLive={() => setScenarioId(null)}
           counts={counts}
+          shares={severityShares}
+          filter={severityFilter}
+          onFilter={(severity) => {
+            setSeverityFilter(severity);
+            setTab('diagnosis');
+          }}
           notice={notice}
           wide={wide}
         />
