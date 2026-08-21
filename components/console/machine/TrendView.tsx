@@ -1,68 +1,91 @@
 /**
- * TRENDS — every mapped channel on one time chart.
+ * TRENDS — one signal at true scale, against its own references.
  *
- * Why this is hand-drawn rather than a charting package
- * ----------------------------------------------------
- * The obvious move is to drop in Recharts, Chart.js, ECharts, Tremor or visx.
- * None of them can mount here: they render React DOM and reach for `document`,
- * and this screen also compiles to real native views for the Expo iOS/Android
- * targets. The React Native charting packages that do run on both — victory-native
- * (Skia + Reanimated), react-native-gifted-charts, react-native-graph — bring
- * their own visual language, their own colour props and their own type ramp,
- * which is exactly what the console kit exists to prevent: see the note at the
- * top of `components/ui/tokens.ts` on why shadcn/ui is not used either. A chart
- * that does not resolve its colours out of `lib/consoleTheme.ts` cannot stay in
- * step with the rest of the product, and a themed wrapper around a package that
- * fights you is more code than the plot itself.
+ * This is a port of the T36 Trend Focus panel: same card anatomy, same reading
+ * order, same chart furniture. What changed in the port is where the numbers on
+ * it come from, and that is worth stating precisely, because the difference
+ * between the reference design and this screen is entirely a difference in what
+ * this machine actually has configured.
  *
- * So the *techniques* are borrowed rather than the code, and they are the ones
- * the good financial and observability charts share:
+ * Ported as specified
+ * -------------------
+ *   card head        swatch, name, tag pill, verdict pill, subline, the reading
+ *                    at display size with its unit, a direction tag and a
+ *                    deviation tag
+ *   stats bar        now / mean / min / max / range / std dev / samples, with
+ *                    "now" carrying the series colour
+ *   plot grid        a value gutter, the plot, and a flag column — one grid
+ *                    shared by the plot row, the tick row and the brush row, so
+ *                    all three stay in column
+ *   plot             tinted reference band, dashed reference lines with edge
+ *                    labels, event verticals with chips, gradient area, smooth
+ *                    line, hollow labelled min and max dots, latest-sample
+ *                    marker, right-edge value flag
+ *   crosshair        snapped vertical, marker, a value bubble in the gutter and
+ *                    a tooltip carrying value, deviation and band state; the
+ *                    header label flips to "at cursor" so a scrubbed value is
+ *                    never mistaken for live
+ *   session strip    the whole session as an area, with the selected window
+ *                    bracketed at the right
+ *   legend           one key per drawn element, and the axis note
+ *   maths            niceDomain / niceStep and the Catmull-Rom → cubic Bézier
+ *                    smoothPath, lifted verbatim
  *
- *   - a nice-number value scale, so gridlines land on 2.0 and 3.0 rather than
- *     on 2.275 and 3.35 — a tick you cannot say out loud is a tick you cannot
- *     read a value off;
- *   - a crosshair that snaps to the nearest sample column and reads every
- *     visible series at that instant, which is the single feature that turns a
- *     picture of lines into an instrument you can interrogate;
- *   - a last-value flag pinned to the axis edge, so the current number is on
- *     the plot rather than only in a table below it;
- *   - a filled area under the subject, a live pulse on its newest sample, and a
- *     ruled matrix behind everything.
+ * Changed, and why
+ * ----------------
+ *   setpoint         A channel has no setpoint in this system. Rather than draw
+ *                    a green dashed line at an invented number, the slot is
+ *                    filled by what a channel *does* carry: its configured
+ *                    alarm limits. The deviation tag reports headroom to the
+ *                    nearest one, and disappears entirely on a channel with no
+ *                    limits configured rather than reporting a deviation from
+ *                    nothing.
+ *   band             `bandLow`/`bandHigh` become the measurement kind's
+ *                    registered operating band from `liveValue.ts` — the band
+ *                    this whole console already normalises against. It is
+ *                    labelled as the expected band, not as an acceptance spec,
+ *                    because that is what it is.
+ *   boundary         The design has one; a channel here can have two, a warning
+ *                    and an alarm. Both are drawn when set, each in its own
+ *                    meaning's colour, and the verdict pill reads the higher one
+ *                    that is crossed.
+ *   events           There is no event stream behind this screen, so the three
+ *                    demo events are replaced by the ones the samples
+ *                    themselves prove: the moments the series crossed a
+ *                    configured limit, up or down. A recipe change is not
+ *                    something this screen can know about, so it is not shown.
+ *   window           The design's 15m / 1h / 8h / 24h assume timestamps. These
+ *                    buffers are sample counts with no clock behind them, so
+ *                    the windows are counted in samples and the axis is
+ *                    labelled in samples back from the newest. Inventing
+ *                    minutes from a sample index would be a fabricated time
+ *                    axis.
+ *   theme            The `--tf-*` tokens resolve to `lib/consoleTheme.ts`
+ *                    instead, and the series colour comes from the console's
+ *                    lightness ramp, so the panel is theme-aware in both
+ *                    directions. The README's own theming section is explicit
+ *                    that the series colour is a per-instance token; this is
+ *                    that, wired to the app's palette.
  *
- * The crosshair rides W3C pointer events, which `react-native-web` forwards to
- * the DOM node directly. On the native targets those only fire once the runtime
- * emits W3C pointer events, so the crosshair is a desktop affordance and the
- * plot degrades to a static chart on a phone — everything it would have told
- * you is also in the table below.
- *
- * Why the screen has a subject
- * ----------------------------
- * Twelve equally-weighted strokes over a grid is a picture of a machine, not a
- * reading of one. Exactly one series is the subject at any moment: it is drawn
- * thick with a filled area, the value axis is labelled in *its* real
- * engineering units, and its reading, direction and session range are stated
- * above and below the plot. Everything else drops to a hairline — still there
- * for comparison, no longer competing for the eye. Pressing a row in the table
- * moves the subject; there is no "all equal" mode to fall into, because that
- * mode was the confusion this screen started with.
- *
- * The series are real. There is no historian behind this: each one plots the
- * samples its channel has actually reported, accumulated from live frames and
- * persisted per channel, so a series begins at the moment the channel first
- * reports and fills from there. A channel that has never reported draws nothing
- * at all — a flat line would read as a genuine measurement of zero.
+ * The design is single-series and says so on the chart. That is kept: the table
+ * below is the picker, not a legend, and nothing is overlaid at a false scale.
  */
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, LayoutChangeEvent, Pressable, ScrollView, Text, View, type GestureResponderEvent } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { LayoutChangeEvent, ScrollView, Text, View } from 'react-native';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { DeviceNode } from '../../../lib/devices';
-import { channelNumberFor, liveMeasurementKeyForChannel, useLiveChannelHistory } from '../../../lib/liveChannelValue';
+import {
+  HISTORY_LENGTH,
+  channelNumberFor,
+  liveMeasurementKeyForChannel,
+  useLiveChannelHistory,
+} from '../../../lib/liveChannelValue';
 import type { ChannelRef } from '../../../lib/rack';
-import { alpha, consolePalette } from '../../ui';
-import { EmptyState, FilterChips, PressSurface, RangeRail } from './analyzer/AnalyzerParts';
+import { alpha, consolePalette, type ConsolePalette } from '../../ui';
+import { EmptyState, FilterChips, PressSurface } from './analyzer/AnalyzerParts';
 import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter } from './liveValue';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -77,15 +100,13 @@ const KIND_LABEL: Record<LiveKindLetter, string> = {
 };
 
 /**
- * Overlaid series have to stay tellable apart, but a twelve-hue rainbow fights
- * the console's black-grey-green palette and makes hue meaningless — you cannot
- * tell "red because it is series four" from "red because it is in alarm".
+ * The series colour, per instance.
  *
- * So the ramp is built from lightness instead: the first series takes the
- * accent, the rest step down a neutral scale. Alarm colour is then free to mean
- * only one thing. Twelve steps stay distinguishable because consecutive series
- * are never adjacent in the ramp — and there are two ramps, because a stroke
- * that reads clearly on the dark console is invisible on the light one.
+ * The reference panel sets one `--tf-series` token and lets the line, area,
+ * flag, marker and brush all follow it. This is the same idea with the console's
+ * own ramp behind it: a lightness scale rather than a hue wheel, so status
+ * colour stays free to mean only status. Two ramps, because a stroke that reads
+ * on the dark console is invisible on the light one.
  */
 const SERIES_RAMP_DARK = [
   '#3FBF6A', '#E8EAE7', '#8FF0A8', '#A1A3A0', '#2F7A48', '#C9CCC9',
@@ -96,14 +117,7 @@ const SERIES_RAMP_LIGHT = [
   '#4FA36A', '#4A4D52', '#7ACF97', '#B0B3B8', '#0F4A2C', '#1A1C20',
 ];
 
-/**
- * Text that stays readable on a filled swatch.
- *
- * The value flag is painted in its series' own colour, and both ramps run from
- * near-black to near-white — so picking the label colour from the *theme* gets
- * it wrong for half the series in either mode. WCAG relative luminance decides
- * it per colour instead.
- */
+/** Text that stays readable on a filled swatch, whichever end of the ramp it came from. */
 function inkOn(hex: string): string {
   const value = hex.replace('#', '');
   if (value.length !== 6) return '#FFFFFF';
@@ -115,60 +129,68 @@ function inkOn(hex: string): string {
   return luminance > 0.4 ? '#0B0D10' : '#FFFFFF';
 }
 
-const CHART_HEIGHT = 300;
-const PAD = { left: 54, right: 58, top: 18, bottom: 26 };
-const GRID_COLS = 8;
-const TICK_TARGET = 4;
-const HISTORY_POINTS = 40; // matches useLiveChannelHistory's rolling buffer length
-const TOOLTIP_WIDTH = 214;
-const TOOLTIP_ROWS = 7;
+// --- Geometry ---------------------------------------------------------------
+// The design's three-column grid, shared by the plot row, the tick row and the
+// brush row so a column never drifts between them.
+const Y_COL = 62;
+const FLAG_COL = 96;
+const PLOT_H = 300;
+const TOP = 14;
+const BOT = PLOT_H - 14;
+const BRUSH_H = 30;
+const Y_TICKS = 6;
+const X_TICKS = 6;
+const MAX_EVENTS = 4;
 
-type Pt = { x: number; y: number };
+type Pt = [number, number];
 
-/**
- * A value scale a human can read off.
- *
- * The raw measurement bands are engineering numbers — vibration runs 1.2 to 5.5
- * — and slicing one into four equal parts puts gridlines at 2.275 and 3.35. The
- * standard fix, and the one every serious charting library implements: round
- * the step up to the nearest 1, 2 or 5 times a power of ten, then extend the
- * domain outwards to land on multiples of it. The plot loses a few pixels of
- * resolution and gains an axis you can read a value off without arithmetic.
- */
-function niceScale(min: number, max: number, targetTicks = TICK_TARGET): { min: number; max: number; ticks: number[] } {
-  const range = max - min || Math.abs(max) || 1;
-  const rawStep = range / targetTicks;
-  const magnitude = 10 ** Math.floor(Math.log10(rawStep));
-  const normalised = rawStep / magnitude;
-  const step = (normalised <= 1 ? 1 : normalised <= 2 ? 2 : normalised <= 5 ? 5 : 10) * magnitude;
-  const niceMin = Math.floor(min / step) * step;
-  const niceMax = Math.ceil(max / step) * step;
-  const ticks: number[] = [];
-  for (let value = niceMin; value <= niceMax + step / 2; value += step) {
-    ticks.push(Number(value.toPrecision(12)));
-  }
-  return { min: niceMin, max: niceMax, ticks };
+/* ── scale helpers, lifted from the reference panel ───────────────────────── */
+
+function niceStep(raw: number): number {
+  if (!(raw > 0)) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(raw));
+  const norm = raw / magnitude;
+  return (norm <= 1 ? 1 : norm <= 2 ? 2 : norm <= 2.5 ? 2.5 : norm <= 5 ? 5 : 10) * magnitude;
 }
 
-// Catmull-Rom spline (uniform, tension 0) expressed as cubic Béziers — turns the
-// jagged straight-segment polyline into a smooth curve through every sample.
+/** Rounded, evenly spaced ticks that always contain the data AND the references. */
+function niceDomain(low: number, high: number, count: number): { lo: number; hi: number; step: number } {
+  let lo = low;
+  let hi = high;
+  if (!(hi > lo)) {
+    const centre = (lo + hi) / 2 || 0;
+    lo = centre - 1;
+    hi = centre + 1;
+  }
+  const step = niceStep((hi - lo) / Math.max(1, count - 1));
+  const domainLo = Math.floor(lo / step) * step;
+  let domainHi = Math.ceil(hi / step) * step;
+  while ((domainHi - domainLo) / step < count - 1) domainHi += step;
+  return { lo: domainLo, hi: domainHi, step };
+}
+
 function smoothPath(points: Pt[]): string {
-  if (points.length < 2) return '';
-  if (points.length === 2) return `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y}`;
-  let d = `M ${points[0].x} ${points[0].y}`;
+  if (points.length === 0) return '';
+  let d = `M ${points[0][0].toFixed(2)} ${points[0][1].toFixed(2)}`;
   for (let i = 0; i < points.length - 1; i++) {
-    const p0 = points[i - 1] ?? points[i];
+    const p0 = points[i === 0 ? 0 : i - 1];
     const p1 = points[i];
     const p2 = points[i + 1];
     const p3 = points[i + 2] ?? p2;
-    const cp1x = p1.x + (p2.x - p0.x) / 6;
-    const cp1y = p1.y + (p2.y - p0.y) / 6;
-    const cp2x = p2.x - (p3.x - p1.x) / 6;
-    const cp2y = p2.y - (p3.y - p1.y) / 6;
-    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
+    d +=
+      ` C ${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(2)} ${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(2)}` +
+      ` ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(2)} ${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(2)}` +
+      ` ${p2[0].toFixed(2)} ${p2[1].toFixed(2)}`;
   }
   return d;
 }
+
+/** Samples back from the newest. There is no clock behind these buffers. */
+function samplesBack(count: number): string {
+  return count < 1 ? 'latest' : `−${Math.round(count)}`;
+}
+
+// --- Types ------------------------------------------------------------------
 
 type SeriesMeta = {
   id: string;
@@ -177,29 +199,26 @@ type SeriesMeta = {
   code: string;
   label: string;
   unit: string;
+  decimals: number;
   channel: ChannelRef;
 };
 
-type SeriesData = {
-  samples: number[];
-  latest?: number;
-  first?: number;
-  min?: number;
-  max?: number;
-  mean?: number;
-  count: number;
-};
-
+type SeriesData = { samples: number[]; latest?: number; count: number };
 const EMPTY_DATA: SeriesData = { samples: [], count: 0 };
+
+/** A configured limit, drawn as a dashed line and read by the verdict. */
+type Reference = { value: number; colour: string; label: string; severity: 'warning' | 'alarm' };
+
+/** A moment the series proved something: it crossed a configured limit. */
+type CrossEvent = { index: number; label: string; colour: string; tint: string };
 
 /**
  * A channel's live subscription, with nothing to show for itself.
  *
- * Each series needs its own `useLiveChannelHistory` call, and hooks cannot be
- * called in a loop from the parent — so there is one of these per series and it
- * renders nothing. All the drawing happens in the parent, because the crosshair
- * has to read *every* series at one instant and a component that owns its own
- * samples cannot be asked what it was reading four columns ago.
+ * Every mapped channel needs its own `useLiveChannelHistory`, and hooks cannot
+ * be called in a loop — so there is one of these per channel and it renders
+ * nothing. The table below the chart shows every channel's current reading, so
+ * every channel stays subscribed even though only one is plotted.
  */
 function SeriesFeed({
   meta,
@@ -218,21 +237,14 @@ function SeriesFeed({
   );
   const history = useLiveChannelHistory(key, `ultron.trendhistory.${machineId}.${meta.id}`);
 
-  const data = useMemo<SeriesData>(() => {
-    if (history.length === 0) return EMPTY_DATA;
-    return {
-      samples: history,
-      latest: history[history.length - 1],
-      first: history[0],
-      min: Math.min(...history),
-      max: Math.max(...history),
-      mean: history.reduce((sum, value) => sum + value, 0) / history.length,
-      count: history.length,
-    };
-  }, [history]);
+  const data = useMemo<SeriesData>(
+    () =>
+      history.length === 0
+        ? EMPTY_DATA
+        : { samples: history, latest: history[history.length - 1], count: history.length },
+    [history],
+  );
 
-  // Reported up in an effect, not during render, so the parent is never set
-  // mid-render. `data` only changes identity when the sample buffer does.
   useEffect(() => {
     onData(meta.id, data);
   }, [onData, meta.id, data]);
@@ -240,45 +252,90 @@ function SeriesFeed({
   return null;
 }
 
-/**
- * The newest sample, breathing.
- *
- * A live chart that is indistinguishable from a screenshot is a chart you stop
- * trusting to be live. One slow ring, on the subject only — repeat it on twelve
- * series and it stops meaning "live" and starts meaning "busy".
- */
-function LivePulse({ x, y, colour }: { x: number; y: number; colour: string }) {
-  const pulse = useRef(new Animated.Value(0)).current;
+// --- Card furniture ---------------------------------------------------------
 
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.timing(pulse, {
-        toValue: 1,
-        duration: 2200,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: false,
-      }),
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
-
+/** The design's `.tf-pill` — a mono uppercase chip carrying an identity or a verdict. */
+function Pill({
+  children,
+  accent,
+  tint,
+  palette,
+}: {
+  children: string;
+  accent?: string;
+  tint?: string;
+  palette: ConsolePalette;
+}) {
   return (
-    <Animated.View
-      pointerEvents="none"
+    <View className="rounded-md px-2 py-[3px]" style={{ backgroundColor: tint ?? palette.panelRaised }}>
+      <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: accent ?? palette.inkMuted }}>
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+/** The design's `.tf-tag` — a mono chip carrying a movement or a margin. */
+function Tag({
+  children,
+  accent,
+  tint,
+  palette,
+}: {
+  children: string;
+  accent?: string;
+  tint?: string;
+  palette: ConsolePalette;
+}) {
+  return (
+    <View className="rounded-md px-2.5 py-1" style={{ backgroundColor: tint ?? palette.panelRaised }}>
+      <Text className="font-mono text-[10.5px]" style={{ color: accent ?? palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+        {children}
+      </Text>
+    </View>
+  );
+}
+
+/** One cell of the stats strip. */
+function Stat({
+  label,
+  value,
+  accent,
+  last,
+  palette,
+}: {
+  label: string;
+  value: string;
+  accent?: string;
+  last: boolean;
+  palette: ConsolePalette;
+}) {
+  return (
+    <View
+      className="px-4 py-2.5"
       style={{
-        position: 'absolute',
-        left: x - 18,
-        top: y - 18,
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        borderWidth: 1.5,
-        borderColor: colour,
-        opacity: pulse.interpolate({ inputRange: [0, 0.7, 1], outputRange: [0.55, 0, 0] }),
-        transform: [{ scale: pulse.interpolate({ inputRange: [0, 1], outputRange: [0.28, 1] }) }],
+        flexGrow: 1,
+        flexBasis: 0,
+        minWidth: 96,
+        borderRightWidth: last ? 0 : 1,
+        borderRightColor: palette.line,
       }}
-    />
+    >
+      <Text
+        numberOfLines={1}
+        className="font-mono text-[9px] uppercase tracking-[0.16em]"
+        style={{ color: palette.inkFaint }}
+      >
+        {label}
+      </Text>
+      <Text
+        numberOfLines={1}
+        className="mt-1 font-mono text-[13px]"
+        style={{ color: accent ?? palette.ink, fontVariant: ['tabular-nums'] }}
+      >
+        {value}
+      </Text>
+    </View>
   );
 }
 
@@ -294,19 +351,19 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
   const ramp = isDark ? SERIES_RAMP_DARK : SERIES_RAMP_LIGHT;
 
   const [kindFilter, setKindFilter] = useState<'all' | LiveKindLetter>('all');
-  const [hidden, setHidden] = useState<Record<string, boolean>>({});
   const [focusedId, setFocusedId] = useState<string | null>(null);
+  const [windowKey, setWindowKey] = useState<string>('w60');
   const [data, setData] = useState<Record<string, SeriesData>>({});
-  const [chartWidth, setChartWidth] = useState(0);
-  /** Which sample column the crosshair is on, counted back from the newest. */
-  const [cursorSlot, setCursorSlot] = useState<number | null>(null);
+  const [plotWidth, setPlotWidth] = useState(0);
+  /** Fraction across the window, 0 = oldest, 1 = newest. Null when not scrubbing. */
+  const [cursor, setCursor] = useState<number | null>(null);
 
   const onData = useCallback((id: string, next: SeriesData) => {
     setData((previous) => (previous[id] === next ? previous : { ...previous, [id]: next }));
   }, []);
 
   const onLayout = useCallback((event: LayoutChangeEvent) => {
-    setChartWidth(Math.round(event.nativeEvent.layout.width));
+    setPlotWidth(Math.round(event.nativeEvent.layout.width));
   }, []);
 
   const series = useMemo<SeriesMeta[]>(
@@ -318,13 +375,12 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
         code: mapped.channel.code,
         label: mapped.label,
         unit: mapped.channel.unit,
+        decimals: LIVE_RANGE_FOR_LETTER[mapped.channel.letter].decimals,
         channel: mapped.channel,
       })),
     [mappedChannels, ramp],
   );
 
-  // Only the measurement kinds actually present, each with how many series it
-  // holds — the count is the reason to press the chip, so it lives on the chip.
   const kindOptions = useMemo(() => {
     const present: LiveKindLetter[] = [];
     for (const entry of series) if (!present.includes(entry.letter)) present.push(entry.letter);
@@ -338,124 +394,167 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
     ];
   }, [series]);
 
-  /** One rounded value scale per measurement kind, shared by every series of it. */
-  const scales = useMemo(() => {
-    const map = {} as Record<LiveKindLetter, ReturnType<typeof niceScale>>;
-    (Object.keys(LIVE_RANGE_FOR_LETTER) as LiveKindLetter[]).forEach((letter) => {
-      const band = LIVE_RANGE_FOR_LETTER[letter];
-      map[letter] = niceScale(band.min, band.max);
-    });
-    return map;
-  }, []);
+  /** The design's four window chips, counted in samples because that is what exists. */
+  const windowOptions = useMemo(
+    () => [
+      { value: 'w30', label: '30', count: undefined },
+      { value: 'w60', label: '60', count: undefined },
+      { value: 'w120', label: '120', count: undefined },
+      { value: 'all', label: 'Session', count: undefined },
+    ],
+    [],
+  );
+  const windowSize = windowKey === 'w30' ? 30 : windowKey === 'w60' ? 60 : windowKey === 'w120' ? 120 : HISTORY_LENGTH;
 
   const filtered = useMemo(
     () => (kindFilter === 'all' ? series : series.filter((entry) => entry.letter === kindFilter)),
     [series, kindFilter],
   );
-  const visible = useMemo(() => filtered.filter((entry) => !hidden[entry.id]), [filtered, hidden]);
 
-  /**
-   * Exactly one subject, always.
-   *
-   * It falls back on its own when the chosen series is filtered out or hidden,
-   * rather than leaving the header empty — and the default lands on the first
-   * series that has actually reported something. Opening on a channel that has
-   * never sent a sample would show a correct, fully-labelled, completely empty
-   * plot, which reads as a broken screen rather than as a silent channel.
-   */
+  // Exactly one subject, and the default lands on a channel that has actually
+  // reported — opening on a silent one shows a correct, fully-labelled, empty
+  // plot, which reads as a broken screen rather than as a quiet channel.
   const focused =
-    visible.find((entry) => entry.id === focusedId) ??
-    visible.find((entry) => (data[entry.id]?.count ?? 0) > 1) ??
-    visible[0] ??
+    filtered.find((entry) => entry.id === focusedId) ??
+    filtered.find((entry) => (data[entry.id]?.count ?? 0) > 1) ??
+    filtered[0] ??
     null;
 
-  // Paint order: the subject last, so it sits over everything it is compared to.
-  const ordered = useMemo(
-    () => (focused ? [...visible.filter((entry) => entry.id !== focused.id), focused] : visible),
-    [visible, focused],
-  );
+  const session = focused ? (data[focused.id] ?? EMPTY_DATA).samples : [];
+  const win = useMemo(() => session.slice(Math.max(0, session.length - windowSize)), [session, windowSize]);
+  const n = win.length;
 
-  // --- geometry --------------------------------------------------------------
-  const plotW = Math.max(0, chartWidth - PAD.left - PAD.right);
-  const plotH = CHART_HEIGHT - PAD.top - PAD.bottom;
-  const floor = PAD.top + plotH;
-  const stepX = plotW / (HISTORY_POINTS - 1);
-  const xForSlot = (slot: number) => PAD.left + plotW - slot * stepX;
+  // --- scale -----------------------------------------------------------------
+  const band = focused ? LIVE_RANGE_FOR_LETTER[focused.letter] : null;
 
-  const pointsFor = useCallback(
-    (meta: SeriesMeta): Pt[] => {
-      const samples = (data[meta.id] ?? EMPTY_DATA).samples;
-      const scale = scales[meta.letter];
-      const span = scale.max - scale.min || 1;
-      return samples.map((value, index) => ({
-        x: xForSlot(samples.length - 1 - index),
-        y: PAD.top + (1 - (value - scale.min) / span) * plotH,
-      }));
-    },
-    // xForSlot and plotH are derived from chartWidth, which is in the deps.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, scales, chartWidth],
-  );
+  const references = useMemo<Reference[]>(() => {
+    if (!focused) return [];
+    const list: Reference[] = [];
+    if (typeof focused.channel.alarmWarning === 'number') {
+      list.push({ value: focused.channel.alarmWarning, colour: palette.warning, label: 'warning', severity: 'warning' });
+    }
+    if (typeof focused.channel.alarmCritical === 'number') {
+      list.push({ value: focused.channel.alarmCritical, colour: palette.critical, label: 'alarm', severity: 'alarm' });
+    }
+    return list;
+  }, [focused, palette.critical, palette.warning]);
 
-  const axisScale = focused ? scales[focused.letter] : null;
-  const decimals = focused ? LIVE_RANGE_FOR_LETTER[focused.letter].decimals : 1;
-  const focusedData = focused ? (data[focused.id] ?? EMPTY_DATA) : EMPTY_DATA;
-  const focusedPoints = focused ? pointsFor(focused) : [];
-  const focusedLast = focusedPoints.length > 0 ? focusedPoints[focusedPoints.length - 1] : null;
-  // The flag rides the axis edge, so it is clamped into the plot even when the
-  // reading itself is outside the channel's declared band. The *line* is never
-  // clamped — a measurement off the top of the scale has to look off the scale.
-  const flagY = focusedLast ? Math.min(floor - 10, Math.max(PAD.top + 10, focusedLast.y)) : 0;
+  const domain = useMemo(() => {
+    if (!band || n < 1) return niceDomain(0, 1, Y_TICKS);
+    const dataLo = Math.min(...win);
+    const dataHi = Math.max(...win);
+    const lo = Math.min(dataLo, band.min);
+    const hi = Math.max(dataHi, band.max, ...references.map((reference) => reference.value));
+    return niceDomain(lo, hi, Y_TICKS);
+  }, [band, n, win, references]);
 
-  const delta =
-    focusedData.latest !== undefined && focusedData.first !== undefined
-      ? focusedData.latest - focusedData.first
-      : null;
+  const span = domain.hi - domain.lo || 1;
+  const y = useCallback((value: number) => BOT - ((value - domain.lo) / span) * (BOT - TOP), [domain.lo, span]);
+  const xOf = useCallback((index: number) => (n > 1 ? (index / (n - 1)) * plotWidth : plotWidth / 2), [n, plotWidth]);
+
+  const points = useMemo<Pt[]>(() => win.map((value, index) => [xOf(index), y(value)]), [win, xOf, y]);
+  const linePath = useMemo(() => smoothPath(points), [points]);
+
+  /** The whole session, decimated to at most 200 points for the strip below. */
+  const brushPath = useMemo(() => {
+    if (plotWidth <= 0 || session.length < 2) return '';
+    const lo = Math.min(...session);
+    const hi = Math.max(...session);
+    const range = hi - lo || 1;
+    const stride = Math.max(1, Math.floor(session.length / 200));
+    const brush: Pt[] = [];
+    for (let index = 0; index < session.length; index += stride) {
+      brush.push([
+        (index / (session.length - 1)) * plotWidth,
+        BRUSH_H - 3 - ((session[index] - lo) / range) * (BRUSH_H - 6),
+      ]);
+    }
+    return smoothPath(brush);
+  }, [plotWidth, session]);
+
+  // --- reading ---------------------------------------------------------------
+  const cursorIndex = cursor === null ? n - 1 : Math.max(0, Math.min(n - 1, Math.round(cursor * (n - 1))));
+  const shown = n > 0 ? win[cursorIndex] : null;
+  const latest = n > 0 ? win[n - 1] : null;
+  const first = n > 0 ? win[0] : null;
+  const decimals = focused?.decimals ?? 1;
+  const fmt = useCallback((value: number) => value.toFixed(decimals), [decimals]);
+
+  const dataLo = n > 0 ? Math.min(...win) : 0;
+  const dataHi = n > 0 ? Math.max(...win) : 0;
+  const mean = n > 0 ? win.reduce((sum, value) => sum + value, 0) / n : 0;
+  const sd = n > 0 ? Math.sqrt(win.reduce((sum, value) => sum + (value - mean) ** 2, 0) / n) : 0;
+  let minIndex = 0;
+  let maxIndex = 0;
+  win.forEach((value, index) => {
+    if (value < win[minIndex]) minIndex = index;
+    if (value > win[maxIndex]) maxIndex = index;
+  });
+
+  /**
+   * The verdict, and the margin that justifies it.
+   *
+   * The reference panel reads one boundary; a channel here can carry two, so
+   * the highest one crossed wins. With no limits configured the honest verdict
+   * is about the expected band alone, and the margin tag disappears rather than
+   * reporting a distance to nothing.
+   */
+  const crossed = shown === null ? null : references.filter((reference) => shown >= reference.value).pop() ?? null;
+  const inBand = shown !== null && band !== null && shown >= band.min && shown <= band.max;
+  const verdict = crossed
+    ? { text: crossed.severity === 'alarm' ? 'Over alarm limit' : 'Over warning limit', accent: crossed.colour }
+    : inBand
+      ? { text: 'In band', accent: palette.accent }
+      : { text: 'Outside band', accent: palette.warning };
+
+  const nearest =
+    shown === null || references.length === 0
+      ? null
+      : references.reduce((best, reference) =>
+          Math.abs(reference.value - shown) < Math.abs(best.value - shown) ? reference : best,
+        );
+  const margin = nearest && shown !== null ? nearest.value - shown : null;
+  const movement = shown !== null && first !== null ? shown - first : null;
+
+  /** Every moment in the window the series crossed a configured limit. */
+  const events = useMemo<CrossEvent[]>(() => {
+    if (n < 2 || references.length === 0) return [];
+    const found: CrossEvent[] = [];
+    for (const reference of references) {
+      for (let index = 1; index < n; index += 1) {
+        const before = win[index - 1];
+        const after = win[index];
+        if (before < reference.value && after >= reference.value) {
+          found.push({
+            index,
+            label: `${reference.label} crossed`,
+            colour: reference.colour,
+            tint: alpha(reference.colour, 0.12),
+          });
+        } else if (before >= reference.value && after < reference.value) {
+          found.push({
+            index,
+            label: `back under ${reference.label}`,
+            colour: palette.accent,
+            tint: alpha(palette.accent, 0.12),
+          });
+        }
+      }
+    }
+    return found.sort((a, b) => a.index - b.index).slice(-MAX_EVENTS);
+  }, [n, references, win, palette.accent]);
 
   // --- crosshair -------------------------------------------------------------
   const onPointerMove = useCallback(
     (event: { nativeEvent: unknown }) => {
-      if (plotW <= 0) return;
+      if (plotWidth <= 0) return;
       const native = event.nativeEvent as { offsetX?: number; locationX?: number };
       const x = native.offsetX ?? native.locationX;
       if (typeof x !== 'number') return;
-      if (x < PAD.left - 8 || x > PAD.left + plotW + 8) {
-        setCursorSlot(null);
-        return;
-      }
-      const slot = Math.round((PAD.left + plotW - x) / stepX);
-      setCursorSlot(Math.min(HISTORY_POINTS - 1, Math.max(0, slot)));
+      setCursor(Math.max(0, Math.min(1, x / plotWidth)));
     },
-    [plotW, stepX],
+    [plotWidth],
   );
-
-  /**
-   * Every visible series at the crosshair's instant.
-   *
-   * The buffers are all right-aligned on "now", so a column counted back from
-   * the right edge is the same moment for every series regardless of how long
-   * each has been reporting. A series that had not started yet at that column
-   * is absent from the read-out rather than shown as a dash — it has no value
-   * there, and inventing one is the thing this whole screen refuses to do.
-   */
-  const cursorRows = useMemo(() => {
-    if (cursorSlot === null) return [];
-    return ordered
-      .map((meta) => {
-        const entry = data[meta.id] ?? EMPTY_DATA;
-        const value = entry.samples[entry.samples.length - 1 - cursorSlot];
-        if (typeof value !== 'number' || !Number.isFinite(value)) return null;
-        const scale = scales[meta.letter];
-        const span = scale.max - scale.min || 1;
-        return {
-          meta,
-          value,
-          y: PAD.top + (1 - (value - scale.min) / span) * plotH,
-        };
-      })
-      .filter((row): row is { meta: SeriesMeta; value: number; y: number } => row !== null)
-      .sort((a, b) => a.y - b.y);
-  }, [cursorSlot, ordered, data, scales, plotH]);
 
   if (mappedChannels.length === 0) {
     return (
@@ -469,457 +568,567 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
     );
   }
 
-  const cursorX = cursorSlot === null ? 0 : xForSlot(cursorSlot);
-  const tooltipLeft =
-    cursorX + 14 + TOOLTIP_WIDTH > chartWidth ? Math.max(4, cursorX - 14 - TOOLTIP_WIDTH) : cursorX + 14;
+  const cursorX = n > 1 ? xOf(cursorIndex) : 0;
+  const flagY = latest === null ? 0 : Math.min(BOT, Math.max(TOP, y(latest)));
+  const ticks = Array.from({ length: Y_TICKS }, (_, index) => domain.hi - (span * index) / (Y_TICKS - 1));
+  const ready = Boolean(focused) && plotWidth > 0 && n >= 2;
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 12 }}>
-      {/* Every subscription in the screen, drawing nothing. */}
+      {/* Every subscription on the screen, drawing nothing. */}
       {series.map((meta) => (
         <SeriesFeed key={meta.id} meta={meta} devices={devices} machineId={machineId} onData={onData} />
       ))}
 
+      {/* The chrome the reference panel tells you to replace with the host
+          app's own: the window chips move into this toolbar and keep driving
+          the same window state. */}
       <View className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2.5">
         <Text className="font-body-bold text-[15px] tracking-[-0.02em]" style={{ color: palette.ink }}>
           Live trends
         </Text>
-        <FilterChips label="Filter by measurement kind" options={kindOptions} value={kindFilter} onChange={setKindFilter} />
+        <View className="flex-row flex-wrap items-center gap-2.5">
+          <Text className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+            Window
+          </Text>
+          <FilterChips label="Window length in samples" options={windowOptions} value={windowKey} onChange={setWindowKey} />
+          <FilterChips label="Filter by measurement kind" options={kindOptions} value={kindFilter} onChange={setKindFilter} />
+        </View>
       </View>
 
-      <View
-        className="overflow-hidden rounded-2xl border"
-        style={{ borderColor: palette.line, backgroundColor: palette.panel }}
-      >
-        {/* The subject, read out. */}
-        {focused ? (
-          <View
-            className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2 px-4 py-3"
-            style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
-          >
-            <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
-              <View style={{ width: 16, height: 2.5, borderRadius: 2, backgroundColor: focused.colour }} />
-              <View className="min-w-0">
-                <Text className="font-body-bold text-[13px]" style={{ color: palette.ink }} numberOfLines={1}>
+      {focused ? (
+        <View
+          className="overflow-hidden rounded-xl border"
+          style={{ borderColor: palette.line, backgroundColor: palette.panel }}
+        >
+          {/* ── card head ─────────────────────────────────────────────── */}
+          <View className="flex-row flex-wrap items-end gap-x-5 gap-y-3 px-5 pb-3.5 pt-4">
+            <View className="min-w-[240px] flex-1">
+              <View className="flex-row flex-wrap items-center gap-2.5">
+                <View style={{ width: 18, height: 3, borderRadius: 2, backgroundColor: focused.colour }} />
+                <Text className="font-body-bold text-[19px] tracking-[-0.025em]" style={{ color: palette.ink }} numberOfLines={1}>
                   {focused.label}
                 </Text>
-                <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-                  {focused.code} · {KIND_LABEL[focused.letter]}
+                <Pill palette={palette}>{`${focused.code} · ${KIND_LABEL[focused.letter]}`}</Pill>
+                <Pill palette={palette} accent={verdict.accent} tint={alpha(verdict.accent, 0.12)}>
+                  {verdict.text}
+                </Pill>
+              </View>
+              <Text className="mt-[7px] font-body text-[12.5px] leading-[17px]" style={{ color: palette.inkMuted }}>
+                {focused.channel.deviceName} · expected band {band ? `${fmt(band.min)} – ${fmt(band.max)} ${focused.unit}` : '—'}
+                {references.length > 0
+                  ? ` · ${references.map((reference) => `${reference.label} ${fmt(reference.value)}`).join(' · ')}`
+                  : ' · no limits configured on this channel'}
+              </Text>
+            </View>
+
+            <View className="items-end">
+              <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+                {cursor === null ? 'latest sample' : 'at cursor'}
+              </Text>
+              <View className="mt-[5px] flex-row items-baseline gap-[7px]">
+                <Text
+                  className="font-mono text-[34px] leading-[36px] tracking-[-0.04em]"
+                  style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
+                >
+                  {shown === null ? '—' : fmt(shown)}
+                </Text>
+                <Text className="font-mono text-[12px] uppercase tracking-[0.1em]" style={{ color: palette.inkMuted }}>
+                  {focused.unit}
                 </Text>
               </View>
             </View>
 
-            <View className="flex-row flex-wrap items-center gap-2.5">
-              <Text
-                className="font-body text-[22px] leading-[26px] tracking-[-0.03em]"
-                style={{ color: palette.ink, fontWeight: '300', fontVariant: ['tabular-nums'] }}
-              >
-                {focusedData.latest === undefined ? '—' : focusedData.latest.toFixed(decimals)}
-                <Text className="font-mono text-[10px]" style={{ color: palette.inkMuted }}>
-                  {' '}
-                  {focused.unit}
-                </Text>
-              </Text>
-
-              {delta !== null ? (
-                <View
-                  className="flex-row items-center gap-1.5 rounded-full border px-2 py-[3px]"
-                  style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
+            <View className="items-end gap-1.5">
+              {movement !== null ? (
+                <Tag
+                  palette={palette}
+                  accent={movement >= 0 ? palette.warning : palette.neutral}
+                  tint={alpha(movement >= 0 ? palette.warning : palette.neutral, 0.12)}
                 >
-                  <MaterialCommunityIcons
-                    name={delta > 0 ? 'arrow-top-right' : delta < 0 ? 'arrow-bottom-right' : 'arrow-right'}
-                    size={11}
-                    color={palette.inkMuted}
-                  />
-                  <Text className="font-mono text-[9.5px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
-                    {delta > 0 ? '+' : delta < 0 ? '−' : ''}
-                    {Math.abs(delta).toFixed(decimals)}
+                  {`${movement >= 0 ? '↑' : '↓'} ${Math.abs(movement).toFixed(decimals)} ${focused.unit} over window`}
+                </Tag>
+              ) : null}
+              {margin !== null && nearest ? (
+                <Tag palette={palette} accent={margin <= 0 ? nearest.colour : palette.inkMuted}>
+                  {`${margin >= 0 ? '' : '−'}${Math.abs(margin).toFixed(decimals)} ${focused.unit} to ${nearest.label}`}
+                </Tag>
+              ) : null}
+            </View>
+          </View>
+
+          {/* ── stats strip ───────────────────────────────────────────── */}
+          <View
+            className="flex-row flex-wrap"
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: palette.line,
+              borderBottomWidth: 1,
+              borderBottomColor: palette.line,
+              backgroundColor: palette.panelRaised,
+            }}
+          >
+            <Stat palette={palette} label="Now" value={shown === null ? '—' : `${fmt(shown)} ${focused.unit}`} accent={focused.colour} last={false} />
+            <Stat palette={palette} label="Mean" value={n > 0 ? fmt(mean) : '—'} last={false} />
+            <Stat palette={palette} label="Min" value={n > 0 ? fmt(dataLo) : '—'} last={false} />
+            <Stat palette={palette} label="Max" value={n > 0 ? fmt(dataHi) : '—'} last={false} />
+            <Stat palette={palette} label="Range" value={n > 0 ? fmt(dataHi - dataLo) : '—'} last={false} />
+            <Stat palette={palette} label="Std dev" value={n > 0 ? sd.toFixed(2) : '—'} last={false} />
+            <Stat palette={palette} label="Samples" value={String(n)} last />
+          </View>
+
+          {/* ── plot row: value gutter | plot | flag column ───────────── */}
+          <View className="flex-row px-5 pt-[18px]">
+            <View style={{ width: Y_COL, height: PLOT_H }}>
+              <Text
+                className="absolute font-mono text-[9px] uppercase tracking-[0.16em]"
+                style={{ color: palette.inkFaint, right: 10, top: -14 }}
+              >
+                {focused.unit}
+              </Text>
+              {ready
+                ? ticks.map((tick) => (
+                    <Text
+                      key={tick}
+                      className="absolute font-mono text-[10px]"
+                      style={{ color: palette.inkFaint, right: 10, top: y(tick) - 7, fontVariant: ['tabular-nums'] }}
+                      numberOfLines={1}
+                    >
+                      {fmt(tick)}
+                    </Text>
+                  ))
+                : null}
+              {/* The cursor's own value, bubbled onto the axis it belongs to. */}
+              {ready && cursor !== null && shown !== null ? (
+                <View
+                  className="absolute rounded px-1.5 py-[2px]"
+                  style={{ right: 6, top: y(shown) - 9, backgroundColor: palette.ink }}
+                >
+                  <Text className="font-mono text-[10px]" style={{ color: palette.panel, fontVariant: ['tabular-nums'] }}>
+                    {fmt(shown)}
                   </Text>
-                  <Text className="font-mono text-[8.5px] uppercase tracking-[0.12em]" style={{ color: palette.inkFaint }}>
-                    over {focusedData.count}
+                </View>
+              ) : null}
+            </View>
+
+            <View
+              className="min-w-0 flex-1"
+              onLayout={onLayout}
+              onPointerMove={onPointerMove}
+              onPointerLeave={() => setCursor(null)}
+              style={{ height: PLOT_H }}
+            >
+              {ready && band ? (
+                <>
+                  <View pointerEvents="none">
+                    <Svg width={plotWidth} height={PLOT_H}>
+                      <Defs>
+                        <LinearGradient id="tfFill" x1="0" y1="0" x2="0" y2="1">
+                          <Stop offset="0" stopColor={focused.colour} stopOpacity={isDark ? 0.26 : 0.16} />
+                          <Stop offset="1" stopColor={focused.colour} stopOpacity={0.01} />
+                        </LinearGradient>
+                      </Defs>
+
+                      {/* The registered band, tinted. */}
+                      <Rect
+                        x={0}
+                        y={y(band.max)}
+                        width={plotWidth}
+                        height={Math.max(0, y(band.min) - y(band.max))}
+                        fill={palette.accent}
+                        fillOpacity={isDark ? 0.07 : 0.05}
+                      />
+
+                      {/* Grids. */}
+                      {Array.from({ length: X_TICKS }, (_, index) => {
+                        const x = Math.round((index / (X_TICKS - 1)) * plotWidth) + 0.5;
+                        return (
+                          <Line key={`v${index}`} x1={x} y1={0} x2={x} y2={PLOT_H} stroke={palette.line} strokeWidth={1} opacity={0.45} />
+                        );
+                      })}
+                      {ticks.map((tick, index) => {
+                        const py = Math.round(y(tick)) + 0.5;
+                        const edge = index === 0 || index === ticks.length - 1;
+                        return (
+                          <Line
+                            key={`h${tick}`}
+                            x1={0}
+                            y1={py}
+                            x2={plotWidth}
+                            y2={py}
+                            stroke={palette.line}
+                            strokeWidth={1}
+                            opacity={edge ? 0.95 : 0.55}
+                          />
+                        );
+                      })}
+
+                      {/* Configured limits. */}
+                      {references.map((reference) => (
+                        <Line
+                          key={reference.label}
+                          x1={0}
+                          y1={y(reference.value)}
+                          x2={plotWidth}
+                          y2={y(reference.value)}
+                          stroke={reference.colour}
+                          strokeWidth={1}
+                          strokeDasharray="6 5"
+                          opacity={0.6}
+                        />
+                      ))}
+
+                      {/* What the samples proved. */}
+                      {events.map((event, index) => (
+                        <Line
+                          key={`${event.label}${event.index}${index}`}
+                          x1={xOf(event.index)}
+                          y1={0}
+                          x2={xOf(event.index)}
+                          y2={PLOT_H}
+                          stroke={event.colour}
+                          strokeWidth={1}
+                          strokeDasharray="3 4"
+                          opacity={0.5}
+                        />
+                      ))}
+
+                      <Path d={`${linePath} L ${plotWidth} ${BOT} L 0 ${BOT} Z`} fill="url(#tfFill)" />
+                      <Path
+                        d={linePath}
+                        fill="none"
+                        stroke={focused.colour}
+                        strokeWidth={2}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                      />
+
+                      {/* Window extremes, hollow so they read as annotations. */}
+                      <Circle cx={xOf(minIndex)} cy={y(win[minIndex])} r={3} fill={palette.panel} stroke={focused.colour} strokeWidth={1.4} />
+                      <Circle cx={xOf(maxIndex)} cy={y(win[maxIndex])} r={3} fill={palette.panel} stroke={focused.colour} strokeWidth={1.4} />
+
+                      {cursor !== null ? (
+                        <Line x1={cursorX} y1={0} x2={cursorX} y2={PLOT_H} stroke={palette.ink} strokeWidth={1} opacity={0.3} />
+                      ) : null}
+                    </Svg>
+                  </View>
+
+                  {/* Overlay: chips, reference labels, extremes, marker, tip. */}
+                  <View pointerEvents="none" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
+                    {events.map((event, index) => {
+                      const x = xOf(event.index);
+                      const flip = x > plotWidth * 0.6;
+                      return (
+                        <View
+                          key={`chip${event.index}${index}`}
+                          className="absolute rounded-[5px] px-2 py-[3px]"
+                          style={{
+                            top: 4 + (index % 2) * 20,
+                            ...(flip ? { right: plotWidth - x + 4 } : { left: x + 4 }),
+                            backgroundColor: event.tint,
+                          }}
+                        >
+                          <Text className="font-mono text-[9px] uppercase tracking-[0.12em]" style={{ color: event.colour }}>
+                            {event.label}
+                          </Text>
+                        </View>
+                      );
+                    })}
+
+                    {/* The design splits its two reference labels across the two
+                        edges so neither sits on top of the other. Same here: the
+                        warning takes the left edge, the alarm the right. */}
+                    {references.map((reference) => (
+                      <View
+                        key={`ref${reference.label}`}
+                        className="absolute px-[5px]"
+                        style={{
+                          ...(reference.severity === 'alarm' ? { right: 6 } : { left: 6 }),
+                          top: y(reference.value) - 15,
+                          backgroundColor: palette.panel,
+                        }}
+                      >
+                        <Text className="font-mono text-[9.5px]" style={{ color: reference.colour }}>
+                          {reference.label} {fmt(reference.value)} {focused.unit}
+                        </Text>
+                      </View>
+                    ))}
+
+                    <View
+                      className="absolute rounded-[5px] px-[7px] py-[2px]"
+                      style={{
+                        ...(xOf(minIndex) > plotWidth * 0.6
+                          ? { right: plotWidth - xOf(minIndex) + 6 }
+                          : { left: xOf(minIndex) + 6 }),
+                        top: y(win[minIndex]) + 4,
+                        backgroundColor: palette.panelRaised,
+                      }}
+                    >
+                      <Text className="font-mono text-[9.5px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+                        min {fmt(win[minIndex])}
+                      </Text>
+                    </View>
+                    <View
+                      className="absolute rounded-[5px] px-[7px] py-[2px]"
+                      style={{
+                        ...(xOf(maxIndex) > plotWidth * 0.6
+                          ? { right: plotWidth - xOf(maxIndex) + 6 }
+                          : { left: xOf(maxIndex) + 6 }),
+                        top: y(win[maxIndex]) - 20,
+                        backgroundColor: palette.panelRaised,
+                      }}
+                    >
+                      <Text className="font-mono text-[9.5px]" style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+                        max {fmt(win[maxIndex])}
+                      </Text>
+                    </View>
+
+                    {shown !== null ? (
+                      <View
+                        style={{
+                          position: 'absolute',
+                          left: cursorX - 4.5,
+                          top: y(shown) - 4.5,
+                          width: 9,
+                          height: 9,
+                          borderRadius: 9,
+                          backgroundColor: focused.colour,
+                          borderWidth: 2,
+                          borderColor: palette.panel,
+                        }}
+                      />
+                    ) : null}
+
+                    {cursor !== null && shown !== null ? (
+                      <View
+                        className="absolute rounded-[9px] border px-3 py-2.5"
+                        style={{
+                          ...(cursorX > plotWidth * 0.6
+                            ? { right: plotWidth - cursorX + 12 }
+                            : { left: cursorX + 12 }),
+                          top: 12,
+                          minWidth: 150,
+                          borderColor: palette.lineStrong,
+                          backgroundColor: palette.panel,
+                          shadowColor: palette.shadow,
+                          shadowOpacity: isDark ? 0.6 : 0.14,
+                          shadowRadius: 18,
+                          shadowOffset: { width: 0, height: 8 },
+                        }}
+                      >
+                        <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+                          {samplesBack(n - 1 - cursorIndex)}
+                        </Text>
+                        <View className="mt-1.5 flex-row items-baseline gap-[5px]">
+                          <Text
+                            className="font-mono text-[17px] tracking-[-0.02em]"
+                            style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
+                          >
+                            {fmt(shown)}
+                          </Text>
+                          <Text className="font-mono text-[9.5px] uppercase tracking-[0.1em]" style={{ color: palette.inkMuted }}>
+                            {focused.unit}
+                          </Text>
+                        </View>
+                        <View className="mt-[7px]" style={{ gap: 4 }}>
+                          {nearest && margin !== null ? (
+                            <View className="flex-row items-center justify-between gap-2.5">
+                              <Text className="font-mono text-[10px]" style={{ color: palette.inkMuted }}>
+                                to {nearest.label}
+                              </Text>
+                              <Text
+                                className="font-mono text-[10px]"
+                                style={{ color: margin <= 0 ? nearest.colour : palette.ink, fontVariant: ['tabular-nums'] }}
+                              >
+                                {margin >= 0 ? '' : '−'}
+                                {Math.abs(margin).toFixed(decimals)} {focused.unit}
+                              </Text>
+                            </View>
+                          ) : null}
+                          <View className="flex-row items-center justify-between gap-2.5">
+                            <Text className="font-mono text-[10px]" style={{ color: palette.inkMuted }}>
+                              state
+                            </Text>
+                            <Text className="font-mono text-[10px]" style={{ color: verdict.accent }}>
+                              {verdict.text.toLowerCase()}
+                            </Text>
+                          </View>
+                        </View>
+                      </View>
+                    ) : null}
+                  </View>
+                </>
+              ) : (
+                <View className="flex-1 items-center justify-center">
+                  <Text
+                    className="font-mono text-[11px] uppercase tracking-[0.14em]"
+                    style={{ color: palette.inkFaint }}
+                  >
+                    {n === 0 ? 'this channel has not reported yet' : n < 2 ? 'no samples in window' : 'sizing the plot'}
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <View style={{ width: FLAG_COL, paddingLeft: 10 }}>
+              {ready && latest !== null ? (
+                <View
+                  className="absolute rounded-[5px] px-2 py-[3px]"
+                  style={{ left: 4, top: flagY - 10, backgroundColor: focused.colour }}
+                >
+                  <Text
+                    className="font-mono text-[10.5px]"
+                    style={{ color: inkOn(focused.colour), fontVariant: ['tabular-nums'] }}
+                  >
+                    {fmt(latest)}
                   </Text>
                 </View>
               ) : null}
             </View>
           </View>
-        ) : null}
 
-        {/* The plot. The wrapper is the only pointer target on the stack — the
-            SVG and the label overlay are both inert — so a pointer position is
-            always in the wrapper's own coordinates and never in a child's. */}
-        <View className="px-3 pb-1 pt-2">
-          <View
-            onLayout={onLayout}
-            onPointerMove={onPointerMove}
-            onPointerLeave={() => setCursorSlot(null)}
-            style={{ height: CHART_HEIGHT }}
-          >
-            {chartWidth > 0 && focused ? (
-              <>
-                <View pointerEvents="none">
-                  <Svg width={chartWidth} height={CHART_HEIGHT}>
-                    <Defs>
-                      <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-                        <Stop offset="0" stopColor={focused.colour} stopOpacity={isDark ? 0.34 : 0.22} />
-                        <Stop offset="1" stopColor={focused.colour} stopOpacity={0} />
-                      </LinearGradient>
-                    </Defs>
-
-                    {/* The plot well: a hair darker than the card, so the chart
-                        reads as a recessed instrument window rather than as a
-                        drawing floating on the panel. */}
-                    <Rect
-                      x={PAD.left}
-                      y={PAD.top}
-                      width={plotW}
-                      height={plotH}
-                      rx={6}
-                      fill="#000000"
-                      fillOpacity={isDark ? 0.16 : 0.015}
-                    />
-
-                    {/* The matrix. Verticals are the sampling grid, horizontals
-                        the value grid, and both sit under everything so no
-                        series is ever mistaken for one of them. */}
-                    {Array.from({ length: GRID_COLS + 1 }, (_, index) => {
-                      const x = Math.round(PAD.left + (index / GRID_COLS) * plotW) + 0.5;
-                      const edge = index === 0 || index === GRID_COLS;
-                      return (
-                        <Line
-                          key={`v${index}`}
-                          x1={x}
-                          y1={PAD.top}
-                          x2={x}
-                          y2={floor}
-                          stroke={palette.line}
-                          strokeWidth={1}
-                          opacity={edge ? 0.95 : 0.45}
-                        />
-                      );
-                    })}
-                    {axisScale
-                      ? axisScale.ticks.map((tick, index) => {
-                          const span = axisScale.max - axisScale.min || 1;
-                          const y = Math.round(PAD.top + (1 - (tick - axisScale.min) / span) * plotH) + 0.5;
-                          const edge = index === 0 || index === axisScale.ticks.length - 1;
-                          return (
-                            <Line
-                              key={`h${tick}`}
-                              x1={PAD.left}
-                              y1={y}
-                              x2={PAD.left + plotW}
-                              y2={y}
-                              stroke={palette.line}
-                              strokeWidth={1}
-                              strokeDasharray={edge ? undefined : '2 5'}
-                              opacity={edge ? 0.95 : 0.7}
-                            />
-                          );
-                        })
-                      : null}
-
-                    {/* The comparison set, then the subject over it. */}
-                    {ordered.map((meta) => {
-                      const points = pointsFor(meta);
-                      if (points.length < 2) return null;
-                      const isFocused = meta.id === focused.id;
-                      const d = smoothPath(points);
-                      const last = points[points.length - 1];
-                      return (
-                        <Fragment key={meta.id}>
-                          {isFocused ? (
-                            <Path d={`${d} L ${last.x} ${floor} L ${points[0].x} ${floor} Z`} fill="url(#trendFill)" />
-                          ) : null}
-                          <Path
-                            d={d}
-                            fill="none"
-                            stroke={meta.colour}
-                            strokeWidth={isFocused ? 2.4 : 1.1}
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            opacity={isFocused ? 1 : 0.32}
-                          />
-                          <Circle
-                            cx={last.x}
-                            cy={last.y}
-                            r={isFocused ? 3.4 : 2.2}
-                            fill={meta.colour}
-                            opacity={isFocused ? 1 : 0.4}
-                          />
-                        </Fragment>
-                      );
-                    })}
-
-                    {/* The crosshair, and every series it is crossing. */}
-                    {cursorSlot !== null ? (
-                      <>
-                        <Line
-                          x1={cursorX}
-                          y1={PAD.top}
-                          x2={cursorX}
-                          y2={floor}
-                          stroke={palette.lineStrong}
-                          strokeWidth={1}
-                        />
-                        {cursorRows.map((row) => (
-                          <Circle
-                            key={row.meta.id}
-                            cx={cursorX}
-                            cy={row.y}
-                            r={row.meta.id === focused.id ? 4 : 3}
-                            fill={palette.panel}
-                            stroke={row.meta.colour}
-                            strokeWidth={row.meta.id === focused.id ? 2.2 : 1.6}
-                          />
-                        ))}
-                      </>
-                    ) : null}
-
-                    {/* Corner brackets. An instrument frames its window. */}
-                    {[
-                      [PAD.left, PAD.top],
-                      [PAD.left + plotW - 10, PAD.top],
-                      [PAD.left, floor - 1.4],
-                      [PAD.left + plotW - 10, floor - 1.4],
-                    ].map(([x, y], index) => (
-                      <Rect key={`c${index}`} x={x} y={y} width={10} height={1.4} fill={palette.lineStrong} />
-                    ))}
-                  </Svg>
-                </View>
-
-                {/* Scale, time and the flags, as real text: the console's mono
-                    face is loaded for the DOM, and naming it again inside the
-                    SVG would mean maintaining the same type in two systems. */}
-                <View pointerEvents="none" style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}>
-                  {axisScale
-                    ? axisScale.ticks.map((tick) => {
-                        const span = axisScale.max - axisScale.min || 1;
-                        return (
-                          <Text
-                            key={tick}
-                            className="absolute font-mono text-[9px]"
-                            style={{
-                              color: palette.inkFaint,
-                              left: 0,
-                              width: PAD.left - 10,
-                              textAlign: 'right',
-                              top: PAD.top + (1 - (tick - axisScale.min) / span) * plotH - 6,
-                              fontVariant: ['tabular-nums'],
-                            }}
-                            numberOfLines={1}
-                          >
-                            {tick.toFixed(decimals)}
-                          </Text>
-                        );
-                      })
-                    : null}
+          {/* ── sample axis, on the same three columns ────────────────── */}
+          <View className="flex-row px-5 pb-3 pt-2">
+            <View style={{ width: Y_COL }} />
+            <View className="min-w-0 flex-1 flex-row items-center justify-between">
+              {Array.from({ length: X_TICKS }, (_, index) => {
+                const fraction = index / (X_TICKS - 1);
+                return (
                   <Text
-                    className="absolute font-mono text-[8px] uppercase tracking-[0.14em]"
-                    style={{ color: palette.inkFaint, left: 0, width: PAD.left - 10, textAlign: 'right', top: 2 }}
-                    numberOfLines={1}
+                    key={index}
+                    className="font-mono text-[9.5px] uppercase tracking-[0.14em]"
+                    style={{ color: palette.inkFaint }}
                   >
-                    {focused.unit || 'value'}
+                    {samplesBack((1 - fraction) * Math.max(0, n - 1))}
                   </Text>
+                );
+              })}
+            </View>
+            <View style={{ width: FLAG_COL }} />
+          </View>
 
-                  {/* Sample axis. There is no clock behind these buffers, so the
-                      honest x label is how many samples ago, not a time. */}
-                  {[0, 0.25, 0.5, 0.75, 1].map((fraction) => {
-                    const slot = Math.round((1 - fraction) * (HISTORY_POINTS - 1));
-                    return (
-                      <Text
-                        key={fraction}
-                        className="absolute font-mono text-[8.5px] uppercase tracking-[0.12em]"
-                        style={{
-                          color: palette.inkFaint,
-                          left: PAD.left + fraction * plotW - 20,
-                          width: 40,
-                          textAlign: 'center',
-                          bottom: 5,
-                        }}
-                        numberOfLines={1}
-                      >
-                        {slot === 0 ? 'now' : `−${slot}`}
-                      </Text>
-                    );
-                  })}
+          {/* ── session strip, window bracketed ───────────────────────── */}
+          <View
+            className="flex-row items-center px-5 pb-3 pt-2.5"
+            style={{ borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.panelRaised }}
+          >
+            <View style={{ width: Y_COL, paddingRight: 10 }}>
+              <Text className="text-right font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+                Session
+              </Text>
+            </View>
+            <View className="min-w-0 flex-1" style={{ height: BRUSH_H }}>
+              {brushPath ? (
+                <>
+                  <Svg width={plotWidth} height={BRUSH_H}>
+                    <Path
+                      d={`${brushPath} L ${plotWidth} ${BRUSH_H} L 0 ${BRUSH_H} Z`}
+                      fill={focused.colour}
+                      fillOpacity={0.07}
+                    />
+                    <Path
+                      d={brushPath}
+                      fill="none"
+                      stroke={focused.colour}
+                      strokeWidth={1}
+                      strokeOpacity={0.5}
+                      strokeLinejoin="round"
+                    />
+                  </Svg>
+                  <View
+                    pointerEvents="none"
+                    style={{
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      right: 0,
+                      width: (n / session.length) * plotWidth,
+                      borderLeftWidth: 1,
+                      borderRightWidth: 1,
+                      borderColor: focused.colour,
+                      backgroundColor: alpha(focused.colour, 0.08),
+                    }}
+                  />
+                </>
+              ) : null}
+            </View>
+            <View style={{ width: FLAG_COL }}>
+              <Text className="text-right font-mono text-[9.5px] uppercase tracking-[0.1em]" style={{ color: palette.inkMuted }}>
+                {session.length} · {n}
+              </Text>
+            </View>
+          </View>
 
-                  {/* The last-value flag, pinned to the axis edge at the height
-                      the subject is currently reading. The number a reader wants
-                      most should be on the plot, not only in a table below it. */}
-                  {focusedLast && focusedData.latest !== undefined ? (
-                    <>
-                      <View
-                        style={{
-                          position: 'absolute',
-                          left: PAD.left + plotW,
-                          top: flagY - 0.5,
-                          width: PAD.right - 6,
-                          height: 1,
-                          backgroundColor: alpha(focused.colour, 0.4),
-                        }}
-                      />
-                      <View
-                        className="absolute items-center justify-center rounded-md px-1.5 py-[3px]"
-                        style={{
-                          left: PAD.left + plotW + 6,
-                          top: flagY - 10,
-                          backgroundColor: focused.colour,
-                        }}
-                      >
-                        <Text
-                          className="font-mono text-[9.5px]"
-                          style={{ color: inkOn(focused.colour), fontVariant: ['tabular-nums'] }}
-                        >
-                          {focusedData.latest.toFixed(decimals)}
-                        </Text>
-                      </View>
-                      <LivePulse x={focusedLast.x} y={focusedLast.y} colour={focused.colour} />
-                    </>
-                  ) : null}
-
-                  {/* The crosshair read-out. */}
-                  {cursorSlot !== null && cursorRows.length > 0 ? (
-                    <View
-                      className="absolute overflow-hidden rounded-xl border"
-                      style={{
-                        left: tooltipLeft,
-                        top: PAD.top + 6,
-                        width: TOOLTIP_WIDTH,
-                        borderColor: palette.lineStrong,
-                        backgroundColor: palette.panel,
-                        shadowColor: palette.shadow,
-                        shadowOpacity: isDark ? 0.6 : 0.16,
-                        shadowRadius: 18,
-                        shadowOffset: { width: 0, height: 8 },
-                      }}
-                    >
-                      <View
-                        className="px-2.5 py-1.5"
-                        style={{ backgroundColor: palette.panelRaised, borderBottomWidth: 1, borderBottomColor: palette.line }}
-                      >
-                        <Text className="font-mono text-[8.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
-                          {cursorSlot === 0 ? 'latest sample' : `${cursorSlot} samples ago`}
-                        </Text>
-                      </View>
-                      <View className="px-2.5 py-1.5" style={{ gap: 4 }}>
-                        {cursorRows.slice(0, TOOLTIP_ROWS).map((row) => (
-                          <View key={row.meta.id} className="flex-row items-center gap-2">
-                            <View
-                              style={{ width: 8, height: 2.5, borderRadius: 2, backgroundColor: row.meta.colour }}
-                            />
-                            <Text
-                              numberOfLines={1}
-                              className={
-                                row.meta.id === focused.id
-                                  ? 'min-w-0 flex-1 font-body-bold text-[10.5px]'
-                                  : 'min-w-0 flex-1 font-body text-[10.5px]'
-                              }
-                              style={{ color: row.meta.id === focused.id ? palette.ink : palette.inkMuted }}
-                            >
-                              {row.meta.label}
-                            </Text>
-                            <Text
-                              className="font-mono text-[10.5px]"
-                              style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
-                            >
-                              {row.value.toFixed(LIVE_RANGE_FOR_LETTER[row.meta.letter].decimals)}
-                            </Text>
-                            <Text className="font-mono text-[8px] uppercase" style={{ color: palette.inkFaint, width: 26 }}>
-                              {row.meta.unit}
-                            </Text>
-                          </View>
-                        ))}
-                        {cursorRows.length > TOOLTIP_ROWS ? (
-                          <Text className="font-mono text-[8.5px] uppercase tracking-[0.12em]" style={{ color: palette.inkFaint }}>
-                            +{cursorRows.length - TOOLTIP_ROWS} more
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  ) : null}
-                </View>
-              </>
-            ) : (
-              <View className="flex-1 items-center justify-center">
-                <Text className="font-body text-[11.5px]" style={{ color: palette.inkFaint }}>
-                  {visible.length === 0
-                    ? 'Every series is hidden. Use the eye in the table below to bring one back.'
-                    : 'Sizing the plot…'}
+          {/* ── legend ────────────────────────────────────────────────── */}
+          <View
+            className="flex-row flex-wrap items-center gap-x-3.5 gap-y-2 px-5 pb-3 pt-2.5"
+            style={{ borderTopWidth: 1, borderTopColor: palette.line }}
+          >
+            <Text className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+              Legend
+            </Text>
+            <View className="flex-row items-center gap-[7px]">
+              <View style={{ width: 14, height: 2, backgroundColor: focused.colour }} />
+              <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+                measured
+              </Text>
+            </View>
+            <View className="flex-row items-center gap-[7px]">
+              <View style={{ width: 14, height: 8, backgroundColor: alpha(palette.accent, 0.14) }} />
+              <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+                expected band
+              </Text>
+            </View>
+            {references.map((reference) => (
+              <View key={`key${reference.label}`} className="flex-row items-center gap-[7px]">
+                <View style={{ width: 14, height: 0, borderTopWidth: 1, borderStyle: 'dashed', borderColor: reference.colour }} />
+                <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+                  {reference.label}
                 </Text>
               </View>
-            )}
-          </View>
-        </View>
-
-        {/* Where the subject currently sits inside everything this session has
-            seen, and the one caveat the axis needs. */}
-        {focused ? (
-          <View className="px-4 pb-3 pt-2" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
-            {focusedData.min !== undefined && focusedData.max !== undefined && focusedData.max > focusedData.min ? (
-              <>
-                <RangeRail
-                  min={focusedData.min}
-                  max={focusedData.max}
-                  mean={focusedData.mean ?? focusedData.min}
-                  value={focusedData.latest ?? null}
-                  colour={focused.colour}
-                />
-                <View className="mt-1 flex-row items-center justify-between">
-                  <Text className="font-mono text-[8.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
-                    {focusedData.min.toFixed(decimals)}
-                  </Text>
-                  <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-                    session range · {focused.unit}
-                  </Text>
-                  <Text className="font-mono text-[8.5px]" style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
-                    {focusedData.max.toFixed(decimals)}
-                  </Text>
-                </View>
-              </>
-            ) : null}
-            <Text className="mt-1.5 font-body text-[10px]" style={{ color: palette.inkFaint }}>
-              Axis in {focused.unit || 'the channel band'} · other series drawn against their own bands
+            ))}
+            <View className="min-w-0 flex-1" />
+            <Text className="font-body text-[11.5px]" style={{ color: palette.inkMuted }}>
+              Axis in {focused.unit}, true scale — this chart plots one series only.
             </Text>
           </View>
-        ) : null}
-      </View>
+        </View>
+      ) : null}
 
-      {/* The series table. Pressing a row makes it the subject; the eye keeps a
-          noisy channel out of the picture without losing its place in the list. */}
+      {/* The picker. Not a legend: only one series is ever on the chart, so a
+          row here chooses the subject rather than toggling a line on and off. */}
       <View
-        className="overflow-hidden rounded-2xl border"
+        className="overflow-hidden rounded-xl border"
         style={{ borderColor: palette.line, backgroundColor: palette.panel }}
       >
         <View
-          className="flex-row items-center justify-between px-4 py-2.5"
+          className="flex-row items-center justify-between px-5 py-2.5"
           style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
         >
-          <Text className="font-mono text-[8.5px] uppercase tracking-[0.18em]" style={{ color: palette.inkFaint }}>
-            Series
+          <Text className="font-mono text-[9px] uppercase tracking-[0.16em]" style={{ color: palette.inkFaint }}>
+            Signals
           </Text>
-          <Text className="font-mono text-[8.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
-            {visible.length} of {filtered.length} shown
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em]" style={{ color: palette.inkFaint }}>
+            {filtered.length} mapped
           </Text>
         </View>
 
         {filtered.map((meta, index) => {
-          const isHidden = Boolean(hidden[meta.id]);
           const isFocused = focused?.id === meta.id;
           const entry = data[meta.id] ?? EMPTY_DATA;
-          const entryDecimals = LIVE_RANGE_FOR_LETTER[meta.letter].decimals;
 
           return (
             <View key={meta.id} style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.line }}>
               <PressSurface
-                onPress={() => setFocusedId(meta.id)}
+                onPress={() => {
+                  setFocusedId(meta.id);
+                  setCursor(null);
+                }}
                 selected={isFocused}
                 accent={meta.colour}
-                accessibilityLabel={`Read ${meta.label}, ${meta.code}, on the chart`}
-                className="flex-row items-center gap-3 px-4 py-2.5"
-                style={{
-                  backgroundColor: isFocused ? alpha(meta.colour, 0.08) : palette.panel,
-                  opacity: isHidden ? 0.45 : 1,
-                }}
+                accessibilityLabel={`Plot ${meta.label}, ${meta.code}`}
+                className="flex-row items-center gap-3 px-5 py-2.5"
+                style={{ backgroundColor: isFocused ? alpha(meta.colour, 0.08) : palette.panel }}
               >
                 <View style={{ width: 14, height: 2.5, borderRadius: 2, backgroundColor: meta.colour }} />
                 <Text
@@ -928,37 +1137,20 @@ export function TrendView({ mappedChannels, devices, machineId }: TrendViewProps
                 >
                   {meta.code}
                 </Text>
-                <Text
-                  numberOfLines={1}
-                  className="min-w-0 flex-1 font-body text-[12px]"
-                  style={{ color: palette.ink, textDecorationLine: isHidden ? 'line-through' : 'none' }}
-                >
+                <Text numberOfLines={1} className="min-w-0 flex-1 font-body text-[12px]" style={{ color: palette.ink }}>
                   {meta.label}
                 </Text>
                 <Text
                   className="font-mono text-[11.5px]"
                   style={{ color: entry.latest === undefined ? palette.inkFaint : palette.ink, fontVariant: ['tabular-nums'] }}
                 >
-                  {entry.latest === undefined ? '—' : `${entry.latest.toFixed(entryDecimals)} ${meta.unit}`}
+                  {entry.latest === undefined ? '—' : `${entry.latest.toFixed(meta.decimals)} ${meta.unit}`}
                 </Text>
-                <Pressable
-                  onPress={(event: GestureResponderEvent) => {
-                    // The row underneath is a focus control; without this the
-                    // eye would hide the series and focus it in one click.
-                    event.stopPropagation?.();
-                    setHidden((previous) => ({ ...previous, [meta.id]: !previous[meta.id] }));
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={isHidden ? `Show ${meta.label} on the chart` : `Hide ${meta.label} from the chart`}
-                  hitSlop={6}
-                  className="h-6 w-6 items-center justify-center rounded-lg"
-                >
-                  <MaterialCommunityIcons
-                    name={isHidden ? 'eye-off-outline' : 'eye-outline'}
-                    size={14}
-                    color={palette.inkFaint}
-                  />
-                </Pressable>
+                {isFocused ? (
+                  <MaterialCommunityIcons name="chart-line" size={14} color={meta.colour} />
+                ) : (
+                  <View style={{ width: 14 }} />
+                )}
               </PressSurface>
             </View>
           );

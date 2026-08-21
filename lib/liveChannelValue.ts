@@ -133,7 +133,19 @@ export function useChannelReading(
 
 // --- History ----------------------------------------------------------------
 
-export const HISTORY_LENGTH = 40;
+/**
+ * How many samples a channel keeps.
+ *
+ * This was 40, which is a sparkline's worth of history and nothing more. The
+ * Trends screen selects a window inside the session and brackets it against the
+ * whole session on a strip below the plot, and at 40 samples that structure is
+ * a window of 20 inside a session of 40 — an arrangement with nothing to say.
+ *
+ * Everything that reads a history slices from the newest end, so a longer
+ * buffer costs the sparklines nothing. The persisted cost is a few kilobytes
+ * per channel in local storage.
+ */
+export const HISTORY_LENGTH = 240;
 const PERSIST_EVERY_N = 4;
 
 /**
