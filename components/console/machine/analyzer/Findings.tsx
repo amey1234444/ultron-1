@@ -161,7 +161,11 @@ function ExceedanceBar({ ratio, severity }: { ratio: number | null; severity: Se
           }}
         />
       </View>
-      <Text className={cn('mt-1', text.label)} style={{ color: over ? tones.text : palette.inkFaint }} numberOfLines={1}>
+      <Text
+        className={cn('mt-1', text.meta)}
+        style={[tabular, { color: over ? tones.text : palette.inkFaint }]}
+        numberOfLines={1}
+      >
         {exceedanceLabel(ratio)}
       </Text>
     </View>
@@ -227,7 +231,10 @@ function ClusterRow({
           <Text className={text.bodyStrong} style={{ color: palette.ink }} numberOfLines={1}>
             {cluster.title}
           </Text>
-          <Text className={cn('mt-0.5', text.label)} style={{ color: palette.inkMuted }} numberOfLines={1}>
+          {/* The tag, the sensor and its unit — an identifier the reader
+              matches against a drawing, so `code`: mono, and cased the way it
+              actually arrives rather than restyled into capitals. */}
+          <Text className={cn('mt-0.5', text.code)} style={{ color: palette.inkMuted }} numberOfLines={1}>
             {cluster.signal}
           </Text>
         </View>
@@ -260,7 +267,7 @@ function ClusterRow({
               >
                 <View style={{ width: COLS.dot }} />
                 <Text
-                  className={text.label}
+                  className={text.code}
                   style={{ color: palette.inkMuted, flex: 1, minWidth: 0, paddingLeft: 16 }}
                   numberOfLines={1}
                 >
@@ -358,10 +365,10 @@ function FilterButton({
         opacity: count === 0 && !active ? 0.5 : 1,
       }}
     >
-      <Text className={text.label} style={{ color: active ? tone : palette.inkMuted }}>
+      <Text className={text.chip} style={{ color: active ? tone : palette.inkMuted }}>
         {label}
       </Text>
-      <Text className={text.label} style={[tabular, { color: active ? tone : palette.inkFaint }]}>
+      <Text className={text.meta} style={[tabular, { color: active ? tone : palette.inkFaint }]}>
         {count}
       </Text>
     </Pressable>
@@ -446,7 +453,7 @@ export function FindingsCard({
               className="pb-1"
               style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
             >
-              <Text className={text.label} style={{ color: palette.inkMuted }}>
+              <Text className={text.chip} style={{ color: palette.inkMuted }}>
                 {allOpen ? 'Collapse all' : 'Expand all'}
               </Text>
             </Pressable>
@@ -502,7 +509,7 @@ export function FindingsCard({
                   <Text className={text.label} style={{ color: tones.text }}>
                     {SEVERITY_LABEL[severity]}
                   </Text>
-                  <Text className={text.label} style={[tabular, { color: palette.inkMuted }]}>
+                  <Text className={text.data} style={[tabular, { color: tones.text }]}>
                     {countRules(items)}
                   </Text>
                   <Text className={text.body} style={{ color: palette.inkMuted }}>

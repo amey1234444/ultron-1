@@ -4,6 +4,7 @@ import { Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { consolePalette, variantStyle, type Variant } from './tokens';
+import { text } from './type';
 
 /**
  * Card — the console's surface primitive.
@@ -118,7 +119,7 @@ export function SectionLabel({ children, className }: { children: React.ReactNod
     <View
       className={cn('self-start rounded-md px-2 py-[3px]', isDark ? 'bg-white/[0.055]' : 'bg-black/[0.045]', className)}
     >
-      <Text className="font-mono text-[8.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
+      <Text className={text.label} style={{ color: palette.inkMuted }}>
         {children}
       </Text>
     </View>
@@ -144,7 +145,7 @@ export function Body({
   return (
     <Text
       numberOfLines={numberOfLines}
-      className={cn(mono ? 'font-mono text-[11px]' : 'font-body text-xs', 'leading-[17px]', className)}
+      className={cn(mono ? text.data : text.body, className)}
       style={{ color: muted ? palette.inkMuted : palette.ink }}
     >
       {children}

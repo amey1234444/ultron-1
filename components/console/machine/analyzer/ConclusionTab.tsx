@@ -98,7 +98,7 @@ function AdviceCard({
             Do this
           </Text>
           <View className="rounded-[6px] px-2 py-1" style={{ backgroundColor: tones.head }}>
-            <Text className={text.label} style={{ color: tones.text }}>
+            <Text className={text.chip} style={{ color: tones.text }}>
               {action.priority} priority
             </Text>
           </View>

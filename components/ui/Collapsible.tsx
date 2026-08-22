@@ -7,6 +7,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { Card } from './Card';
 import { consolePalette, variantStyle, type IconName, type Variant } from './tokens';
+import { text } from './type';
 
 /**
  * Collapsible — a disclosure section.
@@ -63,7 +64,7 @@ export function Collapsible({
             {count !== undefined && count > 0 ? (
               <View className="rounded-full px-1.5 py-[1px]" style={{ backgroundColor: style?.tint ?? palette.panelRaised }}>
                 <Text
-                  className="font-mono text-[9px]"
+                  className={text.meta}
                   style={{ color: accent, fontVariant: ['tabular-nums'] }}
                 >
                   {count}

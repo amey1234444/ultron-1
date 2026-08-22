@@ -4,6 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { consolePalette, variantStyle, type IconName, type Variant } from './tokens';
+import { text } from './type';
 
 export type TabItem<T extends string> = {
   value: T;
@@ -73,7 +74,7 @@ export function Tabs<T extends string>({
                 />
               ) : null}
               <Text
-                className="font-mono text-[10px] uppercase tracking-[0.14em]"
+                className={text.chip}
                 style={{ color: active ? palette.panel : palette.inkMuted }}
               >
                 {item.label}
@@ -90,7 +91,7 @@ export function Tabs<T extends string>({
                   }}
                 >
                   <Text
-                    className="font-mono text-[9px]"
+                    className={text.meta}
                     style={{
                       color: active ? palette.panel : (countStyle?.accent ?? palette.inkMuted),
                       fontVariant: ['tabular-nums'],

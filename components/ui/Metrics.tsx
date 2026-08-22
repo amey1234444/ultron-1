@@ -6,6 +6,7 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { Card } from './Card';
 import { alpha, consolePalette, variantStyle, type IconName, type Variant } from './tokens';
+import { text } from './type';
 
 /**
  * Meter — a bounded 0-100 track.
@@ -79,7 +80,7 @@ export function StatTile({
       <View className="flex-row items-center gap-2">
         <MaterialCommunityIcons name={icon ?? style.icon} size={13} color={style.accent} />
         <Text
-          className="min-w-0 flex-1 font-mono text-[9px] uppercase tracking-[0.14em]"
+          className={cn('min-w-0 flex-1', text.label)}
           style={{ color: palette.inkMuted }}
           numberOfLines={1}
         >
@@ -154,7 +155,7 @@ export function MagnitudeBars({
           <View key={datum.key} className="gap-1.5">
             <View className="flex-row items-center gap-2">
               <Text
-                className="min-w-0 flex-1 font-mono text-[10.5px]"
+                className={cn('min-w-0 flex-1', text.data)}
                 style={{ color: palette.ink }}
                 numberOfLines={1}
               >
@@ -163,13 +164,13 @@ export function MagnitudeBars({
               {datum.direction ? (
                 <View className="flex-row items-center gap-1">
                   <MaterialCommunityIcons name={arrow} size={11} color={palette.inkMuted} />
-                  <Text className="font-mono text-[9.5px] uppercase tracking-[0.1em]" style={{ color: palette.inkMuted }}>
+                  <Text className={text.meta} style={{ color: palette.inkMuted }}>
                     {datum.direction}
                   </Text>
                 </View>
               ) : null}
               <Text
-                className="font-mono text-[10.5px]"
+                className={text.data}
                 style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
               >
                 {datum.display ?? datum.value.toFixed(1)}

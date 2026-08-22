@@ -308,16 +308,29 @@ html.dark {
 /*
  * Scroll chaining.
  *
- * `:where()` so this carries zero specificity and any component can override
- * it without a fight. On a non-scrolling element the property is inert, so a
- * universal selector is the honest way to reach a tree of scroll containers
- * that react-native-web generates with no stable class names.
+ * There used to be a `:where(*) { overscroll-behavior: contain }` here, on the
+ * reasoning that the property is inert on a non-scrolling element so a
+ * universal selector was a safe way to reach react-native-web's unnamed scroll
+ * containers. That reasoning is wrong, and it cost the product its scrolling.
  *
- * `contain` and not `none`: nested lists stop handing the wheel to the page
- * behind them, but the browser's own gestures — pull-to-refresh, back-swipe —
- * still work where the platform provides them.
+ * `overflow: hidden` makes an element a scroll container. It cannot be scrolled
+ * by the user, but it is still a node on the browser's scroll chain, and
+ * `overscroll-behavior: contain` on a scroll chain node stops the wheel there
+ * instead of passing it to the page. A full-bleed `overflow: hidden` box — the
+ * landing hero, a rounded card, a horizontal ScrollView, all of which are
+ * `overflow: hidden` on one axis or both — therefore swallowed every wheel
+ * event over it and the document never moved at all.
+ *
+ * Measured on /home before the rule was removed: twelve wheel notches over the
+ * hero moved a 9864px document exactly 0px. Neutralising this one declaration
+ * restored it; nothing else did.
+ *
+ * So containment is opt-in now. `html, body` below stops the document itself
+ * rubber-banding, which was the case that actually mattered, and any genuine
+ * nested list that should not hand the wheel to the page behind it asks for it
+ * with `.u-scroll-contain`. Never reintroduce the universal form.
  */
-:where(*) {
+.u-scroll-contain {
   overscroll-behavior: contain;
 }
 

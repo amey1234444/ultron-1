@@ -4,6 +4,7 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { consolePalette, variantStyle, type IconName, type Variant } from './tokens';
+import { tabular, text } from './type';
 
 /**
  * Badge — a status pill.
@@ -42,8 +43,14 @@ export function Badge({
       }}
     >
       {glyph ? <MaterialCommunityIcons name={glyph} size={11} color={style.accent} /> : null}
+      {/* Sentence case, from the type scale, rather than a hand-rolled tracked
+          uppercase of its own. Every label passed in here already arrives cased
+          the way it should read — 'Normal', 'No reading', 'F-MOTOR-EFF' — so the
+          CSS transform was doing nothing but shouting, and a signals table with
+          eleven stencilled NORMAL pills down it buries the one row that is not.
+          Codes stay upper case because they are written that way at source. */}
       <Text
-        className="font-mono text-[9.5px] uppercase tracking-[0.12em]"
+        className={text.chip}
         style={{ color: variant === 'default' || variant === 'muted' ? palette.inkMuted : palette.ink }}
       >
         {children}
@@ -86,15 +93,12 @@ export function KeyValue({
   const accent = variant ? variantStyle(palette, variant).accent : undefined;
   return (
     <View className={cn('flex-row flex-wrap items-baseline gap-x-2 gap-y-0.5', className)}>
-      <Text className="font-mono text-[9.5px] uppercase tracking-[0.12em]" style={{ color: palette.inkFaint }}>
+      <Text className={text.label} style={{ color: palette.inkFaint }}>
         {label}
       </Text>
       <View className="min-w-0 flex-row items-center gap-1.5">
         {accent ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: accent }} /> : null}
-        <Text
-          className="font-mono text-[11px]"
-          style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}
-        >
+        <Text className={text.data} style={[tabular, { color: palette.ink }]}>
           {value}
         </Text>
       </View>

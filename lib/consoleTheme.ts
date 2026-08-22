@@ -28,6 +28,14 @@ export type ConsolePalette = {
 
   ink: string;
   inkMuted: string;
+  /**
+   * The third and last ink step — small print, scope notes, column headers.
+   *
+   * It is a step below `inkMuted`, not a different kind of thing: everything
+   * set in it is still text a reader is expected to read. Both steps clear
+   * 4.5:1 against `panel`, which is what the analysis layer's 9–11px captions
+   * need and what the old value (3.2:1 dark, 3.5:1 light) did not give them.
+   */
   inkFaint: string;
 
   /** Live, healthy, on-target, active control. */
@@ -67,7 +75,7 @@ const DARK: ConsolePalette = {
 
   ink: '#F7F6F2',
   inkMuted: '#8B8D93',
-  inkFaint: '#62666E',
+  inkFaint: '#7C8189',
 
   accent: '#3FBF6A',
   accentSoft: 'rgba(63,191,106,0.13)',
@@ -94,7 +102,7 @@ const LIGHT: ConsolePalette = {
 
   ink: '#0A0B0D',
   inkMuted: '#5C6068',
-  inkFaint: '#878B92',
+  inkFaint: '#6E737B',
 
   accent: '#1F8A4C',
   accentSoft: 'rgba(31,138,76,0.1)',

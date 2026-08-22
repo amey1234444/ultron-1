@@ -118,9 +118,16 @@ function Counter({ count, divided }: { count: StatusCount; divided: boolean }) {
         <Text numberOfLines={1} className={text.display} style={[tabular, { color: tones.text }]}>
           {count.value}
         </Text>
-        <Text numberOfLines={1} className={text.label} style={{ color: palette.inkFaint }}>
-          {count.scope}
-        </Text>
+        {/* A qualifier on the figure, not the name of a field — so it is
+            `meta`, sentence case, and stays out of the number's way. Set in
+            `label` it read as a second heading competing with the first.
+            Empty when there is nothing to scope: a zero followed by the word
+            "none" is the same fact told twice. */}
+        {count.scope ? (
+          <Text numberOfLines={1} className={text.meta} style={{ color: palette.inkFaint }}>
+            {count.scope}
+          </Text>
+        ) : null}
       </View>
 
       <Text numberOfLines={2} className={cn('mt-2', text.body)} style={{ color: palette.inkMuted }}>
@@ -227,8 +234,8 @@ function SeverityMix({
       </View>
 
       {total > 0 ? (
-        <Text className={cn('mt-1', text.label)} style={{ color: palette.inkFaint }}>
-          {total} rules fired
+        <Text className={cn('mt-2.5 pt-2.5', text.meta)} style={{ color: palette.inkFaint, borderTopWidth: 1, borderTopColor: palette.line }}>
+          {total} rule{total === 1 ? '' : 's'} fired across {present.length} severit{present.length === 1 ? 'y' : 'ies'}
         </Text>
       ) : null}
     </View>
@@ -322,7 +329,7 @@ export function StatusBand({
                 style={{ backgroundColor: tones.head, borderWidth: 1, borderColor: tones.edge }}
               >
                 <View style={{ width: 5, height: 5, borderRadius: 5, backgroundColor: tones.dot }} />
-                <Text className={text.label} style={{ color: tones.text }}>
+                <Text className={text.chip} style={{ color: tones.text }}>
                   {statusChip}
                 </Text>
               </View>
@@ -350,7 +357,7 @@ export function StatusBand({
                 }}
               />
               <Text
-                className={text.label}
+                className={text.chip}
                 style={{ color: sourceVariant === 'success' ? palette.accent : palette.inkMuted }}
               >
                 {sourceLabel}

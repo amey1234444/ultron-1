@@ -5,6 +5,7 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { consolePalette, variantStyle, type IconName, type Variant } from './tokens';
+import { text } from './type';
 
 /**
  * Alert — a callout that states a condition and what it means.
@@ -92,7 +93,7 @@ export function VerdictBanner({
     >
       <View className="flex-row items-center gap-2">
         <MaterialCommunityIcons name={style.icon} size={14} color={style.accent} />
-        <Text className="font-mono text-[9.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
+        <Text className={text.label} style={{ color: palette.inkMuted }}>
           {eyebrow}
         </Text>
       </View>

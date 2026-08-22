@@ -74,7 +74,16 @@ function deltaPixels(event: WheelEvent): number {
  */
 function hasOwnScroller(start: EventTarget | null, root: HTMLElement): boolean {
   let node = start instanceof Element ? start : null;
-  while (node && node !== root) {
+  // Stop at `body`, not just at `html`. `body` carries `overflow-x: hidden`
+  // (global.css clips the page horizontally there), and a box with one axis
+  // hidden and the other visible computes the visible axis to `auto` — so
+  // `getComputedStyle(body).overflowY` reads "auto" on every marketing page.
+  // The used value is still `visible`, because the root propagates body's
+  // overflow to the viewport, but `getComputedStyle` reports the computed
+  // value and this walk cannot see the difference. Left in, `body` matched on
+  // the first step of every wheel event, the function returned true every
+  // time, and the eased scrolling below never ran once.
+  while (node && node !== root && node !== document.body) {
     const style = window.getComputedStyle(node);
     const scrollsY = /(auto|scroll|overlay)/.test(style.overflowY);
     if (scrollsY && node.scrollHeight > node.clientHeight + 1) return true;
@@ -98,17 +107,55 @@ export function startSmoothScroll(): () => void {
   let frame = 0;
   let animating = false;
   let last = 0;
+  /** Where the page was on the previous frame, for the stall check in `tick`. */
+  let previous = Number.NaN;
 
   const maxScroll = () => Math.max(0, root.scrollHeight - window.innerHeight);
+
+  /**
+   * The easing below drives the page with one `scrollTo` per frame, and
+   * global.css sets `scroll-behavior: smooth` on the root so that anchor jumps
+   * ease. Those two cannot both be true at once: under `smooth`, every
+   * `scrollTo` starts a fresh ~300ms browser animation, and a call on the next
+   * frame aborts it and starts another before it has travelled a pixel. The
+   * page ends up crawling, or not moving at all.
+   *
+   * So the root's scroll behaviour is suspended for exactly as long as a wheel
+   * run lasts — two style writes per gesture — and restored the moment it
+   * settles, which leaves anchors and `scrollIntoView` eased as intended.
+   */
+  const suspendCssEasing = () => {
+    root.style.scrollBehavior = 'auto';
+  };
+  const restoreCssEasing = () => {
+    root.style.scrollBehavior = '';
+  };
 
   const tick = (now: number) => {
     const current = window.scrollY;
     const distance = target - current;
 
-    if (Math.abs(distance) < EPSILON) {
-      window.scrollTo(0, target);
+    // Two ways a run ends, and the second one is not optional.
+    //
+    //   1. It arrived — within EPSILON of the target.
+    //   2. It cannot arrive. The scroll offset a browser stores is quantised,
+    //      so a target of 600 can come to rest at 599 and stay there: the
+    //      distance never falls under EPSILON, the loop never exits, and a rAF
+    //      spins for the rest of the session with the root pinned to
+    //      `scroll-behavior: auto`. Observed on /home before this check
+    //      existed. If a frame moved the page less than a quarter pixel and
+    //      there is under 2px left to go, this is as close as it gets.
+    const stalled = Math.abs(current - previous) < 0.25 && Math.abs(distance) < 2;
+    previous = current;
+
+    if (Math.abs(distance) < EPSILON || stalled) {
+      if (!stalled) window.scrollTo(0, target);
+      // Re-seed from where the page actually is, so a residual pixel the
+      // scroller refused to travel is not carried into the next wheel notch.
+      target = window.scrollY;
       animating = false;
       frame = 0;
+      restoreCssEasing();
       return;
     }
 
@@ -139,6 +186,8 @@ export function startSmoothScroll(): () => void {
     if (!animating) {
       animating = true;
       last = 0;
+      previous = Number.NaN;
+      suspendCssEasing();
       frame = window.requestAnimationFrame(tick);
     }
   };
@@ -164,6 +213,9 @@ export function startSmoothScroll(): () => void {
 
   return () => {
     if (frame) window.cancelAnimationFrame(frame);
+    // Navigating away mid-glide must not leave the root pinned to `auto`, or
+    // the next page's anchor jumps would silently stop easing.
+    restoreCssEasing();
     window.removeEventListener('wheel', onWheel);
     window.removeEventListener('scroll', onScroll);
     window.removeEventListener('resize', onResize);

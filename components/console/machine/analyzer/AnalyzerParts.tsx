@@ -290,14 +290,14 @@ export function FilterChips<T extends string>({
               <View style={{ width: 4.5, height: 4.5, borderRadius: 6, backgroundColor: style?.accent }} />
             ) : null}
             <Text
-              className={text.label}
+              className={text.chip}
               style={{ color: active ? palette.ink : palette.inkMuted }}
             >
               {option.label}
             </Text>
             {option.count !== undefined ? (
               <Text
-                className={text.label}
+                className={text.meta}
                 style={{ color: active ? (style?.accent ?? palette.inkMuted) : palette.inkFaint, fontVariant: ['tabular-nums'] }}
               >
                 {option.count}
@@ -833,7 +833,7 @@ export function TrendChart({
             {[0, 0.5, 1].map((fraction) => (
               <Text
                 key={fraction}
-                className={cn('absolute', text.label)}
+                className={cn('absolute', text.code)}
                 style={{
                   color: palette.inkFaint,
                   left: 0,
@@ -856,13 +856,13 @@ export function TrendChart({
             </Text>
 
             <Text
-              className={cn('absolute', text.label)}
+              className={cn('absolute', text.code)}
               style={{ color: palette.inkFaint, left: PLOT.left, bottom: 2 }}
             >
               {footLeft}
             </Text>
             <Text
-              className={cn('absolute', text.label)}
+              className={cn('absolute', text.code)}
               style={{ color: palette.inkFaint, right: PLOT.right, bottom: 2 }}
             >
               {footRight}
@@ -874,7 +874,7 @@ export function TrendChart({
                 {model.guides.map((guide) => (
                   <View key={guide.label} className="flex-row items-center gap-1">
                     <View style={{ width: 9, height: 1.5, backgroundColor: guide.colour, opacity: 0.85 }} />
-                    <Text className={text.label} style={{ color: palette.inkFaint }}>
+                    <Text className={text.meta} style={{ color: palette.inkFaint }}>
                       {guide.label}
                     </Text>
                   </View>
@@ -1013,7 +1013,7 @@ export function EmptyState({
           className="mt-0.5 rounded-full border px-2.5 py-[3px]"
           style={{ borderColor: palette.line, backgroundColor: palette.panel }}
         >
-          <Text className={text.label} style={{ color: palette.inkFaint }}>
+          <Text className={text.meta} style={{ color: palette.inkFaint }}>
             {meta}
           </Text>
         </View>
@@ -1092,28 +1092,37 @@ export function MarginBar({
 
   return (
     <View className="h-[14px] justify-center">
-      {/* The track: the whole domain, quiet. */}
+      {/* The track: the whole domain, quiet.
+
+          An ungraded row gets a visible dotted track rather than a transparent
+          one with a hairline border nobody can see. Left invisible, the only
+          thing the reader could make out was the fill below — which is why a
+          table of eleven unlimited signals read as eleven bars all sitting at
+          the same level, against a scale that was never drawn. */}
       <View
         style={{
           height: 3,
           borderRadius: 3,
-          backgroundColor: graded ? palette.panelRaised : 'transparent',
-          borderWidth: graded ? 0 : 1,
-          borderColor: palette.line,
-          borderStyle: graded ? 'solid' : 'dashed',
+          backgroundColor: graded ? palette.panelRaised : alpha(palette.inkFaint, 0.16),
         }}
       />
-      {/* Filled to the reading, so the eye lands on length before position. */}
-      <View
-        style={{
-          position: 'absolute',
-          left: 0,
-          width: at(value),
-          height: 3,
-          borderRadius: 3,
-          backgroundColor: alpha(accent, 0.4),
-        }}
-      />
+      {/* Filled to the reading, so the eye lands on length before position —
+          but ONLY where limits exist to judge that length against. With no
+          warning or critical bound the bar has no scale, and a filled bar with
+          no scale is a claim about a comparison nobody made. Ungraded rows
+          therefore show position alone: the marker, on a bare track. */}
+      {graded ? (
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            width: at(value),
+            height: 3,
+            borderRadius: 3,
+            backgroundColor: alpha(accent, 0.4),
+          }}
+        />
+      ) : null}
       {/* The limits, each in its own meaning's colour. */}
       {warningLimit !== null && Number.isFinite(warningLimit) ? (
         <View
@@ -1148,7 +1157,7 @@ export function MarginBar({
           width: 8,
           height: 8,
           borderRadius: 6,
-          backgroundColor: accent,
+          backgroundColor: graded ? accent : palette.inkFaint,
           borderWidth: 1.5,
           borderColor: palette.panel,
         }}

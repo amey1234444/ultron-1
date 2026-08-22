@@ -162,7 +162,7 @@ function PartChips({
       >
         <MaterialCommunityIcons name={icon} size={13} color={active ? palette.ink : accent} />
         <Text
-          className={text.label}
+          className={text.chip}
           style={{ color: active ? palette.ink : palette.inkMuted }}
         >
           {label}
@@ -231,7 +231,7 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
                 </Text>
                 <View className="mt-0.5 flex-row items-center gap-1.5">
                   <StateDot state={state} size={5} />
-                  <Text className={text.label} style={{ color: style.dot }}>
+                  <Text className={text.chip} style={{ color: style.dot }}>
                     {PART_STATE_LABEL[state]}
                   </Text>
                 </View>
@@ -253,7 +253,7 @@ function ConditionStrip({ parts, onSelect }: { parts: PartView[]; onSelect: (par
             Electrical / Power
           </Text>
           <StateDot state={supply.state} size={5} />
-          <Text className={text.label} style={{ color: palette.inkMuted }}>
+          <Text className={text.chip} style={{ color: palette.inkMuted }}>
             {PART_STATE_LABEL[supply.state]} · supplies the machine
           </Text>
         </PressSurface>
@@ -326,6 +326,7 @@ function PartGroupLine({
   variant,
 }: {
   parts: PartView[];
+  /** What the group is, as a predicate about one part — "normal", "not measured". */
   title: string;
   badge: string;
   variant: Variant;
@@ -343,7 +344,7 @@ function PartGroupLine({
         {badge}
       </Badge>
       <Text className={text.bodyStrong} style={{ color: palette.ink }}>
-        {parts.length} {title}
+        {parts.length} part{parts.length === 1 ? '' : 's'} {title}
       </Text>
       <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.inkMuted }} numberOfLines={1}>
         {parts.map((view) => view.part).join(', ')}
@@ -400,7 +401,7 @@ function ReasoningChain({ view }: { view: PartView }) {
                 }
               >
                 <Text
-                  className={text.label}
+                  className={text.code}
                   style={{ color: step.evaluated ? palette.panel : palette.inkFaint, fontVariant: ['tabular-nums'] }}
                 >
                   {index + 1}
@@ -542,7 +543,7 @@ function CauseList({ view }: { view: PartView }) {
                       {matchClassLabel(cause.matchClass)}
                     </Badge>
                   </View>
-                  <Text className={cn('mt-0.5', text.label)} style={{ color: palette.inkFaint }}>
+                  <Text className={cn('mt-0.5', text.code)} style={{ color: palette.inkFaint }}>
                     {cause.faultId}
                   </Text>
                 </View>
@@ -555,7 +556,7 @@ function CauseList({ view }: { view: PartView }) {
                 <View className="h-[4px] flex-1 overflow-hidden rounded-full" style={{ backgroundColor: palette.panelRaised }}>
                   <View style={{ width: `${share}%`, height: '100%', borderRadius: 6, backgroundColor: accent }} />
                 </View>
-                <Text className={text.label} style={{ color: palette.inkFaint }}>
+                <Text className={text.meta} style={{ color: palette.inkFaint }}>
                   {index === 0 ? 'best match' : `${share}% of best`}
                 </Text>
               </View>
@@ -656,7 +657,7 @@ function ReadingHero({ signal }: { signal: SignalView }) {
           <Text className={cn('min-w-0', text.bodyStrong)} style={{ color: palette.ink }} numberOfLines={1}>
             {signal.measures}
           </Text>
-          <Text className={text.label} style={{ color: palette.inkFaint }}>
+          <Text className={text.code} style={{ color: palette.inkFaint }}>
             {signal.tag} · {KIND_LABEL[signal.kind]}
           </Text>
         </View>
@@ -668,7 +669,7 @@ function ReadingHero({ signal }: { signal: SignalView }) {
           >
             {signal.value === null ? '—' : formatValue(signal.value, '')}
           </Text>
-          <Text className={cn('pb-[5px]', text.label)} style={{ color: palette.inkMuted }}>
+          <Text className={cn('pb-[5px]', text.meta)} style={{ color: palette.inkMuted }}>
             {signal.unit || 'unitless'}
           </Text>
 
@@ -682,7 +683,7 @@ function ReadingHero({ signal }: { signal: SignalView }) {
                 size={12}
                 color={palette.inkMuted}
               />
-              <Text className={text.label} style={{ color: palette.inkMuted }}>
+              <Text className={text.meta} style={{ color: palette.inkMuted }}>
                 {BEHAVIOUR_LABEL[signal.behaviour]}
               </Text>
             </View>
@@ -745,7 +746,7 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
       <View className="gap-1.5 rounded-[6px] border px-3 py-3" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
         <View className="flex-row items-center gap-1.5">
           <MaterialCommunityIcons name="lock-outline" size={13} color={palette.inkFaint} />
-          <Text className={text.label} style={{ color: palette.inkMuted }}>
+          <Text className={text.meta} style={{ color: palette.inkMuted }}>
             {tool.label} not available on this machine
           </Text>
         </View>
@@ -797,12 +798,12 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
                 color={deltaColour}
               />
               <Text
-                className={text.label}
+                className={text.meta}
                 style={{ color: deltaColour, fontVariant: ['tabular-nums'] }}
               >
                 {formatDelta(stats.delta, signal.unit)}
               </Text>
-              <Text className={text.label} style={{ color: palette.inkFaint }}>
+              <Text className={text.meta} style={{ color: palette.inkFaint }}>
                 over {stats.count}
               </Text>
             </View>
@@ -829,13 +830,13 @@ function ToolPanel({ signal, tool }: { signal: SignalView; tool: AnalysisTool })
           <View className="px-3.5 pb-3 pt-1.5" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
             <RangeRail min={stats.min} max={stats.max} mean={stats.mean} value={signal.value} colour={accent} />
             <View className="mt-1 flex-row items-center justify-between">
-              <Text className={text.label} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+              <Text className={text.code} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
                 {formatValue(stats.min, signal.unit)}
               </Text>
-              <Text className={text.label} style={{ color: palette.inkFaint }}>
+              <Text className={text.code} style={{ color: palette.inkFaint }}>
                 mean {formatValue(stats.mean, signal.unit)}
               </Text>
-              <Text className={text.label} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+              <Text className={text.code} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
                 {formatValue(stats.max, signal.unit)}
               </Text>
             </View>
@@ -966,7 +967,7 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
                     {entry.measures}
                   </Text>
                 </View>
-                <Text className={cn('mt-0.5', text.label)} style={{ color: palette.inkFaint }}>
+                <Text className={cn('mt-0.5', text.code)} style={{ color: palette.inkFaint }}>
                   {entry.tag} · {entry.part === part ? KIND_LABEL[entry.kind] : `context · ${entry.part}`}
                 </Text>
               </PressSurface>
@@ -996,7 +997,7 @@ function SignalDetail({ signals, part }: { signals: SignalView[]; part: MachineP
               }}
             >
               <Text
-                className={text.label}
+                className={text.chip}
                 style={{ color: active ? palette.ink : palette.inkMuted }}
               >
                 {entry.label}
@@ -1177,8 +1178,8 @@ export function AdvanceDiagnosisTab({
                     ))}
                   </View>
                 ) : null}
-                <PartGroupLine parts={healthy} title="parts normal" badge="Normal" variant="success" />
-                <PartGroupLine parts={unmeasured} title="parts not measured" badge="No data" variant="muted" />
+                <PartGroupLine parts={healthy} title="normal" badge="Normal" variant="success" />
+                <PartGroupLine parts={unmeasured} title="not measured" badge="No data" variant="muted" />
               </View>
             </Block>
           ) : null}

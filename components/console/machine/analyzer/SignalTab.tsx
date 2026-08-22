@@ -220,11 +220,11 @@ function Acquisition({
       <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
         <DetailHeading>Acquisition</DetailHeading>
         <View className="rounded-full px-2 py-[3px]" style={{ backgroundColor: style.tint }}>
-          <Text className={text.label} style={{ color: style.accent }}>
+          <Text className={text.chip} style={{ color: style.accent }}>
             {QUALITY_LABEL[connection.quality]}
           </Text>
         </View>
-        <Text className={text.label} style={{ color: palette.inkFaint }}>
+        <Text className={text.meta} style={{ color: palette.inkFaint }}>
           {relativeAge(connection.lastUpdatedAt)}
         </Text>
       </View>
@@ -265,7 +265,7 @@ function Acquisition({
                 onPressEmpty={() => {}}
                 onPressCard={() => {}}
               />
-              <Text className={text.label} style={{ color: palette.inkFaint }}>
+              <Text className={text.code} style={{ color: palette.inkFaint }}>
                 Slot {String(connection.slot).padStart(2, '0')}
               </Text>
             </View>
@@ -357,7 +357,10 @@ function SignalRowSummary({
       <Text className={text.bodyStrong} style={{ color: palette.ink }} numberOfLines={1}>
         {signal.measures}
       </Text>
-      <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
+      {/* The tag and the part it sits on. An identifier, so `code` — and no
+          longer tracked capitals, which at this size turned every row's second
+          line into a second heading. */}
+      <Text className={text.code} style={{ color: palette.inkFaint }} numberOfLines={1}>
         {signal.tag} · {signal.part}
       </Text>
     </View>
@@ -416,7 +419,7 @@ function SignalRowSummary({
           {STATUS_LABEL[signal.status]}
         </Badge>
       </View>
-      <Text className={text.label} style={{ color: palette.inkFaint, width: 74 }} numberOfLines={1}>
+      <Text className={text.code} style={{ color: palette.inkFaint, width: 74 }} numberOfLines={1}>
         {wiredTo}
       </Text>
     </View>
@@ -515,7 +518,7 @@ function SignalRowDetail({
         className="flex-row items-center justify-between self-start rounded-[10px] border px-2.5 py-1.5"
         style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
       >
-        <Text className={text.label} style={{ color: palette.inkMuted }}>
+        <Text className={text.chip} style={{ color: palette.inkMuted }}>
           Open {signal.part} in Advance Diagnosis
         </Text>
         <MaterialCommunityIcons name="arrow-right" size={13} color={palette.inkFaint} style={{ marginLeft: 8 }} />
@@ -659,7 +662,7 @@ export function SignalTab({
                       {item.label}
                     </Text>
                     {connection && connection.state !== 'unmapped' ? (
-                      <Text className={text.label} style={{ color: palette.inkFaint }}>
+                      <Text className={text.code} style={{ color: palette.inkFaint }}>
                         {connection.rackName} · {connection.channelCode} · slot {String(connection.slot).padStart(2, '0')}
                       </Text>
                     ) : null}

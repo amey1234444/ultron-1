@@ -4,6 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 import { consolePalette } from './tokens';
+import { text } from './type';
 
 export type Column<Row> = {
   key: string;
@@ -64,7 +65,7 @@ export function DataTable<Row>({
           {columns.map((column) => (
             <Text
               key={column.key}
-              className={cn('font-mono text-[8.5px] uppercase tracking-[0.14em]', column.numeric && 'text-right')}
+              className={cn(text.label, column.numeric && 'text-right')}
               style={{ color: palette.inkFaint, flex: column.width }}
               numberOfLines={1}
             >
@@ -113,7 +114,7 @@ export function Cell({
   return (
     <Text
       numberOfLines={numberOfLines}
-      className={cn(mono || numeric ? 'font-mono text-[10.5px]' : 'font-body text-[11.5px]', 'leading-[16px]')}
+      className={cn(mono || numeric ? text.data : text.body)}
       style={{
         color: muted ? palette.inkMuted : palette.ink,
         ...(numeric ? { fontVariant: ['tabular-nums' as const] } : null),

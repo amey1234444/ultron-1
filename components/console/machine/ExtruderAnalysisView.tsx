@@ -72,6 +72,7 @@ import {
   SectionLabel,
   Separator,
   Tabs,
+  text,
   type TabItem,
   type Variant,
 } from '../../ui';
@@ -217,6 +218,11 @@ function humanise(value: string): string {
   return value.replace(/_/g, ' ').toLowerCase();
 }
 
+/** First letter up, the rest as `humanise` left it. For anything that starts a line. */
+function sentenceCase(value: string): string {
+  return value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
+}
+
 /**
  * Three screens, three questions.
  *
@@ -320,7 +326,7 @@ function ScenarioPicker({ activeId, onSelect }: { activeId: string | null; onSel
             className="rounded-lg border px-3 py-2"
             style={{ borderColor: palette.line }}
           >
-            <Text className="font-mono text-[10px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+            <Text className={text.chip} style={{ color: palette.inkMuted }}>
               Back to live data
             </Text>
           </Pressable>
@@ -351,7 +357,7 @@ function ScenarioPicker({ activeId, onSelect }: { activeId: string | null; onSel
                       backgroundColor: active ? palette.panelRaised : 'transparent',
                     }}
                   >
-                    <Text className="font-mono text-[10.5px]" style={{ color: palette.ink, minWidth: 168 }} numberOfLines={1}>
+                    <Text className={text.data} style={{ color: palette.ink, minWidth: 168 }} numberOfLines={1}>
                       {scenario.id}
                     </Text>
                     <Text className="min-w-0 flex-1 font-body text-xs" style={{ color: palette.ink }} numberOfLines={1}>
@@ -781,7 +787,9 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
 
   const nextAction = analysis.maintenance.caseRequired
     ? {
-        priority: humanise(analysis.maintenance.priority),
+        // Sentence case: the pill that shows this is no longer set in tracked
+        // capitals, so "medium" would arrive lower-case at the start of a line.
+        priority: sentenceCase(humanise(analysis.maintenance.priority)),
         steps: analysis.maintenance.recommendedActions,
         verification: analysis.maintenance.verificationSteps,
       }
@@ -939,7 +947,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       value: String(unconsumed.length),
       detail: 'Mapped but not resolved onto a tag',
       severity: 'advisory',
-      scope: unconsumed.length === 0 ? 'none' : 'this machine',
+      scope: unconsumed.length === 0 ? '' : 'this machine',
       onPress: unconsumed.length > 0 ? () => setTab('signal') : undefined,
     },
   ];

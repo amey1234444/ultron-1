@@ -24,9 +24,25 @@
 //
 // Rules that go with the scale:
 //
-//  - `label` is the ONLY uppercase style. Uppercase is how this console marks
-//    "this is a name, not a value", and it stops working the moment a second
-//    style borrows it.
+//  - `label` is the ONLY uppercase style, and it is RATIONED. Uppercase mono at
+//    9px is the console's "this is the name of a thing" mark — it is the style
+//    the asset hierarchy sets its section headers in, and it is the best thing
+//    in the type system. It is also the easiest to spend, and this layer had
+//    spent it: eighty-six call sites, on region eyebrows and column headers
+//    (right) but also on chips, control labels, scope notes, tag identifiers
+//    and bare values (wrong). A mark that appears on fifteen different roles
+//    marks nothing, and a screen of stencilled capitals is a screen with no
+//    quiet layer left to rest in.
+//
+//    So `label` now has exactly three jobs and no others:
+//      1. the eyebrow above a region — "machine status", "severity mix";
+//      2. a table's column headers;
+//      3. a section band that says what everything under it is.
+//    Everything that used to reach for it reaches for `chip`, `code` or `meta`.
+//
+//  - `chip`, `code` and `meta` exist to absorb those three misuses, and each is
+//    sentence case on purpose. A control that reads as a word is a control; a
+//    control set in tracked capitals is a sign.
 //  - Every number that can change wears `tabular`. A digit that changes width
 //    reflows the layout around it, and on a live console that is a shimmer.
 //  - `display` is set light. At 26px the body weight is a shout, and a plant
@@ -52,8 +68,37 @@ export const text = {
   data: 'font-mono text-[11.5px] leading-[16px]',
   /** Small print: caveats, provenance, axis captions. */
   micro: 'font-body text-[10.5px] leading-[14px]',
-  /** The name of a field. The only uppercase style in the console. */
-  label: 'font-mono text-[9px] leading-[12px] uppercase tracking-[0.16em]',
+  /**
+   * The name of a field. The only uppercase style in the console, and rationed
+   * to the three jobs listed above.
+   *
+   * The tracking matches the asset hierarchy's section headers exactly, so the
+   * tree in the sidebar and the eyebrow on a card are visibly the same mark
+   * rather than two near-misses.
+   */
+  label: 'font-mono text-[9px] leading-[12px] uppercase tracking-[0.18em]',
+  /**
+   * A pill or a control: "Medium priority", "Scenario injection", "Normal".
+   *
+   * Sentence case, and sans rather than mono. These are words a reader says,
+   * not codes they match, and setting them as capitals was most of why the
+   * layer read as shouting — a screen can carry one stencilled voice, not six.
+   */
+  chip: 'font-body-bold text-[10px] leading-[13px] tracking-[0.005em]',
+  /**
+   * A machine identifier: a tag, a threshold id, a channel address.
+   *
+   * Mono, because these are matched character by character against a drawing
+   * or a controller, and NOT uppercase — they arrive already cased and the
+   * console has no business restyling somebody's tag name into a headline.
+   */
+  code: 'font-mono text-[9.5px] leading-[13px] tracking-[0.02em]',
+  /**
+   * A qualifier attached to a value: "this machine", "2 rules fired", "within
+   * reference". Small and quiet, and deliberately not a label — it says
+   * something *about* the number beside it rather than naming a field.
+   */
+  meta: 'font-body text-[10px] leading-[13px]',
 } as const;
 
 /**
