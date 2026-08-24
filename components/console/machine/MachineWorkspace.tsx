@@ -201,10 +201,16 @@ export function MachineWorkspace({
   }, [isActual, actualTab, machine.id, layout]);
 
   const mappedChannels = useMemo<MappedChannel[]>(() => {
+    const seenChannels = new Set<string>();
     return savedBoxes
       .filter((box) => box.channelId)
       .map((box) => ({ box, channel: allChannels.find((c) => c.id === box.channelId) }))
       .filter((entry): entry is { box: Box; channel: NonNullable<(typeof entry)['channel']> } => !!entry.channel)
+      .filter(({ channel }) => {
+        if (seenChannels.has(channel.id)) return false;
+        seenChannels.add(channel.id);
+        return true;
+      })
       .map(({ box, channel }) => ({
         id: box.id,
         channel,

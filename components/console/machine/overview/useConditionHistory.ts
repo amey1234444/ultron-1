@@ -105,17 +105,17 @@ function useLiveConditionHistory(
     setState(saved && Array.isArray(saved.samples) && saved.samples.length === saved.stamps?.length ? saved : EMPTY_LIVE);
   }, [busKey, storageKey]);
 
-  // `ageMs` re-renders once a second so a channel can go stale on its own, so
-  // the sample's own arrival time is what decides whether it is new — not the
-  // value, which legitimately repeats.
+  // Keyed on the sample's own timestamp, never on `ageMs`. A sample's value
+  // legitimately repeats, so the value cannot say whether it is new — and
+  // `ageMs` moves on every render, so an effect depending on it never settles.
   const appendedAt = useRef<number | null>(null);
   const writeCount = useRef(0);
-  const { value, ageMs } = reading;
+  const { value, atMs } = reading;
   const isLive = reading.status === 'live';
 
   useEffect(() => {
-    if (!isLive || typeof value !== 'number' || !Number.isFinite(value) || ageMs === null) return;
-    const sampleAtMs = Date.now() - ageMs;
+    if (!isLive || typeof value !== 'number' || !Number.isFinite(value) || atMs === null) return;
+    const sampleAtMs = atMs;
     if (appendedAt.current === sampleAtMs) return;
     appendedAt.current = sampleAtMs;
 
@@ -129,7 +129,7 @@ function useLiveConditionHistory(
       if (writeCount.current % LIVE_PERSIST_EVERY_N === 0) saveLocal(storageKey, next);
       return next;
     });
-  }, [ageMs, isLive, storageKey, value]);
+  }, [atMs, isLive, storageKey, value]);
 
   const history = useMemo(() => {
     const { samples, stamps } = state;

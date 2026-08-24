@@ -406,6 +406,7 @@ export function TrailBoard({
 
   const channels = useMemo(() => listChannels(devices, cards), [devices, cards]);
   const pickableChannels = useMemo(() => listChannels(devices, cards, { channelIsAvailable: pickableChannelFilter }), [devices, cards, pickableChannelFilter]);
+  const assignedChannelIds = useMemo(() => new Set(boxes.map((box) => box.channelId).filter((id): id is string => Boolean(id))), [boxes]);
   const isChannelLive = useCallback(
     (channel: ChannelRef | null) => {
       if (!channel) return true;
@@ -851,7 +852,10 @@ export function TrailBoard({
   };
 
   const pickBoxChannel = (id: string, channel: ChannelRef | null) => {
-    const nextBoxes = boxesRef.current.map((b) => (b.id === id ? { ...b, channelId: channel?.id } : b));
+    const nextBoxes = boxesRef.current.map((b) => {
+      if (b.id === id) return { ...b, channelId: channel?.id };
+      return channel && b.channelId === channel.id ? { ...b, channelId: undefined } : b;
+    });
     replaceBoxes(nextBoxes);
 
     // The card was already sitting on an instrument pad and has only now been
@@ -1247,6 +1251,7 @@ export function TrailBoard({
 
         {boxes.map((box) => {
           const channel = channels.find((c) => c.id === box.channelId) ?? null;
+          const channelsForBox = pickableChannels.filter((candidate) => candidate.id === box.channelId || !assignedChannelIds.has(candidate.id));
           return (
             <MappableBox
               key={box.id}
@@ -1260,7 +1265,7 @@ export function TrailBoard({
               liveReading={liveReadingFor(channel)}
               liveMeasurementKey={liveMeasurementKeyFor(channel)}
               channels={channels}
-              pickableChannels={pickableChannels}
+              pickableChannels={channelsForBox}
               devices={devices}
               bounds={stageBounds}
               stageScale={stageScale}

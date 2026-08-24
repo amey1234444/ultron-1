@@ -29,9 +29,19 @@ export type LiveChannelReading = {
   unit: string | undefined;
   status: LiveReadingStatus;
   ageMs: number | null;
+  // When the sample itself was taken, as an absolute epoch time.
+  //
+  // `ageMs` is recomputed from `Date.now()` on every render, so it is a
+  // different number each pass and cannot identify a sample. Anything that
+  // appends to a buffer has to key off this instead: reconstructing the
+  // timestamp as `Date.now() - ageMs` inside an effect uses a *later* clock
+  // reading than the render that produced `ageMs`, so it drifts by a few
+  // milliseconds each time, never matches the last appended value, and appends
+  // the same sample forever.
+  atMs: number | null;
 };
 
-export const NO_READING: LiveChannelReading = { value: null, unit: undefined, status: 'none', ageMs: null };
+export const NO_READING: LiveChannelReading = { value: null, unit: undefined, status: 'none', ageMs: null, atMs: null };
 
 // A channel is called stale once it has missed roughly three seconds. Slow
 // channels legitimately publish at 1 Hz, so this must not be tighter.
@@ -110,6 +120,7 @@ export function useLiveChannelReading(key: string | null | undefined): LiveChann
     unit: current.unit,
     status: ageMs > STALE_AFTER_MS ? 'stale' : 'live',
     ageMs,
+    atMs: current.atMs,
   };
 }
 
@@ -190,13 +201,12 @@ export function useLiveChannelHistory(key: string | null | undefined, storageKey
   const tickRef = useRef(0);
   const value = reading.value;
   const isLive = reading.status === 'live';
-  const ageMs = reading.ageMs;
+  const atMs = reading.atMs;
 
   useEffect(() => {
-    if (!isLive || typeof value !== 'number' || ageMs === null) return;
-    const sampleAt = Date.now() - ageMs;
-    if (appendedAt.current === sampleAt) return;
-    appendedAt.current = sampleAt;
+    if (!isLive || typeof value !== 'number' || atMs === null) return;
+    if (appendedAt.current === atMs) return;
+    appendedAt.current = atMs;
     setHistory((prev) => {
       const next = [...prev, value];
       const trimmed = next.length > HISTORY_LENGTH ? next.slice(next.length - HISTORY_LENGTH) : next;
@@ -204,7 +214,7 @@ export function useLiveChannelHistory(key: string | null | undefined, storageKey
       if (storageKey && tickRef.current % PERSIST_EVERY_N === 0) saveLocal(storageKey, trimmed);
       return trimmed;
     });
-  }, [ageMs, isLive, storageKey, value]);
+  }, [atMs, isLive, storageKey, value]);
 
   return history;
 }
@@ -256,12 +266,14 @@ export function useMappedChannelReading(
   if (bus.status !== 'none') return bus;
   if (!fromState || typeof fromState.value !== 'number' || !Number.isFinite(fromState.value)) return NO_READING;
 
-  const atMs = Date.parse(fromState.updatedAt);
-  const ageMs = Date.now() - (Number.isFinite(atMs) ? atMs : Date.now());
+  const parsed = Date.parse(fromState.updatedAt);
+  const atMs = Number.isFinite(parsed) ? parsed : Date.now();
+  const ageMs = Date.now() - atMs;
   return {
     value: fromState.value,
     unit: fromState.unit,
     status: ageMs > STALE_AFTER_MS ? 'stale' : 'live',
     ageMs,
+    atMs,
   };
 }

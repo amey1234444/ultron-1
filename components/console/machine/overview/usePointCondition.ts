@@ -22,7 +22,7 @@ import type { DeviceNode } from '../../../../lib/devices';
 import type { LiveState } from '../../../../lib/liveTelemetry';
 import type { MeasurementPointKind } from '../../../../lib/machines';
 import { channelEngineeringRange, type CardNode } from '../../../../lib/rack';
-import { channelNumberFor } from '../../../../lib/liveChannelValue';
+import { channelNumberFor, useMappedChannelReading } from '../../../../lib/liveChannelValue';
 import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter } from '../liveValue';
 import type { MappedChannel } from '../RackOccupancyView';
 import { conditionHistoryStorageKey, useConditionHistory, type ConditionSource } from './useConditionHistory';
@@ -116,6 +116,7 @@ export function usePointCondition(
     live,
     key: conditionHistoryStorageKey(machineId, mapped.id),
   });
+  const reading = useMappedChannelReading(channel, devices ?? noDevices, cards ?? noCards, live);
 
   // The card behind this channel, and which of its channels this is — a card
   // carries one signal definition per channel, so the index matters.
@@ -133,7 +134,11 @@ export function usePointCondition(
     // a 4-20 mA range says nothing about it.
     const configured = card ? channelEngineeringRange(card, channelIndex) : null;
     const band = configured ? { ...configured, decimals: fallback.decimals } : fallback;
-    const samples = history.samples;
+    const liveValue = typeof reading.value === 'number' && Number.isFinite(reading.value) ? reading.value : null;
+    const samples =
+      liveValue !== null && history.samples[history.samples.length - 1] !== liveValue
+        ? [...history.samples, liveValue]
+        : history.samples;
     const hasReading = samples.length > 0 && Number.isFinite(samples[samples.length - 1]);
     const value = hasReading ? samples[samples.length - 1] : null;
     const first = samples[0];
@@ -177,7 +182,7 @@ export function usePointCondition(
           ? isoZone(value, isoGroup)
           : null,
       componentId,
-      source: history.source,
+      source: liveValue !== null ? reading.status : history.source,
     };
-  }, [channel, label, mapped.id, history, isoGroup, componentId, online, card, channelIndex]);
+  }, [channel, label, mapped.id, history, reading, isoGroup, componentId, online, card, channelIndex]);
 }
