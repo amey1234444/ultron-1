@@ -10,6 +10,7 @@ import type { DeviceNode } from '../../../../lib/devices';
 import type { CardNode } from '../../../../lib/rack';
 import type { MappedChannel } from '../RackOccupancyView';
 import { BarGauge, gaugeColumnWidth, gaugeSpanFor, gaugeTubeHeight, type GaugeSize } from './BarGauge';
+import type { LiveState } from '../../../../lib/liveTelemetry';
 import { NO_VALUE_TEXT } from '../liveValue';
 import { resolveSensorIdentity } from './sensorIdentity';
 import { usePointCondition, type PointCondition } from './usePointCondition';
@@ -62,6 +63,9 @@ export type SensorGaugeTileProps = {
   // Must be referentially stable, since the condition recomputes on every tick.
   onCondition?: (condition: PointCondition) => void;
   onPress?: () => void;
+  // Live telemetry the host already holds. Needed for racks that are not
+  // addressable on the measurement bus — see useMappedChannelReading.
+  live?: LiveState;
 };
 
 // One sensor as a panel gauge: what it reads now, where that sits against its
@@ -75,6 +79,7 @@ export function SensorGaugeTile({
   componentLabel,
   devices,
   cards,
+  live,
   width,
   online = true,
   isoGroup,
@@ -88,7 +93,7 @@ export function SensorGaugeTile({
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
 
-  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards });
+  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards, live });
   const colour = stateHex(condition.state);
 
   useEffect(() => {
@@ -106,7 +111,6 @@ export function SensorGaugeTile({
   // behind this page, so the tile shows the channel and its limits and says
   // plainly that nothing has come back — rather than drawing a plausible needle.
   const hasReading = value !== null;
-  const neverReported = condition.source === 'none';
   const span = gaugeSpanFor(thresholds, identity.engineeringRange);
   const changePercent = Math.round(condition.changeFraction * 100);
   const isFlat = Math.abs(condition.changeFraction) <= TREND_FLAT_BAND;
@@ -207,7 +211,11 @@ export function SensorGaugeTile({
 
           <View className={cn('flex-1 justify-center', compact ? 'pl-1.5' : 'pl-3')}>
             <Text className={cn('font-mono tracking-widest', compact ? 'text-[8px]' : 'text-[10px]', mutedClass)}>
-              {neverReported ? 'NO DATA' : offline ? 'LAST' : 'LIVE'}
+              {/* Keyed off where the buffer came from, not off the condition.
+                  A held buffer whose feed has gone quiet is still a real
+                  measurement, but it is not a current one, and labelling it LIVE
+                  is how a page ends up asserting a value nobody is sending. */}
+              {condition.source === 'none' ? 'NO DATA' : condition.source === 'stale' ? 'LAST' : 'LIVE'}
             </Text>
             <Text
               numberOfLines={1}

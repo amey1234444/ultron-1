@@ -11,8 +11,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { gatewayForRack, type DeviceNode } from './devices';
 import { liveMeasurementKey, useLiveMeasurement } from './liveMeasurementBus';
+import { latestMeasurementForChannel, type LiveState } from './liveTelemetry';
 import { loadLocal, saveLocal } from './localPersist';
-import type { ChannelRef } from './rack';
+import type { CardNode, ChannelRef } from './rack';
 
 /**
  * `live`  - a reading arrived recently.
@@ -206,4 +207,61 @@ export function useLiveChannelHistory(key: string | null | undefined, storageKey
   }, [ageMs, isLive, storageKey, value]);
 
   return history;
+}
+
+// --- The reading a mapped channel actually resolves to ------------------------
+
+/**
+ * A mapped channel's reading, resolved the way the canvas resolves it.
+ *
+ * There are two ways a value reaches the UI and a channel may only be reachable
+ * by one of them:
+ *
+ *   1. The measurement bus, keyed by gateway/rack/slot/channel. This needs the
+ *      rack to carry a `realRackId` and to resolve to a gateway with a
+ *      `realGatewayId`. A rack that has neither is unaddressable here.
+ *   2. The `LiveState` the caller already holds — what MQTT ingest and the
+ *      in-app simulation engine both build — matched through
+ *      `latestMeasurementForChannel`, which can find the rack by its configured
+ *      ids or by falling back to the gateway's own measurement list.
+ *
+ * MappableBox has always used both, in this order, which is why a canvas box
+ * shows a value on racks where a bus-only reader shows nothing. Every screen
+ * that displays the same channel has to resolve it identically or two pages will
+ * report different numbers for one sensor — which is exactly what happened when
+ * the overview read the bus alone.
+ */
+export function useMappedChannelReading(
+  channel: ChannelRef | null | undefined,
+  devices: DeviceNode[],
+  cards: CardNode[],
+  live?: LiveState,
+): LiveChannelReading {
+  const key = useMemo(
+    () => (channel ? liveMeasurementKeyForChannel(channel, channelNumberFor(channel), devices) : null),
+    [channel, devices],
+  );
+  const bus = useLiveChannelReading(key);
+
+  // Only consulted when the bus has nothing, so a bus-addressable channel keeps
+  // the held-value and staleness behaviour above rather than two competing ones.
+  const fromState = useMemo(() => {
+    if (!channel || !live) return null;
+    const rack = devices.find((device) => device.id === channel.rackId);
+    const card = cards.find((c) => c.deviceId === channel.rackId && c.slot === channel.slot);
+    if (!rack || !card || rack.status !== 'Online') return null;
+    return latestMeasurementForChannel(rack, card, channelNumberFor(channel), live) ?? null;
+  }, [channel, cards, devices, live]);
+
+  if (bus.status !== 'none') return bus;
+  if (!fromState || typeof fromState.value !== 'number' || !Number.isFinite(fromState.value)) return NO_READING;
+
+  const atMs = Date.parse(fromState.updatedAt);
+  const ageMs = Date.now() - (Number.isFinite(atMs) ? atMs : Date.now());
+  return {
+    value: fromState.value,
+    unit: fromState.unit,
+    status: ageMs > STALE_AFTER_MS ? 'stale' : 'live',
+    ageMs,
+  };
 }

@@ -19,6 +19,7 @@ import {
   type SensorState,
 } from '../../../../lib/condition';
 import type { DeviceNode } from '../../../../lib/devices';
+import type { LiveState } from '../../../../lib/liveTelemetry';
 import type { MeasurementPointKind } from '../../../../lib/machines';
 import { channelEngineeringRange, type CardNode } from '../../../../lib/rack';
 import { channelNumberFor } from '../../../../lib/liveChannelValue';
@@ -91,6 +92,10 @@ export function usePointCondition(
     // that has them must pass them.
     devices?: DeviceNode[];
     cards?: CardNode[];
+    // The live telemetry the host already holds. A rack that carries no
+    // real gateway/rack ids is unreachable on the measurement bus and is only
+    // resolvable through this, which is how the canvas reads it.
+    live?: LiveState;
   },
 ): PointCondition {
   const { channel, label } = mapped;
@@ -99,12 +104,16 @@ export function usePointCondition(
   const online = options?.online ?? true;
   const devices = options?.devices;
   const cards = options?.cards;
+  const live = options?.live;
 
   const noDevices = useMemo<DeviceNode[]>(() => [], []);
+  const noCards = useMemo<CardNode[]>(() => [], []);
 
   const history = useConditionHistory({
     channel,
     devices: devices ?? noDevices,
+    cards: cards ?? noCards,
+    live,
     key: conditionHistoryStorageKey(machineId, mapped.id),
   });
 

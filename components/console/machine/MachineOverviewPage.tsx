@@ -16,6 +16,7 @@ import {
   type IsoZone,
 } from '../../../lib/condition';
 import type { DeviceNode } from '../../../lib/devices';
+import type { LiveState } from '../../../lib/liveTelemetry';
 import type { MachineNode } from '../../../lib/machines';
 import type { CardNode } from '../../../lib/rack';
 import { Panel } from '../../Panel';
@@ -88,6 +89,11 @@ export type MachineOverviewPageProps = {
   // range. MachineWorkspace already holds both lists.
   devices: DeviceNode[];
   cards: CardNode[];
+  // Live telemetry the host already holds. Channels on racks that carry no real
+  // gateway/rack ids are not addressable on the measurement bus and resolve only
+  // through this — which is how a canvas box reads them. See
+  // useMappedChannelReading.
+  live?: LiveState;
   // Total measurement points the machine template defines.
   expectedPoints: number;
   // Which ISO 10816-3 group this machine belongs to. Really a property of the
@@ -134,6 +140,7 @@ export function MachineOverviewPage({
   mappedChannels,
   devices,
   cards,
+  live,
   expectedPoints,
   isoGroup = DEFAULT_ISO_GROUP,
   maintenance,
@@ -413,6 +420,7 @@ export function MachineOverviewPage({
                 componentLabel={componentId ? componentLabelById[componentId] ?? null : null}
                 devices={devices}
                 cards={cards}
+                live={live}
                 width={tileWidth}
                 online={onlineByRack[mapped.channel.rackId] ?? true}
                 isoGroup={isoGroup}

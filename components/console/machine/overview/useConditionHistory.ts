@@ -1,13 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import {
-  channelNumberFor,
-  liveMeasurementKeyForChannel,
-  useLiveChannelReading,
-} from '../../../../lib/liveChannelValue';
+import { useMappedChannelReading } from '../../../../lib/liveChannelValue';
 import type { DeviceNode } from '../../../../lib/devices';
+import type { LiveState } from '../../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../../lib/localPersist';
-import type { ChannelRef } from '../../../../lib/rack';
+import type { CardNode, ChannelRef } from '../../../../lib/rack';
 
 // The reading buffer this machine's condition, trend and prognosis are computed
 // from, and the one rule it enforces: every number in it came off the
@@ -55,8 +52,12 @@ const NOMINAL_LIVE_INTERVAL_HOURS = 1 / 3600;
 // `key` identifies the reading, not the channel: several boxes can be mapped to
 // the same rack channel, and each keeps its own buffer rather than fighting over
 // one storage slot — the same reason TrendView keys by box id.
+// v2: v1 buffers were written by a generator and by an earlier bus-only reader
+// that could hold a value the channel never reported. Blending those into a live
+// trend would carry a wrong number forward and flatten the change percentage
+// against it, so the version bump discards them rather than migrating them.
 export function conditionHistoryStorageKey(machineId: string, boxId: string) {
-  return `ultron.condition.v1.${machineId}.${boxId}`;
+  return `ultron.condition.v2.${machineId}.${boxId}`;
 }
 
 // --- The real thing ----------------------------------------------------------
@@ -75,15 +76,17 @@ const EMPTY_LIVE: LiveStored = { samples: [], stamps: [] };
 // "to limit in 40 d" off ninety seconds of watching — a number with the shape of
 // a forecast and none of the content.
 function useLiveConditionHistory(
-  channel: Pick<ChannelRef, 'id' | 'rackId' | 'slot'> | null,
+  channel: ChannelRef | null,
   devices: DeviceNode[],
+  cards: CardNode[],
+  live: LiveState | undefined,
   storageKey: string,
 ): { history: Omit<ConditionHistory, 'source'>; status: 'live' | 'stale' | 'none' } {
-  const busKey = useMemo(
-    () => (channel ? liveMeasurementKeyForChannel(channel, channelNumberFor(channel), devices) : null),
-    [channel, devices],
-  );
-  const reading = useLiveChannelReading(busKey);
+  // Resolved exactly the way a canvas box resolves it — bus first, then the
+  // LiveState the caller holds. See useMappedChannelReading for why both are
+  // needed; reading only the bus is what made this page disagree with the canvas.
+  const reading = useMappedChannelReading(channel, devices, cards, live);
+  const busKey = channel ? `${channel.rackId}|${channel.slot}|${channel.id}` : null;
 
   const [state, setState] = useState<LiveStored>(() => {
     const saved = loadLocal<LiveStored>(storageKey);
@@ -153,8 +156,12 @@ function useLiveConditionHistory(
 export type ConditionHistoryInput = {
   // The mapped rack channel. Null while a box is unlinked, which is the one case
   // with genuinely nothing to subscribe to.
-  channel: Pick<ChannelRef, 'id' | 'rackId' | 'slot'> | null;
+  channel: ChannelRef | null;
   devices: DeviceNode[];
+  // The cards behind the racks, needed to match a channel against the LiveState
+  // fallback, and the LiveState itself where the caller has one.
+  cards: CardNode[];
+  live?: LiveState;
   // Per-box storage identity — see conditionHistoryStorageKey.
   key: string;
 };
@@ -167,11 +174,11 @@ export type ConditionHistoryInput = {
 // lib/liveChannelValue.ts. A channel that has reported nothing returns an empty
 // buffer and `none`, and the pages above render it as a point with no reading
 // rather than assessing a number that was never measured.
-export function useConditionHistory({ channel, devices, key }: ConditionHistoryInput): ConditionHistory {
-  const live = useLiveConditionHistory(channel, devices, `${key}.live`);
+export function useConditionHistory({ channel, devices, cards, live, key }: ConditionHistoryInput): ConditionHistory {
+  const resolved = useLiveConditionHistory(channel, devices, cards, live, `${key}.live`);
 
   return useMemo(
-    () => ({ ...live.history, source: live.status === 'none' ? 'none' : live.status }),
-    [live.history, live.status],
+    () => ({ ...resolved.history, source: resolved.status === 'none' ? 'none' : resolved.status }),
+    [resolved.history, resolved.status],
   );
 }

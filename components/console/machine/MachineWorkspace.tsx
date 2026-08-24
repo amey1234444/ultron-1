@@ -439,6 +439,7 @@ export function MachineWorkspace({
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}
+          live={live}
           expectedPoints={expectedPoints}
           onOpenAlarms={() => setActualTab('alarm')}
           onOpenAnalysis={() => setActualTab('analysis')}
@@ -451,6 +452,7 @@ export function MachineWorkspace({
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}
+          live={live}
           onOpenAlarms={() => setActualTab('alarm')}
         />
       )}

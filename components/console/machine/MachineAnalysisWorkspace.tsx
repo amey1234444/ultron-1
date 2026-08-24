@@ -5,6 +5,7 @@ import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { attributeToComponent, DEFAULT_ISO_GROUP, type IsoGroup } from '../../../lib/condition';
 import type { DeviceNode } from '../../../lib/devices';
+import type { LiveState } from '../../../lib/liveTelemetry';
 import type { MachineNode } from '../../../lib/machines';
 import type { CardNode } from '../../../lib/rack';
 import { AnalysisWorkspace, type AnalysisMachine, type AnalysisWorkspaceData } from './AnalysisWorkspace';
@@ -36,6 +37,7 @@ function ConditionProbe({
   online,
   devices,
   cards,
+  live,
   onCondition,
 }: {
   mapped: MappedChannel;
@@ -45,9 +47,10 @@ function ConditionProbe({
   online: boolean;
   devices: DeviceNode[];
   cards: CardNode[];
+  live?: LiveState;
   onCondition: (condition: PointCondition) => void;
 }) {
-  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards });
+  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards, live });
 
   useEffect(() => {
     onCondition(condition);
@@ -61,6 +64,10 @@ export type MachineAnalysisWorkspaceProps = {
   mappedChannels: MappedChannel[];
   devices: DeviceNode[];
   cards: CardNode[];
+  // Live telemetry the host already holds, forwarded so channels on racks that
+  // are not addressable on the measurement bus still resolve — the canvas reads
+  // them the same way. See useMappedChannelReading.
+  live?: LiveState;
   isoGroup?: IsoGroup;
   hierarchyPath?: string;
   onOpenAlarms?: () => void;
@@ -71,6 +78,7 @@ export function MachineAnalysisWorkspace({
   mappedChannels,
   devices,
   cards,
+  live,
   isoGroup = DEFAULT_ISO_GROUP,
   hierarchyPath,
   onOpenAlarms,
@@ -178,6 +186,7 @@ export function MachineAnalysisWorkspace({
           online={onlineByRack[mapped.channel.rackId] ?? false}
           devices={devices}
           cards={cards}
+          live={live}
           onCondition={reportCondition}
         />
       ))}

@@ -284,8 +284,9 @@ function Harness() {
   const cards = useMemo<CardNode[]>(() => SLOTS.map(cardFor), []);
 
   // The real engine. Everything the pages show below comes from what this
-  // publishes onto the measurement bus.
-  useSimulationEngine(devices, cards, true);
+  // publishes — onto the measurement bus, and as the LiveState the pages take as
+  // a prop, exactly as the console wires it.
+  const live = useSimulationEngine(devices, cards, true);
 
   const machine = useMemo<MachineNode>(() => {
     let counter = 0;
@@ -319,6 +320,7 @@ function Harness() {
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}
+          live={live}
           expectedPoints={expectedPointsForTemplate(machine.template)}
         />
       ) : (
@@ -327,6 +329,7 @@ function Harness() {
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}
+          live={live}
           hierarchyPath="QA Plant → Area 1"
         />
       )}
