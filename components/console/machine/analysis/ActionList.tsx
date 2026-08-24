@@ -2,15 +2,16 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { SEVERITY_HEX } from '../../../../lib/analysisDiagnosis';
+import { severityHexes } from '../../../../lib/analysisDiagnosis';
 
 export type ActionPriority = 'high' | 'medium' | 'low';
 
-const PRIORITY_HEX: Record<ActionPriority, string> = {
-  high: SEVERITY_HEX.fault,
-  medium: SEVERITY_HEX.limit,
-  low: SEVERITY_HEX.boundary,
-};
+// Resolved per theme rather than at module load: light mode carries its own,
+// deeper status ramp. See `severityHexes`.
+function priorityHexes(isDark: boolean): Record<ActionPriority, string> {
+  const severity = severityHexes(isDark);
+  return { high: severity.fault, medium: severity.limit, low: severity.boundary };
+}
 
 // "Do this" — ordered steps, where the order is the safety argument: verify the
 // reading before acting on it, and isolate before opening anything. Numbered
@@ -27,7 +28,7 @@ export function DoThisList({
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const tint = PRIORITY_HEX[priority];
+  const tint = priorityHexes(isDark)[priority];
 
   return (
     <View className="gap-3">

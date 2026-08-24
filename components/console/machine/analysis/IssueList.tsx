@@ -6,7 +6,7 @@ import {
   CATEGORY_BLURB,
   CATEGORY_LABEL,
   categoryIsAboutMachine,
-  CONDITION_HEX,
+  conditionHexes,
   CONDITION_LABEL,
   CONSEQUENCE_LABEL,
   issueAgeLabel,
@@ -15,9 +15,11 @@ import {
   TREND_LABEL,
   type Issue,
 } from '../../../../lib/analysisOverview';
+import { consolePalette } from '../../../../lib/consoleTheme';
 
 function ConditionBadge({ condition }: { condition: Issue['condition'] }) {
-  const colour = CONDITION_HEX[condition];
+  const { isDark } = useAppTheme();
+  const colour = conditionHexes(isDark)[condition];
   return (
     <View className="rounded border px-1.5 py-[1px]" style={{ borderColor: `${colour}66`, backgroundColor: `${colour}14` }}>
       <Text style={{ color: colour }} className="font-mono text-[9px] font-bold tracking-wider">
@@ -43,10 +45,11 @@ function Field({ label, value, tint }: { label: string; value: string; tint?: st
 
 function IssueCard({ issue, onOpenDiagnosis }: { issue: Issue; onOpenDiagnosis?: (issue: Issue) => void }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
-  const colour = CONDITION_HEX[issue.condition];
+  const colour = conditionHex[issue.condition];
   const aboutMachine = categoryIsAboutMachine(issue.category);
 
   return (
@@ -54,7 +57,15 @@ function IssueCard({ issue, onOpenDiagnosis }: { issue: Issue; onOpenDiagnosis?:
       // Basis wide enough that a 1440px page lands on two columns, not three:
       // an issue card carries four fields and an action, and three across turns
       // each of them into a column of truncated labels.
-      style={{ flexGrow: 1, flexBasis: 520, minWidth: 320, borderColor: `${colour}40` }}
+      // Light mode keeps the edge neutral: a grid of cards each outlined in
+      // its own status colour is a grid where the outlines, not the readings,
+      // are what the eye lands on. The 2px stripe below still states it.
+      style={{
+        flexGrow: 1,
+        flexBasis: 520,
+        minWidth: 320,
+        borderColor: isDark ? `${colour}40` : consolePalette(isDark).line,
+      }}
       className={cn('overflow-hidden rounded-xl border', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
     >
       <View style={{ height: 2, backgroundColor: colour }} />
@@ -75,7 +86,7 @@ function IssueCard({ issue, onOpenDiagnosis }: { issue: Issue; onOpenDiagnosis?:
         {/* A data-quality problem is labelled as one on the card itself, so it can
             never be skimmed as mechanical damage. */}
         {!aboutMachine ? (
-          <View className="self-start rounded px-1.5 py-[1px]" style={{ backgroundColor: `${CONDITION_HEX.offline}26` }}>
+          <View className="self-start rounded px-1.5 py-[1px]" style={{ backgroundColor: `${conditionHex.offline}26` }}>
             <Text className={cn('font-mono text-[8px] font-bold tracking-wider', mutedClass)}>
               DATA QUALITY — NOT MACHINE DAMAGE
             </Text>
@@ -154,6 +165,7 @@ export function IssueList({ issues, onOpenDiagnosis }: { issues: Issue[]; onOpen
 // kept visually apart. The point of the section is the separation, not the count.
 export function CategoryBreakdown({ issues }: { issues: Issue[] }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
@@ -174,7 +186,7 @@ export function CategoryBreakdown({ issues }: { issues: Issue[] }) {
       ) : (
         <View className="flex-row flex-wrap gap-3">
           {summaries.map((summary) => {
-            const colour = CONDITION_HEX[summary.worst];
+            const colour = conditionHex[summary.worst];
             const aboutMachine = categoryIsAboutMachine(summary.category);
             return (
               <View

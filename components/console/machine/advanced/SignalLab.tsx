@@ -15,7 +15,7 @@ import {
   type AnalysisMode,
   type CapabilityInputs,
 } from '../../../../lib/analysisCapability';
-import { CONDITION_HEX } from '../../../../lib/analysisOverview';
+import { conditionHexes } from '../../../../lib/analysisOverview';
 import { qualityHex, QUALITY_LABEL, type DataQuality } from '../../../../lib/advancedDiagnosis';
 import { cn } from '../../../../lib/cn';
 import { axisColour, gridColour, seriesColour, seriesMutedColour } from './vizTokens';
@@ -45,6 +45,7 @@ function TrendPlot({
   decimals: number;
 }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const [width, setWidth] = useState<number | null>(null);
 
@@ -125,7 +126,7 @@ function TrendPlot({
               x2={width - PAD.right}
               y1={geometry.yAlert}
               y2={geometry.yAlert}
-              stroke={CONDITION_HEX.alert}
+              stroke={conditionHex.alert}
               strokeWidth={1.25}
               strokeDasharray="5 4"
             />
@@ -134,7 +135,7 @@ function TrendPlot({
               x2={width - PAD.right}
               y1={geometry.yDanger}
               y2={geometry.yDanger}
-              stroke={CONDITION_HEX.danger}
+              stroke={conditionHex.danger}
               strokeWidth={1.25}
               strokeDasharray="5 4"
             />
@@ -168,11 +169,11 @@ function TrendPlot({
           </View>
         ) : null}
         <View className="flex-row items-center gap-1.5">
-          <View style={{ width: 12, height: 2, backgroundColor: CONDITION_HEX.alert }} />
+          <View style={{ width: 12, height: 2, backgroundColor: conditionHex.alert }} />
           <Text className={cn('font-mono text-[9px]', mutedClass)}>alert {alert.toFixed(decimals)}</Text>
         </View>
         <View className="flex-row items-center gap-1.5">
-          <View style={{ width: 12, height: 2, backgroundColor: CONDITION_HEX.danger }} />
+          <View style={{ width: 12, height: 2, backgroundColor: conditionHex.danger }} />
           <Text className={cn('font-mono text-[9px]', mutedClass)}>danger {danger.toFixed(decimals)}</Text>
         </View>
       </View>
@@ -187,6 +188,7 @@ function TrendPlot({
 // transformed back into one" tells them what to go and change.
 function CapabilityNotice({ mode, missing }: { mode: AnalysisMode; missing: ReturnType<typeof assessAll>[number]['missing'] }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -194,7 +196,7 @@ function CapabilityNotice({ mode, missing }: { mode: AnalysisMode; missing: Retu
   return (
     <View className="gap-3 rounded-xl border px-4 py-4" style={{ borderColor: hairline }}>
       <View className="flex-row items-center gap-2">
-        <Text style={{ color: CONDITION_HEX.offline }} className="font-mono text-[10px] font-bold tracking-wider">
+        <Text style={{ color: conditionHex.offline }} className="font-mono text-[10px] font-bold tracking-wider">
           NOT AVAILABLE
         </Text>
         <Text className={cn('font-body-medium text-[12px]', inkClass)}>{MODE_LABEL[mode]} analysis cannot be performed</Text>
@@ -252,6 +254,7 @@ export function SignalLab({
   onAddEvidence,
 }: SignalLabProps) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -290,9 +293,9 @@ export function SignalLab({
         {fact('SAMPLE RATE', capability.sampleRateHz === null ? 'not configured' : `${capability.sampleRateHz} Hz`)}
         {fact('USABLE SPAN', span === null ? '--' : `${Math.round(span)} Hz`)}
         {fact('SHAFT SPEED', capability.shaftHz === null ? 'unknown' : `${capability.shaftHz.toFixed(1)} Hz`)}
-        {fact('WAVEFORM', capability.hasRawWaveform ? 'stored' : 'not stored', CONDITION_HEX.offline)}
-        {fact('SPEED REF', capability.hasTacho ? 'synchronised' : 'none', CONDITION_HEX.offline)}
-        {fact('QUALITY', QUALITY_LABEL[quality], qualityHex(quality))}
+        {fact('WAVEFORM', capability.hasRawWaveform ? 'stored' : 'not stored', conditionHex.offline)}
+        {fact('SPEED REF', capability.hasTacho ? 'synchronised' : 'none', conditionHex.offline)}
+        {fact('QUALITY', QUALITY_LABEL[quality], qualityHex(quality, isDark))}
       </View>
 
       {/* The concrete commissioning finding — invisible unless something states the
@@ -300,10 +303,10 @@ export function SignalLab({
       {rateVerdict ? (
         <View
           className="flex-row gap-2 rounded-lg px-3 py-2.5"
-          style={{ backgroundColor: `${rateVerdict.ok ? CONDITION_HEX.healthy : CONDITION_HEX.alert}12` }}
+          style={{ backgroundColor: `${rateVerdict.ok ? conditionHex.healthy : conditionHex.alert}12` }}
         >
           <Text
-            style={{ color: rateVerdict.ok ? CONDITION_HEX.healthy : CONDITION_HEX.alert }}
+            style={{ color: rateVerdict.ok ? conditionHex.healthy : conditionHex.alert }}
             className="font-mono text-[9px] font-bold tracking-wider"
           >
             {rateVerdict.ok ? 'RATE OK' : 'RATE LIMITS ANALYSIS'}

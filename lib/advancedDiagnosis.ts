@@ -1,4 +1,4 @@
-import { CONDITION_HEX, type OverviewCondition } from './analysisOverview';
+import { conditionHexes, type OverviewCondition } from './analysisOverview';
 
 // Domain for the senior-analyst workbench. The analyst's own sequence — observe,
 // compare, validate, decompose, correlate, hypothesise, root cause, act — is what
@@ -28,14 +28,15 @@ export const QUALITY_LABEL: Record<DataQuality, string> = {
   missing: 'MISSING',
 };
 
-export function qualityHex(quality: DataQuality): string {
+export function qualityHex(quality: DataQuality, isDark = true): string {
+  const hexes = conditionHexes(isDark);
   return quality === 'good'
-    ? CONDITION_HEX.healthy
+    ? hexes.healthy
     : quality === 'questionable'
-      ? CONDITION_HEX.attention
+      ? hexes.attention
       : quality === 'poor'
-        ? CONDITION_HEX.alert
-        : CONDITION_HEX.offline;
+        ? hexes.alert
+        : hexes.offline;
 }
 
 // --- Analysis tree ------------------------------------------------------------

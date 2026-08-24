@@ -31,11 +31,13 @@ export type MappedChannel = { id: string; channel: ChannelRef; label: string; te
 // scanned in a second or two, and the detail — faceplate, slots, live
 // readings — opens for the rack that is selected. Nothing was removed; the
 // secondary half of it stopped being permanently on screen.
-const TILE_MIN_WIDTH = 196;
-const TILE_MAX_WIDTH = 240;
+const TILE_MIN_WIDTH = 164;
+const TILE_MAX_WIDTH = 196;
+const TILE_PAD = 9;
+const TILE_GAP = 8;
 // The slot strip: 14 cells, so a rack's occupancy is a shape rather than a
 // sentence. Sized to fit TILE_MIN_WIDTH less the tile's own padding.
-const SLOT_CELL_HEIGHT = 14;
+const SLOT_CELL_HEIGHT = 9;
 const SLOT_CELL_GAP = 2;
 
 function statusToneFor(online: boolean) {
@@ -227,45 +229,40 @@ function RackTile({
         width,
         borderWidth: 1,
         borderColor: border,
-        borderRadius: 12,
-        padding: 12,
-        gap: 8,
+        borderRadius: 10,
+        paddingHorizontal: TILE_PAD,
+        paddingVertical: 8,
+        gap: 6,
         backgroundColor: selected ? palette.selected : hovered ? palette.hover : palette.panel,
         ...cardElevation(isDark),
       }}
     >
-      <View className="flex-row items-center justify-between gap-2">
-        <View className="min-w-0 flex-1 flex-row items-center gap-2">
-          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: tone.dot }} />
-          <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.title)} style={{ color: palette.ink }}>
-            {group.rack?.name ?? 'Unknown rack'}
-          </Text>
-        </View>
-        <Text className={text.chip} style={{ color: tone.fg }}>
+      <View className="flex-row items-center gap-1.5">
+        <View style={{ width: 6, height: 6, borderRadius: 4, backgroundColor: tone.dot }} />
+        <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: palette.ink }}>
+          {group.rack?.name ?? 'Unknown rack'}
+        </Text>
+        <Text className={text.meta} style={{ color: tone.fg }}>
           {online ? 'Healthy' : 'Offline'}
         </Text>
       </View>
 
-      <View className="flex-row items-baseline gap-1.5">
-        <Text className={text.data} style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}>
-          {installed.size} / {TOTAL_SLOTS}
-        </Text>
-        <Text className={text.meta} style={{ color: palette.inkFaint }}>
-          slots populated
-        </Text>
-      </View>
+      <SlotStrip
+        installed={installed}
+        mapped={mappedSlots}
+        palette={palette}
+        accent={tone.dot}
+        width={width - TILE_PAD * 2 - 2}
+      />
 
-      <SlotStrip installed={installed} mapped={mappedSlots} palette={palette} accent={tone.dot} width={width - 24} />
-
+      {/* One line for both counts. The gateway behind them is secondary and
+          appears on hover or once the rack is open. */}
       <View className="flex-row items-center justify-between gap-2">
-        <Text className={text.meta} style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
-          {group.channels.length} channel{group.channels.length === 1 ? '' : 's'} mapped
+        <Text numberOfLines={1} className={text.meta} style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+          {installed.size}/{TOTAL_SLOTS} slots
         </Text>
-        {/* Secondary metadata — the gateway this rack talks through — surfaces
-            on hover and stays on while the rack is open. It is context for the
-            reading, not part of the scan. */}
-        <Text numberOfLines={1} className={text.meta} style={{ color: palette.inkFaint, opacity: hovered || selected ? 1 : 0 }}>
-          {group.gatewayName ? `via ${group.gatewayName}` : 'direct'}
+        <Text className={text.meta} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+          {group.channels.length} ch · {group.slots.length} mapped
         </Text>
       </View>
     </Pressable>
@@ -327,6 +324,7 @@ function RackDetail({
           live={live}
           editable={false}
           fill={false}
+          density="compact"
           slots={slots}
           onPressEmpty={() => {}}
           onPressCard={() => {}}
@@ -417,8 +415,14 @@ export function RackOccupancyView({ devices, cards, live, mappedChannels }: Rack
   // two-rack machine does not get two tiles floating in a wide empty band.
   const tileWidth = (() => {
     if (!stripWidth) return TILE_MIN_WIDTH;
-    const perRow = Math.max(1, Math.min(groups.length, Math.floor((stripWidth + 10) / (TILE_MIN_WIDTH + 10))));
-    return Math.min(TILE_MAX_WIDTH, Math.max(TILE_MIN_WIDTH, Math.floor((stripWidth - 10 * (perRow - 1)) / perRow)));
+    const perRow = Math.max(
+      1,
+      Math.min(groups.length, Math.floor((stripWidth + TILE_GAP) / (TILE_MIN_WIDTH + TILE_GAP))),
+    );
+    return Math.min(
+      TILE_MAX_WIDTH,
+      Math.max(TILE_MIN_WIDTH, Math.floor((stripWidth - TILE_GAP * (perRow - 1)) / perRow)),
+    );
   })();
 
   if (groups.length === 0) {
@@ -440,7 +444,7 @@ export function RackOccupancyView({ devices, cards, live, mappedChannels }: Rack
 
         <View
           className="flex-row flex-wrap"
-          style={{ gap: 10 }}
+          style={{ gap: TILE_GAP }}
           onLayout={(event) => {
             const width = event.nativeEvent.layout.width;
             setStripWidth((previous) => (previous !== null && Math.abs(previous - width) < 1 ? previous : width));

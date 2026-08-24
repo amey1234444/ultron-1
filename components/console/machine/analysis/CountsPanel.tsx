@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_ORDER, type AnalysisCounts } from '../../../../lib/analysisDiagnosis';
+import { severityHexes, SEVERITY_LABEL, SEVERITY_ORDER, type AnalysisCounts } from '../../../../lib/analysisDiagnosis';
 
 // Severity counts for this machine.
 //
@@ -12,6 +12,7 @@ import { SEVERITY_HEX, SEVERITY_LABEL, SEVERITY_ORDER, type AnalysisCounts } fro
 // finding can carry several rules; both numbers are useful, neither is "the" count.
 export function CountsPanel({ counts }: { counts: AnalysisCounts }) {
   const { isDark } = useAppTheme();
+  const severityHex = severityHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const track = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
@@ -31,11 +32,11 @@ export function CountsPanel({ counts }: { counts: AnalysisCounts }) {
 
       {SEVERITY_ORDER.map((severity) => (
         <View key={severity} className="flex-row items-center gap-2">
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: SEVERITY_HEX[severity] }} />
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: severityHex[severity] }} />
           <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
             {SEVERITY_LABEL[severity]}
           </Text>
-          <Text style={{ width: 54, color: SEVERITY_HEX[severity] }} className="text-right font-mono text-[13px] font-bold tabular-nums">
+          <Text style={{ width: 54, color: severityHex[severity] }} className="text-right font-mono text-[13px] font-bold tabular-nums">
             {counts.findingsBySeverity[severity]}
           </Text>
           <Text style={{ width: 42 }} className={cn('text-right font-mono text-[11px] tabular-nums', mutedClass)}>
@@ -53,7 +54,7 @@ export function CountsPanel({ counts }: { counts: AnalysisCounts }) {
             {SEVERITY_ORDER.map((severity) => {
               const share = (counts.findingsBySeverity[severity] / total) * 100;
               if (share === 0) return null;
-              return <View key={severity} style={{ width: `${share}%`, backgroundColor: SEVERITY_HEX[severity] }} />;
+              return <View key={severity} style={{ width: `${share}%`, backgroundColor: severityHex[severity] }} />;
             })}
           </View>
         )}

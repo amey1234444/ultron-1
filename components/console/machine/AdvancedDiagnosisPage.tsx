@@ -4,7 +4,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { CapabilityInputs } from '../../../lib/analysisCapability';
-import { CONDITION_HEX, CONDITION_LABEL, type OverviewCondition } from '../../../lib/analysisOverview';
+import { conditionHexes, CONDITION_LABEL, type OverviewCondition } from '../../../lib/analysisOverview';
 import {
   findNode,
   pathTo,
@@ -132,6 +132,7 @@ export function AdvancedDiagnosisPage({
   onConclusionAction,
 }: AdvancedDiagnosisPageProps) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -257,7 +258,7 @@ export function AdvancedDiagnosisPage({
         </View>
 
         <View className="flex-row flex-wrap gap-1.5">
-          {contextItem('CONDITION', CONDITION_LABEL[condition], CONDITION_HEX[condition])}
+          {contextItem('CONDITION', CONDITION_LABEL[condition], conditionHex[condition])}
           {contextItem('OPERATING', operatingState)}
           {contextItem('RPM', rpm ?? 'NO DATA')}
           {contextItem('LOAD', load ?? 'NO DATA')}

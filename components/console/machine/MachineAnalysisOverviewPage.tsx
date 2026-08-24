@@ -4,7 +4,7 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import {
-  CONDITION_HEX,
+  conditionHexes,
   countByCondition,
   overallState,
   overallTrend,
@@ -97,6 +97,7 @@ export function MachineAnalysisOverviewPage({
   onRefresh,
 }: MachineAnalysisOverviewPageProps) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
@@ -162,9 +163,9 @@ export function MachineAnalysisOverviewPage({
       {offline ? (
         <View
           className="flex-row flex-wrap items-center gap-2 rounded-xl border px-4 py-3"
-          style={{ borderColor: `${CONDITION_HEX.offline}59`, backgroundColor: `${CONDITION_HEX.offline}14` }}
+          style={{ borderColor: `${conditionHex.offline}59`, backgroundColor: `${conditionHex.offline}14` }}
         >
-          <Text style={{ color: CONDITION_HEX.offline }} className="font-mono text-[11px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex.offline }} className="font-mono text-[11px] font-bold tracking-wider">
             OFFLINE
           </Text>
           <Text className={cn('flex-1 font-body text-[11px]', inkClass)}>

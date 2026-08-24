@@ -18,7 +18,7 @@ export function HealthFactorList({ factors }: { factors: HealthFactor[] }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const track = isDark ? 'rgba(255,255,255,0.08)' : consolePalette(isDark).lineSubtle;
+  const track = consolePalette(isDark).track;
   const levels = levelHexes(isDark);
 
   if (factors.length === 0) {

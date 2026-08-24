@@ -98,6 +98,16 @@ export type ConsolePalette = {
    */
   info: string;
 
+  /**
+   * The unfilled part of a bar, ring or meter.
+   *
+   * Its own token because it is the single most repeated neutral on the
+   * overview and it must stay almost invisible: a track that carries any
+   * weight of its own competes with the fill, which is the only part of a
+   * meter that means anything.
+   */
+  track: string;
+
   /** Secondary chart series. Grey, so the primary green always reads first. */
   series2: string;
   /** Chart gridlines and axis rules. */
@@ -193,6 +203,7 @@ const DARK: ConsolePalette = {
   neutral: '#7A7E86',
   info: '#4FA6AD',
 
+  track: 'rgba(255,255,255,0.08)',
   series2: '#C3C6CC',
   grid: 'rgba(255,255,255,0.055)',
   shadow: '#000000',
@@ -226,69 +237,75 @@ const DARK: ConsolePalette = {
 // white, which is what makes the screen read as an engineering workstation
 // rather than a dashboard with the highlighter left on.
 const LIGHT: ConsolePalette = {
-  bg: '#F5F6F8',
-  bgSoft: '#F8F9FA',
+  bg: '#F6F7F9',
+  bgSoft: '#FAFBFC',
   panel: '#FFFFFF',
-  panelRaised: '#FAFBFC',
+  panelRaised: '#F7F8FA',
   hover: '#F3F5F7',
-  selected: '#EEF2F6',
-  line: '#DFE3E8',
-  lineSubtle: '#ECEEF1',
-  lineStrong: '#C9CED6',
+  selected: '#EDF1F5',
+  line: '#E1E5EA',
+  lineSubtle: '#ECEFF2',
+  lineStrong: '#CCD2DA',
 
   ink: '#171A1F',
   inkStrong: '#101318',
-  inkMuted: '#5E6673',
-  inkFaint: '#7A828E',
-  inkDisabled: '#9CA3AD',
+  inkMuted: '#5F6874',
+  inkFaint: '#89929F',
+  inkDisabled: '#A8B0BB',
 
-  accent: '#15804A',
-  accentValue: '#169B56',
-  accentDot: '#22A866',
-  accentSoft: '#ECF8F1',
-  accentBorder: '#B9E4CA',
-  accentDim: '#8FD0A8',
+  // Forest green, not the dark theme's mint. The word, the reading and the dot
+  // are three steps of one colour because they are read at three different
+  // sizes — a 9px status word needs more weight than a 26px reading does.
+  accent: '#18794E',
+  accentValue: '#168A55',
+  accentDot: '#1B8C58',
+  accentSoft: '#EDF7F2',
+  accentBorder: '#BFDCCB',
+  accentDim: '#A9D6BE',
 
-  critical: '#C63C3C',
-  criticalValue: '#D14343',
-  criticalDot: '#D84A4A',
+  critical: '#B83B3B',
+  criticalValue: '#C54141',
+  criticalDot: '#C54141',
   criticalSoft: '#FDEEEE',
-  criticalBorder: '#EAB7B7',
+  criticalBorder: '#E5B5B5',
 
-  warning: '#B86800',
-  warningValue: '#C77700',
-  warningDot: '#D88A12',
-  warningSoft: '#FFF6E6',
-  warningBorder: '#EACB91',
+  // Burnt amber. Bright orange on white is the single loudest thing a light
+  // console can do, and "watch this" is not the loudest thing it has to say.
+  warning: '#A85D08',
+  warningValue: '#B76709',
+  warningDot: '#B76709',
+  warningSoft: '#FFF6E8',
+  warningBorder: '#E7C99C',
 
-  neutral: '#878B92',
-  info: '#167C80',
+  neutral: '#7C8591',
+  info: '#356DA8',
 
-  series2: '#6A6E76',
-  grid: 'rgba(10,11,13,0.07)',
+  track: '#EDF0F3',
+  series2: '#5F6874',
+  grid: 'rgba(23,26,31,0.06)',
   shadow: '#101828',
 
   chartBg: '#FFFFFF',
   chartGridMajor: '#E2E5E9',
   chartGridMinor: '#F1F2F4',
-  chartAxis: '#D7DBE0',
-  chartAxisText: '#6B7280',
-  chartText: '#262B33',
+  chartAxis: '#DDE1E6',
+  chartAxisText: '#737D89',
+  chartText: '#353B44',
   chartCrosshair: 'rgba(55,60,70,0.34)',
   chartTooltipBg: '#FFFFFF',
-  // A shade brighter than the card's `accent`/`warning`/`critical`: a 2px
-  // stroke on white needs a little more chroma than a word does to read as the
-  // same colour.
-  chartNormal: '#15965A',
-  chartAlert: '#C77B0A',
-  chartDanger: '#D14343',
+  // A shade brighter than the card's `accent`/`warning`/`critical`: a stroke
+  // one and a half pixels wide on white needs a little more chroma than a word
+  // does to read as the same colour.
+  chartNormal: '#168A55',
+  chartAlert: '#B76709',
+  chartDanger: '#C54141',
 
-  gaugeBorder: '#C9CED4',
-  gaugeTrack: '#EEF0F2',
-  gaugeTick: '#747B84',
-  gaugeNormal: '#29B765',
-  gaugeWarning: '#D99017',
-  gaugeDanger: '#D64A4A',
+  gaugeBorder: '#CCD2DA',
+  gaugeTrack: '#EDF0F3',
+  gaugeTick: '#737D89',
+  gaugeNormal: '#18794E',
+  gaugeWarning: '#A85D08',
+  gaugeDanger: '#B83B3B',
 };
 
 export function consolePalette(isDark: boolean): ConsolePalette {

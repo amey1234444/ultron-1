@@ -2,7 +2,6 @@ import { Text, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { cn } from '../../../../lib/cn';
 import { levelHexes, type ConditionLevel } from '../../../../lib/condition';
 import { consolePalette } from '../../../../lib/consoleTheme';
 
@@ -23,7 +22,7 @@ export function HealthRing({
   size?: number;
 }) {
   const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const palette = consolePalette(isDark);
   const colour = levelHexes(isDark)[level];
 
   const radius = (size - STROKE) / 2;
@@ -33,7 +32,7 @@ export function HealthRing({
   return (
     <View style={{ width: size, height: size }} className="items-center justify-center">
       <Svg width={size} height={size} style={{ position: 'absolute' }}>
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={consolePalette(isDark).lineSubtle} strokeWidth={STROKE} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={palette.track} strokeWidth={STROKE} fill="none" />
         {/* Rotated so the arc starts at twelve o'clock. Written as an SVG
             transform string with its centre baked in rather than via the
             rotation/originX/originY props: on web, react-native-svg 15 turns
@@ -57,7 +56,13 @@ export function HealthRing({
       <Text style={{ color: colour }} className="font-mono text-3xl font-bold tabular-nums">
         {score === null ? '--' : Math.round(score)}
       </Text>
-      <Text className={cn('font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>{caption ?? 'health'}</Text>
+      {/* The caption stays neutral. Painting the ring, the number AND the word
+          under it the same amber is three sayings of one thing, and it is what
+          made the light overview read as an orange panel rather than as a
+          machine with one amber score on it. */}
+      <Text style={{ color: palette.inkMuted }} className="font-body-medium text-[10px] uppercase tracking-wider">
+        {caption ?? 'health'}
+      </Text>
     </View>
   );
 }

@@ -147,6 +147,52 @@ export function decimate(samples: TrendSample[], from: number, to: number, colum
   return out;
 }
 
+/**
+ * The typical interval between samples, as the median of what is on screen.
+ *
+ * Median rather than mean: one reconnect gap of four minutes would drag a mean
+ * far enough that every real gap afterwards looks normal, which is the opposite
+ * of what this is for.
+ */
+export function medianInterval(points: TrendSample[]): number | null {
+  if (points.length < 3) return null;
+  const deltas: number[] = [];
+  for (let i = 1; i < points.length; i += 1) deltas.push(points[i].t - points[i - 1].t);
+  deltas.sort((a, b) => a - b);
+  const middle = deltas[deltas.length >> 1];
+  return middle > 0 ? middle : null;
+}
+
+/**
+ * Break the series wherever the feed stopped.
+ *
+ * A buffer survives a reload and a reconnect, so two runs of samples minutes
+ * apart routinely sit next to each other in it. Joining them draws a straight
+ * line across a period in which nothing was measured — a measurement that was
+ * never taken, presented at the same weight as the ones that were. The gap is
+ * drawn as a gap.
+ *
+ * The threshold is relative to the channel's own cadence, because a 1 Hz
+ * channel and a 10 Hz one disagree by an order of magnitude about what counts
+ * as a pause.
+ */
+export function splitOnGaps(points: TrendSample[], gapMs: number | null): TrendSample[][] {
+  if (points.length === 0) return [];
+  if (gapMs === null) return [points];
+  const runs: TrendSample[][] = [];
+  let run: TrendSample[] = [points[0]];
+  for (let i = 1; i < points.length; i += 1) {
+    if (points[i].t - points[i - 1].t > gapMs) {
+      runs.push(run);
+      run = [points[i]];
+      continue;
+    }
+    run.push(points[i]);
+  }
+  runs.push(run);
+  return runs;
+}
+
 export type Segment = { state: SignalState; points: TrendSample[] };
 
 /**

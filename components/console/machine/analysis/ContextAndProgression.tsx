@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { CONDITION_HEX, CONDITION_LABEL, type OverallState, type ProgressionEvent } from '../../../../lib/analysisOverview';
+import { conditionHexes, CONDITION_LABEL, type OverallState, type ProgressionEvent } from '../../../../lib/analysisOverview';
 import { MetricBox } from './StatusStrip';
 
 // How the machine is being run, next to what condition it is in.
@@ -60,6 +60,7 @@ export function OperatingContext({
 // the four moments that actually describe the escalation.
 export function FaultProgression({ events }: { events: ProgressionEvent[] }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
@@ -89,7 +90,7 @@ export function FaultProgression({ events }: { events: ProgressionEvent[] }) {
 
               <View className="items-center" style={{ width: 8 }}>
                 <View
-                  style={{ width: 7, height: 7, borderRadius: 4, marginTop: 4, backgroundColor: CONDITION_HEX[event.condition] }}
+                  style={{ width: 7, height: 7, borderRadius: 4, marginTop: 4, backgroundColor: conditionHex[event.condition] }}
                 />
                 {index < events.length - 1 ? <View style={{ width: 1, flex: 1, marginTop: 3, backgroundColor: hairline }} /> : null}
               </View>

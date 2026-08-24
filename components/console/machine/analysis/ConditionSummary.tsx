@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import {
-  CONDITION_HEX,
+  conditionHexes,
   CONDITION_LABEL,
   type ConditionSummaryText,
   type OverallState,
@@ -79,6 +79,7 @@ export function ConditionSummary({
 // recommendations has not prioritised anything, it has only sorted.
 export function PriorityActions({ actions }: { actions: PriorityAction[] }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
@@ -95,7 +96,7 @@ export function PriorityActions({ actions }: { actions: PriorityAction[] }) {
       ) : (
         <View className="flex-row flex-wrap gap-3">
           {actions.map((action) => {
-            const colour = CONDITION_HEX[action.condition];
+            const colour = conditionHex[action.condition];
             return (
               <View
                 key={action.priority}

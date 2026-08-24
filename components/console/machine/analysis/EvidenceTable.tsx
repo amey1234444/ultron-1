@@ -8,7 +8,7 @@ import {
   formatDuration,
   formatExceedance,
   SEVERITY_BLURB,
-  SEVERITY_HEX,
+  severityHexes,
   SEVERITY_LABEL,
   SEVERITY_ORDER,
   type Finding,
@@ -37,6 +37,7 @@ const FILTER_LABEL: Record<Filter, string> = {
 
 export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; onOpenTrend?: (finding: Finding) => void }) {
   const { isDark } = useAppTheme();
+  const severityHex = severityHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
@@ -78,7 +79,7 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
         <View className="flex-row flex-wrap items-center gap-1.5">
           {(['all', 'fault', 'limit', 'boundary', 'chain'] as Filter[]).map((f) => {
             const active = filter === f;
-            const tint = f === 'chain' ? '#8A8A8A' : f === 'all' ? undefined : SEVERITY_HEX[f];
+            const tint = f === 'chain' ? '#8A8A8A' : f === 'all' ? undefined : severityHex[f];
             return (
               <Pressable
                 key={f}
@@ -116,7 +117,7 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
         SEVERITY_ORDER.map((severity) => {
           const group = shown.filter((f) => f.severity === severity);
           if (group.length === 0) return null;
-          const tint = SEVERITY_HEX[severity];
+          const tint = severityHex[severity];
 
           return (
             <View key={severity} className="gap-0">
@@ -158,7 +159,7 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
                           instrument — the case most worth noticing. */}
                       <View style={{ width: 84 }}>
                         <Text
-                          style={{ color: cls === 'machine' ? inkColour(isDark) : cls === 'chain' ? '#8A8A8A' : SEVERITY_HEX.limit }}
+                          style={{ color: cls === 'machine' ? inkColour(isDark) : cls === 'chain' ? '#8A8A8A' : severityHex.limit }}
                           className="font-mono text-[8px] font-bold tracking-wider"
                         >
                           {cls === 'machine' ? 'MACHINE' : cls === 'chain' ? 'CHAIN' : 'MIXED'}

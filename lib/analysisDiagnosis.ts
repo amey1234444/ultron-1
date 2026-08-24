@@ -1,4 +1,5 @@
 import { LEVEL_HEX } from './condition';
+import { consolePalette } from './consoleTheme';
 
 // The analysis layer's own vocabulary: what was observed, which rule said so, and
 // — the distinction the whole page turns on — whether that rule describes the
@@ -54,6 +55,17 @@ export const SEVERITY_HEX: Record<Severity, string> = {
 };
 
 export const IN_CONTROL_HEX = LEVEL_HEX.normal;
+
+/** `SEVERITY_HEX`, resolved for the theme on screen. See `conditionHexes`. */
+export function severityHexes(isDark: boolean): Record<Severity, string> {
+  const palette = consolePalette(isDark);
+  return { fault: palette.critical, limit: palette.warning, boundary: isDark ? '#C9A15C' : '#8A6A2F' };
+}
+
+/** `IN_CONTROL_HEX`, resolved for the theme on screen. */
+export function inControlHex(isDark: boolean): string {
+  return consolePalette(isDark).accent;
+}
 
 // --- Rules and findings ------------------------------------------------------
 
@@ -258,8 +270,8 @@ export function deriveVerdict(findings: Finding[], hypothesis: Hypothesis | null
   };
 }
 
-export function verdictHex(verdict: Verdict): string {
-  return verdict.level === 'clear' ? IN_CONTROL_HEX : SEVERITY_HEX[verdict.level];
+export function verdictHex(verdict: Verdict, isDark = true): string {
+  return verdict.level === 'clear' ? inControlHex(isDark) : severityHexes(isDark)[verdict.level];
 }
 
 // --- Signals ------------------------------------------------------------------

@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import { formatRul, levelHexes, type PointEvidence } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 import type { MachineSummary, RankedDiagnosis } from './rollup';
 
 function evidenceLine(evidence: PointEvidence[]) {
@@ -27,9 +28,9 @@ export function DiagnosisBanner({
   onAction?: () => void;
 }) {
   const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const palette = consolePalette(isDark);
   const levels = levelHexes(isDark);
 
   // Nothing is elevated. Say so plainly and give the number that backs it up,
@@ -37,7 +38,7 @@ export function DiagnosisBanner({
   if (!diagnosis) {
     const worst = summary.worstPoint;
     return (
-      <View className={cn('flex-row items-center gap-3 rounded-xl border px-4 py-3', lineClass)}>
+      <View className="flex-row items-center gap-3 rounded-xl border px-4 py-3" style={{ borderColor: palette.line }}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: levels.normal }} />
         <Text className={cn('font-body-medium text-xs', inkClass)}>No active condition</Text>
         {worst && worst.value !== null ? (
@@ -59,18 +60,24 @@ export function DiagnosisBanner({
     worst && worst.level !== 'normal' && !diagnosis.evidence.some((e) => e.id === worst.id) ? worst : null;
 
   return (
+    // The card itself is neutral, and the state arrives as a 3px rule down its
+    // leading edge. A tinted rectangle this size is the largest coloured object
+    // on the overview, which puts the loudest colour on the page around the
+    // *explanation* rather than around the measurement that caused it.
     <View
-      className="gap-2 overflow-hidden rounded-xl border px-4 py-3"
-      style={{ borderColor: `${colour}55`, backgroundColor: `${colour}0F` }}
+      className="flex-row overflow-hidden rounded-xl border"
+      style={{ borderColor: palette.line, backgroundColor: palette.panel }}
     >
-      <View className="flex-row items-center gap-2">
+      <View style={{ width: 3, backgroundColor: colour }} />
+      <View className="min-w-0 flex-1 gap-2 px-4 py-3">
+      <View className="flex-row flex-wrap items-center gap-2">
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colour }} />
         <Text style={{ color: colour }} className="font-body-bold text-sm">
           {diagnosis.label}
         </Text>
         <Text className={cn('font-body text-xs', mutedClass)}>on {diagnosis.componentLabel}</Text>
 
-        <View className={cn('rounded-full border px-1.5 py-0.5', lineClass)}>
+        <View className="rounded-full border px-1.5 py-0.5" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
           <Text className={cn('font-mono text-[9px] uppercase tracking-wide', mutedClass)}>{diagnosis.confidence} confidence</Text>
         </View>
 
@@ -83,8 +90,14 @@ export function DiagnosisBanner({
         <View className="flex-1" />
 
         {onAction && actionLabel ? (
-          <Pressable onPress={onAction} className="rounded-full border border-accent/35 bg-accent/10 px-2.5 py-1">
-            <Text className="font-body-bold text-[10px] text-accent">{actionLabel}</Text>
+          <Pressable
+            onPress={onAction}
+            className="rounded-full border px-2.5 py-1"
+            style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft }}
+          >
+            <Text style={{ color: palette.accent }} className="font-body-bold text-[10px]">
+              {actionLabel}
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -105,6 +118,7 @@ export function DiagnosisBanner({
           {unrepresentedWorst.level === 'danger' ? 'over its limit' : 'elevated'}, and is not covered by this diagnosis.
         </Text>
       ) : null}
+      </View>
     </View>
   );
 }

@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { CONDITION_HEX } from '../../../../lib/analysisOverview';
+import { conditionHexes } from '../../../../lib/analysisOverview';
 import { qualityHex, QUALITY_LABEL, type DataQuality, type EvidenceItem } from '../../../../lib/advancedDiagnosis';
 import { cn } from '../../../../lib/cn';
 
@@ -78,7 +78,7 @@ export function IntelligencePanel({
       <PanelHeader title="Analyst intelligence" subtitle="OBSERVATION, NOT VERDICT" onCollapse={onCollapse} />
 
       {card('CURRENT OBSERVATION', observation)}
-      {card(`DATA QUALITY · ${QUALITY_LABEL[quality]}`, qualityNote, qualityHex(quality))}
+      {card(`DATA QUALITY · ${QUALITY_LABEL[quality]}`, qualityNote, qualityHex(quality, isDark))}
       {card('DOMINANT EVIDENCE', dominantEvidence)}
       {card('WHAT WOULD DISCRIMINATE', nextStep)}
 
@@ -98,11 +98,12 @@ export function IntelligencePanel({
   );
 }
 
-const ROLE_HEX: Record<EvidenceItem['role'], string> = {
-  supports: CONDITION_HEX.healthy,
-  contradicts: CONDITION_HEX.danger,
-  context: CONDITION_HEX.offline,
-};
+// Resolved per theme rather than at module load: light mode carries its own,
+// deeper status ramp. See `conditionHexes` in lib/analysisOverview.ts.
+function roleHexes(isDark: boolean): Record<EvidenceItem['role'], string> {
+  const hex = conditionHexes(isDark);
+  return { supports: hex.healthy, contradicts: hex.danger, context: hex.offline };
+}
 
 // Evidence persists across work areas, because an investigation is built by
 // collecting from several of them. Contradicting evidence is kept alongside
@@ -161,7 +162,7 @@ export function EvidenceTray({
                 <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[11px]', inkClass)}>
                   {item.title}
                 </Text>
-                <Text style={{ color: ROLE_HEX[item.role] }} className="font-mono text-[8px] font-bold tracking-wider">
+                <Text style={{ color: roleHexes(isDark)[item.role] }} className="font-mono text-[8px] font-bold tracking-wider">
                   {item.role.toUpperCase()}
                 </Text>
               </View>

@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import {
-  CONDITION_HEX,
+  conditionHexes,
   CONDITION_LABEL,
   OVERALL_TREND_LABEL,
   type ConditionCounts,
@@ -30,10 +30,11 @@ export function MetricBox({
   emphasis?: boolean;
 }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
-  const colour = condition ? CONDITION_HEX[condition] : undefined;
+  const colour = condition ? conditionHex[condition] : undefined;
 
   return (
     <View
@@ -84,6 +85,7 @@ export function StatusStrip({
   totalIssues: number;
 }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
 
   const mix = [
@@ -145,9 +147,9 @@ export function StatusStrip({
       {state.scoreUnderstates ? (
         <View
           className="flex-row flex-wrap items-center gap-2 rounded-lg px-3 py-2"
-          style={{ backgroundColor: `${CONDITION_HEX[state.condition]}12` }}
+          style={{ backgroundColor: `${conditionHex[state.condition]}12` }}
         >
-          <Text style={{ color: CONDITION_HEX[state.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex[state.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
             HEALTH SCORE UNDERSTATES THIS MACHINE
           </Text>
           <Text className={cn('flex-1 font-body text-[10px]', mutedClass)}>

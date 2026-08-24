@@ -14,8 +14,10 @@ import {
   nearestIndex,
   niceDomain,
   niceTimeStep,
+  medianInterval,
   segmentByState,
   sliceVisible,
+  splitOnGaps,
   stateOf,
   timeTicks,
   type Limits,
@@ -35,9 +37,10 @@ import {
  *   grid          two weights. Majors are what a value is read against and sit
  *                 under every axis label; minors halve them for finer reading.
  *                 Both are neutral tokens, not the series colour at an opacity.
- *   zones         alert and danger shaded at 5-6%. Enough to see which band the
- *                 line is in from across a room, faint enough that the line
- *                 stays the strongest object on the plot.
+ *   zones         alert and danger shaded, and at half strength on white: on a
+ *                 signal sitting near its limits these bands cover most of the
+ *                 plot, so they have to be faint enough that most of the plot
+ *                 still reads as white. They follow the Thresholds control.
  *   limits        1px dashed, in the meaning's own colour, labelled at the left
  *                 edge — ALERT 2.50 / DANGER 3.50, the same words and the same
  *                 numbers the sensor tiles and the analysis layer use.
@@ -119,6 +122,7 @@ export function TrendChart({
   const bottom = Math.max(top + 1, plotH - PAD_BOTTOM);
 
   const span = Math.max(MIN_SPAN_MS, to - from);
+  const zoneOpacity = isDark ? 0.055 : 0.028;
   const fmt = useCallback((value: number) => value.toFixed(decimals), [decimals]);
 
   // --- data ------------------------------------------------------------------
@@ -162,7 +166,17 @@ export function TrendChart({
   const xTicks = useMemo(() => timeTicks(from, to, xStep), [from, to, xStep]);
   const xMinor = useMemo(() => timeTicks(from, to, xStep / 2), [from, to, xStep]);
 
-  const segments = useMemo(() => segmentByState(drawn, limits), [drawn, limits]);
+  // A pause in the feed is drawn as a pause. Five times the channel's own
+  // cadence is comfortably past jitter and well short of a reconnect.
+  const gapMs = useMemo(() => {
+    const cadence = medianInterval(visible);
+    return cadence === null ? null : Math.max(cadence * 5, 1500);
+  }, [visible]);
+
+  const segments = useMemo(
+    () => splitOnGaps(drawn, gapMs).flatMap((run) => segmentByState(run, limits)),
+    [drawn, gapMs, limits],
+  );
 
   const seriesColour = useCallback(
     (state: SignalState) =>
@@ -268,19 +282,34 @@ export function TrendChart({
           {ready ? (
             <View pointerEvents="none">
               <Svg width={plotW} height={plotH}>
-                {/* Threshold zones. Faint enough that the series still wins. */}
-                {limits.alert !== undefined ? (
+                {/* Threshold zones.
+                    They are bands, not blocks: on a signal sitting near its
+                    limits the alert and danger zones between them cover most of
+                    the plot, so the opacity has to be low enough that "most of
+                    the plot" still reads as white. Light mode runs at half the
+                    dark figure — a 6% amber wash over 80% of a white chart is a
+                    cream chart, and the line stops being the strongest object
+                    on it. They follow the Thresholds control, because a zone
+                    with no line to anchor it is decoration. */}
+                {showLimits && limits.alert !== undefined ? (
                   <Rect
                     x={0}
                     y={limits.danger !== undefined ? y(limits.danger) : 0}
                     width={plotW}
                     height={Math.max(0, y(limits.alert) - (limits.danger !== undefined ? y(limits.danger) : 0))}
                     fill={palette.chartAlert}
-                    fillOpacity={0.055}
+                    fillOpacity={zoneOpacity}
                   />
                 ) : null}
-                {limits.danger !== undefined ? (
-                  <Rect x={0} y={0} width={plotW} height={Math.max(0, y(limits.danger))} fill={palette.chartDanger} fillOpacity={0.06} />
+                {showLimits && limits.danger !== undefined ? (
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={plotW}
+                    height={Math.max(0, y(limits.danger))}
+                    fill={palette.chartDanger}
+                    fillOpacity={zoneOpacity * 1.1}
+                  />
                 ) : null}
 
                 {/* Minor grid, then major. Order matters: a major line must not

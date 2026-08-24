@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import { confidenceStatement, EVIDENCE_LABEL, verdictHex, type Hypothesis, type Verdict } from '../../../../lib/analysisDiagnosis';
+import { consolePalette } from '../../../../lib/consoleTheme';
 
 // The page's thesis, in the order a reader needs it: how bad, what is thought to
 // be wrong, whether that is the machine or the instrument, and what to do next.
@@ -34,10 +35,25 @@ export function VerdictBanner({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
-  const colour = verdictHex(verdict);
+  const palette = consolePalette(isDark);
+  const colour = verdictHex(verdict, isDark);
 
   return (
-    <View className="overflow-hidden rounded-2xl border" style={{ borderColor: `${colour}59`, backgroundColor: `${colour}0D` }}>
+    // The stripe is the state; the card underneath it is not. On the dark
+    // console a 5%-tinted wash reads as depth, but on white the same wash turns
+    // the largest object on the page into a block of colour and the reader
+    // stops being able to tell which part of it is the actual signal. Light
+    // mode gets a white card with a neutral edge and keeps the stripe, the
+    // headline and the class pill in the verdict's colour — see the note at the
+    // top of lib/consoleTheme.ts.
+    <View
+      className="overflow-hidden rounded-2xl border"
+      style={
+        isDark
+          ? { borderColor: `${colour}59`, backgroundColor: `${colour}0D` }
+          : { borderColor: palette.line, backgroundColor: palette.panel }
+      }
+    >
       {/* Severity stripe: the page's state before a word is read. */}
       <View style={{ height: 3, backgroundColor: colour }} />
 

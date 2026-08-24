@@ -1,5 +1,6 @@
 import { formatDuration } from './analysisDiagnosis';
 import { LEVEL_HEX } from './condition';
+import { consolePalette } from './consoleTheme';
 
 // The Analysis Overview's domain: what is wrong with this machine, how serious,
 // where, since when, whether it is getting worse, and what to do first.
@@ -34,6 +35,30 @@ export const CONDITION_HEX: Record<OverviewCondition, string> = {
   danger: LEVEL_HEX.danger,
   offline: '#737373',
 };
+
+/**
+ * The same map, resolved for the theme on screen.
+ *
+ * `CONDITION_HEX` above is the dark ramp and stays that way — it is what the
+ * pure derivation modules, which have no React context, hand to callers.
+ * Anything that actually paints resolves through here instead, because light
+ * mode is not the dark palette on a white page: see the note at the top of
+ * `lib/consoleTheme.ts`. Which condition a thing is in does not change; only
+ * what that condition is painted.
+ */
+export function conditionHexes(isDark: boolean): Record<OverviewCondition, string> {
+  const palette = consolePalette(isDark);
+  return {
+    healthy: palette.accent,
+    // The fourth step — "notable, not yet alarming". A muted gold on the dark
+    // console; on white it has to sit between neutral and the alert amber
+    // without becoming a second alert.
+    attention: isDark ? '#C9A15C' : '#8A6A2F',
+    alert: palette.warning,
+    danger: palette.critical,
+    offline: palette.neutral,
+  };
+}
 
 // Offline ranks above healthy but below a real condition: not knowing is worse
 // than knowing it is fine, and better than knowing it is failing.

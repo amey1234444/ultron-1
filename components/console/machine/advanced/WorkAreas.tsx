@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { CONDITION_HEX, CONDITION_LABEL } from '../../../../lib/analysisOverview';
+import { conditionHexes, CONDITION_LABEL } from '../../../../lib/analysisOverview';
 import {
   changePercent,
   EVENT_KIND_LABEL,
@@ -68,6 +68,7 @@ export function MachineWorkArea({
   operating: Array<{ label: string; value: string; note?: string }>;
 }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -121,10 +122,10 @@ export function MachineWorkArea({
             <Text numberOfLines={1} style={{ width: 112 }} className={cn('font-body text-[10px]', mutedClass)}>
               {row.trend}
             </Text>
-            <Text style={{ width: 76, color: CONDITION_HEX[row.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
+            <Text style={{ width: 76, color: conditionHex[row.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
               {CONDITION_LABEL[row.condition]}
             </Text>
-            <Text style={{ width: 92, color: qualityHex(row.quality) }} className="font-mono text-[9px] tracking-wider">
+            <Text style={{ width: 92, color: qualityHex(row.quality, isDark) }} className="font-mono text-[9px] tracking-wider">
               {QUALITY_LABEL[row.quality]}
             </Text>
             <Text style={{ width: 62 }} className={cn('text-right font-mono text-[10px]', mutedClass)}>
@@ -145,6 +146,7 @@ export function MachineWorkArea({
 // current value alone.
 export function TrainWorkArea({ rows, note }: { rows: PropagationRow[]; note: string }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
@@ -175,7 +177,7 @@ export function TrainWorkArea({ rows, note }: { rows: PropagationRow[]; note: st
         {rows.map((row) => {
           const change = changePercent(row);
           const isStrongest = strongest?.location === row.location;
-          const tint = CONDITION_HEX[row.condition];
+          const tint = conditionHex[row.condition];
 
           return (
             <Row key={row.location}>

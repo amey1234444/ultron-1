@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { SEVERITY_HEX, type AnalysisCounts } from '../../../../lib/analysisDiagnosis';
+import { severityHexes, type AnalysisCounts } from '../../../../lib/analysisDiagnosis';
 
 const CHAIN_HEX = '#8A8A8A';
 
@@ -17,6 +17,7 @@ const CHAIN_HEX = '#8A8A8A';
 // this; a reader who wants to check it could not.
 export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCounts; unverifiedCount: number }) {
   const { isDark } = useAppTheme();
+  const severityHex = severityHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const track = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.06)';
@@ -37,14 +38,14 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
       ) : (
         <>
           <View style={{ height: 10, borderRadius: 5, backgroundColor: track }} className="w-full flex-row overflow-hidden">
-            <View style={{ width: `${machineShare}%`, backgroundColor: SEVERITY_HEX.fault }} />
+            <View style={{ width: `${machineShare}%`, backgroundColor: severityHex.fault }} />
             <View style={{ width: `${chainShare}%`, backgroundColor: CHAIN_HEX }} />
           </View>
 
           <View className="flex-row flex-wrap gap-x-6 gap-y-2">
             <View className="gap-0.5">
               <View className="flex-row items-center gap-1.5">
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: SEVERITY_HEX.fault }} />
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: severityHex.fault }} />
                 <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>MACHINE</Text>
               </View>
               <Text className={cn('font-mono text-[19px] font-bold tabular-nums', inkClass)}>{counts.machineRules}</Text>
@@ -59,7 +60,7 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CHAIN_HEX }} />
                 <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>MEASUREMENT CHAIN</Text>
               </View>
-              <Text style={{ color: chainDominant ? SEVERITY_HEX.limit : undefined } } className={cn('font-mono text-[19px] font-bold tabular-nums', !chainDominant && inkClass)}>
+              <Text style={{ color: chainDominant ? severityHex.limit : undefined } } className={cn('font-mono text-[19px] font-bold tabular-nums', !chainDominant && inkClass)}>
                 {counts.chainRules}
               </Text>
               <Text className={cn('font-body text-[10px]', mutedClass)}>rules about the instrument</Text>
@@ -97,8 +98,8 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
           )}
 
           {unverifiedCount > 0 ? (
-            <View className="flex-row items-center gap-2 rounded-lg px-2.5 py-2" style={{ backgroundColor: `${SEVERITY_HEX.limit}14` }}>
-              <Text style={{ color: SEVERITY_HEX.limit }} className="font-mono text-[9px] font-bold tracking-wider">
+            <View className="flex-row items-center gap-2 rounded-lg px-2.5 py-2" style={{ backgroundColor: `${severityHex.limit}14` }}>
+              <Text style={{ color: severityHex.limit }} className="font-mono text-[9px] font-bold tracking-wider">
                 {unverifiedCount} SIGNAL{unverifiedCount === 1 ? '' : 'S'} UNVERIFIED
               </Text>
               <Text className={cn('flex-1 font-body text-[10px]', mutedClass)}>Treat their values as suspect until the chain is checked.</Text>

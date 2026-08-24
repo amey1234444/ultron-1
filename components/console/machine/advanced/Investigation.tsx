@@ -1,7 +1,7 @@
 import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { CONDITION_HEX } from '../../../../lib/analysisOverview';
+import { conditionHexes } from '../../../../lib/analysisOverview';
 import {
   CONCLUSION_STATUS_LABEL,
   HYPOTHESIS_STATUS_LABEL,
@@ -15,14 +15,19 @@ import { cn } from '../../../../lib/cn';
 import { ActionButton } from '../../ActionButton';
 import { WorkAreaHeader } from './WorkAreas';
 
-const STATUS_HEX: Record<AnalystHypothesis['status'], string> = {
-  confirmed: CONDITION_HEX.danger,
-  probable: CONDITION_HEX.alert,
-  possible: CONDITION_HEX.attention,
-  unresolved: CONDITION_HEX.offline,
-  unlikely: CONDITION_HEX.offline,
-  rejected: CONDITION_HEX.offline,
-};
+// Resolved per theme rather than at module load: light mode carries its own,
+// deeper status ramp. See `conditionHexes` in lib/analysisOverview.ts.
+function statusHexes(isDark: boolean): Record<AnalystHypothesis['status'], string> {
+  const hex = conditionHexes(isDark);
+  return {
+    confirmed: hex.danger,
+    probable: hex.alert,
+    possible: hex.attention,
+    unresolved: hex.offline,
+    unlikely: hex.offline,
+    rejected: hex.offline,
+  };
+}
 
 // Competing explanations, with what argues against each shown at the same weight
 // as what argues for it.
@@ -32,10 +37,11 @@ const STATUS_HEX: Record<AnalystHypothesis['status'], string> = {
 // naming the test is how an analyst decides what to do next.
 function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
-  const tint = STATUS_HEX[hypothesis.status];
+  const tint = statusHexes(isDark)[hypothesis.status];
 
   return (
     <View className="gap-2.5 rounded-xl border px-3.5 py-3" style={{ borderColor: hairline }}>
@@ -58,7 +64,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
 
       <View className="flex-row flex-wrap gap-3">
         <View style={{ flexGrow: 1, flexBasis: 170, minWidth: 150 }} className="gap-1">
-          <Text style={{ color: CONDITION_HEX.healthy }} className="font-mono text-[8px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex.healthy }} className="font-mono text-[8px] font-bold tracking-wider">
             SUPPORTS
           </Text>
           {hypothesis.supporting.map((line) => (
@@ -69,7 +75,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
         </View>
 
         <View style={{ flexGrow: 1, flexBasis: 170, minWidth: 150 }} className="gap-1">
-          <Text style={{ color: CONDITION_HEX.danger }} className="font-mono text-[8px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex.danger }} className="font-mono text-[8px] font-bold tracking-wider">
             CONTRADICTS
           </Text>
           {hypothesis.contradicting.length === 0 ? (
@@ -91,7 +97,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
         </View>
       ) : (
         <View className="pt-2" style={{ borderTopWidth: 1, borderTopColor: hairline }}>
-          <Text style={{ color: CONDITION_HEX.attention }} className="font-mono text-[8px] tracking-wider">
+          <Text style={{ color: conditionHex.attention }} className="font-mono text-[8px] tracking-wider">
             NO DISCRIMINATING TEST RECORDED
           </Text>
         </View>
@@ -105,6 +111,7 @@ function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
 // distinction reads as proven the whole way down.
 function RootCauseChain({ steps }: { steps: ChainStep[] }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -120,7 +127,7 @@ function RootCauseChain({ steps }: { steps: ChainStep[] }) {
             <View className="flex-row items-center justify-between gap-2">
               <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{step.label}</Text>
               <Text
-                style={{ color: step.established ? CONDITION_HEX.healthy : CONDITION_HEX.attention }}
+                style={{ color: step.established ? conditionHex.healthy : conditionHex.attention }}
                 className="font-mono text-[7px] font-bold tracking-wider"
               >
                 {step.established ? 'MEASURED' : 'ASSUMED'}
@@ -151,6 +158,7 @@ function AnalystConclusion({
   onAction?: (action: string) => void;
 }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -179,7 +187,7 @@ function AnalystConclusion({
     <View className="gap-3">
       <View className="flex-row flex-wrap items-center justify-between gap-2">
         <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Analyst conclusion</Text>
-        <Text style={{ color: CONDITION_HEX.attention }} className="font-mono text-[9px] font-bold tracking-wider">
+        <Text style={{ color: conditionHex.attention }} className="font-mono text-[9px] font-bold tracking-wider">
           {CONCLUSION_STATUS_LABEL[conclusion.status]}
         </Text>
       </View>

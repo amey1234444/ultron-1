@@ -22,6 +22,17 @@ type RackFaceplateProps = {
   slots?: number[];
   /** Fill the parent (default). Set false to size to content inside a ScrollView. */
   fill?: boolean;
+  /**
+   * Draw the chassis at reference size (the asset hierarchy's rack page, where
+   * the rack IS the screen) or compact (a machine's Rack tab, where the rack is
+   * a reference for where the readings come from and the readings are the
+   * subject).
+   *
+   * Compact is the same drawing at a smaller slot width — every proportion is
+   * derived from `cardWidth`, so nothing is redrawn or repositioned — plus
+   * tighter chassis padding. It lands at roughly two thirds the height.
+   */
+  density?: 'reference' | 'compact';
   onPressEmpty: (slot: number, x: number, y: number) => void;
   onPressCard: (card: CardNode, x: number, y: number) => void;
 };
@@ -34,6 +45,10 @@ const BASE_CARD_WIDTH = 72;
 const BASE_CARD_HEIGHT = 220;
 const MIN_CARD_WIDTH = 56;
 const MAX_CARD_WIDTH = 116;
+// The compact ceiling. 78px of slot puts the card at ~238px tall against the
+// reference 354, which is the ~33% the machine workspace needed to stop the
+// chassis from being the tallest thing on a page about live readings.
+const COMPACT_MAX_CARD_WIDTH = 78;
 
 const SLOT_MARGIN = 5; // horizontal margin on each side of a slot
 const HANDLE_WIDTH = 18;
@@ -109,6 +124,7 @@ export function RackFaceplate({
   editable = true,
   slots,
   fill = true,
+  density = 'reference',
   onPressEmpty,
   onPressCard,
 }: RackFaceplateProps) {
@@ -137,10 +153,15 @@ export function RackFaceplate({
   const availableWidth = chassisWidth ?? BASE_CARD_WIDTH * slotCount;
   const fixedChrome = SCROLL_PADDING + 2 * (HANDLE_WIDTH + HANDLE_MARGIN) + DIVIDER_SPACE;
   const widthPerSlot = (availableWidth - fixedChrome) / slotCount - SLOT_MARGIN * 2;
-  const cardWidth = clamp(widthPerSlot, MIN_CARD_WIDTH, MAX_CARD_WIDTH);
+  const compact = density === 'compact';
+  const cardWidth = clamp(widthPerSlot, MIN_CARD_WIDTH, compact ? COMPACT_MAX_CARD_WIDTH : MAX_CARD_WIDTH);
   const cardHeight = cardWidth * (BASE_CARD_HEIGHT / BASE_CARD_WIDTH);
   const scale = cardWidth / BASE_CARD_WIDTH;
   const handleHeight = 140 * scale;
+  // Chassis chrome scales with the slot, so the drawing keeps its proportions
+  // rather than becoming a small rack in a large frame.
+  const outerPad = compact ? 12 : 24;
+  const railPad = compact ? 12 : 20;
 
   const handleLayout = (e: LayoutChangeEvent) => {
     const width = e.nativeEvent.layout.width;
@@ -148,7 +169,10 @@ export function RackFaceplate({
   };
 
   return (
-    <View className={fill ? 'flex-1 items-center justify-center px-6 py-6' : 'w-full items-center justify-center px-6 py-6'}>
+    <View
+      className={fill ? 'flex-1 items-center justify-center' : 'w-full items-center justify-center'}
+      style={{ paddingHorizontal: outerPad, paddingVertical: outerPad }}
+    >
       <View
         onLayout={handleLayout}
         style={{
@@ -197,8 +221,8 @@ export function RackFaceplate({
             alignItems: 'center',
             justifyContent: 'center',
             paddingHorizontal: SCROLL_PADDING / 2,
-            paddingTop: 20,
-            paddingBottom: 20,
+            paddingTop: railPad,
+            paddingBottom: railPad,
           }}
         >
           <View className="flex-row items-center">

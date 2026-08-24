@@ -2,7 +2,7 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { CONDITION_HEX, CONDITION_LABEL, type OverviewCondition } from '../../../../lib/analysisOverview';
+import { conditionHexes, CONDITION_LABEL, type OverviewCondition } from '../../../../lib/analysisOverview';
 import type { ComponentType } from '../../../../lib/machines';
 import { ComponentTypeIcon } from '../machineIcons';
 
@@ -41,11 +41,12 @@ function HealthBar({ health, colour }: { health: number | null; colour: string }
 
 function Node({ node, onPress }: { node: TrainNode; onPress?: (node: TrainNode) => void }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
   const monitored = node.health !== null;
-  const colour = monitored ? CONDITION_HEX[node.condition] : CONDITION_HEX.offline;
+  const colour = monitored ? conditionHex[node.condition] : conditionHex.offline;
 
   const body = (
     <View
@@ -145,6 +146,7 @@ export function TrainHealth({
   onSelectNode?: (node: TrainNode) => void;
 }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const connector = isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)';
   const hairline = isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
@@ -200,7 +202,7 @@ export function TrainHealth({
       {criticalPath ? (
         <View className="rounded-lg border px-3.5 py-2.5" style={{ borderColor: hairline }}>
           <Text className={cn('font-body text-[11px] leading-[17px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
-            <Text style={{ color: CONDITION_HEX.danger }} className="font-body-bold">
+            <Text style={{ color: conditionHex.danger }} className="font-body-bold">
               Critical path:{' '}
             </Text>
             {criticalPath}

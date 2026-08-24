@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { useAppTheme } from '../hooks/useAppTheme';
 import { cn } from '../lib/cn';
+import { consolePalette } from '../lib/consoleTheme';
 import { STATUS_HEX, type Status } from '../lib/status';
 
 type PanelProps = {
@@ -27,40 +28,45 @@ function hexToRgba(hex: string, alpha: number) {
 
 export function Panel({ children, className, status, fill = false }: PanelProps) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   // "success" reads as normal, not a color to celebrate — keep the panel neutral
   // (only the StatusDot shows green); warning/critical are the ones worth coloring.
-  const glowColor = !status ? null : status === 'success' ? (isDark ? '#FFFFFF' : '#0A0A0A') : STATUS_HEX[status];
+  //
+  // In LIGHT mode nothing is coloured, whatever the status. A tinted wash and a
+  // coloured top rule are a dark-theme device: on #08090C they read as depth,
+  // on #FFFFFF they turn an entire region of the page amber and the reader
+  // stops being able to tell which part of it is actually the alarm. The state
+  // is still said — by the ring, the bars, the status word and the diagnosis's
+  // own accent — in the places where it means something. See the note at the
+  // top of lib/consoleTheme.ts.
+  const glowColor = !isDark || !status ? null : status === 'success' ? '#FFFFFF' : STATUS_HEX[status];
 
   return (
     <View
-      className={cn(
-        'overflow-hidden rounded-2xl border',
-        isDark ? 'border-line-dark' : 'border-line-light',
-        fill && 'flex-1',
-        className,
-      )}
+      className={cn('overflow-hidden rounded-2xl border', fill && 'flex-1', className)}
       style={
         glowColor
           ? {
+              borderColor: palette.line,
               shadowColor: glowColor,
-              shadowOpacity: isDark ? 0.14 : 0.1,
+              shadowOpacity: 0.14,
               shadowRadius: 14,
               shadowOffset: { width: 0, height: 6 },
               elevation: 3,
             }
-          : undefined
+          : { borderColor: palette.line }
       }
     >
       {glowColor && <View style={{ height: 1, backgroundColor: hexToRgba(glowColor, 0.6) }} />}
       {glowColor ? (
         <LinearGradient
-          colors={[hexToRgba(glowColor, isDark ? 0.05 : 0.06), isDark ? 'rgba(19,19,19,1)' : 'rgba(255,255,255,1)']}
+          colors={[hexToRgba(glowColor, 0.05), 'rgba(19,19,19,1)']}
           style={fill ? { padding: 24, flex: 1 } : { padding: 24 }}
         >
           {children}
         </LinearGradient>
       ) : (
-        <View className={cn('p-6', fill && 'flex-1', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}>
+        <View className={cn('p-6', fill && 'flex-1')} style={{ backgroundColor: palette.panel }}>
           {children}
         </View>
       )}

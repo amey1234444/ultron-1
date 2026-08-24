@@ -1,7 +1,7 @@
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { CONDITION_HEX, CONDITION_LABEL } from '../../../../lib/analysisOverview';
+import { conditionHexes, CONDITION_LABEL } from '../../../../lib/analysisOverview';
 import type { AnalystTreeNode } from '../../../../lib/advancedDiagnosis';
 import { cn } from '../../../../lib/cn';
 
@@ -31,6 +31,7 @@ export function AnalysisTree({
   depth?: number;
 }) {
   const { isDark } = useAppTheme();
+  const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
@@ -38,7 +39,7 @@ export function AnalysisTree({
     <>
       {nodes.map((node) => {
         const selected = node.id === selectedId;
-        const colour = node.condition ? CONDITION_HEX[node.condition] : CONDITION_HEX.offline;
+        const colour = node.condition ? conditionHex[node.condition] : conditionHex.offline;
 
         return (
           <View key={node.id}>
