@@ -16,8 +16,8 @@ import { consolePalette } from '../../ui';
 import { BackButton } from '../BackButton';
 import { connectorsForTemplate, type ConnectorState } from './machineConnectors';
 import { AlarmView } from './AlarmView';
-import { AnalysisView } from './AnalysisView';
-import { MachineOverview } from './MachineOverview';
+import { MachineAnalysisWorkspace } from './MachineAnalysisWorkspace';
+import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
@@ -426,26 +426,24 @@ export function MachineWorkspace({
       )}
 
       {isActual && actualTab === 'overview' && (
-        <MachineOverview
+        <MachineOverviewPage
+          machine={machine}
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}
-          live={live}
           expectedPoints={expectedPoints}
-          machineId={machine.id}
-          machineTemplate={machine.template}
+          onOpenAlarms={() => setActualTab('alarm')}
+          onOpenAnalysis={() => setActualTab('analysis')}
         />
       )}
 
       {isActual && actualTab === 'analysis' && (
-        <AnalysisView
+        <MachineAnalysisWorkspace
+          machine={machine}
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}
-          live={live}
-          expectedPoints={expectedPoints}
-          machineId={machine.id}
-          machineTemplate={machine.template}
+          onOpenAlarms={() => setActualTab('alarm')}
         />
       )}
 
