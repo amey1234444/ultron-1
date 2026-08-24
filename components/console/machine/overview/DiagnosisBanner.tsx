@@ -39,7 +39,7 @@ export function DiagnosisBanner({
       <View className={cn('flex-row items-center gap-3 rounded-xl border px-4 py-3', lineClass)}>
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: LEVEL_HEX.normal }} />
         <Text className={cn('font-body-medium text-xs', inkClass)}>No active condition</Text>
-        {worst ? (
+        {worst && worst.value !== null ? (
           <Text className={cn('flex-1 font-body text-[11px]', mutedClass)} numberOfLines={1}>
             Closest to a limit: {worst.code} {worst.label} at {worst.value.toFixed(worst.band.decimals)} {worst.unit}, alert at{' '}
             {worst.thresholds.alert.toFixed(worst.band.decimals)}.
@@ -97,7 +97,7 @@ export function DiagnosisBanner({
           urgent point can sit outside every rule that fired, and the banner would
           quietly talk about the second-worst problem while the header reported the
           worst. Name it when that happens. */}
-      {unrepresentedWorst ? (
+      {unrepresentedWorst && unrepresentedWorst.value !== null ? (
         <Text className={cn('font-body text-[11px]', mutedClass)} numberOfLines={1}>
           Also: {unrepresentedWorst.code} {unrepresentedWorst.label} at{' '}
           {unrepresentedWorst.value.toFixed(unrepresentedWorst.band.decimals)} {unrepresentedWorst.unit} is{' '}

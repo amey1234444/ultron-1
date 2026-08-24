@@ -47,7 +47,13 @@ function channelNumber(channelId: string): number | null {
   return match ? Number(match[1]) : null;
 }
 
-function rangeFor(card: CardNode | null): { min: number; max: number } | null {
+// The channel's own configured engineering range. Exported because this is not
+// only identity: LIVE_RANGE_FOR_LETTER is presentation metadata for drawing an
+// empty axis, and wherever a card actually declares a range, that range is the
+// band a reading has to be judged against. Falling back to the letter's default
+// puts a 0-2 bar transmitter on a 0-10 bar scale and, for an uncommissioned
+// channel, infers its alarm limits from the wrong span entirely.
+export function engineeringRangeFor(card: CardNode | null): { min: number; max: number } | null {
   if (!card) return null;
   const c = card.config;
 
@@ -167,6 +173,6 @@ export function resolveSensorIdentity({
     gateway,
     gatewayIsDirect: !gatewayDevice,
     location: locationFor(channel.label, componentLabel),
-    engineeringRange: rangeFor(card),
+    engineeringRange: engineeringRangeFor(card),
   };
 }

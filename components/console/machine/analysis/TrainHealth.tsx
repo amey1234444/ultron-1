@@ -49,8 +49,8 @@ function Node({ node, onPress }: { node: TrainNode; onPress?: (node: TrainNode) 
 
   const body = (
     <View
-      style={{ width: NODE_WIDTH, borderColor: monitored ? `${colour}40` : hairline }}
-      className={cn('gap-2.5 rounded-xl border px-3 py-3', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
+      style={{ borderColor: monitored ? `${colour}40` : hairline }}
+      className={cn('flex-1 gap-2.5 rounded-xl border px-3 py-3', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
     >
       <View className="flex-row items-start justify-between gap-2">
         <View className="flex-1 flex-row items-center gap-1.5">
@@ -98,17 +98,33 @@ function Node({ node, onPress }: { node: TrainNode; onPress?: (node: TrainNode) 
         </View>
       )}
 
-      <Text numberOfLines={2} className={cn('font-body text-[10px] leading-[14px]', mutedClass)}>
+      {/* Pushed to the bottom of the card rather than following the block above
+          it, so the observation lines read across the train as one row instead
+          of stepping with whatever each element had to say above them. */}
+      <Text numberOfLines={2} className={cn('mt-auto font-body text-[10px] leading-[14px]', mutedClass)}>
         {node.observation}
       </Text>
     </View>
   );
 
-  if (!onPress) return body;
+  // The width lives on the outer wrapper so the card itself is free to grow down
+  // the cross axis — every element in the train is the same height whatever it
+  // has to report, which is what makes the row read as one machine.
   return (
-    <Pressable onPress={() => onPress(node)} accessibilityRole="button" accessibilityLabel={`Open ${node.name}`}>
-      {body}
-    </Pressable>
+    <View style={{ width: NODE_WIDTH }}>
+      {onPress ? (
+        <Pressable
+          onPress={() => onPress(node)}
+          accessibilityRole="button"
+          accessibilityLabel={`Open ${node.name}`}
+          className="flex-1"
+        >
+          {body}
+        </Pressable>
+      ) : (
+        body
+      )}
+    </View>
   );
 }
 
@@ -163,7 +179,7 @@ export function TrainHealth({
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 4 }}>
           <View className="flex-row items-stretch">
             {nodes.map((node, index) => (
-              <View key={node.id} className="flex-row items-center">
+              <View key={node.id} className="flex-row items-stretch">
                 {index > 0 ? (
                   <View className="flex-row items-center" style={{ width: 26 }}>
                     <View style={{ flex: 1, height: 1, backgroundColor: connector }} />

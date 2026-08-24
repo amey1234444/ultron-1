@@ -329,14 +329,18 @@ export function MachineWorkspace({
   // One header band for every mode: identity on the left, the controls for
   // whatever is below it on the right. It is the only chrome above the canvas,
   // which is what lets the stage run to the left, right and bottom edges.
-  const header = (controls: ReactNode) => (
+  // `showName` is dropped by the sub-tabs whose own page opens with a full
+  // identity block (machine name, template, hierarchy path and feed state). Two
+  // stacked bands naming the same machine is the most visible thing wrong with a
+  // page embedded in a shell that already introduced it.
+  const header = (controls: ReactNode, showName = true) => (
     <View
       className="gap-2 px-3 py-2 md:flex-row md:items-center md:justify-between md:gap-4 md:px-5"
       style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
     >
       <View className="min-w-0 flex-row items-center gap-2.5">
         {backButton}
-        {nameBlock}
+        {showName ? nameBlock : null}
       </View>
       <View className="min-w-0 flex-row flex-wrap items-center justify-start gap-2 md:justify-end">{controls}</View>
     </View>
@@ -417,9 +421,13 @@ export function MachineWorkspace({
     );
   }
 
+  // The Overview and Analysis pages each open with their own identity header, so
+  // the shell only carries the back button and the tab rail for them.
+  const pageOwnsIdentity = actualTab === 'overview' || actualTab === 'analysis';
+
   return (
     <View className="flex-1">
-      {header(actualSubTabs)}
+      {header(actualSubTabs, !pageOwnsIdentity)}
 
       {isActual && actualTab === 'rack' && (
         <RackOccupancyView devices={devices} cards={cards} live={live} mappedChannels={mappedChannels} />

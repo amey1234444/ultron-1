@@ -39,7 +39,6 @@ import {
   summarizeMachine,
 } from './overview/rollup';
 import { SENSOR_TILE_MIN_WIDTH, SensorGaugeTile } from './overview/SensorGaugeTile';
-import { SAMPLE_INTERVAL_HOURS } from './overview/useConditionHistory';
 import type { PointCondition } from './overview/usePointCondition';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -373,14 +372,14 @@ export function MachineOverviewPage({
         </View>
       </Panel>
 
-      <View className="flex-row flex-wrap gap-4">
+      <View className="flex-row flex-wrap items-stretch gap-4">
         <View style={COLUMN}>
-          <Panel>
+          <Panel fill>
             <MachineTrain summaries={componentSummaries} />
           </Panel>
         </View>
         <View style={COLUMN}>
-          <Panel>
+          <Panel fill>
             <PredictionList diagnoses={ranked} />
           </Panel>
         </View>
@@ -426,15 +425,15 @@ export function MachineOverviewPage({
         </View>
       </View>
 
-      <View className="flex-row flex-wrap gap-4">
-        <View style={{ flexGrow: 2, flexBasis: 460, minWidth: 320 }}>
-          <Panel>
+      <View className="flex-row flex-wrap items-stretch gap-4">
+        <View style={COLUMN}>
+          <Panel fill>
             {trended ? (
               <ConditionTrend
                 label={`${trended.code} · ${trended.label}`}
                 unit={trended.unit}
                 samples={trended.samples}
-                sampleIntervalHours={SAMPLE_INTERVAL_HOURS}
+                sampleIntervalHours={trended.sampleIntervalHours}
                 thresholds={trended.thresholds}
                 state={trended.state}
                 decimals={trended.band.decimals}
@@ -445,20 +444,20 @@ export function MachineOverviewPage({
           </Panel>
         </View>
         <View style={COLUMN}>
-          <Panel>
+          <Panel fill>
             <RecentEvents events={events} />
           </Panel>
         </View>
       </View>
 
-      <View className="flex-row flex-wrap gap-4">
+      <View className="flex-row flex-wrap items-stretch gap-4">
         <View style={COLUMN}>
-          <Panel>
+          <Panel fill>
             <AlarmSummaryCard summary={summary} conditions={conditionList} machineId={machine.id} onOpenAlarms={onOpenAlarms} />
           </Panel>
         </View>
         <View style={COLUMN}>
-          <Panel>
+          <Panel fill>
             <MaintenanceCard records={maintenance} soonestRulDays={summary.soonestRulDays} />
           </Panel>
         </View>

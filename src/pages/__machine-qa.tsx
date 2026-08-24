@@ -1,8 +1,27 @@
-// TEMPORARY visual-QA harness for the machine Overview and Analysis pages.
+// TEMPORARY verification harness for the machine Overview and Analysis pages.
 // Delete before commit.
 //
-// Renders the two new pages against seeded rack data with no AuthGate, so they
-// can be looked at without a database or a session. `?view=analysis` switches.
+// This is deliberately NOT a mock. It builds a simulated gateway and rack in the
+// ordinary workspace shape, configures one signal per channel exactly the way the
+// Simulation Mode screen does, and runs the real `useSimulationEngine`. The
+// engine publishes through `publishLiveMeasurements` onto the same measurement
+// bus that MQTT ingest publishes to, so what these pages read here is what they
+// read against a physical gateway.
+//
+// Three channels carry fault-injection behaviours, so the pages have something
+// they are supposed to report:
+//
+//   V1 DE Vibration H   Ramp To Danger  alert 3.5  danger 4.8  -> DANGER
+//   V2 DE Vibration V   Ramp To Alert   alert 3.5  danger 4.8  -> ALERT
+//   T1 DE Bearing Temp  Ramp To Alert   alert 65   danger 78   -> ALERT
+//   T2 NDE Bearing Temp Steady                                 -> NORMAL
+//   P1 Inlet Pressure   Steady                                 -> NORMAL
+//   C1 Motor Current    Steady                                 -> NORMAL
+//   S1 Rotor Speed      Steady                                 -> NORMAL
+//
+// Vibration and temperature elevated together on one component is the
+// bearing-wear signature, so a correct Analysis page reports that rule rather
+// than three unrelated limit breaches.
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
@@ -12,10 +31,241 @@ import { useColorScheme } from 'nativewind';
 import { MachineAnalysisWorkspace } from '../../components/console/machine/MachineAnalysisWorkspace';
 import { MachineOverviewPage } from '../../components/console/machine/MachineOverviewPage';
 import type { MappedChannel } from '../../components/console/machine/RackOccupancyView';
+import { useSimulationEngine } from '../../hooks/useSimulationEngine';
 import { consolePalette } from '../../lib/consoleTheme';
-import { expectedPointsForTemplate } from '../../lib/machines';
-import { listChannels } from '../../lib/rack';
-import { createSeedData } from '../../lib/seedData';
+import type { DeviceNode } from '../../lib/devices';
+import { componentsForTemplate, expectedPointsForTemplate, type MachineNode } from '../../lib/machines';
+import { listChannels, type CardNode } from '../../lib/rack';
+import {
+  defaultSimulatedChannel,
+  type SimulatedChannel,
+  type SimulatedChannelKind,
+  type SimulationBehaviour,
+} from '../../lib/simulation';
+
+const GATEWAY_ID = 'sim-gw-qa';
+const RACK_REAL_ID = 1;
+
+const GATEWAY: DeviceNode = {
+  id: 'qa-sim-gateway',
+  name: 'QA Simulated Gateway',
+  type: 'Gateway',
+  model: 'ULTRON-GW',
+  ip: '10.99.1.1',
+  port: '1883',
+  protocol: 'Modbus TCP',
+  description: 'Virtual gateway for the QA harness',
+  status: 'Online',
+  projectId: 'qa-plant',
+  realGatewayId: GATEWAY_ID,
+  simulated: true,
+  archived: false,
+};
+
+const RACK: DeviceNode = {
+  id: 'qa-sim-rack',
+  name: 'Rack-QA-1',
+  type: 'Rack',
+  model: 'RACK-12-R',
+  ip: '10.99.1.11',
+  port: '502',
+  protocol: 'Modbus TCP',
+  description: 'Virtual rack for the QA harness',
+  status: 'Online',
+  projectId: 'qa-plant',
+  gatewayId: GATEWAY.id,
+  realGatewayId: GATEWAY_ID,
+  realRackId: RACK_REAL_ID,
+  simulated: true,
+  archived: false,
+};
+
+// One signal per channel, in the shape the Simulation Mode screen stores.
+function signal(
+  kind: SimulatedChannelKind,
+  behaviour: SimulationBehaviour,
+  over: Partial<SimulatedChannel>,
+): SimulatedChannel {
+  return { ...defaultSimulatedChannel(kind), behaviour, ...over };
+}
+
+type SlotSpec = {
+  slot: number;
+  label: string;
+  type: CardNode['type'];
+  channel: SimulatedChannel;
+};
+
+const SLOTS: SlotSpec[] = [
+  {
+    slot: 1,
+    label: 'DE Vibration H',
+    type: 'Vibration Card',
+    channel: signal('Vibration', 'Ramp To Danger', {
+      unit: 'mm/s',
+      min: 1.2,
+      max: 5.5,
+      normalMin: 0,
+      normalMax: 3.5,
+      alertLimit: 3.5,
+      dangerLimit: 4.8,
+      samplesPerSecond: 4,
+      decimals: 2,
+    }),
+  },
+  {
+    slot: 2,
+    label: 'DE Vibration V',
+    type: 'Vibration Card',
+    channel: signal('Vibration', 'Ramp To Alert', {
+      unit: 'mm/s',
+      min: 1.2,
+      max: 5.5,
+      normalMin: 0,
+      normalMax: 3.5,
+      alertLimit: 3.5,
+      dangerLimit: 4.8,
+      samplesPerSecond: 4,
+      decimals: 2,
+    }),
+  },
+  {
+    slot: 3,
+    label: 'DE Bearing Temp',
+    type: 'Process Card',
+    channel: signal('RTD / Temperature', 'Ramp To Alert', {
+      unit: '°C',
+      min: 40,
+      max: 90,
+      normalMin: 40,
+      normalMax: 65,
+      alertLimit: 65,
+      dangerLimit: 78,
+      samplesPerSecond: 2,
+      decimals: 1,
+    }),
+  },
+  {
+    slot: 4,
+    label: 'NDE Bearing Temp',
+    type: 'Process Card',
+    channel: signal('RTD / Temperature', 'Steady', {
+      unit: '°C',
+      min: 40,
+      max: 90,
+      normalMin: 45,
+      normalMax: 58,
+      alertLimit: 65,
+      dangerLimit: 78,
+      samplesPerSecond: 2,
+      decimals: 1,
+    }),
+  },
+  {
+    slot: 5,
+    label: 'Inlet Pressure',
+    type: 'Process Card',
+    channel: signal('Pressure', 'Cycle', {
+      unit: 'bar',
+      min: 0.6,
+      max: 1.1,
+      normalMin: 0.5,
+      normalMax: 1.2,
+      alertLimit: 1.5,
+      dangerLimit: 1.9,
+      samplesPerSecond: 2,
+      decimals: 2,
+    }),
+  },
+  {
+    slot: 6,
+    label: 'Motor Current',
+    type: 'Process Card',
+    channel: signal('Universal Voltage / Current', 'Steady', {
+      unit: 'A',
+      min: 14,
+      max: 22,
+      normalMin: 15,
+      normalMax: 21,
+      alertLimit: 30,
+      dangerLimit: 36,
+      samplesPerSecond: 2,
+      decimals: 1,
+    }),
+  },
+  {
+    slot: 7,
+    label: 'Rotor Speed',
+    type: 'Speed Card',
+    channel: signal('Speed / RPM', 'Steady', {
+      unit: 'rpm',
+      min: 1440,
+      max: 1480,
+      normalMin: 1450,
+      normalMax: 1475,
+      alertLimit: 1600,
+      dangerLimit: 1750,
+      samplesPerSecond: 1,
+      decimals: 0,
+    }),
+  },
+];
+
+// A simulated card carries its signal definition per channel; the card config
+// mirrors channel 1, which is what a commissioning engineer would have typed.
+function cardFor(spec: SlotSpec): CardNode {
+  const { channel } = spec;
+  const alarmWarning = channel.alertLimit === null ? '' : String(channel.alertLimit);
+  const alarmCritical = channel.dangerLimit === null ? '' : String(channel.dangerLimit);
+
+  const config =
+    spec.type === 'Vibration Card'
+      ? {
+          channelNames: [spec.label],
+          sensorType: 'Accelerometer',
+          sensitivity: '100 mV/g',
+          engineeringUnit: channel.unit,
+          measurementRangeMin: String(channel.min),
+          measurementRangeMax: String(channel.max),
+          samplingRate: String(channel.samplesPerSecond),
+          alarmWarning,
+          alarmCritical,
+        }
+      : spec.type === 'Speed Card'
+        ? {
+            channelNames: [spec.label],
+            inputType: 'RPM',
+            pulsesPerRevolution: '60',
+            trigger: 'Rising',
+            hysteresis: '5',
+            minSpeed: String(channel.min),
+            maxSpeed: String(channel.max),
+            alarmWarning,
+            alarmCritical,
+          }
+        : {
+            channelNames: [spec.label],
+            inputType: channel.unit === '°C' ? 'RTD 3-wire' : '4-20 mA',
+            engineeringMin: String(channel.min),
+            engineeringMax: String(channel.max),
+            unit: channel.unit,
+            scaling: '1',
+            offset: '0',
+            filter: '',
+            alarmWarning,
+            alarmCritical,
+          };
+
+  return {
+    id: `qa-card-${spec.slot}`,
+    deviceId: RACK.id,
+    slot: spec.slot,
+    type: spec.type,
+    enabled: true,
+    config: config as CardNode['config'],
+    simulation: [spec.channel],
+  };
+}
 
 function Harness() {
   const { setColorScheme } = useColorScheme();
@@ -30,22 +280,32 @@ function Harness() {
     setView(params.get('view') === 'analysis' ? 'analysis' : 'overview');
   }, [setColorScheme]);
 
-  const seed = useMemo(() => {
+  const devices = useMemo<DeviceNode[]>(() => [GATEWAY, RACK], []);
+  const cards = useMemo<CardNode[]>(() => SLOTS.map(cardFor), []);
+
+  // The real engine. Everything the pages show below comes from what this
+  // publishes onto the measurement bus.
+  useSimulationEngine(devices, cards, true);
+
+  const machine = useMemo<MachineNode>(() => {
     let counter = 0;
-    return createSeedData(() => `qa-${counter++}`);
+    return {
+      id: 'qa-machine-rav',
+      projectId: 'qa-plant',
+      folderId: 'qa-area',
+      name: 'RAV-01',
+      template: 'Rotary Airlock Valve',
+      components: componentsForTemplate('Rotary Airlock Valve', () => `qa-c-${counter++}`),
+    };
   }, []);
 
-  const machine = seed.machines.find((m) => m.id === 'seed-machine-rav')!;
-  const cards = seed.cards.filter((c) => c.deviceId === 'seed-rack-north-1');
-  const devices = seed.devices.filter((d) => d.id === 'seed-rack-north-1' || d.type === 'Gateway');
-
-  // Every channel on this machine's own rack that commissioning actually named,
-  // mapped the way a saved TrailBoard layout would map it.
   const mappedChannels = useMemo<MappedChannel[]>(
     () =>
-      listChannels(devices, cards)
-        .filter((channel) => channel.label.startsWith('RAV-01 '))
-        .map((channel) => ({ id: `qa-box-${channel.id}`, channel, label: channel.label.replace('RAV-01 ', '') })),
+      listChannels(devices, cards).map((channel) => ({
+        id: `qa-box-${channel.id}`,
+        channel,
+        label: channel.label,
+      })),
     [devices, cards],
   );
 
@@ -67,7 +327,7 @@ function Harness() {
           mappedChannels={mappedChannels}
           devices={devices}
           cards={cards}
-          hierarchyPath="Northfield Plant → Area 1"
+          hierarchyPath="QA Plant → Area 1"
         />
       )}
     </View>

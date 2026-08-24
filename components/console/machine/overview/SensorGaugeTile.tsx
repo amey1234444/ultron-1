@@ -10,6 +10,7 @@ import type { DeviceNode } from '../../../../lib/devices';
 import type { CardNode } from '../../../../lib/rack';
 import type { MappedChannel } from '../RackOccupancyView';
 import { BarGauge, gaugeColumnWidth, gaugeSpanFor, gaugeTubeHeight, type GaugeSize } from './BarGauge';
+import { NO_VALUE_TEXT } from '../liveValue';
 import { resolveSensorIdentity } from './sensorIdentity';
 import { usePointCondition, type PointCondition } from './usePointCondition';
 
@@ -87,7 +88,7 @@ export function SensorGaugeTile({
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
 
-  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online });
+  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards });
   const colour = stateHex(condition.state);
 
   useEffect(() => {
@@ -101,6 +102,11 @@ export function SensorGaugeTile({
   const padX = PADDING_X[size];
 
   const { value, band, thresholds, prognosis } = condition;
+  // A mapped channel the gateway has never reported. There is no generator
+  // behind this page, so the tile shows the channel and its limits and says
+  // plainly that nothing has come back — rather than drawing a plausible needle.
+  const hasReading = value !== null;
+  const neverReported = condition.source === 'none';
   const span = gaugeSpanFor(thresholds, identity.engineeringRange);
   const changePercent = Math.round(condition.changeFraction * 100);
   const isFlat = Math.abs(condition.changeFraction) <= TREND_FLAT_BAND;
@@ -191,7 +197,7 @@ export function SensorGaugeTile({
 
         <View className={cn('flex-row', compact ? 'mt-2' : 'mt-3')} style={{ height: gaugeTubeHeight(size) }}>
           <BarGauge
-            value={value}
+            value={value ?? span.min}
             span={span}
             thresholds={thresholds}
             state={condition.state}
@@ -201,14 +207,14 @@ export function SensorGaugeTile({
 
           <View className={cn('flex-1 justify-center', compact ? 'pl-1.5' : 'pl-3')}>
             <Text className={cn('font-mono tracking-widest', compact ? 'text-[8px]' : 'text-[10px]', mutedClass)}>
-              {offline ? 'LAST' : 'LIVE'}
+              {neverReported ? 'NO DATA' : offline ? 'LAST' : 'LIVE'}
             </Text>
             <Text
               numberOfLines={1}
               style={{ color: colour, fontSize: valueFontSize, lineHeight: valueFontSize + 4, letterSpacing: -1 }}
               className="mt-0.5 font-mono font-bold tabular-nums"
             >
-              {value.toFixed(decimals)}
+              {hasReading ? value.toFixed(decimals) : NO_VALUE_TEXT}
             </Text>
             <Text className={cn('font-mono', compact ? 'text-[10px]' : 'text-[14px]', mutedClass)}>{condition.unit}</Text>
 
@@ -290,7 +296,7 @@ export function SensorGaugeTile({
 
   if (!onPress) return body;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${condition.label}. ${value.toFixed(decimals)} ${condition.unit}. ${STATE_LABEL[condition.state]}. Alert ${thresholds.alert.toFixed(decimals)}, danger ${thresholds.danger.toFixed(decimals)}.`}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${condition.label}. ${hasReading ? `${value.toFixed(decimals)} ${condition.unit}` : 'no reading reported'}. ${STATE_LABEL[condition.state]}. Alert ${thresholds.alert.toFixed(decimals)}, danger ${thresholds.danger.toFixed(decimals)}.`}>
       {body}
     </Pressable>
   );

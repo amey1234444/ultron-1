@@ -147,22 +147,22 @@ export function MachineAnalysisPage({
 
       {/* The split comes before the evidence table: it says what the table is
           about, and it is the finding most likely to change what happens next. */}
-      <View className="flex-row flex-wrap gap-4">
+      <View className="flex-row flex-wrap items-stretch gap-4">
         <View style={WIDE}>
-          <Panel>
+          <Panel fill>
             <EvidenceSplit counts={counts} unverifiedCount={unverified.size} />
           </Panel>
         </View>
         <View style={NARROW}>
-          <Panel>
+          <Panel fill>
             <CountsPanel counts={counts} />
           </Panel>
         </View>
       </View>
 
-      <View className="flex-row flex-wrap gap-4">
+      <View className="flex-row flex-wrap items-stretch gap-4">
         <View style={WIDE}>
-          <Panel>
+          <Panel fill>
             <EvidenceTable findings={findings} onOpenTrend={onOpenTrend ? () => onOpenTrend() : undefined} />
           </Panel>
         </View>
@@ -171,7 +171,7 @@ export function MachineAnalysisPage({
           <Panel>
             <DoThisList steps={doThis} priority={doThisPriority} />
           </Panel>
-          <Panel>
+          <Panel fill>
             <ThenConfirmList criteria={thenConfirm} footnote={modelCaveat} />
           </Panel>
         </View>

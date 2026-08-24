@@ -317,10 +317,10 @@ export function AdvancedDiagnosisPage({
         ) : null}
       </View>
 
-      <View className="flex-row flex-wrap items-start gap-3">
+      <View className="flex-row flex-wrap items-stretch gap-3">
         {treeOpen ? (
           <View style={{ width: TREE_WIDTH }}>
-            <Panel>
+            <Panel fill>
               <View className="gap-2">
                 <PanelHeader title="Analysis tree" subtitle="MACHINE → POINT → SIGNAL" onCollapse={() => setTreeOpen(false)} />
                 <AnalysisTree
@@ -337,12 +337,12 @@ export function AdvancedDiagnosisPage({
         ) : null}
 
         <View style={{ flexGrow: 1, flexBasis: 520, minWidth: 320 }}>
-          <Panel>{centre()}</Panel>
+          <Panel fill>{centre()}</Panel>
         </View>
 
         {intelOpen ? (
           <View style={{ width: INTEL_WIDTH }}>
-            <Panel>
+            <Panel fill>
               <IntelligencePanel
                 observation={intelligence.observation}
                 quality={signal?.quality ?? dataQuality}

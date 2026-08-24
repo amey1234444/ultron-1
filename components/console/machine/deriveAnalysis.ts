@@ -63,6 +63,11 @@ export type DeriveInput = {
 
 // --- small numeric helpers ---------------------------------------------------
 
+// A point with a reading behind it. The analysis layer reasons only over these;
+// a mapped channel the gateway has never reported is carried as a data-quality
+// issue instead, never as a measurement.
+type ReportedCondition = PointCondition & { value: number; health: number };
+
 function sampleIntervalHours(c: PointCondition): number {
   return c.windowHours / Math.max(1, c.samples.length - 1);
 }
@@ -113,7 +118,7 @@ function fmt(value: number, decimals: number): string {
 
 // How long the point has been continuously at or above its alert limit, walking
 // the buffer back from now. Zero when it is currently inside limits.
-function elevatedSamples(c: PointCondition): number {
+function elevatedSamples(c: ReportedCondition): number {
   let n = 0;
   for (let i = c.samples.length - 1; i >= 0; i--) {
     if (c.samples[i] >= c.thresholds.alert) n += 1;
@@ -122,7 +127,7 @@ function elevatedSamples(c: PointCondition): number {
   return n;
 }
 
-function elevatedForMinutes(c: PointCondition): number {
+function elevatedForMinutes(c: ReportedCondition): number {
   return elevatedSamples(c) * sampleIntervalHours(c) * 60;
 }
 
@@ -130,7 +135,7 @@ function elevatedForMinutes(c: PointCondition): number {
 // below that threshold, or when it has never been below it inside the window — in
 // which case the honest answer is "at least the whole window", which callers say
 // differently rather than reporting a crossing that is not in the data.
-function crossedHoursAgo(c: PointCondition, threshold: number): number | null {
+function crossedHoursAgo(c: ReportedCondition, threshold: number): number | null {
   const last = c.samples.length - 1;
   if (last < 1 || c.samples[last] < threshold) return null;
   for (let i = last; i >= 0; i--) {
@@ -141,7 +146,7 @@ function crossedHoursAgo(c: PointCondition, threshold: number): number | null {
 
 // How many times the point has moved in and out of its alert band across the
 // window. Three or more is a genuinely intermittent signal rather than a trend.
-function bandCrossings(c: PointCondition): number {
+function bandCrossings(c: ReportedCondition): number {
   if (c.samples.length === 0) return 0;
   let crossings = 0;
   let above = c.samples[0] >= c.thresholds.alert;
@@ -156,7 +161,7 @@ function bandCrossings(c: PointCondition): number {
 }
 
 // A channel repeating one value is a fact about the sensor, not about the machine.
-function isFrozen(c: PointCondition): boolean {
+function isFrozen(c: ReportedCondition): boolean {
   const tail = c.samples.slice(-8);
   return tail.length >= 8 && tail.every((v) => v === tail[0]);
 }
@@ -192,7 +197,7 @@ function bestLagCorrelation(a: number[], b: number[], maxLag: number): { r: numb
   return best;
 }
 
-function worstLevelOf(points: PointCondition[]): ConditionLevel {
+function worstLevelOf(points: ReportedCondition[]): ConditionLevel {
   return points.reduce<ConditionLevel>(
     (worst, p) => (p.level === 'danger' ? 'danger' : p.level === 'alert' && worst !== 'danger' ? 'alert' : worst),
     'normal',
@@ -240,7 +245,7 @@ function consequenceFor(category: IssueCategory, condition: OverviewCondition): 
   return 'efficiency';
 }
 
-function trendFor(c: PointCondition): IssueTrend {
+function trendFor(c: ReportedCondition): IssueTrend {
   if (bandCrossings(c) >= 3) return 'intermittent';
   if (c.prognosis.daysToDanger !== null && c.prognosis.daysToDanger <= 7) return 'rapidly-worsening';
   if (c.rising) return 'worsening';
@@ -256,7 +261,7 @@ const TREND_RANK: Record<IssueTrend, number> = {
   improving: 0,
 };
 
-function worstTrend(points: PointCondition[]): IssueTrend {
+function worstTrend(points: ReportedCondition[]): IssueTrend {
   if (points.length === 0) return 'stable';
   return points.map(trendFor).reduce<IssueTrend>((worst, t) => (TREND_RANK[t] > TREND_RANK[worst] ? t : worst), 'improving');
 }
@@ -266,7 +271,7 @@ function worstTrend(points: PointCondition[]): IssueTrend {
 // actually fits move it inside that band.
 const TIER_BASE: Record<RankedDiagnosis['confidence'], number> = { high: 78, medium: 62, low: 46 };
 
-function matchScore(diagnosis: RankedDiagnosis, points: PointCondition[]): number {
+function matchScore(diagnosis: RankedDiagnosis, points: ReportedCondition[]): number {
   const base = TIER_BASE[diagnosis.confidence];
   const agreement = Math.min(9, Math.max(0, diagnosis.evidence.length - 1) * 4);
   const fit = points.length > 0 ? Math.round(Math.max(...points.map((p) => p.prognosis.r2)) * 8) : 0;
@@ -301,7 +306,11 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   const componentLabelById = new Map(machine.components.map((c) => [c.id, c.label]));
   const conditionById = new Map(conditions.map((c) => [c.id, c]));
 
-  const online = conditions.filter((c) => c.online);
+  // Points the gateway has actually reported, narrowed so everything below can
+  // read a value without re-testing it. `online` already implies a reading:
+  // usePointCondition marks a channel offline precisely when nothing has come
+  // back for it, so these are the same set and this only tells the compiler so.
+  const online = conditions.filter((c): c is ReportedCondition => c.online && c.value !== null && c.health !== null);
   const offline = conditions.filter((c) => !c.online);
   const frozen = online.filter(isFrozen);
   const inferred = online.filter((c) => !c.thresholds.configured);
@@ -310,6 +319,12 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   const speedPoint = online.find((c) => c.kind === 'Speed') ?? null;
   const currentPoint = online.find((c) => c.kind === 'Current') ?? null;
   const vibration = online.filter((c) => c.kind === 'Vibration');
+
+  // Narrows a component's points to the ones the gateway has reported. A
+  // component can carry mapped channels that have never returned a frame, and
+  // those have nothing to sort, compare or state a value for.
+  const reportedOf = (points: PointCondition[]) =>
+    points.filter((p): p is ReportedCondition => p.value !== null && p.health !== null);
 
   const componentLabelFor = (c: PointCondition) =>
     c.componentId ? componentLabelById.get(c.componentId) ?? 'Unattributed' : 'Unattributed';
@@ -340,7 +355,9 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   };
 
   const pointsOf = (diagnosis: RankedDiagnosis) =>
-    diagnosis.evidence.map((e) => conditionById.get(e.id)).filter((c): c is PointCondition => Boolean(c));
+    diagnosis.evidence
+      .map((e) => conditionById.get(e.id))
+      .filter((c): c is ReportedCondition => Boolean(c) && c!.value !== null && c!.health !== null);
 
   // --- issues ----------------------------------------------------------------
 
@@ -451,7 +468,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   // --- train -----------------------------------------------------------------
 
   const train: TrainNode[] = components.map((c) => {
-    const worst = [...c.points].sort((a, b) => a.health - b.health)[0] ?? null;
+    const worst = [...reportedOf(c.points)].sort((a, b) => a.health - b.health)[0] ?? null;
     const allOffline = c.points.length > 0 && c.points.every((p) => !p.online);
     const diagnosis = c.diagnoses[0] ?? null;
 
@@ -484,9 +501,13 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   const worstComponent = [...instrumented].sort((a, b) => (a.health ?? 101) - (b.health ?? 101))[0] ?? null;
   const secondary = worstComponent ? instrumented.filter((c) => c !== worstComponent && c.level !== 'normal') : [];
 
+  const worstComponentPoint = worstComponent
+    ? [...reportedOf(worstComponent.points)].sort((a, b) => a.health - b.health)[0] ?? null
+    : null;
+
   const criticalPath = worstComponent
     ? `Abnormal evidence is strongest at the ${worstComponent.label.toLowerCase()} (${
-        [...worstComponent.points].sort((a, b) => a.health - b.health)[0].label
+        worstComponentPoint?.label ?? 'no reported point'
       }). ${
         secondary.length > 0
           ? `${secondary.map((c) => c.label).join(' and ')} ${secondary.length === 1 ? 'is' : 'are'} elevated as well and may be secondary.`
@@ -528,9 +549,11 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
 
   // --- signals ---------------------------------------------------------------
 
-  const signalOrder = [...conditions].sort((a, b) => a.health - b.health);
+  // Only reported channels have a value to strip. An unreported one appears in
+  // the data-quality issues instead, which is where it belongs.
+  const signalOrder = [...online].sort((a, b) => a.health - b.health);
 
-  const signalStateFor = (c: PointCondition): SignalState => {
+  const signalStateFor = (c: ReportedCondition): SignalState => {
     if (claimedByDiagnosis.has(c.id) && c.level === 'danger') return 'fault';
     if (c.level === 'danger') return 'limit';
     if (c.level === 'alert') return 'boundary';
@@ -732,7 +755,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
 
   // --- advanced: analysis tree ------------------------------------------------
 
-  const signalNode = (point: PointCondition): AnalystTreeNode => ({
+  const signalNode = (point: ReportedCondition): AnalystTreeNode => ({
     id: `sig-${point.id}`,
     name: point.label,
     kind: 'signal',
@@ -754,8 +777,8 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
         // reads machine → component → location → signal the way an analyst walks
         // it. A point whose label says nothing about position hangs directly off
         // the component rather than under an invented location.
-        const byLocation = new Map<string, PointCondition[]>();
-        for (const point of component.points) {
+        const byLocation = new Map<string, ReportedCondition[]>();
+        for (const point of reportedOf(component.points)) {
           const location = identityFor(point)?.location ?? '';
           const position = location.split(' · ').slice(1, 2)[0] ?? '';
           const bucket = byLocation.get(position);
@@ -796,16 +819,19 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   // --- advanced: condition rows ----------------------------------------------
 
   const conditionRows: ConditionRow[] = instrumented.map((component) => {
-    const worst = [...component.points].sort((a, b) => a.health - b.health)[0];
+    const reported = reportedOf(component.points);
+    const worst = [...reported].sort((a, b) => a.health - b.health)[0] ?? null;
     const allOffline = component.points.every((p) => !p.online);
     const anyInferred = component.points.some((p) => !p.thresholds.configured);
-    const anyFrozen = component.points.some(isFrozen);
-    const elevatedHours = crossedHoursAgo(worst, worst.thresholds.alert);
+    const anyFrozen = reported.some(isFrozen);
+    const elevatedHours = worst ? crossedHoursAgo(worst, worst.thresholds.alert) : null;
 
     return {
       area: component.label,
       health: component.health === null ? null : Math.round(component.health),
-      indicator: `${worst.code} ${fmt(worst.value, worst.band.decimals)} ${worst.unit}`,
+      indicator: worst
+        ? `${worst.code} ${fmt(worst.value, worst.band.decimals)} ${worst.unit}`
+        : 'no reported channel',
       trend:
         component.soonestRulDays !== null
           ? `To limit in ${formatRul(component.soonestRulDays)}`
@@ -1066,9 +1092,9 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
       reference: baselineOf(point),
       alert: point.thresholds.alert,
       danger: point.thresholds.danger,
-      quality: !point.online
+      quality: !point.online || point.value === null
         ? 'missing'
-        : isFrozen(point)
+        : isFrozen(point as ReportedCondition)
           ? 'poor'
           : point.thresholds.configured
             ? 'good'
@@ -1131,7 +1157,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     conclusion,
     signalFor,
     intelligence: {
-      observation: worstPoint
+      observation: worstPoint && worstPoint.value !== null
         ? `${worstPoint.label} reads ${fmt(worstPoint.value, worstPoint.band.decimals)} ${worstPoint.unit}, ${
             worstPoint.rising ? 'and is still rising' : 'and is not trending upward'
           }${summary.soonestRulDays !== null ? `, projecting to its limit in ${formatRul(summary.soonestRulDays)}` : ''}. ${

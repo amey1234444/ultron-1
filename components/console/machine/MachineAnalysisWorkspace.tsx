@@ -34,6 +34,8 @@ function ConditionProbe({
   isoGroup,
   componentId,
   online,
+  devices,
+  cards,
   onCondition,
 }: {
   mapped: MappedChannel;
@@ -41,9 +43,11 @@ function ConditionProbe({
   isoGroup: IsoGroup;
   componentId: string | null;
   online: boolean;
+  devices: DeviceNode[];
+  cards: CardNode[];
   onCondition: (condition: PointCondition) => void;
 }) {
-  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online });
+  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards });
 
   useEffect(() => {
     onCondition(condition);
@@ -172,6 +176,8 @@ export function MachineAnalysisWorkspace({
           isoGroup={isoGroup}
           componentId={componentIdByBox[mapped.id] ?? null}
           online={onlineByRack[mapped.channel.rackId] ?? false}
+          devices={devices}
+          cards={cards}
           onCondition={reportCondition}
         />
       ))}

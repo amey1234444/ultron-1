@@ -16,7 +16,15 @@ import type { PointCondition } from './usePointCondition';
 // data, so the ring, the component list, the diagnosis banner and the alarm
 // counts cannot disagree with each other.
 
-export function toEvidence(condition: PointCondition): PointEvidence {
+// Points the gateway has actually reported. Everything scored below is scored
+// over these: a channel with no reading contributes no health, no level and no
+// evidence, and is reported as a data-quality problem instead of being averaged
+// in as though it were fine.
+export function hasReading(condition: PointCondition): condition is PointCondition & { value: number; health: number } {
+  return condition.value !== null && condition.health !== null;
+}
+
+export function toEvidence(condition: PointCondition & { value: number }): PointEvidence {
   return {
     id: condition.id,
     code: condition.code,
@@ -52,15 +60,16 @@ export type ComponentSummary = {
 export function rollUpComponents(machine: MachineNode, conditions: PointCondition[]): ComponentSummary[] {
   const summaries: ComponentSummary[] = machine.components.map((component) => {
     const points = conditions.filter((c) => c.componentId === component.id);
+    const reported = points.filter(hasReading);
     return {
       componentId: component.id,
       label: component.label,
       type: component.type,
       points,
-      health: aggregateHealth(points.map((p) => p.health)),
-      level: worstLevel(points.map((p) => p.level)),
+      health: aggregateHealth(reported.map((p) => p.health)),
+      level: worstLevel(reported.map((p) => p.level)),
       soonestRulDays: soonestRul(points),
-      diagnoses: inferFailureModes(points.map(toEvidence)),
+      diagnoses: inferFailureModes(reported.map(toEvidence)),
     };
   });
 
@@ -71,8 +80,8 @@ export function rollUpComponents(machine: MachineNode, conditions: PointConditio
       label: 'Unattributed points',
       type: 'Unattributed',
       points: orphans,
-      health: aggregateHealth(orphans.map((p) => p.health)),
-      level: worstLevel(orphans.map((p) => p.level)),
+      health: aggregateHealth(orphans.filter(hasReading).map((p) => p.health)),
+      level: worstLevel(orphans.filter(hasReading).map((p) => p.level)),
       soonestRulDays: soonestRul(orphans),
       // No diagnosis for this bucket: the failure-mode rules read a signature
       // across one physical component, and readings from different components
@@ -102,11 +111,12 @@ export type MachineSummary = {
 };
 
 export function summarizeMachine(conditions: PointCondition[]): MachineSummary {
-  const byHealth = [...conditions].sort((a, b) => a.health - b.health);
+  const reported = conditions.filter(hasReading);
+  const byHealth = [...reported].sort((a, b) => a.health - b.health);
 
   return {
-    health: aggregateHealth(conditions.map((c) => c.health)),
-    level: worstLevel(conditions.map((c) => c.level)),
+    health: aggregateHealth(reported.map((c) => c.health)),
+    level: worstLevel(reported.map((c) => c.level)),
     dangerCount: conditions.filter((c) => c.level === 'danger').length,
     alertCount: conditions.filter((c) => c.level === 'alert').length,
     normalCount: conditions.filter((c) => c.level === 'normal').length,
@@ -164,11 +174,12 @@ export function healthByKind(conditions: PointCondition[]): HealthFactor[] {
   for (const kind of order) {
     const of = conditions.filter((c) => c.kind === kind);
     if (of.length === 0) continue;
+    const reported = of.filter(hasReading);
     factors.push({
       key: kind,
       label: kind === 'Unknown' ? 'Unclassified' : kind === 'Current' ? 'Motor current' : kind,
-      health: aggregateHealth(of.map((p) => p.health)),
-      level: worstLevel(of.map((p) => p.level)),
+      health: aggregateHealth(reported.map((p) => p.health)),
+      level: worstLevel(reported.map((p) => p.level)),
       count: of.length,
     });
   }
@@ -202,15 +213,16 @@ export type MachineRunState = {
 const RUNNING_ABOVE_RPM = 1;
 
 export function deriveRunState(conditions: PointCondition[]): MachineRunState {
-  const speed = conditions.find((c) => c.kind === 'Speed' && c.online);
+  const speed = conditions.find((c) => c.kind === 'Speed' && c.online && c.value !== null);
   if (!speed) {
     const offlineSpeed = conditions.some((c) => c.kind === 'Speed');
     return { label: 'UNKNOWN', detail: offlineSpeed ? 'speed channel offline' : 'no speed channel' };
   }
-  const running = speed.value > RUNNING_ABOVE_RPM;
+  const reading = speed.value as number;
+  const running = reading > RUNNING_ABOVE_RPM;
   return {
     label: running ? 'RUNNING' : 'STOPPED',
-    detail: `${speed.value.toFixed(speed.band.decimals)} ${speed.unit}`,
+    detail: `${reading.toFixed(speed.band.decimals)} ${speed.unit}`,
   };
 }
 

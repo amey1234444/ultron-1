@@ -55,7 +55,9 @@ export function AlarmSummaryCard({
 
   const unacked = conditions.filter((c) => latched[c.id] === 'active-unacked').length;
   const elevated = conditions
-    .filter((c) => c.level !== 'normal')
+    .filter((c): c is PointCondition & { value: number; health: number } =>
+      c.level !== 'normal' && c.value !== null && c.health !== null,
+    )
     .sort((a, b) => a.health - b.health)
     .slice(0, 3);
 

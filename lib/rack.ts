@@ -314,6 +314,37 @@ function channelDescriptor(card: CardNode, index: number): { letter: ChannelRef[
   };
 }
 
+/**
+ * The engineering range a channel is actually measured against.
+ *
+ * Same precedence `channelDescriptor` uses for the unit and the alarm limits,
+ * and for the same reason: on a simulated card the signal definition is the
+ * source of truth, and the card-level fields are a mirror of channel 1 only. A
+ * caller that reads the card config directly gets channel 1's range for every
+ * channel on the card, and gets it stale whenever the two have not been synced.
+ *
+ * Null when nothing declares a range, so a caller falls back to a display
+ * default rather than inventing one.
+ */
+export function channelEngineeringRange(card: CardNode, index: number): { min: number; max: number } | null {
+  const simulated = card.simulation?.[index];
+  if (simulated && Number.isFinite(simulated.min) && Number.isFinite(simulated.max) && simulated.max > simulated.min) {
+    return { min: simulated.min, max: simulated.max };
+  }
+
+  const config = card.config;
+  const range = (min: string | undefined, max: string | undefined) => {
+    const lo = parsedThreshold(min);
+    const hi = parsedThreshold(max);
+    return lo !== undefined && hi !== undefined && hi > lo ? { min: lo, max: hi } : null;
+  };
+
+  if ('measurementRangeMin' in config) return range(config.measurementRangeMin, config.measurementRangeMax);
+  if ('engineeringMin' in config) return range(config.engineeringMin, config.engineeringMax);
+  if ('minSpeed' in config) return range(config.minSpeed, config.maxSpeed);
+  return null;
+}
+
 // Flattens every acquisition-card channel across all racks into a pickable list —
 // used wherever something (e.g. a machine's mapping trail) needs to reference a
 // physical rack channel, independent of that rack's own detail screen.

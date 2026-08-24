@@ -212,9 +212,9 @@ export function MachineAnalysisOverviewPage({
         <TrainHealth nodes={train} criticalPath={criticalPath} onSelectNode={onSelectTrainNode} />
       </Panel>
 
-      <View className="flex-row flex-wrap gap-4">
+      <View className="flex-row flex-wrap items-stretch gap-4">
         <View style={HALF}>
-          <Panel>
+          <Panel fill>
             <OperatingContext
               state={state}
               operatingState={operatingState}
@@ -226,7 +226,7 @@ export function MachineAnalysisOverviewPage({
           </Panel>
         </View>
         <View style={HALF}>
-          <Panel>
+          <Panel fill>
             <FaultProgression events={progression} />
           </Panel>
         </View>
