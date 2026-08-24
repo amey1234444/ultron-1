@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { gatewayForRack, type DeviceNode } from './devices';
+import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from './devices';
 import { liveMeasurementKey, useLiveMeasurement } from './liveMeasurementBus';
 import { latestMeasurementForChannel, type LiveState } from './liveTelemetry';
 import { loadLocal, saveLocal } from './localPersist';
@@ -259,8 +259,10 @@ export function useMappedChannelReading(
     if (!channel || !live) return null;
     const rack = devices.find((device) => device.id === channel.rackId);
     const card = cards.find((c) => c.deviceId === channel.rackId && c.slot === channel.slot);
-    if (!rack || !card || rack.status !== 'Online') return null;
-    return latestMeasurementForChannel(rack, card, channelNumberFor(channel), live) ?? null;
+    if (!rack || !card) return null;
+    const rackState = deviceWithGatewayConnectionState(rack, devices);
+    if (rackState.status !== 'Online') return null;
+    return latestMeasurementForChannel(rackState, card, channelNumberFor(channel), live) ?? null;
   }, [channel, cards, devices, live]);
 
   if (bus.status !== 'none') return bus;

@@ -17,7 +17,7 @@
  * file.
  */
 
-import { gatewayForRack, type DeviceNode } from '../devices';
+import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../devices';
 import {
   CHANNEL_LIVE_GRACE_MS,
   latestMeasurementForChannel,
@@ -209,9 +209,10 @@ export function buildParameterConnections({
       (candidate) => candidate.deviceId === point.channel.rackId && candidate.slot === point.channel.slot,
     );
     const gateway = rack ? gatewayForRack(rack, devices) : undefined;
+    const rackState = rack ? deviceWithGatewayConnectionState(rack, devices) : undefined;
     const number = channelNumber(point.channel.id);
     const measurement =
-      rack && card && live ? latestMeasurementForChannel(rack, card, number, live) : undefined;
+      rackState && card && live ? latestMeasurementForChannel(rackState, card, number, live) : undefined;
     const quality = qualityFor(measurement, now);
     const resolution = resolveTag(point);
 

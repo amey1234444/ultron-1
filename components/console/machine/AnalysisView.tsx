@@ -11,7 +11,7 @@ import {
   type RotaryAirlockAnalysisResult,
 } from '../../../lib/analysis/rotaryAirlockAnalyzer';
 import { cn } from '../../../lib/cn';
-import type { DeviceNode } from '../../../lib/devices';
+import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
 import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import { apiFetch } from '../../../src/lib/apiClient';
@@ -147,7 +147,7 @@ function buildReadings(
     let source: AnalysisReading['source'] = 'gateway';
 
     if (rack && card && live) {
-      const measurement = latestMeasurementForChannel(rack, card, channelNumber(mapped.channel.id), live);
+      const measurement = latestMeasurementForChannel(deviceWithGatewayConnectionState(rack, devices), card, channelNumber(mapped.channel.id), live);
       if (measurement && measurement.value !== null && measurement.value !== undefined) {
         value = measurement.value;
         unit = measurement.unit ?? unit;

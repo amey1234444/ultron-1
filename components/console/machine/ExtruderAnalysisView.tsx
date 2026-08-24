@@ -57,7 +57,7 @@ import {
   type SignalView,
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
-import type { DeviceNode } from '../../../lib/devices';
+import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
 import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import {
@@ -159,7 +159,9 @@ function buildPoints(
       (candidate) => candidate.deviceId === mapped.channel.rackId && candidate.slot === mapped.channel.slot,
     );
     const measurement =
-      rack && card && live ? latestMeasurementForChannel(rack, card, channelNumber(mapped.channel.id), live) : undefined;
+      rack && card && live
+        ? latestMeasurementForChannel(deviceWithGatewayConnectionState(rack, devices), card, channelNumber(mapped.channel.id), live)
+        : undefined;
     const value = usableMeasurementValue(measurement);
     return { mapped, label, measurement, value };
   });
