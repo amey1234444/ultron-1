@@ -2,7 +2,7 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { formatRul, LEVEL_HEX, type PointEvidence } from '../../../../lib/condition';
+import { formatRul, levelHexes, type PointEvidence } from '../../../../lib/condition';
 import type { MachineSummary, RankedDiagnosis } from './rollup';
 
 function evidenceLine(evidence: PointEvidence[]) {
@@ -30,6 +30,7 @@ export function DiagnosisBanner({
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const levels = levelHexes(isDark);
 
   // Nothing is elevated. Say so plainly and give the number that backs it up,
   // rather than leaving a blank space that reads as "not checked".
@@ -37,7 +38,7 @@ export function DiagnosisBanner({
     const worst = summary.worstPoint;
     return (
       <View className={cn('flex-row items-center gap-3 rounded-xl border px-4 py-3', lineClass)}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: LEVEL_HEX.normal }} />
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: levels.normal }} />
         <Text className={cn('font-body-medium text-xs', inkClass)}>No active condition</Text>
         {worst && worst.value !== null ? (
           <Text className={cn('flex-1 font-body text-[11px]', mutedClass)} numberOfLines={1}>
@@ -49,7 +50,7 @@ export function DiagnosisBanner({
     );
   }
 
-  const colour = LEVEL_HEX[summary.level];
+  const colour = levels[summary.level];
 
   // The worst point on the machine, when this diagnosis does not already account
   // for it. Only worth calling out if it is actually elevated.

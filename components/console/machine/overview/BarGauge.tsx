@@ -3,7 +3,8 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { LEVEL_HEX, stateHex, type SensorState, type Thresholds } from '../../../../lib/condition';
+import { levelHexes, type SensorState, type Thresholds } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 
 // The gauge column of a sensor tile: numbered scale, tick rail, hollow tube, fill,
 // ALERT and DANGER lines, live pointer, and — where the tile is wide enough —
@@ -153,8 +154,20 @@ export function BarGauge({
   size?: GaugeSize;
 }) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const levels = levelHexes(isDark);
   const p = PRESETS[size];
-  const colour = stateHex(state);
+  // The fill is the one place the gauge is allowed to be saturated — it is the
+  // measurement. Everything else (frame, track, ticks) is neutral furniture, and
+  // in light mode it is a good deal quieter than the dark instrument's chrome.
+  const colour =
+    state === 'offline'
+      ? palette.neutral
+      : state === 'danger'
+        ? palette.gaugeDanger
+        : state === 'alert'
+          ? palette.gaugeWarning
+          : palette.gaugeNormal;
 
   const innerHeight = p.tubeHeight - p.border * 2 - p.pad * 2;
   const innerWidth = p.tubeWidth - p.border * 2 - p.pad * 2;
@@ -201,8 +214,8 @@ export function BarGauge({
     <View className="flex-row" style={{ height: p.tubeHeight, width: gaugeColumnWidth(size) }}>
       {p.calloutWidth > 0 && (
         <View style={{ width: p.calloutWidth, height: p.tubeHeight }} className="relative">
-          {callout('DANGER', thresholds.danger, LEVEL_HEX.danger)}
-          {callout('ALERT', thresholds.alert, LEVEL_HEX.alert)}
+          {callout('DANGER', thresholds.danger, levels.danger)}
+          {callout('ALERT', thresholds.alert, levels.alert)}
         </View>
       )}
 
@@ -219,8 +232,9 @@ export function BarGauge({
               textAlign: 'right',
               fontSize: p.scaleFontSize,
               lineHeight: p.scaleFontSize + 3,
+              color: palette.inkMuted,
             }}
-            className={cn('font-mono', isDark ? 'text-ink' : 'text-ink-inverse')}
+            className="font-mono"
           >
             {formatTick(v)}
           </Text>
@@ -239,7 +253,7 @@ export function BarGauge({
                 bottom: fromFloor(toPx(v)),
                 width: isMajor ? p.railWidth : Math.max(3, p.railWidth - 4),
                 height: isMajor ? 1.5 : 1,
-                backgroundColor: isDark ? '#BEBEBE' : '#4A4A4A',
+                backgroundColor: palette.gaugeTick,
                 opacity: isMajor ? 0.95 : 0.5,
               }}
             />
@@ -252,10 +266,10 @@ export function BarGauge({
           width: p.tubeWidth,
           height: p.tubeHeight,
           borderWidth: p.border,
-          borderColor: isDark ? '#55565A' : '#C9C9C9',
+          borderColor: palette.gaugeBorder,
           borderRadius: p.radius,
           padding: p.pad,
-          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)',
+          backgroundColor: isDark ? 'rgba(255,255,255,0.02)' : palette.bgSoft,
         }}
       >
         <View
@@ -265,9 +279,9 @@ export function BarGauge({
             borderRadius: Math.max(4, p.radius - 6),
             overflow: 'hidden',
             // Hollow: this dark ground is what stays visible above the reading.
-            backgroundColor: isDark ? '#0B0B0C' : '#EDEDED',
+            backgroundColor: palette.gaugeTrack,
             borderWidth: 1,
-            borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+            borderColor: isDark ? 'rgba(255,255,255,0.08)' : palette.line,
           }}
         >
           {showFill && (
@@ -301,8 +315,8 @@ export function BarGauge({
 
           {/* Drawn after the fill, so a reading past danger does not paint over
               the line it crossed. */}
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: alertPx - 1, height: 2, backgroundColor: LEVEL_HEX.alert }} />
-          <View style={{ position: 'absolute', left: 0, right: 0, bottom: dangerPx - 1, height: 2, backgroundColor: LEVEL_HEX.danger }} />
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: alertPx - 1, height: 2, backgroundColor: levels.alert }} />
+          <View style={{ position: 'absolute', left: 0, right: 0, bottom: dangerPx - 1, height: 2, backgroundColor: levels.danger }} />
 
           {showFill && (
             <View

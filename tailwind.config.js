@@ -23,18 +23,20 @@ module.exports = {
           darkpanel: '#111318',
           // Slightly lifted panel used by the console dashboard cards.
           card: '#171A20',
-          light: '#F6F6F4',
+          light: '#F5F6F8',
           lightpanel: '#FFFFFF',
+          // Nested surface inside a light card, see `panelRaised` in consoleTheme.
+          lightraised: '#FAFBFC',
         },
         ink: {
           DEFAULT: '#F7F6F2',
           muted: '#8B8D93',
-          inverse: '#0A0B0D',
-          'inverse-muted': '#5C6068',
+          inverse: '#171A1F',
+          'inverse-muted': '#5E6673',
         },
         line: {
           dark: 'rgba(255,255,255,0.075)',
-          light: '#E6E5E1',
+          light: '#DFE3E8',
         },
         // One green for the whole product: the Online pill on racks and
         // gateways set it, so `status.success` and `accent` are the same value

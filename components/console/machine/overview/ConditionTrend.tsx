@@ -4,7 +4,8 @@ import Svg, { Line, Path, Polyline } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { LEVEL_HEX, stateHex, type SensorState, type Thresholds } from '../../../../lib/condition';
+import { levelHexes, stateHexFor, type SensorState, type Thresholds } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 
 // Measured trend against its ALERT and DANGER limits.
 //
@@ -75,14 +76,16 @@ export function ConditionTrend({
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const grid = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+  const palette = consolePalette(isDark);
+  const levels = levelHexes(isDark);
+  const grid = palette.chartGridMajor;
 
   const ranges = useMemo(() => rangesFor(samples.length, sampleIntervalHours), [samples.length, sampleIntervalHours]);
   const [rangeLabel, setRangeLabel] = useState<string | null>(null);
   const range = ranges.find((r) => r.label === rangeLabel) ?? ranges[ranges.length - 1];
 
   const [width, setWidth] = useState<number | null>(null);
-  const colour = stateHex(state);
+  const colour = stateHexFor(state, isDark);
 
   const shown = range ? samples.slice(Math.max(0, samples.length - range.samples)) : samples;
 
@@ -171,7 +174,7 @@ export function ConditionTrend({
               y1={geometry.yAlert}
               x2={width - PAD_RIGHT}
               y2={geometry.yAlert}
-              stroke={LEVEL_HEX.alert}
+              stroke={levels.alert}
               strokeWidth={1.25}
               strokeDasharray="5 4"
             />
@@ -180,7 +183,7 @@ export function ConditionTrend({
               y1={geometry.yDanger}
               x2={width - PAD_RIGHT}
               y2={geometry.yDanger}
-              stroke={LEVEL_HEX.danger}
+              stroke={levels.danger}
               strokeWidth={1.25}
               strokeDasharray="5 4"
             />
@@ -194,11 +197,11 @@ export function ConditionTrend({
 
       <View className="flex-row flex-wrap items-center gap-4">
         <View className="flex-row items-center gap-1.5">
-          <View style={{ width: 12, height: 2, backgroundColor: LEVEL_HEX.alert }} />
+          <View style={{ width: 12, height: 2, backgroundColor: levels.alert }} />
           <Text className={cn('font-mono text-[9px]', mutedClass)}>ALERT {thresholds.alert.toFixed(decimals)}</Text>
         </View>
         <View className="flex-row items-center gap-1.5">
-          <View style={{ width: 12, height: 2, backgroundColor: LEVEL_HEX.danger }} />
+          <View style={{ width: 12, height: 2, backgroundColor: levels.danger }} />
           <Text className={cn('font-mono text-[9px]', mutedClass)}>DANGER {thresholds.danger.toFixed(decimals)}</Text>
         </View>
       </View>

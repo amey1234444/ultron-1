@@ -219,6 +219,101 @@ export function useLiveChannelHistory(key: string | null | undefined, storageKey
   return history;
 }
 
+// --- Timestamped history, for the trends workspace ---------------------------
+
+/** One sample: when it was taken, and what it read. */
+export type TrendSample = { t: number; v: number };
+
+/**
+ * The trends buffer, in samples.
+ *
+ * Longer than `HISTORY_LENGTH` because the trends workspace offers windows in
+ * minutes and hours, and a 240-sample buffer at 1 Hz is four minutes of screen.
+ * It is still a bounded in-memory ring: there is no history endpoint behind
+ * this app, so a window longer than what has actually been received is reported
+ * as unavailable rather than drawn short and passed off as complete.
+ */
+export const TREND_BUFFER_LENGTH = 3600;
+/**
+ * How much of it survives a reload. The whole buffer would be ~100 kB per
+ * channel in local storage; the tail is enough to reopen the page on a
+ * populated chart rather than an empty one.
+ */
+const TREND_PERSIST_LENGTH = 480;
+const TREND_PERSIST_EVERY_N = 8;
+
+function isSample(value: unknown): value is TrendSample {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    typeof (value as TrendSample).t === 'number' &&
+    typeof (value as TrendSample).v === 'number' &&
+    Number.isFinite((value as TrendSample).t) &&
+    Number.isFinite((value as TrendSample).v)
+  );
+}
+
+function loadSamples(storageKey: string | undefined): TrendSample[] {
+  const saved = storageKey ? loadLocal<unknown[]>(storageKey) : null;
+  return Array.isArray(saved) ? saved.filter(isSample) : [];
+}
+
+/**
+ * A channel's samples, each carrying the time it was taken.
+ *
+ * `useLiveChannelHistory` above returns bare numbers, which is all a sparkline
+ * needs and is why every existing caller uses it. A trend chart with a real
+ * time axis cannot: without `t` there is no way to honour a "last 30 seconds"
+ * window, tell a 1 Hz channel from a 10 Hz one, or draw a gap where the feed
+ * stopped. The timestamp is the sample's own `updatedAt`, not the clock at the
+ * moment it was appended — see the note on `LiveChannelReading.atMs`.
+ *
+ * One deliberate difference from `useLiveChannelHistory`: going stale does NOT
+ * clear the buffer. A channel that stops reporting still has a real history,
+ * and a trend screen that blanks itself the moment a feed pauses cannot show
+ * what happened before it paused — which is exactly what it is for. The caller
+ * is told the reading is stale and says so; the samples stay.
+ */
+export function useLiveChannelSamples(key: string | null | undefined, storageKey?: string): TrendSample[] {
+  const reading = useLiveChannelReading(key);
+  const [samples, setSamples] = useState<TrendSample[]>(() => (key ? loadSamples(storageKey) : []));
+
+  // A changed key is a different channel: its samples must never be continued
+  // with another channel's.
+  const lastKey = useRef(key);
+  useEffect(() => {
+    if (lastKey.current === key) return;
+    lastKey.current = key;
+    setSamples(key ? loadSamples(storageKey) : []);
+  }, [key, storageKey]);
+
+  const appendedAt = useRef<number | null>(null);
+  const tickRef = useRef(0);
+  const value = reading.value;
+  const isLive = reading.status === 'live';
+  const atMs = reading.atMs;
+
+  useEffect(() => {
+    if (!isLive || typeof value !== 'number' || atMs === null) return;
+    if (appendedAt.current === atMs) return;
+    appendedAt.current = atMs;
+    setSamples((previous) => {
+      // Out-of-order frames would draw a line that goes backwards in time.
+      const last = previous[previous.length - 1];
+      if (last && atMs < last.t) return previous;
+      const next = [...previous, { t: atMs, v: value }];
+      const trimmed = next.length > TREND_BUFFER_LENGTH ? next.slice(next.length - TREND_BUFFER_LENGTH) : next;
+      tickRef.current += 1;
+      if (storageKey && tickRef.current % TREND_PERSIST_EVERY_N === 0) {
+        saveLocal(storageKey, trimmed.slice(Math.max(0, trimmed.length - TREND_PERSIST_LENGTH)));
+      }
+      return trimmed;
+    });
+  }, [atMs, isLive, storageKey, value]);
+
+  return samples;
+}
+
 // --- The reading a mapped channel actually resolves to ------------------------
 
 /**

@@ -30,6 +30,8 @@ import { useColorScheme } from 'nativewind';
 
 import { MachineAnalysisWorkspace } from '../../components/console/machine/MachineAnalysisWorkspace';
 import { MachineOverviewPage } from '../../components/console/machine/MachineOverviewPage';
+import { RackOccupancyView } from '../../components/console/machine/RackOccupancyView';
+import { TrendView } from '../../components/console/machine/TrendView';
 import type { MappedChannel } from '../../components/console/machine/RackOccupancyView';
 import { useSimulationEngine } from '../../hooks/useSimulationEngine';
 import { consolePalette } from '../../lib/consoleTheme';
@@ -270,14 +272,15 @@ function cardFor(spec: SlotSpec): CardNode {
 function Harness() {
   const { setColorScheme } = useColorScheme();
   const [dark, setDark] = useState(true);
-  const [view, setView] = useState<'overview' | 'analysis'>('overview');
+  const [view, setView] = useState<'overview' | 'analysis' | 'rack' | 'trend'>('overview');
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const isDark = params.get('theme') !== 'light';
     setDark(isDark);
     setColorScheme(isDark ? 'dark' : 'light');
-    setView(params.get('view') === 'analysis' ? 'analysis' : 'overview');
+    const requested = params.get('view');
+    setView(requested === 'analysis' || requested === 'rack' || requested === 'trend' ? requested : 'overview');
   }, [setColorScheme]);
 
   const devices = useMemo<DeviceNode[]>(() => [GATEWAY, RACK], []);
@@ -323,6 +326,10 @@ function Harness() {
           live={live}
           expectedPoints={expectedPointsForTemplate(machine.template)}
         />
+      ) : view === 'rack' ? (
+        <RackOccupancyView devices={devices} cards={cards} live={live} mappedChannels={mappedChannels} />
+      ) : view === 'trend' ? (
+        <TrendView mappedChannels={mappedChannels} devices={devices} machineId={machine.id} />
       ) : (
         <MachineAnalysisWorkspace
           machine={machine}

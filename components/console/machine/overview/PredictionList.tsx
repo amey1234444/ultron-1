@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { formatRul, LEVEL_HEX } from '../../../../lib/condition';
+import { formatRul, levelHexes } from '../../../../lib/condition';
 import type { RankedDiagnosis } from './rollup';
 
 const CONFIDENCE_DOTS: Record<RankedDiagnosis['confidence'], string> = {
@@ -19,6 +19,7 @@ export function PredictionList({ diagnoses }: { diagnoses: RankedDiagnosis[] }) 
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const levels = levelHexes(isDark);
 
   return (
     <View className="gap-3">
@@ -37,7 +38,7 @@ export function PredictionList({ diagnoses }: { diagnoses: RankedDiagnosis[] }) 
             // Colour by urgency, not by confidence: a low-confidence mode on a
             // point already past critical still needs to look like a problem.
             const level = diagnosis.evidence.some((e) => e.level === 'danger') ? 'danger' : 'alert';
-            const colour = LEVEL_HEX[level];
+            const colour = levels[level];
 
             return (
               <View

@@ -3,7 +3,8 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { LEVEL_HEX, type ConditionLevel } from '../../../../lib/condition';
+import { levelHexes, type ConditionLevel } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 
 const STROKE = 9;
 
@@ -23,7 +24,7 @@ export function HealthRing({
 }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const colour = LEVEL_HEX[level];
+  const colour = levelHexes(isDark)[level];
 
   const radius = (size - STROKE) / 2;
   const circumference = 2 * Math.PI * radius;
@@ -32,7 +33,7 @@ export function HealthRing({
   return (
     <View style={{ width: size, height: size }} className="items-center justify-center">
       <Svg width={size} height={size} style={{ position: 'absolute' }}>
-        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={isDark ? '#252525' : '#E5E5E5'} strokeWidth={STROKE} fill="none" />
+        <Circle cx={size / 2} cy={size / 2} r={radius} stroke={consolePalette(isDark).lineSubtle} strokeWidth={STROKE} fill="none" />
         {/* Rotated so the arc starts at twelve o'clock. Written as an SVG
             transform string with its centre baked in rather than via the
             rotation/originX/originY props: on web, react-native-svg 15 turns

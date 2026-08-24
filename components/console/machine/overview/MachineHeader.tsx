@@ -2,7 +2,8 @@ import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { LEVEL_HEX } from '../../../../lib/condition';
+import { levelHexes } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 
 // Whether the page is showing current data, and how sure it is of that. Kept
 // separate from sensor condition: every reading can be healthy while the feed
@@ -10,11 +11,10 @@ import { LEVEL_HEX } from '../../../../lib/condition';
 export type FeedStatus = 'live' | 'delayed' | 'offline';
 
 const FEED_LABEL: Record<FeedStatus, string> = { live: 'LIVE', delayed: 'DELAYED', offline: 'OFFLINE' };
-const FEED_HEX: Record<FeedStatus, string> = {
-  live: LEVEL_HEX.normal,
-  delayed: LEVEL_HEX.alert,
-  offline: '#737373',
-};
+function feedHexes(isDark: boolean): Record<FeedStatus, string> {
+  const levels = levelHexes(isDark);
+  return { live: levels.normal, delayed: levels.alert, offline: consolePalette(isDark).neutral };
+}
 
 export type MachineHeaderProps = {
   machineName: string;
@@ -64,7 +64,7 @@ export function MachineHeader({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
-  const feedColour = FEED_HEX[feed];
+  const feedColour = feedHexes(isDark)[feed];
   const age = ageLabel(feed, ageSeconds);
 
   return (

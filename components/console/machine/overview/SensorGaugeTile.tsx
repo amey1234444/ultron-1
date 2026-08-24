@@ -5,7 +5,8 @@ import Svg, { Circle, Line } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { formatRul, LEVEL_HEX, stateHex, STATE_LABEL, TREND_FLAT_BAND, type IsoGroup } from '../../../../lib/condition';
+import { formatRul, levelHexes, stateTone, STATE_LABEL, TREND_FLAT_BAND, type IsoGroup } from '../../../../lib/condition';
+import { cardElevation, consolePalette } from '../../../../lib/consoleTheme';
 import type { DeviceNode } from '../../../../lib/devices';
 import type { CardNode } from '../../../../lib/rack';
 import type { MappedChannel } from '../RackOccupancyView';
@@ -89,12 +90,19 @@ export function SensorGaugeTile({
   onPress,
 }: SensorGaugeTileProps) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const levels = levelHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
+  const hairline = isDark ? 'rgba(255,255,255,0.10)' : palette.lineSubtle;
 
   const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards, live });
-  const colour = stateHex(condition.state);
+  // A state is a word, a dot and a number, and each wants a different amount of
+  // chroma to read as the same colour on a white ground — see `statusTone`.
+  const tone = stateTone(condition.state, isDark);
+  const colour = tone.fg;
+  const valueColour = tone.value;
+  const dotColour = tone.dot;
 
   useEffect(() => {
     onCondition?.(condition);
@@ -118,6 +126,20 @@ export function SensorGaugeTile({
   const offline = condition.state === 'offline';
 
   const valueFontSize = compact ? 25 : 40;
+
+  // Light mode: a healthy card is a white card with a neutral edge. Colour goes
+  // on the reading, the dot and the status word, and the border only picks up a
+  // hue once the sensor is actually asking for attention. Dark mode keeps the
+  // tinted edge it has always had — on a near-black ground it reads as depth
+  // rather than as a highlight.
+  const quiet = !isDark && condition.state === 'normal';
+  const cardBorder = offline
+    ? hairline
+    : isDark
+      ? `${colour}80`
+      : condition.state === 'normal'
+        ? palette.line
+        : tone.border;
 
   const summaryCell = (label: string, tint: string | undefined, text: string) => (
     <View className="flex-1 items-center">
@@ -159,7 +181,7 @@ export function SensorGaugeTile({
   const body = (
     <View
       className={cn('overflow-hidden border', compact ? 'rounded-2xl' : 'rounded-[22px]')}
-      style={{ width, borderColor: offline ? hairline : `${colour}80`, opacity: offline ? 0.72 : 1 }}
+      style={{ width, borderColor: cardBorder, opacity: offline ? 0.72 : 1, ...cardElevation(isDark) }}
     >
       <LinearGradient
         colors={isDark ? ['#141416', '#0B0B0C', '#101011'] : ['#FFFFFF', '#FAFAFA', '#FFFFFF']}
@@ -169,7 +191,10 @@ export function SensorGaugeTile({
       >
         <View className="flex-row items-center justify-between gap-1">
           <View className="flex-row items-center gap-2">
-            <View className={cn('rounded-md border', compact ? 'px-1.5 py-[1px]' : 'px-2 py-1')} style={{ borderColor: `${colour}8C` }}>
+            <View
+              className={cn('rounded-md border', compact ? 'px-1.5 py-[1px]' : 'px-2 py-1')}
+              style={{ borderColor: quiet ? palette.line : `${colour}8C`, backgroundColor: quiet ? palette.panelRaised : undefined }}
+            >
               <Text style={{ color: colour }} className={cn('font-mono font-bold', compact ? 'text-[11px]' : 'text-[13px]')}>
                 {condition.code}
               </Text>
@@ -186,7 +211,7 @@ export function SensorGaugeTile({
                 {STATE_LABEL[condition.state]}
               </Text>
             )}
-            <View style={{ width: compact ? 9 : 12, height: compact ? 9 : 12, borderRadius: 6, backgroundColor: colour }} />
+            <View style={{ width: compact ? 9 : 12, height: compact ? 9 : 12, borderRadius: 6, backgroundColor: dotColour }} />
           </View>
         </View>
 
@@ -219,7 +244,7 @@ export function SensorGaugeTile({
             </Text>
             <Text
               numberOfLines={1}
-              style={{ color: colour, fontSize: valueFontSize, lineHeight: valueFontSize + 4, letterSpacing: -1 }}
+              style={{ color: valueColour, fontSize: valueFontSize, lineHeight: valueFontSize + 4, letterSpacing: -1 }}
               className="mt-0.5 font-mono font-bold tabular-nums"
             >
               {hasReading ? value.toFixed(decimals) : NO_VALUE_TEXT}
@@ -247,7 +272,7 @@ export function SensorGaugeTile({
             {condition.isoZone && !offline ? (
               <View
                 className={cn('self-start rounded border', compact ? 'mt-1.5 px-1 py-[1px]' : 'mt-3 px-2.5 py-1')}
-                style={{ borderColor: `${colour}99` }}
+                style={{ borderColor: quiet ? palette.line : `${colour}99` }}
               >
                 <Text style={{ color: colour }} className={cn('font-mono font-bold', compact ? 'text-[8px]' : 'text-[11px]')}>
                   ISO {condition.isoZone}
@@ -261,9 +286,9 @@ export function SensorGaugeTile({
           className={cn('flex-row items-center rounded-lg border', compact ? 'mt-2 py-1.5' : 'mt-3 py-2')}
           style={{ borderColor: hairline }}
         >
-          {summaryCell('ALERT', LEVEL_HEX.alert, thresholds.alert.toFixed(decimals))}
+          {summaryCell('ALERT', levels.alert, thresholds.alert.toFixed(decimals))}
           <View style={{ width: 1, height: compact ? 22 : 32, backgroundColor: hairline }} />
-          {summaryCell('DANGER', LEVEL_HEX.danger, thresholds.danger.toFixed(decimals))}
+          {summaryCell('DANGER', levels.danger, thresholds.danger.toFixed(decimals))}
           <View style={{ width: 1, height: compact ? 22 : 32, backgroundColor: hairline }} />
           {summaryCell(
             'F.S.',
@@ -274,7 +299,7 @@ export function SensorGaugeTile({
 
         {/* Limits nobody configured must not read as commissioned ones. */}
         {!thresholds.configured && (
-          <Text className={cn('mt-1 text-center font-mono text-accent', compact ? 'text-[8px]' : 'text-[10px]')}>
+          <Text style={{ color: palette.accent }} className={cn('mt-1 text-center font-mono', compact ? 'text-[8px]' : 'text-[10px]')}>
             limits inferred, not configured
           </Text>
         )}

@@ -1,5 +1,6 @@
 import type { MachineComponent, MeasurementPointKind } from './machines';
 import type { ChannelRef } from './rack';
+import { consolePalette, statusTone, type ToneName } from './consoleTheme';
 import { STATUS_HEX, type Status } from './status';
 
 // Everything a condition-monitoring / predictive-maintenance view needs to say
@@ -49,6 +50,55 @@ const OFFLINE_HEX = '#737373';
 
 export function stateHex(state: SensorState): string {
   return state === 'offline' ? OFFLINE_HEX : LEVEL_HEX[state];
+}
+
+// --- Theme-aware condition colour --------------------------------------------
+//
+// `LEVEL_HEX` above is a module constant, so it cannot know which theme is on
+// screen. It is the dark ramp, and it stays that way: it is what the pure
+// derivation modules (which have no React context) hand to callers, and it is
+// correct on the console's primary theme.
+//
+// A component that renders a state DOES know the theme, and light mode needs a
+// genuinely different ramp — see the note at the top of `consoleTheme.ts`. So
+// anything drawn resolves its colour through these instead, which return the
+// dark values unchanged and the deeper light ones on a white ground.
+//
+// The mapping is one-to-one with `ConditionLevel`, so nothing about which state
+// a reading is in changes here — only what that state is painted.
+
+/** The three condition levels as one tone name each. */
+const TONE_FOR_LEVEL: Record<SensorState, ToneName> = {
+  normal: 'normal',
+  alert: 'alert',
+  danger: 'danger',
+  offline: 'offline',
+};
+
+/** The full tone (word / value / dot / soft fill / tinted border) for a state. */
+export function stateTone(state: SensorState, isDark: boolean) {
+  return statusTone(consolePalette(isDark), TONE_FOR_LEVEL[state]);
+}
+
+/** The colour a state's *word* and marks are set in, for the current theme. */
+export function stateHexFor(state: SensorState, isDark: boolean): string {
+  return stateTone(state, isDark).fg;
+}
+
+/** The colour a state's live *number* is set in, for the current theme. */
+export function stateValueHexFor(state: SensorState, isDark: boolean): string {
+  return stateTone(state, isDark).value;
+}
+
+/**
+ * `LEVEL_HEX`, resolved for the current theme.
+ *
+ * Drop-in for the constant: `const levels = levelHexes(isDark)` then
+ * `levels.alert` wherever `LEVEL_HEX.alert` used to be.
+ */
+export function levelHexes(isDark: boolean): Record<ConditionLevel, string> {
+  const palette = consolePalette(isDark);
+  return { normal: palette.accent, alert: palette.warning, danger: palette.critical };
 }
 
 // Single place the precedence is decided: unreachable beats every reading, and a

@@ -2,7 +2,8 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { LEVEL_HEX, STATE_LABEL } from '../../../../lib/condition';
+import { levelHexes, STATE_LABEL } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 import type { HealthFactor } from './rollup';
 
 // What the machine's single health score is made of, one bar per measurement kind
@@ -17,7 +18,8 @@ export function HealthFactorList({ factors }: { factors: HealthFactor[] }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const track = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+  const track = isDark ? 'rgba(255,255,255,0.08)' : consolePalette(isDark).lineSubtle;
+  const levels = levelHexes(isDark);
 
   if (factors.length === 0) {
     return <Text className={cn('font-body text-xs italic', mutedClass)}>No measurement kinds mapped yet.</Text>;
@@ -26,7 +28,7 @@ export function HealthFactorList({ factors }: { factors: HealthFactor[] }) {
   return (
     <View className="gap-2.5">
       {factors.map((factor) => {
-        const colour = LEVEL_HEX[factor.level];
+        const colour = levels[factor.level];
         const percent = factor.health === null ? 0 : Math.max(0, Math.min(100, factor.health));
 
         return (

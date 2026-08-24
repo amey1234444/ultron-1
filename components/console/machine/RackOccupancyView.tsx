@@ -1,21 +1,17 @@
-﻿import { useMemo } from 'react';
-import { ScrollView, Text, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
+import { cardElevation, consolePalette, statusTone, type ConsolePalette } from '../../../lib/consoleTheme';
 import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
-import type { CardNode, ChannelRef } from '../../../lib/rack';
+import { TOTAL_SLOTS, type CardNode, type ChannelRef } from '../../../lib/rack';
 import { useChannelReading } from '../../../lib/liveChannelValue';
+import { text } from '../../ui';
 import { RackFaceplate } from '../rack/RackFaceplate';
 import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT } from './liveValue';
-
-const LIVE_COLOUR = '#3FBF6A';
-// Grey: nothing has reported for this channel. Distinct from any alarm colour.
-const NO_DATA_COLOUR = '#8B8D93';
-const WARNING_COLOUR = '#D9962B';
-const CRITICAL_COLOUR = '#D64545';
 
 // `id` is the mapping's own identity (the box that's linked to this channel),
 // not the channel's — several boxes can legitimately point at the same real
@@ -24,35 +20,67 @@ const CRITICAL_COLOUR = '#D64545';
 // produces React's "two children with the same key" warning.
 export type MappedChannel = { id: string; channel: ChannelRef; label: string; templatePointCode?: string };
 
-function statusColour(channel: ChannelRef, value: number): string {
-  if (channel.alarmCritical !== undefined && value >= channel.alarmCritical) return CRITICAL_COLOUR;
-  if (channel.alarmWarning !== undefined && value >= channel.alarmWarning) return WARNING_COLOUR;
-  return LIVE_COLOUR;
+// --- Compact rack navigator geometry -----------------------------------------
+//
+// The rack strip used to be one full-height section per rack — a faceplate, a
+// header block and a column of 260px slot cards, all expanded, all at once.
+// On a machine wired across two racks that is most of a screen spent on
+// "which rack is this channel on", before a single reading has been read.
+//
+// It is a navigator now: one tile per rack, sized so a row of them can be
+// scanned in a second or two, and the detail — faceplate, slots, live
+// readings — opens for the rack that is selected. Nothing was removed; the
+// secondary half of it stopped being permanently on screen.
+const TILE_MIN_WIDTH = 196;
+const TILE_MAX_WIDTH = 240;
+// The slot strip: 14 cells, so a rack's occupancy is a shape rather than a
+// sentence. Sized to fit TILE_MIN_WIDTH less the tile's own padding.
+const SLOT_CELL_HEIGHT = 14;
+const SLOT_CELL_GAP = 2;
+
+function statusToneFor(online: boolean) {
+  return online ? ('normal' as const) : ('offline' as const);
 }
 
-function ChannelReadout({ mapped, devices }: { mapped: MappedChannel; devices: DeviceNode[] }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
+function ChannelReadout({
+  mapped,
+  devices,
+  palette,
+}: {
+  mapped: MappedChannel;
+  devices: DeviceNode[];
+  palette: ConsolePalette;
+}) {
   const { channel, label } = mapped;
   const reading = useChannelReading(channel, devices);
   const value = reading.value;
   const hasReading = typeof value === 'number';
   // No reading means no alarm colour — an absent value is grey, not green.
-  const colour = hasReading ? statusColour(channel, value) : NO_DATA_COLOUR;
+  const tone = !hasReading
+    ? statusTone(palette, 'offline')
+    : channel.alarmCritical !== undefined && value >= channel.alarmCritical
+      ? statusTone(palette, 'danger')
+      : channel.alarmWarning !== undefined && value >= channel.alarmWarning
+        ? statusTone(palette, 'alert')
+        : statusTone(palette, 'normal');
   const range = LIVE_RANGE_FOR_LETTER[channel.letter];
 
   return (
-    <View className="flex-row items-center justify-between gap-3 border-t px-3 py-2" style={{ borderColor: isDark ? '#252525' : '#E5E5E5' }}>
-      <View className="flex-1 flex-row items-center gap-2">
-        <View className={cn('rounded-full border px-1.5 py-0.5', lineClass)}>
-          <Text className={cn('font-mono text-[10px]', mutedClass)}>{channel.code}</Text>
+    <View
+      className="flex-row items-center justify-between gap-3 px-2.5 py-1.5"
+      style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+    >
+      <View className="min-w-0 flex-1 flex-row items-center gap-2">
+        <View className="rounded-[5px] border px-1.5 py-[1px]" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
+          <Text className={text.code} style={{ color: palette.inkFaint }}>
+            {channel.code}
+          </Text>
         </View>
-        <Text numberOfLines={1} className={cn('font-body text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>
+        <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.ink }}>
           {label}
         </Text>
       </View>
-      <Text style={{ color: colour }} className="font-mono text-xs font-bold">
+      <Text className={text.data} style={{ color: hasReading ? tone.value : palette.inkFaint, fontVariant: ['tabular-nums'] }}>
         {hasReading ? `${value.toFixed(range.decimals)} ${channel.unit}` : NO_VALUE_TEXT}
       </Text>
     </View>
@@ -64,26 +92,29 @@ function SlotOccupancyCard({
   card,
   channels,
   devices,
+  palette,
 }: {
   slot: number;
   card: CardNode | null;
   channels: MappedChannel[];
   devices: DeviceNode[];
+  palette: ConsolePalette;
 }) {
-  const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-
   return (
-    <View className={cn('overflow-hidden rounded-xl border', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')} style={{ borderColor: `${LIVE_COLOUR}55` }}>
-      <View className="flex-row items-center justify-between px-3 py-2">
-        <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
+    <View
+      className="overflow-hidden rounded-[10px] border"
+      style={{ borderColor: palette.line, backgroundColor: palette.panel }}
+    >
+      <View className="flex-row items-center justify-between px-2.5 py-1.5" style={{ backgroundColor: palette.panelRaised }}>
+        <Text className={text.bodyStrong} style={{ color: palette.ink }}>
           Slot {String(slot).padStart(2, '0')}
         </Text>
-        <Text className={cn('font-body text-[11px]', mutedClass)}>{card?.type ?? 'Unknown card'}</Text>
+        <Text className={text.meta} style={{ color: palette.inkFaint }}>
+          {card?.type ?? 'Unknown card'}
+        </Text>
       </View>
       {channels.map((mapped) => (
-        <ChannelReadout key={mapped.id} mapped={mapped} devices={devices} />
+        <ChannelReadout key={mapped.id} mapped={mapped} devices={devices} palette={palette} />
       ))}
     </View>
   );
@@ -98,8 +129,152 @@ type RackGroup = {
   bySlot: Map<number, MappedChannel[]>;
 };
 
-// The physical rack, as drawn in the asset hierarchy, for one machine.
-function RackSection({
+/**
+ * The 14-slot chassis as a strip of cells.
+ *
+ * Three states, and they are the three facts a rack tile has to carry: a slot
+ * this machine reads through (accent), a slot that holds a card belonging to
+ * something else (filled grey), and an empty slot (outline). It replaces the
+ * sentence "3 channels on slots 02, 04, 07" with a shape, which is the whole
+ * reason the tile can be this small.
+ */
+function SlotStrip({
+  installed,
+  mapped,
+  palette,
+  accent,
+  width,
+}: {
+  installed: Set<number>;
+  mapped: Set<number>;
+  palette: ConsolePalette;
+  accent: string;
+  width: number;
+}) {
+  const cell = Math.max(5, Math.floor((width - SLOT_CELL_GAP * (TOTAL_SLOTS - 1)) / TOTAL_SLOTS));
+  return (
+    <View className="flex-row" style={{ gap: SLOT_CELL_GAP }}>
+      {Array.from({ length: TOTAL_SLOTS }, (_, index) => index + 1).map((slot) => {
+        const isMapped = mapped.has(slot);
+        const isInstalled = installed.has(slot);
+        return (
+          <View
+            key={slot}
+            style={{
+              width: cell,
+              height: SLOT_CELL_HEIGHT,
+              borderRadius: 2,
+              backgroundColor: isMapped ? accent : isInstalled ? palette.lineStrong : 'transparent',
+              borderWidth: isMapped ? 0 : 1,
+              borderColor: palette.line,
+            }}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+/**
+ * One rack, compact.
+ *
+ * What stays permanently visible is the shortlist: which rack, whether it is
+ * reachable, how much of it is populated, how much of it this machine reads,
+ * and whether it is the one currently open. Model, gateway and the per-channel
+ * readings are one press away rather than always on screen.
+ */
+function RackTile({
+  group,
+  cards,
+  devices,
+  selected,
+  onPress,
+  width,
+}: {
+  group: RackGroup;
+  cards: CardNode[];
+  devices: DeviceNode[];
+  selected: boolean;
+  onPress: () => void;
+  width: number;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const [hovered, setHovered] = useState(false);
+
+  const rackCards = useMemo(() => cards.filter((card) => card.deviceId === group.rackId), [cards, group.rackId]);
+  const rackWithState = useMemo(
+    () => (group.rack ? deviceWithGatewayConnectionState(group.rack, devices) : undefined),
+    [group.rack, devices],
+  );
+  const online = rackWithState?.status === 'Online';
+  const tone = statusTone(palette, statusToneFor(online));
+
+  const installed = useMemo(() => new Set(rackCards.map((card) => card.slot)), [rackCards]);
+  const mappedSlots = useMemo(() => new Set(group.slots), [group.slots]);
+
+  const border = selected ? tone.border : hovered ? palette.lineStrong : palette.line;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      onHoverIn={() => setHovered(true)}
+      onHoverOut={() => setHovered(false)}
+      accessibilityRole="tab"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${group.rack?.name ?? 'Unknown rack'}, ${online ? 'online' : 'offline'}, ${installed.size} of ${TOTAL_SLOTS} slots populated, ${group.channels.length} channels mapped to this machine`}
+      style={{
+        width,
+        borderWidth: 1,
+        borderColor: border,
+        borderRadius: 12,
+        padding: 12,
+        gap: 8,
+        backgroundColor: selected ? palette.selected : hovered ? palette.hover : palette.panel,
+        ...cardElevation(isDark),
+      }}
+    >
+      <View className="flex-row items-center justify-between gap-2">
+        <View className="min-w-0 flex-1 flex-row items-center gap-2">
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: tone.dot }} />
+          <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.title)} style={{ color: palette.ink }}>
+            {group.rack?.name ?? 'Unknown rack'}
+          </Text>
+        </View>
+        <Text className={text.chip} style={{ color: tone.fg }}>
+          {online ? 'Healthy' : 'Offline'}
+        </Text>
+      </View>
+
+      <View className="flex-row items-baseline gap-1.5">
+        <Text className={text.data} style={{ color: palette.ink, fontVariant: ['tabular-nums'] }}>
+          {installed.size} / {TOTAL_SLOTS}
+        </Text>
+        <Text className={text.meta} style={{ color: palette.inkFaint }}>
+          slots populated
+        </Text>
+      </View>
+
+      <SlotStrip installed={installed} mapped={mappedSlots} palette={palette} accent={tone.dot} width={width - 24} />
+
+      <View className="flex-row items-center justify-between gap-2">
+        <Text className={text.meta} style={{ color: palette.inkMuted, fontVariant: ['tabular-nums'] }}>
+          {group.channels.length} channel{group.channels.length === 1 ? '' : 's'} mapped
+        </Text>
+        {/* Secondary metadata — the gateway this rack talks through — surfaces
+            on hover and stays on while the rack is open. It is context for the
+            reading, not part of the scan. */}
+        <Text numberOfLines={1} className={text.meta} style={{ color: palette.inkFaint, opacity: hovered || selected ? 1 : 0 }}>
+          {group.gatewayName ? `via ${group.gatewayName}` : 'direct'}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
+
+// The opened rack: the physical chassis exactly as the asset hierarchy draws it,
+// plus the live reading on every channel this machine is wired to.
+function RackDetail({
   group,
   cards,
   devices,
@@ -111,8 +286,7 @@ function RackSection({
   live?: LiveState;
 }) {
   const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const palette = consolePalette(isDark);
   const { rack, slots, bySlot } = group;
 
   const rackCards = useMemo(() => cards.filter((card) => card.deviceId === group.rackId), [cards, group.rackId]);
@@ -123,42 +297,29 @@ function RackSection({
     [rack, devices],
   );
 
-  const online = rackWithState?.status === 'Online';
-
   return (
-    <View className={cn('overflow-hidden rounded-2xl border', lineClass, isDark ? 'bg-white/[0.02]' : 'bg-white')}>
-      <View className="flex-row flex-wrap items-center justify-between gap-3 px-4 py-3" style={{ borderBottomWidth: 1, borderBottomColor: isDark ? '#252525' : '#E5E5E5' }}>
-        <View className="min-w-0 flex-row items-center gap-2.5">
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: online ? LIVE_COLOUR : NO_DATA_COLOUR,
-            }}
-          />
-          <View className="min-w-0">
-            <Text numberOfLines={1} className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>
-              {rack?.name ?? 'Unknown rack'}
-            </Text>
-            <Text numberOfLines={1} className={cn('font-mono text-[9.5px] uppercase tracking-[0.18em]', mutedClass)}>
-              {[rack?.model, group.gatewayName ? `via ${group.gatewayName}` : null, rackWithState?.status]
-                .filter(Boolean)
-                .join(' · ')}
-            </Text>
-          </View>
-        </View>
-
-        <Text className={cn('font-body text-[11px]', mutedClass)}>
-          {group.channels.length} channel{group.channels.length === 1 ? '' : 's'} on slot{slots.length === 1 ? '' : 's'}{' '}
-          {slots.map((slot) => String(slot).padStart(2, '0')).join(', ')}
+    <View
+      className="overflow-hidden rounded-[14px] border"
+      style={{ borderColor: palette.line, backgroundColor: palette.panel, ...cardElevation(isDark) }}
+    >
+      <View
+        className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5"
+        style={{ borderBottomWidth: 1, borderBottomColor: palette.line, backgroundColor: palette.panelRaised }}
+      >
+        <Text numberOfLines={1} className={text.title} style={{ color: palette.ink }}>
+          {rack?.name ?? 'Unknown rack'}
+        </Text>
+        <Text numberOfLines={1} className={text.meta} style={{ color: palette.inkMuted }}>
+          {[rack?.model, group.gatewayName ? `via ${group.gatewayName}` : null, rackWithState?.status]
+            .filter(Boolean)
+            .join(' · ')}
         </Text>
       </View>
 
-      {/* The rack itself. Read-only here: this is a "where does this machine's
-          data physically come from" reference, not the rack configurator. A
-          mapping can only name a rack that exists, so the missing-device case is
-          a stale-layout guard rather than an expected state. */}
+      {/* Read-only here: this is a "where does this machine's data physically
+          come from" reference, not the rack configurator. A mapping can only
+          name a rack that exists, so the missing-device case is a stale-layout
+          guard rather than an expected state. */}
       {rackWithState ? (
         <RackFaceplate
           device={rackWithState}
@@ -171,19 +332,20 @@ function RackSection({
           onPressCard={() => {}}
         />
       ) : (
-        <Text className={cn('px-6 py-8 text-center font-body text-xs', mutedClass)}>
+        <Text className={cn('px-6 py-6 text-center', text.body)} style={{ color: palette.inkMuted }}>
           This rack is no longer in the device tree — only the last known channel readings are shown.
         </Text>
       )}
 
-      <View className="flex-row flex-wrap gap-3 px-6 pb-6">
+      <View className="flex-row flex-wrap gap-2.5 px-4 pb-4">
         {slots.map((slot) => (
-          <View key={slot} style={{ width: 260 }}>
+          <View key={slot} style={{ width: 236 }}>
             <SlotOccupancyCard
               slot={slot}
               card={rackCards.find((card) => card.slot === slot) ?? null}
               channels={bySlot.get(slot)!}
               devices={devices}
+              palette={palette}
             />
           </View>
         ))}
@@ -199,11 +361,15 @@ export type RackOccupancyViewProps = {
   mappedChannels: MappedChannel[];
 };
 
-// Actual View → Rack: the physical rack, drawn exactly as the asset hierarchy
-// draws it, but carrying only the racks and channels this machine is configured
-// against. A machine wired across several racks gets one faceplate per rack,
-// stacked in a single scroll.
+// Actual View → Rack: the physical racks this machine's data comes through,
+// drawn exactly as the asset hierarchy draws them, but carrying only the racks
+// and channels this machine is configured against.
 export function RackOccupancyView({ devices, cards, live, mappedChannels }: RackOccupancyViewProps) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const [selectedRackId, setSelectedRackId] = useState<string | null>(null);
+  const [stripWidth, setStripWidth] = useState<number | null>(null);
+
   const groups = useMemo<RackGroup[]>(() => {
     const order: string[] = [];
     const byRack = new Map<string, MappedChannel[]>();
@@ -236,15 +402,65 @@ export function RackOccupancyView({ devices, cards, live, mappedChannels }: Rack
     });
   }, [mappedChannels, devices]);
 
+  // A rack is always open. On a single-rack machine that means this view opens
+  // exactly as it did before the navigator existed; on a multi-rack one it opens
+  // on the first rack rather than on all of them at once.
+  useEffect(() => {
+    setSelectedRackId((current) =>
+      current && groups.some((group) => group.rackId === current) ? current : (groups[0]?.rackId ?? null),
+    );
+  }, [groups]);
+
+  const selected = groups.find((group) => group.rackId === selectedRackId) ?? groups[0] ?? null;
+
+  // Tiles share the row evenly rather than each taking its natural width, so a
+  // two-rack machine does not get two tiles floating in a wide empty band.
+  const tileWidth = (() => {
+    if (!stripWidth) return TILE_MIN_WIDTH;
+    const perRow = Math.max(1, Math.min(groups.length, Math.floor((stripWidth + 10) / (TILE_MIN_WIDTH + 10))));
+    return Math.min(TILE_MAX_WIDTH, Math.max(TILE_MIN_WIDTH, Math.floor((stripWidth - 10 * (perRow - 1)) / perRow)));
+  })();
+
   if (groups.length === 0) {
     return <EmptyState title="No racks mapped" description="Rack occupancy follows saved mappings — link a box to a channel in Design mode, then save the canvas configuration." />;
   }
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
-      {groups.map((group) => (
-        <RackSection key={group.rackId} group={group} cards={cards} devices={devices} live={live} />
-      ))}
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 20, gap: 16 }}>
+      <View className="gap-2.5">
+        <View className="flex-row items-center gap-3">
+          <Text className={text.label} style={{ color: palette.inkFaint }}>
+            Racks
+          </Text>
+          <View className="h-px flex-1" style={{ backgroundColor: palette.line }} />
+          <Text className={text.meta} style={{ color: palette.inkFaint, fontVariant: ['tabular-nums'] }}>
+            {groups.length} rack{groups.length === 1 ? '' : 's'} · {mappedChannels.length} channels
+          </Text>
+        </View>
+
+        <View
+          className="flex-row flex-wrap"
+          style={{ gap: 10 }}
+          onLayout={(event) => {
+            const width = event.nativeEvent.layout.width;
+            setStripWidth((previous) => (previous !== null && Math.abs(previous - width) < 1 ? previous : width));
+          }}
+        >
+          {groups.map((group) => (
+            <RackTile
+              key={group.rackId}
+              group={group}
+              cards={cards}
+              devices={devices}
+              width={tileWidth}
+              selected={selected?.rackId === group.rackId}
+              onPress={() => setSelectedRackId(group.rackId)}
+            />
+          ))}
+        </View>
+      </View>
+
+      {selected ? <RackDetail group={selected} cards={cards} devices={devices} live={live} /> : null}
     </ScrollView>
   );
 }

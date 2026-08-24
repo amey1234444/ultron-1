@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { formatRul, LEVEL_HEX } from '../../../../lib/condition';
+import { formatRul, levelHexes } from '../../../../lib/condition';
 
 // There is no maintenance model in lib/ yet, so this is the shape the card needs
 // rather than a schema anything currently produces. Move it to lib/maintenance.ts
@@ -42,6 +42,7 @@ export function MaintenanceCard({
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const levels = levelHexes(isDark);
 
   const scheduled = (records ?? []).filter((r) => r.kind !== 'completed');
   const nextPlanned = scheduled[0] ?? null;
@@ -79,7 +80,7 @@ export function MaintenanceCard({
                 {record.componentLabel ? ` · ${record.componentLabel}` : ''}
               </Text>
               <Text
-                style={record.kind === 'overdue' ? { color: LEVEL_HEX.danger } : undefined}
+                style={record.kind === 'overdue' ? { color: levels.danger } : undefined}
                 className={cn('font-body-medium text-[9px] uppercase tracking-wide', record.kind !== 'overdue' && mutedClass)}
               >
                 {KIND_LABEL[record.kind]}

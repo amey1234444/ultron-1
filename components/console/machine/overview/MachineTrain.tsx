@@ -2,7 +2,8 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { formatRul, LEVEL_HEX } from '../../../../lib/condition';
+import { formatRul, levelHexes } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 import { ComponentTypeIcon } from '../machineIcons';
 import type { ComponentSummary } from './rollup';
 
@@ -25,18 +26,18 @@ function verdictFor(summary: ComponentSummary): Verdict {
   return summary.health !== null && summary.health < WATCH_BELOW ? 'WATCH' : 'GOOD';
 }
 
-const VERDICT_HEX: Record<Verdict, string> = {
-  GOOD: LEVEL_HEX.normal,
-  WATCH: LEVEL_HEX.alert,
-  ALERT: LEVEL_HEX.alert,
-  DANGER: LEVEL_HEX.danger,
-};
+function verdictHexes(isDark: boolean): Record<Verdict, string> {
+  const levels = levelHexes(isDark);
+  return { GOOD: levels.normal, WATCH: levels.alert, ALERT: levels.alert, DANGER: levels.danger };
+}
 
 export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const track = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)';
+  const palette = consolePalette(isDark);
+  const verdictHex = verdictHexes(isDark);
+  const track = isDark ? 'rgba(255,255,255,0.08)' : palette.lineSubtle;
   const connector = isDark ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.16)';
 
   return (
@@ -53,7 +54,7 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
           {summaries.map((summary, index) => {
             const monitored = summary.points.length > 0;
             const verdict = verdictFor(summary);
-            const colour = monitored ? VERDICT_HEX[verdict] : '#737373';
+            const colour = monitored ? verdictHex[verdict] : palette.neutral;
             const percent = summary.health === null ? 0 : Math.max(0, Math.min(100, summary.health));
             const isTrain = summary.type !== 'Unattributed';
 
@@ -70,7 +71,7 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
                       borderRadius: 5,
                       borderWidth: 1.5,
                       borderColor: colour,
-                      backgroundColor: isDark ? '#0B0B0C' : '#FFFFFF',
+                      backgroundColor: palette.panel,
                       marginTop: isTrain && index > 0 ? 0 : 10,
                     }}
                   />

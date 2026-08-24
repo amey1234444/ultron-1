@@ -448,7 +448,6 @@ export function MachineWorkspace({
           live={live}
           expectedPoints={expectedPoints}
           onOpenAlarms={() => setActualTab('alarm')}
-          onOpenAnalysis={() => setActualTab('analysis')}
         />
       )}
 

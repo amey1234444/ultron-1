@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
@@ -9,7 +9,7 @@ import {
   formatHours,
   formatRul,
   ISO_10816_GROUPS,
-  LEVEL_HEX,
+  levelHexes,
   STATE_LABEL,
   statusForLevel,
   type IsoGroup,
@@ -19,6 +19,7 @@ import type { DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import type { MachineNode } from '../../../lib/machines';
 import type { CardNode } from '../../../lib/rack';
+import { consolePalette } from '../../../lib/consoleTheme';
 import { Panel } from '../../Panel';
 import { AlarmSummaryCard } from './overview/AlarmSummaryCard';
 import { ConditionTrend } from './overview/ConditionTrend';
@@ -120,10 +121,6 @@ export type MachineOverviewPageProps = {
   // which label matching cannot separate. A host that knows the binding should say
   // so rather than let it be guessed.
   componentIdFor?: (mapped: MappedChannel) => string | undefined;
-  // Link into the analysis layer. This page answers "what is every sensor
-  // reading"; analysis answers "what does that mean", and the two are read in
-  // that order.
-  onOpenAnalysis?: () => void;
 };
 
 // Single-machine condition and prognostic overview: what state the machine is
@@ -152,11 +149,12 @@ export function MachineOverviewPage({
   onOpenAlarms,
   onSelectPoint,
   componentIdFor,
-  onOpenAnalysis,
 }: MachineOverviewPageProps) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const levels = levelHexes(isDark);
+  const palette = consolePalette(isDark);
 
   const [conditions, setConditions] = useState<Record<string, PointCondition>>({});
   const [gridWidth, setGridWidth] = useState<number | null>(null);
@@ -287,8 +285,8 @@ export function MachineOverviewPage({
       {/* Data-quality strip: what the assessment above is based on. */}
       <View className="flex-row flex-wrap items-center gap-x-5 gap-y-2">
         <View className="flex-row items-center gap-2">
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: LEVEL_HEX[summary.level] }} />
-          <Text style={{ color: LEVEL_HEX[summary.level] }} className="font-mono text-[11px] font-bold tracking-wider">
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: levels[summary.level] }} />
+          <Text style={{ color: levels[summary.level] }} className="font-mono text-[11px] font-bold tracking-wider">
             {STATE_LABEL[summary.level]}
           </Text>
         </View>
@@ -304,24 +302,9 @@ export function MachineOverviewPage({
         <Text className={cn('font-body text-[11px]', mutedClass)}>
           {formatHours(windowHours)} of history · {ISO_10816_GROUPS[isoGroup].label}
         </Text>
-        <View className="flex-1" />
-
-        {/* Reads as the next step rather than a tab: this page states what every
-            sensor is doing, analysis states what it means. */}
-        {onOpenAnalysis ? (
-          <Pressable
-            onPress={onOpenAnalysis}
-            accessibilityRole="button"
-            accessibilityLabel="Open the analysis layer for this machine"
-            className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-1.5"
-          >
-            <Text className="font-mono text-[10px] font-bold tracking-wider text-accent">ANALYSIS ›</Text>
-          </Pressable>
-        ) : null}
-
         {/* How much of this page's own judgement rests on limits nobody set. */}
         {summary.inferredLimitCount > 0 && (
-          <Text className="font-body text-[11px] text-accent">
+          <Text style={{ color: palette.accent }} className="font-body text-[11px]">
             {summary.inferredLimitCount} point{summary.inferredLimitCount === 1 ? '' : 's'} judged against inferred limits
           </Text>
         )}
@@ -332,14 +315,14 @@ export function MachineOverviewPage({
         <KpiTile
           label="Machine health"
           value={summary.health === null ? '--' : `${Math.round(summary.health)}%`}
-          tone={LEVEL_HEX[summary.level]}
+          tone={levels[summary.level]}
           hint={STATE_LABEL[summary.level]}
           width={176}
         />
         <KpiTile
           label="Active alerts"
           value={String(activeAlerts).padStart(2, '0')}
-          tone={activeAlerts > 0 ? LEVEL_HEX[summary.level] : undefined}
+          tone={activeAlerts > 0 ? levels[summary.level] : undefined}
           hint={`${summary.dangerCount} danger · ${summary.alertCount} alert`}
         />
         <KpiTile label="Machine state" value={runState.label} hint={runState.detail ?? undefined} />
@@ -351,7 +334,7 @@ export function MachineOverviewPage({
         <KpiTile
           label="Sensor health"
           value={`${sensors.online} / ${sensors.total}`}
-          tone={sensors.online < sensors.total ? LEVEL_HEX.alert : undefined}
+          tone={sensors.online < sensors.total ? levels.alert : undefined}
           hint="channels online"
         />
       </View>
@@ -363,7 +346,7 @@ export function MachineOverviewPage({
           <View className="flex-row flex-wrap items-start gap-6">
             <View className="items-center gap-2">
               <HealthRing score={summary.health} level={summary.level} />
-              <Text style={{ color: LEVEL_HEX[summary.level] }} className="font-mono text-[11px] font-bold tracking-widest">
+              <Text style={{ color: levels[summary.level] }} className="font-mono text-[11px] font-bold tracking-widest">
                 {STATE_LABEL[summary.level]}
               </Text>
             </View>

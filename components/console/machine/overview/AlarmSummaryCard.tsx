@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import { loadLocal } from '../../../../lib/localPersist';
-import { LEVEL_HEX } from '../../../../lib/condition';
+import { levelHexes } from '../../../../lib/condition';
 import type { MachineSummary } from './rollup';
 import type { PointCondition } from './usePointCondition';
 
@@ -45,6 +45,7 @@ export function AlarmSummaryCard({
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const levels = levelHexes(isDark);
 
   // Read once per machine rather than polling: the operator acknowledges alarms
   // on the Alarm tab, and remounting this view is what brings the fresh count.
@@ -73,9 +74,9 @@ export function AlarmSummaryCard({
       </View>
 
       <View className="flex-row flex-wrap items-baseline gap-4">
-        <Count label="danger" count={summary.dangerCount} colour={LEVEL_HEX.danger} />
-        <Count label="alert" count={summary.alertCount} colour={LEVEL_HEX.alert} />
-        <Count label="normal" count={summary.normalCount} colour={LEVEL_HEX.normal} />
+        <Count label="danger" count={summary.dangerCount} colour={levels.danger} />
+        <Count label="alert" count={summary.alertCount} colour={levels.alert} />
+        <Count label="normal" count={summary.normalCount} colour={levels.normal} />
       </View>
 
       {/* Unacknowledged is the number that says whether anyone has looked, which
@@ -88,12 +89,12 @@ export function AlarmSummaryCard({
         <View className="gap-1.5">
           {elevated.map((condition) => (
             <View key={condition.id} className={cn('flex-row items-center gap-2 rounded-lg border px-2.5 py-1.5', lineClass)}>
-              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: LEVEL_HEX[condition.level] }} />
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: levels[condition.level] }} />
               <Text className={cn('font-mono text-[10px]', mutedClass)}>{condition.code}</Text>
               <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
                 {condition.label}
               </Text>
-              <Text style={{ color: LEVEL_HEX[condition.level] }} className="font-mono text-[11px] font-bold tabular-nums">
+              <Text style={{ color: levels[condition.level] }} className="font-mono text-[11px] font-bold tabular-nums">
                 {condition.value.toFixed(condition.band.decimals)} {condition.unit}
               </Text>
             </View>

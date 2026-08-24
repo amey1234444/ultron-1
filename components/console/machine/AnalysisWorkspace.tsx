@@ -388,7 +388,6 @@ export function AnalysisWorkspace({
           expectedPoints={overview.expectedPoints}
           componentIdFor={overview.componentIdFor}
           hierarchyPath={machine.hierarchyPath}
-          onOpenAnalysis={() => setView(depth)}
           onOpenAlarms={onOpenAlarms ? () => onOpenAlarms(machineId) : undefined}
           onSelectPoint={(mapped) => {
             // A sensor picked here is the subject when the workbench opens. The

@@ -2,7 +2,8 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
-import { LEVEL_HEX } from '../../../../lib/condition';
+import { levelHexes } from '../../../../lib/condition';
+import { consolePalette } from '../../../../lib/consoleTheme';
 
 // There is no event log in the data model — nothing records that a machine
 // started, that a channel dropped out, or that a trend crossed a limit. This is
@@ -21,14 +22,20 @@ export type MachineEvent = {
   detail?: string;
 };
 
-const KIND_HEX: Record<MachineEventKind, string> = {
-  info: '#737373',
-  normal: LEVEL_HEX.normal,
-  alert: LEVEL_HEX.alert,
-  danger: LEVEL_HEX.danger,
-  'sensor-offline': '#737373',
-  'comms-failure': LEVEL_HEX.danger,
-};
+// Resolved per theme rather than at module load: light mode carries its own,
+// deeper status ramp — see the note at the top of `consoleTheme.ts`.
+function kindHexes(isDark: boolean): Record<MachineEventKind, string> {
+  const levels = levelHexes(isDark);
+  const quiet = consolePalette(isDark).neutral;
+  return {
+    info: quiet,
+    normal: levels.normal,
+    alert: levels.alert,
+    danger: levels.danger,
+    'sensor-offline': quiet,
+    'comms-failure': levels.danger,
+  };
+}
 
 const KIND_LABEL: Record<MachineEventKind, string> = {
   info: 'INFO',
@@ -49,7 +56,8 @@ export function RecentEvents({ events, limit = 6 }: { events?: MachineEvent[]; l
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : consolePalette(isDark).lineSubtle;
+  const kindHex = kindHexes(isDark);
 
   const shown = (events ?? []).slice(0, limit);
 
@@ -71,7 +79,7 @@ export function RecentEvents({ events, limit = 6 }: { events?: MachineEvent[]; l
             >
               <Text className={cn('w-10 font-mono text-[10px] tabular-nums', mutedClass)}>{timeLabel(event.at)}</Text>
 
-              <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 4, backgroundColor: KIND_HEX[event.kind] }} />
+              <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 4, backgroundColor: kindHex[event.kind] }} />
 
               <View className="flex-1">
                 <Text numberOfLines={1} className={cn('font-body text-[11px]', inkClass)}>
@@ -84,7 +92,7 @@ export function RecentEvents({ events, limit = 6 }: { events?: MachineEvent[]; l
                 ) : null}
               </View>
 
-              <Text style={{ color: KIND_HEX[event.kind] }} className="font-mono text-[8px] font-bold tracking-wider">
+              <Text style={{ color: kindHex[event.kind] }} className="font-mono text-[8px] font-bold tracking-wider">
                 {KIND_LABEL[event.kind]}
               </Text>
             </View>
