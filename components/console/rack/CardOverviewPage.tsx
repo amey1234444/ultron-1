@@ -1,4 +1,4 @@
-import { Text, View } from 'react-native';
+import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
@@ -30,11 +30,14 @@ type CardOverviewPageProps = {
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
+  const surfaceClass = isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel';
 
   return (
-    <View className={cn('flex-row items-center justify-between border-b px-5 py-3', lineClass)}>
-      <Text className={cn('font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{label}</Text>
-      <Text className={cn(mono ? 'font-mono' : 'font-body-medium', 'text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
+    <View className={cn('flex-row items-center justify-between gap-4 border-b px-5 py-3', lineClass, surfaceClass)}>
+      <Text className={cn('shrink-0 font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{label}</Text>
+      <Text className={cn(mono ? 'font-mono' : 'font-body-medium', 'min-w-0 flex-1 text-right text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
+        {value}
+      </Text>
     </View>
   );
 }
@@ -113,40 +116,44 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
 export function CardOverviewPage({ card, backLabel = 'Back', onBack, onEdit, canEditDeleteSchema }: CardOverviewPageProps) {
   const { isDark } = useAppTheme();
   const inkColor = isDark ? '#F5F5F5' : '#0A0A0A';
+  const pageClass = isDark ? 'bg-surface-dark' : 'bg-surface-light';
+  const panelClass = isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel';
 
   return (
-    <View className="flex-1">
-      <View className="px-6 pt-5">
-        <BackButton label={backLabel} onPress={onBack} />
-      </View>
-
-      <View className="flex-row items-center justify-between px-6 pt-3">
-        <View className="flex-row items-center gap-2">
-          <CardTypeIcon type={card.type} color={inkColor} size={18} />
-          <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{card.type}</Text>
+    <View className={cn('flex-1', pageClass)}>
+      <ScrollView className="flex-1" contentContainerClassName="pb-6">
+        <View className="px-6 pt-5">
+          <BackButton label={backLabel} onPress={onBack} />
         </View>
-        {canEditDeleteSchema && <ActionButton label="Edit Configuration" onPress={onEdit} />}
-      </View>
 
-      <View className={cn('mx-6 mt-4 rounded-xl border', isDark ? 'border-line-dark' : 'border-line-light')}>
-        <Row label="Slot" value={String(card.slot)} mono />
-        <Row label="Card Type" value={card.type} />
-        <Row label="Kind" value={slotKind(card.slot) === 'acquisition' ? 'Acquisition' : 'Controller'} />
-        <Row label="Status" value={card.enabled ? 'Enabled' : 'Disabled'} />
-        {channelCountForCardType(card.type) > 0 && <Row label="Channels" value={String(channelCountForCardType(card.type))} mono />}
-      </View>
+        <View className="flex-row items-center justify-between px-6 pt-3">
+          <View className="flex-row items-center gap-2">
+            <CardTypeIcon type={card.type} color={inkColor} size={18} />
+            <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{card.type}</Text>
+          </View>
+          {canEditDeleteSchema && <ActionButton label="Edit Configuration" onPress={onEdit} />}
+        </View>
 
-      <View className="px-6 pt-5">
-        <Text className={cn('font-body-medium text-xs uppercase tracking-wider', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          {channelCountForCardType(card.type) > 0 ? 'Channel Configuration' : 'Controller Details'}
-        </Text>
-      </View>
+        <View className={cn('mx-6 mt-4 overflow-hidden rounded-xl border', panelClass)}>
+          <Row label="Slot" value={String(card.slot)} mono />
+          <Row label="Card Type" value={card.type} />
+          <Row label="Kind" value={slotKind(card.slot) === 'acquisition' ? 'Acquisition' : 'Controller'} />
+          <Row label="Status" value={card.enabled ? 'Enabled' : 'Disabled'} />
+          {channelCountForCardType(card.type) > 0 && <Row label="Channels" value={String(channelCountForCardType(card.type))} mono />}
+        </View>
 
-      <View className={cn('mx-6 mt-2 rounded-xl border', isDark ? 'border-line-dark' : 'border-line-light')}>
-        {channelRows(card).map((row) => (
-          <Row key={row.label} label={row.label} value={row.value} />
-        ))}
-      </View>
+        <View className="px-6 pt-5">
+          <Text className={cn('font-body-medium text-xs uppercase tracking-wider', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            {channelCountForCardType(card.type) > 0 ? 'Channel Configuration' : 'Controller Details'}
+          </Text>
+        </View>
+
+        <View className={cn('mx-6 mt-2 overflow-hidden rounded-xl border', panelClass)}>
+          {channelRows(card).map((row) => (
+            <Row key={row.label} label={row.label} value={row.value} />
+          ))}
+        </View>
+      </ScrollView>
     </View>
   );
 }

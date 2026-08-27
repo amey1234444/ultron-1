@@ -307,14 +307,13 @@ export function suggestedChannelHysteresis(config: ChannelCommonConfig): string 
  * Keeps the single warning/critical pair the rest of the app reads in step with
  * the four-level block the operator actually edits.
  *
- * High and High-High are preferred because that is the usual direction of a
- * process alarm; a channel alarmed only on its low side still reports something
- * rather than nothing.
+ * Only High and High-High are mirrored because existing consumers read these
+ * fields as high-side thresholds. Low-side alarms stay in the four-level block,
+ * where the knob and alarm-band meter can evaluate their direction correctly.
  */
 export function syncChannelLegacyAlarms<T extends ChannelCommonConfig>(config: T): T {
-  const alarmWarning = config.alarmHighEnabled && config.alarmHigh.trim() ? config.alarmHigh : config.alarmLowEnabled && config.alarmLow.trim() ? config.alarmLow : '';
-  const alarmCritical =
-    config.alarmHighHighEnabled && config.alarmHighHigh.trim() ? config.alarmHighHigh : config.alarmLowLowEnabled && config.alarmLowLow.trim() ? config.alarmLowLow : '';
+  const alarmWarning = config.alarmHighEnabled && config.alarmHigh.trim() ? config.alarmHigh : '';
+  const alarmCritical = config.alarmHighHighEnabled && config.alarmHighHigh.trim() ? config.alarmHighHigh : '';
   return { ...config, alarmWarning, alarmCritical };
 }
 
