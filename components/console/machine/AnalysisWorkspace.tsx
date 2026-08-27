@@ -437,9 +437,18 @@ export function AnalysisWorkspace({
           signals={data.signals}
           findings={data.findings}
           hypothesis={data.hypothesis}
+          issues={data.issues}
+          progression={data.progression}
+          condition={data.condition}
+          dataQuality={data.dataQuality}
+          hypotheses={data.hypotheses}
+          chain={data.chain}
+          conclusion={conclusion}
           doThis={data.doThis}
           thenConfirm={data.thenConfirm}
           modelCaveat={data.modelCaveat}
+          selectedProblemId={selectedIssueId}
+          onSelectProblem={setSelectedIssueId}
           onSelectDepth={goTo}
           tabsTrailing={toMachineOverview.trailing}
           onVerifyChain={() =>
