@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import Svg, { Line, Polyline } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { CapabilityInputs } from '../../../lib/analysisCapability';
@@ -21,6 +22,7 @@ import {
   QUALITY_LABEL,
   WORK_AREAS,
   qualityHex,
+  rankHypotheses,
   type AnalystEvent,
   type AnalystHypothesis,
   type AnalystTreeNode,
@@ -41,10 +43,20 @@ import { AnalysisTree } from './advanced/AnalysisTree';
 import { InvestigationWorkArea } from './advanced/Investigation';
 import { EvidenceTray, IntelligencePanel, PanelHeader } from './advanced/SidePanels';
 import { SignalLab } from './advanced/SignalLab';
-import { CorrelationWorkArea, EventsWorkArea, MachineWorkArea, TrainWorkArea } from './advanced/WorkAreas';
+import {
+  CorrelationWorkArea,
+  EventsWorkArea,
+  MachineWorkArea,
+  TrainWorkArea,
+  WorkAreaHeader,
+} from './advanced/WorkAreas';
+import { seriesColour, seriesMutedColour } from './advanced/vizTokens';
 
 const TREE_WIDTH = 310;
 const INTEL_WIDTH = 262;
+const CHART_W = 900;
+const CHART_H = 230;
+const PAD = { left: 42, right: 20, top: 22, bottom: 34 };
 
 export type SignalContext = {
   unit: string;
@@ -503,13 +515,13 @@ export function AdvancedDiagnosisPage({
     onEvidenceChange?.(next);
   };
 
-  const addEvidence = (note: string) => {
+  const addEvidence = (note: string, detail?: string) => {
     commitEvidence([
       ...evidence,
       {
         id: `ev-${evidence.length + 1}-${note.slice(0, 12)}`,
         title: note,
-        detail: `Captured from ${WORK_AREAS.find((a) => a.id === workArea)?.label ?? 'workbench'}`,
+        detail: detail ?? `Captured from ${WORK_AREAS.find((a) => a.id === workArea)?.label ?? 'workbench'}`,
         role: 'context',
         source: trail.map((n) => n.name).join(' / '),
       },
