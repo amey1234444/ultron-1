@@ -1,6 +1,7 @@
 import { createHash } from 'crypto';
 
 import { buildLiveFrame, parseLiveTopic, type TopicKind } from '../../lib/liveFrame';
+import { normalizeChannelConfig } from '../../lib/rack';
 import { ensureSchema, query } from './db';
 import { publishLiveFrame } from './liveFrame';
 
@@ -76,59 +77,28 @@ function cardConfigForSlot(type: ReturnType<typeof cardTypeForSlot>, slot: Recor
   const label = sensor || stringValue(slot.card_type) || `Slot ${slot.slot_number}`;
   const warning = stringValue(slot.alert_value_formatted) ?? '';
   const critical = stringValue(slot.danger_value_formatted) ?? '';
-  if (type === 'Vibration Card') {
-    return {
-      channelNames: [label],
-      sensorType: sensor,
-      sensitivity: '',
-      engineeringUnit: unit || 'mm/s',
-      measurementRangeMin: '',
-      measurementRangeMax: '',
-      samplingRate: '',
-      alarmWarning: warning,
-      alarmCritical: critical,
-    };
-  }
-  if (type === 'Speed Card') {
-    return {
-      channelNames: [label],
-      inputType: 'RPM',
-      pulsesPerRevolution: '',
-      trigger: '',
-      hysteresis: '',
-      minSpeed: '',
-      maxSpeed: '',
-      alarmWarning: warning,
-      alarmCritical: critical,
-    };
-  }
+
   if (type === 'Communication Controller') {
     return { controllerName: label, ip: '', port: '', firmware: '', role: 'Primary', partnerController: '' };
   }
-  return {
+
+  // Every acquisition card shares one configuration block now, so a discovered
+  // card is described the same way an operator would describe it: a name, a
+  // unit, and the thresholds the controller reported. `normalizeChannelConfig`
+  // fills in the rest and derives the operating range from those thresholds.
+  return normalizeChannelConfig(type, {
     channelNames: [label],
-    tag: '',
-    inputType: '4-20 mA',
-    engineeringMin: '',
-    engineeringMax: '',
-    unit,
-    scaling: '1',
-    offset: '0',
-    filter: '',
-    alarmLowLowEnabled: false,
-    alarmLowEnabled: false,
+    unit: unit || (type === 'Vibration Card' ? 'mm/s' : type === 'Speed Card' ? 'rpm' : ''),
+    ...(type === 'Vibration Card' ? { sensorType: sensor } : {}),
+    ...(type === 'Speed Card' ? { inputType: 'RPM' } : {}),
+    ...(type === 'Process Card' ? { inputType: '4-20 mA' } : {}),
     alarmHighEnabled: !!warning,
-    alarmHighHighEnabled: !!critical,
-    alarmLowLow: '',
-    alarmLow: '',
     alarmHigh: warning,
+    alarmHighHighEnabled: !!critical,
     alarmHighHigh: critical,
-    hysteresis: '',
-    alarmDelay: '0',
-    displayPrecision: '0.00',
     alarmWarning: warning,
     alarmCritical: critical,
-  };
+  }) as unknown as Record<string, unknown>;
 }
 
 const CONTROLLER_SLOT = 13;

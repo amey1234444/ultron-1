@@ -2,7 +2,18 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { channelCountForCardType, channelNamesForCard, formatProcessValue, normalizeProcessConfig, slotKind, type CardNode } from '../../../lib/rack';
+import {
+  channelCountForCardType,
+  derivedChannelRangeFor,
+  formatProcessValue,
+  normalizeChannelConfig,
+  slotKind,
+  type CardNode,
+  type ChannelCommonConfig,
+  type ProcessConfig,
+  type SpeedConfig,
+  type VibrationConfig,
+} from '../../../lib/rack';
 import { manualChannelValue, simulationForCard } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
@@ -29,45 +40,6 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 }
 
 function channelRows(card: CardNode): { label: string; value: string }[] {
-  if (card.type === 'Process Card' && 'engineeringMin' in card.config) {
-    const config = normalizeProcessConfig(card.config);
-    const unit = config.unit || '—';
-    const alarmValue = (enabled: boolean, value: string) => (enabled ? `${value || 'not set'} ${unit}` : 'Disabled');
-    // Only a simulated card carries a signal definition, and only then is there
-    // a driven value to report. A physical card reads its channel from the
-    // field wiring, so there is nothing configured here to show.
-    const channel = card.simulation?.length ? simulationForCard(card)[0] : undefined;
-    const channelValueRows = channel
-      ? [
-          { label: 'Value Source', value: channel.behaviour },
-          // A generated behaviour has no single configured value to report —
-          // its number is whatever the walk currently sits at, which belongs on
-          // the rack faceplate rather than in a configuration summary.
-          ...(channel.behaviour === 'Manual'
-            ? [{ label: 'Channel Value', value: `${formatProcessValue(manualChannelValue(channel), config.displayPrecision)} ${unit}` }]
-            : []),
-        ]
-      : [];
-    return [
-      { label: 'Display Name', value: config.channelNames[0] || '—' },
-      { label: 'Tag', value: config.tag || '—' },
-      { label: 'Input Type', value: config.inputType },
-      { label: 'Engineering Unit', value: unit },
-      { label: 'Engineering Range', value: `${config.engineeringMin || '—'} to ${config.engineeringMax || '—'} ${unit}` },
-      { label: 'Calibration Offset', value: `${config.offset || '0'} ${unit}` },
-      { label: 'Low-Low Alarm', value: alarmValue(config.alarmLowLowEnabled, config.alarmLowLow) },
-      { label: 'Low Alarm', value: alarmValue(config.alarmLowEnabled, config.alarmLow) },
-      { label: 'High Alarm', value: alarmValue(config.alarmHighEnabled, config.alarmHigh) },
-      { label: 'High-High Alarm', value: alarmValue(config.alarmHighHighEnabled, config.alarmHighHigh) },
-      { label: 'Hysteresis', value: `${config.hysteresis || '—'} ${unit}` },
-      { label: 'Alarm Delay', value: `${config.alarmDelay || '0'} sec` },
-      { label: 'Display Precision', value: config.displayPrecision },
-      ...channelValueRows,
-    ];
-  }
-  if (channelCountForCardType(card.type) > 0) {
-    return channelNamesForCard(card).map((name) => ({ label: 'Channel Name', value: name || '—' }));
-  }
   if ('controllerName' in card.config) {
     return [
       { label: 'Controller Name', value: card.config.controllerName || '—' },
@@ -78,7 +50,64 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
       { label: 'Partner Controller', value: card.config.partnerController || '—' },
     ];
   }
-  return [];
+  if (channelCountForCardType(card.type) === 0) return [];
+
+  // One shared block means one summary, whatever the card measures. The rows
+  // that differ are the physical input, which is the only card-specific part of
+  // the editor too.
+  const config = normalizeChannelConfig(card.type, card.config as unknown as Record<string, unknown>) as ChannelCommonConfig;
+  const unit = config.unit || '—';
+  const range = derivedChannelRangeFor(config);
+  const alarmValue = (enabled: boolean, value: string) => (enabled ? `${value || 'not set'} ${unit}` : 'Disabled');
+
+  const hardware: { label: string; value: string }[] =
+    card.type === 'Vibration Card' && 'sensorType' in config
+      ? [
+          { label: 'Sensor Type', value: (config as VibrationConfig).sensorType || '—' },
+          { label: 'Sensitivity', value: (config as VibrationConfig).sensitivity || '—' },
+          { label: 'Sampling Rate', value: (config as VibrationConfig).samplingRate || '—' },
+        ]
+      : card.type === 'Speed Card' && 'pulsesPerRevolution' in config
+        ? [
+            { label: 'Input Type', value: (config as SpeedConfig).inputType },
+            { label: 'Pulses / Revolution', value: (config as SpeedConfig).pulsesPerRevolution || '—' },
+            { label: 'Trigger', value: (config as SpeedConfig).trigger || '—' },
+          ]
+        : 'scaling' in config
+          ? [{ label: 'Input Type', value: (config as ProcessConfig).inputType }]
+          : [];
+
+  // Only a simulated card carries a signal definition, and only then is there a
+  // driven value to report. A physical card reads its channel from the field.
+  const channel = card.simulation?.length ? simulationForCard(card)[0] : undefined;
+  const channelValueRows = channel
+    ? [
+        { label: 'Value Source', value: channel.behaviour },
+        // A generated behaviour has no single configured value to report - its
+        // number is wherever the walk currently sits, which belongs on the rack
+        // faceplate rather than in a configuration summary.
+        ...(channel.behaviour === 'Manual'
+          ? [{ label: 'Channel Value', value: `${formatProcessValue(manualChannelValue(channel), config.displayPrecision)} ${unit}` }]
+          : []),
+      ]
+    : [];
+
+  return [
+    { label: 'Display Name', value: config.channelNames[0] || '—' },
+    { label: 'Tag', value: config.tag || '—' },
+    ...hardware,
+    { label: 'Engineering Unit', value: unit },
+    { label: 'Operating Range (derived)', value: `${formatProcessValue(range.min, config.displayPrecision)} to ${formatProcessValue(range.max, config.displayPrecision)} ${unit}` },
+    { label: 'Calibration Offset', value: `${config.offset || '0'} ${unit}` },
+    { label: 'Low-Low Alarm', value: alarmValue(config.alarmLowLowEnabled, config.alarmLowLow) },
+    { label: 'Low Alarm', value: alarmValue(config.alarmLowEnabled, config.alarmLow) },
+    { label: 'High Alarm', value: alarmValue(config.alarmHighEnabled, config.alarmHigh) },
+    { label: 'High-High Alarm', value: alarmValue(config.alarmHighHighEnabled, config.alarmHighHigh) },
+    { label: 'Hysteresis', value: `${config.hysteresis || '—'} ${unit}` },
+    { label: 'Alarm Delay', value: `${config.alarmDelay || '0'} sec` },
+    { label: 'Display Precision', value: config.displayPrecision },
+    ...channelValueRows,
+  ];
 }
 
 export function CardOverviewPage({ card, backLabel = 'Back', onBack, onEdit, canEditDeleteSchema }: CardOverviewPageProps) {
@@ -109,7 +138,7 @@ export function CardOverviewPage({ card, backLabel = 'Back', onBack, onEdit, can
 
       <View className="px-6 pt-5">
         <Text className={cn('font-body-medium text-xs uppercase tracking-wider', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          {card.type === 'Process Card' && 'engineeringMin' in card.config ? 'Channel Card Configuration' : 'channelNames' in card.config ? 'Channels' : 'Controller Details'}
+          {channelCountForCardType(card.type) > 0 ? 'Channel Configuration' : 'Controller Details'}
         </Text>
       </View>
 

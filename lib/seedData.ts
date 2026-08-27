@@ -1,7 +1,7 @@
 import type { DeviceNode } from './devices';
 import type { FolderNode, ProjectNode } from './hierarchy';
 import { componentsForTemplate, type MachineComponent, type MachineNode, type MeasurementPointStatus } from './machines';
-import type { CardNode, ProcessInputType } from './rack';
+import { normalizeChannelConfig, type CardNode, type ProcessDisplayPrecision, type ProcessInputType } from './rack';
 
 // Demo-only seed data: two plants each with a couple of machines, and a handful of
 // online racks with named channels, so the app has something to look at on first
@@ -125,23 +125,27 @@ export function createSeedData(makeId: () => string): {
   // One acquisition card carries one channel, so every measurement point below
   // occupies its own slot — the same demo points as before, spread across the
   // rack rather than sharing a card.
+  // Every acquisition card is built through `normalizeChannelConfig`, so the
+  // seed data is described the same way the editor describes it: alarm levels
+  // and a unit, with the operating range derived from them.
   const vibrationCard = (id: string, deviceId: string, slot: number, name: string): CardNode => ({
     id,
     deviceId,
     slot,
     type: 'Vibration Card',
     enabled: true,
-    config: {
+    config: normalizeChannelConfig('Vibration Card', {
       channelNames: [name],
       sensorType: 'Accelerometer',
       sensitivity: '100 mV/g',
-      engineeringUnit: 'mm/s',
-      measurementRangeMin: '0',
-      measurementRangeMax: '20',
-      samplingRate: '1000',
-      alarmWarning: '3.5',
-      alarmCritical: '4.8',
-    },
+      samplingRate: '1000 Hz',
+      unit: 'mm/s',
+      alarmHighEnabled: true,
+      alarmHigh: '3.5',
+      alarmHighHighEnabled: true,
+      alarmHighHigh: '4.8',
+      displayPrecision: '0.00',
+    }),
   });
 
   const processCard = (
@@ -151,81 +155,61 @@ export function createSeedData(makeId: () => string): {
     name: string,
     input: ProcessInputType,
     unit: string,
-    range: [string, string],
     alarms: [string, string],
+    precision: ProcessDisplayPrecision = '0.00',
   ): CardNode => ({
     id,
     deviceId,
     slot,
     type: 'Process Card',
     enabled: true,
-    config: {
+    config: normalizeChannelConfig('Process Card', {
       channelNames: [name],
-      tag: '',
       inputType: input,
-      engineeringMin: range[0],
-      engineeringMax: range[1],
       unit,
-      scaling: '1',
-      offset: '0',
-      filter: '',
-      alarmLowLowEnabled: false,
-      alarmLowEnabled: false,
-      alarmHighEnabled: !!alarms[0],
-      alarmHighHighEnabled: !!alarms[1],
-      alarmLowLow: '',
-      alarmLow: '',
+      alarmHighEnabled: true,
       alarmHigh: alarms[0],
+      alarmHighHighEnabled: true,
       alarmHighHigh: alarms[1],
-      hysteresis: String((Number(range[1]) - Number(range[0])) * 0.01),
-      alarmDelay: '0',
-      displayPrecision: '0.00',
-      alarmWarning: alarms[0],
-      alarmCritical: alarms[1],
-    },
+      displayPrecision: precision,
+    }),
   });
 
-  const speedCard = (
-    id: string,
-    deviceId: string,
-    slot: number,
-    name: string,
-    pulsesPerRevolution: string,
-    maxSpeed: string,
-    alarms: [string, string],
-  ): CardNode => ({
+  const speedCard = (id: string, deviceId: string, slot: number, name: string, pulsesPerRevolution: string, alarms: [string, string]): CardNode => ({
     id,
     deviceId,
     slot,
     type: 'Speed Card',
     enabled: true,
-    config: {
+    config: normalizeChannelConfig('Speed Card', {
       channelNames: [name],
       inputType: 'RPM',
       pulsesPerRevolution,
       trigger: 'Rising',
-      hysteresis: '1',
-      minSpeed: '0',
-      maxSpeed,
-      alarmWarning: alarms[0],
-      alarmCritical: alarms[1],
-    },
+      triggerHysteresis: '0.2 V',
+      unit: 'rpm',
+      alarmHighEnabled: true,
+      alarmHigh: alarms[0],
+      alarmHighHighEnabled: true,
+      alarmHighHigh: alarms[1],
+      displayPrecision: '0',
+    }),
   });
 
   const cards: CardNode[] = [
     vibrationCard('seed-card-1', 'seed-rack-north-1', 1, 'RAV-01 DE Vibration H'),
     vibrationCard('seed-card-rav-vib-v', 'seed-rack-north-1', 2, 'RAV-01 DE Vibration V'),
-    processCard('seed-card-2', 'seed-rack-north-1', 3, 'RAV-01 DE Bearing Temp', '4-20 mA', '°C', ['0', '150'], ['65', '78']),
-    processCard('seed-card-rav-nde-temp', 'seed-rack-north-1', 4, 'RAV-01 NDE Bearing Temp', '4-20 mA', '°C', ['0', '150'], ['65', '78']),
-    processCard('seed-card-rav-material-temp', 'seed-rack-north-1', 5, 'RAV-01 Material Temp', '4-20 mA', '°C', ['0', '150'], ['65', '78']),
-    processCard('seed-card-rav-pressure', 'seed-rack-north-1', 6, 'RAV-01 Inlet Pressure', '4-20 mA', 'bar', ['0', '2'], ['1.2', '1.6']),
-    processCard('seed-card-rav-outlet-pressure', 'seed-rack-north-1', 7, 'RAV-01 Outlet Pressure', '4-20 mA', 'bar', ['0', '2'], ['1.2', '1.6']),
-    processCard('seed-card-rav-current', 'seed-rack-north-1', 8, 'RAV-01 Motor Current', '4-20 mA', 'A', ['0', '40'], ['20', '30']),
-    speedCard('seed-card-rav-speed', 'seed-rack-north-1', 9, 'RAV-01 Rotor Speed', '1', '60', ['45', '55']),
-    speedCard('seed-card-3', 'seed-rack-north-2', 1, 'PUMP-01 Shaft Speed', '60', '3600', ['1465', '1475']),
+    processCard('seed-card-2', 'seed-rack-north-1', 3, 'RAV-01 DE Bearing Temp', '4-20 mA', '°C', ['65', '78'], '0.0'),
+    processCard('seed-card-rav-nde-temp', 'seed-rack-north-1', 4, 'RAV-01 NDE Bearing Temp', '4-20 mA', '°C', ['65', '78'], '0.0'),
+    processCard('seed-card-rav-material-temp', 'seed-rack-north-1', 5, 'RAV-01 Material Temp', '4-20 mA', '°C', ['65', '78'], '0.0'),
+    processCard('seed-card-rav-pressure', 'seed-rack-north-1', 6, 'RAV-01 Inlet Pressure', '4-20 mA', 'bar', ['1.2', '1.6'], '0.00'),
+    processCard('seed-card-rav-outlet-pressure', 'seed-rack-north-1', 7, 'RAV-01 Outlet Pressure', '4-20 mA', 'bar', ['1.2', '1.6'], '0.00'),
+    processCard('seed-card-rav-current', 'seed-rack-north-1', 8, 'RAV-01 Motor Current', '4-20 mA', 'A', ['20', '30'], '0.00'),
+    speedCard('seed-card-rav-speed', 'seed-rack-north-1', 9, 'RAV-01 Rotor Speed', '1', ['45', '55']),
+    speedCard('seed-card-3', 'seed-rack-north-2', 1, 'PUMP-01 Shaft Speed', '60', ['1465', '1475']),
     vibrationCard('seed-card-4', 'seed-rack-south-1', 1, 'FAN-01 DE Vibration H'),
     vibrationCard('seed-card-fan-nde', 'seed-rack-south-1', 2, 'FAN-01 NDE Vibration H'),
-    processCard('seed-card-5', 'seed-rack-south-2', 1, 'COMP-01 Discharge Pressure', '4-20 mA', 'bar', ['0', '10'], ['4.5', '5.8']),
+    processCard('seed-card-5', 'seed-rack-south-2', 1, 'COMP-01 Discharge Pressure', '4-20 mA', 'bar', ['4.5', '5.8'], '0.00'),
   ];
 
   return {

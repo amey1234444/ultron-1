@@ -14,14 +14,16 @@ import { composeIp, ipPrefixFor, isValidIp, type DeviceNode } from './devices';
 import { buildLiveFrame, type FrameEnvelope } from './liveFrame';
 import type { LiveFrame } from './liveTelemetry';
 import {
+  channelAlarmLimits,
   channelCountForCardType,
   decimalsForPrecision,
+  derivedChannelRangeFor,
+  normalizeChannelConfig,
   precisionForDecimals,
-  syncProcessLegacyAlarms,
   type CardConfig,
   type CardNode,
   type CardType,
-  type ProcessConfig,
+  type ChannelCommonConfig,
 } from './rack';
 
 // Card families the simulator can stand in for. Kinds map onto the real card
@@ -96,11 +98,6 @@ export type SimulatedChannel = {
   // Hard bounds of generated values — a non-fault behaviour never leaves these.
   min: number;
   max: number;
-  // Declared healthy band, reported alongside the value so status and analysis
-  // can call out "outside normal operating range" independently of the alarm
-  // thresholds. Null means "no separate normal band declared".
-  normalMin: number | null;
-  normalMax: number | null;
   alertLimit: number | null;
   dangerLimit: number | null;
   samplesPerSecond: number;
@@ -124,8 +121,6 @@ export type SimulatedChannelValidationErrors = Partial<
     | 'max'
     | 'samplesPerSecond'
     | 'decimals'
-    | 'normalMin'
-    | 'normalMax'
     | 'alertLimit'
     | 'dangerLimit'
     | 'manualValue',
@@ -149,20 +144,6 @@ export function validateSimulatedChannel(channel: SimulatedChannel, channelName:
   }
   if (!Number.isInteger(channel.decimals) || channel.decimals < 0 || channel.decimals > 6) {
     errors.decimals = 'Use a whole number from 0 to 6.';
-  }
-
-  if (channel.normalMin !== null && !Number.isFinite(channel.normalMin)) errors.normalMin = 'Enter a valid number or leave blank.';
-  if (channel.normalMax !== null && !Number.isFinite(channel.normalMax)) errors.normalMax = 'Enter a valid number or leave blank.';
-  if (channel.normalMin === null && channel.normalMax !== null) errors.normalMin = 'Enter the lower normal limit.';
-  if (channel.normalMin !== null && channel.normalMax === null) errors.normalMax = 'Enter the upper normal limit.';
-  if (
-    channel.normalMin !== null &&
-    channel.normalMax !== null &&
-    Number.isFinite(channel.normalMin) &&
-    Number.isFinite(channel.normalMax) &&
-    channel.normalMax <= channel.normalMin
-  ) {
-    errors.normalMax = 'Normal maximum must be greater than normal minimum.';
   }
 
   if (channel.alertLimit !== null && !Number.isFinite(channel.alertLimit)) errors.alertLimit = 'Enter a valid number or leave blank.';
@@ -202,8 +183,6 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'mm/s',
     min: 1.2,
     max: 4.5,
-    normalMin: 0,
-    normalMax: 4.5,
     alertLimit: 5,
     dangerLimit: 7,
     samplesPerSecond: 10,
@@ -214,8 +193,6 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: '°C',
     min: 45,
     max: 72,
-    normalMin: 20,
-    normalMax: 80,
     alertLimit: 85,
     dangerLimit: 95,
     samplesPerSecond: 1,
@@ -226,8 +203,6 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'A',
     min: 8,
     max: 32,
-    normalMin: 5,
-    normalMax: 35,
     alertLimit: 38,
     dangerLimit: 45,
     samplesPerSecond: 1,
@@ -238,8 +213,6 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'rpm',
     min: 1440,
     max: 1480,
-    normalMin: 1400,
-    normalMax: 1520,
     alertLimit: 1600,
     dangerLimit: 1750,
     samplesPerSecond: 1,
@@ -250,8 +223,6 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'bar',
     min: 1.5,
     max: 6.2,
-    normalMin: 1,
-    normalMax: 7,
     alertLimit: 8,
     dangerLimit: 10,
     samplesPerSecond: 1,
@@ -272,11 +243,11 @@ export function defaultSimulatedChannel(kind: SimulatedChannelKind): SimulatedCh
 
 export function defaultSimulationForCard(type: CardType): SimulatedChannel[] {
   const kind = defaultKindForCardType(type);
-  // The Universal V/I card is configured through the knob-driven channel page,
-  // where an operator sets a value and expects to see exactly that value. A
-  // random walk would immediately move off whatever they dialled in, so this
-  // card family starts Manual; the generated behaviours are still one chip away.
-  const behaviour: SimulationBehaviour = type === 'Process Card' ? 'Manual' : 'Steady';
+  // Every acquisition card is configured through the same knob-driven channel
+  // page, where an operator sets a value and expects to see exactly that value.
+  // A random walk would immediately move off whatever they dialled in, so a new
+  // channel starts Manual; the generated behaviours are still one chip away.
+  const behaviour: SimulationBehaviour = 'Manual';
   return Array.from({ length: channelCountForCardType(type) }, () => ({ ...defaultSimulatedChannel(kind), behaviour }));
 }
 
@@ -341,12 +312,9 @@ function midpoint(channel: SimulatedChannel): number {
  * Used to seed a knob that has never been set, so switching a channel to Manual
  * starts it at a healthy reading rather than at a range edge or at zero.
  */
-export function restingValue(channel: Pick<SimulatedChannel, 'min' | 'max' | 'normalMin' | 'normalMax'>): number {
+export function restingValue(channel: Pick<SimulatedChannel, 'min' | 'max'>): number {
   const min = Number.isFinite(channel.min) ? channel.min : 0;
   const max = Number.isFinite(channel.max) && channel.max > min ? channel.max : min + 1;
-  if (channel.normalMin !== null && channel.normalMax !== null && Number.isFinite(channel.normalMin) && Number.isFinite(channel.normalMax)) {
-    return clamp((channel.normalMin + channel.normalMax) / 2, min, max);
-  }
   return (min + max) / 2;
 }
 
@@ -410,15 +378,11 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
       return { target, low: channel.min, high: Math.max(channel.max, target) };
     }
     case 'Steady':
-    default: {
-      // Centre on the declared normal band when it sits inside the range, so a
-      // "normal" channel reads normal rather than hovering at a range edge.
-      const normalCentre =
-        channel.normalMin !== null && channel.normalMax !== null
-          ? clamp((channel.normalMin + channel.normalMax) / 2, channel.min, channel.max)
-          : midpoint(channel);
-      return { target: normalCentre, low: channel.min, high: channel.max };
-    }
+    default:
+      // The operating range is derived from the alarm levels, so its centre is
+      // by construction the point furthest from every limit — which is exactly
+      // where a healthy channel should sit.
+      return { target: midpoint(channel), low: channel.min, high: channel.max };
   }
 }
 
@@ -488,9 +452,16 @@ export function thresholdStates(
   };
 }
 
+/**
+ * Whether a reading has crossed one of the channel's own limits.
+ *
+ * There is no separate "normal band" any more: the alarm levels are the only
+ * declaration of what normal means, so this is simply "is the warning or the
+ * critical limit met".
+ */
 export function isOutsideNormalRange(value: number, channel: SimulatedChannel): boolean {
-  if (channel.normalMin !== null && value < channel.normalMin) return true;
-  return channel.normalMax !== null && value > channel.normalMax;
+  const { alert, danger } = thresholdStates(value, channel.alertLimit, channel.dangerLimit);
+  return alert === 'ACTIVE' || danger === 'ACTIVE';
 }
 
 export function formatSimulatedValue(value: number, decimals: number): string {
@@ -574,8 +545,6 @@ function slotPayload(
     // Extra context a physical card does not report; harmless to downstream
     // consumers and useful when inspecting the raw simulated payload.
     simulated: true,
-    normal_min: channel.normalMin,
-    normal_max: channel.normalMax,
     samples_per_second: channel.samplesPerSecond,
   };
 }
@@ -692,156 +661,94 @@ export function simulationFramesForGateway(
   return frames;
 }
 
-function limitText(value: number | null): string {
-  return value === null ? '' : String(value);
+function numericOr(text: string | undefined, fallback: number): number {
+  const parsed = Number.parseFloat(String(text ?? '').trim());
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 /**
- * Mirrors a simulated channel's unit, range and limits into the card's own
- * configuration.
+ * Push the card's configuration into the signal definition the generator runs.
  *
- * The rest of the app reads engineering units and alarm limits off the card
- * (that is where a real commissioning engineer enters them) — `listChannels`
- * derives a mapped point's unit and V/T/S/P/C letter from them, and the
- * analysis layer reads its thresholds from them. For a simulated card the
- * signal definition is the source of truth, so the two are kept in step
- * instead of asking the operator to type the same numbers twice.
+ * One direction, one rule, for every acquisition card: the card is where the
+ * engineer types, and the signal definition is a projection of it. Unit,
+ * operating range, decimals and limits are all read off the shared channel
+ * block, so a vibration card, a process card and a speed card are handled by
+ * the same four lines rather than by three near-identical branches.
  *
- * Channel 1 decides the card-level values, since a card carries one unit and
- * one threshold pair for all of its channels.
+ * Only the high-side levels become the signal's alert/danger limits, because
+ * the payload's threshold states are "value at or above the limit". Feeding a
+ * low alarm in there would report a healthy reading as critical the moment it
+ * rose past the low limit — the card's own alarm evaluation, which knows which
+ * side each level guards, keeps handling those.
  */
-/**
- * Push a card-level edit back into the signal definition.
- *
- * The unit, range and alarm pair exist in two places for a simulated card: on
- * the card (where a commissioning engineer expects to type them) and on the
- * signal definition (which is what the generator actually publishes). Previously
- * the signal definition won unconditionally on save, so editing the card's Unit
- * field appeared to do nothing — the value snapped straight back.
- *
- * The two are now kept in step in BOTH directions: edit either side and the
- * other follows. This is the reverse of `cardConfigWithSimulation`.
- */
-export function simulationWithCardConfig(
-  type: CardType,
-  config: CardConfig,
-  channels: SimulatedChannel[],
-): SimulatedChannel[] {
+export function simulationWithCardConfig(type: CardType, config: CardConfig, channels: SimulatedChannel[]): SimulatedChannel[] {
   const primary = channels[0];
-  if (!primary) return channels;
+  if (!primary || !('alarmHigh' in config)) return channels;
 
-  const numeric = (text: string | undefined, fallback: number): number => {
-    const parsed = Number.parseFloat(String(text ?? '').trim());
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
-  const limit = (text: string | undefined, fallback: number | null): number | null => {
-    const raw = String(text ?? '').trim();
-    if (!raw) return null;
-    const parsed = Number.parseFloat(raw);
-    return Number.isFinite(parsed) ? parsed : fallback;
-  };
+  const common = config as ChannelCommonConfig;
+  const { min, max } = derivedChannelRangeFor(common);
+  const limits = channelAlarmLimits(common);
 
-  let next: Partial<SimulatedChannel> = {};
-  if (type === 'Vibration Card' && 'engineeringUnit' in config) {
-    next = {
-      unit: config.engineeringUnit || primary.unit,
-      min: numeric(config.measurementRangeMin, primary.min),
-      max: numeric(config.measurementRangeMax, primary.max),
-      // Accept both "10" and the persisted card representation "10 Hz" so a
-      // configuration round-trip keeps the requested cadence.
-      samplesPerSecond: numeric(config.samplingRate, primary.samplesPerSecond),
-    };
-  } else if (type === 'Process Card' && 'engineeringMin' in config) {
-    next = {
-      unit: config.unit || primary.unit,
-      min: numeric(config.engineeringMin, primary.min),
-      max: numeric(config.engineeringMax, primary.max),
-      // Section 5 of the card specification makes display precision the single
-      // place decimals are chosen, so the generator follows it rather than
-      // asking for the same number twice.
-      decimals: decimalsForPrecision(config.displayPrecision),
-    };
-  } else if (type === 'Speed Card' && 'minSpeed' in config) {
-    next = {
-      unit: config.unit || primary.unit,
-      min: numeric(config.minSpeed, primary.min),
-      max: numeric(config.maxSpeed, primary.max),
-    };
-  } else {
-    return channels;
+  const next: Partial<SimulatedChannel> = {
+    unit: common.unit || primary.unit,
+    min,
+    max,
+    decimals: decimalsForPrecision(common.displayPrecision),
+    alertLimit: limits.high,
+    dangerLimit: limits.highHigh,
+  };
+  // A vibration card is the one type whose acquisition rate is part of the
+  // hardware configuration rather than of the simulation. Accepts both "2560"
+  // and the stored "2560 Hz".
+  if (type === 'Vibration Card' && 'samplingRate' in config) {
+    next.samplesPerSecond = numericOr(config.samplingRate, primary.samplesPerSecond);
   }
 
-  if ('alarmWarning' in config) next.alertLimit = limit(config.alarmWarning, primary.alertLimit);
-  if ('alarmCritical' in config) next.dangerLimit = limit(config.alarmCritical, primary.dangerLimit);
-  // A range that ends up inverted would stall the generator; keep the stored one.
-  if (next.min !== undefined && next.max !== undefined && next.max <= next.min) {
-    next.min = primary.min;
-    next.max = primary.max;
-  }
-
-  // Narrowing the engineering range must not leave the knob parked outside it —
-  // the generator clamps on publish, so an unclamped knob would show one number
-  // on the configuration page and publish another to the machine view.
-  const merged = { ...primary, ...next };
-  next.manualValue = manualChannelValue(merged);
+  // Narrowing the alarm levels narrows the derived range, which must not leave
+  // the knob parked outside it: the generator clamps on publish, so an
+  // unclamped knob would show one number and publish another.
+  next.manualValue = manualChannelValue({ ...primary, ...next } as SimulatedChannel);
 
   return channels.map((channel, index) => (index === 0 ? { ...channel, ...next } : channel));
 }
 
+/**
+ * The reverse trip, used once when a card's editor opens.
+ *
+ * It carries only what the signal definition is the authority on — the unit it
+ * was created with, its decimals, and the limits it has been publishing
+ * against. It deliberately does NOT write a range back: the range is derived
+ * from the alarm levels now, so writing one would immediately be overwritten
+ * by the next normalisation and would look like the field ignoring the user.
+ */
 export function cardConfigWithSimulation(type: CardType, config: CardConfig, channels: SimulatedChannel[]): CardConfig {
   const primary = channels[0];
-  if (!primary) return config;
-  const alarmWarning = limitText(primary.alertLimit);
-  const alarmCritical = limitText(primary.dangerLimit);
+  if (!primary || !('alarmHigh' in config)) return config;
 
-  if (type === 'Vibration Card' && 'engineeringUnit' in config) {
-    return {
-      ...config,
-      engineeringUnit: primary.unit,
-      measurementRangeMin: String(primary.min),
-      measurementRangeMax: String(primary.max),
-      samplingRate: `${primary.samplesPerSecond} Hz`,
-      alarmWarning,
-      alarmCritical,
-    };
+  const common = config as ChannelCommonConfig;
+  const next: Record<string, unknown> = {
+    ...common,
+    unit: common.unit || primary.unit,
+    displayPrecision: precisionForDecimals(primary.decimals),
+  };
+  // Seed the card's H and HH from the pair the signal carries when the card has
+  // none of its own — a card created before it had an alarm block, or one
+  // installed straight from a signal default. Without this the first edit
+  // recomputes the pair from empty fields and the generator silently loses the
+  // thresholds it was publishing against.
+  if (!common.alarmHigh.trim() && primary.alertLimit !== null) {
+    next.alarmHigh = String(primary.alertLimit);
+    next.alarmHighEnabled = true;
   }
-  if (type === 'Process Card' && 'engineeringMin' in config) {
-    const next: ProcessConfig = {
-      ...config,
-      unit: primary.unit,
-      engineeringMin: String(primary.min),
-      engineeringMax: String(primary.max),
-      displayPrecision: precisionForDecimals(primary.decimals),
-      alarmWarning,
-      alarmCritical,
-    };
-    // The card specification's alarm block is richer than a signal definition,
-    // which carries only a warning/critical pair. Seeding H and HH from that
-    // pair when the card has none of its own keeps the two descriptions of the
-    // same limits together: without it, `syncProcessLegacyAlarms` recomputes
-    // the pair from the (empty) H/HH fields on the very first edit and the
-    // generator quietly loses the thresholds it was publishing against.
-    if (!next.alarmHigh.trim() && primary.alertLimit !== null) {
-      next.alarmHigh = String(primary.alertLimit);
-      next.alarmHighEnabled = true;
-    }
-    if (!next.alarmHighHigh.trim() && primary.dangerLimit !== null) {
-      next.alarmHighHigh = String(primary.dangerLimit);
-      next.alarmHighHighEnabled = true;
-    }
-    return syncProcessLegacyAlarms(next);
+  if (!common.alarmHighHigh.trim() && primary.dangerLimit !== null) {
+    next.alarmHighHigh = String(primary.dangerLimit);
+    next.alarmHighHighEnabled = true;
   }
-  if (type === 'Speed Card' && 'minSpeed' in config) {
-    return {
-      ...config,
-      unit: primary.unit,
-      minSpeed: String(primary.min),
-      maxSpeed: String(primary.max),
-      alarmWarning,
-      alarmCritical,
-    };
+  if (type === 'Vibration Card' && 'samplingRate' in config && !config.samplingRate.trim()) {
+    next.samplingRate = `${primary.samplesPerSecond} Hz`;
   }
-  return config;
+
+  return normalizeChannelConfig(type, next);
 }
 
 // --- Workspace helpers ------------------------------------------------------

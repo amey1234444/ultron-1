@@ -58,28 +58,27 @@ export function allowedCardTypesForSlot(slot: number): CardType[] {
   return slotKind(slot) === 'acquisition' ? ACQUISITION_CARD_TYPES : CONTROLLER_CARD_TYPES;
 }
 
-export type VibrationConfig = {
-  channelNames: string[];
-  sensorType: string;
-  sensitivity: string;
-  engineeringUnit: string;
-  measurementRangeMin: string;
-  measurementRangeMax: string;
-  samplingRate: string;
-  alarmWarning: string;
-  alarmCritical: string;
-};
-
-export type ProcessConfig = {
+/**
+ * The part of a channel's configuration that is the same on every acquisition
+ * card, whatever it measures.
+ *
+ * Every acquisition card is one channel, and every channel is named, carries a
+ * unit, is calibrated by an offset, is alarmed on four levels and is displayed
+ * at a precision. Vibration, process and speed cards used to describe those
+ * same things with three different field sets, which is why they needed three
+ * different editors and three different sync paths into the simulator. They now
+ * share this block and one editor.
+ *
+ * The operating range is deliberately NOT here: it is derived from the enabled
+ * alarm levels (see `derivedChannelRange`), so there is nothing to type and
+ * nothing that can contradict the limits.
+ */
+export type ChannelCommonConfig = {
   channelNames: string[];
   tag: string;
-  inputType: ProcessInputType;
-  engineeringMin: string;
-  engineeringMax: string;
   unit: string;
-  scaling: string;
+  /** Signed calibration offset, in the channel's engineering unit. */
   offset: string;
-  filter: string;
   alarmLowLowEnabled: boolean;
   alarmLowEnabled: boolean;
   alarmHighEnabled: boolean;
@@ -91,25 +90,53 @@ export type ProcessConfig = {
   hysteresis: string;
   alarmDelay: string;
   displayPrecision: ProcessDisplayPrecision;
+  /**
+   * Mirrors of the High and High-High thresholds, kept because the analysis,
+   * dashboard and mapping layers read a single warning/critical pair off the
+   * card. `syncChannelLegacyAlarms` keeps them in step; nothing writes them
+   * directly.
+   */
   alarmWarning: string;
   alarmCritical: string;
 };
 
-export type SpeedConfig = {
-  channelNames: string[];
+export type VibrationConfig = ChannelCommonConfig & {
+  sensorType: string;
+  sensitivity: string;
+  samplingRate: string;
+  /**
+   * Kept so racks saved before the shared block existed still read, and so the
+   * derived operating range has somewhere card-shaped to live. Written by
+   * `normalizeChannelConfig`, never typed by hand.
+   */
+  engineeringUnit: string;
+  measurementRangeMin: string;
+  measurementRangeMax: string;
+};
+
+export type ProcessConfig = ChannelCommonConfig & {
+  inputType: ProcessInputType;
+  scaling: string;
+  filter: string;
+  /** Derived from the alarm levels; see the note on VibrationConfig. */
+  engineeringMin: string;
+  engineeringMax: string;
+};
+
+export type SpeedConfig = ChannelCommonConfig & {
   inputType: SpeedInputType;
   pulsesPerRevolution: string;
   trigger: string;
-  hysteresis: string;
   /**
-   * Engineering unit for the speed reading. Optional so racks saved before this
-   * field existed keep working — `letterAndUnitForCard` falls back to rpm.
+   * Trigger hysteresis in volts — a property of the pulse input, unrelated to
+   * the alarm hysteresis in the shared block. It was called `hysteresis` before
+   * the two blocks merged, which is why `normalizeChannelConfig` reads the old
+   * name across.
    */
-  unit?: string;
+  triggerHysteresis: string;
+  /** Derived from the alarm levels; see the note on VibrationConfig. */
   minSpeed: string;
   maxSpeed: string;
-  alarmWarning: string;
-  alarmCritical: string;
 };
 
 export type ControllerConfig = {
@@ -159,16 +186,11 @@ export function channelNamesForCard(card: CardNode): string[] {
   return Array.from({ length: count }, (_, index) => stored[index] ?? '');
 }
 
-// The same resize applied to a config being edited, so the form renders exactly
-// the fields the card actually has rather than whatever length was stored.
+// The same completion applied to a config being edited, so the form renders
+// exactly the fields the card actually has rather than whatever was stored.
 export function normalizedCardConfig(type: CardType, config: CardConfig): CardConfig {
-  const count = channelCountForCardType(type);
-  if (type === 'Process Card' && 'engineeringMin' in config) {
-    return normalizeProcessConfig({ ...config, channelNames: Array.from({ length: count }, (_, index) => config.channelNames[index] ?? '') });
-  }
-  if (!('channelNames' in config)) return config;
-  if (config.channelNames.length === count) return config;
-  return { ...config, channelNames: Array.from({ length: count }, (_, index) => config.channelNames[index] ?? '') };
+  if (channelCountForCardType(type) === 0) return config;
+  return normalizeChannelConfig(type, config as unknown as Record<string, unknown>);
 }
 
 function isProcessInputType(value: unknown): value is ProcessInputType {
@@ -179,149 +201,250 @@ function isProcessDisplayPrecision(value: unknown): value is ProcessDisplayPreci
   return PROCESS_DISPLAY_PRECISIONS.includes(value as ProcessDisplayPrecision);
 }
 
-function processSpan(config: Pick<ProcessConfig, 'engineeringMin' | 'engineeringMax'>): number | null {
-  const min = Number(config.engineeringMin);
-  const max = Number(config.engineeringMax);
-  return Number.isFinite(min) && Number.isFinite(max) && max > min ? max - min : null;
+/** The four alarm levels, low to high, as they appear in every editor and rule. */
+export const CHANNEL_ALARM_LEVELS = [
+  { enabledKey: 'alarmLowLowEnabled', valueKey: 'alarmLowLow', label: 'LL', name: 'Low Low' },
+  { enabledKey: 'alarmLowEnabled', valueKey: 'alarmLow', label: 'L', name: 'Low' },
+  { enabledKey: 'alarmHighEnabled', valueKey: 'alarmHigh', label: 'H', name: 'High' },
+  { enabledKey: 'alarmHighHighEnabled', valueKey: 'alarmHighHigh', label: 'HH', name: 'High High' },
+] as const;
+
+export type ChannelAlarmLevel = (typeof CHANNEL_ALARM_LEVELS)[number];
+
+/** The armed thresholds as numbers. A disabled or unparseable level is null. */
+export type ChannelAlarmLimits = { lowLow: number | null; low: number | null; high: number | null; highHigh: number | null };
+
+function parsedNumber(value: string | undefined): number | null {
+  const trimmed = String(value ?? '').trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function suggestedProcessHysteresis(config: Pick<ProcessConfig, 'engineeringMin' | 'engineeringMax'>): string {
-  const span = processSpan(config);
+export function channelAlarmLimits(config: ChannelCommonConfig): ChannelAlarmLimits {
+  const armed = (enabled: boolean, text: string) => (enabled ? parsedNumber(text) : null);
+  return {
+    lowLow: armed(config.alarmLowLowEnabled, config.alarmLowLow),
+    low: armed(config.alarmLowEnabled, config.alarmLow),
+    high: armed(config.alarmHighEnabled, config.alarmHigh),
+    highHigh: armed(config.alarmHighHighEnabled, config.alarmHighHigh),
+  };
+}
+
+/** How much room the operating range leaves beyond the outermost alarm level. */
+const RANGE_HEADROOM = 0.1;
+/** The range a channel gets when no alarm level is enabled at all. */
+const FALLBACK_RANGE = { min: 0, max: 100 };
+
+/**
+ * The channel's operating range, derived from its enabled alarm levels.
+ *
+ * There is no minimum/maximum to type any more. An engineer who has said
+ * "LL 20, L 40, H 210, HH 230" has already described the span this channel
+ * works over, and asking for it a second time only creates a way for the two
+ * answers to disagree — a threshold outside its own range, a knob that cannot
+ * reach an alarm, a gauge whose bands run off the end of the track.
+ *
+ * The rule: span the enabled levels and add 10% of that span at each end, so
+ * every level is reachable and there is somewhere to sit beyond HH. A range
+ * whose levels are all non-negative is not pulled below zero, because a
+ * pressure or a speed that reads -1 is a nonsense the operator then has to
+ * ignore on every gauge. One level alone has no span, so it is given a quarter
+ * of itself as headroom; none at all falls back to 0-100.
+ */
+export function derivedChannelRange(limits: ChannelAlarmLimits): { min: number; max: number } {
+  const armed = [limits.lowLow, limits.low, limits.high, limits.highHigh].filter((value): value is number => value !== null);
+  if (armed.length === 0) return { ...FALLBACK_RANGE };
+
+  const lowest = Math.min(...armed);
+  const highest = Math.max(...armed);
+  const guardsLowSide = limits.lowLow !== null || limits.low !== null;
+  const allNonNegative = lowest >= 0;
+
+  // A channel alarmed only on its high side runs from zero up to its limits —
+  // that is what "high only" means, and it is how the reference simulator bands
+  // a HIGH_ONLY profile. A vibration channel with H 3.5 and HH 4.8 measures
+  // 0-5, not 3.4-4.9; anchoring it at the low alarm would leave the knob unable
+  // to reach a healthy reading at all.
+  const base = guardsLowSide || !allNonNegative ? lowest : 0;
+  const span = highest - base;
+  const headroom = span > 0 ? span * RANGE_HEADROOM : Math.max(Math.abs(highest) * 0.25, 1);
+
+  // The low end is padded only when a low alarm put it there. A zero floor is
+  // deliberate and must not be pushed negative.
+  let min = guardsLowSide || !allNonNegative ? base - headroom : base;
+  if (allNonNegative && min < 0) min = 0;
+  const max = highest + headroom;
+
+  return max > min ? { min, max } : { min, max: min + 1 };
+}
+
+export function derivedChannelRangeFor(config: ChannelCommonConfig): { min: number; max: number } {
+  return derivedChannelRange(channelAlarmLimits(config));
+}
+
+/** The derived range as the strings a card stores. */
+function derivedRangeText(config: ChannelCommonConfig): { min: string; max: string } {
+  const { min, max } = derivedChannelRangeFor(config);
+  const decimals = decimalsForPrecision(config.displayPrecision);
+  return { min: String(Number(min.toFixed(decimals))), max: String(Number(max.toFixed(decimals))) };
+}
+
+function channelSpan(config: ChannelCommonConfig): number | null {
+  const { min, max } = derivedChannelRangeFor(config);
+  return max > min ? max - min : null;
+}
+
+/** Section 5.2's suggested starting point: roughly 1% of the operating span. */
+export function suggestedChannelHysteresis(config: ChannelCommonConfig): string {
+  const span = channelSpan(config);
   if (span === null) return '';
   const suggested = span * 0.01;
   return Number.isInteger(suggested) ? String(suggested) : String(Number(suggested.toFixed(6)));
 }
 
-export function syncProcessLegacyAlarms(config: ProcessConfig): ProcessConfig {
+/**
+ * Keeps the single warning/critical pair the rest of the app reads in step with
+ * the four-level block the operator actually edits.
+ *
+ * High and High-High are preferred because that is the usual direction of a
+ * process alarm; a channel alarmed only on its low side still reports something
+ * rather than nothing.
+ */
+export function syncChannelLegacyAlarms<T extends ChannelCommonConfig>(config: T): T {
   const alarmWarning = config.alarmHighEnabled && config.alarmHigh.trim() ? config.alarmHigh : config.alarmLowEnabled && config.alarmLow.trim() ? config.alarmLow : '';
   const alarmCritical =
     config.alarmHighHighEnabled && config.alarmHighHigh.trim() ? config.alarmHighHigh : config.alarmLowLowEnabled && config.alarmLowLow.trim() ? config.alarmLowLow : '';
   return { ...config, alarmWarning, alarmCritical };
 }
 
-export function normalizeProcessConfig(config: Partial<ProcessConfig> & Pick<ProcessConfig, 'channelNames'>): ProcessConfig {
-  const base: ProcessConfig = {
-    channelNames: config.channelNames,
-    tag: config.tag ?? '',
-    inputType: isProcessInputType(config.inputType) ? config.inputType : '4-20 mA',
-    engineeringMin: config.engineeringMin ?? '',
-    engineeringMax: config.engineeringMax ?? '',
-    unit: config.unit ?? '',
-    scaling: config.scaling ?? '1',
-    offset: config.offset ?? '0',
-    filter: config.filter ?? '',
-    alarmLowLowEnabled: config.alarmLowLowEnabled ?? false,
-    alarmLowEnabled: config.alarmLowEnabled ?? false,
-    alarmHighEnabled: config.alarmHighEnabled ?? !!config.alarmWarning,
-    alarmHighHighEnabled: config.alarmHighHighEnabled ?? !!config.alarmCritical,
-    alarmLowLow: config.alarmLowLow ?? '',
-    alarmLow: config.alarmLow ?? '',
-    alarmHigh: config.alarmHigh ?? config.alarmWarning ?? '',
-    alarmHighHigh: config.alarmHighHigh ?? config.alarmCritical ?? '',
-    hysteresis: config.hysteresis ?? '',
-    alarmDelay: config.alarmDelay ?? '0',
-    displayPrecision: isProcessDisplayPrecision(config.displayPrecision) ? config.displayPrecision : '0.00',
-    alarmWarning: config.alarmWarning ?? '',
-    alarmCritical: config.alarmCritical ?? '',
+function commonDefaults(source: Partial<ChannelCommonConfig>, fallbackUnit: string): ChannelCommonConfig {
+  return {
+    channelNames: source.channelNames ?? [],
+    tag: source.tag ?? '',
+    unit: source.unit ?? fallbackUnit,
+    offset: source.offset ?? '0',
+    alarmLowLowEnabled: source.alarmLowLowEnabled ?? false,
+    alarmLowEnabled: source.alarmLowEnabled ?? false,
+    alarmHighEnabled: source.alarmHighEnabled ?? !!source.alarmWarning,
+    alarmHighHighEnabled: source.alarmHighHighEnabled ?? !!source.alarmCritical,
+    alarmLowLow: source.alarmLowLow ?? '',
+    alarmLow: source.alarmLow ?? '',
+    alarmHigh: source.alarmHigh ?? source.alarmWarning ?? '',
+    alarmHighHigh: source.alarmHighHigh ?? source.alarmCritical ?? '',
+    hysteresis: source.hysteresis ?? '',
+    alarmDelay: source.alarmDelay ?? '0',
+    displayPrecision: isProcessDisplayPrecision(source.displayPrecision) ? source.displayPrecision : '0.00',
+    alarmWarning: source.alarmWarning ?? '',
+    alarmCritical: source.alarmCritical ?? '',
   };
-  return syncProcessLegacyAlarms({
-    ...base,
-    hysteresis: base.hysteresis || suggestedProcessHysteresis(base),
+}
+
+/**
+ * Brings any stored acquisition-card config up to the shared shape, whatever
+ * build wrote it, and rewrites the derived range from the alarm levels.
+ *
+ * This is the one place a card config is made whole. Everything that edits or
+ * renders a card runs through it, so a rack saved before the three card types
+ * shared a block — a vibration card with only warning/critical, a speed card
+ * whose `hysteresis` meant volts — opens with LL/L/H/HH, a precision and a
+ * derived range rather than blank fields.
+ */
+export function normalizeChannelConfig(type: CardType, config: Record<string, unknown>): CardConfig {
+  const count = channelCountForCardType(type);
+  // `inputType` is excluded from the intersection because the process and speed
+  // unions share no member: intersecting them collapses the whole source type
+  // to `never`. Each branch narrows it with its own guard instead.
+  const source = config as Partial<Omit<ProcessConfig, 'inputType'>> &
+    Partial<Omit<VibrationConfig, 'inputType'>> &
+    Partial<Omit<SpeedConfig, 'inputType'>> & { inputType?: unknown };
+  const channelNames = Array.from({ length: count }, (_, index) => source.channelNames?.[index] ?? '');
+
+  if (type === 'Vibration Card') {
+    const common = commonDefaults({ ...source, channelNames, unit: source.unit ?? source.engineeringUnit }, 'mm/s');
+    const withHysteresis = { ...common, hysteresis: common.hysteresis || suggestedChannelHysteresis(common) };
+    const range = derivedRangeText(withHysteresis);
+    return syncChannelLegacyAlarms({
+      ...withHysteresis,
+      sensorType: source.sensorType ?? '',
+      sensitivity: source.sensitivity ?? '',
+      samplingRate: source.samplingRate ?? '',
+      engineeringUnit: withHysteresis.unit,
+      measurementRangeMin: range.min,
+      measurementRangeMax: range.max,
+    });
+  }
+
+  if (type === 'Speed Card') {
+    const common = commonDefaults({ ...source, channelNames }, 'rpm');
+    const withHysteresis = { ...common, hysteresis: common.hysteresis || suggestedChannelHysteresis(common) };
+    const range = derivedRangeText(withHysteresis);
+    return syncChannelLegacyAlarms({
+      ...withHysteresis,
+      inputType: SPEED_INPUT_TYPES.includes(source.inputType as SpeedInputType) ? (source.inputType as SpeedInputType) : 'RPM',
+      pulsesPerRevolution: source.pulsesPerRevolution ?? '',
+      trigger: source.trigger ?? '',
+      // `hysteresis` used to be the trigger's volts on a speed card; read it
+      // across only when the field it moved to is empty.
+      triggerHysteresis: source.triggerHysteresis ?? (typeof config.hysteresis === 'string' && !source.alarmHigh ? (config.hysteresis as string) : '') ?? '',
+      minSpeed: range.min,
+      maxSpeed: range.max,
+    });
+  }
+
+  const common = commonDefaults({ ...source, channelNames }, '');
+  const withHysteresis = { ...common, hysteresis: common.hysteresis || suggestedChannelHysteresis(common) };
+  const range = derivedRangeText(withHysteresis);
+  return syncChannelLegacyAlarms({
+    ...withHysteresis,
+    inputType: isProcessInputType(source.inputType) ? source.inputType : '4-20 mA',
+    scaling: source.scaling ?? '1',
+    filter: source.filter ?? '',
+    engineeringMin: range.min,
+    engineeringMax: range.max,
   });
 }
 
-export function emptyConfigFor(type: CardType): CardConfig {
-  switch (type) {
-    case 'Vibration Card':
-      return {
-        channelNames: emptyChannelNames(type),
-        sensorType: '',
-        sensitivity: '',
-        engineeringUnit: 'mm/s',
-        measurementRangeMin: '',
-        measurementRangeMax: '',
-        samplingRate: '',
-        alarmWarning: '',
-        alarmCritical: '',
-      };
-    case 'Process Card':
-      return {
-        channelNames: emptyChannelNames(type),
-        tag: '',
-        inputType: '4-20 mA',
-        engineeringMin: '',
-        engineeringMax: '',
-        unit: '',
-        scaling: '',
-        offset: '0',
-        filter: '',
-        alarmLowLowEnabled: false,
-        alarmLowEnabled: false,
-        alarmHighEnabled: false,
-        alarmHighHighEnabled: false,
-        alarmLowLow: '',
-        alarmLow: '',
-        alarmHigh: '',
-        alarmHighHigh: '',
-        hysteresis: '',
-        alarmDelay: '0',
-        displayPrecision: '0.00',
-        alarmWarning: '',
-        alarmCritical: '',
-      };
-    case 'Speed Card':
-      return {
-        channelNames: emptyChannelNames(type),
-        inputType: 'Pulse',
-        pulsesPerRevolution: '',
-        trigger: '',
-        hysteresis: '',
-        unit: 'rpm',
-        minSpeed: '',
-        maxSpeed: '',
-        alarmWarning: '',
-        alarmCritical: '',
-      };
-    case 'Communication Controller':
-      return { controllerName: '', ip: '', port: '', firmware: '', role: 'Primary', partnerController: '' };
-  }
+/** Back-compatible aliases, so existing callers keep reading. */
+export function normalizeProcessConfig(config: Partial<ProcessConfig> & Pick<ProcessConfig, 'channelNames'>): ProcessConfig {
+  return normalizeChannelConfig('Process Card', config as Record<string, unknown>) as ProcessConfig;
 }
 
-function midpoint(low: string | undefined, high: string | undefined): number | null {
-  const min = Number.parseFloat(String(low ?? '').trim());
-  const max = Number.parseFloat(String(high ?? '').trim());
-  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return null;
-  return (min + max) / 2;
+export function syncProcessLegacyAlarms(config: ProcessConfig): ProcessConfig {
+  return syncChannelLegacyAlarms(config);
+}
+
+export function suggestedProcessHysteresis(config: ChannelCommonConfig): string {
+  return suggestedChannelHysteresis(config);
+}
+
+export function emptyConfigFor(type: CardType): CardConfig {
+  if (type === 'Communication Controller') {
+    return { controllerName: '', ip: '', port: '', firmware: '', role: 'Primary', partnerController: '' };
+  }
+  // Every acquisition card starts from the same shared block, so a new card of
+  // any type opens on the same editor with the same fields filled in.
+  return normalizeChannelConfig(type, { channelNames: emptyChannelNames(type) });
 }
 
 /**
  * The value this channel reads when the process is healthy, taken from the
  * channel's own configuration.
  *
- * Preference order, strongest declaration first:
- *   1. the simulated signal's declared NORMAL band (what the commissioning
- *      engineer said "good" looks like)
- *   2. the simulated signal's generation range
- *   3. the card's engineering range
- *
- * Returns `null` when the card declares no range at all, so a caller reports
- * "not configured" rather than inventing a number.
+ * With the operating range derived from the alarm levels, "healthy" is simply
+ * the middle of that range: the point furthest from both the low and the high
+ * limits. Returns null when the card declares nothing at all, so a caller
+ * reports "not configured" rather than inventing a number.
  */
 export function configuredHealthyValue(card: CardNode): number | null {
   const simulated = card.simulation?.[0];
-  if (simulated) {
-    if (simulated.normalMin !== null && simulated.normalMax !== null && simulated.normalMax > simulated.normalMin) {
-      return (simulated.normalMin + simulated.normalMax) / 2;
-    }
-    if (Number.isFinite(simulated.min) && Number.isFinite(simulated.max) && simulated.max > simulated.min) {
-      return (simulated.min + simulated.max) / 2;
-    }
+  if (simulated && Number.isFinite(simulated.min) && Number.isFinite(simulated.max) && simulated.max > simulated.min) {
+    return (simulated.min + simulated.max) / 2;
   }
   const config = card.config;
-  if ('measurementRangeMin' in config) return midpoint(config.measurementRangeMin, config.measurementRangeMax);
-  if ('engineeringMin' in config) return midpoint(config.engineeringMin, config.engineeringMax);
-  if ('minSpeed' in config) return midpoint(config.minSpeed, config.maxSpeed);
-  return null;
+  if (!('alarmHigh' in config)) return null;
+  const { min, max } = derivedChannelRangeFor(config);
+  return max > min ? (min + max) / 2 : null;
 }
 
 // A freshly-installed card has only defaults — nothing worth showing in a
@@ -443,16 +566,9 @@ export function channelEngineeringRange(card: CardNode, index: number): { min: n
   }
 
   const config = card.config;
-  const range = (min: string | undefined, max: string | undefined) => {
-    const lo = parsedThreshold(min);
-    const hi = parsedThreshold(max);
-    return lo !== undefined && hi !== undefined && hi > lo ? { min: lo, max: hi } : null;
-  };
-
-  if ('measurementRangeMin' in config) return range(config.measurementRangeMin, config.measurementRangeMax);
-  if ('engineeringMin' in config) return range(config.engineeringMin, config.engineeringMax);
-  if ('minSpeed' in config) return range(config.minSpeed, config.maxSpeed);
-  return null;
+  if (!('alarmHigh' in config)) return null;
+  const { min, max } = derivedChannelRangeFor(config);
+  return max > min ? { min, max } : null;
 }
 
 // Flattens every acquisition-card channel across all racks into a pickable list —

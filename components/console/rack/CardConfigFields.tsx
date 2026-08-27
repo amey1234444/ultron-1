@@ -4,24 +4,30 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import {
+  CHANNEL_ALARM_LEVELS,
   PROCESS_DISPLAY_PRECISIONS,
   PROCESS_INPUT_TYPES,
   SPEED_INPUT_TYPES,
+  channelAlarmLimits,
+  decimalsForPrecision,
+  derivedChannelRangeFor,
+  formatProcessValue,
+  suggestedChannelHysteresis,
+  syncChannelLegacyAlarms,
+  type CardType,
+  type ChannelAlarmLevel,
+  type ChannelCommonConfig,
   type ControllerConfig,
-  type ProcessDisplayPrecision,
   type ProcessConfig,
+  type ProcessDisplayPrecision,
   type ProcessInputType,
   type SpeedConfig,
   type SpeedInputType,
   type VibrationConfig,
-  decimalsForPrecision,
-  formatProcessValue,
-  suggestedProcessHysteresis,
-  syncProcessLegacyAlarms,
 } from '../../../lib/rack';
 import { SIMULATION_BEHAVIOURS, kindsForCardType, manualChannelValue, restingValue, type SimulatedChannel } from '../../../lib/simulation';
 import { FormField } from '../FormField';
-import { AlarmBandMeter, ExactValueField, KnobResetButton, RotaryKnob, processConditionFor, quantize, type AlarmLimits } from './ChannelValueKnob';
+import { AlarmBandMeter, ExactValueField, KnobResetButton, RotaryKnob, processConditionFor, quantize } from './ChannelValueKnob';
 
 export function Chip<T extends string>({ label, selected, onPress }: { label: T; selected: boolean; onPress: () => void }) {
   const { isDark } = useAppTheme();
@@ -57,12 +63,18 @@ export function EnabledToggle({ enabled, onChange }: { enabled: boolean; onChang
   );
 }
 
-const COMMON_PROCESS_UNITS = ['bar', 'psi', 'kPa', 'MPa', 'degC', 'degF', '%', 'L/min', 'm3/h', 'A', 'V', 'Nm', 'N', 'mm', 'Hz'];
+// Suggested units per card family. The unit field is free text, so this is a
+// shortlist to click rather than a constraint — a custom unit is always typable.
+const COMMON_UNITS: Record<string, string[]> = {
+  'Vibration Card': ['mm/s', 'mm/s²', 'g', 'µm', 'in/s', 'mil', 'Hz'],
+  'Process Card': ['bar', 'psi', 'kPa', 'MPa', 'degC', 'degF', '%', 'L/min', 'm3/h', 'A', 'V', 'Nm', 'N', 'mm', 'Hz'],
+  'Speed Card': ['rpm', 'Hz', 'rad/s', 'm/s'],
+};
 
-// Section 3.3: which end of the electrical range maps to which end of the
-// engineering range. Ultron performs the linear conversion internally - no
-// slope or intercept field is exposed - so this is shown as a statement of
-// what the card will do rather than as something to configure.
+// Which end of the electrical range maps to which end of the operating range.
+// Ultron performs the linear conversion internally — no slope or intercept
+// field is exposed — so this is a statement of what the card will do rather
+// than something to configure.
 const ELECTRICAL_MAPPING: Record<ProcessInputType, string> = {
   '0-1 V': '0 V → minimum · 1 V → maximum',
   '0-5 V': '0 V → minimum · 5 V → maximum',
@@ -71,20 +83,10 @@ const ELECTRICAL_MAPPING: Record<ProcessInputType, string> = {
   '0-20 mA': '0 mA → minimum · 20 mA → maximum',
 };
 
-const PROCESS_ALARM_LEVELS = [
-  { enabledKey: 'alarmLowLowEnabled', valueKey: 'alarmLowLow', label: 'LL', name: 'Low Low' },
-  { enabledKey: 'alarmLowEnabled', valueKey: 'alarmLow', label: 'L', name: 'Low' },
-  { enabledKey: 'alarmHighEnabled', valueKey: 'alarmHigh', label: 'H', name: 'High' },
-  { enabledKey: 'alarmHighHighEnabled', valueKey: 'alarmHighHigh', label: 'HH', name: 'High High' },
-] as const;
-
-type ProcessAlarmLevel = (typeof PROCESS_ALARM_LEVELS)[number];
-type ProcessErrorKey =
+type ChannelErrorKey =
   | 'displayName'
   | 'inputType'
   | 'unit'
-  | 'engineeringMin'
-  | 'engineeringMax'
   | 'offset'
   | 'alarmLowLow'
   | 'alarmLow'
@@ -95,7 +97,9 @@ type ProcessErrorKey =
   | 'displayPrecision'
   | 'channelValue';
 
-export type ProcessConfigErrors = Partial<Record<ProcessErrorKey, string>>;
+export type ChannelConfigErrors = Partial<Record<ChannelErrorKey, string>>;
+/** Retained name, so callers that spoke of "process" errors keep compiling. */
+export type ProcessConfigErrors = ChannelConfigErrors;
 
 function numberFromText(value: string): number | null {
   const trimmed = value.trim();
@@ -104,48 +108,54 @@ function numberFromText(value: string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function processConfigErrors(config: ProcessConfig): ProcessConfigErrors {
-  const errors: ProcessConfigErrors = {};
+/**
+ * Every rule that can block a save, for any acquisition card.
+ *
+ * There is no minimum/maximum rule any more, because there are no minimum and
+ * maximum fields: the operating range is derived from the enabled alarm levels,
+ * so a threshold cannot fall outside its own range and the two can never be
+ * made to disagree. What is left is the levels' own ordering, the hysteresis
+ * and delay bounds, and the fields the channel cannot be identified without.
+ */
+export function channelConfigErrors(type: CardType, config: ChannelCommonConfig): ChannelConfigErrors {
+  const errors: ChannelConfigErrors = {};
   const displayName = config.channelNames[0] ?? '';
-  const min = numberFromText(config.engineeringMin);
-  const max = numberFromText(config.engineeringMax);
   const offset = numberFromText(config.offset);
   const hysteresis = numberFromText(config.hysteresis);
   const alarmDelay = numberFromText(config.alarmDelay);
-  const hasRange = min !== null && max !== null && max > min;
-  const span = hasRange ? max - min : null;
+  const { min, max } = derivedChannelRangeFor(config);
+  const span = max > min ? max - min : null;
 
   if (!displayName.trim()) errors.displayName = 'Display name is required';
-  if (!PROCESS_INPUT_TYPES.includes(config.inputType)) errors.inputType = 'Select an input type';
   if (!config.unit.trim()) errors.unit = 'Engineering unit is required';
-  if (min === null) errors.engineeringMin = 'Engineering minimum must be numeric';
-  if (max === null) errors.engineeringMax = 'Engineering maximum must be numeric';
-  if (min !== null && max !== null && max <= min) errors.engineeringMax = 'Engineering maximum must be greater than minimum';
-  if (offset === null) errors.offset = 'Offset must be numeric';
+  if (type === 'Process Card' && 'inputType' in config && !PROCESS_INPUT_TYPES.includes((config as ProcessConfig).inputType)) {
+    errors.inputType = 'Select an input type';
+  }
+  if (type === 'Speed Card' && 'inputType' in config && !SPEED_INPUT_TYPES.includes((config as SpeedConfig).inputType)) {
+    errors.inputType = 'Select an input type';
+  }
+  if (offset === null) errors.offset = 'Calibration offset must be numeric';
   if (hysteresis === null) {
     errors.hysteresis = 'Hysteresis must be numeric';
   } else if (hysteresis < 0) {
     errors.hysteresis = 'Hysteresis must be zero or greater';
   } else if (span !== null && hysteresis >= span) {
-    errors.hysteresis = 'Hysteresis must be less than the engineering span';
+    errors.hysteresis = 'Hysteresis must be less than the operating span';
   }
   if (alarmDelay === null) {
-    errors.alarmDelay = 'Delay must be numeric';
+    errors.alarmDelay = 'Alarm delay must be numeric';
   } else if (alarmDelay < 0) {
-    errors.alarmDelay = 'Delay must be zero or greater';
+    errors.alarmDelay = 'Alarm delay must be zero or greater';
   }
   if (!PROCESS_DISPLAY_PRECISIONS.includes(config.displayPrecision)) errors.displayPrecision = 'Select a display precision';
 
-  const enabledThresholds: { level: ProcessAlarmLevel; value: number }[] = [];
-  for (const level of PROCESS_ALARM_LEVELS) {
+  const enabledThresholds: { level: ChannelAlarmLevel; value: number }[] = [];
+  for (const level of CHANNEL_ALARM_LEVELS) {
     if (!config[level.enabledKey]) continue;
     const value = numberFromText(config[level.valueKey]);
     if (value === null) {
       errors[level.valueKey] = `${level.label} threshold must be numeric`;
       continue;
-    }
-    if (hasRange && (value < min || value > max)) {
-      errors[level.valueKey] = `${level.label} must be inside the engineering range`;
     }
     enabledThresholds.push({ level, value });
   }
@@ -159,6 +169,36 @@ export function processConfigErrors(config: ProcessConfig): ProcessConfigErrors 
   }
 
   return errors;
+}
+
+/** Retained name for callers written against the process-only editor. */
+export function processConfigErrors(config: ChannelCommonConfig): ChannelConfigErrors {
+  return channelConfigErrors('Process Card', config);
+}
+
+/**
+ * Whether a driven channel value is usable against this card's configuration.
+ *
+ * Kept beside `channelConfigErrors` rather than inside it because the value
+ * lives on the signal definition, not on the card: a physical card has no such
+ * value and must not be blocked from saving for lacking one.
+ */
+export function channelValueError(config: ChannelCommonConfig, value: number | null): string | undefined {
+  const { min, max } = derivedChannelRangeFor(config);
+  if (value === null || !Number.isFinite(value)) return 'Channel value must be numeric';
+  if (max > min && (value < min || value > max)) return 'Channel value must be inside the operating range';
+  return undefined;
+}
+
+/** Retained name. */
+export function processChannelValueError(config: ChannelCommonConfig, value: number | null): string | undefined {
+  return channelValueError(config, value);
+}
+
+/** The step the knob moves in, taken from the configured display precision. */
+export function channelValueStep(precision: ProcessDisplayPrecision): number {
+  const decimals = decimalsForPrecision(precision);
+  return Number(Math.pow(10, -decimals).toFixed(decimals));
 }
 
 function SectionPanel({ index, title, note, children }: { index: string; title: string; note?: string; children: ReactNode }) {
@@ -177,9 +217,9 @@ function SectionPanel({ index, title, note, children }: { index: string; title: 
   );
 }
 
-// A read-only figure shown beside the fields that produce it - the calibration
-// arithmetic and the display-precision preview. Deliberately not an input: the
-// specification exposes exactly one calibration control, a signed offset.
+// A read-only figure shown beside the fields that produce it — the calibration
+// arithmetic, the derived range, the precision preview. Deliberately not an
+// input: each of these is a consequence of a value entered somewhere else.
 function ReadoutTile({ label, value, tone }: { label: string; value: string; tone?: 'accent' | 'warning' | 'critical' }) {
   const { isDark } = useAppTheme();
   const toneClass =
@@ -193,13 +233,13 @@ function ReadoutTile({ label, value, tone }: { label: string; value: string; ton
 }
 
 /**
- * The inline validation bar from section 8 of the specification.
+ * The inline validation bar.
  *
  * Field-level messages already sit under each control; this restates them in
  * one place so the reason Save is disabled is visible without hunting down the
  * page for a red line.
  */
-function ValidationBar({ errors }: { errors: ProcessConfigErrors }) {
+function ValidationBar({ errors }: { errors: ChannelConfigErrors }) {
   const { isDark } = useAppTheme();
   const messages = Object.values(errors).filter((message): message is string => !!message);
 
@@ -251,183 +291,175 @@ function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (enab
   );
 }
 
-export function ChannelNameFields({
-  channelNames,
-  setChannelName,
-  placeholder,
-}: {
-  channelNames: string[];
-  setChannelName: (index: number, value: string) => void;
-  placeholder: (index: number) => string;
-}) {
-  // One channel per card, so the single field is just "Channel Name"; the map is
-  // kept so a card type that ever exposes more than one still renders correctly.
-  return (
-    <>
-      {channelNames.map((name, index) => (
-        <FormField
-          key={index}
-          label={channelNames.length === 1 ? 'Channel Name' : `Channel ${index + 1} Name`}
-          required={index === 0}
-          value={name}
-          onChangeText={(v) => setChannelName(index, v)}
-          placeholder={placeholder(index)}
-        />
-      ))}
-    </>
-  );
-}
-
-export function VibrationFields({
+/**
+ * The one part of the editor that differs by card type: the physical input.
+ *
+ * Everything else on the page — identity, unit, calibration, alarms, precision,
+ * the value knob — is the same for a vibration, process or speed card, because
+ * every acquisition card is one channel that reads one number.
+ */
+function HardwareFields({
+  type,
   config,
-  set,
-  setChannelName,
+  setField,
+  error,
 }: {
-  config: VibrationConfig;
-  set: (k: string, v: string) => void;
-  setChannelName: (index: number, value: string) => void;
+  type: CardType;
+  config: ChannelCommonConfig;
+  setField: (key: string, value: string) => void;
+  error?: string;
 }) {
-  return (
-    <>
-      <ChannelNameFields
-        channelNames={config.channelNames}
-        setChannelName={setChannelName}
-        placeholder={(i) => (i === 0 ? 'e.g. DE Horizontal' : 'e.g. DE Vertical')}
-      />
-      <FormField label="Sensor Type" value={config.sensorType} onChangeText={(v) => set('sensorType', v)} placeholder="e.g. Accelerometer" />
-      <FormField label="Sensitivity" value={config.sensitivity} onChangeText={(v) => set('sensitivity', v)} placeholder="e.g. 100 mV/g" />
-      <FormField label="Engineering Unit" value={config.engineeringUnit} onChangeText={(v) => set('engineeringUnit', v)} placeholder="e.g. mm/s" />
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Range Min" value={config.measurementRangeMin} onChangeText={(v) => set('measurementRangeMin', v)} placeholder="0" />
-        </View>
-        <View className="flex-1">
-          <FormField label="Range Max" value={config.measurementRangeMax} onChangeText={(v) => set('measurementRangeMax', v)} placeholder="50" />
-        </View>
-      </View>
-      <FormField label="Sampling Rate" value={config.samplingRate} onChangeText={(v) => set('samplingRate', v)} placeholder="e.g. 2560 Hz" />
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Warning Alarm" value={config.alarmWarning} onChangeText={(v) => set('alarmWarning', v)} placeholder="e.g. 7.1" />
-        </View>
-        <View className="flex-1">
-          <FormField label="Critical Alarm" value={config.alarmCritical} onChangeText={(v) => set('alarmCritical', v)} placeholder="e.g. 11.0" />
-        </View>
-      </View>
-    </>
-  );
-}
+  const { isDark } = useAppTheme();
 
-/**
- * The alarm thresholds that are actually armed, as numbers.
- *
- * A disabled level is null rather than its stored text, because section 5 is
- * explicit that disabled alarms take no part in ordering, in banding or in
- * evaluating a reading — and a stored threshold survives being switched off.
- */
-export function processAlarmLimits(config: ProcessConfig): AlarmLimits {
-  const armed = (enabled: boolean, text: string) => (enabled ? numberFromText(text) : null);
-  return {
-    lowLow: armed(config.alarmLowLowEnabled, config.alarmLowLow),
-    low: armed(config.alarmLowEnabled, config.alarmLow),
-    high: armed(config.alarmHighEnabled, config.alarmHigh),
-    highHigh: armed(config.alarmHighHighEnabled, config.alarmHighHigh),
-  };
-}
-
-/**
- * Whether a driven channel value is usable against this card's configuration.
- *
- * Kept beside `processConfigErrors` rather than inside it because the value
- * lives on the signal definition, not on the card: a physical card has no such
- * value and must not be blocked from saving for lacking one.
- */
-export function processChannelValueError(config: ProcessConfig, value: number | null): string | undefined {
-  const min = numberFromText(config.engineeringMin);
-  const max = numberFromText(config.engineeringMax);
-  if (value === null || !Number.isFinite(value)) return 'Channel value must be numeric';
-  if (min !== null && max !== null && max > min && (value < min || value > max)) {
-    return 'Channel value must be inside the engineering range';
+  if (type === 'Vibration Card') {
+    const vibration = config as VibrationConfig;
+    return (
+      <View className="flex-row flex-wrap gap-3">
+        <FieldCell>
+          <FormField label="Sensor Type" value={vibration.sensorType} onChangeText={(value) => setField('sensorType', value)} placeholder="e.g. Accelerometer" />
+        </FieldCell>
+        <FieldCell>
+          <FormField label="Sensitivity" value={vibration.sensitivity} onChangeText={(value) => setField('sensitivity', value)} placeholder="e.g. 100 mV/g" />
+        </FieldCell>
+        <FieldCell>
+          <FormField label="Sampling Rate" value={vibration.samplingRate} onChangeText={(value) => setField('samplingRate', value)} placeholder="e.g. 2560 Hz" />
+        </FieldCell>
+      </View>
+    );
   }
-  return undefined;
-}
 
-/** The step the knob moves in, taken from the configured display precision. */
-export function processValueStep(precision: ProcessConfig['displayPrecision']): number {
-  const decimals = decimalsForPrecision(precision);
-  return Number(Math.pow(10, -decimals).toFixed(decimals));
+  if (type === 'Speed Card') {
+    const speed = config as SpeedConfig;
+    return (
+      <View className="gap-3">
+        <View className="gap-2">
+          <FieldLabel>Input Type *</FieldLabel>
+          <View className="flex-row flex-wrap gap-2">
+            {SPEED_INPUT_TYPES.map((option) => (
+              <Chip key={option} label={option} selected={speed.inputType === option} onPress={() => setField('inputType', option)} />
+            ))}
+          </View>
+          {error && <Text className="font-body text-xs text-status-critical">{error}</Text>}
+        </View>
+        <View className="flex-row flex-wrap gap-3">
+          <FieldCell>
+            <FormField label="Pulses / Revolution" value={speed.pulsesPerRevolution} onChangeText={(value) => setField('pulsesPerRevolution', value)} placeholder="1" />
+          </FieldCell>
+          <FieldCell>
+            <FormField label="Trigger" value={speed.trigger} onChangeText={(value) => setField('trigger', value)} placeholder="e.g. Rising" />
+          </FieldCell>
+          <FieldCell>
+            <FormField label="Trigger Hysteresis" value={speed.triggerHysteresis} onChangeText={(value) => setField('triggerHysteresis', value)} placeholder="e.g. 0.2 V" />
+          </FieldCell>
+        </View>
+      </View>
+    );
+  }
+
+  const process = config as ProcessConfig;
+  return (
+    <View className="gap-3">
+      <View className="gap-2">
+        <FieldLabel>Input Type *</FieldLabel>
+        <View className="flex-row flex-wrap gap-2">
+          {PROCESS_INPUT_TYPES.map((option) => {
+            const selected = process.inputType === option;
+            return (
+              <Pressable
+                key={option}
+                onPress={() => setField('inputType', option)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected }}
+                className={cn(
+                  'min-h-[54px] justify-center rounded-lg border px-4 py-3',
+                  selected ? 'border-status-success bg-status-success/10' : isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light',
+                )}
+                style={{ flexBasis: 142, flexGrow: 1 }}
+              >
+                <Text className={cn('font-body-bold text-sm', selected ? 'text-status-success' : isDark ? 'text-ink' : 'text-ink-inverse')}>{option}</Text>
+                <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                  {option.includes('V') ? 'Voltage input' : 'Current input'}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+          {ELECTRICAL_MAPPING[process.inputType]} — Ultron applies the linear conversion internally.
+        </Text>
+        {error && <Text className="font-body text-xs text-status-critical">{error}</Text>}
+      </View>
+      <View className="flex-row flex-wrap gap-3">
+        <FieldCell>
+          <FormField label="Scaling" value={process.scaling} onChangeText={(value) => setField('scaling', value)} placeholder="1" />
+        </FieldCell>
+        <FieldCell>
+          <FormField label="Filter" value={process.filter} onChangeText={(value) => setField('filter', value)} placeholder="e.g. 1st order, 5 s" />
+        </FieldCell>
+      </View>
+    </View>
+  );
 }
 
 /**
  * The channel-value editor: a rotary knob driving the exact figure this channel
  * publishes.
  *
- * This is the piece that removes the discrepancy between the configuration page
- * and the machine view. Turning the knob writes `manualValue` onto the signal
+ * This is what removes the discrepancy between the configuration page and the
+ * machine view. Turning the knob writes `manualValue` onto the signal
  * definition and switches the channel to the `Manual` behaviour, and the
  * generator publishes that number verbatim — no walk, no noise, no pull toward
- * a band midpoint. The number under the knob, the number on the rack faceplate
- * and the number on the mapped machine point are then the same number, because
- * they are all one stored value rather than three samples of one random walk.
+ * a midpoint. The number on the knob face, the number on the rack faceplate and
+ * the number on the mapped machine point are then one stored value rather than
+ * three samples of one random walk.
  *
- * The generated behaviours remain available beside it, for the case a moving
- * signal is what is wanted; the knob then shows where the walk currently sits
- * and is read-only.
+ * The generated behaviours remain beside it for the case a moving signal is
+ * what is wanted; the knob then shows where the walk sits and is read-only.
  */
 function ChannelValuePanel({
+  type,
   config,
   channel,
   onChannelChange,
 }: {
-  config: ProcessConfig;
+  type: CardType;
+  config: ChannelCommonConfig;
   channel: SimulatedChannel;
   onChannelChange: (channel: SimulatedChannel) => void;
 }) {
   const { isDark } = useAppTheme();
   // Held while the operator is mid-keystroke: committing "12." on every
-  // character would turn it into 12 and eat the decimal point. The same applies
-  // to the acquisition fields below, which is why they keep drafts too.
+  // character would turn it into 12 and eat the decimal point. The acquisition
+  // fields below keep drafts for the same reason.
   const [draft, setDraft] = useState<string | null>(null);
-  const [numericDrafts, setNumericDrafts] = useState<Partial<Record<'samplesPerSecond' | 'normalMin' | 'normalMax', string>>>({});
+  const [numericDrafts, setNumericDrafts] = useState<Partial<Record<'samplesPerSecond', string>>>({});
 
   const manual = channel.behaviour === 'Manual';
-  const min = numberFromText(config.engineeringMin);
-  const max = numberFromText(config.engineeringMax);
-  const hasRange = min !== null && max !== null && max > min;
-  const step = processValueStep(config.displayPrecision);
+  const { min, max } = derivedChannelRangeFor(config);
+  const step = channelValueStep(config.displayPrecision);
+  const decimals = decimalsForPrecision(config.displayPrecision);
   const offset = numberFromText(config.offset) ?? 0;
   const unit = config.unit.trim();
 
   const value = manualChannelValue(channel);
   const scaled = value - offset;
-  const limits = processAlarmLimits(config);
+  const limits = channelAlarmLimits(config);
   const condition = processConditionFor(value, limits);
-  const valueError = manual ? processChannelValueError(config, channel.manualValue) : undefined;
+  const valueError = manual ? channelValueError(config, channel.manualValue) : undefined;
 
   const drive = (next: number) => {
     setDraft(null);
     onChannelChange({ ...channel, behaviour: 'Manual', manualValue: next });
   };
-  const numberText = (raw: number | null) => (raw === null || !Number.isFinite(raw) ? '' : String(raw));
-  const setNumeric = (key: 'samplesPerSecond' | 'normalMin' | 'normalMax', text: string, optional: boolean) => {
-    setNumericDrafts((current) => ({ ...current, [key]: text }));
-    const trimmed = text.trim();
-    if (!trimmed) {
-      onChannelChange({ ...channel, [key]: optional ? null : Number.NaN });
-      return;
-    }
-    const parsed = Number(trimmed);
-    if (Number.isFinite(parsed)) onChannelChange({ ...channel, [key]: parsed });
-  };
   const typeValue = (text: string) => {
     setDraft(text);
     const parsed = Number(text.trim());
-    // Typed values are taken verbatim: section 6 makes precision a display
+    // Typed values are taken verbatim: display precision is a presentation
     // concern, so the exact-value field must not round what it is given.
     if (text.trim() && Number.isFinite(parsed)) onChannelChange({ ...channel, behaviour: 'Manual', manualValue: parsed });
   };
 
-  const conditionLabel = condition === 'critical' ? 'Critical' : condition === 'warning' ? 'Warning' : 'Normal';
+  const conditionLabel = condition === 'critical' ? 'Critical' : condition === 'warning' ? 'Warning' : 'Healthy';
   const conditionClass = condition === 'critical' ? 'text-status-critical' : condition === 'warning' ? 'text-status-warning' : 'text-accent';
   const shown = draft ?? formatProcessValue(value, config.displayPrecision);
 
@@ -438,51 +470,48 @@ function ChannelValuePanel({
       note="Drives the value this channel publishes to the rack, to mapped machine points and to trends. Drag the knob, scroll it, use the arrow keys, or type an exact value."
     >
       <View className="flex-row flex-wrap items-start gap-5">
-        <View className="items-center gap-3" style={{ flexBasis: 180 }}>
+        <View className="items-center gap-3" style={{ flexBasis: 190 }}>
           <RotaryKnob
             label={`${config.channelNames[0]?.trim() || 'Channel'} value`}
             value={value}
-            min={hasRange ? (min as number) : channel.min}
-            max={hasRange ? (max as number) : channel.max}
+            min={min}
+            max={max}
             step={step}
+            unit={unit}
+            decimals={decimals}
             tone={condition}
             disabled={!manual}
             onChange={drive}
           />
           {!manual && (
             <Text className={cn('text-center font-body text-[11px] leading-4', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-              Generated by {channel.behaviour}. Turn on Manual to set the value directly.
+              Generated by {channel.behaviour}. Choose Manual to set the value directly.
             </Text>
           )}
         </View>
 
-        <View className="flex-1 gap-3" style={{ flexBasis: 260, minWidth: 260 }}>
+        <View className="flex-1 gap-3" style={{ flexBasis: 250, minWidth: 250 }}>
           <View className={cn('rounded-lg border px-4 py-3', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}>
             <FieldLabel>Published value</FieldLabel>
             <View className="mt-1 flex-row items-baseline gap-2">
               <Text className={cn('font-mono text-3xl', conditionClass)}>{formatProcessValue(value, config.displayPrecision)}</Text>
               <Text className={cn('font-body-medium text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit || '—'}</Text>
             </View>
-            <Text className={cn('mt-1 font-body text-[11px]', conditionClass)}>{conditionLabel} against the configured alarm limits</Text>
+            <Text className={cn('mt-1 font-body text-[11px]', conditionClass)}>{conditionLabel} against the configured alarm levels</Text>
           </View>
 
           <View className="flex-row flex-wrap items-end gap-3">
             <View className="flex-1" style={{ minWidth: 160 }}>
               <ExactValueField value={shown} unit={unit} disabled={!manual} error={valueError} onChange={typeValue} />
             </View>
-            <KnobResetButton label="Reset" disabled={!manual} onPress={() => drive(quantize(restingValue(channel), step))} />
+            <KnobResetButton label="Reset" disabled={!manual} onPress={() => drive(quantize(restingValue({ min, max }), step))} />
           </View>
 
           <View className="gap-1.5">
             <FieldLabel>Value Source</FieldLabel>
             <View className="flex-row flex-wrap gap-2">
               {SIMULATION_BEHAVIOURS.map((behaviour) => (
-                <Chip
-                  key={behaviour}
-                  label={behaviour}
-                  selected={channel.behaviour === behaviour}
-                  onPress={() => onChannelChange({ ...channel, behaviour })}
-                />
+                <Chip key={behaviour} label={behaviour} selected={channel.behaviour === behaviour} onPress={() => onChannelChange({ ...channel, behaviour })} />
               ))}
             </View>
           </View>
@@ -496,17 +525,14 @@ function ChannelValuePanel({
           </View>
         </View>
 
-        <View className="flex-1 gap-3" style={{ flexBasis: 280, minWidth: 260 }}>
-          <FieldLabel>Alarm Bands</FieldLabel>
-          <AlarmBandMeter
-            min={hasRange ? (min as number) : channel.min}
-            max={hasRange ? (max as number) : channel.max}
-            value={value}
-            limits={limits}
-            unit={unit}
-          />
+        <View className="flex-1 gap-3" style={{ flexBasis: 260, minWidth: 240 }}>
+          <FieldLabel>Operating Bands</FieldLabel>
+          <AlarmBandMeter min={min} max={max} value={value} limits={limits} unit={unit} />
           <ReadoutTile label="Scaled Value" value={`${formatProcessValue(scaled, config.displayPrecision)} ${unit}`.trim()} />
-          <ReadoutTile label="Calibration Offset" value={`${offset >= 0 ? '+' : ''}${formatProcessValue(offset, config.displayPrecision)} ${unit}`.trim()} />
+          <ReadoutTile
+            label="Calibration Offset"
+            value={`${offset >= 0 ? '+' : ''}${formatProcessValue(offset, config.displayPrecision)} ${unit}`.trim()}
+          />
         </View>
       </View>
 
@@ -515,94 +541,94 @@ function ChannelValuePanel({
         <View className="gap-1.5">
           <FieldLabel>Measurement Type</FieldLabel>
           <View className="flex-row flex-wrap gap-2">
-            {kindsForCardType('Process Card').map((kind) => (
+            {kindsForCardType(type).map((kind) => (
               <Chip key={kind} label={kind} selected={channel.kind === kind} onPress={() => onChannelChange({ ...channel, kind })} />
             ))}
           </View>
           <Text className={cn('font-body text-[11px] leading-4', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            Decides how this channel is classified where it is mapped. Unit, range and alarm limits come from the sections above.
+            Decides how this channel is classified where it is mapped. Unit, operating range and alarm levels come from the sections above.
           </Text>
         </View>
-        <View className="flex-row flex-wrap gap-3">
-          <FieldCell basis={160}>
-            <FormField
-              label="Samples / second"
-              value={numericDrafts.samplesPerSecond ?? numberText(channel.samplesPerSecond)}
-              onChangeText={(value) => setNumeric('samplesPerSecond', value, false)}
-              placeholder="1"
-            />
-          </FieldCell>
-          <FieldCell basis={160}>
-            <FormField
-              label="Normal Min"
-              value={numericDrafts.normalMin ?? numberText(channel.normalMin)}
-              onChangeText={(value) => setNumeric('normalMin', value, true)}
-              placeholder="Optional"
-            />
-          </FieldCell>
-          <FieldCell basis={160}>
-            <FormField
-              label="Normal Max"
-              value={numericDrafts.normalMax ?? numberText(channel.normalMax)}
-              onChangeText={(value) => setNumeric('normalMax', value, true)}
-              placeholder="Optional"
-            />
-          </FieldCell>
-        </View>
+        <FieldCell basis={180}>
+          <FormField
+            label="Samples / second"
+            value={numericDrafts.samplesPerSecond ?? (Number.isFinite(channel.samplesPerSecond) ? String(channel.samplesPerSecond) : '')}
+            onChangeText={(text) => {
+              setNumericDrafts({ samplesPerSecond: text });
+              const parsed = Number(text.trim());
+              if (text.trim() && Number.isFinite(parsed)) onChannelChange({ ...channel, samplesPerSecond: parsed });
+            }}
+            placeholder="1"
+          />
+        </FieldCell>
       </View>
     </SectionPanel>
   );
 }
 
-export function ProcessFields({
+/**
+ * One configuration page for every acquisition card.
+ *
+ * Vibration, process and speed cards each carry a single channel that is named,
+ * scaled, calibrated, alarmed on four levels, displayed at a precision and —
+ * when simulated — driven by a knob. They had three separate editors describing
+ * those same things in three different vocabularies; this is the one editor,
+ * with the physical input as the only card-specific block.
+ */
+export function ChannelConfigFields({
+  type,
   config,
   setChannelName,
   setConfig,
   channel,
   onChannelChange,
 }: {
-  config: ProcessConfig;
+  type: CardType;
+  config: ChannelCommonConfig;
   setChannelName: (index: number, value: string) => void;
-  setConfig: (config: ProcessConfig) => void;
+  setConfig: (config: ChannelCommonConfig) => void;
   /** Present only for a card in a simulated rack — enables the value knob. */
   channel?: SimulatedChannel;
   onChannelChange?: (channel: SimulatedChannel) => void;
 }) {
   const { isDark } = useAppTheme();
   const [unitQuery, setUnitQuery] = useState('');
-  const errors = processConfigErrors(config);
-  const suggestion = suggestedProcessHysteresis(config);
-  const commit = (next: ProcessConfig) => setConfig(syncProcessLegacyAlarms(next));
-  const setProcessField = <K extends keyof ProcessConfig>(key: K, value: ProcessConfig[K]) => {
-    if (key === 'engineeringMin' || key === 'engineeringMax') {
-      const previousSuggestion = suggestedProcessHysteresis(config);
-      const ranged = { ...config, [key]: value };
-      const shouldRefreshHysteresis = !config.hysteresis.trim() || config.hysteresis === previousSuggestion;
-      commit({
-        ...ranged,
-        hysteresis: shouldRefreshHysteresis ? suggestedProcessHysteresis(ranged) : config.hysteresis,
-      });
+  const errors = channelConfigErrors(type, config);
+  const suggestion = suggestedChannelHysteresis(config);
+  const unitOptions = COMMON_UNITS[type] ?? COMMON_UNITS['Process Card'];
+
+  const commit = (next: ChannelCommonConfig) => setConfig(syncChannelLegacyAlarms(next));
+  const setField = (key: string, value: string | boolean) => {
+    const next = { ...config, [key]: value } as ChannelCommonConfig;
+    // The suggested hysteresis tracks the operating span, which the alarm
+    // levels move. It is refreshed only while the operator has not overridden
+    // it, so a hand-entered value is never quietly replaced.
+    const alarmKeys = ['alarmLowLow', 'alarmLow', 'alarmHigh', 'alarmHighHigh', 'alarmLowLowEnabled', 'alarmLowEnabled', 'alarmHighEnabled', 'alarmHighHighEnabled'];
+    if (alarmKeys.includes(key)) {
+      const previousSuggestion = suggestedChannelHysteresis(config);
+      const untouched = !config.hysteresis.trim() || config.hysteresis === previousSuggestion;
+      commit({ ...next, hysteresis: untouched ? suggestedChannelHysteresis(next) : config.hysteresis });
       return;
     }
-    commit({ ...config, [key]: value });
+    commit(next);
   };
-  const setAlarmEnabled = (level: ProcessAlarmLevel, enabled: boolean) => commit({ ...config, [level.enabledKey]: enabled });
 
-  // Section 3.2 asks for a searchable unit list rather than a long dropdown.
-  // The free-text field above doubles as the search box and as the custom-unit
-  // entry, so a unit that is not on the list is still one field away.
+  // A searchable unit list rather than a long dropdown. The free-text field
+  // above doubles as the search box and as the custom-unit entry, so a unit
+  // that is not on the list is still one field away.
   const matchingUnits = useMemo(() => {
     const query = unitQuery.trim().toLowerCase();
-    if (!query) return COMMON_PROCESS_UNITS;
-    return COMMON_PROCESS_UNITS.filter((unit) => unit.toLowerCase().includes(query));
-  }, [unitQuery]);
+    if (!query) return unitOptions;
+    return unitOptions.filter((unit) => unit.toLowerCase().includes(query));
+  }, [unitQuery, unitOptions]);
 
+  const unit = config.unit.trim();
   const offset = numberFromText(config.offset);
+  const { min, max } = derivedChannelRangeFor(config);
+  const anyAlarmEnabled = CHANNEL_ALARM_LEVELS.some((level) => config[level.enabledKey]);
   const previewScaled = 98.7;
-  const channelErrors: ProcessConfigErrors =
-    channel && channel.behaviour === 'Manual'
-      ? { ...errors, channelValue: processChannelValueError(config, channel.manualValue) }
-      : errors;
+  const allErrors: ChannelConfigErrors =
+    channel && channel.behaviour === 'Manual' ? { ...errors, channelValue: channelValueError(config, channel.manualValue) } : errors;
 
   return (
     <View className="gap-4">
@@ -619,47 +645,13 @@ export function ProcessFields({
             />
           </FieldCell>
           <FieldCell>
-            <FormField label="Tag" value={config.tag} onChangeText={(value) => setProcessField('tag', value)} placeholder="e.g. PT-101" />
+            <FormField label="Tag" value={config.tag} onChangeText={(value) => setField('tag', value)} placeholder="e.g. PT-101" />
           </FieldCell>
         </View>
       </SectionPanel>
 
-      <SectionPanel index="02" title="Channel Configuration" note="Electrical input, engineering unit and linear scaling for CH-01 on this Universal V/I card.">
-        <View className="gap-2">
-          <FieldLabel>Input Type *</FieldLabel>
-          <View className="flex-row flex-wrap gap-2">
-            {PROCESS_INPUT_TYPES.map((type) => {
-              const selected = config.inputType === type;
-              return (
-                <Pressable
-                  key={type}
-                  onPress={() => setProcessField('inputType', type as ProcessInputType)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected }}
-                  className={cn(
-                    'min-h-[54px] justify-center rounded-lg border px-4 py-3',
-                    selected
-                      ? 'border-status-success bg-status-success/10'
-                      : isDark
-                        ? 'border-line-dark bg-surface-dark'
-                        : 'border-line-light bg-surface-light',
-                  )}
-                  style={{ flexBasis: 142, flexGrow: 1 }}
-                >
-                  <Text className={cn('font-body-bold text-sm', selected ? 'text-status-success' : isDark ? 'text-ink' : 'text-ink-inverse')}>{type}</Text>
-                  <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-                    {type.includes('V') ? 'Voltage input' : 'Current input'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            {ELECTRICAL_MAPPING[config.inputType]} — Ultron applies the linear conversion internally.
-          </Text>
-          {errors.inputType && <Text className="font-body text-xs text-status-critical">{errors.inputType}</Text>}
-        </View>
-
+      <SectionPanel index="02" title="Channel Configuration" note="The physical input and the engineering unit this channel is read in.">
+        <HardwareFields type={type} config={config} setField={setField} error={errors.inputType} />
         <View className="flex-row flex-wrap gap-3">
           <FieldCell>
             <FormField
@@ -668,7 +660,7 @@ export function ProcessFields({
               value={config.unit}
               onChangeText={(value) => {
                 setUnitQuery(value);
-                setProcessField('unit', value);
+                setField('unit', value);
               }}
               placeholder="Search or type a custom unit"
               error={errors.unit}
@@ -678,14 +670,14 @@ export function ProcessFields({
             <View className="gap-1.5">
               <FieldLabel>Common Units</FieldLabel>
               <View className="flex-row flex-wrap gap-2">
-                {matchingUnits.map((unit) => (
+                {matchingUnits.map((option) => (
                   <Chip
-                    key={unit}
-                    label={unit}
-                    selected={config.unit === unit}
+                    key={option}
+                    label={option}
+                    selected={config.unit === option}
                     onPress={() => {
                       setUnitQuery('');
-                      setProcessField('unit', unit);
+                      setField('unit', option);
                     }}
                   />
                 ))}
@@ -698,54 +690,21 @@ export function ProcessFields({
             </View>
           </FieldCell>
         </View>
-
-        <View className="flex-row flex-wrap gap-3">
-          <FieldCell>
-            <FormField
-              label="Engineering Min"
-              required
-              value={config.engineeringMin}
-              onChangeText={(value) => setProcessField('engineeringMin', value)}
-              placeholder="0"
-              error={errors.engineeringMin}
-            />
-          </FieldCell>
-          <FieldCell>
-            <FormField
-              label="Engineering Max"
-              required
-              value={config.engineeringMax}
-              onChangeText={(value) => setProcessField('engineeringMax', value)}
-              placeholder="250"
-              error={errors.engineeringMax}
-            />
-          </FieldCell>
-        </View>
       </SectionPanel>
 
       <SectionPanel index="03" title="Calibration" note="One signed offset in the selected engineering unit. The final process value is the scaled value plus this offset.">
         <View className="flex-row flex-wrap gap-3">
           <FieldCell>
-            <FormField
-              label="Calibration Offset"
-              value={config.offset}
-              onChangeText={(value) => setProcessField('offset', value)}
-              placeholder="0"
-              error={errors.offset}
-            />
+            <FormField label="Calibration Offset" value={config.offset} onChangeText={(value) => setField('offset', value)} placeholder="0" error={errors.offset} />
           </FieldCell>
           <FieldCell>
-            <ReadoutTile label="Worked Example — Scaled Value" value={`${formatProcessValue(previewScaled, config.displayPrecision)} ${config.unit.trim()}`.trim()} />
+            <ReadoutTile label="Worked Example — Scaled Value" value={`${formatProcessValue(previewScaled, config.displayPrecision)} ${unit}`.trim()} />
           </FieldCell>
           <FieldCell>
             <ReadoutTile
               label="Worked Example — Final Value"
               tone="accent"
-              value={
-                offset === null
-                  ? '—'
-                  : `${formatProcessValue(previewScaled + offset, config.displayPrecision)} ${config.unit.trim()}`.trim()
-              }
+              value={offset === null ? '—' : `${formatProcessValue(previewScaled + offset, config.displayPrecision)} ${unit}`.trim()}
             />
           </FieldCell>
         </View>
@@ -754,21 +713,21 @@ export function ProcessFields({
       <SectionPanel
         index="04"
         title="Alarm Configuration"
-        note="Each level has its own enable control. Enabled limits must stay inside the engineering range and in the order LL < L < H < HH; disabled levels are ignored."
+        note="The four levels define both the alarms and the channel's operating range — there is no separate minimum and maximum to enter. Enabled levels must run LL < L < H < HH; disabled levels are ignored."
       >
         <View className="gap-3">
-          {PROCESS_ALARM_LEVELS.map((level) => (
+          {CHANNEL_ALARM_LEVELS.map((level) => (
             <View key={level.valueKey} className={cn('flex-row flex-wrap items-center gap-3 rounded-lg border p-3', isDark ? 'border-line-dark' : 'border-line-light')}>
               <View className="w-[120px] gap-1">
                 <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{level.label}</Text>
                 <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{level.name}</Text>
               </View>
-              <ToggleSwitch enabled={config[level.enabledKey]} onChange={(enabled) => setAlarmEnabled(level, enabled)} />
+              <ToggleSwitch enabled={config[level.enabledKey]} onChange={(enabled) => setField(level.enabledKey, enabled)} />
               <FieldCell basis={180}>
                 <FormField
-                  label={`Threshold${config.unit.trim() ? ` (${config.unit.trim()})` : ''}`}
+                  label={`Threshold${unit ? ` (${unit})` : ''}`}
                   value={config[level.valueKey]}
-                  onChangeText={(value) => setProcessField(level.valueKey, value)}
+                  onChangeText={(value) => setField(level.valueKey, value)}
                   placeholder={config[level.enabledKey] ? 'Required' : 'Optional'}
                   error={errors[level.valueKey]}
                 />
@@ -779,29 +738,33 @@ export function ProcessFields({
             </View>
           ))}
         </View>
+
         <View className="flex-row flex-wrap gap-3">
           <FieldCell>
+            <ReadoutTile
+              label="Operating Range (derived)"
+              tone={anyAlarmEnabled ? 'accent' : 'warning'}
+              value={`${formatProcessValue(min, config.displayPrecision)} to ${formatProcessValue(max, config.displayPrecision)} ${unit}`.trim()}
+            />
+          </FieldCell>
+          <FieldCell>
             <FormField
-              label={`Hysteresis${config.unit.trim() ? ` (${config.unit.trim()})` : ''}`}
+              label={`Hysteresis${unit ? ` (${unit})` : ''}`}
               value={config.hysteresis}
-              onChangeText={(value) => setProcessField('hysteresis', value)}
+              onChangeText={(value) => setField('hysteresis', value)}
               placeholder={suggestion ? `Suggested ${suggestion}` : '1% of span'}
               error={errors.hysteresis}
             />
           </FieldCell>
           <FieldCell>
-            <FormField
-              label="Alarm Delay (seconds)"
-              value={config.alarmDelay}
-              onChangeText={(value) => setProcessField('alarmDelay', value)}
-              placeholder="0"
-              error={errors.alarmDelay}
-            />
+            <FormField label="Alarm Delay (seconds)" value={config.alarmDelay} onChangeText={(value) => setField('alarmDelay', value)} placeholder="0" error={errors.alarmDelay} />
           </FieldCell>
         </View>
+
         <Text className={cn('font-body text-[11px] leading-4', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          One common hysteresis and one common delay apply to every enabled level. A high alarm clears below its threshold minus the hysteresis; a low alarm clears above its
-          threshold plus the hysteresis. An alarm is raised only once the value stays beyond the limit for the whole delay.
+          {anyAlarmEnabled
+            ? 'The operating range spans the enabled levels with 10% headroom at each end, so every level is reachable on the knob and on the gauge. One common hysteresis and one common delay apply to every enabled level: a high alarm clears below its threshold minus the hysteresis, a low alarm clears above its threshold plus it, and an alarm is raised only once the value stays beyond the limit for the whole delay.'
+            : `No alarm level is enabled, so the channel falls back to a ${min}–${max} operating range. Enable at least one level to describe the span this channel actually works over.`}
         </Text>
       </SectionPanel>
 
@@ -814,84 +777,30 @@ export function ProcessFields({
                 key={precision}
                 label={precision}
                 selected={config.displayPrecision === precision}
-                onPress={() => setProcessField('displayPrecision', precision as ProcessDisplayPrecision)}
+                onPress={() => setField('displayPrecision', precision as ProcessDisplayPrecision)}
               />
             ))}
           </View>
           {errors.displayPrecision && <Text className="font-body text-xs text-status-critical">{errors.displayPrecision}</Text>}
         </View>
         <FieldCell>
-          <ReadoutTile label="Displayed Example" value={`${formatProcessValue(125.4271, config.displayPrecision)} ${config.unit.trim()}`.trim()} />
+          <ReadoutTile label="Displayed Example" value={`${formatProcessValue(125.4271, config.displayPrecision)} ${unit}`.trim()} />
         </FieldCell>
       </SectionPanel>
 
       {channel && onChannelChange ? (
-        <ChannelValuePanel config={config} channel={channel} onChannelChange={onChannelChange} />
+        <ChannelValuePanel type={type} config={config} channel={channel} onChannelChange={onChannelChange} />
       ) : (
         <SectionPanel index="06" title="Channel Value" note="Where this channel's reading comes from.">
           <Text className={cn('font-body text-xs leading-5', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            This card is wired to the field, so CH-01 reads whatever the transmitter sends and there is nothing to set here. A card installed in a simulated rack is driven from
-            this page instead, with a knob for the exact value it should publish.
+            This card is wired to the field, so CH-01 reads whatever the sensor sends and there is nothing to set here. A card installed in a simulated rack is driven from this
+            page instead, with a knob for the exact value it should publish.
           </Text>
         </SectionPanel>
       )}
 
-      <ValidationBar errors={channelErrors} />
+      <ValidationBar errors={allErrors} />
     </View>
-  );
-}
-
-export function SpeedFields({
-  config,
-  set,
-  setChannelName,
-}: {
-  config: SpeedConfig;
-  set: (k: string, v: string) => void;
-  setChannelName: (index: number, value: string) => void;
-}) {
-  return (
-    <>
-      <ChannelNameFields
-        channelNames={config.channelNames}
-        setChannelName={setChannelName}
-        placeholder={(i) => (i === 0 ? 'e.g. Rotor Speed' : 'e.g. Keyphasor')}
-      />
-      <View className="gap-1.5">
-        <FieldLabel>Input Type</FieldLabel>
-        <View className="flex-row flex-wrap gap-2">
-          {SPEED_INPUT_TYPES.map((t) => (
-            <Chip key={t} label={t} selected={config.inputType === t} onPress={() => set('inputType', t as SpeedInputType)} />
-          ))}
-        </View>
-      </View>
-      <FormField label="Engineering Unit" value={config.unit ?? ''} onChangeText={(v) => set('unit', v)} placeholder="e.g. rpm" />
-      <FormField label="Pulses Per Revolution" value={config.pulsesPerRevolution} onChangeText={(v) => set('pulsesPerRevolution', v)} placeholder="1" />
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Trigger" value={config.trigger} onChangeText={(v) => set('trigger', v)} placeholder="e.g. 2.5 V" />
-        </View>
-        <View className="flex-1">
-          <FormField label="Hysteresis" value={config.hysteresis} onChangeText={(v) => set('hysteresis', v)} placeholder="e.g. 0.2 V" />
-        </View>
-      </View>
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Min Speed" value={config.minSpeed} onChangeText={(v) => set('minSpeed', v)} placeholder="0" />
-        </View>
-        <View className="flex-1">
-          <FormField label="Max Speed" value={config.maxSpeed} onChangeText={(v) => set('maxSpeed', v)} placeholder="3600" />
-        </View>
-      </View>
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Warning Alarm" value={config.alarmWarning} onChangeText={(v) => set('alarmWarning', v)} placeholder="e.g. 3800" />
-        </View>
-        <View className="flex-1">
-          <FormField label="Critical Alarm" value={config.alarmCritical} onChangeText={(v) => set('alarmCritical', v)} placeholder="e.g. 4000" />
-        </View>
-      </View>
-    </>
   );
 }
 

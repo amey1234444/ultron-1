@@ -8,16 +8,13 @@ import {
   normalizedCardConfig,
   type CardConfig,
   type CardType,
+  type ChannelCommonConfig,
   type ControllerConfig,
-  type ProcessConfig,
-  type SpeedConfig,
-  type VibrationConfig,
 } from '../../../lib/rack';
 import { cardConfigWithSimulation, simulationWithCardConfig, validateSimulatedChannel, type SimulatedChannel } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
-import { ControllerFields, EnabledToggle, ProcessFields, SpeedFields, VibrationFields, processChannelValueError, processConfigErrors } from './CardConfigFields';
-import { SimulationFields } from './SimulationFields';
+import { ChannelConfigFields, ControllerFields, EnabledToggle, channelConfigErrors, channelValueError } from './CardConfigFields';
 
 type CardConfigPageProps = {
   /** Rack name, shown in the page header alongside slot, card type and channel. */
@@ -33,6 +30,21 @@ type CardConfigPageProps = {
   onSave: (config: CardConfig, enabled: boolean, simulation?: SimulatedChannel[]) => void;
 };
 
+/** The page title each card family gets, matching the hardware it stands for. */
+const EDITOR_TITLE: Record<CardType, string> = {
+  'Vibration Card': 'Vibration Channel Configuration',
+  'Process Card': 'Universal V/I Channel Configuration',
+  'Speed Card': 'Speed Channel Configuration',
+  'Communication Controller': 'Configure Communication Controller',
+};
+
+const CONTEXT_CARD_LABEL: Record<CardType, string> = {
+  'Vibration Card': 'Vibration',
+  'Process Card': 'Universal V/I',
+  'Speed Card': 'Speed',
+  'Communication Controller': 'Controller',
+};
+
 export function CardConfigPage({ rackName, slot, cardType, initialConfig, initialEnabled, initialSimulation, backLabel = 'Back', onBack, onSave }: CardConfigPageProps) {
   const { isDark } = useAppTheme();
   const [form, setForm] = useState<{ config: CardConfig; enabled: boolean; simulation?: SimulatedChannel[] }>(() => {
@@ -44,22 +56,12 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
     };
   });
   const { config, enabled, simulation } = form;
-  const isSimulatedSignal = !!simulation?.length;
-  const isExistingSignal = 'channelNames' in initialConfig && !!initialConfig.channelNames[0]?.trim();
+  const isAcquisitionCard = channelCountForCardType(cardType) > 0;
+  const channelConfig = isAcquisitionCard ? (config as ChannelCommonConfig) : null;
 
-  // Unit, range and alarm limits live on the card AND on the signal definition
-  // of a simulated channel. Editing either side now updates the other, so a
-  // value typed here is not silently replaced on save — which is exactly what
-  // used to happen, and made the card's Unit field look read-only.
   const set = <K extends string>(key: K, value: string) =>
-    setForm((previous) => {
-      const nextConfig = { ...previous.config, [key]: value } as CardConfig;
-      return {
-        ...previous,
-        config: nextConfig,
-        simulation: previous.simulation ? simulationWithCardConfig(cardType, nextConfig, previous.simulation) : previous.simulation,
-      };
-    });
+    setForm((previous) => ({ ...previous, config: { ...previous.config, [key]: value } as CardConfig }));
+
   const setChannelName = (index: number, value: string) =>
     setForm((previous) => {
       if (!('channelNames' in previous.config)) return previous;
@@ -67,57 +69,48 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
       channelNames[index] = value;
       return { ...previous, config: { ...previous.config, channelNames } };
     });
-  // The knob panel edits only the signal definition (value, behaviour, output
-  // state, measurement type, cadence, normal band). It deliberately does NOT
-  // mirror back into the card config: unit, range, alarms and precision flow
-  // card -> signal, and echoing them back would rewrite the text an operator is
-  // still typing ("0.5" becoming "0.5" only after a round-trip through Number).
+
+  // The card is where an engineer types, so a card edit always flows into the
+  // signal definition the generator runs — never the other way round while the
+  // page is open. Echoing back would rewrite the text still being typed.
+  const setChannelConfig = (nextConfig: ChannelCommonConfig) =>
+    setForm((previous) => ({
+      ...previous,
+      config: nextConfig as CardConfig,
+      simulation: previous.simulation ? simulationWithCardConfig(cardType, nextConfig as CardConfig, previous.simulation) : previous.simulation,
+    }));
+
+  // The knob panel edits only the signal definition — value, behaviour, output
+  // state, measurement type, cadence — none of which the card config derives
+  // from, so nothing needs to flow back.
   const setPrimaryChannel = (channel: SimulatedChannel) =>
     setForm((previous) => {
       if (!previous.simulation?.length) return previous;
       return { ...previous, simulation: previous.simulation.map((entry, index) => (index === 0 ? channel : entry)) };
     });
 
-  const setProcessConfig = (nextConfig: ProcessConfig) =>
-    setForm((previous) => ({
-      ...previous,
-      config: nextConfig,
-      simulation: previous.simulation ? simulationWithCardConfig(cardType, nextConfig, previous.simulation) : previous.simulation,
-    }));
-
   const canSave = (() => {
     if ('controllerName' in config) {
       return config.controllerName.trim().length > 0 && config.ip.trim().length > 0 && config.port.trim().length > 0;
     }
-    if ('channelNames' in config) {
-      if (!config.channelNames[0]?.trim()) return false;
-      // The Universal V/I editor owns a Process Card whether or not it is
-      // simulated, so its specification rules always apply — and when a signal
-      // is attached, the knob's value has to satisfy them too. Both sides are
-      // checked, rather than one standing in for the other.
-      if (cardType === 'Process Card' && 'engineeringMin' in config) {
-        if (Object.keys(processConfigErrors(config as ProcessConfig)).length > 0) return false;
-        const channel = simulation?.[0];
-        if (channel && channel.behaviour === 'Manual' && processChannelValueError(config as ProcessConfig, channel.manualValue)) return false;
-        if (simulation) {
-          return simulation.every((entry, index) => Object.keys(validateSimulatedChannel(entry, config.channelNames[index] ?? '')).length === 0);
-        }
-        return true;
-      }
-      if (isSimulatedSignal && simulation) {
-        return simulation.every((channel, index) => Object.keys(validateSimulatedChannel(channel, config.channelNames[index] ?? '')).length === 0);
-      }
-      return true;
+    if (!channelConfig) return false;
+    // The card's own rules always apply. When a signal is attached, the knob's
+    // value and the generator's own bounds have to hold as well — both sides are
+    // checked rather than one standing in for the other.
+    if (Object.keys(channelConfigErrors(cardType, channelConfig)).length > 0) return false;
+    const channel = simulation?.[0];
+    if (channel && channel.behaviour === 'Manual' && channelValueError(channelConfig, channel.manualValue)) return false;
+    if (simulation) {
+      return simulation.every((entry, index) => Object.keys(validateSimulatedChannel(entry, channelConfig.channelNames[index] ?? '')).length === 0);
     }
-    return false;
+    return true;
   })();
 
   /**
    * Saves the configuration as typed, with the free-text fields trimmed.
    *
-   * Section 3.4 asks for a custom unit to be trimmed before saving; a trailing
-   * space in a unit is invisible in the field and then shows up beside every
-   * reading on every screen that renders the channel.
+   * A trailing space in a unit is invisible in the field and then shows up
+   * beside every reading on every screen that renders the channel.
    */
   const save = () => {
     if (!canSave) return;
@@ -135,14 +128,6 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
   };
 
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
-  const acquisitionChannelCount = channelCountForCardType(cardType);
-  // The Universal V/I page is the Process Card's editor in both worlds. A
-  // simulated Process Card used to be sent to the generic signal form instead,
-  // which meant the specification's card page — input tiles, calibration, the
-  // LL/L/H/HH block, display precision — was only reachable on a card that
-  // could never publish a value, and the value that WAS published came from a
-  // form with none of it. One editor removes that split.
-  const isUniversalVIEditor = cardType === 'Process Card';
 
   const contextPill = (label: string, value: string) => (
     <View key={label} className={cn('rounded-lg border px-3 py-2', isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel')}>
@@ -158,57 +143,38 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
       </View>
 
       <View className="px-6 pt-3">
-        <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{isUniversalVIEditor ? 'Universal V/I Channel Configuration' : `Configure ${cardType}`}</Text>
+        <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{EDITOR_TITLE[cardType]}</Text>
         <View className="mt-3 flex-row flex-wrap gap-2">
           {rackName ? contextPill('Rack', rackName) : null}
           {contextPill('Slot', `Slot-${String(slot).padStart(2, '0')}`)}
-          {contextPill('Card Type', isUniversalVIEditor ? 'Universal V/I' : cardType)}
-          {acquisitionChannelCount > 0 && contextPill('Channel', 'CH-01')}
+          {contextPill('Card Type', CONTEXT_CARD_LABEL[cardType])}
+          {isAcquisitionCard && contextPill('Channel', 'CH-01')}
         </View>
       </View>
 
       <ScrollView className="flex-1" contentContainerClassName="gap-4 px-6 py-5">
-        {!isSimulatedSignal && cardType === 'Vibration Card' && <VibrationFields config={config as VibrationConfig} set={set} setChannelName={setChannelName} />}
-        {cardType === 'Process Card' && (
-          <ProcessFields
-            config={config as ProcessConfig}
+        {channelConfig && (
+          <ChannelConfigFields
+            type={cardType}
+            config={channelConfig}
             setChannelName={setChannelName}
-            setConfig={setProcessConfig}
+            setConfig={setChannelConfig}
             channel={simulation?.[0]}
             onChannelChange={setPrimaryChannel}
           />
         )}
-        {!isSimulatedSignal && cardType === 'Speed Card' && <SpeedFields config={config as SpeedConfig} set={set} setChannelName={setChannelName} />}
         {cardType === 'Communication Controller' && <ControllerFields config={config as ControllerConfig} set={set} />}
 
-        {(!isSimulatedSignal || isUniversalVIEditor) && <EnabledToggle enabled={enabled} onChange={(next) => setForm((previous) => ({ ...previous, enabled: next }))} />}
-
-        {isSimulatedSignal && !isUniversalVIEditor && simulation && (
-          <SimulationFields
-            cardType={cardType}
-            config={config}
-            cardEnabled={enabled}
-            channels={simulation}
-            onCardEnabledChange={(next) => setForm((previous) => ({ ...previous, enabled: next }))}
-            onConfigChange={(next) => setForm((previous) => ({ ...previous, config: next }))}
-            onChange={(channels) => {
-              setForm((previous) => ({
-                ...previous,
-                simulation: channels,
-                config: cardConfigWithSimulation(cardType, previous.config, channels),
-              }));
-            }}
-          />
-        )}
+        <EnabledToggle enabled={enabled} onChange={(next) => setForm((previous) => ({ ...previous, enabled: next }))} />
       </ScrollView>
 
       <View className={cn('flex-row flex-wrap justify-end gap-3 border-t px-6 py-4', lineClass)}>
         <ActionButton label="Cancel" variant="secondary" onPress={onBack} />
-        {isUniversalVIEditor && <ActionButton label="Save" variant="secondary" onPress={save} disabled={!canSave} />}
+        {isAcquisitionCard && <ActionButton label="Save" variant="secondary" onPress={save} disabled={!canSave} />}
         <ActionButton
-          label={isUniversalVIEditor ? 'Save & Upload' : isSimulatedSignal ? `Save & ${isExistingSignal ? 'update' : 'start'} simulation` : 'Save'}
-          // Both sides are already in step (see `set` above), so saving stores
-          // what is on screen rather than overwriting it from the signal.
+          label={isAcquisitionCard ? 'Save & Upload' : 'Save'}
+          // Both sides are already in step, so saving stores what is on screen
+          // rather than overwriting it from the signal definition.
           onPress={save}
           disabled={!canSave}
         />

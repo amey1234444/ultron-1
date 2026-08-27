@@ -1,36 +1,57 @@
 import { useEffect, useRef } from 'react';
 import { PanResponder, Pressable, Text, TextInput, View, type ViewStyle } from 'react-native';
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, G, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { consolePalette } from '../../../lib/consoleTheme';
+import type { ChannelAlarmLimits } from '../../../lib/rack';
 
 // The knob sweeps 270° with its dead zone at the bottom, the way a panel
 // potentiometer does, so "straight up" reads as mid-range at a glance.
 const SWEEP_DEGREES = 270;
 const START_DEGREES = -135;
-// Pixels of vertical drag that traverse the whole engineering range. Matches
-// the simulator's own knob, so an operator who has used one has used both.
+// Pixels of vertical drag that traverse the whole range. Taken from the
+// reference simulator's knob so the two feel identical under the hand.
 const DRAG_PIXELS_FOR_FULL_RANGE = 220;
 
-export type AlarmLimits = {
-  lowLow: number | null;
-  low: number | null;
-  high: number | null;
-  highHigh: number | null;
-};
+/**
+ * The instrument palette, lifted from the reference simulator so the knob reads
+ * as the same physical control in both places: a brushed gold bezel over a dark
+ * body, with green/amber/red reserved for condition.
+ */
+const KNOB = {
+  gold: '#C9A15C',
+  goldGlow: 'rgba(201,161,92,0.7)',
+  bezelMid: '#393734',
+  bezelEnd: '#1D1D1C',
+  bezelGap: 'rgba(255,255,255,0.05)',
+  bodyHighlight: '#373735',
+  bodyMid: '#171716',
+  bodyEdge: '#090909',
+  bodyRim: '#48453F',
+  healthy: '#59C990',
+  alert: '#E4AD50',
+  danger: '#EF655F',
+  track: '#222222',
+  marker: '#FFFFFF',
+} as const;
 
+export type AlarmLimits = ChannelAlarmLimits;
 export type ProcessCondition = 'normal' | 'warning' | 'critical';
 
+const CONDITION_COLOUR: Record<ProcessCondition, string> = {
+  normal: KNOB.healthy,
+  warning: KNOB.alert,
+  critical: KNOB.danger,
+};
+
 /**
- * The alarm state a value would raise, applying section 5 of the card
- * specification: a high alarm triggers at or above its threshold, a low alarm
- * at or below it, and only enabled levels take part.
+ * The alarm state a value would raise: a high level triggers at or above its
+ * threshold, a low level at or below it, and only enabled levels take part.
  *
- * Hysteresis and delay deliberately play no part here — both describe how an
- * alarm *clears* or how long it must persist, which belong to the alarm engine.
- * This is the instantaneous reading of the configured limits, which is what a
+ * Hysteresis and delay deliberately play no part — both describe how an alarm
+ * clears or how long it must persist, which belong to the alarm engine. This is
+ * the instantaneous reading of the configured limits, which is what a
  * commissioning meter shows.
  */
 export function processConditionFor(value: number, limits: AlarmLimits): ProcessCondition {
@@ -76,12 +97,52 @@ function arcPath(cx: number, cy: number, radius: number, fromDegrees: number, to
   return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArc} 1 ${end.x} ${end.y}`;
 }
 
+function hexToRgb(hex: string): [number, number, number] {
+  const value = Number.parseInt(hex.replace('#', ''), 16);
+  return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+}
+
+function mixHex(from: string, to: string, t: number): string {
+  const [r1, g1, b1] = hexToRgb(from);
+  const [r2, g2, b2] = hexToRgb(to);
+  const channel = (a: number, b: number) => Math.round(a + (b - a) * clamp(t, 0, 1));
+  return `rgb(${channel(r1, r2)},${channel(g1, g2)},${channel(b1, b2)})`;
+}
+
+/**
+ * The bezel, drawn as a run of short arcs.
+ *
+ * The reference knob's bezel is a CSS conic gradient — gold at the start of the
+ * sweep, fading through #393734 at 110° to #1D1D1C at 270°, with the bottom 90°
+ * cut away. SVG has no conic gradient, so the same ramp is drawn as a series of
+ * segments with the colour interpolated across them; at this size the joins are
+ * invisible and the result is indistinguishable from the original.
+ */
+function Bezel({ centre, radius, width, segments = 72 }: { centre: number; radius: number; width: number; segments?: number }) {
+  const step = SWEEP_DEGREES / segments;
+  // The gradient's own stops, as fractions of the 270° sweep.
+  const MID_STOP = 110 / 270;
+  return (
+    <G>
+      {Array.from({ length: segments }, (_, index) => {
+        const from = START_DEGREES + index * step;
+        // Overlap by a hair so no background shows through the joins.
+        const to = from + step + 0.6;
+        const t = index / (segments - 1);
+        const colour = t <= MID_STOP ? mixHex(KNOB.gold, KNOB.bezelMid, t / MID_STOP) : mixHex(KNOB.bezelMid, KNOB.bezelEnd, (t - MID_STOP) / (1 - MID_STOP));
+        return <Path key={index} d={arcPath(centre, centre, radius, from, to)} stroke={colour} strokeWidth={width} fill="none" />;
+      })}
+    </G>
+  );
+}
+
 /**
  * A rotary control for one channel's value.
  *
- * Drag vertically for coarse movement, wheel or arrow keys for one step, and
+ * Drag vertically for coarse movement, wheel or arrow keys for one step,
  * Home/End for the range ends. Every path funnels through `commit`, so all of
- * them clamp to the range and land on the same step grid.
+ * them clamp to the range and land on the same step grid — the knob cannot
+ * produce a value the card would then have to round.
  */
 export function RotaryKnob({
   label,
@@ -89,7 +150,9 @@ export function RotaryKnob({
   min,
   max,
   step,
-  size = 148,
+  unit,
+  decimals,
+  size = 168,
   tone = 'normal',
   disabled = false,
   onChange,
@@ -99,18 +162,22 @@ export function RotaryKnob({
   min: number;
   max: number;
   step: number;
+  /** Shown on the knob face beside the reading. */
+  unit?: string;
+  /** Decimal places for the face reading; defaults to the step's own. */
+  decimals?: number;
   size?: number;
   tone?: ProcessCondition;
   disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const colour = tone === 'critical' ? palette.criticalValue : tone === 'warning' ? palette.warningValue : palette.accentValue;
+  const colour = disabled ? KNOB.bezelMid : CONDITION_COLOUR[tone];
 
   const span = max > min ? max - min : 1;
   const ratio = clamp((value - min) / span, 0, 1);
   const angle = START_DEGREES + ratio * SWEEP_DEGREES;
+  const faceDecimals = decimals ?? Math.min(6, Math.max(0, Math.ceil(-Math.log10(step > 0 ? step : 1))));
 
   // Read by the responder, which is created exactly once: rebuilding it while a
   // pointer is down swaps the DOM node's handlers mid-gesture and stalls the
@@ -184,10 +251,13 @@ export function RotaryKnob({
   }, [disabled]);
 
   const centre = size / 2;
-  const trackRadius = centre - 8;
-  const bodyRadius = centre - 21;
-  const indicator = polar(centre, centre, bodyRadius - 9, angle);
-  const indicatorInner = polar(centre, centre, bodyRadius - 26, angle);
+  const bezelWidth = Math.max(7, size * 0.055);
+  const bezelRadius = centre - bezelWidth / 2 - 1;
+  const bodyRadius = bezelRadius - bezelWidth / 2 - 2;
+  // The reference indicator runs from just off the centre to just short of the
+  // rim; these fractions reproduce its proportions at any size.
+  const indicatorOuter = polar(centre, centre, bodyRadius * 0.86, angle);
+  const indicatorInner = polar(centre, centre, bodyRadius * 0.12, angle);
 
   return (
     <View className="items-center gap-2">
@@ -210,33 +280,55 @@ export function RotaryKnob({
         }
       >
         <Svg width={size} height={size}>
+          <Defs>
+            {/* The body's off-centre highlight, exactly as the reference sets it. */}
+            <RadialGradient id="knobBody" cx="42%" cy="35%" r="72%">
+              <Stop offset="0%" stopColor={KNOB.bodyHighlight} />
+              <Stop offset="58%" stopColor={KNOB.bodyMid} />
+              <Stop offset="100%" stopColor={KNOB.bodyEdge} />
+            </RadialGradient>
+          </Defs>
+
+          {/* The 90° cut-away at the bottom of the sweep, kept faintly visible
+              so the knob still reads as a full circle of hardware. */}
+          <Circle cx={centre} cy={centre} r={bezelRadius} stroke={KNOB.bezelGap} strokeWidth={bezelWidth} fill="none" />
+          <Bezel centre={centre} radius={bezelRadius} width={bezelWidth} />
+
+          {/* Condition arc: the one departure from the reference, and the reason
+              is that this knob drives a live alarmed channel. It tracks the
+              value in the channel's own condition colour, so a knob turned into
+              an alarm band says so without the operator reading the number. */}
+          {ratio > 0 && <Path d={arcPath(centre, centre, bezelRadius, START_DEGREES, angle)} stroke={colour} strokeWidth={2.5} strokeLinecap="round" fill="none" opacity={0.95} />}
+
+          <Circle cx={centre} cy={centre} r={bodyRadius} fill="url(#knobBody)" stroke={KNOB.bodyRim} strokeWidth={1} />
+
+          {/* Glow, then the indicator itself — the SVG stand-in for the
+              reference's box-shadow on the pointer. */}
           <Path
-            d={arcPath(centre, centre, trackRadius, START_DEGREES, START_DEGREES + SWEEP_DEGREES)}
-            stroke={palette.line}
+            d={`M ${indicatorInner.x} ${indicatorInner.y} L ${indicatorOuter.x} ${indicatorOuter.y}`}
+            stroke={disabled ? KNOB.bezelMid : KNOB.goldGlow}
             strokeWidth={7}
             strokeLinecap="round"
-            fill="none"
+            opacity={disabled ? 0.25 : 0.45}
           />
-          {ratio > 0 && (
-            <Path
-              d={arcPath(centre, centre, trackRadius, START_DEGREES, angle)}
-              stroke={disabled ? palette.inkMuted : colour}
-              strokeWidth={7}
-              strokeLinecap="round"
-              fill="none"
-              opacity={disabled ? 0.4 : 1}
-            />
-          )}
-          <Circle cx={centre} cy={centre} r={bodyRadius} fill={palette.panelRaised} stroke={palette.lineStrong} strokeWidth={1} />
           <Path
-            d={`M ${indicatorInner.x} ${indicatorInner.y} L ${indicator.x} ${indicator.y}`}
-            stroke={disabled ? palette.inkMuted : colour}
-            strokeWidth={3}
+            d={`M ${indicatorInner.x} ${indicatorInner.y} L ${indicatorOuter.x} ${indicatorOuter.y}`}
+            stroke={disabled ? '#6B6862' : KNOB.gold}
+            strokeWidth={2.5}
             strokeLinecap="round"
           />
-          <Circle cx={centre} cy={centre} r={4} fill={disabled ? palette.inkMuted : colour} />
+          <Circle cx={centre} cy={centre} r={4} fill={disabled ? '#6B6862' : KNOB.gold} />
         </Svg>
+
+        {/* The reading, on the knob face. */}
+        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <Text style={{ marginTop: size * 0.16 }} className="font-mono text-base text-[#F2EEE6]">
+            {Number.isFinite(value) ? value.toFixed(faceDecimals) : '—'}
+          </Text>
+          {!!unit && <Text className="font-mono text-[9px] text-[#96928A]">{unit}</Text>}
+        </View>
       </View>
+
       <View className="flex-row justify-between" style={{ width: size }}>
         <Text className={cn('font-mono text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{min}</Text>
         <Text className={cn('font-mono text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{max}</Text>
@@ -248,12 +340,13 @@ export function RotaryKnob({
 type Band = { from: number; to: number; level: ProcessCondition };
 
 /**
- * The configured range split into its alarm bands.
+ * The operating range split into its alarm bands.
  *
  * Built by cutting the range at every enabled threshold and classifying each
- * resulting slice by its own midpoint, so the picture can never disagree with
- * `processConditionFor` — one rule decides both the colour of a band and the
- * state of the reading sitting on it.
+ * resulting slice by its own midpoint — the same construction the reference
+ * simulator's range gauge uses, and it means the picture can never disagree
+ * with `processConditionFor`: one rule decides both the colour of a band and
+ * the state of the reading sitting on it.
  */
 export function alarmBands(min: number, max: number, limits: AlarmLimits): Band[] {
   if (!(max > min)) return [];
@@ -271,7 +364,7 @@ export function alarmBands(min: number, max: number, limits: AlarmLimits): Band[
   return bands;
 }
 
-/** The horizontal meter beneath the knob: alarm bands, with the reading on them. */
+/** The banded track beneath the knob, with the reading marked on it. */
 export function AlarmBandMeter({
   min,
   max,
@@ -286,43 +379,53 @@ export function AlarmBandMeter({
   unit: string;
 }) {
   const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
   const bands = alarmBands(min, max, limits);
   const span = max > min ? max - min : 1;
-  const fill = (level: ProcessCondition) =>
-    level === 'critical' ? palette.criticalSoft : level === 'warning' ? palette.warningSoft : palette.accentSoft;
-  const edge = (level: ProcessCondition) =>
-    level === 'critical' ? palette.criticalValue : level === 'warning' ? palette.warningValue : palette.accentValue;
 
   if (bands.length === 0) {
     return (
       <Text className={cn('font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        Set a valid engineering range to see the alarm bands.
+        Enable an alarm level to see the operating bands.
       </Text>
     );
   }
 
-  const HEIGHT = 30;
+  const HEIGHT = 16;
+  const TRACK = 7;
   const marker = clamp((value - min) / span, 0, 1);
 
   return (
-    <View className="gap-1.5">
+    <View className="gap-2">
       <View style={{ height: HEIGHT }}>
         <Svg width="100%" height={HEIGHT}>
+          <Rect x={0} y={(HEIGHT - TRACK) / 2} width="100%" height={TRACK} fill={KNOB.track} />
           {bands.map((band) => (
             <Rect
               key={`${band.from}-${band.to}`}
               x={`${((band.from - min) / span) * 100}%`}
-              y={6}
+              y={(HEIGHT - TRACK) / 2}
               width={`${((band.to - band.from) / span) * 100}%`}
-              height={HEIGHT - 12}
-              fill={fill(band.level)}
-              stroke={edge(band.level)}
-              strokeWidth={1}
+              height={TRACK}
+              fill={CONDITION_COLOUR[band.level]}
+              opacity={0.75}
             />
           ))}
-          <Rect x={`${marker * 100}%`} y={0} width={2} height={HEIGHT} fill={palette.ink} />
+          <Rect x={`${marker * 100}%`} y={0} width={2} height={HEIGHT} fill={KNOB.marker} />
         </Svg>
+      </View>
+      <View className="flex-row items-center justify-between">
+        {(
+          [
+            ['Healthy', KNOB.healthy],
+            ['Alert', KNOB.alert],
+            ['Danger', KNOB.danger],
+          ] as const
+        ).map(([legend, colour]) => (
+          <View key={legend} className="flex-row items-center gap-1.5">
+            <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: colour }} />
+            <Text className={cn('font-mono text-[8px] uppercase tracking-[0.1em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{legend}</Text>
+          </View>
+        ))}
       </View>
       <View className="flex-row justify-between">
         <Text className={cn('font-mono text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
