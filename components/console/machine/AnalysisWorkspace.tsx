@@ -477,6 +477,15 @@ export function AnalysisWorkspace({
           conclusion={conclusion}
           signalFor={data.signalFor}
           intelligence={data.intelligence}
+          issues={data.issues}
+          signals={data.signals}
+          findings={data.findings}
+          progression={data.progression}
+          health={data.health}
+          criticalPath={data.criticalPath}
+          doThis={data.doThis}
+          thenConfirm={data.thenConfirm}
+          modelCaveat={data.modelCaveat}
           initialEvidence={evidence ?? data.initialEvidence ?? []}
           onEvidenceChange={setEvidence}
           selectedSignalId={selectedSignalId}
