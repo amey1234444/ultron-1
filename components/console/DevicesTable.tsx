@@ -30,15 +30,15 @@ type SortKey = 'name' | 'type' | 'status';
 
 // Proportional flex ratios so the table always fills the available width.
 const FLEX = {
-  name: 1.8,
-  type: 0.8,
-  model: 1,
-  ip: 1.3,
-  port: 0.7,
-  status: 1.4,
-  project: 1.1,
-  lastComm: 1.3,
-  mapping: 0.8,
+  name: 3.8,
+  type: 0.7,
+  model: 0.75,
+  ip: 1.05,
+  port: 0.45,
+  status: 1.1,
+  project: 0.95,
+  lastComm: 0.9,
+  mapping: 0.65,
 };
 const MENU_WIDTH = 28;
 
@@ -102,6 +102,46 @@ function StatusPill({ online }: { online: boolean }) {
   );
 }
 
+function DeviceNameCell({ device, isDark, showTooltip }: { device: DeviceNode; isDark: boolean; showTooltip: boolean }) {
+  const simulated = isSimulatedDevice(device);
+
+  return (
+    <View
+      style={{ flex: FLEX.name, minWidth: 280, overflow: 'visible' }}
+      className="relative flex-row items-center gap-2 pr-4"
+    >
+      <Text
+        numberOfLines={1}
+        className={cn('min-w-0 flex-1 font-body-medium text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}
+      >
+        {device.name}
+      </Text>
+      {simulated && (
+        <View className="shrink-0 rounded-full border border-accent/50 bg-accent/10 px-1.5 py-px">
+          <Text className="font-mono text-[9px] uppercase tracking-[0.14em] text-accent">Sim</Text>
+        </View>
+      )}
+
+      {showTooltip && (
+        <View
+          pointerEvents="none"
+          className={cn(
+            'absolute left-0 top-[-36px] z-20 max-w-[520px] rounded-md border px-2.5 py-1.5 shadow-lg',
+            isDark ? 'border-line-dark bg-surface-dark text-ink' : 'border-line-light bg-surface-lightpanel text-ink-inverse',
+          )}
+        >
+          <Text
+            numberOfLines={1}
+            className={cn('font-body-medium text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}
+          >
+            {device.name}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 function DeviceRow({
   device,
   allDevices,
@@ -143,16 +183,7 @@ function DeviceRow({
       <RibbonEdge health={health} side="left" />
       <RibbonEdge health={health} side="right" />
 
-      <View style={{ flex: FLEX.name }} className="flex-row items-center gap-2">
-        <Text numberOfLines={1} className={cn('shrink font-body-medium text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
-          {device.name}
-        </Text>
-        {isSimulatedDevice(device) && (
-          <View className="rounded-full border border-accent/50 bg-accent/10 px-1.5 py-px">
-            <Text className="font-mono text-[9px] uppercase tracking-[0.14em] text-accent">Sim</Text>
-          </View>
-        )}
-      </View>
+      <DeviceNameCell device={device} isDark={isDark} showTooltip={hovered} />
       <Text style={{ flex: FLEX.type }} className={cn('font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
         {device.type}
       </Text>
