@@ -18,7 +18,10 @@ import {
   SIMULATION_BEHAVIOURS,
   defaultSimulatedChannel,
   isFaultInjection,
+  isManual,
   kindsForCardType,
+  manualChannelValue,
+  restingValue,
   sensorLabelForKind,
   validateSimulatedChannel,
   type SimulatedChannel,
@@ -27,6 +30,7 @@ import {
 } from '../../../lib/simulation';
 import { FormField } from '../FormField';
 import { Chip, FieldLabel } from './CardConfigFields';
+import { ExactValueField, KnobResetButton, RotaryKnob, quantize } from './ChannelValueKnob';
 
 type NumericKey =
   | 'min'
@@ -168,6 +172,9 @@ export function SimulationFields({
   const channel = channels[0];
   const channelName = 'channelNames' in config ? config.channelNames[0] ?? '' : '';
   const [drafts, setDrafts] = useState<NumericDrafts>(() => draftsFor(channel));
+  // Held while the exact-value field is being typed, so "12." survives a
+  // keystroke instead of collapsing to 12.
+  const [manualDraft, setManualDraft] = useState<string | null>(null);
 
   useEffect(() => {
     setDrafts(draftsFor(channel));
@@ -198,6 +205,9 @@ export function SimulationFields({
   };
 
   const range = `${drafts.min || '—'}–${drafts.max || '—'}${channel.unit ? ` ${channel.unit}` : ''}`;
+  const manual = isManual(channel.behaviour);
+  const manualStep = Number(Math.pow(10, -Math.min(6, Math.max(0, Math.round(channel.decimals)))).toFixed(6));
+  const manualValue = manualChannelValue(channel);
   const cadence = Number.isFinite(channel.samplesPerSecond) ? `${channel.samplesPerSecond} sample${channel.samplesPerSecond === 1 ? '' : 's'}/s` : 'invalid cadence';
   const stateLabel = cardEnabled && channel.enabled ? 'Publishing' : 'Paused';
 
@@ -315,10 +325,57 @@ export function SimulationFields({
             ))}
           </View>
           <Text className={cn('font-body text-xs leading-4', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            {isFaultInjection(channel.behaviour)
-              ? 'Fault injection intentionally crosses the configured limit so alarm and analysis paths can be verified.'
-              : 'Generated values remain inside the configured minimum and maximum.'}
+            {manual
+              ? 'Manual publishes exactly the value on the knob — no walk and no noise — so the rack, the mapped machine point and the trend all read the same number.'
+              : isFaultInjection(channel.behaviour)
+                ? 'Fault injection intentionally crosses the configured limit so alarm and analysis paths can be verified.'
+                : 'Generated values remain inside the configured minimum and maximum.'}
           </Text>
+          {manual && (
+            <View className="flex-row flex-wrap items-center gap-5 pt-1">
+              <RotaryKnob
+                label={`${channelName.trim() || 'Channel'} value`}
+                value={manualValue}
+                min={channel.min}
+                max={channel.max}
+                step={manualStep}
+                onChange={(next) => {
+                  setManualDraft(null);
+                  setChannel('manualValue', next);
+                }}
+              />
+              <View className="flex-1 gap-3" style={{ minWidth: 220 }}>
+                <View className={cn('rounded-lg border px-4 py-3', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}>
+                  <FieldLabel>Published value</FieldLabel>
+                  <View className="mt-1 flex-row items-baseline gap-2">
+                    <Text className="font-mono text-3xl text-accent">{manualValue.toFixed(Math.min(6, Math.max(0, Math.round(channel.decimals))))}</Text>
+                    <Text className={cn('font-body-medium text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{channel.unit || '—'}</Text>
+                  </View>
+                </View>
+                <View className="flex-row flex-wrap items-end gap-3">
+                  <View className="flex-1" style={{ minWidth: 160 }}>
+                    <ExactValueField
+                      value={manualDraft ?? String(manualValue)}
+                      unit={channel.unit}
+                      error={errors.manualValue}
+                      onChange={(text) => {
+                        setManualDraft(text);
+                        const parsed = Number(text.trim());
+                        if (text.trim() && Number.isFinite(parsed)) setChannel('manualValue', parsed);
+                      }}
+                    />
+                  </View>
+                  <KnobResetButton
+                    label="Reset"
+                    onPress={() => {
+                      setManualDraft(null);
+                      setChannel('manualValue', quantize(restingValue(channel), manualStep));
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
+          )}
         </View>
 
         <View className="rounded-xl border border-accent/30 bg-accent/10 p-4">

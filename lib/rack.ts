@@ -15,6 +15,37 @@ export type ProcessInputType = (typeof PROCESS_INPUT_TYPES)[number];
 export const PROCESS_DISPLAY_PRECISIONS = ['0', '0.0', '0.00', '0.000'] as const;
 export type ProcessDisplayPrecision = (typeof PROCESS_DISPLAY_PRECISIONS)[number];
 
+/**
+ * Display precision as a decimal-place count, and back.
+ *
+ * The card stores precision the way the specification writes it — `0`, `0.0`,
+ * `0.00`, `0.000` — because that is what an engineer picks from. Everything
+ * that formats or generates a number wants a count, and the simulated signal
+ * definition stores one, so the two representations are converted here rather
+ * than in each caller.
+ */
+export function decimalsForPrecision(precision: ProcessDisplayPrecision): number {
+  const dot = precision.indexOf('.');
+  return dot === -1 ? 0 : precision.length - dot - 1;
+}
+
+export function precisionForDecimals(decimals: number): ProcessDisplayPrecision {
+  const rounded = Math.max(0, Math.min(3, Math.round(Number.isFinite(decimals) ? decimals : 2)));
+  return PROCESS_DISPLAY_PRECISIONS[rounded] ?? '0.00';
+}
+
+/**
+ * A process value rendered at the card's configured display precision.
+ *
+ * Section 5 of the specification is explicit that precision is presentation
+ * only: the stored and calculated value keeps full precision, and only the
+ * string shown to the operator is shortened.
+ */
+export function formatProcessValue(value: number, precision: ProcessDisplayPrecision): string {
+  if (!Number.isFinite(value)) return '—';
+  return value.toFixed(decimalsForPrecision(precision));
+}
+
 export const SPEED_INPUT_TYPES = ['Pulse', 'Frequency', 'RPM', 'Keyphasor'] as const;
 export type SpeedInputType = (typeof SPEED_INPUT_TYPES)[number];
 

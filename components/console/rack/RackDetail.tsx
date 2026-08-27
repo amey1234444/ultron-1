@@ -260,6 +260,7 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
         // a changed cardType prop (which previously caused a crash switching
         // between card types across two different slots in one session).
         key={`${pageCard.id}-${pageCard.type}`}
+        rackName={effectiveDevice.name}
         slot={pageCard.slot}
         cardType={pageCard.type}
         initialConfig={pageCard.config}

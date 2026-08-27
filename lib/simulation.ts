@@ -13,7 +13,16 @@
 import { composeIp, ipPrefixFor, isValidIp, type DeviceNode } from './devices';
 import { buildLiveFrame, type FrameEnvelope } from './liveFrame';
 import type { LiveFrame } from './liveTelemetry';
-import { channelCountForCardType, type CardConfig, type CardNode, type CardType } from './rack';
+import {
+  channelCountForCardType,
+  decimalsForPrecision,
+  precisionForDecimals,
+  syncProcessLegacyAlarms,
+  type CardConfig,
+  type CardNode,
+  type CardType,
+  type ProcessConfig,
+} from './rack';
 
 // Card families the simulator can stand in for. Kinds map onto the real card
 // types, so a simulated channel occupies a rack slot exactly like its physical
@@ -54,6 +63,7 @@ export function defaultKindForCardType(type: CardType): SimulatedChannelKind {
 // limit so the alarm, dashboard and analysis path can actually be exercised
 // with a narrow operating range configured.
 export const SIMULATION_BEHAVIOURS = [
+  'Manual',
   'Steady',
   'Drift Up',
   'Drift Down',
@@ -66,6 +76,17 @@ export type SimulationBehaviour = (typeof SIMULATION_BEHAVIOURS)[number];
 
 export function isFaultInjection(behaviour: SimulationBehaviour): boolean {
   return behaviour === 'Ramp To Alert' || behaviour === 'Ramp To Danger' || behaviour === 'Spikes';
+}
+
+/**
+ * `Manual` is the operator-driven behaviour: the channel publishes exactly the
+ * value on its knob, with no walk, no noise and no pull toward a target. It is
+ * the only behaviour whose published number is decided outside the generator,
+ * which is what makes a knob turn land on the machine view as the same figure
+ * rather than a plausible neighbour of it.
+ */
+export function isManual(behaviour: SimulationBehaviour): boolean {
+  return behaviour === 'Manual';
 }
 
 export type SimulatedChannel = {
@@ -85,6 +106,15 @@ export type SimulatedChannel = {
   samplesPerSecond: number;
   behaviour: SimulationBehaviour;
   decimals: number;
+  /**
+   * The exact value the channel publishes while `behaviour` is `Manual` — what
+   * the configuration page's rotary knob writes.
+   *
+   * Null means "never set", and the channel falls back to the centre of its
+   * declared normal band (or of its range). Stored rather than derived so a
+   * saved rack reopens on the value the commissioning engineer dialled in.
+   */
+  manualValue: number | null;
 };
 
 export type SimulatedChannelValidationErrors = Partial<
@@ -97,7 +127,8 @@ export type SimulatedChannelValidationErrors = Partial<
     | 'normalMin'
     | 'normalMax'
     | 'alertLimit'
-    | 'dangerLimit',
+    | 'dangerLimit'
+    | 'manualValue',
     string
   >
 >;
@@ -146,10 +177,25 @@ export function validateSimulatedChannel(channel: SimulatedChannel, channelName:
     errors.dangerLimit = 'Critical limit must be greater than warning limit.';
   }
 
+  // Only enforced for Manual: every other behaviour ignores the stored knob
+  // position, so a stale one must not block saving a drifting channel.
+  if (isManual(channel.behaviour)) {
+    if (channel.manualValue === null || !Number.isFinite(channel.manualValue)) {
+      errors.manualValue = 'Set the channel value.';
+    } else if (
+      Number.isFinite(channel.min) &&
+      Number.isFinite(channel.max) &&
+      channel.max > channel.min &&
+      (channel.manualValue < channel.min || channel.manualValue > channel.max)
+    ) {
+      errors.manualValue = 'Channel value must be inside the engineering range.';
+    }
+  }
+
   return errors;
 }
 
-type KindDefaults = Omit<SimulatedChannel, 'enabled' | 'kind' | 'behaviour'> & { sensor: string };
+type KindDefaults = Omit<SimulatedChannel, 'enabled' | 'kind' | 'behaviour' | 'manualValue'> & { sensor: string };
 
 const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
   Vibration: {
@@ -220,12 +266,18 @@ export function sensorLabelForKind(kind: SimulatedChannelKind): string {
 
 export function defaultSimulatedChannel(kind: SimulatedChannelKind): SimulatedChannel {
   const { sensor: _sensor, ...defaults } = KIND_DEFAULTS[kind];
-  return { enabled: true, kind, behaviour: 'Steady', ...defaults };
+  const channel: SimulatedChannel = { enabled: true, kind, behaviour: 'Steady', manualValue: null, ...defaults };
+  return { ...channel, manualValue: restingValue(channel) };
 }
 
 export function defaultSimulationForCard(type: CardType): SimulatedChannel[] {
   const kind = defaultKindForCardType(type);
-  return Array.from({ length: channelCountForCardType(type) }, () => defaultSimulatedChannel(kind));
+  // The Universal V/I card is configured through the knob-driven channel page,
+  // where an operator sets a value and expects to see exactly that value. A
+  // random walk would immediately move off whatever they dialled in, so this
+  // card family starts Manual; the generated behaviours are still one chip away.
+  const behaviour: SimulationBehaviour = type === 'Process Card' ? 'Manual' : 'Steady';
+  return Array.from({ length: channelCountForCardType(type) }, () => ({ ...defaultSimulatedChannel(kind), behaviour }));
 }
 
 // A card's stored simulation array can be shorter than its channel count (card
@@ -235,7 +287,16 @@ export function simulationForCard(card: CardNode): SimulatedChannel[] {
   if (count === 0) return [];
   const stored = card.simulation ?? [];
   const kind = defaultKindForCardType(card.type);
-  return Array.from({ length: count }, (_, index) => stored[index] ?? defaultSimulatedChannel(kind));
+  return Array.from({ length: count }, (_, index) => {
+    const channel = stored[index];
+    if (!channel) return defaultSimulatedChannel(kind);
+    // A rack saved before the knob existed carries no `manualValue`. Seeding it
+    // from the channel's own resting point means switching to Manual starts
+    // from where the signal already sits, rather than from zero.
+    return channel.manualValue === undefined || channel.manualValue === null
+      ? { ...channel, manualValue: restingValue(channel) }
+      : channel;
+  });
 }
 
 // --- Value generation -------------------------------------------------------
@@ -258,7 +319,11 @@ export function channelRuntimeKey(rackId: string, slot: number, channel: number)
 // Reseed the walk when the operator changes the shape of the signal, so a new
 // range takes effect immediately instead of being merely clamped on later ticks.
 function configSignature(channel: SimulatedChannel): string {
-  return [channel.kind, channel.min, channel.max, channel.behaviour, channel.alertLimit, channel.dangerLimit].join('|');
+  // `manualValue` is part of the signature so that turning the knob reseeds the
+  // channel on the very next tick instead of being walked toward over several
+  // — and so `simulationFramesForGateway` can recognise the change and publish
+  // it immediately rather than waiting out the channel's sample interval.
+  return [channel.kind, channel.min, channel.max, channel.behaviour, channel.alertLimit, channel.dangerLimit, channel.manualValue].join('|');
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -269,6 +334,39 @@ function midpoint(channel: SimulatedChannel): number {
   return (channel.min + channel.max) / 2;
 }
 
+/**
+ * Where a channel sits when nothing is driving it — the centre of the declared
+ * normal band when there is one, otherwise the centre of the range.
+ *
+ * Used to seed a knob that has never been set, so switching a channel to Manual
+ * starts it at a healthy reading rather than at a range edge or at zero.
+ */
+export function restingValue(channel: Pick<SimulatedChannel, 'min' | 'max' | 'normalMin' | 'normalMax'>): number {
+  const min = Number.isFinite(channel.min) ? channel.min : 0;
+  const max = Number.isFinite(channel.max) && channel.max > min ? channel.max : min + 1;
+  if (channel.normalMin !== null && channel.normalMax !== null && Number.isFinite(channel.normalMin) && Number.isFinite(channel.normalMax)) {
+    return clamp((channel.normalMin + channel.normalMax) / 2, min, max);
+  }
+  return (min + max) / 2;
+}
+
+/**
+ * The exact number a Manual channel publishes: the knob position, clamped into
+ * the engineering range, or the resting value when the knob has never been set.
+ *
+ * Every surface that needs to say what a manual channel reads — the generator,
+ * the configuration knob, the card overview — goes through here, so the figure
+ * on the configuration page and the figure on the machine view are produced by
+ * one function rather than by two that agree until they don't.
+ */
+export function manualChannelValue(channel: SimulatedChannel): number {
+  const min = Number.isFinite(channel.min) ? channel.min : 0;
+  const max = Number.isFinite(channel.max) && channel.max > min ? channel.max : min + 1;
+  const requested = channel.manualValue;
+  if (requested === null || !Number.isFinite(requested)) return restingValue(channel);
+  return clamp(requested, min, max);
+}
+
 // Where the walk is being pulled toward, and how far it may roam, for this
 // behaviour at this point in its cycle. `phase` advances one unit per sample.
 function targetFor(channel: SimulatedChannel, phase: number): { target: number; low: number; high: number } {
@@ -276,6 +374,12 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
   const cycle = Math.sin(phase / Math.max(channel.samplesPerSecond * 12, 1));
 
   switch (channel.behaviour) {
+    case 'Manual': {
+      // Pinned: the target is the value itself and the band collapses onto it,
+      // so even a caller that walks toward the target lands exactly on it.
+      const value = manualChannelValue(channel);
+      return { target: value, low: value, high: value };
+    }
     case 'Drift Up':
     case 'Drift Down': {
       // A slow sweep from one end of the range to the other and back, so the
@@ -357,6 +461,14 @@ export function nextChannelValue(
     state = { value: seedValue(channel), phase: 0, signature, lastPublishMs: 0 };
     runtime.channels.set(key, state);
   }
+  // A manual channel is not walked at all. Running it through `advance` would
+  // add the noise term and return the knob's value ± a fraction of the span,
+  // which is precisely the discrepancy the knob exists to remove.
+  if (isManual(channel.behaviour)) {
+    state.value = manualChannelValue(channel);
+    return state.value;
+  }
+
   const steps = clamp(Math.round((channel.samplesPerSecond * elapsedMs) / 1000), 1, MAX_STEPS_PER_TICK);
   state.value = advance(channel, state, steps);
   return state.value;
@@ -553,7 +665,13 @@ export function simulationFramesForGateway(
         // faster channel shares the rack.
         const state = runtime.channels.get(key);
         const publishIntervalMs = 1000 / clamp(channel.samplesPerSecond, 0.1, 50);
-        if (state && nowMs - state.lastPublishMs < publishIntervalMs - 1) continue;
+        // A changed signal definition publishes on the very next tick whatever
+        // the cadence says. A 1 sample/sec channel would otherwise hold the
+        // previous number for up to a second after the knob moved — and a 0.1
+        // sample/sec one for ten — which reads as the machine view disagreeing
+        // with the configuration page rather than as it simply being due.
+        const reconfigured = !!state && state.signature !== configSignature(channel);
+        if (state && !reconfigured && nowMs - state.lastPublishMs < publishIntervalMs - 1) continue;
 
         const value = nextChannelValue(key, channel, runtime, elapsedMs);
         const current = runtime.channels.get(key);
@@ -638,6 +756,10 @@ export function simulationWithCardConfig(
       unit: config.unit || primary.unit,
       min: numeric(config.engineeringMin, primary.min),
       max: numeric(config.engineeringMax, primary.max),
+      // Section 5 of the card specification makes display precision the single
+      // place decimals are chosen, so the generator follows it rather than
+      // asking for the same number twice.
+      decimals: decimalsForPrecision(config.displayPrecision),
     };
   } else if (type === 'Speed Card' && 'minSpeed' in config) {
     next = {
@@ -656,6 +778,12 @@ export function simulationWithCardConfig(
     next.min = primary.min;
     next.max = primary.max;
   }
+
+  // Narrowing the engineering range must not leave the knob parked outside it —
+  // the generator clamps on publish, so an unclamped knob would show one number
+  // on the configuration page and publish another to the machine view.
+  const merged = { ...primary, ...next };
+  next.manualValue = manualChannelValue(merged);
 
   return channels.map((channel, index) => (index === 0 ? { ...channel, ...next } : channel));
 }
@@ -678,14 +806,30 @@ export function cardConfigWithSimulation(type: CardType, config: CardConfig, cha
     };
   }
   if (type === 'Process Card' && 'engineeringMin' in config) {
-    return {
+    const next: ProcessConfig = {
       ...config,
       unit: primary.unit,
       engineeringMin: String(primary.min),
       engineeringMax: String(primary.max),
+      displayPrecision: precisionForDecimals(primary.decimals),
       alarmWarning,
       alarmCritical,
     };
+    // The card specification's alarm block is richer than a signal definition,
+    // which carries only a warning/critical pair. Seeding H and HH from that
+    // pair when the card has none of its own keeps the two descriptions of the
+    // same limits together: without it, `syncProcessLegacyAlarms` recomputes
+    // the pair from the (empty) H/HH fields on the very first edit and the
+    // generator quietly loses the thresholds it was publishing against.
+    if (!next.alarmHigh.trim() && primary.alertLimit !== null) {
+      next.alarmHigh = String(primary.alertLimit);
+      next.alarmHighEnabled = true;
+    }
+    if (!next.alarmHighHigh.trim() && primary.dangerLimit !== null) {
+      next.alarmHighHigh = String(primary.dangerLimit);
+      next.alarmHighHighEnabled = true;
+    }
+    return syncProcessLegacyAlarms(next);
   }
   if (type === 'Speed Card' && 'minSpeed' in config) {
     return {

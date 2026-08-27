@@ -2,7 +2,8 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { channelCountForCardType, channelNamesForCard, normalizeProcessConfig, slotKind, type CardNode } from '../../../lib/rack';
+import { channelCountForCardType, channelNamesForCard, formatProcessValue, normalizeProcessConfig, slotKind, type CardNode } from '../../../lib/rack';
+import { manualChannelValue, simulationForCard } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
 import { CardTypeIcon } from './cardIcons';
@@ -32,6 +33,21 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
     const config = normalizeProcessConfig(card.config);
     const unit = config.unit || '—';
     const alarmValue = (enabled: boolean, value: string) => (enabled ? `${value || 'not set'} ${unit}` : 'Disabled');
+    // Only a simulated card carries a signal definition, and only then is there
+    // a driven value to report. A physical card reads its channel from the
+    // field wiring, so there is nothing configured here to show.
+    const channel = card.simulation?.length ? simulationForCard(card)[0] : undefined;
+    const channelValueRows = channel
+      ? [
+          { label: 'Value Source', value: channel.behaviour },
+          // A generated behaviour has no single configured value to report —
+          // its number is whatever the walk currently sits at, which belongs on
+          // the rack faceplate rather than in a configuration summary.
+          ...(channel.behaviour === 'Manual'
+            ? [{ label: 'Channel Value', value: `${formatProcessValue(manualChannelValue(channel), config.displayPrecision)} ${unit}` }]
+            : []),
+        ]
+      : [];
     return [
       { label: 'Display Name', value: config.channelNames[0] || '—' },
       { label: 'Tag', value: config.tag || '—' },
@@ -46,6 +62,7 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
       { label: 'Hysteresis', value: `${config.hysteresis || '—'} ${unit}` },
       { label: 'Alarm Delay', value: `${config.alarmDelay || '0'} sec` },
       { label: 'Display Precision', value: config.displayPrecision },
+      ...channelValueRows,
     ];
   }
   if (channelCountForCardType(card.type) > 0) {
