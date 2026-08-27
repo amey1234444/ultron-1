@@ -9,18 +9,11 @@ export type CardType = (typeof CARD_TYPES)[number];
 export const ACQUISITION_CARD_TYPES: CardType[] = ['Vibration Card', 'Process Card', 'Speed Card'];
 export const CONTROLLER_CARD_TYPES: CardType[] = ['Communication Controller'];
 
-export const PROCESS_INPUT_TYPES = [
-  '0-1 V',
-  '0-5 V',
-  '0-10 V',
-  '0-20 mA',
-  '4-20 mA',
-  'RTD 2-wire',
-  'RTD 3-wire',
-  'RTD 4-wire',
-  'Thermocouple',
-] as const;
+export const PROCESS_INPUT_TYPES = ['0-1 V', '0-5 V', '0-10 V', '4-20 mA', '0-20 mA'] as const;
 export type ProcessInputType = (typeof PROCESS_INPUT_TYPES)[number];
+
+export const PROCESS_DISPLAY_PRECISIONS = ['0', '0.0', '0.00', '0.000'] as const;
+export type ProcessDisplayPrecision = (typeof PROCESS_DISPLAY_PRECISIONS)[number];
 
 export const SPEED_INPUT_TYPES = ['Pulse', 'Frequency', 'RPM', 'Keyphasor'] as const;
 export type SpeedInputType = (typeof SPEED_INPUT_TYPES)[number];
@@ -48,6 +41,7 @@ export type VibrationConfig = {
 
 export type ProcessConfig = {
   channelNames: string[];
+  tag: string;
   inputType: ProcessInputType;
   engineeringMin: string;
   engineeringMax: string;
@@ -55,6 +49,17 @@ export type ProcessConfig = {
   scaling: string;
   offset: string;
   filter: string;
+  alarmLowLowEnabled: boolean;
+  alarmLowEnabled: boolean;
+  alarmHighEnabled: boolean;
+  alarmHighHighEnabled: boolean;
+  alarmLowLow: string;
+  alarmLow: string;
+  alarmHigh: string;
+  alarmHighHigh: string;
+  hysteresis: string;
+  alarmDelay: string;
+  displayPrecision: ProcessDisplayPrecision;
   alarmWarning: string;
   alarmCritical: string;
 };
@@ -127,9 +132,71 @@ export function channelNamesForCard(card: CardNode): string[] {
 // the fields the card actually has rather than whatever length was stored.
 export function normalizedCardConfig(type: CardType, config: CardConfig): CardConfig {
   const count = channelCountForCardType(type);
+  if (type === 'Process Card' && 'engineeringMin' in config) {
+    return normalizeProcessConfig({ ...config, channelNames: Array.from({ length: count }, (_, index) => config.channelNames[index] ?? '') });
+  }
   if (!('channelNames' in config)) return config;
   if (config.channelNames.length === count) return config;
   return { ...config, channelNames: Array.from({ length: count }, (_, index) => config.channelNames[index] ?? '') };
+}
+
+function isProcessInputType(value: unknown): value is ProcessInputType {
+  return PROCESS_INPUT_TYPES.includes(value as ProcessInputType);
+}
+
+function isProcessDisplayPrecision(value: unknown): value is ProcessDisplayPrecision {
+  return PROCESS_DISPLAY_PRECISIONS.includes(value as ProcessDisplayPrecision);
+}
+
+function processSpan(config: Pick<ProcessConfig, 'engineeringMin' | 'engineeringMax'>): number | null {
+  const min = Number(config.engineeringMin);
+  const max = Number(config.engineeringMax);
+  return Number.isFinite(min) && Number.isFinite(max) && max > min ? max - min : null;
+}
+
+export function suggestedProcessHysteresis(config: Pick<ProcessConfig, 'engineeringMin' | 'engineeringMax'>): string {
+  const span = processSpan(config);
+  if (span === null) return '';
+  const suggested = span * 0.01;
+  return Number.isInteger(suggested) ? String(suggested) : String(Number(suggested.toFixed(6)));
+}
+
+export function syncProcessLegacyAlarms(config: ProcessConfig): ProcessConfig {
+  const alarmWarning = config.alarmHighEnabled && config.alarmHigh.trim() ? config.alarmHigh : config.alarmLowEnabled && config.alarmLow.trim() ? config.alarmLow : '';
+  const alarmCritical =
+    config.alarmHighHighEnabled && config.alarmHighHigh.trim() ? config.alarmHighHigh : config.alarmLowLowEnabled && config.alarmLowLow.trim() ? config.alarmLowLow : '';
+  return { ...config, alarmWarning, alarmCritical };
+}
+
+export function normalizeProcessConfig(config: Partial<ProcessConfig> & Pick<ProcessConfig, 'channelNames'>): ProcessConfig {
+  const base: ProcessConfig = {
+    channelNames: config.channelNames,
+    tag: config.tag ?? '',
+    inputType: isProcessInputType(config.inputType) ? config.inputType : '4-20 mA',
+    engineeringMin: config.engineeringMin ?? '',
+    engineeringMax: config.engineeringMax ?? '',
+    unit: config.unit ?? '',
+    scaling: config.scaling ?? '1',
+    offset: config.offset ?? '0',
+    filter: config.filter ?? '',
+    alarmLowLowEnabled: config.alarmLowLowEnabled ?? false,
+    alarmLowEnabled: config.alarmLowEnabled ?? false,
+    alarmHighEnabled: config.alarmHighEnabled ?? !!config.alarmWarning,
+    alarmHighHighEnabled: config.alarmHighHighEnabled ?? !!config.alarmCritical,
+    alarmLowLow: config.alarmLowLow ?? '',
+    alarmLow: config.alarmLow ?? '',
+    alarmHigh: config.alarmHigh ?? config.alarmWarning ?? '',
+    alarmHighHigh: config.alarmHighHigh ?? config.alarmCritical ?? '',
+    hysteresis: config.hysteresis ?? '',
+    alarmDelay: config.alarmDelay ?? '0',
+    displayPrecision: isProcessDisplayPrecision(config.displayPrecision) ? config.displayPrecision : '0.00',
+    alarmWarning: config.alarmWarning ?? '',
+    alarmCritical: config.alarmCritical ?? '',
+  };
+  return syncProcessLegacyAlarms({
+    ...base,
+    hysteresis: base.hysteresis || suggestedProcessHysteresis(base),
+  });
 }
 
 export function emptyConfigFor(type: CardType): CardConfig {
@@ -149,13 +216,25 @@ export function emptyConfigFor(type: CardType): CardConfig {
     case 'Process Card':
       return {
         channelNames: emptyChannelNames(type),
+        tag: '',
         inputType: '4-20 mA',
         engineeringMin: '',
         engineeringMax: '',
         unit: '',
         scaling: '',
-        offset: '',
+        offset: '0',
         filter: '',
+        alarmLowLowEnabled: false,
+        alarmLowEnabled: false,
+        alarmHighEnabled: false,
+        alarmHighHighEnabled: false,
+        alarmLowLow: '',
+        alarmLow: '',
+        alarmHigh: '',
+        alarmHighHigh: '',
+        hysteresis: '',
+        alarmDelay: '0',
+        displayPrecision: '0.00',
         alarmWarning: '',
         alarmCritical: '',
       };

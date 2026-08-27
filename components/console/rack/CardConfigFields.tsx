@@ -1,16 +1,21 @@
+import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import {
+  PROCESS_DISPLAY_PRECISIONS,
   PROCESS_INPUT_TYPES,
   SPEED_INPUT_TYPES,
   type ControllerConfig,
+  type ProcessDisplayPrecision,
   type ProcessConfig,
   type ProcessInputType,
   type SpeedConfig,
   type SpeedInputType,
   type VibrationConfig,
+  suggestedProcessHysteresis,
+  syncProcessLegacyAlarms,
 } from '../../../lib/rack';
 import { FormField } from '../FormField';
 
@@ -45,6 +50,130 @@ export function EnabledToggle({ enabled, onChange }: { enabled: boolean; onChang
         <Chip label="Disabled" selected={!enabled} onPress={() => onChange(false)} />
       </View>
     </View>
+  );
+}
+
+const COMMON_PROCESS_UNITS = ['bar', 'psi', 'kPa', 'MPa', 'degC', 'degF', '%', 'L/min', 'm3/h', 'A', 'V', 'Nm', 'N', 'mm', 'Hz'];
+
+const PROCESS_ALARM_LEVELS = [
+  { enabledKey: 'alarmLowLowEnabled', valueKey: 'alarmLowLow', label: 'LL', name: 'Low Low' },
+  { enabledKey: 'alarmLowEnabled', valueKey: 'alarmLow', label: 'L', name: 'Low' },
+  { enabledKey: 'alarmHighEnabled', valueKey: 'alarmHigh', label: 'H', name: 'High' },
+  { enabledKey: 'alarmHighHighEnabled', valueKey: 'alarmHighHigh', label: 'HH', name: 'High High' },
+] as const;
+
+type ProcessAlarmLevel = (typeof PROCESS_ALARM_LEVELS)[number];
+type ProcessErrorKey =
+  | 'displayName'
+  | 'unit'
+  | 'engineeringMin'
+  | 'engineeringMax'
+  | 'offset'
+  | 'alarmLowLow'
+  | 'alarmLow'
+  | 'alarmHigh'
+  | 'alarmHighHigh'
+  | 'hysteresis'
+  | 'alarmDelay'
+  | 'displayPrecision';
+
+export type ProcessConfigErrors = Partial<Record<ProcessErrorKey, string>>;
+
+function numberFromText(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const parsed = Number(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+export function processConfigErrors(config: ProcessConfig): ProcessConfigErrors {
+  const errors: ProcessConfigErrors = {};
+  const displayName = config.channelNames[0] ?? '';
+  const min = numberFromText(config.engineeringMin);
+  const max = numberFromText(config.engineeringMax);
+  const offset = numberFromText(config.offset);
+  const hysteresis = numberFromText(config.hysteresis);
+  const alarmDelay = numberFromText(config.alarmDelay);
+  const hasRange = min !== null && max !== null && max > min;
+  const span = hasRange ? max - min : null;
+
+  if (!displayName.trim()) errors.displayName = 'Display name is required';
+  if (!config.unit.trim()) errors.unit = 'Engineering unit is required';
+  if (min === null) errors.engineeringMin = 'Engineering minimum must be numeric';
+  if (max === null) errors.engineeringMax = 'Engineering maximum must be numeric';
+  if (min !== null && max !== null && max <= min) errors.engineeringMax = 'Engineering maximum must be greater than minimum';
+  if (offset === null) errors.offset = 'Offset must be numeric';
+  if (hysteresis === null) {
+    errors.hysteresis = 'Hysteresis must be numeric';
+  } else if (hysteresis < 0) {
+    errors.hysteresis = 'Hysteresis must be zero or greater';
+  } else if (span !== null && hysteresis >= span) {
+    errors.hysteresis = 'Hysteresis must be less than the engineering span';
+  }
+  if (alarmDelay === null) {
+    errors.alarmDelay = 'Delay must be numeric';
+  } else if (alarmDelay < 0) {
+    errors.alarmDelay = 'Delay must be zero or greater';
+  }
+  if (!PROCESS_DISPLAY_PRECISIONS.includes(config.displayPrecision)) errors.displayPrecision = 'Select a display precision';
+
+  const enabledThresholds: { level: ProcessAlarmLevel; value: number }[] = [];
+  for (const level of PROCESS_ALARM_LEVELS) {
+    if (!config[level.enabledKey]) continue;
+    const value = numberFromText(config[level.valueKey]);
+    if (value === null) {
+      errors[level.valueKey] = `${level.label} threshold must be numeric`;
+      continue;
+    }
+    if (hasRange && (value < min || value > max)) {
+      errors[level.valueKey] = `${level.label} must be inside the engineering range`;
+    }
+    enabledThresholds.push({ level, value });
+  }
+
+  for (let index = 1; index < enabledThresholds.length; index += 1) {
+    const previous = enabledThresholds[index - 1];
+    const current = enabledThresholds[index];
+    if (current.value <= previous.value) {
+      errors[current.level.valueKey] = `${current.level.label} must be greater than ${previous.level.label}`;
+    }
+  }
+
+  return errors;
+}
+
+function SectionPanel({ title, children }: { title: string; children: ReactNode }) {
+  const { isDark } = useAppTheme();
+  return (
+    <View className={cn('gap-4 rounded-lg border p-4', isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel')}>
+      <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
+      {children}
+    </View>
+  );
+}
+
+function FieldCell({ children, basis = 220 }: { children: ReactNode; basis?: number }) {
+  return (
+    <View className="flex-1" style={{ flexBasis: basis, minWidth: basis }}>
+      {children}
+    </View>
+  );
+}
+
+function ToggleSwitch({ enabled, onChange }: { enabled: boolean; onChange: (enabled: boolean) => void }) {
+  const { isDark } = useAppTheme();
+  return (
+    <Pressable
+      onPress={() => onChange(!enabled)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: enabled }}
+      className={cn(
+        'h-8 w-[76px] justify-center rounded-full border px-1',
+        enabled ? 'border-status-success bg-status-success' : isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light',
+      )}
+    >
+      <View className={cn('h-6 w-6 rounded-full', enabled ? 'ml-auto bg-white' : isDark ? 'bg-ink-muted' : 'bg-ink-inverse-muted')} />
+    </Pressable>
   );
 }
 
@@ -117,51 +246,194 @@ export function VibrationFields({
 
 export function ProcessFields({
   config,
-  set,
   setChannelName,
+  setConfig,
 }: {
   config: ProcessConfig;
-  set: (k: string, v: string) => void;
   setChannelName: (index: number, value: string) => void;
+  setConfig: (config: ProcessConfig) => void;
 }) {
+  const { isDark } = useAppTheme();
+  const errors = processConfigErrors(config);
+  const suggestion = suggestedProcessHysteresis(config);
+  const commit = (next: ProcessConfig) => setConfig(syncProcessLegacyAlarms(next));
+  const setProcessField = <K extends keyof ProcessConfig>(key: K, value: ProcessConfig[K]) => {
+    if (key === 'engineeringMin' || key === 'engineeringMax') {
+      const previousSuggestion = suggestedProcessHysteresis(config);
+      const ranged = { ...config, [key]: value };
+      const shouldRefreshHysteresis = !config.hysteresis.trim() || config.hysteresis === previousSuggestion;
+      commit({
+        ...ranged,
+        hysteresis: shouldRefreshHysteresis ? suggestedProcessHysteresis(ranged) : config.hysteresis,
+      });
+      return;
+    }
+    commit({ ...config, [key]: value });
+  };
+  const setAlarmEnabled = (level: ProcessAlarmLevel, enabled: boolean) => commit({ ...config, [level.enabledKey]: enabled });
+
   return (
-    <>
-      <ChannelNameFields channelNames={config.channelNames} setChannelName={setChannelName} placeholder={(i) => `e.g. Process Point ${i + 1}`} />
-      <View className="gap-1.5">
-        <FieldLabel>Input Type</FieldLabel>
-        <View className="flex-row flex-wrap gap-2">
-          {PROCESS_INPUT_TYPES.map((t) => (
-            <Chip key={t} label={t} selected={config.inputType === t} onPress={() => set('inputType', t as ProcessInputType)} />
+    <View className="gap-4">
+      <SectionPanel title="Identification">
+        <View className="flex-row flex-wrap gap-3">
+          <FieldCell>
+            <FormField
+              label="Display Name"
+              required
+              value={config.channelNames[0] ?? ''}
+              onChangeText={(value) => setChannelName(0, value)}
+              placeholder="e.g. Inlet Pressure"
+              error={errors.displayName}
+            />
+          </FieldCell>
+          <FieldCell>
+            <FormField label="Tag" value={config.tag} onChangeText={(value) => setProcessField('tag', value)} placeholder="e.g. PT-101" />
+          </FieldCell>
+        </View>
+      </SectionPanel>
+
+      <SectionPanel title="Channel Configuration">
+        <View className="gap-2">
+          <FieldLabel>Input Type</FieldLabel>
+          <View className="flex-row flex-wrap gap-2">
+            {PROCESS_INPUT_TYPES.map((type) => {
+              const selected = config.inputType === type;
+              return (
+                <Pressable
+                  key={type}
+                  onPress={() => setProcessField('inputType', type as ProcessInputType)}
+                  className={cn(
+                    'min-h-[54px] justify-center rounded-lg border px-4 py-3',
+                    selected
+                      ? 'border-status-success bg-status-success/10'
+                      : isDark
+                        ? 'border-line-dark bg-surface-dark'
+                        : 'border-line-light bg-surface-light',
+                  )}
+                  style={{ flexBasis: 142, flexGrow: 1 }}
+                >
+                  <Text className={cn('font-body-bold text-sm', selected ? 'text-status-success' : isDark ? 'text-ink' : 'text-ink-inverse')}>{type}</Text>
+                  <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+                    {type.includes('V') ? 'Voltage input' : 'Current input'}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+        <View className="flex-row flex-wrap gap-3">
+          <FieldCell>
+            <FormField label="Engineering Unit" required value={config.unit} onChangeText={(value) => setProcessField('unit', value)} placeholder="e.g. bar" error={errors.unit} />
+          </FieldCell>
+          <FieldCell>
+            <View className="gap-1.5">
+              <FieldLabel>Common Units</FieldLabel>
+              <View className="flex-row flex-wrap gap-2">
+                {COMMON_PROCESS_UNITS.map((unit) => (
+                  <Chip key={unit} label={unit} selected={config.unit === unit} onPress={() => setProcessField('unit', unit)} />
+                ))}
+              </View>
+            </View>
+          </FieldCell>
+        </View>
+        <View className="flex-row flex-wrap gap-3">
+          <FieldCell>
+            <FormField
+              label="Engineering Min"
+              required
+              value={config.engineeringMin}
+              onChangeText={(value) => setProcessField('engineeringMin', value)}
+              placeholder="0"
+              error={errors.engineeringMin}
+            />
+          </FieldCell>
+          <FieldCell>
+            <FormField
+              label="Engineering Max"
+              required
+              value={config.engineeringMax}
+              onChangeText={(value) => setProcessField('engineeringMax', value)}
+              placeholder="100"
+              error={errors.engineeringMax}
+            />
+          </FieldCell>
+        </View>
+      </SectionPanel>
+
+      <SectionPanel title="Calibration">
+        <View className="flex-row flex-wrap gap-3">
+          <FieldCell>
+            <FormField
+              label="Calibration Offset"
+              value={config.offset}
+              onChangeText={(value) => setProcessField('offset', value)}
+              placeholder="0"
+              error={errors.offset}
+            />
+          </FieldCell>
+          <FieldCell>
+            <View className={cn('rounded-lg border px-3 py-2', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}>
+              <FieldLabel>Applied Unit</FieldLabel>
+              <Text className={cn('mt-1 font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{config.unit.trim() || 'Engineering unit'}</Text>
+            </View>
+          </FieldCell>
+        </View>
+      </SectionPanel>
+
+      <SectionPanel title="Alarm Configuration">
+        <View className="gap-3">
+          {PROCESS_ALARM_LEVELS.map((level) => (
+            <View key={level.valueKey} className={cn('flex-row flex-wrap items-center gap-3 rounded-lg border p-3', isDark ? 'border-line-dark' : 'border-line-light')}>
+              <View className="w-[120px] gap-1">
+                <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>{level.label}</Text>
+                <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{level.name}</Text>
+              </View>
+              <ToggleSwitch enabled={config[level.enabledKey]} onChange={(enabled) => setAlarmEnabled(level, enabled)} />
+              <FieldCell basis={180}>
+                <FormField
+                  label="Threshold"
+                  value={config[level.valueKey]}
+                  onChangeText={(value) => setProcessField(level.valueKey, value)}
+                  placeholder="Optional"
+                  error={errors[level.valueKey]}
+                />
+              </FieldCell>
+            </View>
           ))}
         </View>
-      </View>
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Eng. Min" value={config.engineeringMin} onChangeText={(v) => set('engineeringMin', v)} placeholder="0" />
+        <View className="flex-row flex-wrap gap-3">
+          <FieldCell>
+            <FormField
+              label="Hysteresis"
+              value={config.hysteresis}
+              onChangeText={(value) => setProcessField('hysteresis', value)}
+              placeholder={suggestion ? `Suggested ${suggestion}` : '1% of span'}
+              error={errors.hysteresis}
+            />
+          </FieldCell>
+          <FieldCell>
+            <FormField label="Alarm Delay Seconds" value={config.alarmDelay} onChangeText={(value) => setProcessField('alarmDelay', value)} placeholder="0" error={errors.alarmDelay} />
+          </FieldCell>
         </View>
-        <View className="flex-1">
-          <FormField label="Eng. Max" value={config.engineeringMax} onChangeText={(v) => set('engineeringMax', v)} placeholder="100" />
+      </SectionPanel>
+
+      <SectionPanel title="Display">
+        <View className="gap-2">
+          <FieldLabel>Display Precision</FieldLabel>
+          <View className="flex-row flex-wrap gap-2">
+            {PROCESS_DISPLAY_PRECISIONS.map((precision) => (
+              <Chip
+                key={precision}
+                label={precision}
+                selected={config.displayPrecision === precision}
+                onPress={() => setProcessField('displayPrecision', precision as ProcessDisplayPrecision)}
+              />
+            ))}
+          </View>
+          {errors.displayPrecision && <Text className="font-body text-xs text-status-critical">{errors.displayPrecision}</Text>}
         </View>
-      </View>
-      <FormField label="Unit" value={config.unit} onChangeText={(v) => set('unit', v)} placeholder="e.g. bar" />
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Scaling" value={config.scaling} onChangeText={(v) => set('scaling', v)} placeholder="1.0" />
-        </View>
-        <View className="flex-1">
-          <FormField label="Offset" value={config.offset} onChangeText={(v) => set('offset', v)} placeholder="0" />
-        </View>
-      </View>
-      <FormField label="Filter" value={config.filter} onChangeText={(v) => set('filter', v)} placeholder="e.g. 1st order, 5s" />
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <FormField label="Warning Alarm" value={config.alarmWarning} onChangeText={(v) => set('alarmWarning', v)} placeholder="e.g. 8.5" />
-        </View>
-        <View className="flex-1">
-          <FormField label="Critical Alarm" value={config.alarmCritical} onChangeText={(v) => set('alarmCritical', v)} placeholder="e.g. 10.5" />
-        </View>
-      </View>
-    </>
+      </SectionPanel>
+    </View>
   );
 }
 

@@ -3,11 +3,20 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { normalizedCardConfig, type CardConfig, type CardType, type ControllerConfig, type ProcessConfig, type SpeedConfig, type VibrationConfig } from '../../../lib/rack';
+import {
+  channelCountForCardType,
+  normalizedCardConfig,
+  type CardConfig,
+  type CardType,
+  type ControllerConfig,
+  type ProcessConfig,
+  type SpeedConfig,
+  type VibrationConfig,
+} from '../../../lib/rack';
 import { cardConfigWithSimulation, simulationWithCardConfig, validateSimulatedChannel, type SimulatedChannel } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
-import { ControllerFields, EnabledToggle, ProcessFields, SpeedFields, VibrationFields } from './CardConfigFields';
+import { ControllerFields, EnabledToggle, ProcessFields, SpeedFields, VibrationFields, processConfigErrors } from './CardConfigFields';
 import { SimulationFields } from './SimulationFields';
 
 type CardConfigPageProps = {
@@ -56,6 +65,12 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
       channelNames[index] = value;
       return { ...previous, config: { ...previous.config, channelNames } };
     });
+  const setProcessConfig = (nextConfig: ProcessConfig) =>
+    setForm((previous) => ({
+      ...previous,
+      config: nextConfig,
+      simulation: previous.simulation ? simulationWithCardConfig(cardType, nextConfig, previous.simulation) : previous.simulation,
+    }));
 
   const canSave = (() => {
     if ('controllerName' in config) {
@@ -63,6 +78,9 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
     }
     if ('channelNames' in config) {
       if (!config.channelNames[0]?.trim()) return false;
+      if (!isSimulatedSignal && cardType === 'Process Card' && 'engineeringMin' in config) {
+        return Object.keys(processConfigErrors(config as ProcessConfig)).length === 0;
+      }
       if (isSimulatedSignal && simulation) {
         return simulation.every((channel, index) => Object.keys(validateSimulatedChannel(channel, config.channelNames[index] ?? '')).length === 0);
       }
@@ -72,6 +90,15 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
   })();
 
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
+  const acquisitionChannelCount = channelCountForCardType(cardType);
+  const isUniversalVIEditor = !isSimulatedSignal && cardType === 'Process Card';
+
+  const contextPill = (label: string, value: string) => (
+    <View key={label} className={cn('rounded-lg border px-3 py-2', isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel')}>
+      <Text className={cn('font-mono text-[9px] uppercase tracking-[0.16em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{label}</Text>
+      <Text className={cn('mt-0.5 font-body-bold text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>{value}</Text>
+    </View>
+  );
 
   return (
     <View className="flex-1">
@@ -80,13 +107,17 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
       </View>
 
       <View className="px-6 pt-3">
-        <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>Configure {cardType}</Text>
-        <Text className={cn('font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>Slot {slot}</Text>
+        <Text className={cn('font-body-bold text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>{isUniversalVIEditor ? 'Universal V/I Channel Configuration' : `Configure ${cardType}`}</Text>
+        <View className="mt-3 flex-row flex-wrap gap-2">
+          {contextPill('Rack Slot', `Slot ${slot}`)}
+          {contextPill('Card Type', cardType)}
+          {acquisitionChannelCount > 0 && contextPill('Channel', 'CH-01')}
+        </View>
       </View>
 
-      <ScrollView className="flex-1" contentContainerClassName="gap-4 px-6 py-5" style={{ maxWidth: 480 }}>
+      <ScrollView className="flex-1" contentContainerClassName="gap-4 px-6 py-5">
         {!isSimulatedSignal && cardType === 'Vibration Card' && <VibrationFields config={config as VibrationConfig} set={set} setChannelName={setChannelName} />}
-        {!isSimulatedSignal && cardType === 'Process Card' && <ProcessFields config={config as ProcessConfig} set={set} setChannelName={setChannelName} />}
+        {!isSimulatedSignal && cardType === 'Process Card' && <ProcessFields config={config as ProcessConfig} setChannelName={setChannelName} setConfig={setProcessConfig} />}
         {!isSimulatedSignal && cardType === 'Speed Card' && <SpeedFields config={config as SpeedConfig} set={set} setChannelName={setChannelName} />}
         {cardType === 'Communication Controller' && <ControllerFields config={config as ControllerConfig} set={set} />}
 
@@ -111,10 +142,11 @@ export function CardConfigPage({ slot, cardType, initialConfig, initialEnabled, 
         )}
       </ScrollView>
 
-      <View className={cn('flex-row justify-end gap-3 border-t px-6 py-4', lineClass)}>
+      <View className={cn('flex-row flex-wrap justify-end gap-3 border-t px-6 py-4', lineClass)}>
         <ActionButton label="Cancel" variant="secondary" onPress={onBack} />
+        {isUniversalVIEditor && <ActionButton label="Save" variant="secondary" onPress={() => canSave && onSave(config, enabled, simulation)} disabled={!canSave} />}
         <ActionButton
-          label={isSimulatedSignal ? `Save & ${isExistingSignal ? 'update' : 'start'} simulation` : 'Save'}
+          label={isSimulatedSignal ? `Save & ${isExistingSignal ? 'update' : 'start'} simulation` : isUniversalVIEditor ? 'Save & Upload' : 'Save'}
           // Both sides are already in step (see `set` above), so saving stores
           // what is on screen rather than overwriting it from the signal.
           onPress={() => canSave && onSave(config, enabled, simulation)}

@@ -2,7 +2,7 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { channelCountForCardType, channelNamesForCard, slotKind, type CardNode } from '../../../lib/rack';
+import { channelCountForCardType, channelNamesForCard, normalizeProcessConfig, slotKind, type CardNode } from '../../../lib/rack';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
 import { CardTypeIcon } from './cardIcons';
@@ -28,6 +28,26 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
 }
 
 function channelRows(card: CardNode): { label: string; value: string }[] {
+  if (card.type === 'Process Card' && 'engineeringMin' in card.config) {
+    const config = normalizeProcessConfig(card.config);
+    const unit = config.unit || '—';
+    const alarmValue = (enabled: boolean, value: string) => (enabled ? `${value || 'not set'} ${unit}` : 'Disabled');
+    return [
+      { label: 'Display Name', value: config.channelNames[0] || '—' },
+      { label: 'Tag', value: config.tag || '—' },
+      { label: 'Input Type', value: config.inputType },
+      { label: 'Engineering Unit', value: unit },
+      { label: 'Engineering Range', value: `${config.engineeringMin || '—'} to ${config.engineeringMax || '—'} ${unit}` },
+      { label: 'Calibration Offset', value: `${config.offset || '0'} ${unit}` },
+      { label: 'Low-Low Alarm', value: alarmValue(config.alarmLowLowEnabled, config.alarmLowLow) },
+      { label: 'Low Alarm', value: alarmValue(config.alarmLowEnabled, config.alarmLow) },
+      { label: 'High Alarm', value: alarmValue(config.alarmHighEnabled, config.alarmHigh) },
+      { label: 'High-High Alarm', value: alarmValue(config.alarmHighHighEnabled, config.alarmHighHigh) },
+      { label: 'Hysteresis', value: `${config.hysteresis || '—'} ${unit}` },
+      { label: 'Alarm Delay', value: `${config.alarmDelay || '0'} sec` },
+      { label: 'Display Precision', value: config.displayPrecision },
+    ];
+  }
   if (channelCountForCardType(card.type) > 0) {
     return channelNamesForCard(card).map((name) => ({ label: 'Channel Name', value: name || '—' }));
   }
@@ -72,7 +92,7 @@ export function CardOverviewPage({ card, backLabel = 'Back', onBack, onEdit, can
 
       <View className="px-6 pt-5">
         <Text className={cn('font-body-medium text-xs uppercase tracking-wider', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          {'channelNames' in card.config ? 'Channels' : 'Controller Details'}
+          {card.type === 'Process Card' && 'engineeringMin' in card.config ? 'Channel Card Configuration' : 'channelNames' in card.config ? 'Channels' : 'Controller Details'}
         </Text>
       </View>
 
