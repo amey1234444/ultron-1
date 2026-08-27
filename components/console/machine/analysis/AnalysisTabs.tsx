@@ -13,8 +13,8 @@ import { cn } from '../../../../lib/cn';
 export type AnalysisDepth = 'overview' | 'diagnosis' | 'advanced';
 
 const TABS: Array<{ key: AnalysisDepth; label: string; hint: string }> = [
-  { key: 'overview', label: 'OVERVIEW', hint: 'Is the machine okay' },
-  { key: 'diagnosis', label: 'DIAGNOSIS', hint: 'Why, and what to do' },
+  { key: 'overview', label: 'DIAGNOSIS', hint: 'Is the machine okay' },
+  { key: 'diagnosis', label: 'PRO DIAGNOSIS', hint: 'Why, and what to do' },
   { key: 'advanced', label: 'ADVANCED DIAGNOSIS', hint: 'Signal-level evidence' },
 ];
 

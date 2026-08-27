@@ -110,8 +110,8 @@ export function MachineAnalysisPage({
         machineName={machineName}
         template={template}
         path={hierarchyPath}
-        subtitle="Analysis layer"
-        section="ANALYSIS"
+        subtitle="Pro Diagnosis rule evidence and measurement-chain validation"
+        section="ANALYSIS / PRO DIAGNOSIS"
         feed={feed}
         ageSeconds={ageSeconds}
         onSelectMachine={onSelectMachine}

@@ -23,8 +23,8 @@ import { cn } from '../../../lib/cn';
 import { ActionButton } from '../ActionButton';
 import { Dialog } from '../Dialog';
 import { AdvancedDiagnosisPage, type SignalContext } from './AdvancedDiagnosisPage';
-import { MachineAnalysisOverviewPage } from './MachineAnalysisOverviewPage';
 import { MachineAnalysisPage } from './MachineAnalysisPage';
+import { MachineDiagnosisPage } from './MachineDiagnosisPage';
 import { MachineOverviewPage } from './MachineOverviewPage';
 import type { AnalysisDepth } from './analysis/AnalysisTabs';
 import type { TrainNode } from './analysis/TrainHealth';
@@ -410,25 +410,17 @@ export function AnalysisWorkspace({
       ) : null}
 
       {view === 'overview' ? (
-        <MachineAnalysisOverviewPage
+        <MachineDiagnosisPage
           machineName={machine.name}
           template={machine.template}
           hierarchyPath={machine.hierarchyPath}
           feed={ageSeconds > 30 ? 'delayed' : 'live'}
           ageSeconds={ageSeconds}
-          operatingState={data.operatingState}
-          speed={data.speed}
-          load={data.load}
-          mode={data.mode}
-          health={data.health}
-          issues={data.issues}
-          train={data.train}
-          criticalPath={data.criticalPath}
-          progression={data.progression}
+          data={data}
+          selectedProblemId={selectedIssueId}
+          onSelectProblem={setSelectedIssueId}
           onSelectDepth={goTo}
-          advancedAvailable
-          onOpenDiagnosis={openDiagnosisFor}
-          onSelectTrainNode={(node) => openAdvancedFor(node.name)}
+          onOpenProDiagnosis={(problemId) => openDiagnosisFor(data.issues.find((issue) => issue.id === problemId))}
           tabsTrailing={toMachineOverview.trailing}
           {...headerWiring}
         />
