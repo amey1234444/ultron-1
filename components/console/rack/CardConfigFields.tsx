@@ -438,7 +438,6 @@ function ChannelValuePanel({
   const manual = channel.behaviour === 'Manual';
   const { min, max } = derivedChannelRangeFor(config);
   const step = channelValueStep(config.displayPrecision);
-  const decimals = decimalsForPrecision(config.displayPrecision);
   const offset = numberFromText(config.offset) ?? 0;
   const unit = config.unit.trim();
 
@@ -468,19 +467,41 @@ function ChannelValuePanel({
     <SectionPanel
       index="06"
       title="Channel Value"
-      note="Drives the value this channel publishes to the rack, to mapped machine points and to trends. Drag the knob, scroll it, use the arrow keys, or type an exact value."
+      note="The configured value published to the rack, mapped machine points and trends."
     >
-      <View className="flex-row flex-wrap items-start gap-5">
-        <View className="items-center gap-3" style={{ flexBasis: 190 }}>
+      <View className={cn('overflow-hidden rounded-lg border', isDark ? 'border-line-dark bg-[#101010]' : 'border-line-light bg-surface-lightpanel')}>
+        <View className={cn('flex-row items-start justify-between gap-3 border-b px-4 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
+          <View className="min-w-0 flex-1 gap-1">
+            <Text className={cn('font-mono text-[9px] uppercase tracking-[0.14em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+              CH-01{config.tag.trim() ? `  ·  ${config.tag.trim()}` : ''}
+            </Text>
+            <Text className={cn('font-body-bold text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              {config.channelNames[0]?.trim() || 'Channel 1'}
+            </Text>
+          </View>
+          <View
+            className={cn(
+              'shrink-0 rounded border px-2 py-1',
+              condition === 'critical' ? 'border-status-critical/70' : condition === 'warning' ? 'border-status-warning/70' : 'border-accent/70',
+            )}
+          >
+            <Text className={cn('font-mono text-[8px] uppercase tracking-[0.1em]', conditionClass)}>{conditionLabel}</Text>
+          </View>
+        </View>
+
+        <View className="items-center px-5 pb-4 pt-5">
+          <View className="mb-3 flex-row items-baseline gap-2">
+            <Text className={cn('font-mono text-3xl font-light', isDark ? 'text-[#F2EEE6]' : 'text-ink-inverse')}>
+              {formatProcessValue(value, config.displayPrecision)}
+            </Text>
+            <Text className={cn('font-mono text-[10px]', isDark ? 'text-[#96928A]' : 'text-ink-inverse-muted')}>{unit || '—'}</Text>
+          </View>
           <RotaryKnob
             label={`${config.channelNames[0]?.trim() || 'Channel'} value`}
             value={value}
             min={min}
             max={max}
             step={step}
-            unit={unit}
-            decimals={decimals}
-            tone={condition}
             disabled={false}
             onChange={drive}
           />
@@ -491,16 +512,8 @@ function ChannelValuePanel({
           )}
         </View>
 
-        <View className="flex-1 gap-3" style={{ flexBasis: 250, minWidth: 250 }}>
-          <View className={cn('rounded-lg border px-4 py-3', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}>
-            <FieldLabel>Published value</FieldLabel>
-            <View className="mt-1 flex-row items-baseline gap-2">
-              <Text className={cn('font-mono text-3xl', conditionClass)}>{formatProcessValue(value, config.displayPrecision)}</Text>
-              <Text className={cn('font-body-medium text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{unit || '—'}</Text>
-            </View>
-            <Text className={cn('mt-1 font-body text-[11px]', conditionClass)}>{conditionLabel} against the configured alarm levels</Text>
-          </View>
-
+        <View className="gap-4 px-5 pb-5">
+          <AlarmBandMeter min={min} max={max} value={value} limits={limits} unit={unit} />
           <View className="flex-row flex-wrap items-end gap-3">
             <View className="flex-1" style={{ minWidth: 160 }}>
               <ExactValueField value={shown} unit={unit} disabled={false} error={valueError} onChange={typeValue} />
@@ -508,32 +521,38 @@ function ChannelValuePanel({
             <KnobResetButton label="Reset" disabled={false} onPress={() => drive(quantize(restingValue({ min, max }), step))} />
           </View>
 
-          <View className="gap-1.5">
-            <FieldLabel>Value Source</FieldLabel>
-            <View className="flex-row flex-wrap gap-2">
-              {SIMULATION_BEHAVIOURS.map((behaviour) => (
-                <Chip key={behaviour} label={behaviour} selected={channel.behaviour === behaviour} onPress={() => onChannelChange({ ...channel, behaviour })} />
-              ))}
-            </View>
-          </View>
-
-          <View className="gap-1.5">
-            <FieldLabel>Channel Output</FieldLabel>
-            <View className="flex-row gap-2">
-              <Chip label="Enabled" selected={channel.enabled} onPress={() => onChannelChange({ ...channel, enabled: true })} />
-              <Chip label="Disabled" selected={!channel.enabled} onPress={() => onChannelChange({ ...channel, enabled: false })} />
-            </View>
-          </View>
         </View>
 
-        <View className="flex-1 gap-3" style={{ flexBasis: 260, minWidth: 240 }}>
-          <FieldLabel>Operating Bands</FieldLabel>
-          <AlarmBandMeter min={min} max={max} value={value} limits={limits} unit={unit} />
-          <ReadoutTile label="Scaled Value" value={`${formatProcessValue(scaled, config.displayPrecision)} ${unit}`.trim()} />
-          <ReadoutTile
-            label="Calibration Offset"
-            value={`${offset >= 0 ? '+' : ''}${formatProcessValue(offset, config.displayPrecision)} ${unit}`.trim()}
-          />
+        <View className={cn('border-t px-5 py-3', isDark ? 'border-line-dark' : 'border-line-light')}>
+          <Text className={cn('font-mono text-[9px] uppercase tracking-[0.08em]', isDark ? 'text-[#716E67]' : 'text-ink-inverse-muted')}>
+            {config.tag.trim() || 'UNMAPPED'} / CH-01 / {channel.behaviour.toUpperCase()}
+          </Text>
+        </View>
+      </View>
+
+      <View className="flex-row flex-wrap gap-3">
+        <View className="flex-1 gap-1.5" style={{ flexBasis: 260, minWidth: 240 }}>
+          <FieldLabel>Value Source</FieldLabel>
+          <View className="flex-row flex-wrap gap-2">
+            {SIMULATION_BEHAVIOURS.map((behaviour) => (
+              <Chip key={behaviour} label={behaviour} selected={channel.behaviour === behaviour} onPress={() => onChannelChange({ ...channel, behaviour })} />
+            ))}
+          </View>
+        </View>
+        <View className="flex-1 gap-1.5" style={{ flexBasis: 220, minWidth: 220 }}>
+          <FieldLabel>Channel Output</FieldLabel>
+          <View className="flex-row gap-2">
+            <Chip label="Enabled" selected={channel.enabled} onPress={() => onChannelChange({ ...channel, enabled: true })} />
+            <Chip label="Disabled" selected={!channel.enabled} onPress={() => onChannelChange({ ...channel, enabled: false })} />
+          </View>
+        </View>
+        <View className="flex-1 flex-row gap-3" style={{ flexBasis: 320, minWidth: 280 }}>
+          <View className="flex-1">
+            <ReadoutTile label="Scaled Value" value={`${formatProcessValue(scaled, config.displayPrecision)} ${unit}`.trim()} />
+          </View>
+          <View className="flex-1">
+            <ReadoutTile label="Calibration Offset" value={`${offset >= 0 ? '+' : ''}${formatProcessValue(offset, config.displayPrecision)} ${unit}`.trim()} />
+          </View>
         </View>
       </View>
 

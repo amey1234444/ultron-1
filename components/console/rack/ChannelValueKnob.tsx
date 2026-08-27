@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { PanResponder, Pressable, Text, TextInput, View, type ViewStyle } from 'react-native';
+import { PanResponder, Platform, Pressable, Text, TextInput, View, type ViewStyle } from 'react-native';
 import Svg, { Circle, Defs, G, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -150,10 +150,7 @@ export function RotaryKnob({
   min,
   max,
   step,
-  unit,
-  decimals,
-  size = 168,
-  tone = 'normal',
+  size = 118,
   disabled = false,
   onChange,
 }: {
@@ -162,22 +159,15 @@ export function RotaryKnob({
   min: number;
   max: number;
   step: number;
-  /** Shown on the knob face beside the reading. */
-  unit?: string;
-  /** Decimal places for the face reading; defaults to the step's own. */
-  decimals?: number;
   size?: number;
-  tone?: ProcessCondition;
   disabled?: boolean;
   onChange: (value: number) => void;
 }) {
   const { isDark } = useAppTheme();
-  const colour = disabled ? KNOB.bezelMid : CONDITION_COLOUR[tone];
 
   const span = max > min ? max - min : 1;
   const ratio = clamp((value - min) / span, 0, 1);
   const angle = START_DEGREES + ratio * SWEEP_DEGREES;
-  const faceDecimals = decimals ?? Math.min(6, Math.max(0, Math.ceil(-Math.log10(step > 0 ? step : 1))));
 
   // Read by the responder, which is created exactly once: rebuilding it while a
   // pointer is down swaps the DOM node's handlers mid-gesture and stalls the
@@ -185,6 +175,7 @@ export function RotaryKnob({
   const live = useRef({ value, min, max, span, step, disabled, onChange });
   live.current = { value, min, max, span, step, disabled, onChange };
   const grabbedAt = useRef(value);
+  const pointerDrag = useRef<{ pointerId: number; y: number; value: number } | null>(null);
 
   const commit = (next: number) => {
     const current = live.current;
@@ -206,17 +197,47 @@ export function RotaryKnob({
         // Dragging up must raise the value, and `dy` grows downward.
         commit(grabbedAt.current - gesture.dy * unitsPerPixel);
       },
+      onPanResponderRelease: () => {
+        grabbedAt.current = live.current.value;
+      },
+      onPanResponderTerminate: () => {
+        grabbedAt.current = live.current.value;
+      },
     }),
   ).current;
 
-  // Wheel and keyboard have no react-native equivalent, so they are attached to
-  // the underlying DOM node where there is one. On a native target the guard
-  // means neither exists and drag remains the whole interaction.
+  // Web follows the reference control's pointer-capture contract. Capture keeps
+  // a fast vertical drag alive after the cursor leaves the compact knob.
   const surface = useRef<View | null>(null);
   useEffect(() => {
     const node = surface.current as unknown as HTMLElement | null;
     if (!node || typeof node.addEventListener !== 'function') return;
     node.tabIndex = live.current.disabled ? -1 : 0;
+
+    const onPointerDown = (event: PointerEvent) => {
+      if (live.current.disabled) return;
+      pointerDrag.current = { pointerId: event.pointerId, y: event.clientY, value: live.current.value };
+      node.focus();
+      node.setPointerCapture(event.pointerId);
+      event.preventDefault();
+    };
+    const onPointerMove = (event: PointerEvent) => {
+      const drag = pointerDrag.current;
+      if (!drag || drag.pointerId !== event.pointerId || live.current.disabled) return;
+      const unitsPerPixel = live.current.span / DRAG_PIXELS_FOR_FULL_RANGE;
+      commit(drag.value + (drag.y - event.clientY) * unitsPerPixel);
+      event.preventDefault();
+    };
+    const finishPointer = (event: PointerEvent) => {
+      if (pointerDrag.current?.pointerId !== event.pointerId) return;
+      pointerDrag.current = null;
+      if (typeof node.hasPointerCapture !== 'function' || node.hasPointerCapture(event.pointerId)) {
+        node.releasePointerCapture(event.pointerId);
+      }
+    };
+    const onLostPointerCapture = () => {
+      pointerDrag.current = null;
+    };
 
     const onWheel = (event: WheelEvent) => {
       if (live.current.disabled) return;
@@ -239,9 +260,20 @@ export function RotaryKnob({
       event.preventDefault();
     };
 
+    node.addEventListener('pointerdown', onPointerDown);
+    node.addEventListener('pointermove', onPointerMove);
+    node.addEventListener('pointerup', finishPointer);
+    node.addEventListener('pointercancel', finishPointer);
+    node.addEventListener('lostpointercapture', onLostPointerCapture);
     node.addEventListener('wheel', onWheel, { passive: false });
     node.addEventListener('keydown', onKeyDown);
     return () => {
+      pointerDrag.current = null;
+      node.removeEventListener('pointerdown', onPointerDown);
+      node.removeEventListener('pointermove', onPointerMove);
+      node.removeEventListener('pointerup', finishPointer);
+      node.removeEventListener('pointercancel', finishPointer);
+      node.removeEventListener('lostpointercapture', onLostPointerCapture);
       node.removeEventListener('wheel', onWheel);
       node.removeEventListener('keydown', onKeyDown);
     };
@@ -260,10 +292,10 @@ export function RotaryKnob({
   const indicatorInner = polar(centre, centre, bodyRadius * 0.12, angle);
 
   return (
-    <View className="items-center gap-2">
+    <View className="items-center" style={{ width: 148 }}>
       <View
         ref={surface}
-        {...responder.panHandlers}
+        {...(Platform.OS === 'web' ? {} : responder.panHandlers)}
         accessibilityRole="adjustable"
         accessibilityLabel={label}
         accessibilityValue={{ min, max, now: value }}
@@ -294,12 +326,6 @@ export function RotaryKnob({
           <Circle cx={centre} cy={centre} r={bezelRadius} stroke={KNOB.bezelGap} strokeWidth={bezelWidth} fill="none" />
           <Bezel centre={centre} radius={bezelRadius} width={bezelWidth} />
 
-          {/* Condition arc: the one departure from the reference, and the reason
-              is that this knob drives a live alarmed channel. It tracks the
-              value in the channel's own condition colour, so a knob turned into
-              an alarm band says so without the operator reading the number. */}
-          {ratio > 0 && <Path d={arcPath(centre, centre, bezelRadius, START_DEGREES, angle)} stroke={colour} strokeWidth={2.5} strokeLinecap="round" fill="none" opacity={0.95} />}
-
           <Circle cx={centre} cy={centre} r={bodyRadius} fill="url(#knobBody)" stroke={KNOB.bodyRim} strokeWidth={1} />
 
           {/* Glow, then the indicator itself — the SVG stand-in for the
@@ -320,16 +346,9 @@ export function RotaryKnob({
           <Circle cx={centre} cy={centre} r={4} fill={disabled ? '#6B6862' : KNOB.gold} />
         </Svg>
 
-        {/* The reading, on the knob face. */}
-        <View pointerEvents="none" style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <Text style={{ marginTop: size * 0.16 }} className="font-mono text-base text-[#F2EEE6]">
-            {Number.isFinite(value) ? value.toFixed(faceDecimals) : '—'}
-          </Text>
-          {!!unit && <Text className="font-mono text-[9px] text-[#96928A]">{unit}</Text>}
-        </View>
       </View>
 
-      <View className="flex-row justify-between" style={{ width: size }}>
+      <View className="mt-1 flex-row justify-between" style={{ width: 148 }}>
         <Text className={cn('font-mono text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{min}</Text>
         <Text className={cn('font-mono text-[9px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>{max}</Text>
       </View>

@@ -128,6 +128,8 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
   };
 
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
+  const pageClass = isDark ? 'bg-surface-dark' : 'bg-surface-light';
+  const footerClass = isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel';
 
   const contextPill = (label: string, value: string) => (
     <View key={label} className={cn('rounded-lg border px-3 py-2', isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel')}>
@@ -137,7 +139,7 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
   );
 
   return (
-    <View className="flex-1">
+    <View className={cn('flex-1', pageClass)}>
       <View className="px-6 pt-5">
         <BackButton label={backLabel} onPress={onBack} />
       </View>
@@ -168,7 +170,7 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
         <EnabledToggle enabled={enabled} onChange={(next) => setForm((previous) => ({ ...previous, enabled: next }))} />
       </ScrollView>
 
-      <View className={cn('flex-row flex-wrap justify-end gap-3 border-t px-6 py-4', lineClass)}>
+      <View className={cn('flex-row flex-wrap justify-end gap-3 border-t px-6 py-4', lineClass, footerClass)}>
         <ActionButton label="Cancel" variant="secondary" onPress={onBack} />
         {isAcquisitionCard && <ActionButton label="Save" variant="secondary" onPress={save} disabled={!canSave} />}
         <ActionButton

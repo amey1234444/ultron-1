@@ -908,7 +908,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   })();
 
   return (
-    <SafeAreaView className={cn('flex-1', isDark ? 'bg-surface-dark' : 'bg-surface-light')} edges={['top', 'bottom']}>
+    <SafeAreaView
+      className={cn('flex-1', isDark ? 'bg-surface-dark' : 'bg-surface-light')}
+      edges={['top', 'bottom']}
+      style={Platform.OS === 'web' ? ({ minHeight: '100vh', height: '100vh' } as any) : undefined}
+    >
       <TopBar
         devices={devices}
         canConfigure={hasConfigureAccess}
