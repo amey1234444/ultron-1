@@ -91,6 +91,8 @@ const SSE_CHANNELS: SseChannelSpec[] = [
 const FAULT_DANGER_KEYS = new Set(['motor-de-vibration', 'motor-temperature', 'gearbox-output-vibration', 'hopper-level', 'melt-pressure']);
 const FAULT_ALERT_KEYS = new Set(['motor-power', 'zone-1-temperature']);
 const PREDICTION_KEYS = new Set(['motor-de-vibration', 'motor-temperature', 'gearbox-temperature', 'hopper-level', 'zone-1-temperature', 'melt-temperature', 'melt-pressure']);
+const SSE_PROFILE_NAMES = new Set(PROFILES.map((profile) => profile.name));
+const WANTED_DEVICE_IDS = new Set(PROFILES.flatMap((profile) => [profile.gatewayId, ...profile.racks.map((rack) => rack.id)]));
 
 function behaviourFor(profile: Profile, spec: SseChannelSpec): SimulationBehaviour {
   if (profile === 'healthy') return 'Steady';
@@ -218,6 +220,22 @@ function sameJson(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
+function isStaleSseSimulationDevice(device: DeviceNode): boolean {
+  if (device.archived) return false;
+  if (WANTED_DEVICE_IDS.has(device.id)) return false;
+  const name = device.name.trim();
+  const reservedSseAddress = device.simulated === true && PROFILES.some((profile) => device.ip.trim().startsWith(`${profile.ipPrefix}.`));
+  return (
+    SSE_PROFILE_NAMES.has(name) ||
+    name.startsWith('Healthy SSE R') ||
+    name.startsWith('SSE Faulty R') ||
+    name.startsWith('SSE Prediction R') ||
+    device.id.startsWith('sim-sse-') ||
+    (device.realGatewayId?.startsWith('sim-gw-sse-') ?? false) ||
+    reservedSseAddress
+  );
+}
+
 export function ensureSseSimulationWorkspace(
   devices: DeviceNode[],
   cards: CardNode[],
@@ -227,7 +245,15 @@ export function ensureSseSimulationWorkspace(
   const wantedCards = desiredCards();
   const deviceById = new Map(devices.map((device) => [device.id, device]));
   const cardById = new Map(cards.map((card) => [card.id, card]));
+  const staleDeviceIds = new Set(devices.filter(isStaleSseSimulationDevice).map((device) => device.id));
   let changed = false;
+
+  for (const id of staleDeviceIds) {
+    const current = deviceById.get(id);
+    if (!current) continue;
+    deviceById.set(id, { ...current, archived: true });
+    changed = true;
+  }
 
   for (const device of wantedDevices) {
     const current = deviceById.get(device.id);
@@ -245,5 +271,5 @@ export function ensureSseSimulationWorkspace(
     }
   }
 
-  return { devices: [...deviceById.values()], cards: [...cardById.values()], changed };
+  return { devices: [...deviceById.values()], cards: [...cardById.values()].filter((card) => !staleDeviceIds.has(card.deviceId)), changed };
 }
