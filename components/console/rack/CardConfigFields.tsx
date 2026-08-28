@@ -482,6 +482,12 @@ function ChannelValuePanel({
   const limits = channelAlarmLimits(config);
   const condition = processConditionFor(value, limits);
   const valueError = manual ? channelValueError(config, channel.manualValue) : undefined;
+  const sampleRateText = numericDrafts.samplesPerSecond ?? (Number.isFinite(channel.samplesPerSecond) ? String(channel.samplesPerSecond) : '');
+  const sampleRateValue = Number(sampleRateText.trim());
+  const sampleRateError =
+    sampleRateText.trim() && (!Number.isFinite(sampleRateValue) || sampleRateValue < 0.1 || sampleRateValue > 50)
+      ? 'Use 0.1 to 50 samples/second. Decimals are allowed.'
+      : undefined;
 
   const drive = (next: number) => {
     setDraft(null);
@@ -608,13 +614,14 @@ function ChannelValuePanel({
         <FieldCell basis={180}>
           <FormField
             label="Samples / second"
-            value={numericDrafts.samplesPerSecond ?? (Number.isFinite(channel.samplesPerSecond) ? String(channel.samplesPerSecond) : '')}
+            value={sampleRateText}
             onChangeText={(text) => {
               setNumericDrafts({ samplesPerSecond: text });
               const parsed = Number(text.trim());
               if (text.trim() && Number.isFinite(parsed)) onChannelChange({ ...channel, samplesPerSecond: parsed });
             }}
             placeholder="1"
+            error={sampleRateError}
           />
         </FieldCell>
       </View>

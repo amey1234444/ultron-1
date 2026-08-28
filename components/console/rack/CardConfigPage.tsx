@@ -79,12 +79,16 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
   // The card is where an engineer types, so a card edit always flows into the
   // signal definition the generator runs — never the other way round while the
   // page is open. Echoing back would rewrite the text still being typed.
-  const setChannelConfig = (nextConfig: ChannelCommonConfig) =>
+  const setChannelConfig = (nextConfig: ChannelCommonConfig) => {
+    const typedConfig = nextConfig as CardConfig;
+    const previewSimulation = simulation ? simulationWithCardConfig(cardType, typedConfig, simulation) : undefined;
     setForm((previous) => ({
       ...previous,
-      config: nextConfig as CardConfig,
-      simulation: previous.simulation ? simulationWithCardConfig(cardType, nextConfig as CardConfig, previous.simulation) : previous.simulation,
+      config: typedConfig,
+      simulation: previous.simulation ? simulationWithCardConfig(cardType, typedConfig, previous.simulation) : previous.simulation,
     }));
+    if (previewSimulation) onSimulationPreview?.(typedConfig, enabled, previewSimulation);
+  };
 
   // The knob panel edits only the signal definition — value, behaviour, output
   // state, measurement type, cadence — none of which the card config derives

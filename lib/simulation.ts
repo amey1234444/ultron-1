@@ -291,8 +291,8 @@ export function createSimulationRuntime(): SimulationRuntime {
   return { channels: new Map(), gatewayHeartbeatMs: new Map() };
 }
 
-export function channelRuntimeKey(rackId: string, slot: number, channel: number): string {
-  return `${rackId}|${slot}|${channel}`;
+export function channelRuntimeKey(gatewayId: string, rackId: string, slot: number, channel: number): string {
+  return `${gatewayId}|${rackId}|${slot}|${channel}`;
 }
 
 // Reseed the walk when the operator changes the shape of the signal, so a new
@@ -302,7 +302,7 @@ function configSignature(channel: SimulatedChannel): string {
   // channel on the very next tick instead of being walked toward over several
   // — and so `simulationFramesForGateway` can recognise the change and publish
   // it immediately rather than waiting out the channel's sample interval.
-  return [channel.kind, channel.min, channel.max, channel.behaviour, channel.alertLimit, channel.dangerLimit, channel.manualValue].join('|');
+  return [channel.kind, channel.min, channel.max, channel.behaviour, channel.alertLimit, channel.dangerLimit, channel.samplesPerSecond, channel.decimals, channel.manualValue].join('|');
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -416,9 +416,19 @@ const GATEWAY_HEARTBEAT_MS = 1000;
 
 const PULL = 0.12;
 const NOISE = 0.09;
+const MIN_SAMPLES_PER_SECOND = 0.1;
+const MAX_SAMPLES_PER_SECOND = 50;
 // One tick never advances more than this many samples, so a high sample rate
 // after a long tab-suspend can't stall the engine catching up.
 const MAX_STEPS_PER_TICK = 240;
+
+function samplesPerSecondFor(channel: SimulatedChannel): number {
+  return clamp(channel.samplesPerSecond, MIN_SAMPLES_PER_SECOND, MAX_SAMPLES_PER_SECOND);
+}
+
+function publishIntervalMsFor(channel: SimulatedChannel): number {
+  return 1000 / samplesPerSecondFor(channel);
+}
 
 function advance(channel: SimulatedChannel, state: ChannelRuntime, steps: number): number {
   const span = Math.max(channel.max - channel.min, Number.EPSILON);
@@ -441,7 +451,7 @@ export function nextChannelValue(
   key: string,
   channel: SimulatedChannel,
   runtime: SimulationRuntime,
-  elapsedMs: number,
+  elapsedSincePublishMs: number,
 ): number {
   const signature = configSignature(channel);
   let state = runtime.channels.get(key);
@@ -457,7 +467,9 @@ export function nextChannelValue(
     return state.value;
   }
 
-  const steps = clamp(Math.round((channel.samplesPerSecond * elapsedMs) / 1000), 1, MAX_STEPS_PER_TICK);
+  const elapsedMs = Math.max(0, elapsedSincePublishMs);
+  const elapsedSamples = Math.floor((samplesPerSecondFor(channel) * elapsedMs) / 1000 + Number.EPSILON);
+  const steps = clamp(Math.max(1, elapsedSamples), 1, MAX_STEPS_PER_TICK);
   state.value = advance(channel, state, steps);
   return state.value;
 }
@@ -600,7 +612,7 @@ export function simulationFramesForGateway(
   racks: SimulatedRackInput[],
   runtime: SimulationRuntime,
   nowMs: number,
-  elapsedMs: number,
+  _elapsedMs: number,
 ): LiveFrame[] {
   const gatewayId = gateway.realGatewayId;
   const gatewayIp = gateway.ip.trim();
@@ -651,22 +663,23 @@ export function simulationFramesForGateway(
         const channel = channels[index];
         if (!channel?.enabled) continue;
         const channelNumber = index + 1;
-        const key = channelRuntimeKey(rack.rackId, card.slot, channelNumber);
+        const key = channelRuntimeKey(gatewayId, rack.rackId, card.slot, channelNumber);
 
         // Publish no faster than the channel's own sample rate — a 1 sample/sec
         // channel must not appear to update ten times a second just because a
         // faster channel shares the rack.
         const state = runtime.channels.get(key);
-        const publishIntervalMs = 1000 / clamp(channel.samplesPerSecond, 0.1, 50);
+        const publishIntervalMs = publishIntervalMsFor(channel);
         // A changed signal definition publishes on the very next tick whatever
         // the cadence says. A 1 sample/sec channel would otherwise hold the
         // previous number for up to a second after the knob moved — and a 0.1
         // sample/sec one for ten — which reads as the machine view disagreeing
         // with the configuration page rather than as it simply being due.
         const reconfigured = !!state && state.signature !== configSignature(channel);
-        if (state && !reconfigured && nowMs - state.lastPublishMs < publishIntervalMs - 1) continue;
+        const elapsedSincePublishMs = state ? Math.max(0, nowMs - state.lastPublishMs) : publishIntervalMs;
+        if (state && !reconfigured && elapsedSincePublishMs < publishIntervalMs - 1) continue;
 
-        const value = nextChannelValue(key, channel, runtime, elapsedMs);
+        const value = nextChannelValue(key, channel, runtime, reconfigured ? publishIntervalMs : elapsedSincePublishMs);
         const current = runtime.channels.get(key);
         if (current) current.lastPublishMs = nowMs;
         slots.push(slotPayload(card.slot, channelNumber, card.type, names[index]?.trim() ?? '', channel, value));
@@ -828,7 +841,7 @@ export function listSimulatedChannels(devices: DeviceNode[], cards: CardNode[]):
           const channels = simulationForCard(card);
           const names = 'channelNames' in card.config ? card.config.channelNames : [];
           return channels.map((channel, index) => ({
-            key: channelRuntimeKey(rackId, card.slot, index + 1),
+            key: channelRuntimeKey(gateway.realGatewayId ?? gateway.id, rackId, card.slot, index + 1),
             gatewayId: gateway.id,
             gatewayName: gateway.name,
             rackDeviceId: rack.id,
