@@ -2,10 +2,11 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import type { DeviceNode } from '../../../lib/devices';
-import type { LiveState } from '../../../lib/liveTelemetry';
+import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
+import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
 import {
   channelCountForCardType,
+  decimalsForPrecision,
   derivedChannelRangeFor,
   formatProcessValue,
   normalizeChannelConfig,
@@ -33,6 +34,13 @@ type CardOverviewPageProps = {
   canEditDeleteSchema: boolean;
 };
 
+type ChannelRowsInput = {
+  card: CardNode;
+  rack: DeviceNode;
+  devices: DeviceNode[];
+  live?: LiveState;
+};
+
 function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   const { isDark } = useAppTheme();
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
@@ -48,7 +56,20 @@ function Row({ label, value, mono }: { label: string; value: string; mono?: bool
   );
 }
 
-function channelRows(card: CardNode): { label: string; value: string }[] {
+function livePrimaryChannelValue({ card, rack, devices, live }: ChannelRowsInput): number | undefined {
+  if (!live || channelCountForCardType(card.type) === 0) return undefined;
+  const measurement = latestMeasurementForChannel(deviceWithGatewayConnectionState(rack, devices), card, 1, live);
+  if (!measurement || measurement.measurementValid === false || measurement.quality !== 'GOOD') return undefined;
+  return typeof measurement.value === 'number' && Number.isFinite(measurement.value) ? measurement.value : undefined;
+}
+
+function formatLiveChannelValue(value: number, precision: ChannelCommonConfig['displayPrecision'], unit: string): string {
+  const decimals = Math.max(decimalsForPrecision(precision), 2);
+  return `${value.toFixed(decimals)} ${unit}`;
+}
+
+function channelRows(input: ChannelRowsInput): { label: string; value: string }[] {
+  const { card } = input;
   if ('controllerName' in card.config) {
     return [
       { label: 'Controller Name', value: card.config.controllerName || '—' },
@@ -69,6 +90,7 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
   const range = derivedChannelRangeFor(config);
   const alarmValue = (enabled: boolean, value: string) => (enabled ? `${value || 'not set'} ${unit}` : 'Disabled');
   const channel = card.simulation?.length ? simulationForCard(card)[0] : undefined;
+  const liveValue = channel ? livePrimaryChannelValue(input) : undefined;
 
   const hardware: { label: string; value: string }[] =
     card.type === 'Vibration Card' && 'sensorType' in config
@@ -112,7 +134,15 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
         // number is wherever the walk currently sits, which belongs on the rack
         // faceplate rather than in a configuration summary.
         ...(channel.behaviour === 'Manual'
-          ? [{ label: 'Channel Value', value: `${formatProcessValue(manualChannelValue(channel), config.displayPrecision)} ${unit}` }]
+          ? [
+              {
+                label: 'Channel Value',
+                value:
+                  liveValue === undefined
+                    ? `${formatProcessValue(manualChannelValue(channel), config.displayPrecision)} ${unit}`
+                    : formatLiveChannelValue(liveValue, config.displayPrecision, unit),
+              },
+            ]
           : []),
       ]
     : [];
@@ -174,7 +204,7 @@ export function CardOverviewPage({ card, rack, devices, live, backLabel = 'Back'
         </View>
 
         <View className={cn('mx-6 mt-2 overflow-hidden rounded-xl border', panelClass)}>
-          {channelRows(card).map((row) => (
+          {channelRows({ card, rack, devices, live }).map((row) => (
             <Row key={row.label} label={row.label} value={row.value} />
           ))}
         </View>

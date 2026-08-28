@@ -38,6 +38,11 @@ function searchableChannelText(channel: ChannelRef) {
   return [channel.deviceName, channel.label, channel.code, channelLocation(channel), channel.unit].join(' ').toLowerCase();
 }
 
+function liveDisplayDecimals(channel: ChannelRef, value: number): number {
+  const base = LIVE_RANGE_FOR_LETTER[channel.letter].decimals;
+  return Number.isFinite(value) && Math.abs(value - Math.round(value)) > 0.000001 ? Math.max(base, 2) : base;
+}
+
 export type MappableBoxProps = {
   x: number;
   y: number;
@@ -222,7 +227,7 @@ export function MappableBox({
   const connectorColour = attached ? '#3FBF6A' : '#3FBF6A';
 
   if (channel) {
-    const decimals = LIVE_RANGE_FOR_LETTER[channel.letter].decimals;
+    const decimals = hasReading ? liveDisplayDecimals(channel, displayValue) : LIVE_RANGE_FOR_LETTER[channel.letter].decimals;
     // Without a reading there is no threshold to evaluate: the box reads
     // offline rather than being coloured normal against an absent value.
     const status = dataLive && hasReading ? statusFor(channel, displayValue) : 'offline';

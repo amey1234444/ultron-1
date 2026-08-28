@@ -406,10 +406,10 @@ export function manualChannelValue(channel: SimulatedChannel): number {
   return clamp(requested, min, max);
 }
 
-function manualPublishedValue(channel: SimulatedChannel, phase: number): number {
+function fixedPublishedValue(channel: SimulatedChannel, phase: number): number {
   const min = Number.isFinite(channel.min) ? channel.min : 0;
   const max = Number.isFinite(channel.max) && channel.max > min ? channel.max : min + 1;
-  const amplitude = Math.min(MANUAL_FLUCTUATION_AMPLITUDE, Math.max(0, (max - min) / 4));
+  const amplitude = Math.min(FIXED_FLUCTUATION_AMPLITUDE, Math.max(0, (max - min) / 4));
   return clamp(manualChannelValue(channel) + Math.sin(phase * 1.61803398875) * amplitude, min, max);
 }
 
@@ -421,7 +421,7 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
 
   switch (channel.behaviour) {
     case 'Manual': {
-      const value = manualPublishedValue(channel, phase);
+      const value = fixedPublishedValue(channel, phase);
       return { target: value, low: value, high: value };
     }
     case 'Drift Up':
@@ -463,9 +463,9 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
     }
     case 'Steady':
     default:
-      // Steady is a configured output: keep it pinned to the value stored by
-      // the channel knob instead of adding random walk noise.
-      const value = manualChannelValue(channel);
+      // Steady channels are still fixed around their configured value, but they
+      // publish a tiny dither so healthy simulated points do not look frozen.
+      const value = fixedPublishedValue(channel, phase);
       return { target: value, low: value, high: value };
   }
 }
@@ -474,7 +474,7 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
 // the freshness windows the UI judges liveness by.
 const GATEWAY_HEARTBEAT_MS = 1000;
 
-const MANUAL_FLUCTUATION_AMPLITUDE = 0.05;
+const FIXED_FLUCTUATION_AMPLITUDE = 0.05;
 const PULL = 0.12;
 const NOISE = 0.09;
 const MIN_SAMPLES_PER_SECOND = 0.1;
@@ -524,7 +524,7 @@ export function nextChannelValue(
     const elapsedMs = Math.max(0, elapsedSincePublishMs);
     const elapsedSamples = Math.floor((samplesPerSecondFor(channel) * elapsedMs) / 1000 + Number.EPSILON);
     state.phase += clamp(Math.max(1, elapsedSamples), 1, MAX_STEPS_PER_TICK);
-    state.value = manualPublishedValue(channel, state.phase);
+    state.value = fixedPublishedValue(channel, state.phase);
     return state.value;
   }
 
@@ -629,7 +629,10 @@ function slotPayload(
     sensor: label || sensorLabelForKind(channel.kind),
     unit: channel.unit,
     value_raw: value,
-    value_formatted: Number(display),
+    // The live parser reads `value_formatted` as the engineering value. Keep it
+    // unrounded so diagnostics see the tiny simulated dither even when the
+    // operator-facing display is intentionally rounded to 45.0 or 2000.
+    value_formatted: value,
     value_display: display,
     value_with_unit: channel.unit ? `${display} ${channel.unit}` : display,
     measurement_valid: true,
