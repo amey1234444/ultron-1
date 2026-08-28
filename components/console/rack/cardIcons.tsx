@@ -5,7 +5,7 @@ import type { CardType } from '../../../lib/rack';
 export const CARD_TYPE_ICON: Record<CardType, keyof typeof MaterialCommunityIcons.glyphMap> = {
   'Vibration Card': 'vibrate',
   'RTD Card': 'thermometer',
-  'Universal V/I Card': 'gauge',
+  'Universal V/I Card': 'current-ac',
   'Process Card': 'gauge',
   'Speed Card': 'speedometer',
   'Communication Controller': 'expansion-card-variant',

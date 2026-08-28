@@ -6,6 +6,8 @@ import { cn } from '../../../lib/cn';
 import {
   channelCountForCardType,
   normalizedCardConfig,
+  precisionForDecimals,
+  syncChannelLegacyAlarms,
   type CardConfig,
   type CardType,
   type ChannelCommonConfig,
@@ -37,7 +39,7 @@ const EDITOR_TITLE: Record<CardType, string> = {
   'Vibration Card': 'Vibration Channel Configuration',
   'RTD Card': 'RTD Channel Configuration',
   'Universal V/I Card': 'Universal V/I Channel Configuration',
-  'Process Card': 'Universal V/I Channel Configuration',
+  'Process Card': 'Process Channel Configuration',
   'Speed Card': 'Speed Channel Configuration',
   'Communication Controller': 'Configure Communication Controller',
 };
@@ -46,10 +48,45 @@ const CONTEXT_CARD_LABEL: Record<CardType, string> = {
   'Vibration Card': 'Vibration',
   'RTD Card': 'RTD',
   'Universal V/I Card': 'Universal V/I',
-  'Process Card': 'Universal V/I',
+  'Process Card': 'Process',
   'Speed Card': 'Speed',
   'Communication Controller': 'Controller',
 };
+
+function configWithSignalPreset(config: CardConfig, channel: SimulatedChannel): CardConfig {
+  if (!('alarmHigh' in config)) return config;
+  const common: ChannelCommonConfig = {
+    ...config,
+    unit: channel.unit,
+    rangeMin: String(channel.min),
+    rangeMax: String(channel.max),
+    healthyValue: channel.healthyValue !== null ? String(channel.healthyValue) : config.healthyValue,
+    alarmHighEnabled: channel.alertLimit !== null,
+    alarmHigh: channel.alertLimit !== null ? String(channel.alertLimit) : '',
+    alarmHighHighEnabled: channel.dangerLimit !== null,
+    alarmHighHigh: channel.dangerLimit !== null ? String(channel.dangerLimit) : '',
+    displayPrecision: precisionForDecimals(channel.decimals),
+  };
+
+  if (channel.kind === 'Pressure') {
+    common.alarmLowLowEnabled = true;
+    common.alarmLowLow = '5.6';
+    common.alarmLowEnabled = true;
+    common.alarmLow = '6.8';
+  } else if (channel.kind === 'Level') {
+    common.alarmLowLowEnabled = true;
+    common.alarmLowLow = '15';
+    common.alarmLowEnabled = true;
+    common.alarmLow = '30';
+  } else {
+    common.alarmLowLowEnabled = false;
+    common.alarmLowLow = '';
+    common.alarmLowEnabled = false;
+    common.alarmLow = '';
+  }
+
+  return syncChannelLegacyAlarms(common) as CardConfig;
+}
 
 export function CardConfigPage({ rackName, slot, cardType, initialConfig, initialEnabled, initialSimulation, backLabel = 'Back', onBack, onSave, onSimulationPreview }: CardConfigPageProps) {
   const { isDark } = useAppTheme();
@@ -96,11 +133,13 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
   // sampling-rate field and reopening the editor must not revive an old value.
   const setPrimaryChannel = (channel: SimulatedChannel) => {
     if (!simulation?.length) return;
+    const kindChanged = simulation[0]?.kind !== channel.kind;
     const nextSimulation = simulation.map((entry, index) => (index === 0 ? channel : entry));
+    const presetConfig = kindChanged ? configWithSignalPreset(config, channel) : config;
     const nextConfig =
       cardType === 'Vibration Card' && 'samplingRate' in config && Number.isFinite(channel.samplesPerSecond)
-        ? ({ ...config, samplingRate: `${channel.samplesPerSecond} Hz`, samplingRateSource: 'operator' } as VibrationConfig)
-        : config;
+        ? ({ ...presetConfig, samplingRate: `${channel.samplesPerSecond} Hz`, samplingRateSource: 'operator' } as VibrationConfig)
+        : presetConfig;
     setForm((previous) => ({ ...previous, config: nextConfig, simulation: nextSimulation }));
     onSimulationPreview?.(nextConfig, enabled, nextSimulation);
   };

@@ -34,7 +34,7 @@ type SlotCardProps = {
 // Visual-layer only — our data model (lib/rack.ts) tracks a single enabled
 // channel per card, not per-point status, so these exist purely to drive
 // the physical-module rendering below.
-type VisualKind = 'vibration' | 'rtd' | 'process' | 'speed-keyphasor' | 'communication';
+type VisualKind = 'vibration' | 'rtd' | 'universal-vi' | 'process' | 'speed-keyphasor' | 'communication';
 type PointStatus = 'ok' | 'alert' | 'danger' | 'stale' | 'inactive';
 
 type CardVisualConfig = {
@@ -101,6 +101,7 @@ const INNER_CARD_PATH = `
 const CARD_CONFIG: Record<VisualKind, CardVisualConfig> = {
   vibration: { title: 'Vibration', shortTitle: 'VIB', defaultModel: 'VIB-2200' },
   rtd: { title: 'RTD', shortTitle: 'RTD', defaultModel: 'RTD-1200' },
+  'universal-vi': { title: 'Universal V/I', shortTitle: 'UVI', defaultModel: 'UVI-4400' },
   process: { title: 'Process', shortTitle: 'PROC', defaultModel: 'PROC-4400' },
   'speed-keyphasor': { title: 'Speed / Keyphasor', shortTitle: 'SPD / KPH', defaultModel: 'SPD-2200' },
   communication: { title: 'Communication', shortTitle: 'COMM', defaultModel: 'COMM-1000' },
@@ -129,6 +130,7 @@ function kindFor(type: CardType): VisualKind {
     case 'RTD Card':
       return 'rtd';
     case 'Universal V/I Card':
+      return 'universal-vi';
     case 'Process Card':
       return 'process';
     case 'Speed Card':

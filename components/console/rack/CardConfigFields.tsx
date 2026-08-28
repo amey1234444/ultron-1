@@ -25,7 +25,7 @@ import {
   type SpeedInputType,
   type VibrationConfig,
 } from '../../../lib/rack';
-import { SIMULATION_BEHAVIOURS, kindsForCardType, manualChannelValue, restingValue, type SimulatedChannel } from '../../../lib/simulation';
+import { SIMULATION_BEHAVIOURS, defaultSimulatedChannel, kindsForCardType, manualChannelValue, restingValue, type SimulatedChannel } from '../../../lib/simulation';
 import { FormField } from '../FormField';
 import { AlarmBandMeter, ExactValueField, KnobResetButton, RotaryKnob, processConditionFor, quantize } from './ChannelValueKnob';
 
@@ -390,10 +390,11 @@ function HardwareFields({
   }
 
   const process = config as ProcessConfig;
+  const isUniversal = type === 'Universal V/I Card';
   return (
     <View className="gap-3">
       <View className="gap-2">
-        <FieldLabel>Input Type *</FieldLabel>
+        <FieldLabel>{isUniversal ? 'Universal V/I Input *' : 'Input Type *'}</FieldLabel>
         <View className="flex-row flex-wrap gap-2">
           {PROCESS_INPUT_TYPES.map((option) => {
             const selected = process.inputType === option;
@@ -418,17 +419,22 @@ function HardwareFields({
           })}
         </View>
         <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          {ELECTRICAL_MAPPING[process.inputType]} — Ultron applies the linear conversion internally.
+          {ELECTRICAL_MAPPING[process.inputType]} - Ultron maps the electrical input to the configured full engineering range.
         </Text>
         {error && <Text className="font-body text-xs text-status-critical">{error}</Text>}
       </View>
       <View className="flex-row flex-wrap gap-3">
         <FieldCell>
-          <FormField label="Scaling" value={process.scaling} onChangeText={(value) => setField('scaling', value)} placeholder="1" />
+          <FormField label={isUniversal ? 'Input Scaling' : 'Scaling'} value={process.scaling} onChangeText={(value) => setField('scaling', value)} placeholder="1" />
         </FieldCell>
         <FieldCell>
           <FormField label="Filter" value={process.filter} onChangeText={(value) => setField('filter', value)} placeholder="e.g. 1st order, 5 s" />
         </FieldCell>
+        {isUniversal ? (
+          <FieldCell>
+            <ReadoutTile label="Supported Signals" value="Pressure / Power / Level / V-I" />
+          </FieldCell>
+        ) : null}
       </View>
     </View>
   );
@@ -601,7 +607,27 @@ function ChannelValuePanel({
           <FieldLabel>Measurement Type</FieldLabel>
           <View className="flex-row flex-wrap gap-2">
             {kindsForCardType(type).map((kind) => (
-              <Chip key={kind} label={kind} selected={channel.kind === kind} onPress={() => onChannelChange({ ...channel, kind })} />
+              <Chip
+                key={kind}
+                label={kind}
+                selected={channel.kind === kind}
+                onPress={() => {
+                  const preset = defaultSimulatedChannel(kind);
+                  onChannelChange({
+                    ...channel,
+                    kind,
+                    unit: preset.unit,
+                    min: preset.min,
+                    max: preset.max,
+                    healthyValue: preset.healthyValue,
+                    alertLimit: preset.alertLimit,
+                    dangerLimit: preset.dangerLimit,
+                    decimals: preset.decimals,
+                    behaviour: 'Manual',
+                    manualValue: preset.manualValue,
+                  });
+                }}
+              />
             ))}
           </View>
           <Text className={cn('font-body text-[11px] leading-4', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>

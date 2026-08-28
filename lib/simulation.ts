@@ -36,8 +36,11 @@ export const SIMULATED_CHANNEL_KINDS = [
   'Vibration',
   'RTD / Temperature',
   'Universal Voltage / Current',
-  'Speed / RPM',
   'Pressure',
+  'Power',
+  'Level',
+  'Process Value',
+  'Speed / RPM',
 ] as const;
 export type SimulatedChannelKind = (typeof SIMULATED_CHANNEL_KINDS)[number];
 
@@ -51,7 +54,11 @@ export function cardTypeForKind(kind: SimulatedChannelKind): CardType {
       return 'RTD Card';
     case 'Universal Voltage / Current':
     case 'Pressure':
+    case 'Power':
+    case 'Level':
       return 'Universal V/I Card';
+    case 'Process Value':
+      return 'Process Card';
   }
 }
 
@@ -208,12 +215,12 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     sensor: 'RTD',
   },
   'Universal Voltage / Current': {
-    unit: 'A',
-    min: 8,
-    max: 32,
-    healthyValue: 18,
-    alertLimit: 38,
-    dangerLimit: 45,
+    unit: 'mA',
+    min: 0,
+    max: 20,
+    healthyValue: 12,
+    alertLimit: 18,
+    dangerLimit: 20,
     samplesPerSecond: 1,
     decimals: 2,
     sensor: 'Universal Input',
@@ -230,15 +237,48 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     sensor: 'Speed',
   },
   Pressure: {
-    unit: 'bar',
-    min: 1.5,
-    max: 6.2,
-    healthyValue: 4,
-    alertLimit: 8,
-    dangerLimit: 10,
+    unit: 'MPa',
+    min: 0,
+    max: 20,
+    healthyValue: 8.1,
+    alertLimit: 9.2,
+    dangerLimit: 10.4,
     samplesPerSecond: 1,
     decimals: 2,
     sensor: 'Pressure',
+  },
+  Power: {
+    unit: 'kW',
+    min: 0,
+    max: 40,
+    healthyValue: 18.3,
+    alertLimit: 24,
+    dangerLimit: 30,
+    samplesPerSecond: 1,
+    decimals: 1,
+    sensor: 'Power',
+  },
+  Level: {
+    unit: '%',
+    min: 0,
+    max: 100,
+    healthyValue: 68,
+    alertLimit: 90,
+    dangerLimit: 95,
+    samplesPerSecond: 1,
+    decimals: 1,
+    sensor: 'Level',
+  },
+  'Process Value': {
+    unit: '',
+    min: 0,
+    max: 100,
+    healthyValue: 50,
+    alertLimit: 80,
+    dangerLimit: 90,
+    samplesPerSecond: 1,
+    decimals: 2,
+    sensor: 'Process',
   },
 };
 

@@ -559,6 +559,11 @@ function letterForSimulatedKind(kind: SimulatedChannel['kind']): ChannelRef['let
       return 'S';
     case 'Pressure':
       return 'P';
+    case 'Power':
+      return 'C';
+    case 'Level':
+    case 'Process Value':
+      return 'X';
     case 'Universal Voltage / Current':
       return 'C';
     default:

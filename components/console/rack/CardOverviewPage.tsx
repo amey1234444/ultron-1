@@ -89,8 +89,18 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
             { label: 'Pulses / Revolution', value: (config as SpeedConfig).pulsesPerRevolution || '—' },
             { label: 'Trigger', value: (config as SpeedConfig).trigger || '—' },
           ]
+        : card.type === 'Universal V/I Card' && 'scaling' in config
+          ? [
+              { label: 'Universal V/I Input', value: (config as ProcessConfig).inputType },
+              { label: 'Input Scaling', value: (config as ProcessConfig).scaling || '1' },
+              { label: 'Filter', value: (config as ProcessConfig).filter || '—' },
+            ]
         : 'scaling' in config
-          ? [{ label: 'Input Type', value: (config as ProcessConfig).inputType }]
+          ? [
+              { label: 'Input Type', value: (config as ProcessConfig).inputType },
+              { label: 'Scaling', value: (config as ProcessConfig).scaling || '1' },
+              { label: 'Filter', value: (config as ProcessConfig).filter || '—' },
+            ]
           : [];
 
   // Only a simulated card carries a signal definition, and only then is there a
