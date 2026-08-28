@@ -99,7 +99,7 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
     const nextSimulation = simulation.map((entry, index) => (index === 0 ? channel : entry));
     const nextConfig =
       cardType === 'Vibration Card' && 'samplingRate' in config && Number.isFinite(channel.samplesPerSecond)
-        ? ({ ...config, samplingRate: `${channel.samplesPerSecond} Hz` } as VibrationConfig)
+        ? ({ ...config, samplingRate: `${channel.samplesPerSecond} Hz`, samplingRateSource: 'operator' } as VibrationConfig)
         : config;
     setForm((previous) => ({ ...previous, config: nextConfig, simulation: nextSimulation }));
     onSimulationPreview?.(nextConfig, enabled, nextSimulation);

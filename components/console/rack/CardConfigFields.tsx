@@ -340,9 +340,6 @@ function HardwareFields({
         <FieldCell>
           <FormField label="Sensitivity" value={vibration.sensitivity} onChangeText={(value) => setField('sensitivity', value)} placeholder="e.g. 100 mV/g" />
         </FieldCell>
-        <FieldCell>
-          <FormField label="Sampling Rate" value={vibration.samplingRate} onChangeText={(value) => setField('samplingRate', value)} placeholder="e.g. 2560 Hz" />
-        </FieldCell>
       </View>
     );
   }

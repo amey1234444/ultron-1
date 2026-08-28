@@ -68,13 +68,14 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
   const unit = config.unit || '—';
   const range = derivedChannelRangeFor(config);
   const alarmValue = (enabled: boolean, value: string) => (enabled ? `${value || 'not set'} ${unit}` : 'Disabled');
+  const channel = card.simulation?.length ? simulationForCard(card)[0] : undefined;
 
   const hardware: { label: string; value: string }[] =
     card.type === 'Vibration Card' && 'sensorType' in config
       ? [
           { label: 'Sensor Type', value: (config as VibrationConfig).sensorType || '—' },
           { label: 'Sensitivity', value: (config as VibrationConfig).sensitivity || '—' },
-          { label: 'Sampling Rate', value: (config as VibrationConfig).samplingRate || '—' },
+          { label: 'Sampling Rate', value: channel ? `${channel.samplesPerSecond} Hz` : (config as VibrationConfig).samplingRate || '—' },
         ]
       : card.type === 'RTD Card' && 'scaling' in config
         ? [
@@ -94,7 +95,6 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
 
   // Only a simulated card carries a signal definition, and only then is there a
   // driven value to report. A physical card reads its channel from the field.
-  const channel = card.simulation?.length ? simulationForCard(card)[0] : undefined;
   const channelValueRows = channel
     ? [
         { label: 'Value Source', value: channel.behaviour },

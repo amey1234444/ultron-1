@@ -24,6 +24,7 @@ import {
   type CardNode,
   type CardType,
   type ChannelCommonConfig,
+  type VibrationConfig,
 } from './rack';
 
 const DEFAULT_SAMPLES_PER_SECOND = 1;
@@ -261,6 +262,18 @@ export function defaultSimulationForCard(type: CardType): SimulatedChannel[] {
   return Array.from({ length: channelCountForCardType(type) }, () => ({ ...defaultSimulatedChannel(kind), behaviour }));
 }
 
+function vibrationSamplingWasSetByOperator(config: CardConfig): boolean {
+  return 'samplingRate' in config && (config as VibrationConfig).samplingRateSource === 'operator';
+}
+
+function normalizeStoredSimulationChannel(card: CardNode, channel: SimulatedChannel): SimulatedChannel {
+  if (card.type !== 'Vibration Card') return channel;
+  if (channel.samplesPerSecond === 10 && !vibrationSamplingWasSetByOperator(card.config)) {
+    return { ...channel, samplesPerSecond: DEFAULT_SAMPLES_PER_SECOND };
+  }
+  return channel;
+}
+
 // A card's stored simulation array can be shorter than its channel count (card
 // type changed, config saved by an older build) — pad rather than drop channels.
 export function simulationForCard(card: CardNode): SimulatedChannel[] {
@@ -274,9 +287,10 @@ export function simulationForCard(card: CardNode): SimulatedChannel[] {
     // A rack saved before the knob existed carries no `manualValue`. Seeding it
     // from the channel's own resting point means switching to Manual starts
     // from where the signal already sits, rather than from zero.
-    return channel.manualValue === undefined || channel.manualValue === null
+    const hydrated = channel.manualValue === undefined || channel.manualValue === null
       ? { ...channel, manualValue: restingValue(channel) }
       : channel;
+    return normalizeStoredSimulationChannel(card, hydrated);
   });
 }
 
@@ -737,11 +751,12 @@ export function simulationWithCardConfig(type: CardType, config: CardConfig, cha
     alertLimit: limits.high,
     dangerLimit: limits.highHigh,
   };
-  // A vibration card is the one type whose acquisition rate is part of the
-  // hardware configuration rather than of the simulation. Accepts both "2560"
-  // and the stored "2560 Hz".
-  if (type === 'Vibration Card' && 'samplingRate' in config) {
-    next.samplesPerSecond = numericOr(config.samplingRate, primary.samplesPerSecond);
+  // Older vibration configs carried a default hardware sampling-rate field.
+  // Letting it overwrite the channel here is what kept reviving `10 Hz`.
+  // Only rates written by the current channel-rate control carry the operator
+  // marker and are allowed to flow back into the simulated signal.
+  if (type === 'Vibration Card' && vibrationSamplingWasSetByOperator(config)) {
+    next.samplesPerSecond = numericOr((config as VibrationConfig).samplingRate, primary.samplesPerSecond);
   }
 
   // Narrowing the alarm levels narrows the derived range, which must not leave
@@ -787,6 +802,7 @@ export function cardConfigWithSimulation(type: CardType, config: CardConfig, cha
   }
   if (type === 'Vibration Card' && 'samplingRate' in config && Number.isFinite(primary.samplesPerSecond)) {
     next.samplingRate = `${primary.samplesPerSecond} Hz`;
+    if (vibrationSamplingWasSetByOperator(config)) next.samplingRateSource = 'operator';
   }
 
   return normalizeChannelConfig(type, next);

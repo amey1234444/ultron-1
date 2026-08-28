@@ -185,7 +185,7 @@ export function assessAll(inputs: CapabilityInputs): Capability[] {
 // diagnostic tool starts producing confident nonsense.
 export function capabilityFromCard(card: CardNode | null, shaftHz: number | null, hasScalarHistory: boolean): CapabilityInputs {
   const config = card?.config;
-  const rate = config && 'samplingRate' in config ? Number(config.samplingRate) : NaN;
+  const rate = config && 'samplingRate' in config ? Number.parseFloat(config.samplingRate) : NaN;
 
   return {
     hasScalarHistory,

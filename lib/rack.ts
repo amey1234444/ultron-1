@@ -107,6 +107,7 @@ export type VibrationConfig = ChannelCommonConfig & {
   sensorType: string;
   sensitivity: string;
   samplingRate: string;
+  samplingRateSource?: 'operator';
   /**
    * Kept so racks saved before the shared block existed still read, and so the
    * derived operating range has somewhere card-shaped to live. Written by
@@ -382,7 +383,7 @@ export function normalizeChannelConfig(type: CardType, config: Record<string, un
   // to `never`. Each branch narrows it with its own guard instead.
   const source = config as Partial<Omit<ProcessConfig, 'inputType'>> &
     Partial<Omit<VibrationConfig, 'inputType'>> &
-    Partial<Omit<SpeedConfig, 'inputType'>> & { inputType?: unknown };
+    Partial<Omit<SpeedConfig, 'inputType'>> & { inputType?: unknown; samplingRateSource?: unknown };
   const channelNames = Array.from({ length: count }, (_, index) => source.channelNames?.[index] ?? '');
 
   if (type === 'Vibration Card') {
@@ -395,6 +396,7 @@ export function normalizeChannelConfig(type: CardType, config: Record<string, un
       sensorType: source.sensorType ?? '',
       sensitivity: source.sensitivity ?? '',
       samplingRate: source.samplingRate ?? '',
+      ...(source.samplingRateSource === 'operator' ? { samplingRateSource: 'operator' as const } : {}),
       engineeringUnit: withHysteresis.unit,
       measurementRangeMin: range.min,
       measurementRangeMax: range.max,
