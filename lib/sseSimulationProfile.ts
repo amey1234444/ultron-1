@@ -29,10 +29,12 @@ type SseChannelSpec = {
   high?: number;
   highHigh?: number;
   decimals: number;
-  samplesPerSecond: number;
+  samplesPerSecond?: number;
   inputType?: ProcessInputType;
   precision?: ProcessDisplayPrecision;
 };
+
+const DEFAULT_SAMPLES_PER_SECOND = 1;
 
 const PROFILES: GatewayProfile[] = [
   {
@@ -71,13 +73,13 @@ const PROFILES: GatewayProfile[] = [
 ];
 
 const SSE_CHANNELS: SseChannelSpec[] = [
-  { key: 'motor-de-vibration', rack: 1, slot: 1, label: 'Motor DE Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.5, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
-  { key: 'motor-nde-vibration', rack: 1, slot: 2, label: 'Motor NDE Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.4, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
+  { key: 'motor-de-vibration', rack: 1, slot: 1, label: 'Motor DE Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.5, high: 2.8, highHigh: 7.1, decimals: 2 },
+  { key: 'motor-nde-vibration', rack: 1, slot: 2, label: 'Motor NDE Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.4, high: 2.8, highHigh: 7.1, decimals: 2 },
   { key: 'motor-temperature', rack: 1, slot: 3, label: 'Motor Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 150, healthy: 45, high: 75, highHigh: 90, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
   { key: 'motor-rpm', rack: 1, slot: 4, label: 'Motor RPM', cardType: 'Speed Card', kind: 'Speed / RPM', unit: 'RPM', rangeMin: 0, rangeMax: 3000, lowLow: 1800, low: 1900, healthy: 2000, high: 2100, highHigh: 2200, decimals: 0, samplesPerSecond: 1, precision: '0' },
   { key: 'motor-power', rack: 1, slot: 5, label: 'Motor Power', cardType: 'Universal V/I Card', kind: 'Universal Voltage / Current', unit: 'kW', rangeMin: 0, rangeMax: 40, healthy: 18, high: 24, highHigh: 30, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
-  { key: 'gearbox-input-vibration', rack: 1, slot: 6, label: 'Gearbox Input Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.5, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
-  { key: 'gearbox-output-vibration', rack: 1, slot: 7, label: 'Gearbox Output Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.6, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
+  { key: 'gearbox-input-vibration', rack: 1, slot: 6, label: 'Gearbox Input Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.5, high: 2.8, highHigh: 7.1, decimals: 2 },
+  { key: 'gearbox-output-vibration', rack: 1, slot: 7, label: 'Gearbox Output Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.6, high: 2.8, highHigh: 7.1, decimals: 2 },
   { key: 'gearbox-temperature', rack: 1, slot: 8, label: 'Gearbox Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 150, healthy: 52, high: 70, highHigh: 85, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
   { key: 'hopper-level', rack: 1, slot: 9, label: 'Hopper Level', cardType: 'Universal V/I Card', kind: 'Universal Voltage / Current', unit: '%', rangeMin: 0, rangeMax: 100, lowLow: 15, low: 30, healthy: 70, high: 90, highHigh: 95, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
   { key: 'zone-1-temperature', rack: 1, slot: 10, label: 'Zone 1 Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 300, lowLow: 180, low: 190, healthy: 200, high: 210, highHigh: 220, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
@@ -110,7 +112,7 @@ function channelFor(spec: SseChannelSpec, profile: Profile): SimulatedChannel {
     healthyValue: spec.healthy,
     alertLimit: spec.high ?? null,
     dangerLimit: spec.highHigh ?? null,
-    samplesPerSecond: spec.samplesPerSecond,
+    samplesPerSecond: spec.samplesPerSecond ?? DEFAULT_SAMPLES_PER_SECOND,
     behaviour: behaviourFor(profile, spec),
     decimals: spec.decimals,
     manualValue: null,
@@ -140,7 +142,7 @@ function configFor(spec: SseChannelSpec): CardConfig {
       ...common,
       sensorType: 'Accelerometer',
       sensitivity: '100 mV/g',
-      samplingRate: `${spec.samplesPerSecond} Hz`,
+      samplingRate: spec.samplesPerSecond !== undefined ? `${spec.samplesPerSecond} Hz` : '',
     });
   }
   if (spec.cardType === 'Speed Card') {

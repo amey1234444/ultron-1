@@ -26,6 +26,8 @@ import {
   type ChannelCommonConfig,
 } from './rack';
 
+const DEFAULT_SAMPLES_PER_SECOND = 1;
+
 // Card families the simulator can stand in for. Kinds map onto the real card
 // types, so a simulated channel occupies a rack slot exactly like its physical
 // counterpart and inherits that card's channel count.
@@ -189,7 +191,7 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     healthyValue: 1.5,
     alertLimit: 5,
     dangerLimit: 7,
-    samplesPerSecond: 10,
+    samplesPerSecond: DEFAULT_SAMPLES_PER_SECOND,
     decimals: 2,
     sensor: 'Vibration',
   },
