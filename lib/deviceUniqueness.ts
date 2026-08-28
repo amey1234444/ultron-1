@@ -8,6 +8,11 @@ export type DeviceNameConflict = {
   device: DeviceNode;
 };
 
+export type DeviceIpConflict = {
+  ip: string;
+  device: DeviceNode;
+};
+
 function isUniqueNameDevice(device: DeviceNode): device is DeviceNode & { type: UniqueDeviceType } {
   return !device.archived && (device.type === 'Gateway' || device.type === 'Rack');
 }
@@ -57,6 +62,33 @@ export function findDuplicateNameForDevice(devices: DeviceNode[], device: Pick<D
 }
 
 export function archiveDuplicateConfiguredDeviceNames(devices: DeviceNode[]): { devices: DeviceNode[]; changed: boolean; archivedIds: Set<string> } {
+  return archiveDuplicateConfiguredDevicesBy(devices, (device) => {
+    const normalizedName = normalizeDeviceNameForUniqueness(device.name);
+    return normalizedName ? `${device.type}:${normalizedName}` : '';
+  });
+}
+
+export function findDuplicateConfiguredDeviceIp(devices: DeviceNode[]): DeviceIpConflict | null {
+  const byIp = new Map<string, DeviceNode>();
+  for (const device of devices) {
+    if (!isUniqueNameDevice(device)) continue;
+    const ip = device.ip.trim();
+    if (!ip) continue;
+    const existing = byIp.get(ip);
+    if (existing && existing.id !== device.id) return { ip, device: existing };
+    byIp.set(ip, device);
+  }
+  return null;
+}
+
+export function archiveDuplicateConfiguredDeviceIps(devices: DeviceNode[]): { devices: DeviceNode[]; changed: boolean; archivedIds: Set<string> } {
+  return archiveDuplicateConfiguredDevicesBy(devices, (device) => device.ip.trim());
+}
+
+function archiveDuplicateConfiguredDevicesBy(
+  devices: DeviceNode[],
+  keyFor: (device: DeviceNode & { type: UniqueDeviceType }) => string,
+): { devices: DeviceNode[]; changed: boolean; archivedIds: Set<string> } {
   const indexById = new Map(devices.map((device, index) => [device.id, index]));
   const childCountByGateway = new Map<string, number>();
   for (const device of devices) {
@@ -76,9 +108,8 @@ export function archiveDuplicateConfiguredDeviceNames(devices: DeviceNode[]): { 
 
   for (const device of devices) {
     if (!isUniqueNameDevice(device)) continue;
-    const normalizedName = normalizeDeviceNameForUniqueness(device.name);
-    if (!normalizedName) continue;
-    const key = `${device.type}:${normalizedName}`;
+    const key = keyFor(device);
+    if (!key) continue;
     const winner = winnerByName.get(key);
     if (!winner) {
       winnerByName.set(key, device);

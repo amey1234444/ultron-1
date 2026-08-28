@@ -9,7 +9,12 @@
 // state — so local dev / CI without a DB still boot.
 
 import type { DeviceNode } from '../../lib/devices';
-import { findDuplicateConfiguredDeviceName } from '../../lib/deviceUniqueness';
+import {
+  archiveDuplicateConfiguredDeviceIps,
+  archiveDuplicateConfiguredDeviceNames,
+  findDuplicateConfiguredDeviceName,
+  findDuplicateConfiguredDeviceIp,
+} from '../../lib/deviceUniqueness';
 import type { FolderNode, ProjectNode } from '../../lib/hierarchy';
 import type { MachineNode } from '../../lib/machines';
 import type { CardNode } from '../../lib/rack';
@@ -99,16 +104,9 @@ async function q<T extends Record<string, unknown> = Record<string, unknown>>(
 }
 
 function assertUniqueConfiguredIps(data: HierarchyInput): void {
-  const byIp = new Map<string, DeviceNode>();
-  for (const device of data.devices) {
-    if (device.archived || (device.type !== 'Gateway' && device.type !== 'Rack')) continue;
-    const ip = device.ip.trim();
-    if (!ip) continue;
-    const existing = byIp.get(ip);
-    if (existing && existing.id !== device.id) {
-      throw new ApiError(409, 'IP is already configured.');
-    }
-    byIp.set(ip, device);
+  const duplicate = findDuplicateConfiguredDeviceIp(data.devices);
+  if (duplicate) {
+    throw new ApiError(409, 'IP is already configured.');
   }
 }
 
@@ -117,6 +115,18 @@ function assertUniqueConfiguredDeviceNames(data: HierarchyInput): void {
   if (duplicate) {
     throw new ApiError(409, `${duplicate.type} name is already configured.`);
   }
+}
+
+function normalizeHierarchyForPersistence(data: HierarchyInput): HierarchyInput {
+  const byName = archiveDuplicateConfiguredDeviceNames(data.devices);
+  const byIp = archiveDuplicateConfiguredDeviceIps(byName.devices);
+  const archivedIds = new Set([...byName.archivedIds, ...byIp.archivedIds]);
+  if (!byName.changed && !byIp.changed) return data;
+  return {
+    ...data,
+    devices: byIp.devices,
+    cards: archivedIds.size > 0 ? data.cards.filter((card) => !archivedIds.has(card.deviceId)) : data.cards,
+  };
 }
 
 // Delete every hierarchy row and re-insert from the given snapshot. Callers wrap
@@ -327,8 +337,9 @@ export async function getRevisions(): Promise<{ hierRevision: number; layoutRevi
 // revision. Optimistic concurrency: if baseRevision is provided and no longer
 // matches, the write is rejected so the client can refetch and retry.
 export async function replaceHierarchy(data: HierarchyInput, baseRevision?: number): Promise<{ hierRevision: number } | { conflict: true; hierRevision: number }> {
-  assertUniqueConfiguredIps(data);
-  assertUniqueConfiguredDeviceNames(data);
+  const normalized = normalizeHierarchyForPersistence(data);
+  assertUniqueConfiguredIps(normalized);
+  assertUniqueConfiguredDeviceNames(normalized);
   await ready();
   return withClient(async (client) => {
     await client.query('BEGIN');
@@ -339,7 +350,7 @@ export async function replaceHierarchy(data: HierarchyInput, baseRevision?: numb
         await client.query('ROLLBACK');
         return { conflict: true as const, hierRevision: current };
       }
-      await writeHierarchyRows(client, data);
+      await writeHierarchyRows(client, normalized);
       const next = current + 1;
       await client.query('UPDATE studio_meta SET hier_revision = $1, updated_at = now() WHERE id = 1', [String(next)] as never[]);
       await client.query('COMMIT');

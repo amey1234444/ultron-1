@@ -403,10 +403,10 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
     }
     case 'Steady':
     default:
-      // The operating range is derived from the alarm levels, so its centre is
-      // by construction the point furthest from every limit — which is exactly
-      // where a healthy channel should sit.
-      return { target: nominalValue(channel), low: channel.min, high: channel.max };
+      // Steady is a configured output: keep it pinned to the value stored by
+      // the channel knob instead of adding random walk noise.
+      const value = manualChannelValue(channel);
+      return { target: value, low: value, high: value };
   }
 }
 

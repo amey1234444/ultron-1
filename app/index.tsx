@@ -42,7 +42,7 @@ import {
   type SimulatedChannel,
 } from '../lib/simulation';
 import { ensureSseSimulationWorkspace } from '../lib/sseSimulationProfile';
-import { archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
+import { archiveDuplicateConfiguredDeviceIps, archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
 import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
 import {
   duplicateFolderSubtree,
@@ -528,11 +528,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   }, [cards, setCards, setDevices, storedDevices]);
 
   useEffect(() => {
-    const repaired = archiveDuplicateConfiguredDeviceNames(storedDevices);
-    if (!repaired.changed) return;
-    setDevices(repaired.devices);
-    if (repaired.archivedIds.size > 0) {
-      setCards((prev) => prev.filter((card) => !repaired.archivedIds.has(card.deviceId)));
+    const byName = archiveDuplicateConfiguredDeviceNames(storedDevices);
+    const byIp = archiveDuplicateConfiguredDeviceIps(byName.devices);
+    const archivedIds = new Set([...byName.archivedIds, ...byIp.archivedIds]);
+    if (!byName.changed && !byIp.changed) return;
+    setDevices(byIp.devices);
+    if (archivedIds.size > 0) {
+      setCards((prev) => prev.filter((card) => !archivedIds.has(card.deviceId)));
     }
   }, [setCards, setDevices, storedDevices]);
 

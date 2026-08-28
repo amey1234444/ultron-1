@@ -19,7 +19,7 @@ export function logServerError(context: string, err: unknown) {
 }
 
 export function sendApiError(res: NextApiResponse, err: unknown, context: string) {
-  logServerError(context, err);
   if (err instanceof ApiError) return res.status(err.status).json({ error: err.message });
+  logServerError(context, err);
   return res.status(500).json({ error: 'Internal server error.' });
 }
