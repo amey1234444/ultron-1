@@ -1,9 +1,10 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import Svg, { Line, Polyline } from 'react-native-svg';
+import Svg, { Line, Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import { splinePath, useSmoothSeriesGroup } from '../../../lib/chartMotion';
 import type { CapabilityInputs } from '../../../lib/analysisCapability';
 import type { AnalysisSignal, Finding } from '../../../lib/analysisDiagnosis';
 import {
@@ -350,6 +351,7 @@ function MultiTrendPlot({ signals }: { signals: SignalStat[] }) {
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const colours = [seriesColour(isDark), seriesMutedColour(isDark), conditionHexes(isDark).attention, conditionHexes(isDark).alert];
   const usable = signals.filter((signal) => signal.samples.length >= 2).slice(0, 4);
+  const smoothSignals = useSmoothSeriesGroup(usable.map((signal) => signal.samples.slice(-120)));
 
   if (usable.length === 0) return <Unavailable title="TREND DATA" reason="No selected signal has enough history for a trend plot." />;
 
@@ -369,18 +371,15 @@ function MultiTrendPlot({ signals }: { signals: SignalStat[] }) {
             />
           ))}
           {usable.map((signal, seriesIndex) => {
-            const samples = signal.samples.slice(-120);
+            const samples = smoothSignals[seriesIndex] ?? signal.samples.slice(-120);
             const min = Math.min(...samples);
             const max = Math.max(...samples);
             const span = max - min || 1;
-            const points = samples
-              .map((value, index) => {
-                const x = PAD.left + (index / Math.max(1, samples.length - 1)) * (CHART_W - PAD.left - PAD.right);
-                const y = PAD.top + (1 - (value - min) / span) * (CHART_H - PAD.top - PAD.bottom);
-                return `${x},${y}`;
-              })
-              .join(' ');
-            return <Polyline key={signal.id} points={points} fill="none" stroke={colours[seriesIndex % colours.length]} strokeWidth={2} />;
+            const points = samples.map((value, index) => ({
+              x: PAD.left + (index / Math.max(1, samples.length - 1)) * (CHART_W - PAD.left - PAD.right),
+              y: PAD.top + (1 - (value - min) / span) * (CHART_H - PAD.top - PAD.bottom),
+            }));
+            return <Path key={signal.id} d={splinePath(points, 0.45)} fill="none" stroke={colours[seriesIndex % colours.length]} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />;
           })}
         </Svg>
       </View>

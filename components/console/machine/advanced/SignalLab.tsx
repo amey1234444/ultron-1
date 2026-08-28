@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import Svg, { Line, Path, Polyline } from 'react-native-svg';
+import Svg, { Line, Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import {
@@ -17,6 +17,7 @@ import {
 } from '../../../../lib/analysisCapability';
 import { conditionHexes } from '../../../../lib/analysisOverview';
 import { qualityHex, QUALITY_LABEL, type DataQuality } from '../../../../lib/advancedDiagnosis';
+import { splinePath, useSmoothSeries } from '../../../../lib/chartMotion';
 import { cn } from '../../../../lib/cn';
 import { axisColour, gridColour, seriesColour, seriesMutedColour } from './vizTokens';
 
@@ -48,11 +49,12 @@ function TrendPlot({
   const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const [width, setWidth] = useState<number | null>(null);
+  const smoothSamples = useSmoothSeries(samples);
 
   const geometry = useMemo(() => {
-    if (width === null || samples.length < 2) return null;
+    if (width === null || smoothSamples.length < 2) return null;
 
-    const values = [...samples, alert, danger, ...(reference === undefined ? [] : [reference])];
+    const values = [...smoothSamples, alert, danger, ...(reference === undefined ? [] : [reference])];
     const rawMin = Math.min(...values);
     const rawMax = Math.max(...values);
     const pad = (rawMax - rawMin) * 0.12 || 1;
@@ -61,14 +63,14 @@ function TrendPlot({
 
     const innerW = width - PAD.left - PAD.right;
     const innerH = CHART_HEIGHT - PAD.top - PAD.bottom;
-    const x = (i: number) => PAD.left + (i / (samples.length - 1)) * innerW;
+    const x = (i: number) => PAD.left + (i / (smoothSamples.length - 1)) * innerW;
     const y = (v: number) => PAD.top + (1 - (v - min) / (max - min)) * innerH;
+    const points = smoothSamples.map((v, i) => ({ x: x(i), y: y(v) }));
+    const line = splinePath(points, 0.45);
 
     return {
-      points: samples.map((v, i) => `${x(i)},${y(v)}`).join(' '),
-      area: `M ${x(0)} ${y(samples[0])} ${samples.map((v, i) => `L ${x(i)} ${y(v)}`).join(' ')} L ${x(
-        samples.length - 1,
-      )} ${PAD.top + innerH} L ${x(0)} ${PAD.top + innerH} Z`,
+      line,
+      area: `${line} L ${x(smoothSamples.length - 1)} ${PAD.top + innerH} L ${x(0)} ${PAD.top + innerH} Z`,
       yAlert: y(alert),
       yDanger: y(danger),
       yRef: reference === undefined ? null : y(reference),
@@ -76,7 +78,7 @@ function TrendPlot({
       min,
       max,
     };
-  }, [width, samples, alert, danger, reference]);
+  }, [width, smoothSamples, alert, danger, reference]);
 
   const trace = seriesColour(isDark);
 
@@ -106,7 +108,7 @@ function TrendPlot({
             ))}
 
             <Path d={geometry.area} fill={trace} fillOpacity={0.1} />
-            <Polyline points={geometry.points} fill="none" stroke={trace} strokeWidth={2} strokeLinejoin="round" />
+            <Path d={geometry.line} fill="none" stroke={trace} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
 
             {geometry.yRef !== null ? (
               <Line

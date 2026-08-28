@@ -15,6 +15,7 @@ import { Animated, Easing, Pressable, Text, TextInput, View, type StyleProp, typ
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
+import { splinePath, useSmoothNullableSeries } from '../../../../lib/chartMotion';
 import { cn } from '../../../../lib/cn';
 import { alpha, consolePalette, tabular, text, variantStyle, type Variant } from '../../../ui';
 
@@ -330,8 +331,9 @@ export function TagTrend({
   width?: number;
   height?: number;
 }) {
+  const smoothValues = useSmoothNullableSeries(values.map((value) => (typeof value === 'number' && Number.isFinite(value) ? value : null)));
   const path = useMemo(() => {
-    const samples = values.slice(-24);
+    const samples = smoothValues.slice(-24);
     const finite = samples.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     if (finite.length < 2) return null;
     const min = Math.min(...finite);
@@ -339,20 +341,22 @@ export function TagTrend({
     const span = max - min || Math.abs(max) || 1;
     const stepX = samples.length > 1 ? width / (samples.length - 1) : width;
 
-    let d = '';
-    let pen = false;
+    const runs: { x: number; y: number }[][] = [];
+    let run: { x: number; y: number }[] = [];
     samples.forEach((value, index) => {
       if (typeof value !== 'number' || !Number.isFinite(value)) {
-        pen = false;
+        if (run.length > 0) runs.push(run);
+        run = [];
         return;
       }
       const x = index * stepX;
       const y = height - 2 - ((value - min) / span) * (height - 4);
-      d += `${pen ? ' L' : ' M'} ${x.toFixed(1)} ${y.toFixed(1)}`;
-      pen = true;
+      run.push({ x, y });
     });
-    return d.trim() || null;
-  }, [height, values, width]);
+    if (run.length > 0) runs.push(run);
+    const d = runs.map((points) => splinePath(points, 0.45)).join(' ');
+    return d || null;
+  }, [height, smoothValues, values, width]);
 
   if (!path) {
     return (
@@ -633,10 +637,11 @@ export function TrendChart({
   const palette = consolePalette(isDark);
   const gradientId = useId().replace(/:/g, '');
   const [width, setWidth] = useState(0);
+  const smoothValues = useSmoothNullableSeries(values.map((value) => (typeof value === 'number' && Number.isFinite(value) ? value : null)));
 
   const model = useMemo(() => {
     if (width <= PLOT.left + PLOT.right + 40) return null;
-    const samples = values.slice(-72);
+    const samples = smoothValues.slice(-72);
     const finite = samples.filter((value): value is number => typeof value === 'number' && Number.isFinite(value));
     if (finite.length < 2) return null;
 
@@ -683,15 +688,13 @@ export function TrendChart({
     if (run.length > 0) runs.push(run);
 
     const floor = PLOT.top + plotH;
-    const line = runs.map((points) =>
-      points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' '),
-    );
+    const line = runs.map((points) => splinePath(points, 0.45));
     const area = runs
       .filter((points) => points.length > 1)
       .map(
         (points) =>
           `M ${points[0].x.toFixed(1)} ${floor.toFixed(1)} ` +
-          points.map((point) => `L ${point.x.toFixed(1)} ${point.y.toFixed(1)}`).join(' ') +
+          splinePath(points, 0.45).replace(/^M\s*/, 'L ') +
           ` L ${points[points.length - 1].x.toFixed(1)} ${floor.toFixed(1)} Z`,
       );
 
@@ -708,7 +711,7 @@ export function TrendChart({
     const latest = lastRun && lastRun.length > 0 ? lastRun[lastRun.length - 1] : null;
 
     return { min, max, plotW, plotH, line, area, guides, latest, floor };
-  }, [criticalLimit, height, palette.critical, palette.neutral, palette.warning, reference, values, warningLimit, width]);
+  }, [criticalLimit, height, palette.critical, palette.neutral, palette.warning, reference, smoothValues, warningLimit, width]);
 
   const tick = (value: number) => {
     const magnitude = Math.abs(value);

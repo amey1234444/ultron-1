@@ -1,13 +1,14 @@
 ﻿import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleProp, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
-import Svg, { Circle, Line, Polyline, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Text as SvgText } from 'react-native-svg';
 
 import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { OverviewAnalysisInput, OverviewHistoryPoint } from '../../../lib/analysis/overviewSnapshot';
 import { analyzeRotaryAirlock, type AnalysisReading, type AnalysisSignalCode, type RotaryAirlockAnalysisResult } from '../../../lib/analysis/rotaryAirlockAnalyzer';
 import type { MachineAnalysisResult } from '../../../lib/analysis/types';
+import { splinePath, useSmoothSeries } from '../../../lib/chartMotion';
 import { cn } from '../../../lib/cn';
 import { consolePalette } from '../../../lib/consoleTheme';
 import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
@@ -752,22 +753,22 @@ function TrendChart({
   height?: number;
 }) {
   const { isDark } = useAppTheme();
+  const smoothValues = useSmoothSeries(points.map((point) => point.value));
   const width = 268;
   const padLeft = 30;
   const padBottom = 16;
   const plotWidth = width - padLeft - 8;
   const plotHeight = height - padBottom - 8;
-  const values = points.map((point) => point.value);
-  const max = values.length > 0 ? Math.max(...values) : 1;
-  const min = values.length > 0 ? Math.min(...values) : 0;
+  const max = smoothValues.length > 0 ? Math.max(...smoothValues) : 1;
+  const min = smoothValues.length > 0 ? Math.min(...smoothValues) : 0;
   const top = max === min ? max + 1 : max;
   const bottom = max === min ? Math.max(0, min - 1) : min;
   const spread = top - bottom || 1;
   const axis = isDark ? '#A1A3A0' : '#6B6D6B';
 
-  const coords = points.map((point, index) => {
-    const x = padLeft + (points.length <= 1 ? plotWidth : (index / (points.length - 1)) * plotWidth);
-    const y = 8 + plotHeight - ((point.value - bottom) / spread) * plotHeight;
+  const coords = smoothValues.map((value, index) => {
+    const x = padLeft + (smoothValues.length <= 1 ? plotWidth : (index / (smoothValues.length - 1)) * plotWidth);
+    const y = 8 + plotHeight - ((value - bottom) / spread) * plotHeight;
     return { x, y };
   });
   const last = coords[coords.length - 1];
@@ -786,8 +787,8 @@ function TrendChart({
         </SvgText>
       ))}
       {coords.length > 1 ? (
-        <Polyline
-          points={coords.map((coord) => `${coord.x},${coord.y}`).join(' ')}
+        <Path
+          d={splinePath(coords, 0.45)}
           fill="none"
           stroke={colour}
           strokeWidth={2}

@@ -3,6 +3,7 @@ import { Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
+import { splinePath, useSmoothTimedValues } from '../../../../lib/chartMotion';
 import { cn } from '../../../../lib/cn';
 import { alpha, consolePalette, floatingElevation } from '../../../../lib/consoleTheme';
 import type { TrendSample } from '../../../../lib/liveChannelValue';
@@ -131,9 +132,10 @@ export function TrendChart({
     () => (plotW > 0 ? decimate(visible, from, to, Math.max(2, Math.round(plotW))) : visible),
     [visible, from, to, plotW],
   );
+  const flowingDrawn = useSmoothTimedValues(drawn, stale ? 900 : 650);
 
   const domain = useMemo(() => {
-    const values = visible.map((sample) => sample.v);
+    const values = [...visible, ...flowingDrawn].map((sample) => sample.v);
     const references = [limits.alert, limits.danger].filter((v): v is number => typeof v === 'number');
     if (values.length === 0) {
       return references.length > 0
@@ -146,7 +148,7 @@ export function TrendChart({
     // in the middle of the plot rather than welded to an edge.
     const pad = (hi - lo) * 0.12 || Math.max(Math.abs(hi) * 0.05, 0.5);
     return niceDomain(lo - pad, hi + pad, Y_TICKS);
-  }, [visible, limits.alert, limits.danger]);
+  }, [visible, flowingDrawn, limits.alert, limits.danger]);
 
   const valueSpan = domain.hi - domain.lo || 1;
   const y = useCallback(
@@ -174,8 +176,8 @@ export function TrendChart({
   }, [visible]);
 
   const segments = useMemo(
-    () => splitOnGaps(drawn, gapMs).flatMap((run) => segmentByState(run, limits)),
-    [drawn, gapMs, limits],
+    () => splitOnGaps(flowingDrawn, gapMs).flatMap((run) => segmentByState(run, limits)),
+    [flowingDrawn, gapMs, limits],
   );
 
   const seriesColour = useCallback(
@@ -186,7 +188,8 @@ export function TrendChart({
 
   const latest = samples.length > 0 ? samples[samples.length - 1] : null;
   const latestInView = latest !== null && latest.t >= from && latest.t <= to;
-  const latestState = latest ? stateOf(latest.v, limits) : 'normal';
+  const latestPainted = latestInView ? (flowingDrawn.find((sample) => sample.t === latest?.t) ?? flowingDrawn[flowingDrawn.length - 1] ?? latest) : latest;
+  const latestState = latestPainted ? stateOf(latestPainted.v, limits) : 'normal';
 
   // --- crosshair -------------------------------------------------------------
   const cursorSample = useMemo(() => {
@@ -362,9 +365,7 @@ export function TrendChart({
                 {segments.map((segment, index) => (
                   <Path
                     key={`seg${index}`}
-                    d={segment.points
-                      .map((point, i) => `${i === 0 ? 'M' : 'L'} ${x(point.t).toFixed(2)} ${y(point.v).toFixed(2)}`)
-                      .join(' ')}
+                    d={splinePath(segment.points.map((point) => ({ x: x(point.t), y: y(point.v) })), 0.45)}
                     fill="none"
                     stroke={seriesColour(segment.state)}
                     strokeWidth={1.75}
@@ -374,12 +375,12 @@ export function TrendChart({
                 ))}
 
                 {/* The newest sample. */}
-                {latestInView && latest ? (
+                {latestInView && latestPainted ? (
                   <>
-                    <Circle cx={x(latest.t)} cy={y(latest.v)} r={6} fill={seriesColour(latestState)} fillOpacity={stale ? 0.08 : 0.18} />
+                    <Circle cx={x(latestPainted.t)} cy={y(latestPainted.v)} r={6} fill={seriesColour(latestState)} fillOpacity={stale ? 0.08 : 0.18} />
                     <Circle
-                      cx={x(latest.t)}
-                      cy={y(latest.v)}
+                      cx={x(latestPainted.t)}
+                      cy={y(latestPainted.v)}
                       r={3}
                       fill={stale ? palette.chartBg : seriesColour(latestState)}
                       stroke={seriesColour(latestState)}
@@ -499,13 +500,13 @@ export function TrendChart({
 
           {/* The latest reading, in its status colour — the one number this axis
               exists to carry. */}
-          {ready && latest ? (
+          {ready && latestPainted ? (
             <View
               className="absolute rounded-[5px] px-1.5 py-[2px]"
               style={{
                 left: 3,
                 right: 3,
-                top: Math.max(0, Math.min(plotH - 16, y(latest.v) - 8)),
+                top: Math.max(0, Math.min(plotH - 16, y(latestPainted.v) - 8)),
                 backgroundColor: stale ? palette.panelRaised : seriesColour(latestState),
                 borderWidth: stale ? 1 : 0,
                 borderColor: palette.line,
@@ -516,7 +517,7 @@ export function TrendChart({
                 className={text.code}
                 style={{ color: stale ? palette.inkMuted : '#FFFFFF', fontVariant: ['tabular-nums'] }}
               >
-                {fmt(latest.v)}
+                {fmt(latestPainted.v)}
               </Text>
             </View>
           ) : null}

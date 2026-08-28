@@ -2,6 +2,8 @@ import { useMemo } from 'react';
 import { View } from 'react-native';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
 
+import { splinePath, useSmoothSeries } from '../../../lib/chartMotion';
+
 const WIDTH = 200;
 const HEIGHT = 56;
 const PAD = 6;
@@ -10,21 +12,21 @@ const PAD = 6;
 // (e.g. to the channel kind's plausible band) so cards of the same measurement
 // kind are visually comparable; omit it to auto-fit the buffer's own min/max.
 export function Sparkline({ values, colour, range }: { values: number[]; colour: string; range?: { min: number; max: number } }) {
+  const smoothValues = useSmoothSeries(values);
   const path = useMemo(() => {
-    if (values.length < 2) return null;
-    const min = range ? range.min : Math.min(...values);
-    const max = range ? range.max : Math.max(...values);
+    if (smoothValues.length < 2) return null;
+    const min = range ? range.min : Math.min(...smoothValues);
+    const max = range ? range.max : Math.max(...smoothValues);
     const span = max - min || 1;
-    const stepX = (WIDTH - PAD * 2) / (values.length - 1);
+    const stepX = (WIDTH - PAD * 2) / (smoothValues.length - 1);
 
-    const points = values.map((v, i) => ({
+    const points = smoothValues.map((v, i) => ({
       x: PAD + i * stepX,
       y: PAD + (1 - (v - min) / span) * (HEIGHT - PAD * 2),
     }));
 
-    const d = points.reduce((acc, p, i) => (i === 0 ? `M ${p.x} ${p.y}` : `${acc} L ${p.x} ${p.y}`), '');
-    return { d, last: points[points.length - 1] };
-  }, [values]);
+    return { d: splinePath(points, 0.45), last: points[points.length - 1] };
+  }, [range, smoothValues]);
 
   return (
     <View style={{ width: WIDTH, height: HEIGHT }}>

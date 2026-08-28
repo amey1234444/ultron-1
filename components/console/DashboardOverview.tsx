@@ -4,6 +4,7 @@ import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'r
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
+import { useSmoothSeries } from '../../lib/chartMotion';
 import { cn } from '../../lib/cn';
 import {
   consolePalette,
@@ -99,66 +100,6 @@ function mean(values: number[]) {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 }
 
-
-/** Samples a series at `length` evenly spaced positions, interpolating between them. */
-function resample(values: number[], length: number): number[] {
-  if (values.length === 0) return Array.from({ length }, () => 0);
-  if (values.length === length) return values;
-  return Array.from({ length }, (_, index) => {
-    const at = (index / Math.max(1, length - 1)) * (values.length - 1);
-    const low = Math.floor(at);
-    const high = Math.min(values.length - 1, low + 1);
-    return values[low] + (values[high] - values[low]) * (at - low);
-  });
-}
-
-/**
- * Eases a series toward its target instead of snapping to it.
- *
- * Telemetry arrives as packets, so a chart bound straight to it twitches once
- * per frame — which reads as instrument noise rather than as the plant moving.
- * Every sample is interpolated toward the incoming one over a short ease, so a
- * value that steps 4 points travels those 4 points. Motion becomes information:
- * a slow drift looks slow and a spike looks like a spike.
- */
-function useSmoothSeries(target: number[], duration = 700): number[] {
-  const [shown, setShown] = useState<number[]>(target);
-  const fromRef = useRef<number[]>(target);
-  const frameRef = useRef<number | null>(null);
-  const key = target.join(',');
-
-  useEffect(() => {
-    const to = target;
-    const from = resample(fromRef.current, to.length);
-    // A fresh series (first paint, or a switch between live and demo) has
-    // nothing to travel from, so it simply appears.
-    if (fromRef.current.length === 0) {
-      fromRef.current = to;
-      setShown(to);
-      return;
-    }
-    const start = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const t = Math.min(1, elapsed / duration);
-      // easeOutCubic: quick to respond, settles without overshooting.
-      const eased = 1 - (1 - t) ** 3;
-      const next = to.map((value, index) => from[index] + (value - from[index]) * eased);
-      setShown(next);
-      fromRef.current = next;
-      if (t < 1) frameRef.current = requestAnimationFrame(tick);
-    };
-    frameRef.current = requestAnimationFrame(tick);
-    return () => {
-      if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
-    };
-    // `key` stands in for the array identity so a re-render with the same
-    // numbers does not restart the animation.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, duration]);
-
-  return shown;
-}
 
 /**
  * A plant that moves, for the demo.

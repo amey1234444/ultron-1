@@ -9,6 +9,7 @@ import { useCallback, useState, type ReactNode } from 'react';
 import { View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText } from 'react-native-svg';
 
+import { splinePath, useSmoothSeries, useSmoothSeriesGroup } from '../../../lib/chartMotion';
 import type { ConsolePalette } from '../../../lib/consoleTheme';
 
 const AXIS_FONT = 9.5;
@@ -39,25 +40,6 @@ export function Measured({
 function scaleY(value: number, min: number, max: number, top: number, height: number): number {
   const span = max - min || 1;
   return top + height - ((value - min) / span) * height;
-}
-
-/** Catmull-Rom through the samples, emitted as cubic beziers. */
-function spline(points: { x: number; y: number }[], tension = 0.5): string {
-  if (points.length === 0) return '';
-  if (points.length < 3) return points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
-  let path = `M${points[0].x.toFixed(1)},${points[0].y.toFixed(1)}`;
-  for (let i = 0; i < points.length - 1; i += 1) {
-    const p0 = points[i - 1] ?? points[i];
-    const p1 = points[i];
-    const p2 = points[i + 1];
-    const p3 = points[i + 2] ?? p2;
-    const c1x = p1.x + ((p2.x - p0.x) / 6) * tension;
-    const c1y = p1.y + ((p2.y - p0.y) / 6) * tension;
-    const c2x = p2.x - ((p3.x - p1.x) / 6) * tension;
-    const c2y = p2.y - ((p3.y - p1.y) / 6) * tension;
-    path += ` C${c1x.toFixed(1)},${c1y.toFixed(1)} ${c2x.toFixed(1)},${c2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
-  }
-  return path;
 }
 
 function niceTicks(min: number, max: number, count = 4): number[] {
@@ -96,24 +78,25 @@ export function AreaChart({
   color: string;
   xLabels: string[];
 }) {
-  if (values.length < 2) return null;
+  const smoothValues = useSmoothSeries(values);
+  if (smoothValues.length < 2) return null;
   const padLeft = 30;
   const padBottom = 16;
   const padTop = 6;
   const plotW = Math.max(1, width - padLeft - 4);
   const plotH = Math.max(1, height - padBottom - padTop);
 
-  const rawMin = Math.min(...values);
-  const rawMax = Math.max(...values);
+  const rawMin = Math.min(...smoothValues);
+  const rawMax = Math.max(...smoothValues);
   const min = Math.max(0, rawMin - (rawMax - rawMin) * 0.4);
   const max = rawMax + (rawMax - rawMin) * 0.2;
   const ticks = niceTicks(min, max, 3);
 
-  const points = values.map((value, index) => ({
-    x: padLeft + (index / (values.length - 1)) * plotW,
+  const points = smoothValues.map((value, index) => ({
+    x: padLeft + (index / (smoothValues.length - 1)) * plotW,
     y: scaleY(value, min, max, padTop, plotH),
   }));
-  const line = spline(points);
+  const line = splinePath(points);
   const area = `${line} L${points[points.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L${points[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
   const latestPt = points[points.length - 1];
 
@@ -182,7 +165,8 @@ export function MultiLineChart({
   palette: ConsolePalette;
   xLabels: string[];
 }) {
-  const all = series.flatMap((entry) => entry.values);
+  const smoothSeries = useSmoothSeriesGroup(series.map((entry) => entry.values));
+  const all = smoothSeries.flatMap((values) => values);
   if (all.length === 0) return null;
   const padLeft = 24;
   const padBottom = 16;
@@ -206,15 +190,16 @@ export function MultiLineChart({
           </G>
         );
       })}
-      {series.map((entry) => {
-        const pts = entry.values.map((value, index) => ({
-          x: padLeft + (index / (entry.values.length - 1)) * plotW,
+      {series.map((entry, seriesIndex) => {
+        const values = smoothSeries[seriesIndex] ?? entry.values;
+        const pts = values.map((value, index) => ({
+          x: padLeft + (index / Math.max(1, values.length - 1)) * plotW,
           y: scaleY(value, min, max, padTop, plotH),
         }));
         return (
           <Path
             key={entry.id}
-            d={spline(pts)}
+            d={splinePath(pts)}
             stroke={entry.color}
             strokeWidth={1.8}
             fill="none"
@@ -258,15 +243,16 @@ export function BarChart({
   palette: ConsolePalette;
   color: string;
 }) {
-  if (values.length === 0) return null;
+  const smoothValues = useSmoothSeries(values);
+  if (smoothValues.length === 0) return null;
   const padLeft = 30;
   const padBottom = 16;
   const padTop = 6;
   const plotW = Math.max(1, width - padLeft - 4);
   const plotH = Math.max(1, height - padBottom - padTop);
-  const max = Math.max(...values) * 1.12 || 1;
+  const max = Math.max(...smoothValues) * 1.12 || 1;
   const ticks = niceTicks(0, max, 3);
-  const slot = plotW / values.length;
+  const slot = plotW / smoothValues.length;
   const barW = Math.max(3, Math.min(14, slot * 0.55));
 
   return (
@@ -288,7 +274,7 @@ export function BarChart({
           </G>
         );
       })}
-      {values.map((value, index) => {
+      {smoothValues.map((value, index) => {
         const h = Math.max(2, (value / max) * plotH);
         return (
           <Rect
@@ -335,13 +321,14 @@ export function SeverityBars({
   height: number;
   palette: ConsolePalette;
 }) {
+  const smoothGroups = useSmoothSeriesGroup(groups.map((group) => group.values));
   if (labels.length === 0) return null;
   const padLeft = 24;
   const padBottom = 16;
   const padTop = 6;
   const plotW = Math.max(1, width - padLeft - 4);
   const plotH = Math.max(1, height - padBottom - padTop);
-  const max = Math.max(1, ...groups.flatMap((group) => group.values)) * 1.15;
+  const max = Math.max(1, ...smoothGroups.flatMap((values) => values)) * 1.15;
   const ticks = niceTicks(0, max, 3);
   const slot = plotW / labels.length;
   const barW = Math.max(2.5, Math.min(6, (slot * 0.6) / groups.length));
@@ -365,7 +352,7 @@ export function SeverityBars({
         return (
           <G key={label}>
             {groups.map((group, gIndex) => {
-              const value = group.values[index] ?? 0;
+              const value = smoothGroups[gIndex]?.[index] ?? group.values[index] ?? 0;
               const h = Math.max(value > 0 ? 2 : 0, (value / max) * plotH);
               return (
                 <Rect
@@ -408,7 +395,8 @@ export function ImpulseChart({
   palette: ConsolePalette;
   color?: string;
 }) {
-  if (values.length === 0) return null;
+  const smoothValues = useSmoothSeries(values);
+  if (smoothValues.length === 0) return null;
   const padLeft = 22;
   const padBottom = 16;
   const padTop = 8;
@@ -416,14 +404,14 @@ export function ImpulseChart({
   const plotW = Math.max(1, width - padLeft - padRight);
   const plotH = Math.max(1, height - padBottom - padTop);
 
-  const maxVal = Math.max(1, ...values) * 1.15;
+  const maxVal = Math.max(1, ...smoothValues) * 1.15;
   const ticks = niceTicks(0, maxVal, 3);
   const barColor = color ?? palette.accent;
 
-  const barCount = values.length;
+  const barCount = smoothValues.length;
   const slotW = plotW / Math.max(1, barCount);
   const barW = Math.max(2, Math.min(6, slotW * 0.5));
-  const peakVal = Math.max(...values);
+  const peakVal = Math.max(...smoothValues);
 
   return (
     <Svg width={width} height={height}>
@@ -448,7 +436,7 @@ export function ImpulseChart({
       })}
 
       {/* Impulse Bars */}
-      {values.map((val, idx) => {
+      {smoothValues.map((val, idx) => {
         const cx = padLeft + idx * slotW + slotW / 2;
         const h = Math.max(val > 0 ? 2.5 : 0, (val / maxVal) * plotH);
         const y = padTop + plotH - h;
@@ -518,7 +506,9 @@ export function HealthEnvelopeChart({
   critical?: number;
   currentVal?: number;
 }) {
-  if (values.length === 0) return null;
+  const targetValues = currentVal === undefined || values.length === 0 ? values : [...values.slice(0, -1), currentVal];
+  const smoothValues = useSmoothSeries(targetValues);
+  if (smoothValues.length === 0) return null;
   const padLeft = 24;
   const padRight = 72;
   const padBottom = 16;
@@ -529,27 +519,27 @@ export function HealthEnvelopeChart({
   const minVal = 0;
   const maxVal = 100;
 
-  const points = values.map((v, i) => ({
-    x: padLeft + (i / Math.max(1, values.length - 1)) * plotW,
+  const points = smoothValues.map((v, i) => ({
+    x: padLeft + (i / Math.max(1, smoothValues.length - 1)) * plotW,
     y: scaleY(v, minVal, maxVal, padTop, plotH),
   }));
 
-  const pathD = spline(points);
+  const pathD = splinePath(points);
   const areaD = `${pathD} L${points[points.length - 1].x.toFixed(1)},${(padTop + plotH).toFixed(1)} L${points[0].x.toFixed(1)},${(padTop + plotH).toFixed(1)} Z`;
 
   const targetY = scaleY(target, minVal, maxVal, padTop, plotH);
   const criticalY = scaleY(critical, minVal, maxVal, padTop, plotH);
 
-  const latestVal = currentVal ?? values[values.length - 1] ?? 76;
+  const latestVal = smoothValues[smoothValues.length - 1] ?? currentVal ?? values[values.length - 1] ?? 76;
   const latestPt = points[points.length - 1] ?? { x: padLeft + plotW, y: scaleY(latestVal, minVal, maxVal, padTop, plotH) };
   const latestTone = latestVal >= target ? palette.accent : latestVal >= critical ? palette.warning : palette.critical;
 
   // Maxima & Minima points
   let maxIdx = 0;
   let minIdx = 0;
-  values.forEach((val, i) => {
-    if (val > values[maxIdx]) maxIdx = i;
-    if (val < values[minIdx]) minIdx = i;
+  smoothValues.forEach((val, i) => {
+    if (val > smoothValues[maxIdx]) maxIdx = i;
+    if (val < smoothValues[minIdx]) minIdx = i;
   });
   const maxPt = points[maxIdx];
   const minPt = points[minIdx];
@@ -610,7 +600,7 @@ export function HealthEnvelopeChart({
           <Circle cx={maxPt.x} cy={maxPt.y} r={3} fill={palette.accent} />
           <Rect x={maxPt.x - 22} y={maxPt.y - 18} width={44} height={14} rx={3} fill={palette.accent} opacity={0.9} />
           <SvgText x={maxPt.x} y={maxPt.y - 8} fontSize={8} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
-            MAX {values[maxIdx]}
+            MAX {Math.round(smoothValues[maxIdx])}
           </SvgText>
         </G>
       )}
@@ -621,7 +611,7 @@ export function HealthEnvelopeChart({
           <Circle cx={minPt.x} cy={minPt.y} r={3} fill={palette.critical} />
           <Rect x={minPt.x - 22} y={minPt.y + 4} width={44} height={14} rx={3} fill={palette.critical} opacity={0.9} />
           <SvgText x={minPt.x} y={minPt.y + 14} fontSize={8} fontWeight="700" fill="#FFFFFF" textAnchor="middle">
-            MIN {values[minIdx]}
+            MIN {Math.round(smoothValues[minIdx])}
           </SvgText>
         </G>
       )}
@@ -630,7 +620,7 @@ export function HealthEnvelopeChart({
       <Circle cx={latestPt.x} cy={latestPt.y} r={3.4} fill={latestTone} />
       <Circle cx={latestPt.x} cy={latestPt.y} r={7} stroke={latestTone} strokeWidth={0.9} fill="none" opacity={0.4} />
       <SvgText x={latestPt.x + 12} y={latestPt.y + 3.5} fontSize={11} fill={palette.ink} fontWeight="700">
-        {latestVal}
+        {Math.round(latestVal)}
       </SvgText>
 
       {/* Y Axis Grid/Ticks */}
@@ -681,20 +671,21 @@ export function MicroSparkline({
   height?: number;
   color?: string;
 }) {
-  if (!values || values.length < 2) return null;
-  const min = Math.min(...values);
-  const max = Math.max(...values);
+  const smoothValues = useSmoothSeries(values ?? []);
+  if (smoothValues.length < 2) return null;
+  const min = Math.min(...smoothValues);
+  const max = Math.max(...smoothValues);
   const span = max - min || 1;
 
-  const points = values.map((v, i) => {
-    const x = (i / (values.length - 1)) * width;
+  const points = smoothValues.map((v, i) => {
+    const x = (i / (smoothValues.length - 1)) * width;
     const y = height - 2 - ((v - min) / span) * (height - 4);
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+    return { x, y };
   });
 
   return (
     <Svg width={width} height={height} style={{ overflow: 'visible' }}>
-      <Path d={`M${points.join(' L')}`} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+      <Path d={splinePath(points, 0.45)} fill="none" stroke={color} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
     </Svg>
   );
 }

@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
-import Svg, { Line, Path, Polyline } from 'react-native-svg';
+import Svg, { Line, Path } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
+import { splinePath, useSmoothSeries } from '../../../../lib/chartMotion';
 import { cn } from '../../../../lib/cn';
 import { levelHexes, stateHexFor, type SensorState, type Thresholds } from '../../../../lib/condition';
 import { consolePalette } from '../../../../lib/consoleTheme';
@@ -88,13 +89,14 @@ export function ConditionTrend({
   const colour = stateHexFor(state, isDark);
 
   const shown = range ? samples.slice(Math.max(0, samples.length - range.samples)) : samples;
+  const smoothShown = useSmoothSeries(shown);
 
   const geometry = useMemo(() => {
-    if (width === null || shown.length < 2) return null;
+    if (width === null || smoothShown.length < 2) return null;
 
     // Scale to include both limits, so the DANGER line is always on the chart
     // even when the reading is nowhere near it.
-    const values = [...shown, thresholds.alert, thresholds.danger];
+    const values = [...smoothShown, thresholds.alert, thresholds.danger];
     const rawMin = Math.min(...values);
     const rawMax = Math.max(...values);
     const pad = (rawMax - rawMin) * 0.12 || 1;
@@ -103,14 +105,15 @@ export function ConditionTrend({
 
     const innerW = width - PAD_LEFT - PAD_RIGHT;
     const innerH = CHART_HEIGHT - PAD_Y * 2;
-    const x = (i: number) => PAD_LEFT + (i / (shown.length - 1)) * innerW;
+    const x = (i: number) => PAD_LEFT + (i / (smoothShown.length - 1)) * innerW;
     const y = (v: number) => PAD_Y + (1 - (v - min) / (max - min)) * innerH;
 
-    const points = shown.map((v, i) => `${x(i)},${y(v)}`).join(' ');
-    const area = `M ${x(0)} ${y(shown[0])} ${shown.map((v, i) => `L ${x(i)} ${y(v)}`).join(' ')} L ${x(shown.length - 1)} ${CHART_HEIGHT - PAD_Y} L ${x(0)} ${CHART_HEIGHT - PAD_Y} Z`;
+    const points = smoothShown.map((v, i) => ({ x: x(i), y: y(v) }));
+    const line = splinePath(points, 0.45);
+    const area = `${line} L ${x(smoothShown.length - 1)} ${CHART_HEIGHT - PAD_Y} L ${x(0)} ${CHART_HEIGHT - PAD_Y} Z`;
 
-    return { points, area, yAlert: y(thresholds.alert), yDanger: y(thresholds.danger), innerW, min, max };
-  }, [width, shown, thresholds.alert, thresholds.danger]);
+    return { line, area, yAlert: y(thresholds.alert), yDanger: y(thresholds.danger), innerW, min, max };
+  }, [width, smoothShown, thresholds.alert, thresholds.danger]);
 
   const spanHours = range ? (range.samples - 1) * sampleIntervalHours : 0;
 
@@ -166,7 +169,7 @@ export function ConditionTrend({
             <Line x1={PAD_LEFT} y1={PAD_Y} x2={width - PAD_RIGHT} y2={PAD_Y} stroke={grid} strokeWidth={1} />
 
             <Path d={geometry.area} fill={colour} fillOpacity={0.1} />
-            <Polyline points={geometry.points} fill="none" stroke={colour} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
+            <Path d={geometry.line} fill="none" stroke={colour} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
 
             {/* Limits dashed, so they read as thresholds rather than as data. */}
             <Line
