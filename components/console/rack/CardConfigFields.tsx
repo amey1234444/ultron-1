@@ -67,6 +67,8 @@ export function EnabledToggle({ enabled, onChange }: { enabled: boolean; onChang
 // shortlist to click rather than a constraint — a custom unit is always typable.
 const COMMON_UNITS: Record<string, string[]> = {
   'Vibration Card': ['mm/s', 'mm/s²', 'g', 'µm', 'in/s', 'mil', 'Hz'],
+  'RTD Card': ['C', 'degC', 'degF', 'K'],
+  'Universal V/I Card': ['bar', 'psi', 'kPa', 'MPa', 'degC', 'degF', '%', 'L/min', 'm3/h', 'A', 'V', 'kW', 'Nm', 'N', 'mm', 'Hz'],
   'Process Card': ['bar', 'psi', 'kPa', 'MPa', 'degC', 'degF', '%', 'L/min', 'm3/h', 'A', 'V', 'Nm', 'N', 'mm', 'Hz'],
   'Speed Card': ['rpm', 'Hz', 'rad/s', 'm/s'],
 };
@@ -87,6 +89,9 @@ type ChannelErrorKey =
   | 'displayName'
   | 'inputType'
   | 'unit'
+  | 'rangeMin'
+  | 'rangeMax'
+  | 'healthyValue'
   | 'offset'
   | 'alarmLowLow'
   | 'alarmLow'
@@ -123,16 +128,30 @@ export function channelConfigErrors(type: CardType, config: ChannelCommonConfig)
   const offset = numberFromText(config.offset);
   const hysteresis = numberFromText(config.hysteresis);
   const alarmDelay = numberFromText(config.alarmDelay);
+  const rangeMin = numberFromText(config.rangeMin);
+  const rangeMax = numberFromText(config.rangeMax);
+  const healthyValue = numberFromText(config.healthyValue);
   const { min, max } = derivedChannelRangeFor(config);
   const span = max > min ? max - min : null;
 
   if (!displayName.trim()) errors.displayName = 'Display name is required';
   if (!config.unit.trim()) errors.unit = 'Engineering unit is required';
-  if (type === 'Process Card' && 'inputType' in config && !PROCESS_INPUT_TYPES.includes((config as ProcessConfig).inputType)) {
+  if ((type === 'Process Card' || type === 'Universal V/I Card') && 'inputType' in config && !PROCESS_INPUT_TYPES.includes((config as ProcessConfig).inputType)) {
     errors.inputType = 'Select an input type';
   }
   if (type === 'Speed Card' && 'inputType' in config && !SPEED_INPUT_TYPES.includes((config as SpeedConfig).inputType)) {
     errors.inputType = 'Select an input type';
+  }
+  if (rangeMin === null) errors.rangeMin = 'Full range minimum must be numeric';
+  if (rangeMax === null) {
+    errors.rangeMax = 'Full range maximum must be numeric';
+  } else if (rangeMin !== null && rangeMax <= rangeMin) {
+    errors.rangeMax = 'Full range maximum must be greater than minimum';
+  }
+  if (config.healthyValue.trim() && healthyValue === null) {
+    errors.healthyValue = 'Healthy/reset value must be numeric';
+  } else if (healthyValue !== null && rangeMin !== null && rangeMax !== null && rangeMax > rangeMin && (healthyValue < rangeMin || healthyValue > rangeMax)) {
+    errors.healthyValue = 'Healthy/reset value must be inside the full range';
   }
   if (offset === null) errors.offset = 'Calibration offset must be numeric';
   if (hysteresis === null) {
@@ -186,7 +205,7 @@ export function processConfigErrors(config: ChannelCommonConfig): ChannelConfigE
 export function channelValueError(config: ChannelCommonConfig, value: number | null): string | undefined {
   const { min, max } = derivedChannelRangeFor(config);
   if (value === null || !Number.isFinite(value)) return 'Channel value must be numeric';
-  if (max > min && (value < min || value > max)) return 'Channel value must be inside the operating range';
+  if (max > min && (value < min || value > max)) return 'Channel value must be inside the full range';
   return undefined;
 }
 
@@ -356,6 +375,23 @@ function HardwareFields({
     );
   }
 
+  if (type === 'RTD Card') {
+    const rtd = config as ProcessConfig;
+    return (
+      <View className="flex-row flex-wrap gap-3">
+        <FieldCell>
+          <ReadoutTile label="Sensor Type" value="RTD temperature input" />
+        </FieldCell>
+        <FieldCell>
+          <FormField label="Scaling" value={rtd.scaling} onChangeText={(value) => setField('scaling', value)} placeholder="1" />
+        </FieldCell>
+        <FieldCell>
+          <FormField label="Filter" value={rtd.filter} onChangeText={(value) => setField('filter', value)} placeholder="e.g. 1st order, 5 s" />
+        </FieldCell>
+      </View>
+    );
+  }
+
   const process = config as ProcessConfig;
   return (
     <View className="gap-3">
@@ -518,7 +554,7 @@ function ChannelValuePanel({
             <View className="flex-1" style={{ minWidth: 160 }}>
               <ExactValueField value={shown} unit={unit} disabled={false} error={valueError} onChange={typeValue} />
             </View>
-            <KnobResetButton label="Reset" disabled={false} onPress={() => drive(quantize(restingValue({ min, max }), step))} />
+            <KnobResetButton label="Reset" disabled={false} onPress={() => drive(quantize(restingValue({ min, max, healthyValue: numberFromText(config.healthyValue) }), step))} />
           </View>
 
         </View>
@@ -566,7 +602,7 @@ function ChannelValuePanel({
             ))}
           </View>
           <Text className={cn('font-body text-[11px] leading-4', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-            Decides how this channel is classified where it is mapped. Unit, operating range and alarm levels come from the sections above.
+            Decides how this channel is classified where it is mapped. Unit, full range and alarm levels come from the sections above.
           </Text>
         </View>
         <FieldCell basis={180}>
@@ -623,7 +659,18 @@ export function ChannelConfigFields({
     // The suggested hysteresis tracks the operating span, which the alarm
     // levels move. It is refreshed only while the operator has not overridden
     // it, so a hand-entered value is never quietly replaced.
-    const alarmKeys = ['alarmLowLow', 'alarmLow', 'alarmHigh', 'alarmHighHigh', 'alarmLowLowEnabled', 'alarmLowEnabled', 'alarmHighEnabled', 'alarmHighHighEnabled'];
+    const alarmKeys = [
+      'rangeMin',
+      'rangeMax',
+      'alarmLowLow',
+      'alarmLow',
+      'alarmHigh',
+      'alarmHighHigh',
+      'alarmLowLowEnabled',
+      'alarmLowEnabled',
+      'alarmHighEnabled',
+      'alarmHighHighEnabled',
+    ];
     if (alarmKeys.includes(key)) {
       const previousSuggestion = suggestedChannelHysteresis(config);
       const untouched = !config.hysteresis.trim() || config.hysteresis === previousSuggestion;
@@ -733,8 +780,38 @@ export function ChannelConfigFields({
       <SectionPanel
         index="04"
         title="Alarm Configuration"
-        note="The four levels define both the alarms and the channel's operating range — there is no separate minimum and maximum to enter. Enabled levels must run LL < L < H < HH; disabled levels are ignored."
+        note="The full range defines the knob and graph scale. LL/L/H/HH define only condition color and alarm state; enabled levels must run LL < L < H < HH."
       >
+        <View className="flex-row flex-wrap gap-3">
+          <FieldCell>
+            <FormField
+              label={`Full Range Minimum${unit ? ` (${unit})` : ''}`}
+              value={config.rangeMin}
+              onChangeText={(value) => setField('rangeMin', value)}
+              placeholder="0"
+              error={errors.rangeMin}
+            />
+          </FieldCell>
+          <FieldCell>
+            <FormField
+              label={`Full Range Maximum${unit ? ` (${unit})` : ''}`}
+              value={config.rangeMax}
+              onChangeText={(value) => setField('rangeMax', value)}
+              placeholder="100"
+              error={errors.rangeMax}
+            />
+          </FieldCell>
+          <FieldCell>
+            <FormField
+              label={`Healthy / Reset Value${unit ? ` (${unit})` : ''}`}
+              value={config.healthyValue}
+              onChangeText={(value) => setField('healthyValue', value)}
+              placeholder="Nominal process value"
+              error={errors.healthyValue}
+            />
+          </FieldCell>
+        </View>
+
         <View className="gap-3">
           {CHANNEL_ALARM_LEVELS.map((level) => (
             <View key={level.valueKey} className={cn('flex-row flex-wrap items-center gap-3 rounded-lg border p-3', isDark ? 'border-line-dark' : 'border-line-light')}>
@@ -762,7 +839,7 @@ export function ChannelConfigFields({
         <View className="flex-row flex-wrap gap-3">
           <FieldCell>
             <ReadoutTile
-              label="Operating Range (derived)"
+              label="Full Range"
               tone={anyAlarmEnabled ? 'accent' : 'warning'}
               value={`${formatProcessValue(min, config.displayPrecision)} to ${formatProcessValue(max, config.displayPrecision)} ${unit}`.trim()}
             />
@@ -783,8 +860,8 @@ export function ChannelConfigFields({
 
         <Text className={cn('font-body text-[11px] leading-4', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
           {anyAlarmEnabled
-            ? 'The operating range spans the enabled levels with 10% headroom at each end, so every level is reachable on the knob and on the gauge. One common hysteresis and one common delay apply to every enabled level: a high alarm clears below its threshold minus the hysteresis, a low alarm clears above its threshold plus it, and an alarm is raised only once the value stays beyond the limit for the whole delay.'
-            : `No alarm level is enabled, so the channel falls back to a ${min}–${max} operating range. Enable at least one level to describe the span this channel actually works over.`}
+            ? 'The configured full range stays independent from the alarm levels, so values such as 2.97 stay normal when H is 5 and HH is 7. A high alarm clears below its threshold minus hysteresis, a low alarm clears above its threshold plus hysteresis, and delay applies before an alarm is raised.'
+            : 'No alarm level is enabled, so the channel can still publish and graph values inside the configured full range without raising a condition.'}
         </Text>
       </SectionPanel>
 

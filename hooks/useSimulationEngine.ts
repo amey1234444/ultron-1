@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { publishLiveMeasurements } from '../lib/liveMeasurementBus';
-import { recordChannelHistorySamples } from '../lib/channelHistoryDb';
+import { recordChannelHistorySamples, recordCloudSimulationHistorySamples } from '../lib/channelHistoryDb';
 import { EMPTY_LIVE_STATE, mergeLiveFrame, type LiveFrame, type LiveState } from '../lib/liveTelemetry';
 import type { DeviceNode } from '../lib/devices';
 import type { CardNode } from '../lib/rack';
@@ -82,6 +82,7 @@ export function useSimulationEngine(devices: DeviceNode[], cards: CardNode[], ru
       frames.forEach((frame) => {
         publishLiveMeasurements(frame.measurements);
         recordChannelHistorySamples(frame.measurements);
+        recordCloudSimulationHistorySamples(frame.measurements);
       });
       setState((current) => frames.reduce((next, frame) => mergeLiveFrame(next, frame, 0), current));
     };

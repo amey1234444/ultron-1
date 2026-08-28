@@ -2,6 +2,7 @@
 // Serves the /api/live endpoints the frontend polls for real-time state.
 
 import { ensureSchema, query } from './db';
+import { getCompressedMeasurementHistory, type CloudHistoryPoint } from './channelHistory';
 
 export type LiveGateway = {
   gatewayId: string;
@@ -283,7 +284,7 @@ export async function getLiveState(options: { includeConflictDeviceDetails?: boo
   };
 }
 
-export type HistoryPoint = { value: number; sourceTimestampUs: string };
+export type HistoryPoint = CloudHistoryPoint;
 type HistoryRow = { value: number; source_timestamp_us: string };
 
 export async function getMeasurementHistory(
@@ -292,13 +293,24 @@ export async function getMeasurementHistory(
   slotId: number,
   channelId: number,
   limit: number,
+  fromMs?: number,
+  toMs?: number,
 ): Promise<HistoryPoint[]> {
+  const compressed = await getCompressedMeasurementHistory(gatewayId, rackId, slotId, channelId, limit, fromMs, toMs);
+  if (compressed.length > 0) return compressed;
   await ensureSchema();
+  const upper = Number.isFinite(toMs) ? Number(toMs) : Number.MAX_SAFE_INTEGER;
+  const lower = Number.isFinite(fromMs) ? Number(fromMs) : 0;
   const res = await query<HistoryRow>(
     `SELECT value, source_timestamp_us FROM measurement_history
      WHERE gateway_id = $1 AND rack_id = $2 AND slot_id = $3 AND channel_id = $4
-     ORDER BY source_timestamp_us DESC LIMIT $5`,
-    [gatewayId, rackId, slotId, channelId, limit],
+       AND source_timestamp_us >= $5
+       AND source_timestamp_us <= $6
+     ORDER BY source_timestamp_us DESC LIMIT $7`,
+    [gatewayId, rackId, slotId, channelId, Math.round(lower * 1000), Math.round(upper * 1000), limit],
   );
-  return res.rows.reverse().map((r: HistoryRow) => ({ value: r.value, sourceTimestampUs: String(r.source_timestamp_us) }));
+  return res.rows.reverse().map((r: HistoryRow) => {
+    const t = Math.round(Number(r.source_timestamp_us) / 1000);
+    return { t, v: r.value, value: r.value, sourceTimestampUs: String(r.source_timestamp_us) };
+  });
 }

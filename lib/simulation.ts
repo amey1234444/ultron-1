@@ -45,9 +45,10 @@ export function cardTypeForKind(kind: SimulatedChannelKind): CardType {
     case 'Speed / RPM':
       return 'Speed Card';
     case 'RTD / Temperature':
+      return 'RTD Card';
     case 'Universal Voltage / Current':
     case 'Pressure':
-      return 'Process Card';
+      return 'Universal V/I Card';
   }
 }
 
@@ -99,6 +100,7 @@ export type SimulatedChannel = {
   // Hard bounds of generated values — a non-fault behaviour never leaves these.
   min: number;
   max: number;
+  healthyValue: number | null;
   alertLimit: number | null;
   dangerLimit: number | null;
   samplesPerSecond: number;
@@ -184,6 +186,7 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'mm/s',
     min: 1.2,
     max: 4.5,
+    healthyValue: 1.5,
     alertLimit: 5,
     dangerLimit: 7,
     samplesPerSecond: 10,
@@ -194,6 +197,7 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: '°C',
     min: 45,
     max: 72,
+    healthyValue: 52,
     alertLimit: 85,
     dangerLimit: 95,
     samplesPerSecond: 1,
@@ -204,6 +208,7 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'A',
     min: 8,
     max: 32,
+    healthyValue: 18,
     alertLimit: 38,
     dangerLimit: 45,
     samplesPerSecond: 1,
@@ -214,6 +219,7 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'rpm',
     min: 1440,
     max: 1480,
+    healthyValue: 1460,
     alertLimit: 1600,
     dangerLimit: 1750,
     samplesPerSecond: 1,
@@ -224,6 +230,7 @@ const KIND_DEFAULTS: Record<SimulatedChannelKind, KindDefaults> = {
     unit: 'bar',
     min: 1.5,
     max: 6.2,
+    healthyValue: 4,
     alertLimit: 8,
     dangerLimit: 10,
     samplesPerSecond: 1,
@@ -302,8 +309,16 @@ function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }
 
-function midpoint(channel: SimulatedChannel): number {
+function midpoint(channel: Pick<SimulatedChannel, 'min' | 'max'>): number {
   return (channel.min + channel.max) / 2;
+}
+
+function nominalValue(channel: Pick<SimulatedChannel, 'min' | 'max' | 'healthyValue'>): number {
+  const min = Number.isFinite(channel.min) ? channel.min : 0;
+  const max = Number.isFinite(channel.max) && channel.max > min ? channel.max : min + 1;
+  const healthy = channel.healthyValue;
+  if (healthy !== null && healthy !== undefined && Number.isFinite(healthy)) return clamp(healthy, min, max);
+  return midpoint({ min, max });
 }
 
 /**
@@ -313,10 +328,10 @@ function midpoint(channel: SimulatedChannel): number {
  * Used to seed a knob that has never been set, so switching a channel to Manual
  * starts it at a healthy reading rather than at a range edge or at zero.
  */
-export function restingValue(channel: Pick<SimulatedChannel, 'min' | 'max'>): number {
+export function restingValue(channel: Pick<SimulatedChannel, 'min' | 'max'> & { healthyValue?: number | null }): number {
   const min = Number.isFinite(channel.min) ? channel.min : 0;
   const max = Number.isFinite(channel.max) && channel.max > min ? channel.max : min + 1;
-  return (min + max) / 2;
+  return nominalValue({ min, max, healthyValue: channel.healthyValue ?? null });
 }
 
 /**
@@ -361,7 +376,7 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
       return { target: midpoint(channel) + (span / 2) * cycle, low: channel.min, high: channel.max };
     case 'Predictive Drift': {
       const limit = channel.dangerLimit ?? channel.alertLimit ?? channel.max;
-      const start = midpoint(channel);
+      const start = nominalValue(channel);
       const horizonSamples = Math.max(channel.samplesPerSecond * 180, 1);
       const progress = Math.min(0.82, Math.max(0, phase / horizonSamples));
       const target = start + (limit - start) * progress;
@@ -383,7 +398,7 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
       // intermittent-fault case that alarm latching and trends should catch.
       const spiking = cycle > 0.85;
       const limit = channel.dangerLimit ?? channel.alertLimit ?? channel.max;
-      const target = spiking ? limit + Math.max(span, Math.abs(limit)) * 0.05 : midpoint(channel);
+      const target = spiking ? limit + Math.max(span, Math.abs(limit)) * 0.05 : nominalValue(channel);
       return { target, low: channel.min, high: Math.max(channel.max, target) };
     }
     case 'Steady':
@@ -391,7 +406,7 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
       // The operating range is derived from the alarm levels, so its centre is
       // by construction the point furthest from every limit — which is exactly
       // where a healthy channel should sit.
-      return { target: midpoint(channel), low: channel.min, high: channel.max };
+      return { target: nominalValue(channel), low: channel.min, high: channel.max };
   }
 }
 
@@ -702,6 +717,7 @@ export function simulationWithCardConfig(type: CardType, config: CardConfig, cha
     unit: common.unit || primary.unit,
     min,
     max,
+    healthyValue: numericOr(common.healthyValue, primary.healthyValue ?? restingValue({ min, max })),
     decimals: decimalsForPrecision(common.displayPrecision),
     alertLimit: limits.high,
     dangerLimit: limits.highHigh,
@@ -738,6 +754,7 @@ export function cardConfigWithSimulation(type: CardType, config: CardConfig, cha
   const next: Record<string, unknown> = {
     ...common,
     unit: common.unit || primary.unit,
+    healthyValue: common.healthyValue || (primary.healthyValue !== null ? String(primary.healthyValue) : ''),
     displayPrecision: precisionForDecimals(primary.decimals),
   };
   // Seed the card's H and HH from the pair the signal carries when the card has

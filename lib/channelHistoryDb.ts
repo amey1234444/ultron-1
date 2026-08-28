@@ -26,11 +26,16 @@ const STORE = 'chunks';
 const CHANNEL_TIME_INDEX = 'byChannelTime';
 const FLUSH_DELAY_MS = 250;
 const MAX_QUEUE_PER_CHANNEL = 600;
+const CLOUD_FLUSH_DELAY_MS = 1000;
+const MAX_CLOUD_QUEUE = 5000;
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 let flushTimer: ReturnType<typeof setTimeout> | null = null;
+let cloudFlushTimer: ReturnType<typeof setTimeout> | null = null;
 const pending = new Map<string, StoredChannelSample[]>();
 const lastQueuedTimestamp = new Map<string, number>();
+const cloudPending: LiveMeasurement[] = [];
+const lastCloudQueuedTimestamp = new Map<string, number>();
 
 function hasIndexedDb(): boolean {
   return typeof indexedDB !== 'undefined';
@@ -196,10 +201,67 @@ export function recordChannelHistorySamples(measurements: LiveMeasurement[] | un
   scheduleFlush();
 }
 
+function keyParts(channelKey: string): { gatewayId: string; rackId: string; slotId: number; channelId: number } | null {
+  const [gatewayId, rackId, slotId, channelId] = channelKey.split('|');
+  const slot = Number(slotId);
+  const channel = Number(channelId);
+  if (!gatewayId || !rackId || !Number.isInteger(slot) || !Number.isInteger(channel)) return null;
+  return { gatewayId, rackId, slotId: slot, channelId: channel };
+}
+
+function isCloudPoint(value: unknown): value is StoredChannelSample {
+  const point = value as { t?: unknown; v?: unknown; value?: unknown; sourceTimestampUs?: unknown };
+  if (typeof point?.t === 'number' && typeof point.v === 'number' && Number.isFinite(point.t) && Number.isFinite(point.v)) return true;
+  if (typeof point?.value === 'number' && typeof point.sourceTimestampUs === 'string') return true;
+  return false;
+}
+
+function normalizeCloudPoint(value: unknown): StoredChannelSample | null {
+  const point = value as { t?: unknown; v?: unknown; value?: unknown; sourceTimestampUs?: unknown };
+  if (typeof point.t === 'number' && typeof point.v === 'number' && Number.isFinite(point.t) && Number.isFinite(point.v)) {
+    return { t: point.t, v: point.v };
+  }
+  if (typeof point.value === 'number' && typeof point.sourceTimestampUs === 'string') {
+    const t = Math.round(Number(point.sourceTimestampUs) / 1000);
+    return Number.isFinite(t) ? { t, v: point.value } : null;
+  }
+  return null;
+}
+
+async function readCloudChannelHistory(
+  channelKey: string,
+  limit: number,
+  fromMs?: number,
+  toMs?: number,
+): Promise<StoredChannelSample[]> {
+  if (typeof window === 'undefined' || typeof fetch === 'undefined') return [];
+  const parts = keyParts(channelKey);
+  if (!parts) return [];
+  const params = new URLSearchParams({
+    gatewayId: parts.gatewayId,
+    rackId: parts.rackId,
+    slotId: String(parts.slotId),
+    channelId: String(parts.channelId),
+    limit: String(limit),
+  });
+  if (Number.isFinite(fromMs)) params.set('fromMs', String(Math.round(Number(fromMs))));
+  if (Number.isFinite(toMs)) params.set('toMs', String(Math.round(Number(toMs))));
+  try {
+    const response = await fetch(`/api/live/history?${params.toString()}`, { cache: 'no-store', credentials: 'same-origin' });
+    if (!response.ok) return [];
+    const body = (await response.json()) as { persisted?: boolean; points?: unknown[] };
+    if (!body.persisted || !Array.isArray(body.points)) return [];
+    return body.points.filter(isCloudPoint).map(normalizeCloudPoint).filter((point): point is StoredChannelSample => point !== null);
+  } catch {
+    return [];
+  }
+}
+
 export async function readChannelHistorySamples(channelKey: string, limit: number): Promise<StoredChannelSample[]> {
+  const cloud = await readCloudChannelHistory(channelKey, limit);
   const db = await openHistoryDb();
-  if (!db) return [];
-  return new Promise((resolve) => {
+  if (!db) return cloud;
+  const local = await new Promise<StoredChannelSample[]>((resolve) => {
     const tx = db.transaction(STORE, 'readonly');
     const index = tx.objectStore(STORE).index(CHANNEL_TIME_INDEX);
     const range = IDBKeyRange.bound([channelKey, 0], [channelKey, Number.MAX_SAFE_INTEGER]);
@@ -220,6 +282,10 @@ export async function readChannelHistorySamples(channelKey: string, limit: numbe
     };
     request.onerror = () => resolve([]);
   });
+  const byTimestamp = new Map<number, number>();
+  cloud.forEach((sample) => byTimestamp.set(sample.t, sample.v));
+  local.forEach((sample) => byTimestamp.set(sample.t, sample.v));
+  return [...byTimestamp.entries()].map(([t, v]) => ({ t, v })).sort((a, b) => a.t - b.t).slice(-limit);
 }
 
 export async function readChannelHistoryRange(
@@ -228,9 +294,10 @@ export async function readChannelHistoryRange(
   toMs: number,
   limit: number,
 ): Promise<StoredChannelSample[]> {
+  const cloud = await readCloudChannelHistory(channelKey, limit, fromMs, toMs);
   const db = await openHistoryDb();
-  if (!db || !(toMs >= fromMs) || limit <= 0) return [];
-  return new Promise((resolve) => {
+  if (!db || !(toMs >= fromMs) || limit <= 0) return cloud;
+  const local = await new Promise<StoredChannelSample[]>((resolve) => {
     const tx = db.transaction(STORE, 'readonly');
     const index = tx.objectStore(STORE).index(CHANNEL_TIME_INDEX);
     const range = IDBKeyRange.bound([channelKey, fromMs], [channelKey, Number.MAX_SAFE_INTEGER]);
@@ -262,10 +329,60 @@ export async function readChannelHistoryRange(
     };
     request.onerror = () => resolve([]);
   });
+  const byTimestamp = new Map<number, number>();
+  cloud.forEach((sample) => byTimestamp.set(sample.t, sample.v));
+  local.forEach((sample) => {
+    if (sample.t >= fromMs && sample.t <= toMs) byTimestamp.set(sample.t, sample.v);
+  });
+  return [...byTimestamp.entries()].map(([t, v]) => ({ t, v })).sort((a, b) => a.t - b.t).slice(-limit);
+}
+
+async function flushCloudSimulationHistory() {
+  if (cloudFlushTimer) {
+    clearTimeout(cloudFlushTimer);
+    cloudFlushTimer = null;
+  }
+  if (cloudPending.length === 0 || typeof fetch === 'undefined') return;
+  const measurements = cloudPending.splice(0, MAX_CLOUD_QUEUE);
+  try {
+    await fetch('/api/live/history/chunks', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ measurements }),
+    });
+  } catch {
+    cloudPending.unshift(...measurements.slice(0, MAX_CLOUD_QUEUE - cloudPending.length));
+  }
+  if (cloudPending.length > 0) scheduleCloudFlush();
+}
+
+function scheduleCloudFlush() {
+  if (cloudFlushTimer || typeof window === 'undefined') return;
+  cloudFlushTimer = setTimeout(() => {
+    void flushCloudSimulationHistory();
+  }, CLOUD_FLUSH_DELAY_MS);
+}
+
+export function recordCloudSimulationHistorySamples(measurements: LiveMeasurement[] | undefined) {
+  if (!measurements?.length || typeof window === 'undefined') return;
+  for (const measurement of measurements) {
+    if (!measurement.gatewayId.startsWith('sim-')) continue;
+    if (typeof measurement.value !== 'number' || !Number.isFinite(measurement.value)) continue;
+    const timestamp = Date.parse(measurement.updatedAt);
+    if (!Number.isFinite(timestamp)) continue;
+    const channelKey = liveMeasurementKeyOf(measurement);
+    if ((lastCloudQueuedTimestamp.get(channelKey) ?? -Infinity) >= timestamp) continue;
+    lastCloudQueuedTimestamp.set(channelKey, timestamp);
+    cloudPending.push(measurement);
+    if (cloudPending.length >= MAX_CLOUD_QUEUE) void flushCloudSimulationHistory();
+  }
+  scheduleCloudFlush();
 }
 
 if (typeof window !== 'undefined') {
   window.addEventListener('pagehide', () => {
     void flushChannelHistory();
+    void flushCloudSimulationHistory();
   });
 }

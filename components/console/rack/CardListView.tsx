@@ -13,6 +13,7 @@ import {
 import { cn } from '../../../lib/cn';
 import {
   TOTAL_SLOTS,
+  channelAlarmLimits,
   channelCountForCardType,
   channelNamesForCard,
   isCardConfigured,
@@ -66,6 +67,16 @@ const ALARM_RANK: Record<ChannelAlarmLevel, number> = { normal: 0, alert: 1, dan
 
 type Rollup = { channels: number; liveCount: number; tone: RollupTone };
 
+function configuredAlarmLevel(card: CardNode, measurement: ReturnType<typeof latestMeasurementForChannel>): ChannelAlarmLevel {
+  if (!measurement || typeof measurement.value !== 'number' || !('alarmHigh' in card.config)) return channelAlarmLevel(measurement);
+  const limits = channelAlarmLimits(card.config);
+  if (limits.highHigh !== null && measurement.value >= limits.highHigh) return 'danger';
+  if (limits.lowLow !== null && measurement.value <= limits.lowLow) return 'danger';
+  if (limits.high !== null && measurement.value >= limits.high) return 'alert';
+  if (limits.low !== null && measurement.value <= limits.low) return 'alert';
+  return 'normal';
+}
+
 function cardRollup(device: DeviceNode, card: CardNode, live: LiveState | undefined): Rollup {
   const channels = channelCountForCardType(card.type);
 
@@ -85,7 +96,7 @@ function cardRollup(device: DeviceNode, card: CardNode, live: LiveState | undefi
     if (status === 'active') liveCount += 1;
     if (status === 'stale') anyStale = true;
     const measurement = live && status === 'active' ? latestMeasurementForChannel(device, card, channelId, live) : undefined;
-    const alarm = channelAlarmLevel(measurement);
+    const alarm = configuredAlarmLevel(card, measurement);
     if (ALARM_RANK[alarm] > ALARM_RANK[worst]) worst = alarm;
   }
 

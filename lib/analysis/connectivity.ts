@@ -137,6 +137,8 @@ function signalTypeFor(card: CardNode | undefined): string {
   if ('inputType' in config && config.inputType) return config.inputType;
   if ('sensorType' in config && config.sensorType.trim()) return config.sensorType.trim();
   if (card.type === 'Vibration Card') return 'IEPE accelerometer';
+  if (card.type === 'RTD Card') return 'RTD temperature input';
+  if (card.type === 'Universal V/I Card') return 'Universal voltage/current input';
   return 'Unknown';
 }
 

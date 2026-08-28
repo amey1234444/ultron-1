@@ -20,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text, TextInput, View, useWindowDimensions } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import { readChannelHistorySamples } from '../../../lib/channelHistoryDb';
 import {
   buildParameterConnections,
   relativeAge,
@@ -58,6 +59,7 @@ import {
 } from '../../../lib/analysis/extruder';
 import type { SignalQuality } from '../../../lib/analysis/types';
 import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/devices';
+import { liveMeasurementKeyForChannel } from '../../../lib/liveChannelValue';
 import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import {
@@ -430,6 +432,47 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
   // Without it, heater failure cannot be separated from heater degradation and
   // no instrumentation hypothesis can ever be raised.
   const historyRef = useRef<Partial<Record<ExtruderTag, (number | null)[]>>>({});
+  const [historyRevision, setHistoryRevision] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    const lookups = mappedChannels
+      .map((mapped) => {
+        const resolution = resolveSignal(mapped.label.trim(), mapped.templatePointCode, mapped.channel.unit);
+        if (resolution.kind !== 'mapped') return null;
+        const key = liveMeasurementKeyForChannel(mapped.channel, channelNumber(mapped.channel.id), devices);
+        return key ? { key, tag: resolution.tag } : null;
+      })
+      .filter((entry): entry is { key: string; tag: ExtruderTag } => entry !== null);
+
+    if (lookups.length === 0) return;
+
+    void Promise.all(
+      lookups.map(async (lookup) => ({
+        tag: lookup.tag,
+        samples: await readChannelHistorySamples(lookup.key, 240),
+      })),
+    ).then((loaded) => {
+      if (cancelled) return;
+      let changed = false;
+      const next: Partial<Record<ExtruderTag, (number | null)[]>> = { ...historyRef.current };
+      for (const entry of loaded) {
+        if (entry.samples.length === 0) continue;
+        const values = entry.samples.map((sample) => sample.v);
+        const current = next[entry.tag] ?? [];
+        if (current.length >= values.length && values.every((value, index) => current[current.length - values.length + index] === value)) continue;
+        next[entry.tag] = [...values, ...current].slice(-240);
+        changed = true;
+      }
+      if (!changed) return;
+      historyRef.current = next;
+      setHistoryRevision((value) => value + 1);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [devices, mappedChannels]);
 
   const liveRun = useMemo(() => {
     const now = new Date().toISOString();
@@ -443,7 +486,7 @@ export function ExtruderAnalysisView({ mappedChannels, devices, cards, live, exp
       points: built.points,
       dataMode: built.mode,
     };
-  }, [mappedChannels, devices, cards, live]);
+  }, [mappedChannels, devices, cards, live, historyRevision]);
 
   // Accumulate in an effect rather than inside the memo: mutating a ref during
   // render double-appends under StrictMode's double-invoke.

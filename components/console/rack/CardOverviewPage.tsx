@@ -76,6 +76,12 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
           { label: 'Sensitivity', value: (config as VibrationConfig).sensitivity || '—' },
           { label: 'Sampling Rate', value: (config as VibrationConfig).samplingRate || '—' },
         ]
+      : card.type === 'RTD Card' && 'scaling' in config
+        ? [
+            { label: 'Sensor Type', value: 'RTD temperature input' },
+            { label: 'Scaling', value: (config as ProcessConfig).scaling || '1' },
+            { label: 'Filter', value: (config as ProcessConfig).filter || 'â€”' },
+          ]
       : card.type === 'Speed Card' && 'pulsesPerRevolution' in config
         ? [
             { label: 'Input Type', value: (config as SpeedConfig).inputType },
@@ -106,7 +112,8 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
     { label: 'Tag', value: config.tag || '—' },
     ...hardware,
     { label: 'Engineering Unit', value: unit },
-    { label: 'Operating Range (derived)', value: `${formatProcessValue(range.min, config.displayPrecision)} to ${formatProcessValue(range.max, config.displayPrecision)} ${unit}` },
+    { label: 'Full Range', value: `${formatProcessValue(range.min, config.displayPrecision)} to ${formatProcessValue(range.max, config.displayPrecision)} ${unit}` },
+    { label: 'Healthy / Reset Value', value: config.healthyValue ? `${config.healthyValue} ${unit}` : 'â€”' },
     { label: 'Calibration Offset', value: `${config.offset || '0'} ${unit}` },
     { label: 'Low-Low Alarm', value: alarmValue(config.alarmLowLowEnabled, config.alarmLowLow) },
     { label: 'Low Alarm', value: alarmValue(config.alarmLowEnabled, config.alarmLow) },

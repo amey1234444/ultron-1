@@ -2,6 +2,7 @@ import { createHash } from 'crypto';
 
 import { buildLiveFrame, parseLiveTopic, type TopicKind } from '../../lib/liveFrame';
 import { normalizeChannelConfig } from '../../lib/rack';
+import { storeCompressedHistoryMeasurements } from './channelHistory';
 import { ensureSchema, query } from './db';
 import { publishLiveFrame } from './liveFrame';
 
@@ -58,7 +59,7 @@ function stableId(prefix: string, ...parts: string[]): string {
   return `${prefix}-${createHash('sha1').update(parts.join('|')).digest('hex').slice(0, 16)}`;
 }
 
-function cardTypeForSlot(slot: Record<string, unknown>): 'Vibration Card' | 'Process Card' | 'Speed Card' | 'Communication Controller' {
+function cardTypeForSlot(slot: Record<string, unknown>): 'Vibration Card' | 'RTD Card' | 'Universal V/I Card' | 'Process Card' | 'Speed Card' | 'Communication Controller' {
   const normalized = [slot.card_type, slot.sensor, slot.unit, slot.value_with_unit]
     .map((value) => String(value ?? '').trim().toLowerCase())
     .filter(Boolean)
@@ -68,6 +69,22 @@ function cardTypeForSlot(slot: Record<string, unknown>): 'Vibration Card' | 'Pro
   if (normalized.includes('rpm')) return 'Speed Card';
   if (normalized.includes('communication')) return 'Communication Controller';
   if (normalized.includes('controller')) return 'Communication Controller';
+  if (normalized.includes('rtd') || normalized.includes('temperature') || /\bc\b/.test(normalized)) return 'RTD Card';
+  if (
+    normalized.includes('universal') ||
+    normalized.includes('4-20') ||
+    normalized.includes('0-20') ||
+    normalized.includes('current') ||
+    normalized.includes('voltage') ||
+    normalized.includes('pressure') ||
+    normalized.includes('power') ||
+    normalized.includes('level') ||
+    normalized.includes('mpa') ||
+    normalized.includes('kw') ||
+    normalized.includes('%')
+  ) {
+    return 'Universal V/I Card';
+  }
   return 'Process Card';
 }
 
@@ -88,10 +105,10 @@ function cardConfigForSlot(type: ReturnType<typeof cardTypeForSlot>, slot: Recor
   // fills in the rest and derives the operating range from those thresholds.
   return normalizeChannelConfig(type, {
     channelNames: [label],
-    unit: unit || (type === 'Vibration Card' ? 'mm/s' : type === 'Speed Card' ? 'rpm' : ''),
+    unit: unit || (type === 'Vibration Card' ? 'mm/s' : type === 'Speed Card' ? 'rpm' : type === 'RTD Card' ? 'C' : ''),
     ...(type === 'Vibration Card' ? { sensorType: sensor } : {}),
     ...(type === 'Speed Card' ? { inputType: 'RPM' } : {}),
-    ...(type === 'Process Card' ? { inputType: '4-20 mA' } : {}),
+    ...(type === 'Process Card' || type === 'Universal V/I Card' || type === 'RTD Card' ? { inputType: '4-20 mA' } : {}),
     alarmHighEnabled: !!warning,
     alarmHigh: warning,
     alarmHighHighEnabled: !!critical,
@@ -699,6 +716,21 @@ async function storeChannelMeasurement(msg: MqttEnvelope, slot: Record<string, u
      ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
     params,
   );
+  await storeCompressedHistoryMeasurements([
+    {
+      gatewayId: String(params[0]),
+      rackId: String(params[1]),
+      slotId: Number(params[2]),
+      channelId: Number(params[3]),
+      measurementType: String(params[4]),
+      value,
+      timestampMs: Math.round(Number(params[9]) / 1000),
+      unit: String(params[6] ?? ''),
+      quality: String(params[7] ?? 'GOOD'),
+      cardType: stringValue(slot.card_type),
+      sensor: stringValue(slot.sensor),
+    },
+  ]);
 }
 
 async function handleTelemetry(msg: MqttEnvelope): Promise<number> {

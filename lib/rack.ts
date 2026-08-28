@@ -3,10 +3,10 @@ import type { DeviceNode } from './devices';
 // with lib/simulation.ts (which imports card helpers from here).
 import type { SimulatedChannel } from './simulation';
 
-export const CARD_TYPES = ['Vibration Card', 'Process Card', 'Speed Card', 'Communication Controller'] as const;
+export const CARD_TYPES = ['Vibration Card', 'RTD Card', 'Universal V/I Card', 'Process Card', 'Speed Card', 'Communication Controller'] as const;
 export type CardType = (typeof CARD_TYPES)[number];
 
-export const ACQUISITION_CARD_TYPES: CardType[] = ['Vibration Card', 'Process Card', 'Speed Card'];
+export const ACQUISITION_CARD_TYPES: CardType[] = ['Vibration Card', 'RTD Card', 'Universal V/I Card', 'Process Card', 'Speed Card'];
 export const CONTROLLER_CARD_TYPES: CardType[] = ['Communication Controller'];
 
 export const PROCESS_INPUT_TYPES = ['0-1 V', '0-5 V', '0-10 V', '4-20 mA', '0-20 mA'] as const;
@@ -77,6 +77,9 @@ export type ChannelCommonConfig = {
   channelNames: string[];
   tag: string;
   unit: string;
+  rangeMin: string;
+  rangeMax: string;
+  healthyValue: string;
   /** Signed calibration offset, in the channel's engineering unit. */
   offset: string;
   alarmLowLowEnabled: boolean;
@@ -231,6 +234,12 @@ export function channelAlarmLimits(config: ChannelCommonConfig): ChannelAlarmLim
   };
 }
 
+function explicitChannelRange(config: ChannelCommonConfig): { min: number; max: number } | null {
+  const min = parsedNumber(config.rangeMin);
+  const max = parsedNumber(config.rangeMax);
+  return min !== null && max !== null && max > min ? { min, max } : null;
+}
+
 /** How much room the operating range leaves beyond the outermost alarm level. */
 const RANGE_HEADROOM = 0.1;
 /** The range a channel gets when no alarm level is enabled at all. */
@@ -280,7 +289,7 @@ export function derivedChannelRange(limits: ChannelAlarmLimits): { min: number; 
 }
 
 export function derivedChannelRangeFor(config: ChannelCommonConfig): { min: number; max: number } {
-  return derivedChannelRange(channelAlarmLimits(config));
+  return explicitChannelRange(config) ?? derivedChannelRange(channelAlarmLimits(config));
 }
 
 /** The derived range as the strings a card stores. */
@@ -318,10 +327,21 @@ export function syncChannelLegacyAlarms<T extends ChannelCommonConfig>(config: T
 }
 
 function commonDefaults(source: Partial<ChannelCommonConfig>, fallbackUnit: string): ChannelCommonConfig {
+  const legacy = source as Partial<ChannelCommonConfig> & {
+    measurementRangeMin?: string;
+    measurementRangeMax?: string;
+    engineeringMin?: string;
+    engineeringMax?: string;
+    minSpeed?: string;
+    maxSpeed?: string;
+  };
   return {
     channelNames: source.channelNames ?? [],
     tag: source.tag ?? '',
     unit: source.unit ?? fallbackUnit,
+    rangeMin: source.rangeMin ?? legacy.measurementRangeMin ?? legacy.engineeringMin ?? legacy.minSpeed ?? '',
+    rangeMax: source.rangeMax ?? legacy.measurementRangeMax ?? legacy.engineeringMax ?? legacy.maxSpeed ?? '',
+    healthyValue: source.healthyValue ?? '',
     offset: source.offset ?? '0',
     alarmLowLowEnabled: source.alarmLowLowEnabled ?? false,
     alarmLowEnabled: source.alarmLowEnabled ?? false,
@@ -337,6 +357,12 @@ function commonDefaults(source: Partial<ChannelCommonConfig>, fallbackUnit: stri
     alarmWarning: source.alarmWarning ?? '',
     alarmCritical: source.alarmCritical ?? '',
   };
+}
+
+function commonWithRangeDefaults<T extends ChannelCommonConfig>(config: T): T {
+  if (config.rangeMin.trim() && config.rangeMax.trim()) return config;
+  const range = derivedRangeText(config);
+  return { ...config, rangeMin: config.rangeMin || range.min, rangeMax: config.rangeMax || range.max };
 }
 
 /**
@@ -361,7 +387,8 @@ export function normalizeChannelConfig(type: CardType, config: Record<string, un
 
   if (type === 'Vibration Card') {
     const common = commonDefaults({ ...source, channelNames, unit: source.unit ?? source.engineeringUnit }, 'mm/s');
-    const withHysteresis = { ...common, hysteresis: common.hysteresis || suggestedChannelHysteresis(common) };
+    const ranged = commonWithRangeDefaults(common);
+    const withHysteresis = { ...ranged, hysteresis: ranged.hysteresis || suggestedChannelHysteresis(ranged) };
     const range = derivedRangeText(withHysteresis);
     return syncChannelLegacyAlarms({
       ...withHysteresis,
@@ -376,7 +403,8 @@ export function normalizeChannelConfig(type: CardType, config: Record<string, un
 
   if (type === 'Speed Card') {
     const common = commonDefaults({ ...source, channelNames }, 'rpm');
-    const withHysteresis = { ...common, hysteresis: common.hysteresis || suggestedChannelHysteresis(common) };
+    const ranged = commonWithRangeDefaults(common);
+    const withHysteresis = { ...ranged, hysteresis: ranged.hysteresis || suggestedChannelHysteresis(ranged) };
     const range = derivedRangeText(withHysteresis);
     return syncChannelLegacyAlarms({
       ...withHysteresis,
@@ -391,8 +419,9 @@ export function normalizeChannelConfig(type: CardType, config: Record<string, un
     });
   }
 
-  const common = commonDefaults({ ...source, channelNames }, '');
-  const withHysteresis = { ...common, hysteresis: common.hysteresis || suggestedChannelHysteresis(common) };
+  const common = commonDefaults({ ...source, channelNames }, type === 'RTD Card' ? 'C' : '');
+  const ranged = commonWithRangeDefaults(common);
+  const withHysteresis = { ...ranged, hysteresis: ranged.hysteresis || suggestedChannelHysteresis(ranged) };
   const range = derivedRangeText(withHysteresis);
   return syncChannelLegacyAlarms({
     ...withHysteresis,
@@ -437,11 +466,16 @@ export function emptyConfigFor(type: CardType): CardConfig {
  */
 export function configuredHealthyValue(card: CardNode): number | null {
   const simulated = card.simulation?.[0];
+  if (simulated?.healthyValue !== undefined && simulated.healthyValue !== null && Number.isFinite(simulated.healthyValue)) {
+    return simulated.healthyValue;
+  }
   if (simulated && Number.isFinite(simulated.min) && Number.isFinite(simulated.max) && simulated.max > simulated.min) {
     return (simulated.min + simulated.max) / 2;
   }
   const config = card.config;
   if (!('alarmHigh' in config)) return null;
+  const configured = parsedNumber(config.healthyValue);
+  if (configured !== null) return configured;
   const { min, max } = derivedChannelRangeFor(config);
   return max > min ? (min + max) / 2 : null;
 }
@@ -489,8 +523,9 @@ function letterAndUnitForCard(card: CardNode): { letter: ChannelRef['letter']; u
     const unit = ('unit' in card.config ? card.config.unit : '') || 'rpm';
     return { letter: 'S', unit };
   }
-  if (card.type === 'Process Card' && 'unit' in card.config) {
+  if ((card.type === 'RTD Card' || card.type === 'Universal V/I Card' || card.type === 'Process Card') && 'unit' in card.config) {
     const unit = card.config.unit || '';
+    if (card.type === 'RTD Card') return { letter: 'T', unit: unit || 'C' };
     const normalized = unit.toLowerCase().trim();
     if (normalized.includes('bar') || normalized.includes('psi') || normalized.includes('pa')) {
       return { letter: 'P', unit: unit || 'bar' };

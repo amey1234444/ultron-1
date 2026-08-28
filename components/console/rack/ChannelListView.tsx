@@ -13,7 +13,7 @@ import {
   type LiveMeasurement,
   type LiveState,
 } from '../../../lib/liveTelemetry';
-import { channelCountForCardType, channelNamesForCard, type CardNode } from '../../../lib/rack';
+import { channelAlarmLimits, channelCountForCardType, channelNamesForCard, type CardNode } from '../../../lib/rack';
 
 type ChannelListViewProps = {
   device: DeviceNode;
@@ -92,6 +92,16 @@ function Dot({ label, dot, text }: { label: string; dot: string; text: string })
   );
 }
 
+function configuredAlarmLevel(card: CardNode, measurement: LiveMeasurement | undefined): ChannelAlarmLevel {
+  if (!measurement || typeof measurement.value !== 'number' || !('alarmHigh' in card.config)) return channelAlarmLevel(measurement);
+  const limits = channelAlarmLimits(card.config);
+  if (limits.highHigh !== null && measurement.value >= limits.highHigh) return 'danger';
+  if (limits.lowLow !== null && measurement.value <= limits.lowLow) return 'danger';
+  if (limits.high !== null && measurement.value >= limits.high) return 'alert';
+  if (limits.low !== null && measurement.value <= limits.low) return 'alert';
+  return 'normal';
+}
+
 export function ChannelListView({ device, cards, live }: ChannelListViewProps) {
   const { isDark } = useAppTheme();
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -123,7 +133,7 @@ export function ChannelListView({ device, cards, live }: ChannelListViewProps) {
             named: name.trim().length > 0,
             status,
             measurement,
-            alarm: channelAlarmLevel(measurement),
+            alarm: configuredAlarmLevel(card, measurement),
           };
         }),
       );

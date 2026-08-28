@@ -17,6 +17,51 @@ const decimalStringOrNull = (value) => {
   return null;
 };
 
+function bytesToBase64(bytes) {
+  return Buffer.from(bytes).toString('base64');
+}
+
+function encodeUnsignedVarints(values) {
+  const bytes = [];
+  for (const raw of values) {
+    let value = raw < 0n ? 0n : raw;
+    while (value >= 0x80n) {
+      bytes.push(Number((value & 0x7fn) | 0x80n));
+      value >>= 7n;
+    }
+    bytes.push(Number(value));
+  }
+  return bytesToBase64(Uint8Array.from(bytes));
+}
+
+function floatToBits(value) {
+  const buffer = new ArrayBuffer(8);
+  const view = new DataView(buffer);
+  view.setFloat64(0, value, true);
+  return view.getBigUint64(0, true);
+}
+
+function encodeHistoryChunk(samples) {
+  const ordered = [...samples].filter((sample) => Number.isFinite(sample.t) && Number.isFinite(sample.v)).sort((a, b) => a.t - b.t);
+  const t0 = Math.round(ordered[0]?.t ?? Date.now());
+  let previousTimestamp = BigInt(t0);
+  const timestampDeltas = ordered.map((sample, index) => {
+    const timestamp = BigInt(Math.round(sample.t));
+    if (index === 0) return 0n;
+    const delta = timestamp - previousTimestamp;
+    previousTimestamp = timestamp;
+    return delta;
+  });
+  let previousBits = 0n;
+  const valueXors = ordered.map((sample) => {
+    const bits = floatToBits(sample.v);
+    const xor = bits ^ previousBits;
+    previousBits = bits;
+    return xor;
+  });
+  return { version: 1, t0, td: encodeUnsignedVarints(timestampDeltas), vx: encodeUnsignedVarints(valueXors) };
+}
+
 const channelIdOf = (slot) => intOrNull(slot.channel_id) ?? intOrNull(slot.channel_number) ?? intOrNull(slot.channel) ?? 1;
 const measurementTypeOf = (slot) => textOrNull(slot.sensor) ?? textOrNull(slot.card_type) ?? 'VALUE';
 
@@ -34,6 +79,22 @@ function cardTypeForSlot(slot) {
   if (normalized.includes('rpm')) return 'Speed Card';
   if (normalized.includes('communication')) return 'Communication Controller';
   if (normalized.includes('controller')) return 'Communication Controller';
+  if (normalized.includes('rtd') || normalized.includes('temperature') || /\bc\b/.test(normalized)) return 'RTD Card';
+  if (
+    normalized.includes('universal') ||
+    normalized.includes('4-20') ||
+    normalized.includes('0-20') ||
+    normalized.includes('current') ||
+    normalized.includes('voltage') ||
+    normalized.includes('pressure') ||
+    normalized.includes('power') ||
+    normalized.includes('level') ||
+    normalized.includes('mpa') ||
+    normalized.includes('kw') ||
+    normalized.includes('%')
+  ) {
+    return 'Universal V/I Card';
+  }
   return 'Process Card';
 }
 
@@ -76,7 +137,10 @@ function cardConfigForSlot(type, slot) {
     inputType: '4-20 mA',
     engineeringMin: '',
     engineeringMax: '',
-    unit,
+    rangeMin: '',
+    rangeMax: '',
+    healthyValue: '',
+    unit: unit || (type === 'RTD Card' ? 'C' : ''),
     scaling: '1',
     offset: '0',
     filter: '',
@@ -795,6 +859,10 @@ const CHANNEL_MEASUREMENT_CASTS = [
   '::text', '::text', '::bigint', '::numeric', '::text', '::text',
   '::text', '::text', '::double precision', '::double precision', '::text', '::text',
 ];
+const HISTORY_CHUNK_CASTS = [
+  '::text', '::text', '::text', '::int', '::int', '::text', '::text',
+  '::text', '::text', '::text', '::bigint', '::bigint', '::int', '::text', '::jsonb',
+];
 
 function inventorySlotRow(msg, slot) {
   return [
@@ -861,6 +929,47 @@ function channelMeasurementRow(msg, slot) {
     textOrNull(slot.alert_status) ?? 'INACTIVE',
     textOrNull(slot.danger_status) ?? 'INACTIVE',
   ];
+}
+
+function historyChunkRow(row) {
+  const timestampMs = Math.round(Number(row[9]) / 1000);
+  if (!Number.isFinite(timestampMs)) return null;
+  const sample = { t: timestampMs, v: row[5] };
+  const payload = encodeHistoryChunk([sample]);
+  const identity = [row[0], row[1], row[2], row[3], row[4]].join('|');
+  const id = createHash('sha1').update(`${identity}|${timestampMs}|${timestampMs}|1|${payload.td}|${payload.vx}`).digest('hex');
+  return [
+    id,
+    row[0],
+    String(row[1]),
+    row[2],
+    row[3],
+    row[4],
+    row[6] ?? '',
+    row[7] ?? 'GOOD',
+    row[10] ?? null,
+    row[11] ?? null,
+    timestampMs,
+    timestampMs,
+    1,
+    'delta-varint-f64xor-v1',
+    JSON.stringify(payload),
+  ];
+}
+
+async function insertHistoryChunks(rows) {
+  const chunks = rows.map(historyChunkRow).filter(Boolean);
+  if (chunks.length === 0) return;
+  await query(
+    `INSERT INTO measurement_history_chunks (
+       id, gateway_id, rack_id, slot_id, channel_id, measurement_type, unit,
+       quality, card_type, sensor, first_timestamp_ms, last_timestamp_ms,
+       sample_count, encoding, payload
+     )
+     VALUES ${multiRowValues(chunks.length, HISTORY_CHUNK_CASTS)}
+     ON CONFLICT (id) DO NOTHING`,
+    chunks.flat(),
+  );
 }
 
 async function upsertInventorySlots(rows) {
@@ -977,6 +1086,7 @@ async function upsertChannelMeasurements(msg, slots) {
      ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
     rows.flat(),
   );
+  await insertHistoryChunks(rows);
 }
 
 export async function handleTelemetry(msg) {

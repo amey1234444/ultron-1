@@ -15,14 +15,19 @@ type GatewayProfile = {
 
 type SseChannelSpec = {
   key: string;
+  rack: 1 | 2;
+  slot: number;
   label: string;
   cardType: CardType;
   kind: SimulatedChannelKind;
   unit: string;
-  min: number;
-  max: number;
-  alert: number;
-  danger: number;
+  rangeMin: number;
+  rangeMax: number;
+  lowLow?: number;
+  low?: number;
+  healthy: number;
+  high?: number;
+  highHigh?: number;
   decimals: number;
   samplesPerSecond: number;
   inputType?: ProcessInputType;
@@ -66,37 +71,47 @@ const PROFILES: GatewayProfile[] = [
 ];
 
 const SSE_CHANNELS: SseChannelSpec[] = [
-  { key: 'gearbox-input-vib', label: 'Gearbox Input Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s', min: 1.1, max: 2.2, alert: 4.5, danger: 6.5, decimals: 2, samplesPerSecond: 4 },
-  { key: 'gearbox-output-vib', label: 'Gearbox Output Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s', min: 1.0, max: 2.0, alert: 4.2, danger: 6.2, decimals: 2, samplesPerSecond: 4 },
-  { key: 'motor-current', label: 'Motor Current', cardType: 'Process Card', kind: 'Universal Voltage / Current', unit: 'A', min: 18, max: 28, alert: 38, danger: 45, decimals: 2, samplesPerSecond: 1, inputType: '4-20 mA' },
-  { key: 'screw-rpm', label: 'Screw RPM', cardType: 'Speed Card', kind: 'Speed / RPM', unit: 'rpm', min: 42, max: 48, alert: 55, danger: 65, decimals: 0, samplesPerSecond: 1 },
-  { key: 'barrel-zone-1-temp', label: 'Barrel Zone 1 Temperature', cardType: 'Process Card', kind: 'RTD / Temperature', unit: 'C', min: 172, max: 184, alert: 210, danger: 230, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
-  { key: 'barrel-zone-2-temp', label: 'Barrel Zone 2 Temperature', cardType: 'Process Card', kind: 'RTD / Temperature', unit: 'C', min: 182, max: 194, alert: 220, danger: 240, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
-  { key: 'barrel-zone-3-temp', label: 'Barrel Zone 3 Temperature', cardType: 'Process Card', kind: 'RTD / Temperature', unit: 'C', min: 190, max: 202, alert: 230, danger: 250, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
-  { key: 'melt-temp', label: 'Melt Temperature', cardType: 'Process Card', kind: 'RTD / Temperature', unit: 'C', min: 196, max: 206, alert: 235, danger: 255, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
-  { key: 'melt-pressure', label: 'Melt Pressure', cardType: 'Process Card', kind: 'Pressure', unit: 'bar', min: 86, max: 110, alert: 145, danger: 170, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
-  { key: 'die-pressure', label: 'Die Pressure', cardType: 'Process Card', kind: 'Pressure', unit: 'bar', min: 72, max: 94, alert: 130, danger: 155, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
-  { key: 'feed-rate', label: 'Feed Rate', cardType: 'Process Card', kind: 'Universal Voltage / Current', unit: 'kg/h', min: 180, max: 230, alert: 280, danger: 325, decimals: 0, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0' },
-  { key: 'heater-current', label: 'Heater Current', cardType: 'Process Card', kind: 'Universal Voltage / Current', unit: 'A', min: 9, max: 15, alert: 21, danger: 26, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
+  { key: 'motor-de-vibration', rack: 1, slot: 1, label: 'Motor DE Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.5, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
+  { key: 'motor-nde-vibration', rack: 1, slot: 2, label: 'Motor NDE Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.4, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
+  { key: 'motor-temperature', rack: 1, slot: 3, label: 'Motor Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 150, healthy: 45, high: 75, highHigh: 90, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
+  { key: 'motor-rpm', rack: 1, slot: 4, label: 'Motor RPM', cardType: 'Speed Card', kind: 'Speed / RPM', unit: 'RPM', rangeMin: 0, rangeMax: 3000, lowLow: 1800, low: 1900, healthy: 2000, high: 2100, highHigh: 2200, decimals: 0, samplesPerSecond: 1, precision: '0' },
+  { key: 'motor-power', rack: 1, slot: 5, label: 'Motor Power', cardType: 'Universal V/I Card', kind: 'Universal Voltage / Current', unit: 'kW', rangeMin: 0, rangeMax: 40, healthy: 18, high: 24, highHigh: 30, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
+  { key: 'gearbox-input-vibration', rack: 1, slot: 6, label: 'Gearbox Input Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.5, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
+  { key: 'gearbox-output-vibration', rack: 1, slot: 7, label: 'Gearbox Output Vibration', cardType: 'Vibration Card', kind: 'Vibration', unit: 'mm/s RMS', rangeMin: 0, rangeMax: 15, healthy: 1.6, high: 2.8, highHigh: 7.1, decimals: 2, samplesPerSecond: 10 },
+  { key: 'gearbox-temperature', rack: 1, slot: 8, label: 'Gearbox Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 150, healthy: 52, high: 70, highHigh: 85, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
+  { key: 'hopper-level', rack: 1, slot: 9, label: 'Hopper Level', cardType: 'Universal V/I Card', kind: 'Universal Voltage / Current', unit: '%', rangeMin: 0, rangeMax: 100, lowLow: 15, low: 30, healthy: 70, high: 90, highHigh: 95, decimals: 1, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.0' },
+  { key: 'zone-1-temperature', rack: 1, slot: 10, label: 'Zone 1 Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 300, lowLow: 180, low: 190, healthy: 200, high: 210, highHigh: 220, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
+  { key: 'zone-2-temperature', rack: 1, slot: 11, label: 'Zone 2 Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 300, lowLow: 180, low: 190, healthy: 200, high: 210, highHigh: 220, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
+  { key: 'zone-3-temperature', rack: 1, slot: 12, label: 'Zone 3 Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 300, lowLow: 180, low: 190, healthy: 200, high: 210, highHigh: 220, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
+  { key: 'melt-temperature', rack: 2, slot: 1, label: 'Melt Temperature', cardType: 'RTD Card', kind: 'RTD / Temperature', unit: 'C', rangeMin: 0, rangeMax: 300, lowLow: 200, low: 210, healthy: 220, high: 230, highHigh: 240, decimals: 1, samplesPerSecond: 1, precision: '0.0' },
+  { key: 'melt-pressure', rack: 2, slot: 2, label: 'Melt Pressure', cardType: 'Universal V/I Card', kind: 'Pressure', unit: 'MPa', rangeMin: 0, rangeMax: 20, lowLow: 5.6, low: 6.8, healthy: 8.0, high: 9.2, highHigh: 10.4, decimals: 2, samplesPerSecond: 1, inputType: '4-20 mA', precision: '0.00' },
+  { key: 'screw-rpm', rack: 2, slot: 3, label: 'Screw RPM', cardType: 'Speed Card', kind: 'Speed / RPM', unit: 'RPM', rangeMin: 0, rangeMax: 150, lowLow: 58.5, low: 61.75, healthy: 65, high: 68.25, highHigh: 71.5, decimals: 2, samplesPerSecond: 1, precision: '0.00' },
 ];
 
-function behaviourFor(profile: Profile, slot: number): SimulationBehaviour {
+const FAULT_DANGER_KEYS = new Set(['motor-de-vibration', 'motor-temperature', 'gearbox-output-vibration', 'hopper-level', 'melt-pressure']);
+const FAULT_ALERT_KEYS = new Set(['motor-power', 'zone-1-temperature']);
+const PREDICTION_KEYS = new Set(['motor-de-vibration', 'motor-temperature', 'gearbox-temperature', 'hopper-level', 'zone-1-temperature', 'melt-temperature', 'melt-pressure']);
+
+function behaviourFor(profile: Profile, spec: SseChannelSpec): SimulationBehaviour {
   if (profile === 'healthy') return 'Steady';
-  if (profile === 'prediction') return [1, 3, 8, 9, 10].includes(slot) ? 'Predictive Drift' : 'Steady';
-  return [1, 3, 7, 9].includes(slot) ? 'Ramp To Danger' : [5, 10].includes(slot) ? 'Ramp To Alert' : 'Steady';
+  if (profile === 'prediction') return PREDICTION_KEYS.has(spec.key) ? 'Predictive Drift' : 'Steady';
+  if (FAULT_DANGER_KEYS.has(spec.key)) return 'Ramp To Danger';
+  if (FAULT_ALERT_KEYS.has(spec.key)) return 'Ramp To Alert';
+  return 'Steady';
 }
 
-function channelFor(spec: SseChannelSpec, profile: Profile, slot: number): SimulatedChannel {
+function channelFor(spec: SseChannelSpec, profile: Profile): SimulatedChannel {
   const base: SimulatedChannel = {
     enabled: true,
     kind: spec.kind,
     unit: spec.unit,
-    min: spec.min,
-    max: spec.max,
-    alertLimit: spec.alert,
-    dangerLimit: spec.danger,
+    min: spec.rangeMin,
+    max: spec.rangeMax,
+    healthyValue: spec.healthy,
+    alertLimit: spec.high ?? null,
+    dangerLimit: spec.highHigh ?? null,
     samplesPerSecond: spec.samplesPerSecond,
-    behaviour: behaviourFor(profile, slot),
+    behaviour: behaviourFor(profile, spec),
     decimals: spec.decimals,
     manualValue: null,
   };
@@ -104,58 +119,55 @@ function channelFor(spec: SseChannelSpec, profile: Profile, slot: number): Simul
 }
 
 function configFor(spec: SseChannelSpec): CardConfig {
+  const common = {
+    channelNames: [spec.label],
+    unit: spec.unit,
+    rangeMin: String(spec.rangeMin),
+    rangeMax: String(spec.rangeMax),
+    healthyValue: String(spec.healthy),
+    alarmLowLowEnabled: spec.lowLow !== undefined,
+    alarmLowLow: spec.lowLow !== undefined ? String(spec.lowLow) : '',
+    alarmLowEnabled: spec.low !== undefined,
+    alarmLow: spec.low !== undefined ? String(spec.low) : '',
+    alarmHighEnabled: spec.high !== undefined,
+    alarmHigh: spec.high !== undefined ? String(spec.high) : '',
+    alarmHighHighEnabled: spec.highHigh !== undefined,
+    alarmHighHigh: spec.highHigh !== undefined ? String(spec.highHigh) : '',
+    displayPrecision: spec.precision ?? '0.00',
+  };
   if (spec.cardType === 'Vibration Card') {
     return normalizeChannelConfig('Vibration Card', {
-      channelNames: [spec.label],
+      ...common,
       sensorType: 'Accelerometer',
       sensitivity: '100 mV/g',
       samplingRate: `${spec.samplesPerSecond} Hz`,
-      unit: spec.unit,
-      alarmHighEnabled: true,
-      alarmHigh: String(spec.alert),
-      alarmHighHighEnabled: true,
-      alarmHighHigh: String(spec.danger),
-      displayPrecision: spec.precision ?? '0.00',
     });
   }
   if (spec.cardType === 'Speed Card') {
     return normalizeChannelConfig('Speed Card', {
-      channelNames: [spec.label],
+      ...common,
       inputType: 'RPM',
       pulsesPerRevolution: '1',
       trigger: 'Rising',
       triggerHysteresis: '0.2 V',
-      unit: spec.unit,
-      alarmHighEnabled: true,
-      alarmHigh: String(spec.alert),
-      alarmHighHighEnabled: true,
-      alarmHighHigh: String(spec.danger),
-      displayPrecision: spec.precision ?? '0',
     });
   }
-  return normalizeChannelConfig('Process Card', {
-    channelNames: [spec.label],
+  return normalizeChannelConfig(spec.cardType, {
+    ...common,
     inputType: spec.inputType ?? '4-20 mA',
-    unit: spec.unit,
-    alarmHighEnabled: true,
-    alarmHigh: String(spec.alert),
-    alarmHighHighEnabled: true,
-    alarmHighHigh: String(spec.danger),
-    displayPrecision: spec.precision ?? '0.00',
   });
 }
 
-function cardsForRack(rackId: string, profile: Profile): CardNode[] {
-  return SSE_CHANNELS.map((spec, index) => {
-    const slot = index + 1;
+function cardsForRack(rackId: string, profile: Profile, rackNumber: 1 | 2): CardNode[] {
+  return SSE_CHANNELS.filter((spec) => spec.rack === rackNumber).map((spec) => {
     return {
-      id: `${rackId}-slot-${slot}`,
+      id: `${rackId}-slot-${spec.slot}`,
       deviceId: rackId,
-      slot,
+      slot: spec.slot,
       type: spec.cardType,
       enabled: true,
       config: configFor(spec),
-      simulation: [channelFor(spec, profile, slot)],
+      simulation: [channelFor(spec, profile)],
     };
   });
 }
@@ -199,7 +211,7 @@ function desiredDevices(projectId: string | null): DeviceNode[] {
 }
 
 function desiredCards(): CardNode[] {
-  return PROFILES.flatMap((profile) => profile.racks.flatMap((rack) => cardsForRack(rack.id, profile.profile)));
+  return PROFILES.flatMap((profile) => profile.racks.flatMap((rack) => cardsForRack(rack.id, profile.profile, rack.realRackId === 1 ? 1 : 2)));
 }
 
 function sameJson(a: unknown, b: unknown): boolean {

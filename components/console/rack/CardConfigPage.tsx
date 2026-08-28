@@ -33,6 +33,8 @@ type CardConfigPageProps = {
 /** The page title each card family gets, matching the hardware it stands for. */
 const EDITOR_TITLE: Record<CardType, string> = {
   'Vibration Card': 'Vibration Channel Configuration',
+  'RTD Card': 'RTD Channel Configuration',
+  'Universal V/I Card': 'Universal V/I Channel Configuration',
   'Process Card': 'Universal V/I Channel Configuration',
   'Speed Card': 'Speed Channel Configuration',
   'Communication Controller': 'Configure Communication Controller',
@@ -40,6 +42,8 @@ const EDITOR_TITLE: Record<CardType, string> = {
 
 const CONTEXT_CARD_LABEL: Record<CardType, string> = {
   'Vibration Card': 'Vibration',
+  'RTD Card': 'RTD',
+  'Universal V/I Card': 'Universal V/I',
   'Process Card': 'Universal V/I',
   'Speed Card': 'Speed',
   'Communication Controller': 'Controller',

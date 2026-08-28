@@ -1,11 +1,11 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { isDbEnabled } from '../../../server/db';
-import { sendApiError } from '../../../server/errors';
-import { enforceRateLimit } from '../../../server/rateLimit';
-import { guardRequest } from '../../../server/security';
-import { getSessionUser } from '../../../server/session';
-import { getMeasurementHistory } from '../../../server/telemetry';
+import { isDbEnabled } from '../../../../server/db';
+import { sendApiError } from '../../../../server/errors';
+import { enforceRateLimit } from '../../../../server/rateLimit';
+import { guardRequest } from '../../../../server/security';
+import { getSessionUser } from '../../../../server/session';
+import { getMeasurementHistory } from '../../../../server/telemetry';
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
@@ -23,12 +23,14 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const rackId = String(req.query.rackId ?? '');
     const slotId = Number(req.query.slotId);
     const channelId = Number(req.query.channelId);
-    const limit = Math.min(Math.max(Number(req.query.limit) || 120, 1), 1000);
+    const limit = Math.min(Math.max(Number(req.query.limit) || 120, 1), 8000);
+    const fromMs = req.query.fromMs === undefined ? undefined : Number(req.query.fromMs);
+    const toMs = req.query.toMs === undefined ? undefined : Number(req.query.toMs);
     if (!gatewayId || !rackId || !Number.isInteger(slotId) || !Number.isInteger(channelId)) {
       return res.status(400).json({ error: 'gatewayId, rackId, slotId, and channelId are required.' });
     }
 
-    const points = await getMeasurementHistory(gatewayId, rackId, slotId, channelId, limit);
+    const points = await getMeasurementHistory(gatewayId, rackId, slotId, channelId, limit, fromMs, toMs);
     return res.status(200).json({ persisted: true, points });
   } catch (err) {
     return sendApiError(res, err, 'api/live/history');

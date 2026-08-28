@@ -18,7 +18,7 @@ import Svg, {
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { DeviceNode } from '../../../lib/devices';
 import { channelAlarmLevel, channelLiveStatus, latestMeasurementForChannel, type LiveState } from '../../../lib/liveTelemetry';
-import { channelCountForCardType, channelNamesForCard, type CardNode, type CardType } from '../../../lib/rack';
+import { channelAlarmLimits, channelCountForCardType, channelNamesForCard, type CardNode, type CardType } from '../../../lib/rack';
 
 type SlotCardProps = {
   slot: number;
@@ -34,7 +34,7 @@ type SlotCardProps = {
 // Visual-layer only — our data model (lib/rack.ts) tracks a single enabled
 // channel per card, not per-point status, so these exist purely to drive
 // the physical-module rendering below.
-type VisualKind = 'vibration' | 'process' | 'speed-keyphasor' | 'communication';
+type VisualKind = 'vibration' | 'rtd' | 'process' | 'speed-keyphasor' | 'communication';
 type PointStatus = 'ok' | 'alert' | 'danger' | 'stale' | 'inactive';
 
 type CardVisualConfig = {
@@ -100,6 +100,7 @@ const INNER_CARD_PATH = `
 
 const CARD_CONFIG: Record<VisualKind, CardVisualConfig> = {
   vibration: { title: 'Vibration', shortTitle: 'VIB', defaultModel: 'VIB-2200' },
+  rtd: { title: 'RTD', shortTitle: 'RTD', defaultModel: 'RTD-1200' },
   process: { title: 'Process', shortTitle: 'PROC', defaultModel: 'PROC-4400' },
   'speed-keyphasor': { title: 'Speed / Keyphasor', shortTitle: 'SPD / KPH', defaultModel: 'SPD-2200' },
   communication: { title: 'Communication', shortTitle: 'COMM', defaultModel: 'COMM-1000' },
@@ -125,6 +126,9 @@ function kindFor(type: CardType): VisualKind {
   switch (type) {
     case 'Vibration Card':
       return 'vibration';
+    case 'RTD Card':
+      return 'rtd';
+    case 'Universal V/I Card':
     case 'Process Card':
       return 'process';
     case 'Speed Card':
@@ -144,8 +148,22 @@ function visualStatusFor(card: CardNode, device: DeviceNode, channelId: number, 
   const status = channelLiveStatus(device, card, channelId, live);
   if (status === 'stale') return 'stale';
   if (status !== 'active') return 'inactive';
-  const level = channelAlarmLevel(latestMeasurementForChannel(device, card, channelId, live));
+  const measurement = latestMeasurementForChannel(device, card, channelId, live);
+  const level =
+    measurement && typeof measurement.value === 'number' && 'alarmHigh' in card.config
+      ? configuredAlarmLevel(measurement.value, card)
+      : channelAlarmLevel(measurement);
   return level === 'danger' ? 'danger' : level === 'alert' ? 'alert' : 'ok';
+}
+
+function configuredAlarmLevel(value: number, card: CardNode): 'normal' | 'alert' | 'danger' {
+  if (!('alarmHigh' in card.config)) return 'normal';
+  const limits = channelAlarmLimits(card.config);
+  if (limits.highHigh !== null && value >= limits.highHigh) return 'danger';
+  if (limits.lowLow !== null && value <= limits.lowLow) return 'danger';
+  if (limits.high !== null && value >= limits.high) return 'alert';
+  if (limits.low !== null && value <= limits.low) return 'alert';
+  return 'normal';
 }
 
 function pointStatusesFor(card: CardNode, device: DeviceNode | undefined, live: LiveState | undefined, count: number): PointStatus[] {
@@ -228,6 +246,16 @@ function ModuleGlyph({ kind, accent, size }: { kind: VisualKind; accent: string;
         <Circle cx="5" cy="8" r="2.5" fill={accent} />
         <Circle cx="13.5" cy="8" r="2.5" fill={accent} />
         <Circle cx="22" cy="8" r="2.5" fill={accent} />
+      </Svg>
+    );
+  }
+  if (kind === 'rtd') {
+    return (
+      <Svg width={18 * size} height={22 * size} viewBox="0 0 18 22">
+        <Path d="M9 3 v10" fill="none" stroke={accent} strokeWidth={2} strokeLinecap="round" />
+        <Path d="M6 13 A5 5 0 1 0 12 13 V5 A3 3 0 0 0 6 5 Z" fill="none" stroke={accent} strokeWidth={1.6} strokeLinejoin="round" />
+        <Line x1="11.5" y1="6" x2="14.5" y2="6" stroke={accent} strokeWidth={1.2} strokeLinecap="round" />
+        <Line x1="11.5" y1="9" x2="14" y2="9" stroke={accent} strokeWidth={1.2} strokeLinecap="round" />
       </Svg>
     );
   }
