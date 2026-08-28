@@ -531,18 +531,19 @@ function letterForSimulatedKind(kind: SimulatedChannel['kind']): ChannelRef['let
 
 function channelDescriptor(card: CardNode, index: number): { letter: ChannelRef['letter']; unit: string; alarmWarning?: number; alarmCritical?: number } {
   const simulated = card.simulation?.[index];
+  const configLimits = 'alarmHigh' in card.config ? channelAlarmLimits(card.config) : null;
   if (simulated) {
     return {
       letter: letterForSimulatedKind(simulated.kind),
-      unit: simulated.unit,
-      alarmWarning: simulated.alertLimit ?? undefined,
-      alarmCritical: simulated.dangerLimit ?? undefined,
+      unit: 'unit' in card.config && card.config.unit.trim() ? card.config.unit : simulated.unit,
+      alarmWarning: configLimits ? (configLimits.high ?? undefined) : (simulated.alertLimit ?? undefined),
+      alarmCritical: configLimits ? (configLimits.highHigh ?? undefined) : (simulated.dangerLimit ?? undefined),
     };
   }
   return {
     ...letterAndUnitForCard(card),
-    alarmWarning: 'alarmWarning' in card.config ? parsedThreshold(card.config.alarmWarning) : undefined,
-    alarmCritical: 'alarmCritical' in card.config ? parsedThreshold(card.config.alarmCritical) : undefined,
+    alarmWarning: configLimits ? (configLimits.high ?? undefined) : undefined,
+    alarmCritical: configLimits ? (configLimits.highHigh ?? undefined) : undefined,
   };
 }
 

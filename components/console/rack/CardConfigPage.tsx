@@ -49,10 +49,11 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
   const { isDark } = useAppTheme();
   const [form, setForm] = useState<{ config: CardConfig; enabled: boolean; simulation?: SimulatedChannel[] }>(() => {
     const normalized = normalizedCardConfig(cardType, initialConfig);
+    const config = initialSimulation?.length ? cardConfigWithSimulation(cardType, normalized, initialSimulation) : normalized;
     return {
-      config: initialSimulation?.length ? cardConfigWithSimulation(cardType, normalized, initialSimulation) : normalized,
+      config,
       enabled: initialEnabled,
-      simulation: initialSimulation,
+      simulation: initialSimulation?.length ? simulationWithCardConfig(cardType, config, initialSimulation) : initialSimulation,
     };
   });
   const { config, enabled, simulation } = form;
@@ -124,7 +125,7 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
     if ('tag' in nextConfig) {
       nextConfig = { ...nextConfig, tag: nextConfig.tag.trim() } as CardConfig;
     }
-    onSave(nextConfig, enabled, simulation);
+    onSave(nextConfig, enabled, simulation ? simulationWithCardConfig(cardType, nextConfig, simulation) : simulation);
   };
 
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
