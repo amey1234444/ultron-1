@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { publishLiveMeasurements } from '../lib/liveMeasurementBus';
+import { recordChannelHistorySamples } from '../lib/channelHistoryDb';
 import { EMPTY_LIVE_STATE, mergeLiveFrame, type LiveFrame, type LiveState } from '../lib/liveTelemetry';
 import type { DeviceNode } from '../lib/devices';
 import type { CardNode } from '../lib/rack';
@@ -78,7 +79,10 @@ export function useSimulationEngine(devices: DeviceNode[], cards: CardNode[], ru
       const frames = queued;
       queued = [];
       if (cancelled || frames.length === 0) return;
-      frames.forEach((frame) => publishLiveMeasurements(frame.measurements));
+      frames.forEach((frame) => {
+        publishLiveMeasurements(frame.measurements);
+        recordChannelHistorySamples(frame.measurements);
+      });
       setState((current) => frames.reduce((next, frame) => mergeLiveFrame(next, frame, 0), current));
     };
 

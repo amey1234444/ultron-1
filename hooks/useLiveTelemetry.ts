@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { recordChannelHistorySamples } from '../lib/channelHistoryDb';
 import { pruneLiveMeasurements, publishLiveMeasurements } from '../lib/liveMeasurementBus';
 import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, type LiveFrame, type LiveMeasurement, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
@@ -148,7 +149,9 @@ function withDirectRealtime(snapshot: LiveState, previous: LiveState): LiveState
 }
 
 function publishDirectFrameMeasurements(frame: LiveFrame, blockedGatewayIds: Set<string>) {
-  publishLiveMeasurements(frame.measurements?.filter((measurement) => !blockedGatewayIds.has(measurement.gatewayId)));
+  const measurements = frame.measurements?.filter((measurement) => !blockedGatewayIds.has(measurement.gatewayId));
+  publishLiveMeasurements(measurements);
+  recordChannelHistorySamples(measurements);
 }
 
 export function useLiveTelemetry(): LiveState {

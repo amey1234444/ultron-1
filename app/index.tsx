@@ -41,6 +41,7 @@ import {
   simulatedGatewayScriptId,
   type SimulatedChannel,
 } from '../lib/simulation';
+import { ensureSseSimulationWorkspace } from '../lib/sseSimulationProfile';
 import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
 import {
   duplicateFolderSubtree,
@@ -504,6 +505,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       ];
     });
   }, [setDevices, storedDevices]);
+
+  useEffect(() => {
+    const repaired = ensureSseSimulationWorkspace(storedDevices, cards);
+    if (!repaired.changed) return;
+    setDevices(repaired.devices);
+    setCards(repaired.cards);
+  }, [cards, setCards, setDevices, storedDevices]);
 
   const [createProjectVisible, setCreateProjectVisible] = useState(false);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);

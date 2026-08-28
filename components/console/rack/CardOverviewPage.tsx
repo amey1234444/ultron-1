@@ -2,6 +2,8 @@ import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
+import type { DeviceNode } from '../../../lib/devices';
+import type { LiveState } from '../../../lib/liveTelemetry';
 import {
   channelCountForCardType,
   derivedChannelRangeFor,
@@ -17,10 +19,14 @@ import {
 import { manualChannelValue, simulationForCard } from '../../../lib/simulation';
 import { ActionButton } from '../ActionButton';
 import { BackButton } from '../BackButton';
+import { ChannelDataGraph } from './ChannelDataGraph';
 import { CardTypeIcon } from './cardIcons';
 
 type CardOverviewPageProps = {
   card: CardNode;
+  rack: DeviceNode;
+  devices: DeviceNode[];
+  live?: LiveState;
   backLabel?: string;
   onBack: () => void;
   onEdit: () => void;
@@ -113,7 +119,7 @@ function channelRows(card: CardNode): { label: string; value: string }[] {
   ];
 }
 
-export function CardOverviewPage({ card, backLabel = 'Back', onBack, onEdit, canEditDeleteSchema }: CardOverviewPageProps) {
+export function CardOverviewPage({ card, rack, devices, live, backLabel = 'Back', onBack, onEdit, canEditDeleteSchema }: CardOverviewPageProps) {
   const { isDark } = useAppTheme();
   const inkColor = isDark ? '#F5F5F5' : '#0A0A0A';
   const pageClass = isDark ? 'bg-surface-dark' : 'bg-surface-light';
@@ -141,6 +147,8 @@ export function CardOverviewPage({ card, backLabel = 'Back', onBack, onEdit, can
           <Row label="Status" value={card.enabled ? 'Enabled' : 'Disabled'} />
           {channelCountForCardType(card.type) > 0 && <Row label="Channels" value={String(channelCountForCardType(card.type))} mono />}
         </View>
+
+        {channelCountForCardType(card.type) > 0 && <ChannelDataGraph card={card} rack={rack} devices={devices} live={live} />}
 
         <View className="px-6 pt-5">
           <Text className={cn('font-body-medium text-xs uppercase tracking-wider', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>

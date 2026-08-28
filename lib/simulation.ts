@@ -70,6 +70,7 @@ export const SIMULATION_BEHAVIOURS = [
   'Drift Up',
   'Drift Down',
   'Cycle',
+  'Predictive Drift',
   'Ramp To Alert',
   'Ramp To Danger',
   'Spikes',
@@ -77,7 +78,7 @@ export const SIMULATION_BEHAVIOURS = [
 export type SimulationBehaviour = (typeof SIMULATION_BEHAVIOURS)[number];
 
 export function isFaultInjection(behaviour: SimulationBehaviour): boolean {
-  return behaviour === 'Ramp To Alert' || behaviour === 'Ramp To Danger' || behaviour === 'Spikes';
+  return behaviour === 'Predictive Drift' || behaviour === 'Ramp To Alert' || behaviour === 'Ramp To Danger' || behaviour === 'Spikes';
 }
 
 /**
@@ -358,6 +359,14 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
     }
     case 'Cycle':
       return { target: midpoint(channel) + (span / 2) * cycle, low: channel.min, high: channel.max };
+    case 'Predictive Drift': {
+      const limit = channel.dangerLimit ?? channel.alertLimit ?? channel.max;
+      const start = midpoint(channel);
+      const horizonSamples = Math.max(channel.samplesPerSecond * 180, 1);
+      const progress = Math.min(0.82, Math.max(0, phase / horizonSamples));
+      const target = start + (limit - start) * progress;
+      return { target, low: Math.min(channel.min, start), high: Math.max(channel.max, limit) };
+    }
     case 'Ramp To Alert': {
       const limit = channel.alertLimit ?? channel.max;
       // Settle just above the limit so the channel latches Alert but not Danger.

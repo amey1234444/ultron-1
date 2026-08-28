@@ -246,6 +246,9 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
       return (
         <CardOverviewPage
           card={pageCard}
+          rack={effectiveDevice}
+          devices={devices}
+          live={live}
           backLabel={`Back to ${effectiveDevice.name}`}
           onBack={() => setCardPage(null)}
           onEdit={() => setCardPage({ cardId: pageCard.id, view: 'config' })}

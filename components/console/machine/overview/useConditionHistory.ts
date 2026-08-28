@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
-import { useMappedChannelReading } from '../../../../lib/liveChannelValue';
+import { channelNumberFor, liveMeasurementKeyForChannel, useMappedChannelReading } from '../../../../lib/liveChannelValue';
+import { readChannelHistorySamples } from '../../../../lib/channelHistoryDb';
 import type { DeviceNode } from '../../../../lib/devices';
 import type { LiveState } from '../../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../../lib/localPersist';
@@ -86,7 +87,7 @@ function useLiveConditionHistory(
   // LiveState the caller holds. See useMappedChannelReading for why both are
   // needed; reading only the bus is what made this page disagree with the canvas.
   const reading = useMappedChannelReading(channel, devices, cards, live);
-  const busKey = channel ? `${channel.rackId}|${channel.slot}|${channel.id}` : null;
+  const busKey = channel ? liveMeasurementKeyForChannel(channel, channelNumberFor(channel), devices) : null;
 
   const [state, setState] = useState<LiveStored>(() => {
     const saved = loadLocal<LiveStored>(storageKey);
@@ -104,6 +105,26 @@ function useLiveConditionHistory(
     const saved = loadLocal<LiveStored>(storageKey);
     setState(saved && Array.isArray(saved.samples) && saved.samples.length === saved.stamps?.length ? saved : EMPTY_LIVE);
   }, [busKey, storageKey]);
+
+  useEffect(() => {
+    if (!busKey) return;
+    let cancelled = false;
+    void readChannelHistorySamples(busKey, LIVE_HISTORY_LENGTH).then((stored) => {
+      if (cancelled || stored.length === 0) return;
+      setState((current) => {
+        const byStamp = new Map<number, number>();
+        stored.forEach((sample) => byStamp.set(sample.t, sample.v));
+        current.stamps.forEach((stamp, index) => byStamp.set(stamp, current.samples[index]));
+        const merged = [...byStamp.entries()]
+          .sort((a, b) => a[0] - b[0])
+          .slice(-LIVE_HISTORY_LENGTH);
+        return { stamps: merged.map(([stamp]) => stamp), samples: merged.map(([, sample]) => sample) };
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [busKey]);
 
   // Keyed on the sample's own timestamp, never on `ageMs`. A sample's value
   // legitimately repeats, so the value cannot say whether it is new — and
