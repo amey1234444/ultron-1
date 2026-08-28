@@ -618,7 +618,7 @@ function ChannelValuePanel({
             onChangeText={(text) => {
               setNumericDrafts({ samplesPerSecond: text });
               const parsed = Number(text.trim());
-              if (text.trim() && Number.isFinite(parsed)) onChannelChange({ ...channel, samplesPerSecond: parsed });
+              if (text.trim() && Number.isFinite(parsed) && parsed >= 0.1 && parsed <= 50) onChannelChange({ ...channel, samplesPerSecond: parsed });
             }}
             placeholder="1"
             error={sampleRateError}

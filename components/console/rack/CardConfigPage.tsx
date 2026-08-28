@@ -9,6 +9,7 @@ import {
   type CardConfig,
   type CardType,
   type ChannelCommonConfig,
+  type VibrationConfig,
   type ControllerConfig,
 } from '../../../lib/rack';
 import { cardConfigWithSimulation, simulationWithCardConfig, validateSimulatedChannel, type SimulatedChannel } from '../../../lib/simulation';
@@ -90,14 +91,18 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
     if (previewSimulation) onSimulationPreview?.(typedConfig, enabled, previewSimulation);
   };
 
-  // The knob panel edits only the signal definition — value, behaviour, output
-  // state, measurement type, cadence — none of which the card config derives
-  // from, so nothing needs to flow back.
+  // The knob panel edits the signal definition directly. Vibration cadence is
+  // mirrored into the card config too, because that card also stores a hardware
+  // sampling-rate field and reopening the editor must not revive an old value.
   const setPrimaryChannel = (channel: SimulatedChannel) => {
     if (!simulation?.length) return;
     const nextSimulation = simulation.map((entry, index) => (index === 0 ? channel : entry));
-    setForm((previous) => ({ ...previous, simulation: nextSimulation }));
-    onSimulationPreview?.(config, enabled, simulationWithCardConfig(cardType, config, nextSimulation));
+    const nextConfig =
+      cardType === 'Vibration Card' && 'samplingRate' in config && Number.isFinite(channel.samplesPerSecond)
+        ? ({ ...config, samplingRate: `${channel.samplesPerSecond} Hz` } as VibrationConfig)
+        : config;
+    setForm((previous) => ({ ...previous, config: nextConfig, simulation: nextSimulation }));
+    onSimulationPreview?.(nextConfig, enabled, nextSimulation);
   };
 
   const canSave = (() => {

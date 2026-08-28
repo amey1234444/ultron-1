@@ -783,7 +783,7 @@ export function cardConfigWithSimulation(type: CardType, config: CardConfig, cha
     next.alarmHighHigh = String(primary.dangerLimit);
     next.alarmHighHighEnabled = true;
   }
-  if (type === 'Vibration Card' && 'samplingRate' in config && !config.samplingRate.trim()) {
+  if (type === 'Vibration Card' && 'samplingRate' in config && Number.isFinite(primary.samplesPerSecond)) {
     next.samplingRate = `${primary.samplesPerSecond} Hz`;
   }
 
