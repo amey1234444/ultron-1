@@ -93,11 +93,9 @@ export function isFaultInjection(behaviour: SimulationBehaviour): boolean {
 }
 
 /**
- * `Manual` is the operator-driven behaviour: the channel publishes exactly the
- * value on its knob, with no walk, no noise and no pull toward a target. It is
- * the only behaviour whose published number is decided outside the generator,
- * which is what makes a knob turn land on the machine view as the same figure
- * rather than a plausible neighbour of it.
+ * `Manual` is the operator-driven behaviour: the channel publishes around the
+ * value on its knob, with only a tiny deterministic dither. That keeps manual
+ * simulation useful for fixed setpoints without looking like a frozen sensor.
  */
 export function isManual(behaviour: SimulationBehaviour): boolean {
   return behaviour === 'Manual';
@@ -391,8 +389,9 @@ export function restingValue(channel: Pick<SimulatedChannel, 'min' | 'max'> & { 
 }
 
 /**
- * The exact number a Manual channel publishes: the knob position, clamped into
- * the engineering range, or the resting value when the knob has never been set.
+ * The exact configured centre for a Manual channel: the knob position, clamped
+ * into the engineering range, or the resting value when the knob has never been
+ * set.
  *
  * Every surface that needs to say what a manual channel reads — the generator,
  * the configuration knob, the card overview — goes through here, so the figure
@@ -407,6 +406,13 @@ export function manualChannelValue(channel: SimulatedChannel): number {
   return clamp(requested, min, max);
 }
 
+function manualPublishedValue(channel: SimulatedChannel, phase: number): number {
+  const min = Number.isFinite(channel.min) ? channel.min : 0;
+  const max = Number.isFinite(channel.max) && channel.max > min ? channel.max : min + 1;
+  const amplitude = Math.min(MANUAL_FLUCTUATION_AMPLITUDE, Math.max(0, (max - min) / 4));
+  return clamp(manualChannelValue(channel) + Math.sin(phase * 1.61803398875) * amplitude, min, max);
+}
+
 // Where the walk is being pulled toward, and how far it may roam, for this
 // behaviour at this point in its cycle. `phase` advances one unit per sample.
 function targetFor(channel: SimulatedChannel, phase: number): { target: number; low: number; high: number } {
@@ -415,9 +421,7 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
 
   switch (channel.behaviour) {
     case 'Manual': {
-      // Pinned: the target is the value itself and the band collapses onto it,
-      // so even a caller that walks toward the target lands exactly on it.
-      const value = manualChannelValue(channel);
+      const value = manualPublishedValue(channel, phase);
       return { target: value, low: value, high: value };
     }
     case 'Drift Up':
@@ -470,6 +474,7 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
 // the freshness windows the UI judges liveness by.
 const GATEWAY_HEARTBEAT_MS = 1000;
 
+const MANUAL_FLUCTUATION_AMPLITUDE = 0.05;
 const PULL = 0.12;
 const NOISE = 0.09;
 const MIN_SAMPLES_PER_SECOND = 0.1;
@@ -515,11 +520,11 @@ export function nextChannelValue(
     state = { value: seedValue(channel), phase: 0, signature, lastPublishMs: 0 };
     runtime.channels.set(key, state);
   }
-  // A manual channel is not walked at all. Running it through `advance` would
-  // add the noise term and return the knob's value ± a fraction of the span,
-  // which is precisely the discrepancy the knob exists to remove.
   if (isManual(channel.behaviour)) {
-    state.value = manualChannelValue(channel);
+    const elapsedMs = Math.max(0, elapsedSincePublishMs);
+    const elapsedSamples = Math.floor((samplesPerSecondFor(channel) * elapsedMs) / 1000 + Number.EPSILON);
+    state.phase += clamp(Math.max(1, elapsedSamples), 1, MAX_STEPS_PER_TICK);
+    state.value = manualPublishedValue(channel, state.phase);
     return state.value;
   }
 
