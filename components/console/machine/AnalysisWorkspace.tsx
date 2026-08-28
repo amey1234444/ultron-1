@@ -23,9 +23,9 @@ import { cn } from '../../../lib/cn';
 import { ActionButton } from '../ActionButton';
 import { Dialog } from '../Dialog';
 import { AdvancedDiagnosisPage, type SignalContext } from './AdvancedDiagnosisPage';
-import { MachineAnalysisPage } from './MachineAnalysisPage';
 import { MachineDiagnosisPage } from './MachineDiagnosisPage';
 import { MachineOverviewPage } from './MachineOverviewPage';
+import { MachineProDiagnosisPage } from './MachineProDiagnosisPage';
 import type { AnalysisDepth } from './analysis/AnalysisTabs';
 import type { TrainNode } from './analysis/TrainHealth';
 import type { MappedChannel } from './RackOccupancyView';
@@ -427,7 +427,7 @@ export function AnalysisWorkspace({
       ) : null}
 
       {view === 'diagnosis' ? (
-        <MachineAnalysisPage
+        <MachineProDiagnosisPage
           machineName={machine.name}
           template={machine.template}
           hierarchyPath={machine.hierarchyPath}
