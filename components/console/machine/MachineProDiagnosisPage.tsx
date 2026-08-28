@@ -65,12 +65,29 @@ function fmt(value: number | null | undefined, digits = 1): string {
 }
 
 function predictionListValue(forecast: MachinePredictionResult): string {
-  return forecast.estimatedTimeToDangerDays === null ? forecast.predictionStatus : `${fmt(forecast.estimatedTimeToDangerDays, 0)} d`;
+  return forecast.estimatedTimeToDangerDays === null ? forecast.predictionStatus : formatDayPhrase(forecast.estimatedTimeToDangerDays, true);
 }
 
 function predictionRange(forecast: MachinePredictionResult): string {
   if (forecast.predictionLowerBoundDays === null || forecast.predictionUpperBoundDays === null) return '--';
-  return `${fmt(forecast.predictionLowerBoundDays, 0)}-${fmt(forecast.predictionUpperBoundDays, 0)} days`;
+  return `${formatDayNumber(forecast.predictionLowerBoundDays)}-${formatDayPhrase(forecast.predictionUpperBoundDays)}`;
+}
+
+function formatDayNumber(value: number): string {
+  if (value <= 0) return '0';
+  if (value < 1) return '<1';
+  return value < 10 ? value.toFixed(1).replace(/\.0$/, '') : fmt(value, 0);
+}
+
+function formatDayPhrase(value: number, compact = false): string {
+  if (value <= 0) return 'now';
+  const amount = formatDayNumber(value);
+  return `${amount} ${compact ? 'd' : amount === '1' ? 'day' : 'days'}`;
+}
+
+function dayUnit(value: number | null): string | undefined {
+  if (value === null || value <= 0) return undefined;
+  return formatDayNumber(value) === '1' ? 'day' : 'days';
 }
 
 function formatSlope(value: number | null): string {
@@ -285,8 +302,8 @@ export function MachineProDiagnosisPage({
             <View className="flex-row flex-wrap gap-2">
               <Kpi
                 label="Projected Danger"
-                value={fmt(bestPrediction.estimatedTimeToDangerDays, 0)}
-                unit={bestPrediction.estimatedTimeToDangerDays === null ? undefined : 'days'}
+                value={bestPrediction.estimatedTimeToDangerDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToDangerDays)}
+                unit={dayUnit(bestPrediction.estimatedTimeToDangerDays)}
                 note={bestPrediction.faultName}
                 condition={bestPrediction.condition}
               />

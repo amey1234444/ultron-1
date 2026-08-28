@@ -112,6 +112,7 @@ type TrendModel = {
 
 const MODEL_VERSION = '1.0.0';
 const DEFAULT_OPERATING_HOURS_PER_DAY = 16;
+const SESSION_PROGNOSTIC_SAMPLE_INTERVAL_HOURS = 6;
 
 const PREDICTABILITY_FOR_KIND: Record<string, PredictabilityClass> = {
   Vibration: 'MEDIUM',
@@ -142,8 +143,20 @@ function unique(items: Array<string | undefined | null>): string[] {
   return [...new Set(items.filter((item): item is string => Boolean(item?.trim())).map((item) => item.trim()))];
 }
 
+function prognosticSampleIntervalHours(point: PointCondition): number {
+  const measured = Number.isFinite(point.sampleIntervalHours) ? point.sampleIntervalHours : 0;
+  if (measured <= 0) return 0;
+  if (point.windowHours >= SESSION_PROGNOSTIC_SAMPLE_INTERVAL_HOURS) return measured;
+
+  // Live/session buffers can be second-by-second while the prognosis panel is a
+  // maintenance-planning view. Use the same compressed plant-time cadence the
+  // earlier prognostic demo used so a clean rising condition produces a useful
+  // threshold horizon instead of always rounding to 0 days.
+  return Math.max(measured, SESSION_PROGNOSTIC_SAMPLE_INTERVAL_HOURS);
+}
+
 function daySeries(point: PointCondition): Array<{ day: number; value: number }> {
-  const stepDays = Math.max(point.sampleIntervalHours, 0) / 24;
+  const stepDays = prognosticSampleIntervalHours(point) / 24;
   return point.samples
     .filter((value) => Number.isFinite(value))
     .map((value, index) => ({ day: index * stepDays, value }));
@@ -309,12 +322,12 @@ function pointBaseline(point: PointCondition | null): number | null {
   return median(point.samples.slice(0, Math.max(4, Math.floor(point.samples.length / 3))));
 }
 
-function forecastStatus(point: PointCondition | null, days: number | null, confidence: number, issue: Issue): PredictionStatus {
+function forecastStatus(point: PointCondition | null, days: number | null, confidence: number, issue: Issue, rising: boolean): PredictionStatus {
   if (!point || issue.condition === 'offline') return 'NOT_PREDICTABLE';
   if (point.samples.length < 10) return 'INSUFFICIENT_HISTORY';
   if (days !== null && confidence >= 55) return 'FORECAST_AVAILABLE';
-  if (point.rising && confidence < 45) return 'HIGH_UNCERTAINTY';
-  if (point.rising) return 'DEGRADATION_DETECTED';
+  if (rising && confidence < 45) return 'HIGH_UNCERTAINTY';
+  if (rising) return 'DEGRADATION_DETECTED';
   return 'MONITORING';
 }
 
@@ -332,6 +345,13 @@ function predictionBounds(days: number | null, confidence: number): { lower: num
   return { lower: Math.max(0, days - interval), upper: days + interval };
 }
 
+function forecastDayPhrase(days: number): string {
+  if (days <= 0) return 'now';
+  if (days < 1) return 'less than 1 day';
+  const rounded = days < 10 ? Math.round(days * 10) / 10 : Math.round(days);
+  return `${rounded} ${rounded === 1 ? 'day' : 'days'}`;
+}
+
 function buildPrediction(issue: Issue, conditions: PointCondition[], signals: AnalysisSignal[], hypotheses: AnalystHypothesis[]): MachinePredictionResult {
   const relatedPoints = conditionsForIssue(issue, conditions);
   const point = bestPoint(relatedPoints);
@@ -343,11 +363,13 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
   const baseline = pointBaseline(point);
   const current = typeof point?.value === 'number' ? point.value : null;
   const mono = monotonicity(values, 'UP');
-  const detected = Boolean(point && point.rising && model && model.rSquared >= 0.35 && mono >= 0.58);
-  const danger = current === null || !point ? null : point.prognosis.daysToDanger ?? crossingDays(current, point.thresholds.danger, model?.slope ?? point.prognosis.slopePerDay);
-  const alert = current === null || !point ? null : crossingDays(current, point.thresholds.alert, model?.slope ?? point.prognosis.slopePerDay);
+  const modelSlope = model?.slope ?? point?.prognosis.slopePerDay ?? null;
+  const rising = Boolean(modelSlope !== null && modelSlope > 0 && mono >= 0.58);
+  const detected = Boolean(point && rising && model && model.rSquared >= 0.35);
+  const danger = current === null || !point || modelSlope === null ? null : crossingDays(current, point.thresholds.danger, modelSlope);
+  const alert = current === null || !point || modelSlope === null ? null : crossingDays(current, point.thresholds.alert, modelSlope);
   const confidence = confidencePercent(model, mono, values.length, detected || danger !== null);
-  const status = forecastStatus(point, danger, confidence, issue);
+  const status = forecastStatus(point, danger, confidence, issue, rising);
   const bounds = predictionBounds(danger, confidence);
   const windows = maintenanceWindow(danger);
   const definition = faultDefinition(issue, point);
@@ -398,7 +420,7 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
     thresholdProjectionWording:
       danger === null
         ? null
-        : `At the current degradation rate, the configured DANGER threshold is projected in approximately ${Math.round(danger)} days.`,
+        : `At the current degradation rate, the configured DANGER threshold is projected in approximately ${forecastDayPhrase(danger)}.`,
     functionalFailureValidated: false,
     previousForecastDays: null,
     forecastChangeDays: null,
