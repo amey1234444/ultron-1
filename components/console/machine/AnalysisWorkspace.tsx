@@ -27,6 +27,7 @@ import { MachineDiagnosisPage } from './MachineDiagnosisPage';
 import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineProDiagnosisPage } from './MachineProDiagnosisPage';
 import type { AnalysisDepth } from './analysis/AnalysisTabs';
+import type { MachinePrognosticsResult } from './analysis/prognosticsModel';
 import type { TrainNode } from './analysis/TrainHealth';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -78,6 +79,7 @@ export type AnalysisWorkspaceData = {
   train: TrainNode[];
   criticalPath?: string;
   progression: ProgressionEvent[];
+  prognostics?: MachinePrognosticsResult;
 
   // Diagnosis depth.
   signals: AnalysisSignal[];
@@ -439,6 +441,7 @@ export function AnalysisWorkspace({
           hypothesis={data.hypothesis}
           issues={data.issues}
           progression={data.progression}
+          prognostics={data.prognostics}
           condition={data.condition}
           dataQuality={data.dataQuality}
           hypotheses={data.hypotheses}
@@ -490,6 +493,7 @@ export function AnalysisWorkspace({
           signals={data.signals}
           findings={data.findings}
           progression={data.progression}
+          prognostics={data.prognostics}
           health={data.health}
           criticalPath={data.criticalPath}
           doThis={data.doThis}

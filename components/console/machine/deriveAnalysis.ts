@@ -27,6 +27,7 @@ import type { CardNode } from '../../../lib/rack';
 import type { SignalContext } from './AdvancedDiagnosisPage';
 import type { AnalysisWorkspaceData } from './AnalysisWorkspace';
 import type { TrainNode } from './analysis/TrainHealth';
+import { buildMachinePrognostics } from './analysis/prognosticsModel';
 import type { ComponentSummary, MachineRunState, MachineSummary, RankedDiagnosis } from './overview/rollup';
 import { resolveSensorIdentity } from './overview/sensorIdentity';
 import type { PointCondition } from './overview/usePointCondition';
@@ -1119,6 +1120,16 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
 
   const worstPoint = summary.worstPoint;
 
+  const prognostics = buildMachinePrognostics({
+    machineId: machine.id,
+    machineName: machine.name,
+    issues,
+    conditions,
+    signals,
+    hypotheses,
+    now,
+  });
+
   return {
     operatingState: runState.label,
     speed: speedPoint ? `${fmt(speedPoint.value, speedPoint.band.decimals)} ${speedPoint.unit}` : undefined,
@@ -1132,6 +1143,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     train,
     criticalPath,
     progression,
+    prognostics,
 
     signals,
     findings,

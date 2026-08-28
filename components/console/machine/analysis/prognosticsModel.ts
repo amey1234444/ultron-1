@@ -1,0 +1,455 @@
+import type { AnalysisSignal } from '../../../../lib/analysisDiagnosis';
+import type { Issue, OverviewCondition } from '../../../../lib/analysisOverview';
+import { prioritiseIssues } from '../../../../lib/analysisOverview';
+import type { AnalystHypothesis } from '../../../../lib/advancedDiagnosis';
+import type { PointCondition } from '../overview/usePointCondition';
+
+export type PredictionStatus =
+  | 'NOT_PREDICTABLE'
+  | 'INSUFFICIENT_HISTORY'
+  | 'MONITORING'
+  | 'DEGRADATION_DETECTED'
+  | 'FORECAST_AVAILABLE'
+  | 'HIGH_UNCERTAINTY'
+  | 'VALIDATED_RUL_AVAILABLE';
+
+export type PredictabilityClass = 'HIGH' | 'MEDIUM' | 'LOW' | 'DETECTION_ONLY';
+export type PredictionModelType = 'NONE' | 'LINEAR' | 'ROBUST_THEIL_SEN' | 'EXPONENTIAL' | 'EWMA';
+export type PredictionTrendDirection = 'INCREASING' | 'STABLE' | 'DECREASING';
+
+export type MachinePredictionResult = {
+  predictionId: string;
+  faultId: string;
+  faultName: string;
+  location: string[];
+  condition: OverviewCondition;
+  diagnosticConfidence: number;
+  predictabilityClass: PredictabilityClass;
+  predictionStatus: PredictionStatus;
+  degradationDetected: boolean;
+  degradationOnset: string | null;
+  historyDurationDays: number;
+  sampleCount: number;
+  currentValue: number | null;
+  baselineValue: number | null;
+  unit: string;
+  healthIndicator: number | null;
+  trendDirection: PredictionTrendDirection;
+  trendSlopePerDay: number | null;
+  robustSlopePerDay: number | null;
+  trendAcceleration: number | null;
+  modelType: PredictionModelType;
+  modelVersion: string;
+  modelFit: number | null;
+  residualError: number | null;
+  backtestError: number | null;
+  estimatedTimeToAlertDays: number | null;
+  estimatedTimeToDangerDays: number | null;
+  estimatedTimeToFunctionalFailureDays: number | null;
+  operatingHoursToThreshold: number | null;
+  calendarDaysToThreshold: number | null;
+  predictionLowerBoundDays: number | null;
+  predictionUpperBoundDays: number | null;
+  predictionConfidence: number;
+  recommendedInspectionWindow: string | null;
+  recommendedMaintenanceWindow: string | null;
+  availableInputs: string[];
+  requiredAdditionalEvidence: string[];
+  sourceMeasurementIds: string[];
+  sourceEventIds: string[];
+  sourceLabel: 'SIMULATION' | 'REAL';
+  thresholdProjectionWording: string | null;
+  functionalFailureValidated: boolean;
+  previousForecastDays: number | null;
+  forecastChangeDays: number | null;
+  accelerationDetected: boolean;
+  advanced: {
+    movingAverage: number | null;
+    ewma: number | null;
+    zScore: number | null;
+    variance: number | null;
+    cusum: number | null;
+    monotonicity: number | null;
+    operatingConditionResidual: number | null;
+    dangerThreshold: number | null;
+    alertThreshold: number | null;
+    dataWindowStart: string | null;
+    dataWindowEnd: string | null;
+  };
+};
+
+export type MachinePrognosticsResult = {
+  enabled: boolean;
+  sourceLabel: 'SIMULATION' | 'REAL' | 'NONE';
+  historySampleCount: number;
+  predictions: MachinePredictionResult[];
+  activeForecasts: MachinePredictionResult[];
+  earliestProjectedDanger: MachinePredictionResult | null;
+  machineFailureHorizonDays: number | null;
+  maintenanceEvents: [];
+  generatedAt: string;
+};
+
+type BuildInput = {
+  machineId: string;
+  machineName: string;
+  issues: Issue[];
+  conditions: PointCondition[];
+  signals: AnalysisSignal[];
+  hypotheses: AnalystHypothesis[];
+  now: Date;
+};
+
+type TrendModel = {
+  type: PredictionModelType;
+  slope: number;
+  intercept: number;
+  rSquared: number;
+  residualError: number;
+  backtestError: number | null;
+  predict: (day: number) => number;
+};
+
+const MODEL_VERSION = '1.0.0';
+const DEFAULT_OPERATING_HOURS_PER_DAY = 16;
+
+const PREDICTABILITY_FOR_KIND: Record<string, PredictabilityClass> = {
+  Vibration: 'MEDIUM',
+  Temperature: 'MEDIUM',
+  Current: 'MEDIUM',
+  Pressure: 'MEDIUM',
+  Speed: 'LOW',
+  Unknown: 'DETECTION_ONLY',
+};
+
+function mean(values: number[]): number {
+  return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
+}
+
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  if (sorted.length === 0) return 0;
+  const low = Math.floor((sorted.length - 1) / 2);
+  const high = Math.ceil((sorted.length - 1) / 2);
+  return (sorted[low] + sorted[high]) / 2;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function unique(items: Array<string | undefined | null>): string[] {
+  return [...new Set(items.filter((item): item is string => Boolean(item?.trim())).map((item) => item.trim()))];
+}
+
+function daySeries(point: PointCondition): Array<{ day: number; value: number }> {
+  const stepDays = Math.max(point.sampleIntervalHours, 0) / 24;
+  return point.samples
+    .filter((value) => Number.isFinite(value))
+    .map((value, index) => ({ day: index * stepDays, value }));
+}
+
+function linearModel(points: Array<{ day: number; value: number }>): TrendModel {
+  const mx = mean(points.map((point) => point.day));
+  const my = mean(points.map((point) => point.value));
+  const denominator = points.reduce((sum, point) => sum + (point.day - mx) ** 2, 0);
+  const slope = denominator
+    ? points.reduce((sum, point) => sum + (point.day - mx) * (point.value - my), 0) / denominator
+    : 0;
+  const intercept = my - slope * mx;
+  const predict = (day: number) => intercept + slope * day;
+  const residuals = points.map((point) => point.value - predict(point.day));
+  const sse = residuals.reduce((sum, value) => sum + value ** 2, 0);
+  const sst = points.reduce((sum, point) => sum + (point.value - my) ** 2, 0);
+
+  return {
+    type: 'LINEAR',
+    slope,
+    intercept,
+    rSquared: sst ? Math.max(0, 1 - sse / sst) : 0,
+    residualError: Math.sqrt(sse / Math.max(1, points.length - 2)),
+    backtestError: rollingBacktest(points),
+    predict,
+  };
+}
+
+function theilSenModel(points: Array<{ day: number; value: number }>): TrendModel {
+  const sampled =
+    points.length > 60 ? points.filter((_, index) => index % Math.ceil(points.length / 60) === 0 || index === points.length - 1) : points;
+  const slopes: number[] = [];
+  for (let i = 0; i < sampled.length; i += 1) {
+    for (let j = i + 1; j < sampled.length; j += 1) {
+      if (sampled[j].day !== sampled[i].day) slopes.push((sampled[j].value - sampled[i].value) / (sampled[j].day - sampled[i].day));
+    }
+  }
+
+  const slope = median(slopes);
+  const intercept = median(points.map((point) => point.value - slope * point.day));
+  const predict = (day: number) => intercept + slope * day;
+  const residuals = points.map((point) => point.value - predict(point.day));
+  const my = mean(points.map((point) => point.value));
+  const sse = residuals.reduce((sum, value) => sum + value ** 2, 0);
+  const sst = points.reduce((sum, point) => sum + (point.value - my) ** 2, 0);
+
+  return {
+    type: 'ROBUST_THEIL_SEN',
+    slope,
+    intercept,
+    rSquared: sst ? Math.max(0, 1 - sse / sst) : 0,
+    residualError: Math.sqrt(sse / Math.max(1, points.length - 2)),
+    backtestError: null,
+    predict,
+  };
+}
+
+function rollingBacktest(points: Array<{ day: number; value: number }>): number | null {
+  if (points.length < 20) return null;
+  const split = Math.floor(points.length * 0.7);
+  const train = points.slice(0, split);
+  const test = points.slice(split);
+  const model = linearModel(train);
+  return mean(test.map((point) => Math.abs(point.value - model.predict(point.day))));
+}
+
+function monotonicity(values: number[], direction: 'UP' | 'DOWN'): number {
+  if (values.length < 2) return 0;
+  let matching = 0;
+  for (let i = 1; i < values.length; i += 1) {
+    if (direction === 'UP' ? values[i] >= values[i - 1] : values[i] <= values[i - 1]) matching += 1;
+  }
+  return matching / (values.length - 1);
+}
+
+function ewma(values: number[], alpha = 0.2): number | null {
+  if (values.length === 0) return null;
+  return values.slice(1).reduce((value, next) => alpha * next + (1 - alpha) * value, values[0]);
+}
+
+function variance(values: number[]): number | null {
+  if (values.length === 0) return null;
+  const average = mean(values);
+  return mean(values.map((value) => (value - average) ** 2));
+}
+
+function zScore(current: number | null, baseline: number | null, values: number[]): number | null {
+  if (current === null || baseline === null || values.length < 2) return null;
+  const spread = Math.sqrt(variance(values) ?? 0);
+  return spread > 0 ? (current - baseline) / spread : null;
+}
+
+function crossingDays(current: number, threshold: number, slopePerDay: number): number | null {
+  if (current >= threshold) return 0;
+  if (slopePerDay <= 0) return null;
+  const days = (threshold - current) / slopePerDay;
+  return Number.isFinite(days) && days >= 0 && days <= 3650 ? days : null;
+}
+
+function confidencePercent(model: TrendModel | null, mono: number, sampleCount: number, detected: boolean): number {
+  if (!model) return 0;
+  const noiseRatio = model.residualError / Math.max(0.0001, Math.abs(model.slope) * Math.max(1, sampleCount));
+  const value = detected
+    ? 25 + model.rSquared * 35 + mono * 20 + Math.min(1, sampleCount / 90) * 15 - Math.min(20, noiseRatio * 20)
+    : model.rSquared * 35 + mono * 15;
+  return clamp(Math.round(value), 0, detected ? 95 : 55);
+}
+
+function faultDefinition(issue: Issue, point: PointCondition | null): { id: string; name: string; required: string[] } {
+  const title = issue.title.toLocaleLowerCase();
+  const component = issue.componentLabel.toLocaleLowerCase();
+  const kind = point?.kind ?? 'Unknown';
+
+  if (title.includes('bearing')) return { id: 'PRED-002', name: `${issue.componentLabel} Bearing Degradation`, required: ['Raw acceleration waveform', 'Envelope spectrum', 'Bearing geometry'] };
+  if (component.includes('gearbox')) return { id: 'PRED-006', name: 'Gearbox Mechanical Degradation', required: ['Raw vibration waveform', 'Gear and bearing metadata'] };
+  if (title.includes('lubrication')) return { id: 'PRED-010', name: 'Lubrication Degradation', required: ['Oil condition', 'Particle count', 'Water content'] };
+  if (kind === 'Temperature') return { id: 'PRED-016', name: `${issue.componentLabel} Thermal Zone Degradation`, required: ['Heater duty cycle', 'Cooling command'] };
+  if (kind === 'Current') return { id: 'PRED-004', name: 'Motor Overload Progression', required: ['Screw RPM', 'Melt pressure', 'Melt temperature'] };
+  if (kind === 'Pressure') return { id: 'PRED-015', name: 'Progressive Process / Die Restriction', required: ['Throughput', 'Feed rate'] };
+  if (kind === 'Speed') return { id: 'PRED-011', name: 'Drive Ratio Deterioration', required: ['Driven speed channel', 'Load-normalized trend'] };
+  if (issue.category === 'sensor') return { id: 'PRED-026', name: `${issue.componentLabel} Sensor Drift`, required: ['Redundant sensor', 'Calibration check'] };
+  return { id: 'PRED-029', name: `${issue.componentLabel} Health Degradation`, required: ['Persisted machine health history'] };
+}
+
+function pointIdsForIssue(issue: Issue): string[] {
+  if (issue.id.startsWith('pt-')) return [issue.id.slice(3)];
+  if (issue.id.startsWith('off-')) return [issue.id.slice(4)];
+  if (issue.id.startsWith('frz-')) return [issue.id.slice(4)];
+  return [];
+}
+
+function conditionsForIssue(issue: Issue, conditions: PointCondition[]): PointCondition[] {
+  const direct = new Set(pointIdsForIssue(issue));
+  if (direct.size > 0) return conditions.filter((point) => direct.has(point.id));
+  if (issue.id === 'chan-inferred-limits') return conditions.filter((point) => !point.thresholds.configured);
+
+  const componentMatches = issue.componentId ? conditions.filter((point) => point.componentId === issue.componentId) : [];
+  if (componentMatches.length > 0) return componentMatches;
+
+  const label = issue.componentLabel.toLocaleLowerCase();
+  return conditions.filter((point) => point.label.toLocaleLowerCase().includes(label));
+}
+
+function bestPoint(points: PointCondition[]): PointCondition | null {
+  const reported = points.filter((point) => point.value !== null);
+  if (reported.length === 0) return points[0] ?? null;
+  return [...reported].sort((a, b) => {
+    const aDays = a.prognosis.daysToDanger ?? Infinity;
+    const bDays = b.prognosis.daysToDanger ?? Infinity;
+    if (aDays !== bDays) return aDays - bDays;
+    return (a.health ?? 101) - (b.health ?? 101);
+  })[0] ?? null;
+}
+
+function trendDirection(slope: number | null): PredictionTrendDirection {
+  if (slope === null || Math.abs(slope) < 0.0001) return 'STABLE';
+  return slope > 0 ? 'INCREASING' : 'DECREASING';
+}
+
+function pointBaseline(point: PointCondition | null): number | null {
+  if (!point || point.samples.length === 0) return null;
+  return median(point.samples.slice(0, Math.max(4, Math.floor(point.samples.length / 3))));
+}
+
+function forecastStatus(point: PointCondition | null, days: number | null, confidence: number, issue: Issue): PredictionStatus {
+  if (!point || issue.condition === 'offline') return 'NOT_PREDICTABLE';
+  if (point.samples.length < 10) return 'INSUFFICIENT_HISTORY';
+  if (days !== null && confidence >= 55) return 'FORECAST_AVAILABLE';
+  if (point.rising && confidence < 45) return 'HIGH_UNCERTAINTY';
+  if (point.rising) return 'DEGRADATION_DETECTED';
+  return 'MONITORING';
+}
+
+function maintenanceWindow(days: number | null): { inspection: string | null; maintenance: string | null } {
+  if (days === null) return { inspection: null, maintenance: null };
+  return {
+    inspection: `Within ${Math.max(1, Math.min(5, Math.floor(days * 0.3)))} days`,
+    maintenance: `Within ${Math.max(2, Math.floor(days * 0.55))}-${Math.max(3, Math.floor(days * 0.8))} days`,
+  };
+}
+
+function predictionBounds(days: number | null, confidence: number): { lower: number | null; upper: number | null } {
+  if (days === null) return { lower: null, upper: null };
+  const interval = Math.max(1, days * (0.12 + (100 - confidence) / 180));
+  return { lower: Math.max(0, days - interval), upper: days + interval };
+}
+
+function buildPrediction(issue: Issue, conditions: PointCondition[], signals: AnalysisSignal[], hypotheses: AnalystHypothesis[]): MachinePredictionResult {
+  const relatedPoints = conditionsForIssue(issue, conditions);
+  const point = bestPoint(relatedPoints);
+  const values = point?.samples.filter((value) => Number.isFinite(value)) ?? [];
+  const series = point ? daySeries(point) : [];
+  const linear = series.length >= 2 ? linearModel(series) : null;
+  const robust = series.length >= 2 ? theilSenModel(series) : null;
+  const model = robust && linear && robust.rSquared > linear.rSquared + 0.04 ? robust : linear;
+  const baseline = pointBaseline(point);
+  const current = typeof point?.value === 'number' ? point.value : null;
+  const mono = monotonicity(values, 'UP');
+  const detected = Boolean(point && point.rising && model && model.rSquared >= 0.35 && mono >= 0.58);
+  const danger = current === null || !point ? null : point.prognosis.daysToDanger ?? crossingDays(current, point.thresholds.danger, model?.slope ?? point.prognosis.slopePerDay);
+  const alert = current === null || !point ? null : crossingDays(current, point.thresholds.alert, model?.slope ?? point.prognosis.slopePerDay);
+  const confidence = confidencePercent(model, mono, values.length, detected || danger !== null);
+  const status = forecastStatus(point, danger, confidence, issue);
+  const bounds = predictionBounds(danger, confidence);
+  const windows = maintenanceWindow(danger);
+  const definition = faultDefinition(issue, point);
+  const hypothesis = hypotheses.find((item) => item.name.toLocaleLowerCase().includes(issue.componentLabel.toLocaleLowerCase())) ?? hypotheses[0] ?? null;
+  const signal = point ? signals.find((item) => item.code === point.code) : null;
+
+  return {
+    predictionId: issue.id,
+    faultId: definition.id,
+    faultName: definition.name,
+    location: unique([issue.componentLabel, issue.category.replace('-', ' '), point?.label]),
+    condition: issue.condition,
+    diagnosticConfidence: issue.confidence ?? hypothesis?.matchScore ?? 0,
+    predictabilityClass: point ? PREDICTABILITY_FOR_KIND[point.kind] ?? 'DETECTION_ONLY' : 'DETECTION_ONLY',
+    predictionStatus: status,
+    degradationDetected: detected,
+    degradationOnset: null,
+    historyDurationDays: point ? point.windowHours / 24 : 0,
+    sampleCount: values.length,
+    currentValue: current,
+    baselineValue: baseline,
+    unit: point?.unit ?? signal?.unit ?? '',
+    healthIndicator: point?.health ?? null,
+    trendDirection: trendDirection(model?.slope ?? point?.prognosis.slopePerDay ?? null),
+    trendSlopePerDay: model?.slope ?? point?.prognosis.slopePerDay ?? null,
+    robustSlopePerDay: robust?.slope ?? point?.prognosis.slopePerDay ?? null,
+    trendAcceleration: null,
+    modelType: model?.type ?? 'NONE',
+    modelVersion: MODEL_VERSION,
+    modelFit: model?.rSquared ?? point?.prognosis.r2 ?? null,
+    residualError: model?.residualError ?? null,
+    backtestError: model?.backtestError ?? null,
+    estimatedTimeToAlertDays: alert,
+    estimatedTimeToDangerDays: danger,
+    estimatedTimeToFunctionalFailureDays: null,
+    operatingHoursToThreshold: danger === null ? null : danger * DEFAULT_OPERATING_HOURS_PER_DAY,
+    calendarDaysToThreshold: danger,
+    predictionLowerBoundDays: bounds.lower,
+    predictionUpperBoundDays: bounds.upper,
+    predictionConfidence: confidence,
+    recommendedInspectionWindow: windows.inspection,
+    recommendedMaintenanceWindow: windows.maintenance,
+    availableInputs: unique([point?.code, point?.label, signal?.label]),
+    requiredAdditionalEvidence: unique([...definition.required, hypothesis?.discriminator, 'Validated functional-failure model']),
+    sourceMeasurementIds: unique([point?.id, point?.code]),
+    sourceEventIds: point ? point.samples.map((_, index) => `${point.id}:sample:${index}`) : [],
+    sourceLabel: 'REAL',
+    thresholdProjectionWording:
+      danger === null
+        ? null
+        : `At the current degradation rate, the configured DANGER threshold is projected in approximately ${Math.round(danger)} days.`,
+    functionalFailureValidated: false,
+    previousForecastDays: null,
+    forecastChangeDays: null,
+    accelerationDetected: false,
+    advanced: {
+      movingAverage: values.length > 0 ? mean(values.slice(-7)) : null,
+      ewma: ewma(values),
+      zScore: zScore(current, baseline, values),
+      variance: variance(values),
+      cusum: baseline === null ? null : values.reduce((sum, value) => sum + (value - baseline), 0),
+      monotonicity: mono,
+      operatingConditionResidual: current !== null && values.length > 0 ? current - values[values.length - 1] : null,
+      dangerThreshold: point?.thresholds.danger ?? null,
+      alertThreshold: point?.thresholds.alert ?? null,
+      dataWindowStart: null,
+      dataWindowEnd: null,
+    },
+  };
+}
+
+export function emptyPrognostics(now = new Date()): MachinePrognosticsResult {
+  return {
+    enabled: false,
+    sourceLabel: 'NONE',
+    historySampleCount: 0,
+    predictions: [],
+    activeForecasts: [],
+    earliestProjectedDanger: null,
+    machineFailureHorizonDays: null,
+    maintenanceEvents: [],
+    generatedAt: now.toISOString(),
+  };
+}
+
+export function buildMachinePrognostics(input: BuildInput): MachinePrognosticsResult {
+  const predictions = prioritiseIssues(input.issues).map((issue) =>
+    buildPrediction(issue, input.conditions, input.signals, input.hypotheses),
+  );
+  const activeForecasts = predictions
+    .filter((prediction) => prediction.predictionStatus === 'FORECAST_AVAILABLE' || prediction.predictionStatus === 'VALIDATED_RUL_AVAILABLE')
+    .sort((a, b) => (a.estimatedTimeToDangerDays ?? Infinity) - (b.estimatedTimeToDangerDays ?? Infinity));
+
+  return {
+    enabled: input.conditions.some((point) => point.samples.length >= 2),
+    sourceLabel: input.conditions.some((point) => point.samples.length >= 2) ? 'REAL' : 'NONE',
+    historySampleCount: input.conditions.reduce((sum, point) => sum + point.samples.length, 0),
+    predictions,
+    activeForecasts,
+    earliestProjectedDanger: activeForecasts[0] ?? null,
+    machineFailureHorizonDays: null,
+    maintenanceEvents: [],
+    generatedAt: input.now.toISOString(),
+  };
+}

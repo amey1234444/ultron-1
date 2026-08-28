@@ -39,6 +39,7 @@ import { cn } from '../../../lib/cn';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { Panel } from '../../Panel';
 import { AnalysisTabs, type AnalysisDepth } from './analysis/AnalysisTabs';
+import { emptyPrognostics, type MachinePrognosticsResult } from './analysis/prognosticsModel';
 import { AnalysisTree } from './advanced/AnalysisTree';
 import { InvestigationWorkArea } from './advanced/Investigation';
 import { EvidenceTray, IntelligencePanel, PanelHeader } from './advanced/SidePanels';
@@ -104,6 +105,7 @@ export type AdvancedDiagnosisPageProps = {
   signals?: AnalysisSignal[];
   findings?: Finding[];
   progression?: ProgressionEvent[];
+  prognostics?: MachinePrognosticsResult;
   health?: number | null;
   criticalPath?: string;
   doThis?: string[];
@@ -433,6 +435,7 @@ export function AdvancedDiagnosisPage({
   signals = [],
   findings = [],
   progression = [],
+  prognostics,
   health,
   criticalPath,
   doThis = [],
@@ -650,6 +653,16 @@ export function AdvancedDiagnosisPage({
     correlation[0] ??
     null;
   const topHypothesis = rankHypotheses(hypotheses)[0] ?? null;
+  const prognosisModel = useMemo(() => prognostics ?? emptyPrognostics(), [prognostics]);
+  const selectedPrediction =
+    prognosisModel.predictions.find((prediction) =>
+      activeExplorer?.problemIds.includes(prediction.predictionId) ||
+      activeExplorer?.pointIds.some((id) => prediction.sourceMeasurementIds.includes(id)),
+    ) ??
+    prognosisModel.earliestProjectedDanger ??
+    prognosisModel.activeForecasts[0] ??
+    prognosisModel.predictions[0] ??
+    null;
   const dataCoverage = signalStats.length === 0 ? 0 : (signalStats.filter((stat) => stat.quality === 'good').length / signalStats.length) * 100;
   const diagnosticCoverage = Math.round(
     Math.min(
@@ -925,26 +938,75 @@ export function AdvancedDiagnosisPage({
             description="Prediction is shown only as far as the production data supports it. A danger projection is not functional RUL unless a validated failure model is present."
           />
           <View className="flex-row flex-wrap gap-2">
-            <MetricTile label="STATUS" value={progression.length > 0 ? 'TREND AVAILABLE' : 'LIMITED'} note={progression[0]?.text ?? 'No projected threshold crossing is available.'} />
-            <MetricTile label="MODEL" value="SCALAR TREND" note="No Part2 prognostics engine is imported." />
-            <MetricTile label="DANGER HORIZON" value="UNAVAILABLE" note="Current contract does not expose threshold crossing days." />
-            <MetricTile label="FUNCTIONAL RUL" value="UNAVAILABLE" note="No validated functional-failure model is available." />
+            <MetricTile
+              label="STATUS"
+              value={selectedPrediction?.predictionStatus ?? (prognosisModel.enabled ? 'MONITORING' : 'UNAVAILABLE')}
+              note={selectedPrediction?.thresholdProjectionWording ?? 'No defensible threshold horizon is currently available.'}
+            />
+            <MetricTile
+              label="MODEL"
+              value={selectedPrediction?.modelType ?? 'NONE'}
+              note={`${prognosisModel.historySampleCount} historical samples / ${prognosisModel.sourceLabel}`}
+            />
+            <MetricTile
+              label="PROJECTED DANGER"
+              value={selectedPrediction?.estimatedTimeToDangerDays === null || !selectedPrediction ? '--' : `${fmt(selectedPrediction.estimatedTimeToDangerDays, 0)} days`}
+              note={selectedPrediction?.faultName ?? 'No credible forecast'}
+            />
+            <MetricTile
+              label="OPERATING TIME"
+              value={selectedPrediction?.operatingHoursToThreshold === null || !selectedPrediction ? '--' : `${fmt(selectedPrediction.operatingHoursToThreshold, 0)} hours`}
+            />
+            <MetricTile
+              label="PREDICTION CONFIDENCE"
+              value={selectedPrediction ? `${fmt(selectedPrediction.predictionConfidence, 0)}%` : '--'}
+            />
+            <MetricTile
+              label="FUNCTIONAL RUL"
+              value={
+                selectedPrediction?.functionalFailureValidated
+                  ? `${fmt(selectedPrediction.estimatedTimeToFunctionalFailureDays, 0)} days`
+                  : 'UNAVAILABLE'
+              }
+              note="Requires a validated functional-failure model."
+            />
           </View>
-          {progression.length > 0 ? (
+          {prognosisModel.predictions.length > 0 ? (
             <View className="gap-2">
-              {progression.map((item) => (
-                <View key={item.id} className="flex-row items-center gap-3 rounded-lg border px-3 py-2" style={{ borderColor: hairline }}>
-                  <Text style={{ width: 92, color: conditionHex[item.condition] }} className="font-mono text-[9px] font-bold tracking-wider">{CONDITION_LABEL[item.condition]}</Text>
-                  <Text style={{ width: 76 }} className={cn('font-mono text-[9px]', mutedClass)}>{item.at}</Text>
-                  <Text className={cn('flex-1 font-body text-[10px] leading-[15px]', inkClass)}>{item.text}</Text>
+              {prognosisModel.predictions.map((prediction) => (
+                <View key={prediction.predictionId} className="flex-row flex-wrap items-center gap-3 rounded-lg border px-3 py-2" style={{ borderColor: hairline }}>
+                  <Text style={{ width: 72, color: conditionHex[prediction.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
+                    {prediction.faultId}
+                  </Text>
+                  <Text style={{ width: 126 }} className={cn('font-mono text-[9px]', mutedClass)}>
+                    {prediction.estimatedTimeToDangerDays === null ? prediction.predictionStatus : `${fmt(prediction.estimatedTimeToDangerDays, 0)} days`}
+                  </Text>
+                  <Text className={cn('min-w-[180px] flex-1 font-body text-[10px] leading-[15px]', inkClass)}>{prediction.faultName}</Text>
+                  <Text className={cn('font-mono text-[9px]', mutedClass)}>
+                    {prediction.modelType} / {prediction.modelFit === null ? '--' : `${fmt(prediction.modelFit * 100, 0)}%`}
+                  </Text>
                 </View>
               ))}
             </View>
           ) : (
-            <Unavailable title="PREDICTION" reason="No predictive definition is related to this scope." />
+            <Unavailable
+              title={prognosisModel.enabled ? 'NO CREDIBLE THRESHOLD FORECAST' : 'HISTORICAL SIMULATION IS OFF'}
+              reason={prognosisModel.enabled ? 'Signals remain under monitoring or need more history.' : 'Enable historical trend capture to generate prognostic data.'}
+            />
           )}
+          {selectedPrediction ? (
+            <View className="flex-row flex-wrap gap-2">
+              <MetricTile label="R2" value={fmt(selectedPrediction.modelFit, 3)} />
+              <MetricTile label="ROBUST SLOPE" value={fmt(selectedPrediction.robustSlopePerDay, 4)} />
+              <MetricTile label="MONOTONICITY" value={fmt(selectedPrediction.advanced.monotonicity, 2)} />
+              <MetricTile
+                label="RUL"
+                value={selectedPrediction.functionalFailureValidated ? fmt(selectedPrediction.estimatedTimeToFunctionalFailureDays, 0) : 'UNAVAILABLE'}
+              />
+            </View>
+          ) : null}
           <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
-            {modelCaveat ?? 'Match scores and trend states are decision support only. They are not calibrated failure probabilities.'}
+            {modelCaveat ?? 'Threshold projection is not Remaining Useful Life. Functional-failure forecasts stay unavailable until a validated failure model exists.'}
           </Text>
         </View>
       );
@@ -1186,7 +1248,17 @@ export function AdvancedDiagnosisPage({
             <MetricTile label="OPERATING CONTEXT" value={operatingState} />
             <MetricTile label="DIAGNOSTIC COVERAGE" value={`${diagnosticCoverage}%`} note="Coverage of available evidence, not confidence." />
             <MetricTile label="AUTOMATIC DIAGNOSIS" value={topHypothesis?.name ?? conclusion.suggested} note="Model suggestion requires analyst review." />
-            <MetricTile label="PREDICTION" value={progression.length > 0 ? 'MONITORING' : 'UNAVAILABLE'} note="No functional RUL model exposed." />
+            <MetricTile
+              label="PREDICTION"
+              value={
+                prognosisModel.earliestProjectedDanger?.estimatedTimeToDangerDays === null || !prognosisModel.earliestProjectedDanger
+                  ? prognosisModel.enabled
+                    ? 'MONITORING'
+                    : 'UNAVAILABLE'
+                  : `${fmt(prognosisModel.earliestProjectedDanger.estimatedTimeToDangerDays, 0)} days`
+              }
+              note={prognosisModel.earliestProjectedDanger?.faultName ?? 'No credible forecast'}
+            />
             <MetricTile
               label="MATCH SCORE"
               value={topHypothesis?.matchScore === undefined ? 'NOT RATED' : String(topHypothesis.matchScore)}
