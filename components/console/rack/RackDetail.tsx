@@ -279,6 +279,9 @@ export function RackDetail({ device, devices = [device], cards, live, onBack, ba
           onUpdateCard(pageCard.id, config, enabled, simulation);
           setCardPage({ cardId: pageCard.id, view: 'overview' });
         }}
+        onSimulationPreview={(config, enabled, simulation) => {
+          onUpdateCard(pageCard.id, config, enabled, simulation);
+        }}
       />
     );
   }

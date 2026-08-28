@@ -9,6 +9,7 @@
 // state — so local dev / CI without a DB still boot.
 
 import type { DeviceNode } from '../../lib/devices';
+import { findDuplicateConfiguredDeviceName } from '../../lib/deviceUniqueness';
 import type { FolderNode, ProjectNode } from '../../lib/hierarchy';
 import type { MachineNode } from '../../lib/machines';
 import type { CardNode } from '../../lib/rack';
@@ -108,6 +109,13 @@ function assertUniqueConfiguredIps(data: HierarchyInput): void {
       throw new ApiError(409, 'IP is already configured.');
     }
     byIp.set(ip, device);
+  }
+}
+
+function assertUniqueConfiguredDeviceNames(data: HierarchyInput): void {
+  const duplicate = findDuplicateConfiguredDeviceName(data.devices);
+  if (duplicate) {
+    throw new ApiError(409, `${duplicate.type} name is already configured.`);
   }
 }
 
@@ -320,6 +328,7 @@ export async function getRevisions(): Promise<{ hierRevision: number; layoutRevi
 // matches, the write is rejected so the client can refetch and retry.
 export async function replaceHierarchy(data: HierarchyInput, baseRevision?: number): Promise<{ hierRevision: number } | { conflict: true; hierRevision: number }> {
   assertUniqueConfiguredIps(data);
+  assertUniqueConfiguredDeviceNames(data);
   await ready();
   return withClient(async (client) => {
     await client.query('BEGIN');

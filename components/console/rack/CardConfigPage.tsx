@@ -28,6 +28,7 @@ type CardConfigPageProps = {
   backLabel?: string;
   onBack: () => void;
   onSave: (config: CardConfig, enabled: boolean, simulation?: SimulatedChannel[]) => void;
+  onSimulationPreview?: (config: CardConfig, enabled: boolean, simulation: SimulatedChannel[]) => void;
 };
 
 /** The page title each card family gets, matching the hardware it stands for. */
@@ -49,7 +50,7 @@ const CONTEXT_CARD_LABEL: Record<CardType, string> = {
   'Communication Controller': 'Controller',
 };
 
-export function CardConfigPage({ rackName, slot, cardType, initialConfig, initialEnabled, initialSimulation, backLabel = 'Back', onBack, onSave }: CardConfigPageProps) {
+export function CardConfigPage({ rackName, slot, cardType, initialConfig, initialEnabled, initialSimulation, backLabel = 'Back', onBack, onSave, onSimulationPreview }: CardConfigPageProps) {
   const { isDark } = useAppTheme();
   const [form, setForm] = useState<{ config: CardConfig; enabled: boolean; simulation?: SimulatedChannel[] }>(() => {
     const normalized = normalizedCardConfig(cardType, initialConfig);
@@ -88,11 +89,12 @@ export function CardConfigPage({ rackName, slot, cardType, initialConfig, initia
   // The knob panel edits only the signal definition — value, behaviour, output
   // state, measurement type, cadence — none of which the card config derives
   // from, so nothing needs to flow back.
-  const setPrimaryChannel = (channel: SimulatedChannel) =>
-    setForm((previous) => {
-      if (!previous.simulation?.length) return previous;
-      return { ...previous, simulation: previous.simulation.map((entry, index) => (index === 0 ? channel : entry)) };
-    });
+  const setPrimaryChannel = (channel: SimulatedChannel) => {
+    if (!simulation?.length) return;
+    const nextSimulation = simulation.map((entry, index) => (index === 0 ? channel : entry));
+    setForm((previous) => ({ ...previous, simulation: nextSimulation }));
+    onSimulationPreview?.(config, enabled, simulationWithCardConfig(cardType, config, nextSimulation));
+  };
 
   const canSave = (() => {
     if ('controllerName' in config) {

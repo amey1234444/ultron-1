@@ -42,6 +42,7 @@ import {
   type SimulatedChannel,
 } from '../lib/simulation';
 import { ensureSseSimulationWorkspace } from '../lib/sseSimulationProfile';
+import { archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
 import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
 import {
   duplicateFolderSubtree,
@@ -256,6 +257,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     conflictDeviceName?: string;
     conflictDeviceType?: string;
   } | null>(null);
+  const [deviceNameConflictNotice, setDeviceNameConflictNotice] = useState<{
+    name: string;
+    type: 'Gateway' | 'Rack';
+    conflictDeviceName?: string;
+  } | null>(null);
   const seenIpChanges = useRef<Set<string>>(new Set());
   const seenIpConflictAlerts = useRef<Set<number>>(new Set());
   const ipNoticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -370,7 +376,15 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
     if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
     setIpChangeNotice(null);
+    setDeviceNameConflictNotice(null);
     setIpConflictNotice(notice);
+  };
+  const showDeviceNameConflictNotice = (notice: { name: string; type: 'Gateway' | 'Rack'; conflictDeviceName?: string }) => {
+    if (ipConflictNoticeTimer.current) clearTimeout(ipConflictNoticeTimer.current);
+    if (ipNoticeTimer.current) clearTimeout(ipNoticeTimer.current);
+    setIpChangeNotice(null);
+    setIpConflictNotice(null);
+    setDeviceNameConflictNotice(notice);
   };
 
   useEffect(() => {
@@ -512,6 +526,15 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     setDevices(repaired.devices);
     setCards(repaired.cards);
   }, [cards, setCards, setDevices, storedDevices]);
+
+  useEffect(() => {
+    const repaired = archiveDuplicateConfiguredDeviceNames(storedDevices);
+    if (!repaired.changed) return;
+    setDevices(repaired.devices);
+    if (repaired.archivedIds.size > 0) {
+      setCards((prev) => prev.filter((card) => !repaired.archivedIds.has(card.deviceId)));
+    }
+  }, [setCards, setDevices, storedDevices]);
 
   const [createProjectVisible, setCreateProjectVisible] = useState(false);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
@@ -699,6 +722,15 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       const candidate: DeviceNode[] = previous
         ? updated
         : [...updated, { id: editingDeviceId, projectId: device.gatewayId ? (storedDevices.find((d) => d.id === device.gatewayId)?.projectId ?? null) : null, archived: false, ...savedDevice }];
+      const duplicateName = findDuplicateNameForDevice(candidate, { id: editingDeviceId, name: savedDevice.name, type: savedDevice.type, archived: false });
+      if (duplicateName) {
+        showDeviceNameConflictNotice({
+          name: duplicateName.name,
+          type: duplicateName.type,
+          conflictDeviceName: currentUser?.role === 'super_admin' ? duplicateName.device.name : undefined,
+        });
+        return;
+      }
       const duplicate = findDuplicateIpInDevices(candidate);
       if (duplicate) {
         showIpConflictNotice({
@@ -722,6 +754,15 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         realRackId: device.type === 'Rack' ? nextRackIdForGateway(device.gatewayId, devices, null, device.realRackId ?? null) : null,
       };
       const candidate: DeviceNode[] = [...storedDevices, newDevice];
+      const duplicateName = findDuplicateNameForDevice(candidate, newDevice);
+      if (duplicateName) {
+        showDeviceNameConflictNotice({
+          name: duplicateName.name,
+          type: duplicateName.type,
+          conflictDeviceName: currentUser?.role === 'super_admin' ? duplicateName.device.name : undefined,
+        });
+        return;
+      }
       const duplicate = findDuplicateIpInDevices(candidate);
       if (duplicate) {
         showIpConflictNotice({
@@ -946,6 +987,32 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           <Text className={cn('mt-1 font-body text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
             {ipChangeNotice.gatewayName}: {ipChangeNotice.oldIp} to {ipChangeNotice.newIp}
           </Text>
+        </View>
+      )}
+
+      {deviceNameConflictNotice && (
+        <View
+          className="absolute inset-0 z-50 items-center justify-center px-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.28)' }}
+        >
+          <View
+            className={cn(
+              'w-full max-w-[420px] rounded-xl border px-5 py-4 shadow-xl',
+              isDark ? 'border-status-critical/50 bg-surface-darkpanel' : 'border-status-critical/60 bg-surface-lightpanel',
+            )}
+          >
+            <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              {deviceNameConflictNotice.type} name already exists
+            </Text>
+            <Text className={cn('mt-2 font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+              {deviceNameConflictNotice.conflictDeviceName
+                ? `${deviceNameConflictNotice.name} is already used by ${deviceNameConflictNotice.conflictDeviceName}. Use a unique ${deviceNameConflictNotice.type.toLowerCase()} name before saving.`
+                : `${deviceNameConflictNotice.name} is already used. Use a unique ${deviceNameConflictNotice.type.toLowerCase()} name before saving.`}
+            </Text>
+            <View className="mt-4 items-end">
+              <ActionButton label="OK" onPress={() => setDeviceNameConflictNotice(null)} />
+            </View>
+          </View>
         </View>
       )}
 
