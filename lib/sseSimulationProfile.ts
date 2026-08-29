@@ -90,13 +90,15 @@ const SSE_CHANNELS: SseChannelSpec[] = [
   { key: 'screw-rpm', rack: 2, slot: 3, label: 'Screw RPM', cardType: 'Speed Card', kind: 'Speed / RPM', unit: 'RPM', rangeMin: 0, rangeMax: 150, lowLow: 58.5, low: 61.75, healthy: 65, high: 68.25, highHigh: 71.5, decimals: 2, samplesPerSecond: 1, precision: '0.00' },
 ];
 
-const FAULT_DANGER_KEYS = new Set(['motor-de-vibration', 'motor-temperature', 'gearbox-output-vibration', 'hopper-level', 'melt-pressure']);
-const FAULT_ALERT_KEYS = new Set(['motor-power', 'zone-1-temperature']);
-const PREDICTION_KEYS = new Set(['motor-de-vibration', 'motor-temperature', 'gearbox-temperature', 'hopper-level', 'zone-1-temperature', 'melt-temperature', 'melt-pressure']);
+const FAULT_DANGER_KEYS = new Set<string>();
+const FAULT_ALERT_KEYS = new Set(['motor-de-vibration', 'motor-nde-vibration', 'motor-power', 'gearbox-output-vibration', 'melt-pressure']);
+const FAULT_REDUCED_SPEED_KEYS = new Set(['motor-rpm', 'screw-rpm']);
+const PREDICTION_KEYS = new Set(['gearbox-output-vibration']);
 
 function behaviourFor(profile: Profile, spec: SseChannelSpec): SimulationBehaviour {
   if (profile === 'healthy') return 'Steady';
   if (profile === 'prediction') return PREDICTION_KEYS.has(spec.key) ? 'Predictive Drift' : 'Steady';
+  if (FAULT_REDUCED_SPEED_KEYS.has(spec.key)) return 'Drift Down';
   if (FAULT_DANGER_KEYS.has(spec.key)) return 'Ramp To Danger';
   if (FAULT_ALERT_KEYS.has(spec.key)) return 'Ramp To Alert';
   return 'Steady';

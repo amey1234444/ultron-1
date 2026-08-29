@@ -117,6 +117,22 @@ function fmt(value: number, decimals: number): string {
   return value.toFixed(decimals);
 }
 
+function labelIncludes(c: PointCondition, words: string[]): boolean {
+  const haystack = `${c.label} ${c.code}`.toLocaleLowerCase();
+  return words.every((word) => haystack.includes(word.toLocaleLowerCase()));
+}
+
+function uniqueReported(points: Array<ReportedCondition | undefined | null>): ReportedCondition[] {
+  const seen = new Set<string>();
+  const result: ReportedCondition[] = [];
+  for (const point of points) {
+    if (!point || seen.has(point.id)) continue;
+    seen.add(point.id);
+    result.push(point);
+  }
+  return result;
+}
+
 // How long the point has been continuously at or above its alert limit, walking
 // the buffer back from now. Zero when it is currently inside limits.
 function elevatedSamples(c: ReportedCondition): number {
@@ -233,8 +249,8 @@ const CATEGORY_FOR_RULE: Record<string, IssueCategory> = {
 
 function categoryForKind(kind: PointCondition['kind']): IssueCategory {
   if (kind === 'Vibration') return 'mechanical';
-  if (kind === 'Temperature' || kind === 'Current') return 'electrical';
-  if (kind === 'Pressure' || kind === 'Speed') return 'process';
+  if (kind === 'Temperature' || kind === 'Current' || kind === 'Power') return 'electrical';
+  if (kind === 'Pressure' || kind === 'Speed' || kind === 'Level') return 'process';
   return 'sensor';
 }
 
@@ -318,7 +334,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   const windowHours = conditions[0]?.windowHours ?? 0;
 
   const speedPoint = online.find((c) => c.kind === 'Speed') ?? null;
-  const currentPoint = online.find((c) => c.kind === 'Current') ?? null;
+  const currentPoint = online.find((c) => c.kind === 'Current' || c.kind === 'Power') ?? null;
   const vibration = online.filter((c) => c.kind === 'Vibration');
 
   // Narrows a component's points to the ones the gateway has reported. A
@@ -363,11 +379,51 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   // --- issues ----------------------------------------------------------------
 
   const claimedByDiagnosis = new Set<string>();
+  const processRestrictionPointIds = new Set<string>();
   const issues: Issue[] = [];
+
+  const meltPressurePoint = online.find((c) => c.kind === 'Pressure' && labelIncludes(c, ['melt', 'pressure']) && c.level !== 'normal');
+  const motorPowerPoint =
+    online.find((c) => (c.kind === 'Current' || c.kind === 'Power') && labelIncludes(c, ['motor', 'power']) && c.level !== 'normal') ??
+    online.find((c) => (c.kind === 'Current' || c.kind === 'Power') && labelIncludes(c, ['power']) && c.level !== 'normal') ??
+    null;
+  const reducedSpeedPoints = online.filter(
+    (c) => c.kind === 'Speed' && (c.value < baselineOf(c) * 0.99 || c.changeFraction < -TREND_FLAT_BAND),
+  );
+  const secondaryLoadResponse = vibration.filter(
+    (c) =>
+      c.level !== 'normal' &&
+      (labelIncludes(c, ['motor']) || labelIncludes(c, ['gearbox', 'output']) || labelIncludes(c, ['gb', 'output'])),
+  );
+
+  if (meltPressurePoint && motorPowerPoint && reducedSpeedPoints.length > 0) {
+    const processPoints = uniqueReported([meltPressurePoint, motorPowerPoint, ...reducedSpeedPoints, ...secondaryLoadResponse]);
+    processPoints.forEach((p) => {
+      claimedByDiagnosis.add(p.id);
+      processRestrictionPointIds.add(p.id);
+    });
+    const condition = conditionFor(worstLevelOf(processPoints), Math.min(...processPoints.map((p) => p.health)), true);
+
+    issues.push({
+      id: 'dx-process-downstream-restriction',
+      title: 'Developing downstream process restriction',
+      componentLabel: 'Downstream melt path',
+      category: 'process',
+      condition,
+      description:
+        'Resistance to polymer flow has increased, raising screw torque demand and drive load in the screen-pack / die region.',
+      trend: worstTrend(processPoints),
+      consequence: 'secondary-damage',
+      ageMinutes: Math.max(...processPoints.map(elevatedForMinutes)),
+      confidence: Math.min(95, 82 + Math.min(10, processPoints.length * 2)),
+      action: 'Inspect the screen pack and downstream die/melt path, clean or replace restrictions, then verify pressure, power, speed and vibration recover.',
+    });
+  }
 
   for (const diagnosis of ranked) {
     const points = pointsOf(diagnosis);
     if (points.length === 0) continue;
+    if (points.every((p) => claimedByDiagnosis.has(p.id))) continue;
     points.forEach((p) => claimedByDiagnosis.add(p.id));
 
     const worst = [...points].sort((a, b) => a.health - b.health)[0];
@@ -505,8 +561,11 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   const worstComponentPoint = worstComponent
     ? [...reportedOf(worstComponent.points)].sort((a, b) => a.health - b.health)[0] ?? null
     : null;
+  const processRestrictionIssue = issues.find((issue) => issue.id === 'dx-process-downstream-restriction') ?? null;
 
-  const criticalPath = worstComponent
+  const criticalPath = processRestrictionIssue
+    ? 'Primary problem group is increased process resistance in the downstream melt path. Melt pressure and drive load are high while motor and screw speeds fall together; motor, gearbox-output vibration and speed symptoms should be treated as secondary load response unless spectral evidence proves a separate fault.'
+    : worstComponent
     ? `Abnormal evidence is strongest at the ${worstComponent.label.toLowerCase()} (${
         worstComponentPoint?.label ?? 'no reported point'
       }). ${
@@ -594,6 +653,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   for (const diagnosis of ranked) {
     const points = pointsOf(diagnosis);
     if (points.length === 0) continue;
+    if (points.every((p) => processRestrictionPointIds.has(p.id))) continue;
     const lead = [...points].sort((a, b) => a.health - b.health)[0];
 
     const rules: RuleHit[] = points.map((p) => {
@@ -738,12 +798,20 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   // --- what to do ------------------------------------------------------------
 
   const doThis = [
+    ...(processRestrictionIssue ? [processRestrictionIssue.action] : []),
     ...ranked.slice(0, 3).map((d) => `${d.componentLabel}: ${d.recommendation}`),
     ...offline.slice(0, 2).map((c) => `Restore the link to ${c.label} — it cannot be assessed while unreachable.`),
     ...frozen.slice(0, 2).map((c) => `Treat ${c.code} as unverified until its wiring is checked.`),
   ].slice(0, 5);
 
   const thenConfirm = [
+    ...(processRestrictionIssue
+      ? [
+          'Melt pressure returns below its alert limit under comparable conditions.',
+          'Motor power falls while motor RPM and screw RPM recover.',
+          'Motor and gearbox-output vibration reduce after the restriction is cleared.',
+        ]
+      : []),
     ...ranked.slice(0, 2).flatMap((d) =>
       pointsOf(d)
         .slice(0, 1)
@@ -880,11 +948,11 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     { label: 'SPEED STABILITY', value: speedStability === null ? '--' : `±${speedStability.toFixed(1)} %` },
     currentPoint
       ? {
-          label: 'MOTOR CURRENT',
+          label: currentPoint.kind === 'Power' ? 'MOTOR POWER' : 'MOTOR CURRENT',
           value: `${fmt(currentPoint.value, currentPoint.band.decimals)} ${currentPoint.unit}`,
           note: loadPercent === null ? undefined : `${loadPercent.toFixed(0)} % of range`,
         }
-      : { label: 'MOTOR CURRENT', value: '--', note: 'no current channel mapped' },
+      : { label: 'MOTOR LOAD', value: '--', note: 'no current or power channel mapped' },
     { label: 'HISTORY', value: windowHours >= 48 ? `${Math.round(windowHours / 24)} d` : `${Math.round(windowHours)} h` },
     { label: 'CHANNELS', value: `${online.length} / ${conditions.length}`, note: 'reporting' },
   ];
@@ -1186,14 +1254,18 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
             : inferred.length > 0
               ? `${inferred.length} channel${inferred.length === 1 ? '' : 's'} are judged against inferred limits rather than commissioned ones.`
               : 'Every mapped channel is reporting and moving, against commissioned limits. Suitable for trend reasoning only — no spectra are captured here.',
-      dominantEvidence: lead
-        ? `${lead.label} at the ${lead.componentLabel.toLowerCase()}, carried by ${leadPoints.length} reading${
+      dominantEvidence: processRestrictionIssue
+        ? 'Developing downstream process restriction, carried by pressure, power and speed evidence with secondary vibration response.'
+        : lead
+          ? `${lead.label} at the ${lead.componentLabel.toLowerCase()}, carried by ${leadPoints.length} reading${
             leadPoints.length === 1 ? '' : 's'
           }.`
-        : 'No fault signature matched the current readings.',
-      nextStep: lead
-        ? lead.recommendation
-        : 'Nothing needs action. Keep the trend running and revisit if a point moves toward its limit.',
+          : 'No fault signature matched the current readings.',
+      nextStep: processRestrictionIssue
+        ? processRestrictionIssue.action
+        : lead
+          ? lead.recommendation
+          : 'Nothing needs action. Keep the trend running and revisit if a point moves toward its limit.',
     },
     initialEvidence: leadPoints.slice(0, 3).map<EvidenceItem>((p) => ({
       id: `ev-${p.id}`,

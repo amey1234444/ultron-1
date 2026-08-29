@@ -323,7 +323,7 @@ export function MachineProDiagnosisPage({
   const activeForecasts = model.activeForecasts.length;
   const chainIssueCount = findings.filter((finding) => finding.rules.some((rule) => rule.evidenceClass === 'chain')).length;
   const goodSignalCount = Math.max(0, signals.length - chainIssueCount);
-  const healthyOutlook = condition === 'healthy' && issues.length === 0 && findings.length === 0;
+  const healthyOutlook = condition === 'healthy' && issues.length === 0 && findings.length === 0 && forecasts.length === 0;
 
   const choose = (forecast: MachinePredictionResult) => {
     setSelectedId(forecast.predictionId);
@@ -379,6 +379,13 @@ export function MachineProDiagnosisPage({
 
           {bestPrediction ? (
             <View className="flex-row flex-wrap gap-2">
+              <Kpi label="Current condition" value={CONDITION_LABEL[condition].toLocaleUpperCase()} condition={condition} note="Predictive risk is separate from current condition" />
+              <Kpi
+                label="Projected Alert"
+                value={bestPrediction.estimatedTimeToAlertDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToAlertDays)}
+                unit={dayUnit(bestPrediction.estimatedTimeToAlertDays)}
+                note="Configured threshold crossing, not a fault today"
+              />
               <Kpi
                 label="Projected Danger"
                 value={bestPrediction.estimatedTimeToDangerDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToDangerDays)}
@@ -464,6 +471,10 @@ export function MachineProDiagnosisPage({
 
               <View className="flex-row flex-wrap gap-2">
                 <Kpi label="CURRENT / BASELINE" value={formatCurrentBaseline(selected)} />
+                <Kpi
+                  label="PROJECTED ALERT"
+                  value={selected.estimatedTimeToAlertDays === null ? '--' : formatDayPhrase(selected.estimatedTimeToAlertDays)}
+                />
                 <Kpi label="DEGRADATION RATE" value={formatSlope(selected.trendSlopePerDay)} />
                 <Kpi label="MODEL / FIT" value={`${selected.modelType} / ${selected.modelFit === null ? '--' : `${fmt(selected.modelFit * 100, 0)}%`}`} />
                 <Kpi label="PREDICTION RANGE" value={predictionRange(selected)} />

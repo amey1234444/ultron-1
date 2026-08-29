@@ -118,8 +118,10 @@ const PREDICTABILITY_FOR_KIND: Record<string, PredictabilityClass> = {
   Vibration: 'MEDIUM',
   Temperature: 'MEDIUM',
   Current: 'MEDIUM',
+  Power: 'MEDIUM',
   Pressure: 'MEDIUM',
   Speed: 'LOW',
+  Level: 'LOW',
   Unknown: 'DETECTION_ONLY',
 };
 
@@ -271,11 +273,25 @@ function faultDefinition(issue: Issue, point: PointCondition | null): { id: stri
   const component = issue.componentLabel.toLocaleLowerCase();
   const kind = point?.kind ?? 'Unknown';
 
+  if (issue.id === 'dx-process-downstream-restriction') {
+    return {
+      id: 'PRED-015',
+      name: 'Progressive Process / Die Restriction',
+      required: ['Screen-pack differential pressure', 'Throughput', 'Feed rate', 'Post-cleaning recovery trend'],
+    };
+  }
+  if (issue.id.startsWith('pred-') && component.includes('gearbox output')) {
+    return {
+      id: 'PRED-002',
+      name: 'Gearbox Output Bearing Degradation',
+      required: ['Raw acceleration waveform', 'Envelope spectrum', 'Bearing geometry', 'Validated functional-failure model'],
+    };
+  }
   if (title.includes('bearing')) return { id: 'PRED-002', name: `${issue.componentLabel} Bearing Degradation`, required: ['Raw acceleration waveform', 'Envelope spectrum', 'Bearing geometry'] };
   if (component.includes('gearbox')) return { id: 'PRED-006', name: 'Gearbox Mechanical Degradation', required: ['Raw vibration waveform', 'Gear and bearing metadata'] };
   if (title.includes('lubrication')) return { id: 'PRED-010', name: 'Lubrication Degradation', required: ['Oil condition', 'Particle count', 'Water content'] };
   if (kind === 'Temperature') return { id: 'PRED-016', name: `${issue.componentLabel} Thermal Zone Degradation`, required: ['Heater duty cycle', 'Cooling command'] };
-  if (kind === 'Current') return { id: 'PRED-004', name: 'Motor Overload Progression', required: ['Screw RPM', 'Melt pressure', 'Melt temperature'] };
+  if (kind === 'Current' || kind === 'Power') return { id: 'PRED-004', name: 'Motor Overload Progression', required: ['Screw RPM', 'Melt pressure', 'Melt temperature'] };
   if (kind === 'Pressure') return { id: 'PRED-015', name: 'Progressive Process / Die Restriction', required: ['Throughput', 'Feed rate'] };
   if (kind === 'Speed') return { id: 'PRED-011', name: 'Drive Ratio Deterioration', required: ['Driven speed channel', 'Load-normalized trend'] };
   if (issue.category === 'sensor') return { id: 'PRED-026', name: `${issue.componentLabel} Sensor Drift`, required: ['Redundant sensor', 'Calibration check'] };
@@ -286,6 +302,7 @@ function pointIdsForIssue(issue: Issue): string[] {
   if (issue.id.startsWith('pt-')) return [issue.id.slice(3)];
   if (issue.id.startsWith('off-')) return [issue.id.slice(4)];
   if (issue.id.startsWith('frz-')) return [issue.id.slice(4)];
+  if (issue.id.startsWith('pred-')) return [issue.id.slice(5)];
   return [];
 }
 
@@ -293,6 +310,19 @@ function conditionsForIssue(issue: Issue, conditions: PointCondition[]): PointCo
   const direct = new Set(pointIdsForIssue(issue));
   if (direct.size > 0) return conditions.filter((point) => direct.has(point.id));
   if (issue.id === 'chan-inferred-limits') return conditions.filter((point) => !point.thresholds.configured);
+  if (issue.id === 'dx-process-downstream-restriction') {
+    return conditions.filter((point) => {
+      const label = `${point.label} ${point.code}`.toLocaleLowerCase();
+      return (
+        (label.includes('melt') && label.includes('pressure')) ||
+        (label.includes('motor') && label.includes('power')) ||
+        (label.includes('motor') && label.includes('rpm')) ||
+        (label.includes('screw') && label.includes('rpm')) ||
+        (label.includes('gearbox') && label.includes('output')) ||
+        (label.includes('gb') && label.includes('output'))
+      );
+    });
+  }
 
   const componentMatches = issue.componentId ? conditions.filter((point) => point.componentId === issue.componentId) : [];
   if (componentMatches.length > 0) return componentMatches;
@@ -420,7 +450,9 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
     thresholdProjectionWording:
       danger === null
         ? null
-        : `At the current degradation rate, the configured DANGER threshold is projected in approximately ${forecastDayPhrase(danger)}.`,
+        : alert === null
+          ? `At the current degradation rate, the configured DANGER threshold is projected in approximately ${forecastDayPhrase(danger)}.`
+          : `At the current degradation rate, the configured ALERT threshold is projected in approximately ${forecastDayPhrase(alert)} and DANGER in approximately ${forecastDayPhrase(danger)}.`,
     functionalFailureValidated: false,
     previousForecastDays: null,
     forecastChangeDays: null,
@@ -441,6 +473,65 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
   };
 }
 
+function categoryForPredictivePoint(point: PointCondition): Issue['category'] {
+  if (point.kind === 'Vibration') return 'mechanical';
+  if (point.kind === 'Temperature' || point.kind === 'Current' || point.kind === 'Power') return 'electrical';
+  if (point.kind === 'Pressure' || point.kind === 'Speed' || point.kind === 'Level') return 'process';
+  return 'sensor';
+}
+
+function predictiveLocationFor(point: PointCondition): string {
+  const text = `${point.label} ${point.code}`.toLocaleLowerCase();
+  if ((text.includes('gearbox') || text.includes('gb')) && text.includes('output')) return 'Gearbox output side';
+  if (text.includes('motor')) return 'Motor';
+  if (text.includes('screw')) return 'Screw / extrusion section';
+  if (text.includes('melt')) return 'Melt path';
+  return point.label;
+}
+
+function predictiveIssueForPoint(point: PointCondition): Issue {
+  const location = predictiveLocationFor(point);
+  const confidence =
+    point.prognosis.confidence === 'high' ? 82 : point.prognosis.confidence === 'medium' ? 70 : point.prognosis.confidence === 'low' ? 58 : 0;
+
+  return {
+    id: `pred-${point.id}`,
+    title: `${location} degradation under observation`,
+    componentId: point.componentId ?? undefined,
+    componentLabel: location,
+    category: categoryForPredictivePoint(point),
+    condition: 'healthy',
+    description: `${point.label} remains inside its configured healthy limit but is rising across the available history.`,
+    trend: 'worsening',
+    consequence: 'monitoring-only',
+    ageMinutes: 0,
+    confidence,
+    action: 'Increase monitoring and inspect the related component at the next planned maintenance window.',
+  };
+}
+
+function predictiveCandidates(points: PointCondition[]): PointCondition[] {
+  return points
+    .filter(
+      (point) =>
+        point.online &&
+        point.value !== null &&
+        point.level === 'normal' &&
+        point.samples.length >= 10 &&
+        point.prognosis.confidence !== 'none' &&
+        point.prognosis.slopePerDay > 0 &&
+        point.thresholds.alert > 0 &&
+        point.value >= point.thresholds.alert * 0.65,
+    )
+    .sort((a, b) => {
+      const aDanger = a.prognosis.daysToDanger ?? Infinity;
+      const bDanger = b.prognosis.daysToDanger ?? Infinity;
+      if (aDanger !== bDanger) return aDanger - bDanger;
+      return (b.changeFraction ?? 0) - (a.changeFraction ?? 0);
+    })
+    .slice(0, 3);
+}
+
 export function emptyPrognostics(now = new Date()): MachinePrognosticsResult {
   return {
     enabled: false,
@@ -456,9 +547,12 @@ export function emptyPrognostics(now = new Date()): MachinePrognosticsResult {
 }
 
 export function buildMachinePrognostics(input: BuildInput): MachinePrognosticsResult {
-  const predictions = prioritiseIssues(input.issues).map((issue) =>
-    buildPrediction(issue, input.conditions, input.signals, input.hypotheses),
-  );
+  const predictions = [
+    ...prioritiseIssues(input.issues).map((issue) => buildPrediction(issue, input.conditions, input.signals, input.hypotheses)),
+    ...predictiveCandidates(input.conditions).map((point) =>
+      buildPrediction(predictiveIssueForPoint(point), input.conditions, input.signals, input.hypotheses),
+    ),
+  ];
   const activeForecasts = predictions
     .filter((prediction) => prediction.predictionStatus === 'FORECAST_AVAILABLE' || prediction.predictionStatus === 'VALIDATED_RUL_AVAILABLE')
     .sort((a, b) => (a.estimatedTimeToDangerDays ?? Infinity) - (b.estimatedTimeToDangerDays ?? Infinity));

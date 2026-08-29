@@ -136,6 +136,70 @@ function DiagnosticChain({ steps }: { steps: DiagnosisChainStep[] }) {
   );
 }
 
+function MachineDoctorGrid({ problem }: { problem: DiagnosisProblem }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+
+  const valueFor = (label: string) => problem.chain.find((step) => step.label.toLocaleLowerCase().includes(label))?.value;
+  const cards = [
+    {
+      label: 'WHAT',
+      value:
+        problem.id === 'dx-process-downstream-restriction'
+          ? 'Resistance to polymer flow has increased, raising screw torque demand and drive load.'
+          : (valueFor('what') ?? problem.primaryFinding),
+    },
+    {
+      label: 'WHERE',
+      value:
+        problem.id === 'dx-process-downstream-restriction'
+          ? 'Downstream melt path, primarily screen-pack / die region.'
+          : problem.component,
+    },
+    {
+      label: 'WHY',
+      value:
+        problem.id === 'dx-process-downstream-restriction'
+          ? 'Pressure and power rise while motor and screw speeds fall together.'
+          : (valueFor('mechanism') ?? valueFor('cause') ?? 'Telemetry has not separated the physical cause yet.'),
+    },
+    {
+      label: 'IMPACT',
+      value:
+        problem.id === 'dx-process-downstream-restriction'
+          ? 'Higher mechanical loading, reduced efficiency and escalation risk.'
+          : (problem.impacts.find((item) => item.label === 'MACHINE IMPACT')?.value ?? problem.consequence),
+    },
+  ];
+
+  return (
+    <View className="gap-3">
+      <Text className={cn('font-heading-medium text-[20px]', inkClass)}>{problem.title}</Text>
+      <View className="flex-row flex-wrap" style={{ gap: 14 }}>
+        {cards.map((card) => (
+          <View
+            key={card.label}
+            className="gap-4 border px-4 py-4"
+            style={{
+              flexBasis: 300,
+              flexGrow: 1,
+              minWidth: 260,
+              borderColor: palette.line,
+              backgroundColor: palette.panelRaised,
+              borderRadius: 8,
+            }}
+          >
+            <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">{card.label}</Text>
+            <Text className={cn('font-body-medium text-[14px] leading-5', inkClass)}>{card.value}</Text>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function MetadataStrip({ problem, dataQuality }: { problem: DiagnosisProblem; dataQuality: string }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
@@ -312,6 +376,14 @@ function signalValue(signal: DiagnosisModelSource['diagnosisSignals'][number]): 
   return `${signal.value.toFixed(signal.decimals)} ${signal.unit}`;
 }
 
+function dayPhrase(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '--';
+  if (value <= 0) return 'now';
+  if (value < 1) return '<1 day';
+  const rounded = value < 10 ? Math.round(value * 10) / 10 : Math.round(value);
+  return `${rounded} ${rounded === 1 ? 'day' : 'days'}`;
+}
+
 const SYSTEM_HEALTH_TAGS = [
   'Mechanical',
   'Drive / Load',
@@ -357,6 +429,11 @@ function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; o
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const healthySignals = data.diagnosisSignals.length > 0 ? data.diagnosisSignals : data.signals;
+  const predictive = data.prognostics?.predictions.find(
+    (prediction) =>
+      prediction.condition === 'healthy' &&
+      (prediction.predictionStatus === 'FORECAST_AVAILABLE' || prediction.degradationDetected),
+  );
   const sensorEvidence: DiagnosisSensorEvidence[] = healthySignals.map((signal) => ({
     id: signal.code,
     measurement: signal.label,
@@ -366,6 +443,16 @@ function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; o
     quality: data.dataQuality === 'good' ? 'GOOD' : data.dataQuality.toUpperCase(),
     condition: signalCondition(signal),
   }));
+  const evidenceItems = predictive
+    ? [
+        `${predictive.location.join(' / ')} remains inside current healthy limits.`,
+        `Current value is ${predictive.currentValue === null ? '--' : predictive.currentValue.toFixed(2)} ${predictive.unit} against a healthy baseline of ${
+          predictive.baselineValue === null ? '--' : predictive.baselineValue.toFixed(2)
+        } ${predictive.unit}.`,
+        `Historical trend is ${predictive.trendDirection.toLocaleLowerCase()} across ${predictive.historyDurationDays.toFixed(0)} days.`,
+        'Motor vibration, motor power, melt pressure and thermal context remain healthy, so this is predictive monitoring rather than a current machine alarm.',
+      ]
+    : HEALTHY_EVIDENCE;
 
   return (
     <View className="gap-4">
@@ -374,10 +461,13 @@ function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; o
           <View className="flex-row flex-wrap items-start justify-between gap-4">
             <View className="min-w-0 flex-1 gap-2">
               <ConditionBadge condition="healthy" />
-              <Text className={cn('font-heading-medium text-[22px]', inkClass)}>No active fault detected</Text>
+              <Text className={cn('font-heading-medium text-[22px]', inkClass)}>
+                {predictive ? 'Current diagnosis healthy; predictive pattern under observation' : 'No active fault detected'}
+              </Text>
               <Text className={cn('max-w-[820px] font-body text-[11px] leading-5', mutedClass)}>
-                Diagnosis: no active mechanical, thermal, feeding, pressure, speed or process fault detected. No immediate
-                corrective action is required; continue normal monitoring.
+                {predictive
+                  ? 'Diagnosis: no present ALERT or DANGER fault is active. The prognosis layer is tracking an early degradation pattern, so this remains a monitoring and planned-inspection case.'
+                  : 'Diagnosis: no active mechanical, thermal, feeding, pressure, speed or process fault detected. No immediate corrective action is required; continue normal monitoring.'}
               </Text>
             </View>
             {onOpenPrognosis ? (
@@ -396,10 +486,11 @@ function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; o
           <View className="flex-row flex-wrap border" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
             {[
               ['OVERALL CONDITION', 'HEALTHY'],
-              ['PROBLEM GROUPS', '0'],
-              ['HIGHEST PRIORITY', 'NONE'],
-              ['CORRECTIVE ACTION', 'NONE REQUIRED'],
-              ['MEASUREMENTS', `${healthySignals.length}/${healthySignals.length}`],
+              ['CURRENT FAULTS', '0'],
+              ['PREDICTIVE FINDINGS', predictive ? '1' : '0'],
+              ['HIGHEST PRIORITY', predictive ? predictive.faultName.toLocaleUpperCase() : 'NONE'],
+              ['PROJECTED ALERT', predictive ? dayPhrase(predictive.estimatedTimeToAlertDays).toLocaleUpperCase() : '--'],
+              ['PROJECTED DANGER', predictive ? dayPhrase(predictive.estimatedTimeToDangerDays).toLocaleUpperCase() : '--'],
               ['DATA QUALITY', data.dataQuality.toUpperCase()],
             ].map(([label, value]) => (
               <View key={label} className="gap-1 px-3 py-2.5" style={{ minWidth: 150, flexGrow: 1 }}>
@@ -439,11 +530,30 @@ function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; o
 
       <Panel>
         <View className="gap-4">
-          <SectionHeading eyebrow="HEALTHY EVIDENCE" title="Why no fault was raised" />
+          <SectionHeading eyebrow="HEALTHY EVIDENCE" title={predictive ? 'Why this is not a current fault' : 'Why no fault was raised'} />
           <View className="flex-row flex-wrap" style={{ gap: 16 }}>
-            <EvidenceColumn title="Supporting evidence" items={HEALTHY_EVIDENCE} empty="No healthy evidence is available." />
-            <EvidenceColumn title="Contradicting evidence" items={[]} empty="No material contradiction against a healthy conclusion." />
-            <EvidenceColumn title="Additional evidence required" items={[]} empty="None for this healthy machine snapshot." />
+            <EvidenceColumn title="Supporting evidence" items={evidenceItems} empty="No healthy evidence is available." />
+            <EvidenceColumn
+              title="Contradicting evidence"
+              items={
+                predictive
+                  ? [
+                      'No current sensor is over an alert or danger limit.',
+                      'No motor, process or thermal symptom currently supports an immediate machine fault.',
+                    ]
+                  : []
+              }
+              empty="No material contradiction against a healthy conclusion."
+            />
+            <EvidenceColumn
+              title="Additional evidence required"
+              items={
+                predictive
+                  ? ['Raw waveform, envelope spectrum and bearing geometry are required before naming an inner-race, outer-race or gear fault.']
+                  : []
+              }
+              empty="None for this healthy machine snapshot."
+            />
           </View>
         </View>
       </Panel>
@@ -594,6 +704,7 @@ export function MachineDiagnosisPage({
                     </View>
                   </View>
 
+                  <MachineDoctorGrid problem={selected} />
                   <DiagnosticChain steps={selected.chain} />
                   <MetadataStrip problem={selected} dataQuality={model.dataQuality} />
 
