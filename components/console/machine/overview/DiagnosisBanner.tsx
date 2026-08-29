@@ -6,6 +6,8 @@ import { formatRul, levelHexes, type PointEvidence } from '../../../../lib/condi
 import { consolePalette } from '../../../../lib/consoleTheme';
 import type { MachineSummary, RankedDiagnosis } from './rollup';
 
+type BannerDiagnosis = Pick<RankedDiagnosis, 'label' | 'confidence' | 'recommendation' | 'evidence' | 'componentLabel' | 'rulDays'>;
+
 function evidenceLine(evidence: PointEvidence[]) {
   return evidence
     .slice(0, 4)
@@ -22,7 +24,7 @@ export function DiagnosisBanner({
   actionLabel,
   onAction,
 }: {
-  diagnosis: RankedDiagnosis | null;
+  diagnosis: BannerDiagnosis | null;
   summary: MachineSummary;
   actionLabel?: string;
   onAction?: () => void;

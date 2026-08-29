@@ -625,5 +625,30 @@ export function attributeToComponent(
     if (needle.length > 0 && haystack.includes(needle)) return component.id;
   }
 
+  // Single Screw Extruder mappings often use plant-facing short labels
+  // ("Motor DE Vibration", "Gearbox Output Vibration", "Zone 1 Temperature")
+  // while the template points use longer wording. Keep those tags attached to
+  // the right train element so overview, diagnosis and prognosis all reason over
+  // the same physical buckets.
+  const compact = haystack.replace(/[^a-z0-9]+/g, ' ').trim();
+  const findBy = (predicate: (component: MachineComponent) => boolean) =>
+    components.find((component) => predicate(component))?.id ?? null;
+  if (/\bmotor\b/.test(compact)) {
+    const motor = findBy((component) => component.type === 'Motor' || component.label.toLowerCase() === 'drive');
+    if (motor) return motor;
+  }
+  if (/\bgear\s*box\b|\bgearbox\b|\bgb\b/.test(compact)) {
+    const gearbox = findBy((component) => component.type === 'Gearbox' || component.label.toLowerCase().includes('gear'));
+    if (gearbox) return gearbox;
+  }
+  if (/\bhopper\b|\bfeed\b/.test(compact)) {
+    const feed = findBy((component) => component.label.toLowerCase().includes('feed'));
+    if (feed) return feed;
+  }
+  if (/\bscrew\b|\bbarrel\b|\bzone\b|\bmelt\b/.test(compact)) {
+    const screw = findBy((component) => component.label.toLowerCase().includes('screw') || component.label.toLowerCase().includes('barrel'));
+    if (screw) return screw;
+  }
+
   return null;
 }

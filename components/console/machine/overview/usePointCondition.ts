@@ -25,7 +25,7 @@ import { channelEngineeringRange, type CardNode } from '../../../../lib/rack';
 import { channelNumberFor, useMappedChannelReading } from '../../../../lib/liveChannelValue';
 import { LIVE_RANGE_FOR_LETTER, type LiveKindLetter } from '../liveValue';
 import type { MappedChannel } from '../RackOccupancyView';
-import { conditionHistoryStorageKey, useConditionHistory, type ConditionSource } from './useConditionHistory';
+import { conditionHistoryStorageKey, useConditionHistory, type ConditionHistory, type ConditionSource } from './useConditionHistory';
 
 // Everything the overview knows about one measurement point, assembled in one
 // place so the cards, the component roll-up, the diagnosis banner and the alarm
@@ -87,6 +87,14 @@ function predictiveDemoSamples(start: number, end: number, count = 121): number[
   });
 }
 
+function configuredSimulationValue(mapped: MappedChannel, card: CardNode | null, channelIndex: number): number | null {
+  const simulation = card?.simulation?.[channelIndex];
+  if (!simulation?.enabled) return null;
+  if (typeof simulation.manualValue === 'number' && Number.isFinite(simulation.manualValue)) return simulation.manualValue;
+  if (typeof mapped.channel.healthyValue === 'number' && Number.isFinite(mapped.channel.healthyValue)) return mapped.channel.healthyValue;
+  return null;
+}
+
 export function usePointCondition(
   mapped: MappedChannel,
   machineId: string,
@@ -134,7 +142,41 @@ export function usePointCondition(
   );
   const channelIndex = channelNumberFor(channel) - 1;
 
-  return useMemo(() => {
+  return useMemo(
+    () => derivePointCondition({ mapped, card, channelIndex, history, reading, isoGroup, componentId, online, label }),
+    [mapped, card, channelIndex, history, reading, isoGroup, componentId, online, label],
+  );
+}
+
+// The whole derivation, with the hooks lifted out: everything above this line
+// only resolves the card, the reading and the buffer, and everything below turns
+// those into the condition every screen reads. Kept separate so the demo
+// scenario checks can drive the exact same code the console runs, rather than a
+// re-implementation of it that could agree with the page while both are wrong.
+export type DerivePointConditionInput = {
+  mapped: MappedChannel;
+  // The card behind the channel and which of its channels this is; null when the
+  // caller has no card list, in which case the letter's display band is used.
+  card: CardNode | null;
+  channelIndex: number;
+  history: ConditionHistory;
+  reading: { value: number | null; status: ConditionSource };
+  isoGroup?: IsoGroup;
+  componentId?: string | null;
+  online?: boolean;
+  // Defaults to the mapped channel's own label, which is what the canvas shows.
+  label?: string;
+};
+
+export function derivePointCondition(input: DerivePointConditionInput): PointCondition {
+  const { mapped, card, channelIndex, history, reading } = input;
+  const { channel } = mapped;
+  const isoGroup = input.isoGroup ?? DEFAULT_ISO_GROUP;
+  const componentId = input.componentId ?? null;
+  const online = input.online ?? true;
+  const label = input.label ?? mapped.label;
+
+  {
     const fallback = LIVE_RANGE_FOR_LETTER[channel.letter];
     // The range this channel is actually measured against, resolved with the
     // same precedence listChannels uses for its unit and limits. Decimals stay
@@ -143,12 +185,13 @@ export function usePointCondition(
     const configured = card ? channelEngineeringRange(card, channelIndex) : null;
     const band = configured ? { ...configured, decimals: fallback.decimals } : fallback;
     const simulation = card?.simulation?.[channelIndex];
+    const configuredValue = configuredSimulationValue(mapped, card, channelIndex);
     const configuredPredictiveValue =
       simulation?.behaviour === 'Predictive Drift' && typeof simulation.manualValue === 'number' && Number.isFinite(simulation.manualValue)
         ? simulation.manualValue
         : null;
     const liveValue = typeof reading.value === 'number' && Number.isFinite(reading.value) ? reading.value : null;
-    const analysisValue = configuredPredictiveValue ?? liveValue;
+    const analysisValue = configuredPredictiveValue ?? liveValue ?? configuredValue;
     const thresholds = resolveThresholds(channel, band);
     const syntheticPredictive =
       configuredPredictiveValue !== null && history.samples.length < 30
@@ -174,7 +217,7 @@ export function usePointCondition(
 
     return {
       id: mapped.id,
-      code: channel.code,
+      code: mapped.templatePointCode ?? channel.code,
       label,
       kind: channel.kind ?? KIND_FOR_LETTER[channel.letter],
       letter: channel.letter,
@@ -204,5 +247,5 @@ export function usePointCondition(
       componentId,
       source: liveValue !== null ? reading.status : history.source,
     };
-  }, [channel, label, mapped.id, history, reading, isoGroup, componentId, online, card, channelIndex]);
+  }
 }

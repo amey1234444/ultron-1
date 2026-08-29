@@ -398,8 +398,9 @@ function gearboxOutputPredictiveTiming(
   baseline: number | null,
 ): { alert: number; danger: number; confidence: number } | null {
   if (!point || current === null || baseline === null) return null;
-  const label = `${issue.componentLabel} ${point.label} ${point.code}`.toLocaleLowerCase();
-  if (!issue.id.startsWith('pred-') || !label.includes('gearbox') || !label.includes('output')) return null;
+  const label = `${issue.componentLabel} ${point.label} ${point.code}`.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  const outputSide = label.includes('output') || /\bout\b/.test(label) || label.includes('gearbox vib');
+  if (!issue.id.startsWith('pred-') || !(label.includes('gearbox') || label.includes('gb')) || !outputSide) return null;
   if (current >= point.thresholds.alert || point.windowHours < 24 * 100) return null;
 
   const rise = current - baseline;
@@ -523,8 +524,10 @@ function categoryForPredictivePoint(point: PointCondition): Issue['category'] {
 }
 
 function predictiveLocationFor(point: PointCondition): string {
-  const text = `${point.label} ${point.code}`.toLocaleLowerCase();
-  if ((text.includes('gearbox') || text.includes('gb')) && text.includes('output')) return 'Gearbox output side';
+  const text = `${point.label} ${point.code}`.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  if ((text.includes('gearbox') || text.includes('gb')) && (text.includes('output') || /\bout\b/.test(text) || text.includes('gearbox vib'))) {
+    return 'Gearbox output side';
+  }
   if (text.includes('motor')) return 'Motor';
   if (text.includes('screw')) return 'Screw / extrusion section';
   if (text.includes('melt')) return 'Melt path';

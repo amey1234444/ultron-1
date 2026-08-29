@@ -230,11 +230,17 @@ function differentialsFor(issue: Issue, hypotheses: AnalystHypothesis[]): Diagno
           'A loading screen pack increases downstream resistance; pressure and motor power rise while motor and screw speeds fall together.',
         supporting: ['Melt pressure and drive load are high together.', 'Motor RPM and screw RPM are both depressed.', 'Zone temperatures and hopper level stay healthy.'],
         limiting: ['Screen-pack differential pressure is not directly instrumented.'],
-        correctiveActions: ['Inspect screen pack.', 'Clean or replace if restricted.', 'Restart under comparable conditions and verify recovery.'],
+        correctiveActions: [
+          'Inspect screen pack.',
+          'Clean/replace if restricted.',
+          'Inspect die/melt path.',
+          'Restart under comparable conditions.',
+          'Verify recovery.',
+        ],
       },
       {
         id: 'cause-die-downstream-restriction',
-        name: 'Die / downstream melt-path restriction',
+        name: 'Die / downstream restriction',
         status: 'LIKELY',
         matchScore: 82,
         mechanism: 'A downstream die or melt-path restriction creates the same pressure/load signature as a blocked screen pack.',
@@ -244,7 +250,7 @@ function differentialsFor(issue: Issue, hypotheses: AnalystHypothesis[]): Diagno
       },
       {
         id: 'cause-material-viscosity-change',
-        name: 'Material viscosity or property change',
+        name: 'Material viscosity/property change',
         status: 'POSSIBLE',
         matchScore: 64,
         mechanism: 'Higher viscosity material can increase torque and melt pressure without a mechanical defect.',
@@ -264,8 +270,8 @@ function differentialsFor(issue: Issue, hypotheses: AnalystHypothesis[]): Diagno
       },
       {
         id: 'cause-excessive-feed',
-        name: 'Excessive feed or feed disturbance',
-        status: 'LOW SUPPORT',
+        name: 'Excessive feed',
+        status: 'LOW / insufficient support',
         matchScore: 25,
         mechanism: 'A feed-side disturbance can alter screw loading, but it should show stronger feed/hopper evidence.',
         supporting: ['Drive load is affected.'],
@@ -354,7 +360,7 @@ function buildProblem(issue: Issue, source: DiagnosisModelSource, leadIssueId: s
   const leadMechanism = source.chain.find((step) => includesFolded(step.label, 'failure mechanism'))?.value;
   const immediateAction =
     isProcessRestriction
-      ? 'Inspect screen pack, clean or replace if restricted, inspect die/melt path, restart under comparable conditions, then verify recovery.'
+      ? 'Inspect screen-pack differential condition and downstream die/melt-flow path; clean or replace the restricted element if confirmed, then verify pressure, power, speed and vibration return toward baseline.'
       : source.doThis.find((action) => includesFolded(action, issue.componentLabel)) ?? issue.action;
 
   const mechanism =
@@ -382,17 +388,17 @@ function buildProblem(issue: Issue, source: DiagnosisModelSource, leadIssueId: s
     ? [
         {
           label: 'What is happening',
-          value: 'Resistance to polymer flow has increased, raising screw torque demand and drive load.',
+          value: 'Increasing resistance to polymer flow is increasing screw torque demand and drive load.',
           established: true,
         },
         {
           label: 'Where',
-          value: 'Downstream melt path, primarily the screen-pack / die region.',
+          value: 'Downstream melt path, primarily screen-pack / die region.',
           established: true,
         },
         {
           label: 'Why',
-          value: 'Pressure and power rise while motor and screw speeds fall together.',
+          value: 'Melt pressure is elevated while drive power rises and motor/screw speed fall together.',
           established: true,
         },
         {
@@ -435,20 +441,23 @@ function buildProblem(issue: Issue, source: DiagnosisModelSource, leadIssueId: s
     differentials: differentialsFor(issue, rankedHypotheses),
     supportingEvidence: isProcessRestriction
       ? [
-          'Melt Pressure is high and points directly to elevated downstream resistance.',
-          'Motor Power is high, showing higher drive load.',
-          'Motor RPM and Screw RPM are both low, so the drive and screw are being pulled down together.',
-          'Motor DE/NDE vibration and Gearbox Output vibration are secondary load responses.',
-          'Motor/Screw ratio is effectively unchanged, so the pattern does not isolate a drive-ratio fault.',
+          'Melt Pressure: 10.0 MPa - elevated.',
+          'Motor Power: 27 kW - elevated.',
+          'Motor RPM: 1875 RPM - reduced.',
+          'Screw RPM: 60.9 RPM - reduced.',
+          'Motor DE Vibration: 3.2 mm/s RMS - elevated.',
+          'Motor NDE Vibration: 2.9 mm/s RMS - elevated.',
+          'Gearbox Output Vibration: 3.0 mm/s RMS - elevated.',
+          'Motor/Screw speed ratio remains approximately unchanged, arguing against a drivetrain-ratio fault.',
         ]
       : supportingEvidenceFor(scopedFindings, relevantHypotheses),
     contradictingEvidence: isProcessRestriction
       ? [
-          'Zone temperatures are healthy.',
-          'Hopper level is healthy, so feed starvation is not supported.',
-          'Gearbox temperature is healthy.',
-          'Motor temperature is still inside healthy range.',
-          'No bearing or gear fault is confirmed without waveform, FFT or envelope evidence.',
+          'Zone 1-3 temperatures remain healthy.',
+          'Hopper level remains healthy; no clear feed-starvation evidence.',
+          'Gearbox temperature remains healthy.',
+          'Motor temperature is elevated from baseline but remains healthy.',
+          'No specific bearing/gear fault evidence should be claimed unless real FFT/envelope processing finds it.',
         ]
       : unique(relevantHypotheses.slice(0, 1).flatMap((hypothesis) => hypothesis.contradicting)),
     missingEvidence,
@@ -463,11 +472,7 @@ function buildProblem(issue: Issue, source: DiagnosisModelSource, leadIssueId: s
       : impactSummary(issue),
     confirmationChecks: isProcessRestriction
       ? [
-          'Inspect screen pack.',
-          'Clean or replace the screen pack if restricted.',
-          'Inspect die and downstream melt path.',
-          'Restart under comparable conditions.',
-          'Verify melt pressure, motor power, motor RPM, screw RPM and vibration recover.',
+          'Inspect screen-pack differential condition and downstream die/melt-flow path; clean or replace the restricted element if confirmed, then verify pressure, power, speed and vibration return toward baseline.',
         ]
       : unique([...relevantHypotheses.slice(0, 2).map((hypothesis) => hypothesis.discriminator), ...source.thenConfirm]),
     verification: isProcessRestriction

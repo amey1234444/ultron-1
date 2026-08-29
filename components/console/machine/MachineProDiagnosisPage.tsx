@@ -13,10 +13,21 @@ import {
 } from '../../../lib/analysisOverview';
 import { QUALITY_LABEL, type AnalystHypothesis, type ChainStep, type Conclusion, type DataQuality } from '../../../lib/advancedDiagnosis';
 import { cn } from '../../../lib/cn';
+import { consolePalette } from '../../../lib/consoleTheme';
 import { Panel } from '../../Panel';
 import { AnalysisTabs, type AnalysisDepth } from './analysis/AnalysisTabs';
 import type { ActionPriority } from './analysis/ActionList';
 import { emptyPrognostics, type MachinePredictionResult, type MachinePrognosticsResult } from './analysis/prognosticsModel';
+import {
+  FAULTY_SSE_MAINTENANCE_GUIDANCE,
+  FAULTY_SSE_OPTIONAL_SHORT_HISTORY,
+  FAULTY_SSE_PROGNOSIS_ROWS,
+  FAULTY_SSE_PROGNOSIS_WHAT,
+  PREDICTIVE_SSE_FORECAST_PLOTS,
+  PREDICTIVE_SSE_MAINTENANCE_GUIDANCE,
+  PREDICTIVE_SSE_PROGNOSIS_ROWS,
+  PREDICTIVE_SSE_PROGNOSIS_WHAT,
+} from './demoSseDocs';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
 
 const FORECAST_LIST = { flexGrow: 3, flexBasis: 330, minWidth: 280 } as const;
@@ -202,7 +213,7 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-function BulletList({ items, empty }: { items: string[]; empty: string }) {
+function BulletList({ items, empty }: { items: readonly string[]; empty: string }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
@@ -227,6 +238,34 @@ function DetailBox({ title, children }: { title: string; children: ReactNode }) 
     <View className="gap-2 rounded-lg border px-3 py-2.5" style={{ ...ACTION_CELL, borderColor: hairline }}>
       <Text className={cn('font-body-medium text-[11px]', mutedClass)}>{title}</Text>
       {children}
+    </View>
+  );
+}
+
+function PrognosisDocRows({
+  rows,
+  valueTone = 'warning',
+}: {
+  rows: readonly (readonly [string, string])[];
+  valueTone?: 'warning' | 'accent';
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const valueColor = valueTone === 'accent' ? palette.accent : palette.warning;
+
+  return (
+    <View className="gap-3 border-b pb-4" style={{ borderColor: palette.line }}>
+      {rows.map(([label, value]) => (
+        <View key={label} className="flex-row flex-wrap items-baseline gap-x-8 gap-y-1">
+          <Text className={cn('font-body-medium text-[11px]', mutedClass)} style={{ width: 240 }}>
+            {label}
+          </Text>
+          <Text className="min-w-0 flex-1 font-body-bold text-[12px]" style={{ color: valueColor }}>
+            {value}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -324,6 +363,9 @@ export function MachineProDiagnosisPage({
   const chainIssueCount = findings.filter((finding) => finding.rules.some((rule) => rule.evidenceClass === 'chain')).length;
   const goodSignalCount = Math.max(0, signals.length - chainIssueCount);
   const healthyOutlook = condition === 'healthy' && issues.length === 0 && findings.length === 0 && forecasts.length === 0;
+  const processRestrictionPrognosis = selected?.predictionId === 'dx-process-downstream-restriction';
+  const predictiveGearboxPrognosis =
+    selected?.predictionId.startsWith('pred-') && selected.faultName === 'Gearbox Output Bearing Degradation';
 
   const choose = (forecast: MachinePredictionResult) => {
     setSelectedId(forecast.predictionId);
@@ -378,30 +420,43 @@ export function MachineProDiagnosisPage({
           </View>
 
           {bestPrediction ? (
-            <View className="flex-row flex-wrap gap-2">
-              <Kpi label="Current condition" value={CONDITION_LABEL[condition].toLocaleUpperCase()} condition={condition} note="Predictive risk is separate from current condition" />
-              <Kpi
-                label="Projected Alert"
-                value={bestPrediction.estimatedTimeToAlertDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToAlertDays)}
-                unit={dayUnit(bestPrediction.estimatedTimeToAlertDays)}
-                note="Configured threshold crossing, not a fault today"
-              />
-              <Kpi
-                label="Projected Danger"
-                value={bestPrediction.estimatedTimeToDangerDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToDangerDays)}
-                unit={dayUnit(bestPrediction.estimatedTimeToDangerDays)}
-                note={bestPrediction.faultName}
-                condition={bestPrediction.condition}
-              />
-              <Kpi
-                label="Operating time"
-                value={fmt(bestPrediction.operatingHoursToThreshold, 0)}
-                unit={bestPrediction.operatingHoursToThreshold === null ? undefined : 'hours'}
-                note={runState ?? 'Operating state duration not recorded'}
-              />
-              <Kpi label="Prediction confidence" value={fmt(bestPrediction.predictionConfidence, 0)} unit="%" />
-              <Kpi label="Data coverage" value={`${goodSignalCount}/${signals.length}`} note={`${QUALITY_LABEL[dataQuality]} data quality`} />
-            </View>
+            <>
+              {processRestrictionPrognosis ? <PrognosisDocRows rows={FAULTY_SSE_PROGNOSIS_ROWS} /> : null}
+              {predictiveGearboxPrognosis ? <PrognosisDocRows rows={PREDICTIVE_SSE_PROGNOSIS_ROWS} valueTone="accent" /> : null}
+              <View className="flex-row flex-wrap gap-2">
+                <Kpi label="Current condition" value={CONDITION_LABEL[condition].toLocaleUpperCase()} condition={condition} note="Predictive risk is separate from current condition" />
+                {processRestrictionPrognosis ? (
+                  <Kpi label="Prediction Mode" value="Limited unless sufficient time history is available" />
+                ) : null}
+                {predictiveGearboxPrognosis ? (
+                  <>
+                    <Kpi label="Prediction Status" value="FORECAST AVAILABLE / DEGRADATION DETECTED" />
+                    <Kpi label="Prediction Target" value="Time to configured ALERT and DANGER thresholds - not automatic RUL" />
+                  </>
+                ) : null}
+                <Kpi
+                  label="Projected Alert"
+                  value={bestPrediction.estimatedTimeToAlertDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToAlertDays)}
+                  unit={dayUnit(bestPrediction.estimatedTimeToAlertDays)}
+                  note="Configured threshold crossing, not a fault today"
+                />
+                <Kpi
+                  label="Projected Danger"
+                  value={bestPrediction.estimatedTimeToDangerDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToDangerDays)}
+                  unit={dayUnit(bestPrediction.estimatedTimeToDangerDays)}
+                  note={bestPrediction.faultName}
+                  condition={bestPrediction.condition}
+                />
+                <Kpi
+                  label="Operating time"
+                  value={fmt(bestPrediction.operatingHoursToThreshold, 0)}
+                  unit={bestPrediction.operatingHoursToThreshold === null ? undefined : 'hours'}
+                  note={runState ?? 'Operating state duration not recorded'}
+                />
+                <Kpi label="Prediction confidence" value={fmt(bestPrediction.predictionConfidence, 0)} unit="%" />
+                <Kpi label="Data coverage" value={`${goodSignalCount}/${signals.length}`} note={`${QUALITY_LABEL[dataQuality]} data quality`} />
+              </View>
+            </>
           ) : (
             <View className="items-center gap-1 rounded-lg border px-4 py-8" style={{ borderColor: hairline, borderStyle: 'dashed' }}>
               <Text className={cn('font-body-medium text-[13px]', inkClass)}>
@@ -481,9 +536,15 @@ export function MachineProDiagnosisPage({
               </View>
 
               <Section title="What Happens Next">
-                <Text className={cn('font-body text-[12px] leading-[18px]', inkClass)}>
-                  {selected.thresholdProjectionWording ?? 'No defensible threshold horizon is currently available.'}
-                </Text>
+                {processRestrictionPrognosis ? (
+                  <BulletList items={FAULTY_SSE_PROGNOSIS_WHAT} empty="No Demo 2 prognosis statement is available." />
+                ) : predictiveGearboxPrognosis ? (
+                  <BulletList items={PREDICTIVE_SSE_PROGNOSIS_WHAT} empty="No Demo 3 prognosis statement is available." />
+                ) : (
+                  <Text className={cn('font-body text-[12px] leading-[18px]', inkClass)}>
+                    {selected.thresholdProjectionWording ?? 'No defensible threshold horizon is currently available.'}
+                  </Text>
+                )}
               </Section>
 
               <View className="flex-row flex-wrap gap-2">
@@ -504,6 +565,28 @@ export function MachineProDiagnosisPage({
                   <BulletList items={selected.requiredAdditionalEvidence} empty="No expected inputs are missing." />
                 </DetailBox>
               </View>
+
+              {processRestrictionPrognosis ? (
+                <View className="flex-row flex-wrap gap-2">
+                  <DetailBox title="Optional short-history display">
+                    <BulletList items={FAULTY_SSE_OPTIONAL_SHORT_HISTORY} empty="No optional short-history statement is available." />
+                  </DetailBox>
+                  <DetailBox title="Maintenance guidance shown">
+                    <BulletList items={FAULTY_SSE_MAINTENANCE_GUIDANCE} empty="No Demo 2 maintenance guidance is available." />
+                  </DetailBox>
+                </View>
+              ) : null}
+
+              {predictiveGearboxPrognosis ? (
+                <View className="flex-row flex-wrap gap-2">
+                  <DetailBox title="Forecast plots shown">
+                    <BulletList items={PREDICTIVE_SSE_FORECAST_PLOTS.map((row) => row.join(': '))} empty="No Demo 3 forecast plot statement is available." />
+                  </DetailBox>
+                  <DetailBox title="Maintenance guidance shown">
+                    <BulletList items={PREDICTIVE_SSE_MAINTENANCE_GUIDANCE} empty="No Demo 3 maintenance guidance is available." />
+                  </DetailBox>
+                </View>
+              ) : null}
 
               <Section title="Advanced Model Evidence">
                 <View className="flex-row flex-wrap gap-2">

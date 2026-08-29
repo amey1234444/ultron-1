@@ -90,9 +90,11 @@ const SSE_CHANNELS: SseChannelSpec[] = [
   { key: 'screw-rpm', rack: 2, slot: 3, label: 'Screw RPM', cardType: 'Speed Card', kind: 'Speed / RPM', unit: 'RPM', rangeMin: 0, rangeMax: 150, lowLow: 58.5, low: 61.75, healthy: 65, high: 68.25, highHigh: 71.5, decimals: 2, samplesPerSecond: 1, precision: '0.00' },
 ];
 
-const FAULT_DANGER_KEYS = new Set<string>();
-const FAULT_ALERT_KEYS = new Set(['motor-de-vibration', 'motor-nde-vibration', 'motor-power', 'gearbox-output-vibration', 'melt-pressure']);
-const FAULT_REDUCED_SPEED_KEYS = new Set(['motor-rpm', 'screw-rpm']);
+// Demo 3 is the only profile with a moving signal: its whole point is a
+// degradation history under a currently-healthy reading, and Predictive Drift is
+// what generates one. Demo 2 is "one fixed demo stage only" - every channel sits
+// at its declared Demo 2 value, so a ramp behaviour would walk the snapshot off
+// the values the demo script states.
 const PREDICTION_KEYS = new Set(['gearbox-output-vibration']);
 
 const FAULT_VALUES: Partial<Record<string, number>> = {
@@ -126,12 +128,7 @@ const PREDICTION_VALUES: Partial<Record<string, number>> = {
 };
 
 function behaviourFor(profile: Profile, spec: SseChannelSpec): SimulationBehaviour {
-  if (profile === 'healthy') return 'Steady';
-  if (profile === 'prediction') return PREDICTION_KEYS.has(spec.key) ? 'Predictive Drift' : 'Steady';
-  if (profile === 'faulty') return 'Steady';
-  if (FAULT_REDUCED_SPEED_KEYS.has(spec.key)) return 'Drift Down';
-  if (FAULT_DANGER_KEYS.has(spec.key)) return 'Ramp To Danger';
-  if (FAULT_ALERT_KEYS.has(spec.key)) return 'Ramp To Alert';
+  if (profile === 'prediction' && PREDICTION_KEYS.has(spec.key)) return 'Predictive Drift';
   return 'Steady';
 }
 

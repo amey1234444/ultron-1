@@ -20,7 +20,7 @@ import type {
   OverviewCondition,
   ProgressionEvent,
 } from '../../../lib/analysisOverview';
-import { formatRul, levelFor, TREND_FLAT_BAND, type ConditionLevel } from '../../../lib/condition';
+import { formatRul, levelFor, TREND_FLAT_BAND, type ConditionLevel, type Diagnosis } from '../../../lib/condition';
 import type { DeviceNode } from '../../../lib/devices';
 import type { ComponentType, MachineNode } from '../../../lib/machines';
 import type { CardNode } from '../../../lib/rack';
@@ -117,9 +117,27 @@ function fmt(value: number, decimals: number): string {
   return value.toFixed(decimals);
 }
 
+function foldedSignalText(c: PointCondition): string {
+  return `${c.label} ${c.code}`.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function hasFoldedWord(text: string, word: string): boolean {
+  const needle = word.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  if (!needle) return true;
+  if (text.includes(needle)) return true;
+  if (needle === 'output') return /\bout\b/.test(text) || text.includes('gearbox vib');
+  if (needle === 'input') return /\bin\b/.test(text);
+  if (needle === 'de') return /\bde\b/.test(text) || text.includes('driving end');
+  if (needle === 'nde') return /\bnde\b/.test(text) || text.includes('non driving end') || text.includes('non drive');
+  if (needle === 'rpm') return text.includes('speed');
+  if (needle === 'pressure') return /\bp1\b/.test(text);
+  if (needle === 'power') return /\bpm1\b/.test(text) || text.includes('load');
+  return false;
+}
+
 function labelIncludes(c: PointCondition, words: string[]): boolean {
-  const haystack = `${c.label} ${c.code}`.toLocaleLowerCase();
-  return words.every((word) => haystack.includes(word.toLocaleLowerCase()));
+  const haystack = foldedSignalText(c);
+  return words.every((word) => hasFoldedWord(haystack, word));
 }
 
 function uniqueReported(points: Array<ReportedCondition | undefined | null>): ReportedCondition[] {
@@ -157,6 +175,14 @@ function breachedLimit(c: ReportedCondition): { limit: number; label: string; di
   }
   if (c.level === 'danger') return { limit: c.thresholds.danger, label: 'danger', direction: 'above' };
   return { limit: c.thresholds.alert, label: 'alert', direction: 'above' };
+}
+
+function isMateriallyHigh(c: ReportedCondition, riseFraction = 0.12): boolean {
+  return c.level !== 'normal' || (c.thresholds.healthy !== undefined && c.value > c.thresholds.healthy * (1 + riseFraction));
+}
+
+function isMateriallyLow(c: ReportedCondition, dropFraction = 0.02): boolean {
+  return c.level !== 'normal' || (c.thresholds.healthy !== undefined && c.value < c.thresholds.healthy * (1 - dropFraction));
 }
 
 // Hours ago the point last crossed a threshold upward. Null when it is currently
@@ -393,13 +419,15 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
   const processRestrictionPointIds = new Set<string>();
   const issues: Issue[] = [];
 
-  const meltPressurePoint = online.find((c) => c.kind === 'Pressure' && labelIncludes(c, ['melt', 'pressure']) && c.level !== 'normal');
+  const meltPressurePoint = online.find((c) => c.kind === 'Pressure' && labelIncludes(c, ['melt', 'pressure']) && isMateriallyHigh(c));
   const motorPowerPoint =
-    online.find((c) => (c.kind === 'Current' || c.kind === 'Power') && labelIncludes(c, ['motor', 'power']) && c.level !== 'normal') ??
-    online.find((c) => (c.kind === 'Current' || c.kind === 'Power') && labelIncludes(c, ['power']) && c.level !== 'normal') ??
+    online.find((c) => (c.kind === 'Current' || c.kind === 'Power') && labelIncludes(c, ['motor', 'power']) && isMateriallyHigh(c, 0.18)) ??
+    online.find((c) => (c.kind === 'Current' || c.kind === 'Power') && labelIncludes(c, ['power']) && isMateriallyHigh(c, 0.18)) ??
     null;
   const reducedSpeedPoints = online.filter(
-    (c) => c.kind === 'Speed' && (c.level !== 'normal' || c.value < baselineOf(c) * 0.99 || c.changeFraction < -TREND_FLAT_BAND),
+    (c) =>
+      c.kind === 'Speed' &&
+      (isMateriallyLow(c) || c.value < baselineOf(c) * 0.99 || c.changeFraction < -TREND_FLAT_BAND),
   );
   const secondaryLoadResponse = vibration.filter(
     (c) =>
@@ -413,7 +441,8 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
       claimedByDiagnosis.add(p.id);
       processRestrictionPointIds.add(p.id);
     });
-    const condition = conditionFor(worstLevelOf(processPoints), Math.min(...processPoints.map((p) => p.health)), true);
+    const measuredCondition = conditionFor(worstLevelOf(processPoints), Math.min(...processPoints.map((p) => p.health)), true);
+    const condition = measuredCondition === 'healthy' ? 'alert' : measuredCondition;
 
     issues.push({
       id: 'dx-process-downstream-restriction',
@@ -422,12 +451,13 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
       category: 'process',
       condition,
       description:
-        'Resistance to polymer flow has increased, raising screw torque demand and drive load in the screen-pack / die region.',
+        'Increasing resistance to polymer flow is increasing screw torque demand and drive load.',
       trend: worstTrend(processPoints),
       consequence: 'secondary-damage',
       ageMinutes: Math.max(...processPoints.map(elevatedForMinutes)),
       confidence: Math.min(95, 82 + Math.min(10, processPoints.length * 2)),
-      action: 'Inspect the screen pack and downstream die/melt path, clean or replace restrictions, then verify pressure, power, speed and vibration recover.',
+      action:
+        'Inspect screen-pack differential condition and downstream die/melt-flow path; clean or replace the restricted element if confirmed, then verify pressure, power, speed and vibration return toward baseline.',
     });
   }
 
@@ -535,10 +565,26 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
 
   // --- train -----------------------------------------------------------------
 
+  // A failure-mode rule fires on amplitude and kind alone. Where every reading
+  // behind it is already accounted for by the process-restriction group, the
+  // rise is the drive's load response to that restriction, and naming a bearing,
+  // misalignment or unbalance defect here would assert something no waveform
+  // has been processed to support. The issue list and the findings already drop
+  // those; the train has to drop them too, or the same claim reappears one panel
+  // to the left.
+  const explainedByProcess = (diagnosis: Diagnosis) =>
+    processRestrictionPointIds.size > 0 &&
+    diagnosis.evidence.length > 0 &&
+    diagnosis.evidence.every((e) => processRestrictionPointIds.has(e.id));
+
   const train: TrainNode[] = components.map((c) => {
     const worst = [...reportedOf(c.points)].sort((a, b) => a.health - b.health)[0] ?? null;
     const allOffline = c.points.length > 0 && c.points.every((p) => !p.online);
-    const diagnosis = c.diagnoses[0] ?? null;
+    const diagnosis = c.diagnoses.find((d) => !explainedByProcess(d)) ?? null;
+    // Every elevated point on this component belongs to the restriction group,
+    // so the component is load-affected rather than independently faulty.
+    const elevated = reportedOf(c.points).filter((p) => p.level !== 'normal');
+    const loadRelated = elevated.length > 0 && elevated.every((p) => processRestrictionPointIds.has(p.id));
 
     return {
       id: c.componentId ?? 'unattributed',
@@ -561,7 +607,9 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
               ? `${diagnosis.label} — ${diagnosis.recommendation}`
               : c.level === 'normal'
                 ? 'Every mapped point is inside its limits.'
-                : `${worst?.label ?? 'A point'} is outside its limits.`,
+                : loadRelated
+                  ? `${elevated.map((p) => p.label).join(', ')} ${elevated.length === 1 ? 'is' : 'are'} elevated as a load response to the downstream process restriction. No independent defect signature is present; spectral evidence would be needed to claim one.`
+                  : `${worst?.label ?? 'A point'} is outside its limits.`,
     };
   });
 
@@ -783,6 +831,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
 
   const lead = ranked[0] ?? null;
   const leadPoints = lead ? pointsOf(lead) : [];
+  const hasLowSideLimits = conditions.some((c) => c.thresholds.lowAlert !== undefined || c.thresholds.lowDanger !== undefined);
   const machineRules = findings.reduce(
     (count, f) => count + f.rules.filter((r) => r.evidenceClass === 'machine').length,
     0,
@@ -1155,7 +1204,9 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     rootCause: null,
     remainingUncertainty: [
       'No spectrum, waveform or bearing geometry is configured on this machine, so a bearing defect cannot be confirmed from the data alone.',
-      'Limits are single-sided, so a fault that shows as a reading falling — cavitation, loss of suction, a drive losing speed — is invisible here.',
+      hasLowSideLimits
+        ? 'Configured low-side limits are evaluated where present; channels without LL/L limits still cannot detect faults that only appear as a falling reading.'
+        : 'No low-side limits are configured, so a fault that only appears as a falling reading cannot be detected from thresholds alone.',
       inferred.length > 0
         ? `${inferred.length} channel${inferred.length === 1 ? '' : 's'} are judged against inferred limits.`
         : '',

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
+import type { Issue } from '../../../lib/analysisOverview';
+import { prioritiseIssues } from '../../../lib/analysisOverview';
 import { cn } from '../../../lib/cn';
 import {
   attributeToComponent,
@@ -33,16 +35,28 @@ import { MaintenanceCard, type MaintenanceRecord } from './overview/MaintenanceC
 import { PredictionList } from './overview/PredictionList';
 import { RecentEvents, type MachineEvent } from './overview/RecentEvents';
 import {
+  FAULTY_SSE_OVERVIEW_MUST_NOT_SHOW,
+  FAULTY_SSE_OVERVIEW_ROWS,
+  FAULTY_SSE_OVERVIEW_SHOULD_SHOW,
+  PREDICTIVE_SSE_OVERVIEW_MUST_NOT_SHOW,
+  PREDICTIVE_SSE_OVERVIEW_ROWS,
+  PREDICTIVE_SSE_OVERVIEW_SHOULD_SHOW,
+  PREDICTIVE_SSE_SUMMARY_ROWS,
+} from './demoSseDocs';
+import {
   deriveRunState,
   healthByKind,
   rankDiagnoses,
   rollUpComponents,
   sensorHealthCounts,
   summarizeMachine,
+  toEvidence,
+  type RankedDiagnosis,
 } from './overview/rollup';
 import { SENSOR_TILE_MIN_WIDTH, SensorGaugeTile } from './overview/SensorGaugeTile';
 import type { PointCondition } from './overview/usePointCondition';
 import type { MappedChannel } from './RackOccupancyView';
+import { deriveAnalysis } from './deriveAnalysis';
 
 const ZONE_ORDER: Record<IsoZone, number> = { A: 0, B: 1, C: 2, D: 3 };
 
@@ -80,6 +94,107 @@ const TILE_MAX_WIDTH = 560;
 function channelNumber(channelId: string): number {
   const match = /\.CH(\d+)$/.exec(channelId);
   return match ? Number(match[1]) : 0;
+}
+
+function folded(value: string): string {
+  return value.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+}
+
+function issuePointCandidates(issue: Issue, conditions: PointCondition[]): PointCondition[] {
+  if (issue.id === 'dx-process-downstream-restriction') {
+    return conditions.filter((point) => {
+      const text = folded(`${point.label} ${point.code}`);
+      return (
+        (text.includes('melt') && text.includes('pressure')) ||
+        (text.includes('motor') && text.includes('power')) ||
+        (text.includes('motor') && (text.includes('rpm') || text.includes('speed'))) ||
+        (text.includes('screw') && (text.includes('rpm') || text.includes('speed'))) ||
+        ((text.includes('gearbox') || text.includes('gb')) && (text.includes('output') || /\bout\b/.test(text))) ||
+        (text.includes('motor') && text.includes('vib'))
+      );
+    });
+  }
+  if (issue.componentId) return conditions.filter((point) => point.componentId === issue.componentId);
+  const label = folded(issue.componentLabel);
+  return conditions.filter((point) => folded(point.label).includes(label));
+}
+
+function issueAsDiagnosis(issue: Issue, conditions: PointCondition[]): RankedDiagnosis | null {
+  const evidence = issuePointCandidates(issue, conditions)
+    .filter((point): point is PointCondition & { value: number } => point.value !== null)
+    .map(toEvidence);
+  if (evidence.length === 0) return null;
+  const overviewLabel =
+    issue.id === 'dx-process-downstream-restriction'
+      ? 'Increased Process Resistance / Downstream Restriction'
+      : issue.title;
+  const overviewRecommendation =
+    issue.id === 'dx-process-downstream-restriction'
+      ? 'Likely Location: Downstream melt path - screen pack / die region'
+      : issue.action;
+  return {
+    id: issue.id,
+    label: overviewLabel,
+    confidence: issue.confidence !== undefined && issue.confidence >= 75 ? 'high' : issue.confidence !== undefined && issue.confidence >= 55 ? 'medium' : 'low',
+    recommendation: overviewRecommendation,
+    evidence,
+    componentLabel: issue.componentLabel,
+    rulDays: null,
+  };
+}
+
+function DemoDocList({ title, items }: { title: string; items: readonly string[] }) {
+  const { isDark } = useAppTheme();
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+
+  return (
+    <View className="gap-2">
+      <Text className={cn('font-mono text-[9px] font-bold uppercase tracking-wider', mutedClass)}>{title}</Text>
+      <View className="gap-1.5">
+        {items.map((item) => (
+          <Text key={item} className={cn('font-body text-[11px] leading-4', inkClass)}>
+            {item}
+          </Text>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function DemoOverviewDocBlock({
+  rows,
+  sections,
+  valueTone = 'warning',
+}: {
+  rows: readonly (readonly [string, string])[];
+  sections: Array<{ title: string; items: readonly string[] }>;
+  valueTone?: 'warning' | 'accent';
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const valueColor = valueTone === 'accent' ? palette.accent : palette.warning;
+
+  return (
+    <View className="gap-4 border-b pb-4" style={{ borderColor: palette.line }}>
+      <View className="gap-3">
+        {rows.map(([label, value]) => (
+          <View key={label} className="flex-row flex-wrap items-baseline gap-x-8 gap-y-1">
+            <Text className={cn('font-body-medium text-[11px]', mutedClass)} style={{ width: 240 }}>
+              {label}
+            </Text>
+            <Text className="min-w-0 flex-1 font-body-bold text-[12px]" style={{ color: valueColor }}>
+              {value}
+            </Text>
+          </View>
+        ))}
+      </View>
+      {sections.map((section) => (
+        <DemoDocList key={section.title} title={section.title} items={section.items} />
+      ))}
+    </View>
+  );
 }
 
 export type MachineOverviewPageProps = {
@@ -229,6 +344,22 @@ export function MachineOverviewPage({
   const summary = useMemo(() => summarizeMachine(conditionList), [conditionList]);
   const componentSummaries = useMemo(() => rollUpComponents(machine, conditionList), [machine, conditionList]);
   const ranked = useMemo(() => rankDiagnoses(componentSummaries), [componentSummaries]);
+  const runState = useMemo(() => deriveRunState(conditionList), [conditionList]);
+  const analysisData = useMemo(
+    () =>
+      deriveAnalysis({
+        machine,
+        mappedChannels: orderedChannels,
+        conditions: conditionList,
+        components: componentSummaries,
+        summary,
+        ranked,
+        runState,
+        devices,
+        cards,
+      }),
+    [machine, orderedChannels, conditionList, componentSummaries, summary, ranked, runState, devices, cards],
+  );
 
   const worstZone = useMemo(() => {
     const zones = conditionList.map((c) => c.isoZone).filter((z): z is IsoZone => z !== null);
@@ -236,7 +367,6 @@ export function MachineOverviewPage({
   }, [conditionList]);
 
   const healthFactors = useMemo(() => healthByKind(conditionList), [conditionList]);
-  const runState = useMemo(() => deriveRunState(conditionList), [conditionList]);
   const sensors = useMemo(() => sensorHealthCounts(conditionList), [conditionList]);
   const activeAlerts = summary.dangerCount + summary.alertCount;
 
@@ -268,7 +398,11 @@ export function MachineOverviewPage({
     );
   }
 
-  const leadDiagnosis = ranked[0] ?? null;
+  const leadIssue = prioritiseIssues(analysisData.issues)[0] ?? null;
+  const leadDiagnosis = (leadIssue ? issueAsDiagnosis(leadIssue, conditionList) : null) ?? ranked[0] ?? null;
+  const overviewForecasts = analysisData.prognostics?.predictions ?? [];
+  const isFaultySseDemo = machine.name === 'Faulty SSE Demo' || leadIssue?.id === 'dx-process-downstream-restriction';
+  const isPredictiveSseDemo = machine.name === 'SSE Prediction Demo';
 
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
@@ -341,6 +475,28 @@ export function MachineOverviewPage({
 
       <Panel status={statusForLevel(summary.level)}>
         <View className="gap-4">
+          {isFaultySseDemo ? (
+            <DemoOverviewDocBlock
+              rows={FAULTY_SSE_OVERVIEW_ROWS}
+              sections={[
+                { title: 'OVERVIEW SHOULD SHOW', items: FAULTY_SSE_OVERVIEW_SHOULD_SHOW },
+                { title: 'WHAT MUST NOT BE SHOWN', items: FAULTY_SSE_OVERVIEW_MUST_NOT_SHOW },
+              ]}
+            />
+          ) : null}
+
+          {isPredictiveSseDemo ? (
+            <DemoOverviewDocBlock
+              rows={PREDICTIVE_SSE_OVERVIEW_ROWS}
+              valueTone="accent"
+              sections={[
+                { title: 'OVERVIEW SHOULD SHOW', items: PREDICTIVE_SSE_OVERVIEW_SHOULD_SHOW },
+                { title: 'PREDICTIVE SUMMARY SHOWN', items: PREDICTIVE_SSE_SUMMARY_ROWS.map(([label, value]) => `${label}: ${value}`) },
+                { title: 'WHAT MUST NOT BE SHOWN', items: PREDICTIVE_SSE_OVERVIEW_MUST_NOT_SHOW },
+              ]}
+            />
+          ) : null}
+
           <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Machine health overview</Text>
 
           <View className="flex-row flex-wrap items-start gap-6">
@@ -370,7 +526,7 @@ export function MachineOverviewPage({
         </View>
         <View style={COLUMN}>
           <Panel fill>
-            <PredictionList diagnoses={ranked} />
+            <PredictionList diagnoses={ranked} forecasts={overviewForecasts} />
           </Panel>
         </View>
       </View>

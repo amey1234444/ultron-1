@@ -64,6 +64,7 @@
     "start:next": "next start",
     "start:render": "node server.mjs",
     "lint": "next lint",
+    "check:demo": "npx --yes esbuild components/console/machine/overview/__checks__/demoScenarioChecks.ts --bundle --platform=node --format=esm --external:react --external:react-native --outfile=node_modules/.cache/demoScenarioChecks.mjs && node node_modules/.cache/demoScenarioChecks.mjs",
     "typecheck": "tsc --noEmit"
   },
   "private": true
