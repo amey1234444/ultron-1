@@ -24,6 +24,21 @@ const FORECAST_DETAIL = { flexGrow: 7, flexBasis: 720, minWidth: 320 } as const;
 const DETAIL_CELL = { flexGrow: 1, flexBasis: 210, minWidth: 180 } as const;
 const ACTION_CELL = { flexGrow: 1, flexBasis: 280, minWidth: 240 } as const;
 
+const HEALTHY_PROGNOSIS_POINTS = [
+  'No persistent upward bearing, gear, vibration, temperature, pressure or load degradation pattern.',
+  'Projected ALERT crossing: no reliable crossing predicted.',
+  'Projected DANGER crossing: no reliable crossing predicted.',
+  'Validated RUL: not applicable for this healthy demonstration.',
+  'Maintenance recommendation: continue routine/planned maintenance.',
+];
+
+const HEALTHY_PROGNOSIS_PLOTS = [
+  '120-day machine-health trend: stable.',
+  'Selected sensor / feature degradation trend: stable around the healthy baseline.',
+  'Forecast plot: history remains stable with no artificial threshold crossing.',
+  'Maintenance/event timeline: routine events only when present.',
+];
+
 export type MachineProDiagnosisPageProps = {
   machineName: string;
   template: string;
@@ -216,6 +231,64 @@ function DetailBox({ title, children }: { title: string; children: ReactNode }) 
   );
 }
 
+function HealthyPrognosisState({
+  signals,
+  dataQuality,
+  runState,
+  model,
+}: {
+  signals: AnalysisSignal[];
+  dataQuality: DataQuality;
+  runState?: string;
+  model: MachinePrognosticsResult;
+}) {
+  const { isDark } = useAppTheme();
+  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const stableSignals = signals.slice(0, 6).map((signal) => `${signal.label}: ${fmt(signal.value, signal.decimals)} ${signal.unit} stable`);
+
+  return (
+    <View className="gap-4">
+      <Panel>
+        <View className="gap-4">
+          <View className="flex-row flex-wrap items-start justify-between gap-4">
+            <View className="min-w-0 flex-1 gap-2">
+              <StatusPill condition="healthy" />
+              <Text className={cn('font-heading-medium text-[24px]', inkClass)}>Stable healthy outlook</Text>
+              <Text className={cn('max-w-[820px] font-body text-[11px] leading-[17px]', mutedClass)}>
+                Current machine condition is healthy. No significant degradation forecast is available because the evidence does not
+                support an artificial threshold crossing or a future failure date.
+              </Text>
+            </View>
+            <Text className="font-mono text-[10px] font-bold tracking-wider text-accent">PROGNOSIS</Text>
+          </View>
+
+          <View className="flex-row flex-wrap gap-2">
+            <Kpi label="Current condition" value="HEALTHY" condition="healthy" note={runState ?? 'Running normally'} />
+            <Kpi label="Historical period" value="120" unit="days" note="Stable healthy operation" />
+            <Kpi label="Degradation status" value="NONE" note="No meaningful degradation detected" />
+            <Kpi label="Trend direction" value="STABLE" />
+            <Kpi label="Data quality" value={QUALITY_LABEL[dataQuality]} note={`${signals.length} available measurements`} />
+            <Kpi label="History samples" value={String(model.historySampleCount)} note={model.sourceLabel} />
+          </View>
+        </View>
+      </Panel>
+
+      <View className="flex-row flex-wrap gap-4">
+        <DetailBox title="Forecast">
+          <BulletList items={HEALTHY_PROGNOSIS_POINTS} empty="No healthy forecast statement is available." />
+        </DetailBox>
+        <DetailBox title="Stable evidence">
+          <BulletList items={stableSignals} empty="No live sensor values are available for the prognosis." />
+        </DetailBox>
+        <DetailBox title="Plots shown">
+          <BulletList items={HEALTHY_PROGNOSIS_PLOTS} empty="No plot definitions are available." />
+        </DetailBox>
+      </View>
+    </View>
+  );
+}
+
 export function MachineProDiagnosisPage({
   machineName,
   template,
@@ -225,6 +298,7 @@ export function MachineProDiagnosisPage({
   runState,
   signals,
   findings,
+  issues = [],
   condition = 'healthy',
   dataQuality = 'good',
   prognostics,
@@ -249,6 +323,7 @@ export function MachineProDiagnosisPage({
   const activeForecasts = model.activeForecasts.length;
   const chainIssueCount = findings.filter((finding) => finding.rules.some((rule) => rule.evidenceClass === 'chain')).length;
   const goodSignalCount = Math.max(0, signals.length - chainIssueCount);
+  const healthyOutlook = condition === 'healthy' && issues.length === 0 && findings.length === 0;
 
   const choose = (forecast: MachinePredictionResult) => {
     setSelectedId(forecast.predictionId);
@@ -272,7 +347,7 @@ export function MachineProDiagnosisPage({
         template={template}
         path={hierarchyPath}
         subtitle="Predictive maintenance outlook and prognosis evidence"
-        section="ANALYSIS / PRO DIAGNOSIS"
+        section="ANALYSIS / PROGNOSIS"
         feed={feed}
         ageSeconds={ageSeconds}
         onSelectMachine={onSelectMachine}
@@ -281,6 +356,10 @@ export function MachineProDiagnosisPage({
 
       <AnalysisTabs active="diagnosis" onSelect={onSelectDepth} trailing={tabsTrailing} />
 
+      {healthyOutlook ? (
+        <HealthyPrognosisState signals={signals} dataQuality={dataQuality} runState={runState} model={model} />
+      ) : (
+        <>
       <Panel>
         <View className="gap-4">
           <View className="flex-row flex-wrap items-start justify-between gap-4">
@@ -288,7 +367,7 @@ export function MachineProDiagnosisPage({
               <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">FUTURE DOCTOR</Text>
               <Text className={cn('font-heading-medium text-[24px]', inkClass)}>Predictive maintenance outlook</Text>
               <Text className={cn('max-w-[820px] font-body text-[11px] leading-[17px]', mutedClass)}>
-                Pro Diagnosis reads active problem groups as maintenance forecasts. It does not claim functional RUL unless the production data exposes a validated failure model.
+                Prognosis reads active problem groups as maintenance forecasts. It does not claim functional RUL unless the production data exposes a validated failure model.
               </Text>
             </View>
             <View className="rounded-lg border px-3 py-2" style={{ borderColor: bestPrediction ? `${conditionHex[bestPrediction.condition]}66` : hairline }}>
@@ -442,6 +521,8 @@ export function MachineProDiagnosisPage({
           </Panel>
         </View>
       </View>
+        </>
+      )}
     </ScrollView>
   );
 }

@@ -14,7 +14,7 @@ export type AnalysisDepth = 'overview' | 'diagnosis' | 'advanced';
 
 const TABS: Array<{ key: AnalysisDepth; label: string; hint: string }> = [
   { key: 'overview', label: 'DIAGNOSIS', hint: 'Is the machine okay' },
-  { key: 'diagnosis', label: 'PRO DIAGNOSIS', hint: 'Why, and what to do' },
+  { key: 'diagnosis', label: 'PROGNOSIS', hint: 'Stable outlook and forecasts' },
   { key: 'advanced', label: 'ADVANCED DIAGNOSIS', hint: 'Signal-level evidence' },
 ];
 

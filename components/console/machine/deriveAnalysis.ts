@@ -561,7 +561,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     return Math.abs(c.value - baselineOf(c)) > toleranceOf(c) ? 'boundary' : 'in-control';
   };
 
-  const signals: AnalysisSignal[] = signalOrder.slice(0, 8).map((c) => {
+  const diagnosisSignals: AnalysisSignal[] = signalOrder.map((c) => {
     const base = baselineOf(c);
     const overReference = Math.abs(base) > 1e-6 ? ((c.value - base) / Math.abs(base)) * 100 : 0;
 
@@ -585,6 +585,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
           : `${overReference >= 0 ? '+' : ''}${overReference.toFixed(0)} % against its learned reference`,
     };
   });
+  const signals: AnalysisSignal[] = diagnosisSignals.slice(0, 8);
 
   // --- findings --------------------------------------------------------------
 
@@ -1146,6 +1147,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     prognostics,
 
     signals,
+    diagnosisSignals,
     findings,
     hypothesis,
     doThis,

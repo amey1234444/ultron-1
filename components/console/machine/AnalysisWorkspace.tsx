@@ -83,6 +83,7 @@ export type AnalysisWorkspaceData = {
 
   // Diagnosis depth.
   signals: AnalysisSignal[];
+  diagnosisSignals: AnalysisSignal[];
   findings: Finding[];
   hypothesis: Hypothesis | null;
   doThis: string[];
@@ -436,7 +437,7 @@ export function AnalysisWorkspace({
           feed={ageSeconds > 30 ? 'delayed' : 'live'}
           ageSeconds={ageSeconds}
           runState={data.runState}
-          signals={data.signals}
+          signals={data.diagnosisSignals}
           findings={data.findings}
           hypothesis={data.hypothesis}
           issues={data.issues}

@@ -67,7 +67,7 @@ function EmptyCase({ modelCaveat }: { modelCaveat?: string }) {
 
   return (
     <View className="items-center gap-2 rounded-xl border px-5 py-8" style={{ borderColor: hairline, borderStyle: 'dashed' }}>
-      <Text className={cn('font-heading-medium text-[18px]', inkClass)}>No active Pro Diagnosis case</Text>
+      <Text className={cn('font-heading-medium text-[18px]', inkClass)}>No active Prognosis case</Text>
       <Text className={cn('max-w-[540px] text-center font-body text-[11px] leading-[17px]', mutedClass)}>
         Available findings are inside the configured diagnostic envelope, so the page is holding a healthy state instead of inventing a fault.
       </Text>
@@ -97,7 +97,7 @@ function ProblemCaseButton({
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
-      accessibilityLabel={`Open Pro Diagnosis case ${problem.title}`}
+      accessibilityLabel={`Open Prognosis case ${problem.title}`}
       className={cn('rounded-lg border px-3 py-2.5', selected && 'bg-accent/10')}
       style={{ borderColor: selected ? `${tint}99` : line }}
     >
@@ -375,6 +375,7 @@ export function MachineAnalysisPage({
       buildDiagnosisModel({
         issues,
         signals,
+        diagnosisSignals: signals,
         findings,
         hypothesis,
         hypotheses,
@@ -431,8 +432,8 @@ export function MachineAnalysisPage({
         machineName={machineName}
         template={template}
         path={hierarchyPath}
-        subtitle="Pro Diagnosis rule evidence and measurement-chain validation"
-        section="ANALYSIS / PRO DIAGNOSIS"
+        subtitle="Prognosis rule evidence and measurement-chain validation"
+        section="ANALYSIS / PROGNOSIS"
         feed={feed}
         ageSeconds={ageSeconds}
         onSelectMachine={onSelectMachine}
@@ -473,7 +474,7 @@ export function MachineAnalysisPage({
               <View className="flex-row items-start justify-between gap-2">
                 <View className="flex-1">
                   <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>
-                    Pro Diagnosis cases
+                    Prognosis cases
                   </Text>
                   <Text className={cn('mt-1 font-mono text-[9px]', mutedClass)}>
                     {diagnosisModel.problems.length} active / data {diagnosisModel.dataQuality}
@@ -599,7 +600,7 @@ export function MachineAnalysisPage({
                           <Pressable
                             onPress={onVerifyChain}
                             accessibilityRole="button"
-                            accessibilityLabel="Verify this Pro Diagnosis chain"
+                            accessibilityLabel="Verify this Prognosis chain"
                             className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2"
                           >
                             <Text className="text-center font-mono text-[9px] font-bold tracking-wider text-accent">

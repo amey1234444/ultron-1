@@ -301,27 +301,160 @@ function OrderedList({ items, empty }: { items: string[]; empty: string }) {
   );
 }
 
-function HealthyState() {
+function signalCondition(signal: DiagnosisModelSource['diagnosisSignals'][number]): OverviewCondition {
+  if (signal.state === 'fault') return 'danger';
+  if (signal.state === 'limit') return 'alert';
+  if (signal.state === 'boundary') return 'attention';
+  return 'healthy';
+}
+
+function signalValue(signal: DiagnosisModelSource['diagnosisSignals'][number]): string {
+  return `${signal.value.toFixed(signal.decimals)} ${signal.unit}`;
+}
+
+const SYSTEM_HEALTH_TAGS = [
+  'Mechanical',
+  'Drive / Load',
+  'Heating / Thermal',
+  'Pressure Generation',
+  'Material Feeding',
+  'Overall Extrusion Process',
+];
+
+const TRAIN_HEALTH_TAGS = ['Motor', 'Gearbox', 'Screw / Extrusion section', 'Barrel / Zones', 'Feeding', 'Melt path'];
+
+const HEALTHY_EVIDENCE = [
+  'Motor and gearbox vibration remain within the configured healthy region.',
+  'Motor and screw speed are at healthy operating values and their ratio is normal.',
+  'Motor power/load is normal.',
+  'Motor and gearbox temperatures are normal.',
+  'Zone temperatures and melt temperature are normal.',
+  'Melt pressure and hopper level are normal.',
+  'No meaningful contradictory cross-sensor pattern is present.',
+];
+
+function HealthyTag({ label }: { label: string }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+
+  return (
+    <View
+      className="flex-row items-center justify-between gap-3 border px-3 py-2"
+      style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft, borderRadius: 4, minWidth: 210, flexGrow: 1 }}
+    >
+      <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body-medium text-[11px]', inkClass)}>
+        {label}
+      </Text>
+      <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">HEALTHY</Text>
+    </View>
+  );
+}
+
+function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; onOpenPrognosis?: () => void }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const healthySignals = data.diagnosisSignals.length > 0 ? data.diagnosisSignals : data.signals;
+  const sensorEvidence: DiagnosisSensorEvidence[] = healthySignals.map((signal) => ({
+    id: signal.code,
+    measurement: signal.label,
+    code: signal.code,
+    value: signalValue(signal),
+    trend: signal.qualifier ?? 'Inside configured healthy region.',
+    quality: data.dataQuality === 'good' ? 'GOOD' : data.dataQuality.toUpperCase(),
+    condition: signalCondition(signal),
+  }));
 
   return (
-    <Panel>
-      <View className="items-center gap-3 py-14">
-        <View
-          className="items-center justify-center border"
-          style={{ width: 42, height: 42, borderRadius: 21, borderColor: palette.accentBorder }}
-        >
-          <Text className="font-mono text-[9px] font-bold text-accent">OK</Text>
+    <View className="gap-4">
+      <Panel>
+        <View className="gap-5">
+          <View className="flex-row flex-wrap items-start justify-between gap-4">
+            <View className="min-w-0 flex-1 gap-2">
+              <ConditionBadge condition="healthy" />
+              <Text className={cn('font-heading-medium text-[22px]', inkClass)}>No active fault detected</Text>
+              <Text className={cn('max-w-[820px] font-body text-[11px] leading-5', mutedClass)}>
+                Diagnosis: no active mechanical, thermal, feeding, pressure, speed or process fault detected. No immediate
+                corrective action is required; continue normal monitoring.
+              </Text>
+            </View>
+            {onOpenPrognosis ? (
+              <Pressable
+                onPress={onOpenPrognosis}
+                accessibilityRole="button"
+                accessibilityLabel="Open Prognosis"
+                className="border border-accent/45 bg-accent/10 px-3 py-2"
+                style={{ borderRadius: 4 }}
+              >
+                <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">OPEN PROGNOSIS</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View className="flex-row flex-wrap border" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
+            {[
+              ['OVERALL CONDITION', 'HEALTHY'],
+              ['PROBLEM GROUPS', '0'],
+              ['HIGHEST PRIORITY', 'NONE'],
+              ['CORRECTIVE ACTION', 'NONE REQUIRED'],
+              ['MEASUREMENTS', `${healthySignals.length}/${healthySignals.length}`],
+              ['DATA QUALITY', data.dataQuality.toUpperCase()],
+            ].map(([label, value]) => (
+              <View key={label} className="gap-1 px-3 py-2.5" style={{ minWidth: 150, flexGrow: 1 }}>
+                <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
+                <Text className={cn('font-mono text-[10px] font-bold', value === 'HEALTHY' ? 'text-accent' : inkClass)}>
+                  {value}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
-        <Text className={cn('font-heading-medium text-[16px]', inkClass)}>No active diagnostic problems</Text>
-        <Text className={cn('max-w-xl text-center font-body text-[11px] leading-5', mutedClass)}>
-          Available evidence is within the configured operating envelope. No diagnosis is required for this live snapshot.
-        </Text>
+      </Panel>
+
+      <View className="flex-row flex-wrap gap-4">
+        <Panel>
+          <View className="gap-4">
+            <SectionHeading eyebrow="COMPLETE MACHINE AND PROCESS HEALTH" title="Healthy subsystem tags" />
+            <View className="flex-row flex-wrap gap-2">
+              {SYSTEM_HEALTH_TAGS.map((label) => (
+                <HealthyTag key={label} label={label} />
+              ))}
+            </View>
+          </View>
+        </Panel>
+
+        <Panel>
+          <View className="gap-4">
+            <SectionHeading eyebrow="MACHINE TRAIN / PART HEALTH" title="Healthy part tags" />
+            <View className="flex-row flex-wrap gap-2">
+              {TRAIN_HEALTH_TAGS.map((label) => (
+                <HealthyTag key={label} label={label} />
+              ))}
+            </View>
+          </View>
+        </Panel>
       </View>
-    </Panel>
+
+      <Panel>
+        <View className="gap-4">
+          <SectionHeading eyebrow="HEALTHY EVIDENCE" title="Why no fault was raised" />
+          <View className="flex-row flex-wrap" style={{ gap: 16 }}>
+            <EvidenceColumn title="Supporting evidence" items={HEALTHY_EVIDENCE} empty="No healthy evidence is available." />
+            <EvidenceColumn title="Contradicting evidence" items={[]} empty="No material contradiction against a healthy conclusion." />
+            <EvidenceColumn title="Additional evidence required" items={[]} empty="None for this healthy machine snapshot." />
+          </View>
+        </View>
+      </Panel>
+
+      <Panel>
+        <View className="gap-3">
+          <SectionHeading eyebrow="LIVE EVIDENCE AND TREND" title="Current healthy sensor values" />
+          <SensorEvidenceTable items={sensorEvidence} />
+        </View>
+      </Panel>
+    </View>
   );
 }
 
@@ -401,7 +534,7 @@ export function MachineDiagnosisPage({
       <AnalysisTabs active="overview" onSelect={onSelectDepth} trailing={tabsTrailing} />
 
       {model.problems.length === 0 ? (
-        <HealthyState />
+        <HealthyState data={data} onOpenPrognosis={onSelectDepth ? () => onSelectDepth('diagnosis') : undefined} />
       ) : (
         <View className="flex-row flex-wrap items-start gap-4">
           <View style={MASTER_WIDE} className="gap-4">
@@ -450,11 +583,11 @@ export function MachineDiagnosisPage({
                         <Pressable
                           onPress={() => onOpenProDiagnosis(selected.id)}
                           accessibilityRole="button"
-                          accessibilityLabel={`Open Pro Diagnosis for ${selected.title}`}
+                          accessibilityLabel={`Open Prognosis for ${selected.title}`}
                           className="flex-row items-center gap-2 border border-accent/45 bg-accent/10 px-3 py-2"
                           style={{ borderRadius: 4 }}
                         >
-                          <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">OPEN PRO DIAGNOSIS</Text>
+                          <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">OPEN PROGNOSIS</Text>
                           <Text className="font-mono text-[11px] text-accent">&gt;</Text>
                         </Pressable>
                       ) : null}

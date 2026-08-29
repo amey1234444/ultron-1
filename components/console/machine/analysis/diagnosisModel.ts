@@ -14,6 +14,7 @@ export type DiagnosisModelSource = Pick<
   AnalysisWorkspaceData,
   | 'issues'
   | 'signals'
+  | 'diagnosisSignals'
   | 'findings'
   | 'hypothesis'
   | 'hypotheses'
