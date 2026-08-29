@@ -54,18 +54,6 @@ import {
   WorkAreaHeader,
 } from './advanced/WorkAreas';
 import { seriesColour, seriesMutedColour } from './advanced/vizTokens';
-import {
-  FAULTY_SSE_ADVANCED_ACTIONS,
-  FAULTY_SSE_ADVANCED_CONCLUSION,
-  FAULTY_SSE_ADVANCED_PLOTS,
-  HEALTHY_SSE_ADVANCED_CONTROLS,
-  HEALTHY_SSE_ADVANCED_DEFAULT,
-  HEALTHY_SSE_ADVANCED_PLOTS,
-  PREDICTIVE_SSE_ADVANCED_ACTIONS,
-  PREDICTIVE_SSE_ADVANCED_CONCLUSION,
-  PREDICTIVE_SSE_ADVANCED_PLOTS,
-  PREDICTIVE_SSE_ADVANCED_ROWS,
-} from './demoSseDocs';
 
 const TREE_WIDTH = 310;
 const INTEL_WIDTH = 262;
@@ -356,114 +344,6 @@ function Unavailable({ title, reason }: { title: string; reason: string }) {
       <Text className={cn('font-mono text-[9px] font-bold tracking-wider', mutedClass)}>UNAVAILABLE</Text>
       <Text className={cn('text-center font-body text-[10px] leading-[15px]', mutedClass)}>{reason}</Text>
     </View>
-  );
-}
-
-function DemoAdvancedList({ title, items }: { title: string; items: readonly string[] }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  return (
-    <View className="gap-2">
-      <Text className={cn('font-mono text-[9px] font-bold uppercase tracking-wider', mutedClass)}>{title}</Text>
-      <View className="gap-1.5">
-        {items.map((item) => (
-          <Text key={item} className={cn('font-body text-[11px] leading-4', inkClass)}>
-            {item}
-          </Text>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function DemoAdvancedRows({ rows }: { rows: readonly (readonly [string, string])[] }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-
-  return (
-    <View className="gap-3">
-      {rows.map(([label, value]) => (
-        <View key={label} className="flex-row flex-wrap items-baseline gap-x-8 gap-y-1">
-          <Text className={cn('font-body-medium text-[11px]', mutedClass)} style={{ width: 240 }}>
-            {label}
-          </Text>
-          <Text className="min-w-0 flex-1 font-body-bold text-[12px]" style={{ color: palette.warning }}>
-            {value}
-          </Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function DemoAdvancedTable({ rows }: { rows: readonly (readonly string[])[] }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator>
-      <View style={{ minWidth: 900, borderColor: palette.line, borderWidth: 1 }}>
-        {rows.map((row, index) => (
-          <View key={row.join('|')} className={cn('flex-row', index > 0 && 'border-t')} style={{ borderColor: palette.line }}>
-            {row.map((cell, cellIndex) => (
-              <View
-                key={`${cellIndex}-${cell}`}
-                className={cn('justify-center border-r px-3 py-2', cellIndex === row.length - 1 && 'border-r-0')}
-                style={{ width: cellIndex === 0 ? 225 : cellIndex === row.length - 1 ? 225 : 225, borderColor: palette.line }}
-              >
-                <Text className={cn(cellIndex === 0 ? 'font-body-bold' : 'font-body', 'text-[10px] leading-[14px]', cellIndex === 0 ? inkClass : mutedClass)}>
-                  {cell}
-                </Text>
-              </View>
-            ))}
-          </View>
-        ))}
-      </View>
-    </ScrollView>
-  );
-}
-
-function DemoAdvancedDocPanel({ machineName }: { machineName: string }) {
-  const isHealthy = machineName === 'Healthy SSE Demo';
-  const isFaulty = machineName === 'Faulty SSE Demo';
-  const isPredictive = machineName === 'SSE Prediction Demo';
-  if (!isHealthy && !isFaulty && !isPredictive) return null;
-
-  return (
-    <Panel>
-      <View className="gap-4">
-        <WorkAreaHeader
-          step="DEMO DOCUMENT"
-          title="Advanced Diagnosis"
-          description={
-            isHealthy
-              ? 'A real analyst-style workbench using one selected sensor at a time and correctly defined engineering axes.'
-              : isFaulty
-                ? 'What the analyst will see and use during Demo 2.'
-                : 'What the analyst will see and use during Demo 3.'
-          }
-        />
-        {isHealthy ? <DemoAdvancedList title="DEFAULT SELECTED SIGNAL" items={HEALTHY_SSE_ADVANCED_DEFAULT} /> : null}
-        {isPredictive ? <DemoAdvancedRows rows={PREDICTIVE_SSE_ADVANCED_ROWS} /> : null}
-        <DemoAdvancedList
-          title={isHealthy ? 'MAJOR PLOTS SHOWN' : isFaulty ? 'MAIN ANALYST PLOTS TO SHOW' : 'MAJOR ANALYST PLOTS TO SHOW'}
-          items={[]}
-        />
-        <DemoAdvancedTable rows={isHealthy ? HEALTHY_SSE_ADVANCED_PLOTS : isFaulty ? FAULTY_SSE_ADVANCED_PLOTS : PREDICTIVE_SSE_ADVANCED_PLOTS} />
-        <DemoAdvancedList
-          title={isHealthy ? 'ANALYST CONTROLS SHOWN' : 'WORKBENCH ACTIONS TO SHOW'}
-          items={isHealthy ? HEALTHY_SSE_ADVANCED_CONTROLS : isFaulty ? FAULTY_SSE_ADVANCED_ACTIONS : PREDICTIVE_SSE_ADVANCED_ACTIONS}
-        />
-        {!isHealthy ? (
-          <DemoAdvancedList title="EXPECTED ANALYST CONCLUSION" items={[isFaulty ? FAULTY_SSE_ADVANCED_CONCLUSION : PREDICTIVE_SSE_ADVANCED_CONCLUSION]} />
-        ) : null}
-      </View>
-    </Panel>
   );
 }
 
@@ -1214,8 +1094,6 @@ export function AdvancedDiagnosisPage({
       </View>
 
       <AnalysisTabs active="advanced" onSelect={onSelectDepth} trailing={tabsTrailing} />
-
-      <DemoAdvancedDocPanel machineName={machineName} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View className="flex-row gap-1.5">

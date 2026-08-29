@@ -35,22 +35,6 @@ import { MaintenanceCard, type MaintenanceRecord } from './overview/MaintenanceC
 import { PredictionList } from './overview/PredictionList';
 import { RecentEvents, type MachineEvent } from './overview/RecentEvents';
 import {
-  FAULTY_SSE_OVERVIEW_MUST_NOT_SHOW,
-  FAULTY_SSE_OVERVIEW_ROWS,
-  FAULTY_SSE_OVERVIEW_SHOULD_SHOW,
-  HEALTHY_SSE_COMPLETE_HEALTH,
-  HEALTHY_SSE_INPUT_SOURCE,
-  HEALTHY_SSE_INPUT_VALUES,
-  HEALTHY_SSE_LIVE_EVIDENCE,
-  HEALTHY_SSE_OVERVIEW_MESSAGE,
-  HEALTHY_SSE_OVERVIEW_TOP_SUMMARY,
-  HEALTHY_SSE_TRAIN_HEALTH,
-  PREDICTIVE_SSE_OVERVIEW_MUST_NOT_SHOW,
-  PREDICTIVE_SSE_OVERVIEW_ROWS,
-  PREDICTIVE_SSE_OVERVIEW_SHOULD_SHOW,
-  PREDICTIVE_SSE_SUMMARY_ROWS,
-} from './demoSseDocs';
-import {
   deriveRunState,
   healthByKind,
   rankDiagnoses,
@@ -148,60 +132,6 @@ function issueAsDiagnosis(issue: Issue, conditions: PointCondition[]): RankedDia
     componentLabel: issue.componentLabel,
     rulDays: null,
   };
-}
-
-function DemoDocList({ title, items }: { title: string; items: readonly string[] }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  return (
-    <View className="gap-2">
-      <Text className={cn('font-mono text-[9px] font-bold uppercase tracking-wider', mutedClass)}>{title}</Text>
-      <View className="gap-1.5">
-        {items.map((item) => (
-          <Text key={item} className={cn('font-body text-[11px] leading-4', inkClass)}>
-            {item}
-          </Text>
-        ))}
-      </View>
-    </View>
-  );
-}
-
-function DemoOverviewDocBlock({
-  rows,
-  sections,
-  valueTone = 'warning',
-}: {
-  rows: readonly (readonly [string, string])[];
-  sections: Array<{ title: string; items: readonly string[] }>;
-  valueTone?: 'warning' | 'accent';
-}) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const valueColor = valueTone === 'accent' ? palette.accent : palette.warning;
-
-  return (
-    <View className="gap-4 border-b pb-4" style={{ borderColor: palette.line }}>
-      <View className="gap-3">
-        {rows.map(([label, value]) => (
-          <View key={label} className="flex-row flex-wrap items-baseline gap-x-8 gap-y-1">
-            <Text className={cn('font-body-medium text-[11px]', mutedClass)} style={{ width: 240 }}>
-              {label}
-            </Text>
-            <Text className="min-w-0 flex-1 font-body-bold text-[12px]" style={{ color: valueColor }}>
-              {value}
-            </Text>
-          </View>
-        ))}
-      </View>
-      {sections.map((section) => (
-        <DemoDocList key={section.title} title={section.title} items={section.items} />
-      ))}
-    </View>
-  );
 }
 
 export type MachineOverviewPageProps = {
@@ -483,48 +413,6 @@ export function MachineOverviewPage({
 
       <Panel status={statusForLevel(summary.level)}>
         <View className="gap-4">
-          {isHealthySseDemo ? (
-            <DemoOverviewDocBlock
-              rows={[
-                ['Complete Machine', 'HEALTHY'],
-                ['Active problems', '0  |  DANGER: 0  |  ALERT: 0'],
-                ['Current Live Measurements', '15 / 15 HEALTHY'],
-                ['Demo source data shown', HEALTHY_SSE_INPUT_SOURCE],
-              ]}
-              valueTone="accent"
-              sections={[
-                { title: 'PART 1 - DEMO INPUTS', items: HEALTHY_SSE_INPUT_VALUES },
-                { title: 'TOP SUMMARY', items: HEALTHY_SSE_OVERVIEW_TOP_SUMMARY },
-                { title: 'COMPLETE MACHINE AND PROCESS HEALTH', items: HEALTHY_SSE_COMPLETE_HEALTH },
-                { title: 'MACHINE TRAIN / PART HEALTH', items: HEALTHY_SSE_TRAIN_HEALTH },
-                { title: 'LIVE EVIDENCE AND TREND', items: HEALTHY_SSE_LIVE_EVIDENCE },
-                { title: 'DEMO MESSAGE', items: [HEALTHY_SSE_OVERVIEW_MESSAGE] },
-              ]}
-            />
-          ) : null}
-
-          {isFaultySseDemo ? (
-            <DemoOverviewDocBlock
-              rows={FAULTY_SSE_OVERVIEW_ROWS}
-              sections={[
-                { title: 'OVERVIEW SHOULD SHOW', items: FAULTY_SSE_OVERVIEW_SHOULD_SHOW },
-                { title: 'WHAT MUST NOT BE SHOWN', items: FAULTY_SSE_OVERVIEW_MUST_NOT_SHOW },
-              ]}
-            />
-          ) : null}
-
-          {isPredictiveSseDemo ? (
-            <DemoOverviewDocBlock
-              rows={PREDICTIVE_SSE_OVERVIEW_ROWS}
-              valueTone="accent"
-              sections={[
-                { title: 'OVERVIEW SHOULD SHOW', items: PREDICTIVE_SSE_OVERVIEW_SHOULD_SHOW },
-                { title: 'PREDICTIVE SUMMARY SHOWN', items: PREDICTIVE_SSE_SUMMARY_ROWS.map(([label, value]) => `${label}: ${value}`) },
-                { title: 'WHAT MUST NOT BE SHOWN', items: PREDICTIVE_SSE_OVERVIEW_MUST_NOT_SHOW },
-              ]}
-            />
-          ) : null}
-
           <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Machine health overview</Text>
 
           <View className="flex-row flex-wrap items-start gap-6">
