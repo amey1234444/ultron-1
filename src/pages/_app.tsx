@@ -25,6 +25,10 @@ export default function App({ Component, pageProps }: AppProps) {
   const [routing, setRouting] = useState(false);
 
   useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
+  useEffect(() => {
     loadWebFonts();
   }, []);
 

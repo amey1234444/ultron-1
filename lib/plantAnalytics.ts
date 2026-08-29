@@ -121,6 +121,7 @@ const CURRENCY = '₹';
 const WINDOW_HOURS = 24;
 /** The plant overview target floor for assets that are explicitly healthy. */
 const HEALTHY_DISPLAY_FLOOR = 90;
+const HEALTH_DISPLAY_TICK_MS = 5_000;
 
 // --- deterministic noise -----------------------------------------------------
 
@@ -152,6 +153,11 @@ function round(value: number, places = 1): number {
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function healthyDisplayHealth(id: string, nowMs: number): number {
+  const tick = Math.floor(nowMs / HEALTH_DISPLAY_TICK_MS);
+  return HEALTHY_DISPLAY_FLOOR + ((tick * 3 + hash(id)) % 10);
 }
 
 /**
@@ -270,7 +276,7 @@ export function buildPlantAnalytics({
       : metrics.healthScore;
 
     const status: PlantAssetStatus = statuses[component.id] ?? area?.status ?? 'healthy';
-    const displayHealth = status === 'healthy' ? Math.max(HEALTHY_DISPLAY_FLOOR, health) : health;
+    const displayHealth = status === 'healthy' ? healthyDisplayHealth(component.id, nowMs) : health;
     const offline = status === 'offline';
     // Footprint is a real proxy for connected load: the hall draws more than
     // the gateway house because it is bigger.

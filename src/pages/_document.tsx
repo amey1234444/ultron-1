@@ -2,7 +2,7 @@ import { Html, Head, Main, NextScript } from 'next/document';
 
 export default function Document() {
   return (
-    <Html lang="en">
+    <Html lang="en" className="dark">
       <Head>
         {/* Defense-in-depth anti-clickjacking guard (runs before render). The
             primary protection is the X-Frame-Options / CSP frame-ancestors

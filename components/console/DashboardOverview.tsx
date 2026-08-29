@@ -102,6 +102,11 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
+function plantDisplayHealth(rawScore: number, nowMs: number) {
+  const tick = Math.floor(nowMs / SAMPLE_MS);
+  return clamp(HEALTH_TARGET + ((tick * 3 + Math.round(rawScore)) % 10), HEALTH_TARGET, 99);
+}
+
 function severityColor(palette: ConsolePalette, severity: DashboardAlarm['severity']) {
   return severityToneColor(palette, severity);
 }
@@ -766,7 +771,7 @@ export function DashboardOverview({
     // `live` is deliberately absent: `nowMs` is the rebuild trigger.
     [cards, devices, folders, machines, nowMs, projects],
   );
-  const plantOverviewHealthScore = Math.max(HEALTH_TARGET, metrics.healthScore);
+  const plantOverviewHealthScore = plantDisplayHealth(metrics.healthScore, nowMs);
 
   // Real mode has no historical aggregate endpoint, so the trend charts are fed
   // by sampling the derived metrics while the dashboard is open.
