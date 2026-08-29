@@ -36,8 +36,8 @@ export default function EvidenceCase() {
       <div ref={ref} className={`${styles.media} ${inView ? styles.shown : ''}`}>
         <img
           className={styles.shot}
-          src="/images/northfield-plant.png"
-          alt="A cement plant preheater tower and stacks at sunset."
+          src="/images/cement-plant.jpg"
+          alt="A cement works — preheater tower, silos and stacks — photographed from the air at sunset."
           loading="lazy"
           decoding="async"
         />

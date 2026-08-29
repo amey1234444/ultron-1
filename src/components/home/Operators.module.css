@@ -109,7 +109,7 @@
   margin-top: clamp(72px, 9vh, 112px);
 }
 
-.industries {
+.wayOut {
   display: inline-flex;
   align-items: center;
   gap: 9px;
@@ -125,16 +125,16 @@
   transition: background 200ms ease, border-color 200ms ease;
 }
 
-.industries svg {
+.wayOut svg {
   transition: transform 300ms var(--u-ease);
 }
 
-.industries:hover {
+.wayOut:hover {
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.5);
 }
 
-.industries:hover svg {
+.wayOut:hover svg {
   transform: translateX(3px);
 }
 

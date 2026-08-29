@@ -4,7 +4,6 @@ import Ambience from '../components/home/Ambience';
 import Capabilities from '../components/home/Capabilities';
 import Cutover from '../components/home/Cutover';
 import EvidenceCase from '../components/home/EvidenceCase';
-import Industries from '../components/home/Industries';
 import InTheRoom from '../components/home/InTheRoom';
 import NextStep from '../components/home/NextStep';
 import Operators from '../components/home/Operators';
@@ -45,7 +44,6 @@ export default function HomePage() {
             condition  what measurably changes after cutover
             evidence   one named plant, and what was actually found there
             platform   the surface it all lands on
-            industries where it runs
             next step  the ask
             in the room who opens a finding, and what each of them checks
             operators  the same thing, in their words                        */}
@@ -60,9 +58,6 @@ export default function HomePage() {
 
         {/* Owns `#platform` — scrolling copy against a pinned panel. */}
         <Capabilities />
-
-        {/* Owns `#industries` — the five materials, as specimens. */}
-        <Industries />
 
         <NextStep />
 

@@ -121,9 +121,14 @@
   transform: none;
 }
 
+/* Set in the page sans, the same face as `.title` above it, rather than in the
+   mono used for units and baselines. The four labels are the names of the
+   things being measured — they belong with the headline that introduces them,
+   not with the engineering values underneath. Size, weight, tracking and case
+   are unchanged; only the family moves. */
 .cardLabel {
   margin: 0;
-  font-family: var(--u-font-mono);
+  font-family: var(--u-font-sans);
   font-size: 10px;
   font-weight: 400;
   letter-spacing: 0.09em;

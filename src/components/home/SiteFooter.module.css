@@ -15,7 +15,7 @@
   margin: 0 auto;
   padding: clamp(56px, 7vw, 84px) var(--u-gutter) clamp(48px, 6vw, 72px);
   display: grid;
-  grid-template-columns: minmax(160px, 1.2fr) repeat(2, minmax(120px, 1fr)) minmax(180px, 1fr);
+  grid-template-columns: minmax(160px, 1.15fr) repeat(2, minmax(120px, 1fr)) minmax(210px, 1.2fr);
   gap: 40px clamp(24px, 4vw, 56px);
   align-items: start;
 }
@@ -69,14 +69,32 @@
 
 /* -------------------------------- address -------------------------------- */
 
+/* Same column shell as `.col`, so the title, the street and the mailbox sit on
+   the same rhythm as the link columns to their left. */
+.contact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
 .address {
   font-size: 14px;
   font-style: normal;
+  letter-spacing: -0.01em;
   line-height: 1.72;
   color: var(--u-ink-2);
+  /* The street line is the longest thing in this column. `pretty` keeps it from
+     dropping a single word onto a line of its own when the grid narrows. */
+  text-wrap: pretty;
 }
 
+/* The mailbox is the one live thing in the block, so it is the one thing set in
+   full ink and given a hover. */
 .addressLink {
+  width: fit-content;
+  font-size: 14px;
+  letter-spacing: -0.01em;
   color: var(--u-ink);
   text-decoration: none;
   transition: opacity 220ms ease;

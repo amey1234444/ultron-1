@@ -4,6 +4,10 @@
 // line. No blurb, no glow, no status pill — everything the old footer said in
 // prose is either on a page of its own now or was never load-bearing.
 //
+// "Where we are" is the registered office in Bhilwara and is set as a real
+// <address> element, so it is announced as contact information rather than as
+// four more lines of footer text.
+//
 // Only destinations that exist: real pages, real anchors on the landing page,
 // or a real mailbox.
 
@@ -54,17 +58,27 @@ export default function SiteFooter() {
           </nav>
         ))}
 
-        <address className={styles.address}>
-          ULTRON HQ
-          <br />
-          548 Market Street
-          <br />
-          San Francisco, CA 94104
-          <br />
+        {/* Titled like the two link columns beside it so all four blocks start
+            on the same line. The street sits in its own <address>; the mailbox
+            follows it as a separate link rather than as a fourth address line,
+            because it is a destination and the lines above it are not. */}
+        <div className={styles.contact}>
+          <h2 className={styles.colTitle}>Where we are</h2>
+
+          <address className={styles.address}>
+            ULTRON Technologies
+            <br />
+            E 342, RIICO Growth Centre
+            <br />
+            Bhilwara, Rajasthan 311025
+            <br />
+            India
+          </address>
+
           <a href="mailto:hello@ultron.io" className={styles.addressLink}>
             hello@ultron.io
           </a>
-        </address>
+        </div>
       </div>
 
       <div className={styles.base}>

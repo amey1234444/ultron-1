@@ -46,8 +46,8 @@ export default function Operators() {
       </figure>
 
       <div className={styles.actions}>
-        <Link href="/#industries" className={styles.industries}>
-          See the industries we serve
+        <Link href="/how-it-works" className={styles.wayOut}>
+          See how it works
           <Arrow size={14} />
         </Link>
       </div>

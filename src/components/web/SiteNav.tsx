@@ -21,7 +21,6 @@ const NAV: NavItem[] = [
     items: [
       { label: 'How it works', href: '/how-it-works', hint: 'Machine to decision, hop by hop' },
       { label: 'Capabilities', href: '/#platform', hint: 'Adaptive, explainable, predictive' },
-      { label: 'Industries', href: '/#industries', hint: 'Cement, power, boilers, mining, steel' },
       { label: 'Outcomes', href: '/#condition', hint: 'What changes after cutover' },
     ],
   },

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="ULTRON">
+  <!-- The U traced off the ULTRON wordmark: a 40 x 50 letter with a 10-wide
+       stem and a bowl of two circles concentric on (20,30) at r=20 and r=10,
+       so the stroke is the same weight all the way round. Scaled 0.76 and
+       centred on a 64 tile. -->
+  <rect width="64" height="64" rx="14" fill="#0A0A0A"/>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="13.5" fill="none" stroke="#ffffff" stroke-opacity="0.16"/>
+  <path transform="translate(16.8 13) scale(0.76)"
+        d="M0 0 L10 0 L10 30 A10 10 0 0 0 30 30 L30 0 L40 0 L40 30 A20 20 0 0 1 0 30 Z"
+        fill="#ffffff"/>
+</svg>
