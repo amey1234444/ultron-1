@@ -58,6 +58,9 @@ import {
   FAULTY_SSE_ADVANCED_ACTIONS,
   FAULTY_SSE_ADVANCED_CONCLUSION,
   FAULTY_SSE_ADVANCED_PLOTS,
+  HEALTHY_SSE_ADVANCED_CONTROLS,
+  HEALTHY_SSE_ADVANCED_DEFAULT,
+  HEALTHY_SSE_ADVANCED_PLOTS,
   PREDICTIVE_SSE_ADVANCED_ACTIONS,
   PREDICTIVE_SSE_ADVANCED_CONCLUSION,
   PREDICTIVE_SSE_ADVANCED_PLOTS,
@@ -426,9 +429,10 @@ function DemoAdvancedTable({ rows }: { rows: readonly (readonly string[])[] }) {
 }
 
 function DemoAdvancedDocPanel({ machineName }: { machineName: string }) {
+  const isHealthy = machineName === 'Healthy SSE Demo';
   const isFaulty = machineName === 'Faulty SSE Demo';
   const isPredictive = machineName === 'SSE Prediction Demo';
-  if (!isFaulty && !isPredictive) return null;
+  if (!isHealthy && !isFaulty && !isPredictive) return null;
 
   return (
     <Panel>
@@ -436,13 +440,28 @@ function DemoAdvancedDocPanel({ machineName }: { machineName: string }) {
         <WorkAreaHeader
           step="DEMO DOCUMENT"
           title="Advanced Diagnosis"
-          description={isFaulty ? 'What the analyst will see and use during Demo 2.' : 'What the analyst will see and use during Demo 3.'}
+          description={
+            isHealthy
+              ? 'A real analyst-style workbench using one selected sensor at a time and correctly defined engineering axes.'
+              : isFaulty
+                ? 'What the analyst will see and use during Demo 2.'
+                : 'What the analyst will see and use during Demo 3.'
+          }
         />
+        {isHealthy ? <DemoAdvancedList title="DEFAULT SELECTED SIGNAL" items={HEALTHY_SSE_ADVANCED_DEFAULT} /> : null}
         {isPredictive ? <DemoAdvancedRows rows={PREDICTIVE_SSE_ADVANCED_ROWS} /> : null}
-        <DemoAdvancedList title={isFaulty ? 'MAIN ANALYST PLOTS TO SHOW' : 'MAJOR ANALYST PLOTS TO SHOW'} items={[]} />
-        <DemoAdvancedTable rows={isFaulty ? FAULTY_SSE_ADVANCED_PLOTS : PREDICTIVE_SSE_ADVANCED_PLOTS} />
-        <DemoAdvancedList title="WORKBENCH ACTIONS TO SHOW" items={isFaulty ? FAULTY_SSE_ADVANCED_ACTIONS : PREDICTIVE_SSE_ADVANCED_ACTIONS} />
-        <DemoAdvancedList title="EXPECTED ANALYST CONCLUSION" items={[isFaulty ? FAULTY_SSE_ADVANCED_CONCLUSION : PREDICTIVE_SSE_ADVANCED_CONCLUSION]} />
+        <DemoAdvancedList
+          title={isHealthy ? 'MAJOR PLOTS SHOWN' : isFaulty ? 'MAIN ANALYST PLOTS TO SHOW' : 'MAJOR ANALYST PLOTS TO SHOW'}
+          items={[]}
+        />
+        <DemoAdvancedTable rows={isHealthy ? HEALTHY_SSE_ADVANCED_PLOTS : isFaulty ? FAULTY_SSE_ADVANCED_PLOTS : PREDICTIVE_SSE_ADVANCED_PLOTS} />
+        <DemoAdvancedList
+          title={isHealthy ? 'ANALYST CONTROLS SHOWN' : 'WORKBENCH ACTIONS TO SHOW'}
+          items={isHealthy ? HEALTHY_SSE_ADVANCED_CONTROLS : isFaulty ? FAULTY_SSE_ADVANCED_ACTIONS : PREDICTIVE_SSE_ADVANCED_ACTIONS}
+        />
+        {!isHealthy ? (
+          <DemoAdvancedList title="EXPECTED ANALYST CONCLUSION" items={[isFaulty ? FAULTY_SSE_ADVANCED_CONCLUSION : PREDICTIVE_SSE_ADVANCED_CONCLUSION]} />
+        ) : null}
       </View>
     </Panel>
   );

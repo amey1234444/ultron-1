@@ -15,6 +15,10 @@ import {
   FAULTY_SSE_MACHINE_DOCTOR,
   FAULTY_SSE_RECOMMENDED_ACTION,
   FAULTY_SSE_SUPPORTING_EVIDENCE,
+  HEALTHY_SSE_DIAGNOSIS_EVIDENCE,
+  HEALTHY_SSE_DIAGNOSIS_MESSAGE,
+  HEALTHY_SSE_DIAGNOSIS_RESULT,
+  HEALTHY_SSE_EVIDENCE_STATUS,
   PREDICTIVE_SSE_DIAGNOSIS_MESSAGE,
   PREDICTIVE_SSE_DIAGNOSIS_ROWS,
   PREDICTIVE_SSE_LIMITING_EVIDENCE,
@@ -534,10 +538,12 @@ function DoctorMiniCard({ label, value }: { label: string; value: string }) {
 function HealthyState({
   data,
   isPredictiveSseDemo,
+  isHealthySseDemo,
   onOpenPrognosis,
 }: {
   data: DiagnosisModelSource;
   isPredictiveSseDemo?: boolean;
+  isHealthySseDemo?: boolean;
   onOpenPrognosis?: () => void;
 }) {
   const { isDark } = useAppTheme();
@@ -574,6 +580,27 @@ function HealthyState({
     <View className="gap-4">
       <Panel>
         <View className="gap-5">
+          {isHealthySseDemo ? (
+            <DemoDiagnosisDocBlock
+              rows={[
+                ['Complete Machine', 'HEALTHY'],
+                ['Problem groups', '0'],
+                ['Highest-priority problem', 'None'],
+                ['Corrective action', 'None required; continue normal monitoring.'],
+              ]}
+              doctor={[
+                ['Diagnosis', 'No active mechanical, thermal, feeding, pressure, speed or process fault detected.'],
+              ]}
+              valueTone="accent"
+              sections={[
+                { title: 'DIAGNOSIS RESULT', items: HEALTHY_SSE_DIAGNOSIS_RESULT },
+                { title: 'HEALTHY EVIDENCE', items: HEALTHY_SSE_DIAGNOSIS_EVIDENCE },
+                { title: 'EVIDENCE STATUS', items: HEALTHY_SSE_EVIDENCE_STATUS },
+                { title: 'DEMO MESSAGE', items: [HEALTHY_SSE_DIAGNOSIS_MESSAGE] },
+              ]}
+            />
+          ) : null}
+
           <View className="flex-row flex-wrap items-start justify-between gap-4">
             <View className="min-w-0 flex-1 gap-2">
               <ConditionBadge condition="healthy" />
@@ -755,6 +782,7 @@ export function MachineDiagnosisPage({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const model = useMemo(() => buildDiagnosisModel(data), [data]);
+  const isHealthySseDemo = machineName === 'Healthy SSE Demo';
   const isPredictiveSseDemo = machineName === 'SSE Prediction Demo';
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     selectedProblemId && model.problems.some((problem) => problem.id === selectedProblemId)
@@ -796,7 +824,12 @@ export function MachineDiagnosisPage({
       <AnalysisTabs active="overview" onSelect={onSelectDepth} trailing={tabsTrailing} />
 
       {model.problems.length === 0 ? (
-        <HealthyState data={data} isPredictiveSseDemo={isPredictiveSseDemo} onOpenPrognosis={onSelectDepth ? () => onSelectDepth('diagnosis') : undefined} />
+        <HealthyState
+          data={data}
+          isHealthySseDemo={isHealthySseDemo}
+          isPredictiveSseDemo={isPredictiveSseDemo}
+          onOpenPrognosis={onSelectDepth ? () => onSelectDepth('diagnosis') : undefined}
+        />
       ) : (
         <View className="flex-row flex-wrap items-start gap-4">
           <View style={MASTER_WIDE} className="gap-4">

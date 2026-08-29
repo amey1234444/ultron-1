@@ -1,9 +1,9 @@
 // Shared model for the dashboard's 3D Plant Overview.
 //
 // The plant map renders real geometry (a GLB exported from Blender) instead of
-// an illustration. Super admins place components, size them, recolour or hide
-// individual parts of a model, and draw the dotted service connections between
-// components. Everyone else renders exactly what was saved.
+// an illustration. The production scene is fixed to the canonical seven plant
+// components; super admins can tune placement, scale, labels, status, parts and
+// service connections. Everyone else renders the normalized saved layout.
 //
 // Coordinates are metres in the glTF/Three.js frame: X right, Y up, Z toward the
 // camera. The Blender master is authored Z-up and converted on export, so the
@@ -333,6 +333,11 @@ export const DEFAULT_PLANT_SCENE_3D: PlantScene3DConfig = {
   ],
 };
 
+export const DEFAULT_PLANT_COMPONENT_COUNT = DEFAULT_PLANT_SCENE_3D.components.length;
+
+const DEFAULT_PLANT_COMPONENT_IDS = new Set(DEFAULT_PLANT_SCENE_3D.components.map((component) => component.id));
+const DEFAULT_PLANT_CONNECTION_IDS = new Set(DEFAULT_PLANT_SCENE_3D.connections.map((connection) => connection.id));
+
 // ---------------------------------------------------------------------------
 // Normalisation
 //
@@ -428,6 +433,33 @@ function normalizeConnection(input: unknown, ids: Set<string>, seen: Set<string>
   return { id, fromId, fromPort, toId, toPort, kind };
 }
 
+function hasExactDefaultIds(ids: Iterable<string>, defaults: Set<string>): boolean {
+  const seen = new Set(ids);
+  if (seen.size !== defaults.size) return false;
+  for (const id of defaults) {
+    if (!seen.has(id)) return false;
+  }
+  return true;
+}
+
+function normalizeDefaultPlantComponents(components: PlantComponent3D[]): PlantComponent3D[] {
+  if (!hasExactDefaultIds(components.map((component) => component.id), DEFAULT_PLANT_COMPONENT_IDS)) {
+    return DEFAULT_PLANT_SCENE_3D.components;
+  }
+
+  const byId = new Map(components.map((component) => [component.id, component]));
+  return DEFAULT_PLANT_SCENE_3D.components.map((fallback) => byId.get(fallback.id) ?? fallback);
+}
+
+function normalizeDefaultPlantConnections(connections: PlantConnection3D[]): PlantConnection3D[] {
+  if (!hasExactDefaultIds(connections.map((connection) => connection.id), DEFAULT_PLANT_CONNECTION_IDS)) {
+    return DEFAULT_PLANT_SCENE_3D.connections;
+  }
+
+  const byId = new Map(connections.map((connection) => [connection.id, connection]));
+  return DEFAULT_PLANT_SCENE_3D.connections.map((fallback) => byId.get(fallback.id) ?? fallback);
+}
+
 export function normalizePlantScene3D(input: unknown): PlantScene3DConfig {
   if (!input || typeof input !== 'object') return DEFAULT_PLANT_SCENE_3D;
   const raw = input as Record<string, unknown>;
@@ -449,14 +481,12 @@ export function normalizePlantScene3D(input: unknown): PlantScene3DConfig {
   }
 
   return {
-    // An explicitly empty component list is a valid state (the admin cleared the
-    // map); only a missing/!=array payload falls back to the seeded default.
     enabled: raw.enabled !== false,
     modelScale: Math.round(num(raw.modelScale, 100, COMPONENT_SCALE_MIN, COMPONENT_SCALE_MAX)),
     showGrid: raw.showGrid !== false,
     showLabels: raw.showLabels !== false,
-    components: Array.isArray(raw.components) ? components : DEFAULT_PLANT_SCENE_3D.components,
-    connections: Array.isArray(raw.connections) ? connections : DEFAULT_PLANT_SCENE_3D.connections,
+    components: Array.isArray(raw.components) ? normalizeDefaultPlantComponents(components) : DEFAULT_PLANT_SCENE_3D.components,
+    connections: Array.isArray(raw.connections) ? normalizeDefaultPlantConnections(connections) : DEFAULT_PLANT_SCENE_3D.connections,
   };
 }
 

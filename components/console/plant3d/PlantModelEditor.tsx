@@ -25,13 +25,10 @@ import {
   PLANT_MODEL_KEYS,
   PLANT_PART_COLORS,
   countPartEdits,
-  newComponentId,
   newConnectionId,
-  plantComponentScale,
   type PlantComponent3D,
   type PlantComponentStatus,
   type PlantConnectionKind,
-  type PlantModelKey,
   type PlantPartOverride,
   type PlantScene3DConfig,
 } from '../../../lib/plantScene3d';
@@ -345,40 +342,6 @@ export function PlantModelEditor({
   const restoreComponent = (componentId: string) => patchComponent(componentId, { parts: {} });
   const restoreEverything = () => onChange({ ...scene, components: scene.components.map((c) => ({ ...c, parts: {} })) });
 
-  const addComponent = (model: PlantModelKey) => {
-    // Drop it clear of whatever is already placed, using the widest extent so a
-    // power house (with its transformer bay) never lands inside its neighbour.
-    const rightEdge = scene.components.reduce((max, c) => {
-      const [fx] = PLANT_MODELS[c.model].footprint;
-      return Math.max(max, c.x + (fx / 2) * plantComponentScale(c.model, c.scale));
-    }, 0);
-    const [nfx] = PLANT_MODELS[model].footprint.map(
-      (v) => v * plantComponentScale(model, 100),
-    );
-    const component: PlantComponent3D = {
-      id: newComponentId(),
-      name: PLANT_MODELS[model].name,
-      model,
-      x: Math.round(rightEdge + nfx / 2 + 4),
-      z: 0,
-      rotation: 0,
-      scale: 100,
-      status: 'auto',
-      parts: {},
-    };
-    onChange({ ...scene, components: [...scene.components, component] });
-    setSelectedComponentId(component.id);
-  };
-
-  const removeComponent = (id: string) => {
-    onChange({
-      ...scene,
-      components: scene.components.filter((c) => c.id !== id),
-      connections: scene.connections.filter((c) => c.fromId !== id && c.toId !== id),
-    });
-    setSelectedComponentId((current) => (current === id ? null : current));
-  };
-
   const parts = selected ? partsByComponent[selected.id] ?? [] : [];
   const visibleParts = useMemo(() => {
     const query = partQuery.trim().toUpperCase();
@@ -554,9 +517,6 @@ export function PlantModelEditor({
                         placeholderTextColor="#7A7E86"
                         style={textInputStyle(dark, { flexGrow: 1, minWidth: 150 })}
                       />
-                      <Pressable onPress={() => removeComponent(component.id)} accessibilityLabel={`Remove ${component.name}`}>
-                        <MaterialCommunityIcons name="trash-can-outline" size={16} color="#D64545" />
-                      </Pressable>
                     </View>
                     <View className="flex-row flex-wrap items-center gap-1">
                       <Text className={cn('font-body text-[10px]', inkMuted)}>Template</Text>
@@ -603,19 +563,6 @@ export function PlantModelEditor({
               })}
             </View>
           </ScrollView>
-          <View className="flex-row flex-wrap gap-2">
-            {PLANT_MODEL_KEYS.map((key) => (
-              <Pressable
-                key={key}
-                onPress={() => addComponent(key)}
-                className={cn('flex-1 flex-row items-center justify-center gap-1 rounded-md border py-2', border)}
-                style={{ minWidth: 180 }}
-              >
-                <MaterialCommunityIcons name="plus" size={14} color="#3FBF6A" />
-                <Text className="font-body-medium text-[11px] text-accent">Add {PLANT_MODELS[key].name}</Text>
-              </Pressable>
-            ))}
-          </View>
         </View>
       ) : null}
 

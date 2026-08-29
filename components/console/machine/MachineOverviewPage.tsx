@@ -38,6 +38,13 @@ import {
   FAULTY_SSE_OVERVIEW_MUST_NOT_SHOW,
   FAULTY_SSE_OVERVIEW_ROWS,
   FAULTY_SSE_OVERVIEW_SHOULD_SHOW,
+  HEALTHY_SSE_COMPLETE_HEALTH,
+  HEALTHY_SSE_INPUT_SOURCE,
+  HEALTHY_SSE_INPUT_VALUES,
+  HEALTHY_SSE_LIVE_EVIDENCE,
+  HEALTHY_SSE_OVERVIEW_MESSAGE,
+  HEALTHY_SSE_OVERVIEW_TOP_SUMMARY,
+  HEALTHY_SSE_TRAIN_HEALTH,
   PREDICTIVE_SSE_OVERVIEW_MUST_NOT_SHOW,
   PREDICTIVE_SSE_OVERVIEW_ROWS,
   PREDICTIVE_SSE_OVERVIEW_SHOULD_SHOW,
@@ -401,6 +408,7 @@ export function MachineOverviewPage({
   const leadIssue = prioritiseIssues(analysisData.issues)[0] ?? null;
   const leadDiagnosis = (leadIssue ? issueAsDiagnosis(leadIssue, conditionList) : null) ?? ranked[0] ?? null;
   const overviewForecasts = analysisData.prognostics?.predictions ?? [];
+  const isHealthySseDemo = machine.name === 'Healthy SSE Demo';
   const isFaultySseDemo = machine.name === 'Faulty SSE Demo' || leadIssue?.id === 'dx-process-downstream-restriction';
   const isPredictiveSseDemo = machine.name === 'SSE Prediction Demo';
 
@@ -475,6 +483,26 @@ export function MachineOverviewPage({
 
       <Panel status={statusForLevel(summary.level)}>
         <View className="gap-4">
+          {isHealthySseDemo ? (
+            <DemoOverviewDocBlock
+              rows={[
+                ['Complete Machine', 'HEALTHY'],
+                ['Active problems', '0  |  DANGER: 0  |  ALERT: 0'],
+                ['Current Live Measurements', '15 / 15 HEALTHY'],
+                ['Demo source data shown', HEALTHY_SSE_INPUT_SOURCE],
+              ]}
+              valueTone="accent"
+              sections={[
+                { title: 'PART 1 - DEMO INPUTS', items: HEALTHY_SSE_INPUT_VALUES },
+                { title: 'TOP SUMMARY', items: HEALTHY_SSE_OVERVIEW_TOP_SUMMARY },
+                { title: 'COMPLETE MACHINE AND PROCESS HEALTH', items: HEALTHY_SSE_COMPLETE_HEALTH },
+                { title: 'MACHINE TRAIN / PART HEALTH', items: HEALTHY_SSE_TRAIN_HEALTH },
+                { title: 'LIVE EVIDENCE AND TREND', items: HEALTHY_SSE_LIVE_EVIDENCE },
+                { title: 'DEMO MESSAGE', items: [HEALTHY_SSE_OVERVIEW_MESSAGE] },
+              ]}
+            />
+          ) : null}
+
           {isFaultySseDemo ? (
             <DemoOverviewDocBlock
               rows={FAULTY_SSE_OVERVIEW_ROWS}

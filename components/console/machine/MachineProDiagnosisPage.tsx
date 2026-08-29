@@ -23,6 +23,10 @@ import {
   FAULTY_SSE_OPTIONAL_SHORT_HISTORY,
   FAULTY_SSE_PROGNOSIS_ROWS,
   FAULTY_SSE_PROGNOSIS_WHAT,
+  HEALTHY_SSE_FORECAST,
+  HEALTHY_SSE_PROGNOSIS_CONDITION,
+  HEALTHY_SSE_PROGNOSIS_MESSAGE,
+  HEALTHY_SSE_PROGNOSIS_PLOTS,
   PREDICTIVE_SSE_FORECAST_PLOTS,
   PREDICTIVE_SSE_MAINTENANCE_GUIDANCE,
   PREDICTIVE_SSE_PROGNOSIS_ROWS,
@@ -275,11 +279,13 @@ function HealthyPrognosisState({
   dataQuality,
   runState,
   model,
+  isHealthySseDemo,
 }: {
   signals: AnalysisSignal[];
   dataQuality: DataQuality;
   runState?: string;
   model: MachinePrognosticsResult;
+  isHealthySseDemo?: boolean;
 }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
@@ -290,6 +296,32 @@ function HealthyPrognosisState({
     <View className="gap-4">
       <Panel>
         <View className="gap-4">
+          {isHealthySseDemo ? (
+            <View className="gap-4 border-b pb-4" style={{ borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)' }}>
+              <PrognosisDocRows
+                rows={[
+                  ['Current machine condition', 'HEALTHY'],
+                  ['Historical period', '120 days of stable healthy operation'],
+                  ['Degradation status', 'No meaningful degradation detected'],
+                  ['Trend direction', 'STABLE'],
+                ]}
+                valueTone="accent"
+              />
+              <DetailBox title="Current and historical condition">
+                <BulletList items={HEALTHY_SSE_PROGNOSIS_CONDITION} empty="No Healthy SSE condition statement is available." />
+              </DetailBox>
+              <DetailBox title="Forecast">
+                <BulletList items={HEALTHY_SSE_FORECAST} empty="No Healthy SSE forecast statement is available." />
+              </DetailBox>
+              <DetailBox title="Plots shown">
+                <BulletList items={HEALTHY_SSE_PROGNOSIS_PLOTS} empty="No Healthy SSE plot statement is available." />
+              </DetailBox>
+              <DetailBox title="Demo message">
+                <BulletList items={[HEALTHY_SSE_PROGNOSIS_MESSAGE]} empty="No Healthy SSE demo message is available." />
+              </DetailBox>
+            </View>
+          ) : null}
+
           <View className="flex-row flex-wrap items-start justify-between gap-4">
             <View className="min-w-0 flex-1 gap-2">
               <StatusPill condition="healthy" />
@@ -363,6 +395,7 @@ export function MachineProDiagnosisPage({
   const chainIssueCount = findings.filter((finding) => finding.rules.some((rule) => rule.evidenceClass === 'chain')).length;
   const goodSignalCount = Math.max(0, signals.length - chainIssueCount);
   const healthyOutlook = condition === 'healthy' && issues.length === 0 && findings.length === 0 && forecasts.length === 0;
+  const isHealthySseDemo = machineName === 'Healthy SSE Demo';
   const processRestrictionPrognosis = selected?.predictionId === 'dx-process-downstream-restriction';
   const predictiveGearboxPrognosis =
     selected?.predictionId.startsWith('pred-') && selected.faultName === 'Gearbox Output Bearing Degradation';
@@ -399,7 +432,7 @@ export function MachineProDiagnosisPage({
       <AnalysisTabs active="diagnosis" onSelect={onSelectDepth} trailing={tabsTrailing} />
 
       {healthyOutlook ? (
-        <HealthyPrognosisState signals={signals} dataQuality={dataQuality} runState={runState} model={model} />
+        <HealthyPrognosisState signals={signals} dataQuality={dataQuality} runState={runState} model={model} isHealthySseDemo={isHealthySseDemo} />
       ) : (
         <>
       <Panel>

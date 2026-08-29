@@ -1,3 +1,142 @@
+export const HEALTHY_SSE_INPUT_VALUES = [
+  'Motor DE Vibration: 1.50 mm/s RMS | Full range 0-15 | Configured limits H 2.8 | HH 7.1',
+  'Motor NDE Vibration: 1.40 mm/s RMS | Full range 0-15 | Configured limits H 2.8 | HH 7.1',
+  'Motor Temperature: 45 °C | Full range 0-150 | Configured limits H 75 | HH 90',
+  'Motor RPM: 2000 RPM | Full range 0-3000 | Configured limits LL 1800 | L 1900 | H 2100 | HH 2200',
+  'Motor Power: 18 kW | Full range 0-40 | Configured limits H 24 | HH 30',
+  'Gearbox Input Vibration: 1.50 mm/s RMS | Full range 0-15 | Configured limits H 2.8 | HH 7.1',
+  'Gearbox Output Vibration: 1.60 mm/s RMS | Full range 0-15 | Configured limits H 2.8 | HH 7.1',
+  'Gearbox Temperature: 52 °C | Full range 0-150 | Configured limits H 70 | HH 85',
+  'Hopper Level: 70 % | Full range 0-100 | Configured limits LL 15 | L 30 | H 90 | HH 95',
+  'Zone 1 Temperature: 200 °C | Full range 0-300 | Configured limits LL 180 | L 190 | H 210 | HH 220',
+  'Zone 2 Temperature: 200 °C | Full range 0-300 | Configured limits LL 180 | L 190 | H 210 | HH 220',
+  'Zone 3 Temperature: 200 °C | Full range 0-300 | Configured limits LL 180 | L 190 | H 210 | HH 220',
+  'Melt Temperature: 220 °C | Full range 0-300 | Configured limits LL 200 | L 210 | H 230 | HH 240',
+  'Melt Pressure: 8.0 MPa | Full range 0-20 | Configured limits LL 5.6 | L 6.8 | H 9.2 | HH 10.4',
+  'Screw RPM: 65 RPM | Full range 0-150 | Configured limits LL 58.5 | L 61.75 | H 68.25 | HH 71.5',
+] as const;
+
+export const HEALTHY_SSE_INPUT_SOURCE =
+  'All 15 current values are HEALTHY. Vibration points also have real/simulated raw acceleration waveform samples for analyst plots. Healthy history is available for trend and prognosis display.';
+
+export const HEALTHY_SSE_OVERVIEW_TOP_SUMMARY = [
+  'Machine: Single-Screw Extruder (SSE)  |  Operating state: RUNNING  |  Data quality: GOOD.',
+  'Overall machine condition: HEALTHY.',
+  'Machine health score: near 100/100 (calculated from the healthy demo dataset).',
+  'Active problems: 0  |  DANGER: 0  |  ALERT: 0.',
+  'All 15/15 configured measurement points available.',
+] as const;
+
+export const HEALTHY_SSE_COMPLETE_HEALTH = [
+  'Mechanical: HEALTHY.',
+  'Drive / Load: HEALTHY.',
+  'Heating / Thermal: HEALTHY.',
+  'Pressure Generation: HEALTHY.',
+  'Material Feeding: HEALTHY.',
+  'Overall Extrusion Process: HEALTHY.',
+] as const;
+
+export const HEALTHY_SSE_TRAIN_HEALTH = [
+  'Motor: HEALTHY.',
+  'Gearbox: HEALTHY.',
+  'Screw / Extrusion section: HEALTHY.',
+  'Barrel / Zones: HEALTHY.',
+  'Feeding: HEALTHY.',
+  'Melt path: HEALTHY.',
+] as const;
+
+export const HEALTHY_SSE_LIVE_EVIDENCE = [
+  'Show all 15 current sensor values with their correct engineering units and HEALTHY status.',
+  'Show the configured L / H or LL / L / H / HH boundaries on the gauges/trends.',
+  'Show one healthy machine-condition trend with no Alert or Danger event.',
+  'Show "No active fault detected" and "No immediate action required".',
+] as const;
+
+export const HEALTHY_SSE_OVERVIEW_MESSAGE =
+  'The operator should understand in a few seconds: the machine is running normally, the process is healthy, all measurements are available, and ULTRON is not creating a false fault.';
+
+export const HEALTHY_SSE_DIAGNOSIS_RESULT = [
+  'Complete Machine: HEALTHY.',
+  'Diagnosis: No active mechanical, thermal, feeding, pressure, speed or process fault detected.',
+  'Problem groups: 0.',
+  'Highest-priority problem: None.',
+  'Corrective action: None required; continue normal monitoring.',
+] as const;
+
+export const HEALTHY_SSE_DIAGNOSIS_EVIDENCE = [
+  'Motor and gearbox vibration remain within the configured healthy region.',
+  'Motor and screw speed are at their healthy operating values and their ratio is normal.',
+  'Motor power/load is normal.',
+  'Motor and gearbox temperatures are normal.',
+  'Zone 1-3 and melt temperature are normal.',
+  'Melt pressure is normal.',
+  'Hopper level is normal.',
+  'No meaningful contradictory pattern or abnormal cross-sensor relationship is present.',
+] as const;
+
+export const HEALTHY_SSE_EVIDENCE_STATUS = [
+  'Supporting evidence: healthy/normal evidence only.',
+  'Contradicting evidence against a healthy conclusion: none material.',
+  'Processing coverage: show all processing that was successfully performed from available source data.',
+  'Additional physical evidence required: none for the Healthy SSE demonstration.',
+] as const;
+
+export const HEALTHY_SSE_DIAGNOSIS_MESSAGE =
+  'Diagnosis must not invent a motor, gearbox, bearing, gear, thermal or process fault just to fill the page. The correct diagnosis for Demo 1 is a healthy machine.';
+
+export const HEALTHY_SSE_PROGNOSIS_CONDITION = [
+  'Current machine condition: HEALTHY.',
+  'Historical period: 120 days of stable healthy operation.',
+  'Degradation status: No meaningful degradation detected.',
+  'Trend direction: STABLE.',
+  'No persistent upward bearing, gear, vibration, temperature, pressure or load degradation pattern.',
+] as const;
+
+export const HEALTHY_SSE_FORECAST = [
+  'Projected ALERT crossing: No reliable crossing predicted.',
+  'Projected DANGER crossing: No reliable crossing predicted.',
+  'Validated RUL: Not applicable for this healthy demonstration.',
+  'Maintenance recommendation: Continue routine/planned maintenance.',
+  'Prediction panel should clearly say that no significant degradation forecast is currently available.',
+] as const;
+
+export const HEALTHY_SSE_PROGNOSIS_PLOTS = [
+  '120-day machine-health trend - stable.',
+  'Selected sensor / feature degradation trend - stable around the healthy baseline.',
+  'Forecast plot - history remains stable with no artificial threshold crossing.',
+  'Maintenance/event timeline - only routine events if present.',
+] as const;
+
+export const HEALTHY_SSE_PROGNOSIS_MESSAGE =
+  'Demo 1 should prove that ULTRON does not create a future failure date when the historical evidence does not support one.';
+
+export const HEALTHY_SSE_ADVANCED_DEFAULT = [
+  'Gearbox Output Vibration - healthy reference signal.',
+  'Show sensor ID, location, direction, unit, sample rate, sample count, duration, RPM, operating state and data quality.',
+  'Allow the analyst to switch to any of the other SSE measurements.',
+] as const;
+
+export const HEALTHY_SSE_ADVANCED_PLOTS = [
+  ['Raw acceleration waveform', 'X: Time (s)  |  Y: Acceleration (g or m/s²)'],
+  ['Velocity waveform', 'X: Time (s)  |  Y: Velocity (mm/s)'],
+  ['Filtered / bandpass waveform', 'X: Time (s)  |  Y: same engineering signal unit'],
+  ['Envelope time waveform', 'X: Time (s)  |  Y: Envelope amplitude'],
+  ['FFT spectrum', 'X: Frequency (Hz)  |  Y: correctly scaled amplitude'],
+  ['PSD', 'X: Frequency (Hz)  |  Y: Power spectral density, correct unit²/Hz'],
+  ['Order spectrum', 'X: Order (X)  |  Y: Amplitude'],
+  ['Envelope FFT', 'X: Frequency (Hz)  |  Y: Envelope amplitude'],
+  ['Waterfall / historical spectra', 'X: Frequency (Hz)  |  History/Snapshot axis  |  Amplitude encoded consistently'],
+  ['Trend', 'X: Date/Time  |  Y: Selected measurement engineering unit'],
+] as const;
+
+export const HEALTHY_SSE_ADVANCED_CONTROLS = [
+  'Zoom, pan, reset zoom, single cursor and delta cursor.',
+  'Current vs healthy-reference compare/overlay with matched scales and units.',
+  'Peak markers, 1X/2X/order markers and other markers only when the required inputs exist.',
+  'FFT window, frequency range, linear/log display and bandpass selection.',
+  'Healthy waveform/spectrum should show no convincing bearing, gear or other fault signature.',
+] as const;
+
 export const FAULTY_SSE_OVERVIEW_ROWS = [
   ['Complete Machine', 'ALERT'],
   ['Complete Process', 'ALERT'],
