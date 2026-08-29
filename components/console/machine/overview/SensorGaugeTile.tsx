@@ -286,6 +286,18 @@ export function SensorGaugeTile({
           className={cn('flex-row items-center rounded-lg border', compact ? 'mt-2 py-1.5' : 'mt-3 py-2')}
           style={{ borderColor: hairline }}
         >
+          {thresholds.lowDanger !== undefined ? (
+            <>
+              {summaryCell('LL', levels.danger, thresholds.lowDanger.toFixed(decimals))}
+              <View style={{ width: 1, height: compact ? 22 : 32, backgroundColor: hairline }} />
+            </>
+          ) : null}
+          {thresholds.lowAlert !== undefined ? (
+            <>
+              {summaryCell('L', levels.alert, thresholds.lowAlert.toFixed(decimals))}
+              <View style={{ width: 1, height: compact ? 22 : 32, backgroundColor: hairline }} />
+            </>
+          ) : null}
           {summaryCell('ALERT', levels.alert, thresholds.alert.toFixed(decimals))}
           <View style={{ width: 1, height: compact ? 22 : 32, backgroundColor: hairline }} />
           {summaryCell('DANGER', levels.danger, thresholds.danger.toFixed(decimals))}
@@ -329,7 +341,13 @@ export function SensorGaugeTile({
 
   if (!onPress) return body;
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={`${condition.label}. ${hasReading ? `${value.toFixed(decimals)} ${condition.unit}` : 'no reading reported'}. ${STATE_LABEL[condition.state]}. Alert ${thresholds.alert.toFixed(decimals)}, danger ${thresholds.danger.toFixed(decimals)}.`}>
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={`${condition.label}. ${hasReading ? `${value.toFixed(decimals)} ${condition.unit}` : 'no reading reported'}. ${STATE_LABEL[condition.state]}. ${
+        thresholds.lowDanger !== undefined ? `Low low ${thresholds.lowDanger.toFixed(decimals)}, ` : ''
+      }${thresholds.lowAlert !== undefined ? `low ${thresholds.lowAlert.toFixed(decimals)}, ` : ''}alert ${thresholds.alert.toFixed(decimals)}, danger ${thresholds.danger.toFixed(decimals)}.`}
+    >
       {body}
     </Pressable>
   );

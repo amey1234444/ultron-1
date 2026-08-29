@@ -129,7 +129,13 @@ export const KIND_FOR_LETTER: Record<ChannelRef['letter'], MeasurementPointKind 
 
 // --- Thresholds -------------------------------------------------------------
 
-export type Thresholds = { alert: number; danger: number };
+export type Thresholds = {
+  alert: number;
+  danger: number;
+  lowAlert?: number;
+  lowDanger?: number;
+  healthy?: number;
+};
 
 export type ResolvedThresholds = Thresholds & {
   // False when the card carried no alarm limits and these were inferred from the
@@ -143,7 +149,7 @@ const INFERRED_ALERT_FRACTION = 0.75;
 const INFERRED_DANGER_FRACTION = 0.92;
 
 export function resolveThresholds(
-  channel: Pick<ChannelRef, 'alarmWarning' | 'alarmCritical'>,
+  channel: Pick<ChannelRef, 'alarmLowCritical' | 'alarmLowWarning' | 'alarmWarning' | 'alarmCritical' | 'healthyValue'>,
   band: MeasurementBand,
 ): ResolvedThresholds {
   const span = band.max - band.min || 1;
@@ -154,7 +160,26 @@ export function resolveThresholds(
   // A config with danger below alert is a data-entry error, not something to
   // crash or silently invert on — clamp so every downstream band stays ordered.
   const danger = Math.max(channel.alarmCritical ?? band.min + span * INFERRED_DANGER_FRACTION, alert);
-  return { alert, danger, configured: channel.alarmWarning !== undefined && channel.alarmCritical !== undefined };
+  const lowAlert = channel.alarmLowWarning === undefined ? undefined : Math.min(channel.alarmLowWarning, alert);
+  const lowDanger =
+    channel.alarmLowCritical === undefined ? undefined : Math.min(channel.alarmLowCritical, lowAlert ?? alert);
+  const healthy =
+    channel.healthyValue === undefined || !Number.isFinite(channel.healthyValue)
+      ? undefined
+      : Math.min(Math.max(channel.healthyValue, band.min), band.max);
+
+  return {
+    alert,
+    danger,
+    lowAlert,
+    lowDanger,
+    healthy,
+    configured:
+      channel.alarmWarning !== undefined ||
+      channel.alarmCritical !== undefined ||
+      channel.alarmLowWarning !== undefined ||
+      channel.alarmLowCritical !== undefined,
+  };
 }
 
 // Single-sided, matching the rest of the app (AlarmView and TrendView both test
@@ -164,6 +189,8 @@ export function resolveThresholds(
 // fields to the card configs in lib/rack.ts; until then this module cannot see
 // that class of fault and does not pretend to.
 export function levelFor(value: number, t: Thresholds): ConditionLevel {
+  if (t.lowDanger !== undefined && value <= t.lowDanger) return 'danger';
+  if (t.lowAlert !== undefined && value <= t.lowAlert) return 'alert';
   if (value >= t.danger) return 'danger';
   if (value >= t.alert) return 'alert';
   return 'normal';
@@ -214,22 +241,35 @@ const HEALTH_AT_ALERT = 70;
 const HEALTH_AT_DANGER = 30;
 
 export function pointHealth(value: number, t: Thresholds, band: MeasurementBand): number {
-  if (value <= band.min) return 100;
-
-  if (value < t.alert) {
-    const f = (value - band.min) / (t.alert - band.min || 1);
-    return 100 - f * (100 - HEALTH_AT_ALERT);
+  if (t.lowDanger !== undefined && value <= t.lowDanger) {
+    const width = Math.max((t.lowAlert ?? t.alert) - t.lowDanger, 1);
+    const underrun = Math.min(1, (t.lowDanger - value) / width);
+    return Math.max(0, HEALTH_AT_DANGER * (1 - underrun));
   }
 
-  if (value < t.danger) {
+  if (t.lowAlert !== undefined && value <= t.lowAlert) {
+    const lowDanger = t.lowDanger ?? band.min;
+    const f = (value - lowDanger) / (t.lowAlert - lowDanger || 1);
+    return HEALTH_AT_DANGER + Math.max(0, f) * (HEALTH_AT_ALERT - HEALTH_AT_DANGER);
+  }
+
+  if (value > t.danger) {
+    const overrun = Math.min(1, (value - t.danger) / (t.danger - t.alert || 1));
+    return Math.max(0, HEALTH_AT_DANGER * (1 - overrun));
+  }
+
+  if (value >= t.alert) {
     const f = (value - t.alert) / (t.danger - t.alert || 1);
     return HEALTH_AT_ALERT - f * (HEALTH_AT_ALERT - HEALTH_AT_DANGER);
   }
 
-  // Past critical keep degrading across the same width again, so a badly overrun
-  // reading is distinguishable from one that has only just crossed the line.
-  const overrun = Math.min(1, (value - t.danger) / (t.danger - t.alert || 1));
-  return Math.max(0, HEALTH_AT_DANGER * (1 - overrun));
+  const normalLow = t.lowAlert ?? band.min;
+  const normalHigh = t.alert;
+  const target = Math.min(Math.max(t.healthy ?? (normalLow + normalHigh) / 2, normalLow), normalHigh);
+  const sideSpan = value < target ? target - normalLow : normalHigh - target;
+  const distance = Math.abs(value - target);
+  const f = sideSpan > 0 ? Math.min(1, distance / sideSpan) : 0;
+  return 100 - f * 10;
 }
 
 // Worst-point-dominant. A machine with one bearing about to fail is not "mostly
@@ -373,13 +413,15 @@ export function projectToDanger(values: number[], t: Thresholds, sampleIntervalH
   // Already over the line: remaining life is not a forecast any more.
   const latest = values[values.length - 1];
   if (latest >= t.danger) return { ...base, daysToDanger: 0 };
+  if (t.lowDanger !== undefined && latest <= t.lowDanger) return { ...base, daysToDanger: 0 };
 
   // Nothing to project from. Improving or holding steady is good news, but it is
   // not a date.
-  if (confidence === 'none' || slopePerDay <= 0) return { ...base, daysToDanger: null, confidence: 'none' };
+  if (confidence === 'none' || slopePerDay === 0) return { ...base, daysToDanger: null, confidence: 'none' };
 
-  const days = (t.danger - latest) / slopePerDay;
-  return { ...base, daysToDanger: days > MAX_PROJECTION_DAYS ? null : days };
+  const target = slopePerDay < 0 && t.lowDanger !== undefined ? t.lowDanger : t.danger;
+  const days = (target - latest) / slopePerDay;
+  return { ...base, daysToDanger: days < 0 || days > MAX_PROJECTION_DAYS ? null : days };
 }
 
 // Companion to formatRul for backward-looking spans, so a twelve-day history

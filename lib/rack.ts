@@ -1,4 +1,5 @@
 import type { DeviceNode } from './devices';
+import type { MeasurementPointKind } from './machines';
 // Type-only: erased at compile time, so this does not create an import cycle
 // with lib/simulation.ts (which imports card helpers from here).
 import type { SimulatedChannel } from './simulation';
@@ -500,8 +501,12 @@ export type ChannelRef = {
   code: string;
   unit: string;
   letter: 'V' | 'T' | 'S' | 'P' | 'C' | 'X';
+  kind?: MeasurementPointKind | 'Unknown';
+  alarmLowCritical?: number;
+  alarmLowWarning?: number;
   alarmWarning?: number;
   alarmCritical?: number;
+  healthyValue?: number;
 };
 
 type ListChannelOptions = {
@@ -571,21 +576,81 @@ function letterForSimulatedKind(kind: SimulatedChannel['kind']): ChannelRef['let
   }
 }
 
-function channelDescriptor(card: CardNode, index: number): { letter: ChannelRef['letter']; unit: string; alarmWarning?: number; alarmCritical?: number } {
+function measurementKindForSimulatedKind(kind: SimulatedChannel['kind']): MeasurementPointKind | 'Unknown' {
+  switch (kind) {
+    case 'Vibration':
+      return 'Vibration';
+    case 'RTD / Temperature':
+      return 'Temperature';
+    case 'Speed / RPM':
+      return 'Speed';
+    case 'Pressure':
+      return 'Pressure';
+    case 'Power':
+    case 'Universal Voltage / Current':
+      return 'Power';
+    case 'Level':
+      return 'Level';
+    default:
+      return 'Unknown';
+  }
+}
+
+function measurementKindForLetter(letter: ChannelRef['letter']): MeasurementPointKind | 'Unknown' {
+  switch (letter) {
+    case 'V':
+      return 'Vibration';
+    case 'T':
+      return 'Temperature';
+    case 'S':
+      return 'Speed';
+    case 'P':
+      return 'Pressure';
+    case 'C':
+      return 'Current';
+    default:
+      return 'Unknown';
+  }
+}
+
+function channelDescriptor(
+  card: CardNode,
+  index: number,
+): {
+  letter: ChannelRef['letter'];
+  unit: string;
+  kind?: MeasurementPointKind | 'Unknown';
+  alarmLowCritical?: number;
+  alarmLowWarning?: number;
+  alarmWarning?: number;
+  alarmCritical?: number;
+  healthyValue?: number;
+} {
   const simulated = card.simulation?.[index];
   const configLimits = 'alarmHigh' in card.config ? channelAlarmLimits(card.config) : null;
   if (simulated) {
+    const letter = letterForSimulatedKind(simulated.kind);
     return {
-      letter: letterForSimulatedKind(simulated.kind),
+      letter,
+      kind: measurementKindForSimulatedKind(simulated.kind),
       unit: 'unit' in card.config && card.config.unit.trim() ? card.config.unit : simulated.unit,
+      alarmLowCritical: configLimits ? (configLimits.lowLow ?? undefined) : undefined,
+      alarmLowWarning: configLimits ? (configLimits.low ?? undefined) : undefined,
       alarmWarning: configLimits ? (configLimits.high ?? undefined) : (simulated.alertLimit ?? undefined),
       alarmCritical: configLimits ? (configLimits.highHigh ?? undefined) : (simulated.dangerLimit ?? undefined),
+      healthyValue: simulated.healthyValue ?? configuredHealthyValue(card) ?? undefined,
     };
   }
   return {
-    ...letterAndUnitForCard(card),
+    ...(() => {
+      const base = letterAndUnitForCard(card);
+      return { ...base, kind: measurementKindForLetter(base.letter) };
+    })(),
+    alarmLowCritical: configLimits ? (configLimits.lowLow ?? undefined) : undefined,
+    alarmLowWarning: configLimits ? (configLimits.low ?? undefined) : undefined,
     alarmWarning: configLimits ? (configLimits.high ?? undefined) : undefined,
     alarmCritical: configLimits ? (configLimits.highHigh ?? undefined) : undefined,
+    healthyValue: configuredHealthyValue(card) ?? undefined,
   };
 }
 
@@ -632,7 +697,7 @@ export function listChannels(devices: DeviceNode[], cards: CardNode[], options: 
       return channelNamesForCard(card).flatMap((name, index) => {
         const channelNumber = index + 1;
         if (options.channelIsAvailable && !options.channelIsAvailable(rack, card, channelNumber)) return [];
-        const { letter, unit, alarmWarning, alarmCritical } = channelDescriptor(card, index);
+        const { letter, unit, kind, alarmLowCritical, alarmLowWarning, alarmWarning, alarmCritical, healthyValue } = channelDescriptor(card, index);
         letterCounts[letter] = (letterCounts[letter] ?? 0) + 1;
         return {
           id: `${rack.id}.S${String(card.slot).padStart(2, '0')}.CH${channelNumber}`,
@@ -644,8 +709,12 @@ export function listChannels(devices: DeviceNode[], cards: CardNode[], options: 
           code: `${letter}${letterCounts[letter]}`,
           unit,
           letter,
+          kind,
+          alarmLowCritical,
+          alarmLowWarning,
           alarmWarning,
           alarmCritical,
+          healthyValue,
         };
       });
     });

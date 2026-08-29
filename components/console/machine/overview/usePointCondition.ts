@@ -79,6 +79,14 @@ function isVelocityInMillimetresPerSecond(letter: LiveKindLetter, unit: string) 
   return letter === 'V' && unit.replace(/\s/g, '').toLowerCase() === 'mm/s';
 }
 
+function predictiveDemoSamples(start: number, end: number, count = 121): number[] {
+  return Array.from({ length: count }, (_, index) => {
+    const t = count <= 1 ? 1 : index / (count - 1);
+    const accelerated = t < 0.45 ? t * 0.35 : 0.1575 + ((t - 0.45) / 0.55) ** 1.55 * 0.8425;
+    return start + (end - start) * accelerated;
+  });
+}
+
 export function usePointCondition(
   mapped: MappedChannel,
   machineId: string,
@@ -134,29 +142,41 @@ export function usePointCondition(
     // a 4-20 mA range says nothing about it.
     const configured = card ? channelEngineeringRange(card, channelIndex) : null;
     const band = configured ? { ...configured, decimals: fallback.decimals } : fallback;
+    const simulation = card?.simulation?.[channelIndex];
+    const configuredPredictiveValue =
+      simulation?.behaviour === 'Predictive Drift' && typeof simulation.manualValue === 'number' && Number.isFinite(simulation.manualValue)
+        ? simulation.manualValue
+        : null;
     const liveValue = typeof reading.value === 'number' && Number.isFinite(reading.value) ? reading.value : null;
+    const analysisValue = configuredPredictiveValue ?? liveValue;
+    const thresholds = resolveThresholds(channel, band);
+    const syntheticPredictive =
+      configuredPredictiveValue !== null && history.samples.length < 30
+        ? predictiveDemoSamples(thresholds.healthy ?? configuredPredictiveValue, configuredPredictiveValue)
+        : null;
     const samples =
-      liveValue !== null && history.samples[history.samples.length - 1] !== liveValue
-        ? [...history.samples, liveValue]
-        : history.samples;
+      syntheticPredictive ??
+      (analysisValue !== null && history.samples[history.samples.length - 1] !== analysisValue
+        ? [...history.samples, analysisValue]
+        : history.samples);
     const hasReading = samples.length > 0 && Number.isFinite(samples[samples.length - 1]);
     const value = hasReading ? samples[samples.length - 1] : null;
     const first = samples[0];
-
-    const thresholds = resolveThresholds(channel, band);
+    const sampleIntervalHours = syntheticPredictive ? 24 : history.sampleIntervalHours;
+    const windowHours = syntheticPredictive ? (syntheticPredictive.length - 1) * sampleIntervalHours : history.windowHours;
     // Nothing is judged without a reading. A channel the gateway has not
     // reported is not "normal" — it is unknown, and the difference is the whole
     // point of keeping `source` on the condition.
     const level = value === null ? 'normal' : levelFor(value, thresholds);
     const prognosis = hasReading
-      ? projectToDanger(samples, thresholds, history.sampleIntervalHours)
+      ? projectToDanger(samples, thresholds, sampleIntervalHours)
       : NO_PROGNOSIS;
 
     return {
       id: mapped.id,
       code: channel.code,
       label,
-      kind: KIND_FOR_LETTER[channel.letter],
+      kind: channel.kind ?? KIND_FOR_LETTER[channel.letter],
       letter: channel.letter,
       unit: channel.unit,
       value,
@@ -170,8 +190,8 @@ export function usePointCondition(
       health: value === null ? null : pointHealth(value, thresholds, band),
       prognosis,
       samples,
-      windowHours: history.windowHours,
-      sampleIntervalHours: history.sampleIntervalHours,
+      windowHours,
+      sampleIntervalHours,
       // Guard the divisor: a reading legitimately sitting at zero would make the
       // percentage meaningless rather than infinite.
       changeFraction:

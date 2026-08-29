@@ -95,9 +95,40 @@ const FAULT_ALERT_KEYS = new Set(['motor-de-vibration', 'motor-nde-vibration', '
 const FAULT_REDUCED_SPEED_KEYS = new Set(['motor-rpm', 'screw-rpm']);
 const PREDICTION_KEYS = new Set(['gearbox-output-vibration']);
 
+const FAULT_VALUES: Partial<Record<string, number>> = {
+  'motor-de-vibration': 3.2,
+  'motor-nde-vibration': 2.9,
+  'motor-temperature': 68,
+  'motor-rpm': 1875,
+  'motor-power': 27,
+  'gearbox-input-vibration': 2.4,
+  'gearbox-output-vibration': 3,
+  'gearbox-temperature': 66,
+  'hopper-level': 68,
+  'zone-1-temperature': 201,
+  'zone-2-temperature': 202,
+  'zone-3-temperature': 203,
+  'melt-temperature': 214,
+  'melt-pressure': 10,
+  'screw-rpm': 60.9,
+};
+
+const PREDICTION_VALUES: Partial<Record<string, number>> = {
+  'motor-de-vibration': 1.55,
+  'motor-nde-vibration': 1.45,
+  'motor-temperature': 46,
+  'motor-power': 18.5,
+  'gearbox-input-vibration': 1.6,
+  'gearbox-output-vibration': 2.45,
+  'gearbox-temperature': 59,
+  'zone-2-temperature': 201,
+  'melt-pressure': 8.1,
+};
+
 function behaviourFor(profile: Profile, spec: SseChannelSpec): SimulationBehaviour {
   if (profile === 'healthy') return 'Steady';
   if (profile === 'prediction') return PREDICTION_KEYS.has(spec.key) ? 'Predictive Drift' : 'Steady';
+  if (profile === 'faulty') return 'Steady';
   if (FAULT_REDUCED_SPEED_KEYS.has(spec.key)) return 'Drift Down';
   if (FAULT_DANGER_KEYS.has(spec.key)) return 'Ramp To Danger';
   if (FAULT_ALERT_KEYS.has(spec.key)) return 'Ramp To Alert';
@@ -105,6 +136,8 @@ function behaviourFor(profile: Profile, spec: SseChannelSpec): SimulationBehavio
 }
 
 function channelFor(spec: SseChannelSpec, profile: Profile): SimulatedChannel {
+  const profileValue =
+    profile === 'faulty' ? FAULT_VALUES[spec.key] : profile === 'prediction' ? PREDICTION_VALUES[spec.key] : undefined;
   const base: SimulatedChannel = {
     enabled: true,
     kind: spec.kind,
@@ -117,9 +150,9 @@ function channelFor(spec: SseChannelSpec, profile: Profile): SimulatedChannel {
     samplesPerSecond: spec.samplesPerSecond ?? DEFAULT_SAMPLES_PER_SECOND,
     behaviour: behaviourFor(profile, spec),
     decimals: spec.decimals,
-    manualValue: null,
+    manualValue: profileValue ?? null,
   };
-  return { ...base, manualValue: restingValue(base) };
+  return { ...base, manualValue: profileValue ?? restingValue(base) };
 }
 
 function configFor(spec: SseChannelSpec): CardConfig {

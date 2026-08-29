@@ -109,7 +109,8 @@ function niceCeil(value: number): number {
 // gauge does: the dial covers the operating region, not the transducer's
 // capability, which is why gaugeMax and fullScale are separate values.
 export function gaugeSpanFor(thresholds: Thresholds, engineeringRange: { min: number; max: number } | null) {
-  const min = engineeringRange ? Math.min(engineeringRange.min, thresholds.alert) : 0;
+  const lowLimit = thresholds.lowDanger ?? thresholds.lowAlert ?? thresholds.alert;
+  const min = engineeringRange ? Math.min(engineeringRange.min, lowLimit) : Math.min(0, lowLimit);
   const wanted = niceCeil(thresholds.danger * DANGER_HEADROOM);
   const max = engineeringRange ? Math.min(Math.max(wanted, thresholds.danger), engineeringRange.max) : wanted;
   return { min, max: max > min ? max : min + 1 };
@@ -180,6 +181,8 @@ export function BarGauge({
   const fillPx = toPx(value);
   const alertPx = toPx(thresholds.alert);
   const dangerPx = toPx(thresholds.danger);
+  const lowAlertPx = thresholds.lowAlert === undefined ? null : toPx(thresholds.lowAlert);
+  const lowDangerPx = thresholds.lowDanger === undefined ? null : toPx(thresholds.lowDanger);
   const overRange = showFill && value > span.max;
 
   const majorStep = niceStep((span.max - span.min) / p.majorTicks);
@@ -216,6 +219,8 @@ export function BarGauge({
         <View style={{ width: p.calloutWidth, height: p.tubeHeight }} className="relative">
           {callout('DANGER', thresholds.danger, levels.danger)}
           {callout('ALERT', thresholds.alert, levels.alert)}
+          {thresholds.lowAlert !== undefined ? callout('LOW', thresholds.lowAlert, levels.alert) : null}
+          {thresholds.lowDanger !== undefined ? callout('LOW LOW', thresholds.lowDanger, levels.danger) : null}
         </View>
       )}
 
@@ -315,6 +320,12 @@ export function BarGauge({
 
           {/* Drawn after the fill, so a reading past danger does not paint over
               the line it crossed. */}
+          {lowDangerPx !== null ? (
+            <View style={{ position: 'absolute', left: 0, right: 0, bottom: lowDangerPx - 1, height: 2, backgroundColor: levels.danger }} />
+          ) : null}
+          {lowAlertPx !== null ? (
+            <View style={{ position: 'absolute', left: 0, right: 0, bottom: lowAlertPx - 1, height: 2, backgroundColor: levels.alert }} />
+          ) : null}
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: alertPx - 1, height: 2, backgroundColor: levels.alert }} />
           <View style={{ position: 'absolute', left: 0, right: 0, bottom: dangerPx - 1, height: 2, backgroundColor: levels.danger }} />
 

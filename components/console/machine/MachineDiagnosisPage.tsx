@@ -423,6 +423,22 @@ function HealthyTag({ label }: { label: string }) {
   );
 }
 
+function DoctorMiniCard({ label, value }: { label: string; value: string }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+
+  return (
+    <View
+      className="gap-3 border px-3 py-3"
+      style={{ flexBasis: 230, flexGrow: 1, minWidth: 210, borderColor: palette.line, backgroundColor: palette.panelRaised, borderRadius: 6 }}
+    >
+      <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">{label}</Text>
+      <Text className={cn('font-body-medium text-[12px] leading-5', inkClass)}>{value}</Text>
+    </View>
+  );
+}
+
 function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; onOpenPrognosis?: () => void }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
@@ -527,6 +543,24 @@ function HealthyState({ data, onOpenPrognosis }: { data: DiagnosisModelSource; o
           </View>
         </Panel>
       </View>
+
+      {predictive ? (
+        <Panel>
+          <View className="gap-4">
+            <SectionHeading eyebrow="MACHINE DOCTOR" title="Predictive diagnosis separation" />
+            <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+              <DoctorMiniCard label="WHAT" value="No present operating limit is exceeded; the machine is currently healthy." />
+              <DoctorMiniCard label="WHERE" value="Historical evidence is localized primarily to gearbox output-side vibration." />
+              <DoctorMiniCard
+                label="WHY WATCH"
+                value="Waveform-derived impulsiveness and envelope features are increasing while RMS remains below ALERT."
+              />
+              <DoctorMiniCard label="IMPACT NOW" value="No confirmed current process or production impairment." />
+              <DoctorMiniCard label="RISK IF CONTINUES" value="A gearbox-output bearing condition may develop into an ALERT condition in the future." />
+            </View>
+          </View>
+        </Panel>
+      ) : null}
 
       <Panel>
         <View className="gap-4">

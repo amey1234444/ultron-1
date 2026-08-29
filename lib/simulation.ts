@@ -435,10 +435,10 @@ function targetFor(channel: SimulatedChannel, phase: number): { target: number; 
     case 'Cycle':
       return { target: midpoint(channel) + (span / 2) * cycle, low: channel.min, high: channel.max };
     case 'Predictive Drift': {
-      const limit = channel.dangerLimit ?? channel.alertLimit ?? channel.max;
+      const limit = channel.manualValue ?? channel.dangerLimit ?? channel.alertLimit ?? channel.max;
       const start = nominalValue(channel);
       const horizonSamples = Math.max(channel.samplesPerSecond * 180, 1);
-      const progress = Math.min(0.82, Math.max(0, phase / horizonSamples));
+      const progress = Math.min(1, Math.max(0, phase / horizonSamples));
       const target = start + (limit - start) * progress;
       return { target, low: Math.min(channel.min, start), high: Math.max(channel.max, limit) };
     }

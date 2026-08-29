@@ -20,7 +20,7 @@ import type {
   OverviewCondition,
   ProgressionEvent,
 } from '../../../lib/analysisOverview';
-import { formatRul, TREND_FLAT_BAND, type ConditionLevel } from '../../../lib/condition';
+import { formatRul, levelFor, TREND_FLAT_BAND, type ConditionLevel } from '../../../lib/condition';
 import type { DeviceNode } from '../../../lib/devices';
 import type { ComponentType, MachineNode } from '../../../lib/machines';
 import type { CardNode } from '../../../lib/rack';
@@ -138,7 +138,7 @@ function uniqueReported(points: Array<ReportedCondition | undefined | null>): Re
 function elevatedSamples(c: ReportedCondition): number {
   let n = 0;
   for (let i = c.samples.length - 1; i >= 0; i--) {
-    if (c.samples[i] >= c.thresholds.alert) n += 1;
+    if (levelFor(c.samples[i], c.thresholds) !== 'normal') n += 1;
     else break;
   }
   return n;
@@ -146,6 +146,17 @@ function elevatedSamples(c: ReportedCondition): number {
 
 function elevatedForMinutes(c: ReportedCondition): number {
   return elevatedSamples(c) * sampleIntervalHours(c) * 60;
+}
+
+function breachedLimit(c: ReportedCondition): { limit: number; label: string; direction: 'above' | 'below' } {
+  if (c.thresholds.lowDanger !== undefined && c.value <= c.thresholds.lowDanger) {
+    return { limit: c.thresholds.lowDanger, label: 'low-low', direction: 'below' };
+  }
+  if (c.thresholds.lowAlert !== undefined && c.value <= c.thresholds.lowAlert) {
+    return { limit: c.thresholds.lowAlert, label: 'low', direction: 'below' };
+  }
+  if (c.level === 'danger') return { limit: c.thresholds.danger, label: 'danger', direction: 'above' };
+  return { limit: c.thresholds.alert, label: 'alert', direction: 'above' };
 }
 
 // Hours ago the point last crossed a threshold upward. Null when it is currently
@@ -166,9 +177,9 @@ function crossedHoursAgo(c: ReportedCondition, threshold: number): number | null
 function bandCrossings(c: ReportedCondition): number {
   if (c.samples.length === 0) return 0;
   let crossings = 0;
-  let above = c.samples[0] >= c.thresholds.alert;
+  let above = levelFor(c.samples[0], c.thresholds) !== 'normal';
   for (const value of c.samples) {
-    const now = value >= c.thresholds.alert;
+    const now = levelFor(value, c.thresholds) !== 'normal';
     if (now !== above) {
       crossings += 1;
       above = now;
@@ -388,7 +399,7 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     online.find((c) => (c.kind === 'Current' || c.kind === 'Power') && labelIncludes(c, ['power']) && c.level !== 'normal') ??
     null;
   const reducedSpeedPoints = online.filter(
-    (c) => c.kind === 'Speed' && (c.value < baselineOf(c) * 0.99 || c.changeFraction < -TREND_FLAT_BAND),
+    (c) => c.kind === 'Speed' && (c.level !== 'normal' || c.value < baselineOf(c) * 0.99 || c.changeFraction < -TREND_FLAT_BAND),
   );
   const secondaryLoadResponse = vibration.filter(
     (c) =>
@@ -454,20 +465,20 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     if (c.level === 'normal' || claimedByDiagnosis.has(c.id)) continue;
     const category = categoryForKind(c.kind);
     const condition = conditionFor(c.level, c.health, true);
-    const limit = c.level === 'danger' ? c.thresholds.danger : c.thresholds.alert;
+    const breach = breachedLimit(c);
 
     issues.push({
       id: `pt-${c.id}`,
-      title: `${c.label} above its ${c.level === 'danger' ? 'danger' : 'alert'} limit`,
+      title: `${c.label} ${breach.direction} its ${breach.label} limit`,
       componentId: c.componentId ?? undefined,
       componentLabel: componentLabelFor(c),
       category,
       condition,
-      description: `${fmt(c.value, c.band.decimals)} ${c.unit} against a ${c.thresholds.configured ? 'commissioned' : 'inferred'} limit of ${fmt(limit, c.band.decimals)} ${c.unit}.`,
+      description: `${fmt(c.value, c.band.decimals)} ${c.unit} ${breach.direction} a ${c.thresholds.configured ? 'commissioned' : 'inferred'} ${breach.label} limit of ${fmt(breach.limit, c.band.decimals)} ${c.unit}.`,
       trend: trendFor(c),
       consequence: consequenceFor(category, condition),
       ageMinutes: elevatedForMinutes(c),
-      action: `Verify ${c.label} at the machine and confirm the reading against a handheld instrument.`,
+      action: `Verify ${c.label} at the machine and confirm the reading against the configured ${breach.label} limit.`,
     });
   }
 
@@ -635,7 +646,10 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
       // Scaled to the operating region rather than to the transducer's
       // capability, for the same reason the overview's gauges are: a 0-20 mm/s
       // span puts every reading and both limits in the bottom quarter of the bar.
-      range: { min: c.band.min, max: niceCeil(Math.max(c.value, c.thresholds.danger) * 1.2) },
+      range: {
+        min: Math.min(c.band.min, c.thresholds.lowDanger ?? c.thresholds.lowAlert ?? c.band.min),
+        max: niceCeil(Math.max(c.value, c.thresholds.danger) * 1.2),
+      },
       state: c.online ? signalStateFor(c) : 'boundary',
       qualifier: !c.online
         ? 'channel unreachable — last value, not live'
@@ -657,16 +671,20 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     const lead = [...points].sort((a, b) => a.health - b.health)[0];
 
     const rules: RuleHit[] = points.map((p) => {
-      const overDanger = p.value >= p.thresholds.danger;
-      const limit = overDanger ? p.thresholds.danger : p.thresholds.alert;
+      const breach = breachedLimit(p);
+      const overDanger = p.level === 'danger';
       return {
         id: `rule-${diagnosis.id}-${p.id}`,
-        code: overDanger ? 'TH-LIMIT-HIGH' : 'TH-BOUND-HIGH',
-        label: overDanger ? 'Above the danger limit' : 'Above the alert limit',
+        code: `${overDanger ? 'TH-LIMIT' : 'TH-BOUND'}-${breach.direction.toUpperCase()}`,
+        label: `${breach.direction === 'above' ? 'Above' : 'Below'} the ${breach.label} limit`,
         evidenceClass: 'machine',
-        reference: `${fmt(limit, p.band.decimals)} ${p.unit}${p.thresholds.configured ? '' : ' (inferred)'}`,
+        reference: `${fmt(breach.limit, p.band.decimals)} ${p.unit}${p.thresholds.configured ? '' : ' (inferred)'}`,
         observed: `${fmt(p.value, p.band.decimals)} ${p.unit}`,
-        exceedance: { value: p.value - limit, unit: p.unit, decimals: p.band.decimals },
+        exceedance: {
+          value: breach.direction === 'above' ? p.value - breach.limit : breach.limit - p.value,
+          unit: p.unit,
+          decimals: p.band.decimals,
+        },
         activeForMinutes: elevatedForMinutes(p),
       };
     });
@@ -815,7 +833,10 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     ...ranked.slice(0, 2).flatMap((d) =>
       pointsOf(d)
         .slice(0, 1)
-        .map((p) => `${p.label} returns below ${fmt(p.thresholds.alert, p.band.decimals)} ${p.unit}.`),
+        .map((p) => {
+          const breach = breachedLimit(p);
+          return `${p.label} returns ${breach.direction === 'above' ? 'below' : 'above'} ${fmt(breach.limit, p.band.decimals)} ${p.unit}.`;
+        }),
     ),
     'Record the technician finding against the job, and close it on the evidence rather than on the work having been done.',
     inferred.length > 0
@@ -1076,12 +1097,12 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
       name: `${diagnosis.label} · ${diagnosis.componentLabel}`,
       status: STATUS_FOR_TIER[diagnosis.confidence],
       matchScore: matchScore(diagnosis, points),
-      supporting: points.map(
-        (p) =>
-          `${p.label} at ${fmt(p.value, p.band.decimals)} ${p.unit}, above its ${
-            p.thresholds.configured ? 'commissioned' : 'inferred'
-          } ${p.level === 'danger' ? 'danger' : 'alert'} limit`,
-      ),
+      supporting: points.map((p) => {
+        const breach = breachedLimit(p);
+        return `${p.label} at ${fmt(p.value, p.band.decimals)} ${p.unit}, ${breach.direction} its ${
+          p.thresholds.configured ? 'commissioned' : 'inferred'
+        } ${breach.label} limit`;
+      }),
       contradicting: [
         ...(points.some((p) => !p.rising) ? ['Not every supporting reading is trending upward.'] : []),
         ...(points.some((p) => !p.thresholds.configured)
@@ -1270,9 +1291,12 @@ export function deriveAnalysis(input: DeriveInput): AnalysisWorkspaceData {
     initialEvidence: leadPoints.slice(0, 3).map<EvidenceItem>((p) => ({
       id: `ev-${p.id}`,
       title: p.label,
-      detail: `${fmt(p.value, p.band.decimals)} ${p.unit} against a ${
-        p.thresholds.configured ? 'commissioned' : 'inferred'
-      } limit of ${fmt(p.thresholds.alert, p.band.decimals)} ${p.unit}`,
+      detail: (() => {
+        const breach = breachedLimit(p);
+        return `${fmt(p.value, p.band.decimals)} ${p.unit} ${breach.direction} a ${
+          p.thresholds.configured ? 'commissioned' : 'inferred'
+        } ${breach.label} limit of ${fmt(breach.limit, p.band.decimals)} ${p.unit}`;
+      })(),
       role: p.level === 'normal' ? 'context' : 'supports',
       source: labelFor(p),
     })),

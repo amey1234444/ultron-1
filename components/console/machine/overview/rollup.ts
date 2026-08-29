@@ -186,7 +186,7 @@ export type HealthFactor = {
 // inventing a "Pressure 100%" row for a machine with no pressure channel would be
 // the most misleading number on the page.
 export function healthByKind(conditions: PointCondition[]): HealthFactor[] {
-  const order = ['Vibration', 'Temperature', 'Speed', 'Current', 'Pressure', 'Unknown'];
+  const order = ['Vibration', 'Temperature', 'Speed', 'Current', 'Power', 'Pressure', 'Level', 'Unknown'];
   const factors: HealthFactor[] = [];
 
   for (const kind of order) {
@@ -195,7 +195,7 @@ export function healthByKind(conditions: PointCondition[]): HealthFactor[] {
     const reported = of.filter(hasReading);
     factors.push({
       key: kind,
-      label: kind === 'Unknown' ? 'Unclassified' : kind === 'Current' ? 'Motor current' : kind,
+      label: kind === 'Unknown' ? 'Unclassified' : kind === 'Current' ? 'Motor current' : kind === 'Power' ? 'Motor power' : kind,
       health: aggregateHealth(reported.map((p) => p.health)),
       level: worstLevel(reported.map((p) => p.level)),
       count: of.length,

@@ -96,7 +96,13 @@ export function ConditionTrend({
 
     // Scale to include both limits, so the DANGER line is always on the chart
     // even when the reading is nowhere near it.
-    const values = [...smoothShown, thresholds.alert, thresholds.danger];
+    const values = [
+      ...smoothShown,
+      thresholds.alert,
+      thresholds.danger,
+      ...(thresholds.lowAlert === undefined ? [] : [thresholds.lowAlert]),
+      ...(thresholds.lowDanger === undefined ? [] : [thresholds.lowDanger]),
+    ];
     const rawMin = Math.min(...values);
     const rawMax = Math.max(...values);
     const pad = (rawMax - rawMin) * 0.12 || 1;
@@ -112,8 +118,18 @@ export function ConditionTrend({
     const line = splinePath(points, 0.45);
     const area = `${line} L ${x(smoothShown.length - 1)} ${CHART_HEIGHT - PAD_Y} L ${x(0)} ${CHART_HEIGHT - PAD_Y} Z`;
 
-    return { line, area, yAlert: y(thresholds.alert), yDanger: y(thresholds.danger), innerW, min, max };
-  }, [width, smoothShown, thresholds.alert, thresholds.danger]);
+    return {
+      line,
+      area,
+      yAlert: y(thresholds.alert),
+      yDanger: y(thresholds.danger),
+      yLowAlert: thresholds.lowAlert === undefined ? null : y(thresholds.lowAlert),
+      yLowDanger: thresholds.lowDanger === undefined ? null : y(thresholds.lowDanger),
+      innerW,
+      min,
+      max,
+    };
+  }, [width, smoothShown, thresholds.alert, thresholds.danger, thresholds.lowAlert, thresholds.lowDanger]);
 
   const spanHours = range ? (range.samples - 1) * sampleIntervalHours : 0;
 
@@ -172,6 +188,28 @@ export function ConditionTrend({
             <Path d={geometry.line} fill="none" stroke={colour} strokeWidth={1.75} strokeLinejoin="round" strokeLinecap="round" />
 
             {/* Limits dashed, so they read as thresholds rather than as data. */}
+            {geometry.yLowAlert !== null ? (
+              <Line
+                x1={PAD_LEFT}
+                y1={geometry.yLowAlert}
+                x2={width - PAD_RIGHT}
+                y2={geometry.yLowAlert}
+                stroke={levels.alert}
+                strokeWidth={1.25}
+                strokeDasharray="5 4"
+              />
+            ) : null}
+            {geometry.yLowDanger !== null ? (
+              <Line
+                x1={PAD_LEFT}
+                y1={geometry.yLowDanger}
+                x2={width - PAD_RIGHT}
+                y2={geometry.yLowDanger}
+                stroke={levels.danger}
+                strokeWidth={1.25}
+                strokeDasharray="5 4"
+              />
+            ) : null}
             <Line
               x1={PAD_LEFT}
               y1={geometry.yAlert}
@@ -199,6 +237,18 @@ export function ConditionTrend({
       </View>
 
       <View className="flex-row flex-wrap items-center gap-4">
+        {thresholds.lowDanger !== undefined ? (
+          <View className="flex-row items-center gap-1.5">
+            <View style={{ width: 12, height: 2, backgroundColor: levels.danger }} />
+            <Text className={cn('font-mono text-[9px]', mutedClass)}>LL {thresholds.lowDanger.toFixed(decimals)}</Text>
+          </View>
+        ) : null}
+        {thresholds.lowAlert !== undefined ? (
+          <View className="flex-row items-center gap-1.5">
+            <View style={{ width: 12, height: 2, backgroundColor: levels.alert }} />
+            <Text className={cn('font-mono text-[9px]', mutedClass)}>L {thresholds.lowAlert.toFixed(decimals)}</Text>
+          </View>
+        ) : null}
         <View className="flex-row items-center gap-1.5">
           <View style={{ width: 12, height: 2, backgroundColor: levels.alert }} />
           <Text className={cn('font-mono text-[9px]', mutedClass)}>ALERT {thresholds.alert.toFixed(decimals)}</Text>
