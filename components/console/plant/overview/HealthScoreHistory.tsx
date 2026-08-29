@@ -106,6 +106,38 @@ export function HealthScoreHistory({
     return { min: Math.min(...values), max: Math.max(...values) };
   }, [values]);
 
+  /**
+   * Where the extremes sit *on the curve that is actually drawn*.
+   *
+   * This is indexed against `shown`, never against `values`, and that is not a
+   * style preference — it is the fix for a crash. `shown` is eased state, so
+   * for exactly one render after a new sample arrives it is still one point
+   * shorter than `values`. Looking an index up in `values` and then reading it
+   * out of the plotted array meant that whenever the newest reading happened to
+   * be the window's min or max, the marker read one past the end of the curve
+   * and threw — which unmounted the whole console and left a black screen a
+   * minute or two after the overview opened, once live sampling had grown the
+   * series enough for it to happen.
+   *
+   * The label still prints the measured value rather than the eased one: an
+   * animating curve must never show a number the plant did not report.
+   */
+  const marks = useMemo(() => {
+    if (shown.length === 0) return { minIndex: -1, maxIndex: -1, minValue: 0, maxValue: 0 };
+    let minIndex = 0;
+    let maxIndex = 0;
+    shown.forEach((value, index) => {
+      if (value < shown[minIndex]) minIndex = index;
+      if (value > shown[maxIndex]) maxIndex = index;
+    });
+    return {
+      minIndex,
+      maxIndex,
+      minValue: Math.round(values[minIndex] ?? shown[minIndex]),
+      maxValue: Math.round(values[maxIndex] ?? shown[maxIndex]),
+    };
+  }, [shown, values]);
+
   // The plotted window. Defaults to 40-100 — wide enough to keep all three
   // thresholds on the chart, tight enough that ordinary drift is visible — and
   // opens downward if a reading would otherwise fall off the bottom.
@@ -139,23 +171,27 @@ export function HealthScoreHistory({
     return Array.from(new Set(raw)).sort((a, b) => a - b);
   }, [critical, target, warning, yMax, yMin]);
 
-  const minIndex = values.indexOf(stats.min);
-  const maxIndex = values.indexOf(stats.max);
+  const { minIndex, maxIndex } = marks;
   const currentIndex = coords.length - 1;
   // A marker on the last point would sit under the "now" ring, and a min that
-  // is also the max would draw two labels on one point.
-  const showMin = ready && minIndex >= 0 && minIndex !== currentIndex && stats.min !== stats.max;
-  const showMax = ready && maxIndex >= 0 && maxIndex !== currentIndex && stats.min !== stats.max;
+  // is also the max would draw two labels on one point. The bounds test is
+  // belt-and-braces: every index here is already derived from `coords`, and it
+  // stays cheap insurance against the next person indexing from elsewhere.
+  const inRange = (index: number) => index >= 0 && index < coords.length;
+  const flat = marks.minValue === marks.maxValue;
+  const showMin = ready && inRange(minIndex) && minIndex !== currentIndex && !flat;
+  const showMax = ready && inRange(maxIndex) && maxIndex !== currentIndex && !flat;
 
+  // Ticks are spaced across the plotted curve, so they are counted from it too.
   const xLabelIndices = useMemo(() => {
-    const count = points.length;
+    const count = shown.length;
     if (count === 0) return [];
-    if (count <= 5) return points.map((_, index) => index);
+    if (count <= 5) return shown.map((_, index) => index);
     const wanted = 5;
     const out = new Set<number>();
     for (let i = 0; i < wanted; i += 1) out.add(Math.round((i / (wanted - 1)) * (count - 1)));
     return [...out].sort((a, b) => a - b);
-  }, [points]);
+  }, [shown]);
 
   const onPointerMove = (event: { nativeEvent: unknown }) => {
     if (!ready || shown.length === 0) return;
@@ -166,8 +202,11 @@ export function HealthScoreHistory({
     setHovered(Math.round(ratio * (shown.length - 1)));
   };
 
-  const hoverPoint = hovered !== null && hovered < coords.length ? coords[hovered] : null;
-  const hoverData = hovered !== null && hovered < points.length ? points[hovered] : null;
+  // Both have to be in range: the guide is drawn from `coords` and the readout
+  // from `points`, and for one eased frame those can disagree on length.
+  const hoverReady = hovered !== null && hovered >= 0 && hovered < coords.length && hovered < points.length;
+  const hoverPoint = hoverReady ? coords[hovered as number] : null;
+  const hoverData = hoverReady ? points[hovered as number] : null;
 
   // Tooltip geometry. Fixed width so it can be clamped inside the plot without
   // measuring it — a readout that hangs off the panel edge is worse than none.
@@ -310,7 +349,7 @@ export function HealthScoreHistory({
                     fill="#FFFFFF"
                     textAnchor="middle"
                   >
-                    {`MIN ${stats.min}`}
+                    {`MIN ${marks.minValue}`}
                   </SvgText>
                 </G>
               </G>
@@ -336,7 +375,7 @@ export function HealthScoreHistory({
                     fill="#FFFFFF"
                     textAnchor="middle"
                   >
-                    {`MAX ${stats.max}`}
+                    {`MAX ${marks.maxValue}`}
                   </SvgText>
                 </G>
               </G>
@@ -357,7 +396,7 @@ export function HealthScoreHistory({
                 y={size.height - 6}
                 fontSize={AXIS_FONT}
                 fill={palette.inkFaint}
-                textAnchor={index === 0 ? 'start' : index === points.length - 1 ? 'end' : 'middle'}
+                textAnchor={index === 0 ? 'start' : index === shown.length - 1 ? 'end' : 'middle'}
               >
                 {points[index]?.label ?? ''}
               </SvgText>

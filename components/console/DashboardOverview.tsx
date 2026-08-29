@@ -78,13 +78,20 @@ type Section = 'operations';
 const SERIES_A = '#8E86D6';
 const SERIES_B = '#4FD1C5';
 
-const DEMO_HEALTH_TREND = [86, 88, 92, 96, 79, 88, 94, 82, 98, 91, 99, 90, 84, 88, 91, 93];
+// A plant holding above its 90 target. The band matters as much as the level:
+// the walk below is bounded to it, so the demo trend drifts inside a healthy
+// range instead of wandering down through the warning line and telling a story
+// about a plant in trouble.
+const DEMO_HEALTH_TREND = [91, 92, 94, 93, 95, 94, 96, 95, 93, 94, 96, 97, 95, 94, 96, 95];
+/** Bounds of the demo health walk. Above target, with room to move. */
+const DEMO_HEALTH_MIN = 89;
+const DEMO_HEALTH_MAX = 98;
 const DEMO_THROUGHPUT = [150, 160, 140, 182, 153, 169, 126, 201, 224, 228, 282, 338, 289, 238, 190, 176];
 const DEMO_ALARM_DAYS = ['18', '19', '20', '21', '22', '23', '24'];
 const DEMO_ALARM_BARS = {
-  critical: [10, 11, 18, 15, 20, 13, 16],
-  warning: [22, 29, 34, 27, 31, 36, 30],
-  info: [14, 18, 16, 12, 20, 15, 18],
+  critical: [0, 1, 0, 0, 1, 0, 0],
+  warning: [3, 2, 4, 3, 2, 3, 3],
+  info: [5, 7, 6, 4, 6, 5, 6],
 };
 /** Health target every asset is scored against. */
 const HEALTH_TARGET = 90;
@@ -789,7 +796,7 @@ export function DashboardOverview({
 
   // With real mode off the demo signals walk, so the charts show what they do
   // with moving data rather than standing still.
-  const demoHealth = useDemoWalk(DEMO_HEALTH_TREND, !metrics.live, 48, 99);
+  const demoHealth = useDemoWalk(DEMO_HEALTH_TREND, !metrics.live, DEMO_HEALTH_MIN, DEMO_HEALTH_MAX);
   const demoThroughput = useDemoWalk(DEMO_THROUGHPUT, !metrics.live, 110, 350, 1900);
 
   // These stay the raw samples. The easing lives inside `TrendChart`, so an

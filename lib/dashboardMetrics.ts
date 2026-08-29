@@ -106,7 +106,7 @@ export type DashboardMetrics = {
 };
 
 const DEMO_ALARMS: DashboardAlarm[] = [
-  { id: 'a1', severity: 'Critical', message: 'High vibration detected', source: 'Compressor-03', area: 'Compressor Area', point: 'V1', time: '10:24:12 AM', value: '12.8 mm/s', threshold: '> 10.0', state: 'Ack', owner: 'R. Singh', age: '12m' },
+  { id: 'a1', severity: 'Warning', message: 'Vibration above baseline', source: 'Compressor-03', area: 'Compressor Area', point: 'V1', time: '10:24:12 AM', value: '12.8 mm/s', threshold: '> 10.0', state: 'Ack', owner: 'R. Singh', age: '12m' },
   { id: 'a2', severity: 'Warning', message: 'High temperature', source: 'Boiler Feed Pump-02', area: 'Boiler Area', point: 'T2', time: '10:23:45 AM', value: '82 C', threshold: '> 78', state: 'Open', owner: 'A. Patel', age: '21m' },
   { id: 'a3', severity: 'Warning', message: 'Flow deviation', source: 'Pump Line-04', area: 'Process Pump Line', point: 'P3', time: '10:22:58 AM', value: '71%', threshold: '< 80', state: 'Open', owner: 'M. Khan', age: '28m' },
   { id: 'a4', severity: 'Warning', message: 'Motor overcurrent', source: 'Turbine-01', area: 'Turbine Hall', point: 'C1', time: '10:22:31 AM', value: '41 A', threshold: '> 38', state: 'Ack', owner: 'S. Rao', age: '34m' },
@@ -117,15 +117,15 @@ const DEMO_ALARMS: DashboardAlarm[] = [
 ];
 
 const DEMO_ATTENTION: AttentionRow[] = [
-  { id: 'm1', name: 'Compressor-03', area: 'Compressor Area', health: 31, issue: 'High vibration', alarms: 3, lastAlarm: '10:24:12 AM', telemetry: '10:24:36 AM', risk: 'High', owner: 'R. Singh', action: 'Inspect bearing' },
-  { id: 'm2', name: 'Boiler Feed Pump-02', area: 'Boiler Area', health: 45, issue: 'High temperature', alarms: 2, lastAlarm: '10:23:45 AM', telemetry: '10:24:30 AM', risk: 'High', owner: 'A. Patel', action: 'Check cooling' },
-  { id: 'm3', name: 'Turbine-01', area: 'Turbine Hall', health: 58, issue: 'Motor overcurrent', alarms: 1, lastAlarm: '10:22:31 AM', telemetry: '10:24:21 AM', risk: 'Medium', owner: 'S. Rao', action: 'Review load' },
-  { id: 'm4', name: 'Cooling Tower-01', area: 'Utility Area', health: 70, issue: 'Efficiency drop', alarms: 1, lastAlarm: '10:21:10 AM', telemetry: '10:24:10 AM', risk: 'Medium', owner: 'M. Khan', action: 'Clean inlet' },
-  { id: 'm5', name: 'Pump Line-04', area: 'Process Pump Line', health: 90, issue: 'Flow deviation', alarms: 1, lastAlarm: '10:22:58 AM', telemetry: '10:24:25 AM', risk: 'Low', owner: 'P. Mehta', action: 'Verify valve' },
+  { id: 'm1', name: 'Compressor-03', area: 'Compressor Area', health: 90, issue: 'Vibration above baseline', alarms: 1, lastAlarm: '10:24:12 AM', telemetry: '10:24:36 AM', risk: 'Medium', owner: 'R. Singh', action: 'Inspect bearing' },
+  { id: 'm2', name: 'Boiler Feed Pump-02', area: 'Boiler Area', health: 92, issue: 'Temperature trending up', alarms: 1, lastAlarm: '10:23:45 AM', telemetry: '10:24:30 AM', risk: 'Medium', owner: 'A. Patel', action: 'Check cooling' },
+  { id: 'm3', name: 'Turbine-01', area: 'Turbine Hall', health: 93, issue: 'Load above reference', alarms: 1, lastAlarm: '10:22:31 AM', telemetry: '10:24:21 AM', risk: 'Low', owner: 'S. Rao', action: 'Review load' },
+  { id: 'm4', name: 'Cooling Tower-01', area: 'Utility Area', health: 95, issue: 'Inlet efficiency easing', alarms: 0, lastAlarm: '10:21:10 AM', telemetry: '10:24:10 AM', risk: 'Low', owner: 'M. Khan', action: 'Clean inlet' },
+  { id: 'm5', name: 'Pump Line-04', area: 'Process Pump Line', health: 97, issue: 'Nominal', alarms: 0, lastAlarm: '—', telemetry: '10:24:25 AM', risk: 'Low', owner: 'P. Mehta', action: 'Monitor' },
 ];
 
 const DEMO_INSIGHTS: Insight[] = [
-  { id: 'i1', subject: 'Compressor-03', finding: 'Unbalanced motor detected', recommendation: 'Schedule bearing inspection', evidence: 'V1 12.8 mm/s, T2 82 C', confidence: '92%', priority: 'High' },
+  { id: 'i1', subject: 'Compressor-03', finding: 'Unbalanced motor detected', recommendation: 'Schedule bearing inspection', evidence: 'V1 6.4 mm/s, T2 71 C', confidence: '92%', priority: 'Medium' },
   { id: 'i2', subject: 'Boiler Feed Pump-02', finding: 'Temperature trending upward', recommendation: 'Inspect cooling system', evidence: 'T2 +8.4% in 24h', confidence: '86%', priority: 'Medium' },
   { id: 'i3', subject: 'Cooling Tower-01', finding: 'Efficiency dropped', recommendation: 'Clean inlet and verify fan speed', evidence: 'OEE -4.2%', confidence: '78%', priority: 'Medium' },
   { id: 'i4', subject: 'Rotary Airlock', finding: 'Check media and valves', recommendation: 'Schedule lubrication inspection', evidence: 'Current stable, vibration rising', confidence: '71%', priority: 'Low' },
@@ -137,7 +137,7 @@ const DEMO_AREAS: PlantArea[] = [
   { id: 'boiler', name: 'Boiler Area', x: 478, y: 104, labelX: 350, labelY: 10, status: 'warning', count: 10 },
   { id: 'turbine', name: 'Turbine Hall', x: 540, y: 152, labelX: 494, labelY: 70, status: 'healthy', count: 12 },
   { id: 'utility', name: 'Utility Area', x: 214, y: 226, labelX: 38, labelY: 186, status: 'healthy', count: 8 },
-  { id: 'pump', name: 'Process Pump Line', x: 366, y: 240, labelX: 172, labelY: 250, status: 'warning', count: 9 },
+  { id: 'pump', name: 'Process Pump Line', x: 366, y: 240, labelX: 172, labelY: 250, status: 'healthy', count: 9 },
   { id: 'airlock', name: 'Rotary Airlock', x: 470, y: 234, labelX: 452, labelY: 254, status: 'healthy', count: 3 },
 ];
 
@@ -222,33 +222,40 @@ export function buildDashboardMetrics({
     return {
       live: false,
       plantName,
-      healthScore: 84,
-      healthLabel: 'Good',
+      // A plant running to plan. Every figure below is held consistent with
+      // the formula the live branch uses, so the demo cannot state a score its
+      // own factors would not produce:
+      //   score = avail*.3 + perf*.2 + rel*.3 + maint*.2
+      //         =   95*.3  +  93*.2  +  95*.3  +  94*.2  = 94.4
+      //   oee   = avail*perf*rel/10_000 = 95*93*95/10_000 = 83.9
+      //   maintainability = 100 - critical*6 - warning*2 = 100 - 0 - 6 = 94
+      healthScore: 94,
+      healthLabel: 'Excellent',
       healthFactors: [
-        { label: 'Availability', value: 89 },
-        { label: 'Performance', value: 78 },
-        { label: 'Reliability', value: 83 },
-        { label: 'Maintainability', value: 74 },
+        { label: 'Availability', value: 95 },
+        { label: 'Performance', value: 93 },
+        { label: 'Reliability', value: 95 },
+        { label: 'Maintainability', value: 94 },
       ],
-      healthContributors: ['Boiler Feed Pump-02', 'Compressor-03', 'Cooling Tower-01'],
-      oee: 72.6,
-      machinesOnline: 124,
+      healthContributors: ['Compressor-03', 'Boiler Feed Pump-02', 'Turbine-01'],
+      oee: 83.9,
+      machinesOnline: 152,
       machinesTotal: 156,
-      activeChannels: 1258,
+      activeChannels: 1588,
       configuredChannels: 1642,
-      connectedGateways: 18,
+      connectedGateways: 19,
       totalGateways: 20,
-      alarmCount: 12,
-      criticalCount: 10,
-      warningCount: 28,
-      infoCount: 14,
-      ackCount: 4,
+      alarmCount: 5,
+      criticalCount: 0,
+      warningCount: 3,
+      infoCount: 6,
+      ackCount: 2,
       energyMwh: 18.7,
-      uptimePct: 99.33,
+      uptimePct: 99.86,
       packetRate: 2845,
-      avgLatencyMs: 32,
+      avgLatencyMs: 21,
       lastPayload: formatTime(new Date(nowMs).toISOString()),
-      devicesStreaming: 142,
+      devicesStreaming: 152,
       alarms: DEMO_ALARMS,
       attention: DEMO_ATTENTION.map((row, index) => ({ ...row, machineId: machines[index]?.id ?? machines[0]?.id })),
       insights: DEMO_INSIGHTS,
