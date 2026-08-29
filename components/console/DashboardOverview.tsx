@@ -35,8 +35,12 @@ import { apiFetch } from '../../src/lib/apiClient';
 import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
 import type { PlantCalloutFacts } from './plant3d/types';
 import { FadeLayer } from './plant/FadeLayer';
-import { PlantAnalyticsPanel, type PlantKpi } from './plant/PlantAnalyticsPanel';
-import { PlantBottomAnalytics } from './plant/PlantBottomAnalytics';
+import {
+  PlantBottomStrip,
+  PlantRightRail,
+  type AssetDistribution,
+  type HealthPoint,
+} from './plant/overview';
 import PlantExperience from './plant/PlantExperience';
 import { PlantOverviewHeader } from './plant/PlantOverviewHeader';
 import { PlantOverviewEditor } from './PlantOverviewEditor';
@@ -884,6 +888,52 @@ export function DashboardOverview({
     return facts;
   }, [analytics.assets]);
 
+  // --- the overview's panel model ------------------------------------------
+  // Everything the rail, the strip and the footer show is derived here, from
+  // the same `metrics`/`analytics` the map is drawn from. The panels compute
+  // nothing, so a figure on the rail can never disagree with the yard beside it.
+
+  /** The fleet sorted into the four condition bands the score is built from. */
+  const distribution = useMemo<AssetDistribution>(() => {
+    const count = (status: PlantAssetStatus) => analytics.assets.filter((asset) => asset.status === status).length;
+    return {
+      critical: count('critical'),
+      atRisk: count('warning'),
+      // Offline is not a condition, it is an absence of one — it sits in the
+      // neutral band rather than being counted as healthy.
+      neutral: count('offline'),
+      healthy: count('healthy'),
+    };
+  }, [analytics.assets]);
+
+  /**
+   * The plotted history, one label per sample.
+   *
+   * There is no aggregate history endpoint, so the series is what the console
+   * has sampled since it was opened (live) or the walking demo signal (demo).
+   * Either way each point is stamped at the cadence it was taken at, so the
+   * time axis is the real one rather than a decorative ruler.
+   */
+  const healthHistory = useMemo<HealthPoint[]>(() => {
+    const count = healthTrend.length;
+    return healthTrend.map((value, index) => ({
+      label: new Date(nowMs - (count - 1 - index) * SAMPLE_MS).toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      value: Math.round(value),
+    }));
+  }, [healthTrend, nowMs]);
+
+  /** How much time the plot actually covers. Never rounded up into a claim. */
+  const historyRangeLabel = useMemo(() => {
+    const seconds = Math.max(0, healthTrend.length - 1) * (SAMPLE_MS / 1000);
+    if (seconds < 90) return `Last ${Math.round(seconds)} sec`;
+    return `Last ${Math.round(seconds / 60)} min`;
+  }, [healthTrend.length]);
+
+  const clock = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
   const healthValues = metrics.attention.map((row) => row.health);
   const gaps = healthValues.map((value) => value - HEALTH_TARGET);
   const onPlanCount = gaps.filter((gap) => gap >= -3).length;
@@ -948,27 +998,6 @@ export function DashboardOverview({
       tone: metrics.connectedGateways < metrics.totalGateways ? palette.critical : palette.accent,
     },
   ];
-
-  // The KPI strip carries the reading and one short caption — the state, the
-  // rate or the latency. The gap-to-plan lives on the meter as a marker, which
-  // says the same thing without a second row of numbers.
-  const kpiCaptions: Record<string, string> = {
-    health: metrics.healthLabel,
-    machines: `${metrics.machinesOnline} active`,
-    channels: `${metrics.packetRate.toLocaleString('en-US')} pkt/s`,
-    gateways: `${metrics.avgLatencyMs} ms`,
-  };
-
-  const plantKpis: PlantKpi[] = headline.map((entry) => ({
-    id: entry.id,
-    label: entry.label,
-    value: entry.value,
-    unit: entry.unit,
-    progress: entry.progress,
-    target: entry.target,
-    caption: kpiCaptions[entry.id] ?? entry.planShort,
-    tone: entry.tone,
-  }));
 
   const rowClass = cn('gap-3', isCompact ? 'flex-col' : 'flex-row');
   // A row that takes whatever height is left on the page. Stacked layouts fall
@@ -1047,13 +1076,17 @@ export function DashboardOverview({
       // every callout inside the yard the operator can actually see.
       case 'operations': {
         const showChrome = chromeVisible(plantView);
-        // Wide enough for a 12px label beside a 20px reading without wrapping.
-        // The old 258/292 column could carry neither.
-        const railWidth = width >= 1600 ? 372 : width >= 1400 ? 340 : 312;
-        // Tall enough for a headline, a delta and a plot with a real axis. The
-        // old 134px strip left about 60px of plot under its header. Held back on
-        // a narrow viewport, where there is no rail to give the height back to.
-        const stripHeight = isNarrow ? 184 : width >= 1600 ? 232 : 212;
+        // Wide enough for the 46px score and its target block on one line, and
+        // for a finding's title beside its priority word without wrapping.
+        const railWidth = width >= 1600 ? 392 : width >= 1400 ? 364 : 332;
+        // Below this the strip cannot carry the trend and the queue side by
+        // side, so they stack and the strip takes the height of both.
+        const stackStrip = width > 0 && width < 900;
+        // Tall enough for the chart's header, its legend, a plot with a real
+        // axis and the five-figure summary under it. The trend is the only
+        // thing on this page with a time axis, and a trend squeezed to 60px of
+        // plot is a decoration.
+        const stripHeight = stackStrip ? 400 : isNarrow ? 244 : width >= 1600 ? 296 : 274;
         // The gutter the floating panels sit in, and the header band above them.
         const pad = 12;
         const headerBand = 44;
@@ -1115,21 +1148,26 @@ export function DashboardOverview({
               </FadeLayer>
 
               {/* Everything between the header and the charts is the plant. The
-                  four headline measures live in the analytics column, which is
-                  what keeps this band clear. */}
+                  headline measures live in the analytics column, which is what
+                  keeps this band clear. */}
               <View style={{ flex: 1, minHeight: 0 }} pointerEvents="none" />
 
+              {/* The trend and the queue that comes out of it. */}
               <FadeLayer
                 visible={showChrome}
                 translateY={16}
                 style={{ height: stripHeight, flexDirection: 'row', marginRight: isNarrow ? 0 : railWidth + 10 }}
               >
-                <PlantBottomAnalytics
-                  analytics={analytics}
-                  alarmBars={alarmBars}
+                <PlantBottomStrip
+                  history={healthHistory}
+                  target={HEALTH_TARGET}
+                  rangeLabel={historyRangeLabel}
+                  assets={analytics.assets}
+                  selectedId={selectedAssetId}
+                  onSelectAsset={setSelectedAssetId}
                   palette={palette}
                   isDark={isDark}
-                  stacked={false}
+                  stacked={stackStrip}
                 />
               </FadeLayer>
             </View>
@@ -1149,10 +1187,12 @@ export function DashboardOverview({
                   flexDirection: 'row',
                 }}
               >
-                <PlantAnalyticsPanel
-                  analytics={analytics}
-                  kpis={plantKpis}
-                  insights={metrics.insights}
+                <PlantRightRail
+                  score={metrics.healthScore}
+                  target={HEALTH_TARGET}
+                  distribution={distribution}
+                  updatedLabel={`Updated ${clock}`}
+                  findings={metrics.insights}
                   palette={palette}
                   isDark={isDark}
                 />
