@@ -1,5 +1,6 @@
 import '../global.css';
 
+import { useEffect } from 'react';
 import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
 import {
   Inter_400Regular,
@@ -13,7 +14,18 @@ import {
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
+import { useColorScheme } from 'nativewind';
 import { ActivityIndicator, View } from 'react-native';
+
+function DefaultTheme() {
+  const { setColorScheme } = useColorScheme();
+
+  useEffect(() => {
+    setColorScheme('dark');
+  }, [setColorScheme]);
+
+  return null;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -35,6 +47,7 @@ export default function RootLayout() {
 
   return (
     <>
+      <DefaultTheme />
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />

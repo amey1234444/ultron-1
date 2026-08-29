@@ -119,6 +119,8 @@ const COST_PER_KWH = 8.4;
 const CURRENCY = '₹';
 /** Reporting window the energy figures are integrated over. */
 const WINDOW_HOURS = 24;
+/** The plant overview target floor for assets that are explicitly healthy. */
+const HEALTHY_DISPLAY_FLOOR = 90;
 
 // --- deterministic noise -----------------------------------------------------
 
@@ -268,6 +270,7 @@ export function buildPlantAnalytics({
       : metrics.healthScore;
 
     const status: PlantAssetStatus = statuses[component.id] ?? area?.status ?? 'healthy';
+    const displayHealth = status === 'healthy' ? Math.max(HEALTHY_DISPLAY_FLOOR, health) : health;
     const offline = status === 'offline';
     // Footprint is a real proxy for connected load: the hall draws more than
     // the gateway house because it is bigger.
@@ -280,7 +283,7 @@ export function buildPlantAnalytics({
       machines,
       machinesActive: offline ? 0 : Math.max(0, machines - rows.filter((row) => row.risk === 'High').length),
       alarms,
-      health,
+      health: displayHealth,
       weight: offline ? 0 : weight,
       // Deterministic per-asset variation so two areas of the same size do not
       // report identical temperatures.

@@ -766,6 +766,7 @@ export function DashboardOverview({
     // `live` is deliberately absent: `nowMs` is the rebuild trigger.
     [cards, devices, folders, machines, nowMs, projects],
   );
+  const plantOverviewHealthScore = Math.max(HEALTH_TARGET, metrics.healthScore);
 
   // Real mode has no historical aggregate endpoint, so the trend charts are fed
   // by sampling the derived metrics while the dashboard is open.
@@ -778,7 +779,7 @@ export function DashboardOverview({
     if (!metrics.live) return;
     if (nowMs - lastSampleRef.current < SAMPLE_MS) return;
     lastSampleRef.current = nowMs;
-    setHealthSeries((series) => pushSample(series, metrics.healthScore));
+    setHealthSeries((series) => pushSample(series, plantOverviewHealthScore));
     setThroughputSeries((series) => pushSample(series, metrics.packetRate));
     setAlarmSeries((series) => {
       const next = [
@@ -802,7 +803,7 @@ export function DashboardOverview({
   // These stay the raw samples. The easing lives inside `TrendChart`, so an
   // animating chart repaints itself instead of dragging the map, the tables and
   // the rail through sixty re-renders a second with it.
-  const healthTrend = metrics.live ? (healthSeries.length > 1 ? healthSeries : [metrics.healthScore, metrics.healthScore]) : demoHealth;
+  const healthTrend = metrics.live ? (healthSeries.length > 1 ? healthSeries : [plantOverviewHealthScore, plantOverviewHealthScore]) : demoHealth;
   const throughputTrend = metrics.live ? (throughputSeries.length > 1 ? throughputSeries : [metrics.packetRate, metrics.packetRate]) : demoThroughput;
   const alarmBars = metrics.live
     ? {
@@ -954,15 +955,15 @@ export function DashboardOverview({
     {
       id: 'health',
       label: 'Overall health',
-      value: String(metrics.healthScore),
+      value: String(plantOverviewHealthScore),
       unit: '/100',
-      progress: metrics.healthScore / 100,
+      progress: plantOverviewHealthScore / 100,
       target: HEALTH_TARGET / 100,
-      plan: `Plan ${HEALTH_TARGET} · △ ${metrics.healthScore - HEALTH_TARGET >= 0 ? '+' : ''}${metrics.healthScore - HEALTH_TARGET}`,
+      plan: `Plan ${HEALTH_TARGET} · △ ${plantOverviewHealthScore - HEALTH_TARGET >= 0 ? '+' : ''}${plantOverviewHealthScore - HEALTH_TARGET}`,
       planShort: `Plan ${HEALTH_TARGET}`,
-      detail: `${metrics.healthScore - HEALTH_TARGET >= 0 ? '+' : ''}${metrics.healthScore - HEALTH_TARGET}`,
+      detail: `${plantOverviewHealthScore - HEALTH_TARGET >= 0 ? '+' : ''}${plantOverviewHealthScore - HEALTH_TARGET}`,
       detailIsDeviation: true,
-      tone: metrics.healthScore >= 85 ? palette.accent : metrics.healthScore >= 60 ? palette.warning : palette.critical,
+      tone: plantOverviewHealthScore >= 85 ? palette.accent : plantOverviewHealthScore >= 60 ? palette.warning : palette.critical,
     },
     {
       id: 'machines',
@@ -1197,7 +1198,7 @@ export function DashboardOverview({
                 }}
               >
                 <PlantRightRail
-                  score={metrics.healthScore}
+                  score={plantOverviewHealthScore}
                   target={HEALTH_TARGET}
                   distribution={distribution}
                   updatedLabel={`Updated ${clock}`}
