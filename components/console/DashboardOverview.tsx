@@ -1082,11 +1082,13 @@ export function DashboardOverview({
         // Below this the strip cannot carry the trend and the queue side by
         // side, so they stack and the strip takes the height of both.
         const stackStrip = width > 0 && width < 900;
-        // Tall enough for the chart's header, its legend, a plot with a real
-        // axis and the five-figure summary under it. The trend is the only
-        // thing on this page with a time axis, and a trend squeezed to 60px of
-        // plot is a decoration.
-        const stripHeight = stackStrip ? 400 : isNarrow ? 244 : width >= 1600 ? 296 : 274;
+        // The strip is sized by the smallest plot that still reads as a trend
+        // — a header, a legend, and roughly 130px of plot with a real axis —
+        // and not a pixel more. This page is a yard with instruments over it,
+        // so every row the panels do not need is yard the operator gets back.
+        // The queue beside it takes whole rows out of the same budget rather
+        // than clipping a last one.
+        const stripHeight = stackStrip ? 328 : isNarrow ? 196 : width >= 1600 ? 232 : 216;
         // The gutter the floating panels sit in, and the header band above them.
         const pad = 12;
         const headerBand = 44;

@@ -46,8 +46,15 @@ import {
   UtilityIcon,
 } from './OverviewChrome';
 
-/** One slot. Rows are absolutely placed on this pitch so they can be animated. */
-const ROW_H = 48;
+/**
+ * One slot. Rows are absolutely placed on this pitch so they can be animated.
+ *
+ * Sized to the row's content and nothing else: a name, a status word and a
+ * reading stack to 32px, so the pitch is that plus a hair of breathing room.
+ * Every pixel above that is a pixel of yard, and on a strip this short it is
+ * also the difference between showing three assets and showing two.
+ */
+const ROW_H = 40;
 /** Long enough to be followed by eye, short enough not to delay the next tick. */
 const REORDER_MS = 520;
 /** How long a row stays marked as "this is the one that just moved". */
@@ -62,13 +69,13 @@ const EASE = Easing.bezier(0.22, 1, 0.36, 1);
  * knows about what kind of thing it is. Anything unrecognised gets the generic
  * machine mark rather than a guess.
  */
-function AssetIcon({ name, color }: { name: string; color: string }) {
+function AssetIcon({ name, color, size = 15 }: { name: string; color: string; size?: number }) {
   const key = name.toLowerCase();
   if (key.includes('utility') || key.includes('cooling') || key.includes('water') || key.includes('air')) {
-    return <UtilityIcon color={color} size={15} />;
+    return <UtilityIcon color={color} size={size} />;
   }
   if (key.includes('power') || key.includes('electric') || key.includes('turbine') || key.includes('substation')) {
-    return <PowerIcon color={color} size={15} />;
+    return <PowerIcon color={color} size={size} />;
   }
   if (
     key.includes('preheater') ||
@@ -77,9 +84,9 @@ function AssetIcon({ name, color }: { name: string; color: string }) {
     key.includes('process') ||
     key.includes('boiler')
   ) {
-    return <ProcessIcon color={color} size={15} />;
+    return <ProcessIcon color={color} size={size} />;
   }
-  return <MachineIcon color={color} size={15} />;
+  return <MachineIcon color={color} size={size} />;
 }
 
 function statusWord(status: PlantAssetTelemetry['status']): string {
@@ -129,8 +136,8 @@ function AttentionRow({
         {String(rank).padStart(2, '0')}
       </Text>
 
-      <IconWell palette={palette} size={28}>
-        <AssetIcon name={asset.name} color={palette.accent} />
+      <IconWell palette={palette} size={26}>
+        <AssetIcon name={asset.name} color={palette.accent} size={14} />
       </IconWell>
 
       <View style={{ flex: 1, minWidth: 0 }}>
@@ -301,7 +308,7 @@ export function NeedsAttention({
     <Panel
       palette={palette}
       isDark={isDark}
-      style={{ flex: 1, minWidth: 0, minHeight: 0, padding: PAD, paddingHorizontal: PAD - STEP * 1.5 }}
+      style={{ flex: 1, minWidth: 0, minHeight: 0, padding: PAD - 2, paddingHorizontal: PAD - STEP * 2 }}
     >
       <View style={{ paddingHorizontal: STEP * 1.5 }}>
         <PanelHeader
@@ -319,7 +326,7 @@ export function NeedsAttention({
       </View>
 
       <View
-        style={{ flex: 1, minHeight: 0, marginTop: STEP * 2.5 }}
+        style={{ flex: 1, minHeight: 0, marginTop: STEP * 2 }}
         onLayout={(event) => {
           const next = event.nativeEvent.layout.height;
           setListHeight((current) => (Math.abs(current - next) < 0.5 ? current : next));

@@ -43,48 +43,6 @@ function clamp(value: number, min: number, max: number) {
   return Math.max(min, Math.min(max, value));
 }
 
-function StatCell({
-  label,
-  value,
-  suffix,
-  tone,
-  palette,
-  first,
-}: {
-  label: string;
-  value: string;
-  suffix?: string;
-  tone?: string;
-  palette: ConsolePalette;
-  first?: boolean;
-}) {
-  return (
-    <View
-      style={{
-        flex: 1,
-        minWidth: 0,
-        paddingLeft: first ? 0 : STEP * 3,
-        borderLeftWidth: first ? 0 : 1,
-        borderLeftColor: palette.lineSubtle,
-      }}
-    >
-      <Text numberOfLines={1} className="font-mono" style={{ fontSize: 9, letterSpacing: 0.7, color: palette.inkFaint }}>
-        {label}
-      </Text>
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 2, marginTop: 3 }}>
-        <Text numberOfLines={1} className="font-mono" style={{ fontSize: 13, fontWeight: '600', color: tone ?? palette.ink }}>
-          {value}
-        </Text>
-        {suffix ? (
-          <Text className="font-mono" style={{ fontSize: 9, color: palette.inkFaint }}>
-            {suffix}
-          </Text>
-        ) : null}
-      </View>
-    </View>
-  );
-}
-
 function LegendKey({ label, color, dashed, palette }: { label: string; color: string; dashed?: boolean; palette: ConsolePalette }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: STEP * 1.5 }}>
@@ -138,17 +96,14 @@ export function HealthScoreHistory({
   // map and the rail through sixty re-renders a second with it.
   const shown = useSmoothSeries(values);
 
+  // The extremes, which are the only two points the plot marks besides now.
+  // Nothing here is printed as text: the summary row that used to sit under the
+  // chart restated five numbers the plot already draws, and a strip that spends
+  // a third of its height re-reading its own picture has no height left for the
+  // picture.
   const stats = useMemo(() => {
-    if (values.length === 0) return { avg: 0, min: 0, max: 0, current: 0, change: 0 };
-    const current = values[values.length - 1];
-    const previous = values.length > 1 ? values[values.length - 2] : current;
-    return {
-      avg: values.reduce((sum, value) => sum + value, 0) / values.length,
-      min: Math.min(...values),
-      max: Math.max(...values),
-      current,
-      change: current - previous,
-    };
+    if (values.length === 0) return { min: 0, max: 0 };
+    return { min: Math.min(...values), max: Math.max(...values) };
   }, [values]);
 
   // The plotted window. Defaults to 40-100 — wide enough to keep all three
@@ -224,7 +179,11 @@ export function HealthScoreHistory({
   const zoneOpacity = (dark: number, light: number) => (isDark ? dark : light);
 
   return (
-    <Panel palette={palette} isDark={isDark} style={{ flex: 1, minWidth: 0, minHeight: 0, padding: PAD, paddingBottom: STEP * 2.5 }}>
+    <Panel
+      palette={palette}
+      isDark={isDark}
+      style={{ flex: 1, minWidth: 0, minHeight: 0, padding: PAD - 2, paddingBottom: STEP * 1.5 }}
+    >
       <PanelHeader
         label="Health score history"
         subtitle="Health trend against operating thresholds"
@@ -232,7 +191,7 @@ export function HealthScoreHistory({
         right={<ChipButton label={rangeLabel} onPress={onRangePress} palette={palette} chevron={!!onRangePress} />}
       />
 
-      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: STEP * 3.5, marginTop: STEP * 2.5 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: STEP * 3.5, marginTop: STEP * 2 }}>
         <LegendKey label="Health score" color={palette.accent} palette={palette} />
         <LegendKey label={`Target ${target}`} color={palette.accent} dashed palette={palette} />
         <LegendKey label={`Warning ${warning}`} color={palette.warning} dashed palette={palette} />
@@ -459,33 +418,6 @@ export function HealthScoreHistory({
             </Text>
           </View>
         ) : null}
-      </View>
-
-      <View
-        style={{
-          flexDirection: 'row',
-          paddingTop: STEP * 2.5,
-          marginTop: STEP,
-          borderTopWidth: 1,
-          borderTopColor: palette.lineSubtle,
-        }}
-      >
-        <StatCell label="AVERAGE" value={stats.avg.toFixed(1)} palette={palette} first />
-        <StatCell
-          label="MINIMUM"
-          value={String(stats.min)}
-          tone={stats.min <= critical ? palette.critical : undefined}
-          palette={palette}
-        />
-        <StatCell label="MAXIMUM" value={String(stats.max)} palette={palette} />
-        <StatCell label="CURRENT" value={String(stats.current)} suffix="/100" palette={palette} />
-        <StatCell
-          label="CHANGE"
-          value={`${stats.change > 0 ? '+' : ''}${stats.change}`}
-          suffix="pts"
-          tone={stats.change >= 0 ? palette.accent : palette.critical}
-          palette={palette}
-        />
       </View>
     </Panel>
   );

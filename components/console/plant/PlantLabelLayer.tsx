@@ -39,12 +39,19 @@ const MONO = '"JetBrains Mono", "IBM Plex Mono", ui-monospace, monospace';
  * like "Electrical / Power House" had to be clipped to fit next to its status,
  * and a label that cannot say what it is labelling has no reason to be there.
  */
-const REST = { w: 184, h: 58 };
-const OPEN = { w: 200, h: 132 };
+//
+// Sized against the *models*, not against the text they could hold. A callout
+// that is taller than the building it points at stops reading as a label on the
+// yard and starts reading as a panel that happens to have a line coming out of
+// it — which is what these were: 58px at rest and 132px open, against buildings
+// that project to about 80px on a normal camera. They are now roughly a third
+// shorter, which puts the card back under the roofline of the thing it names.
+const REST = { w: 148, h: 40 };
+const OPEN = { w: 158, h: 104 };
 /** Clearance between a card and a model, and between two cards. */
-const CLEAR = 12;
+const CLEAR = 10;
 /** Length of the connector's lead-off from the model. */
-const LEAD = 20;
+const LEAD = 16;
 
 /**
  * Chrome the solver must stay clear of, in canvas pixels.
@@ -254,9 +261,9 @@ export function PlantLabelLayer({
         const rowStyle: CSSProperties = {
           display: 'flex',
           alignItems: 'baseline',
-          gap: 6,
+          gap: 5,
           fontFamily: MONO,
-          fontSize: 10,
+          fontSize: 9,
           whiteSpace: 'nowrap',
         };
         return (
@@ -284,7 +291,7 @@ export function PlantLabelLayer({
               overflow: 'hidden',
               background: surface,
               border: `1px solid ${active ? 'rgba(63,191,106,0.55)' : hair}`,
-              borderRadius: 6,
+              borderRadius: 5,
               // The callout lifts with the building it belongs to. It already
               // grows and takes an accent edge on hover — the deeper shadow is
               // what makes those read as one card coming forward rather than as
@@ -302,10 +309,10 @@ export function PlantLabelLayer({
                 'border-color 140ms ease, box-shadow 200ms ease, width 160ms cubic-bezier(0.22, 1, 0.36, 1), height 160ms cubic-bezier(0.22, 1, 0.36, 1)',
             }}
           >
-            <div style={{ padding: '7px 9px 6px' }}>
+            <div style={{ padding: '5px 7px 4px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: 999, background: tone, flexShrink: 0 }} />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, minWidth: 0 }}>
+                  <span style={{ width: 5, height: 5, borderRadius: 999, background: tone, flexShrink: 0 }} />
                   <span
                     style={{
                       minWidth: 0,
@@ -313,9 +320,10 @@ export function PlantLabelLayer({
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                       fontFamily: MONO,
-                      fontSize: 10,
+                      fontSize: 9,
+                      lineHeight: '12px',
                       fontWeight: '700',
-                      letterSpacing: '0.06em',
+                      letterSpacing: '0.04em',
                       textTransform: 'uppercase',
                       color: palette.ink,
                     }}
@@ -326,9 +334,10 @@ export function PlantLabelLayer({
                 <span
                   style={{
                     fontFamily: MONO,
-                    fontSize: 8.5,
+                    fontSize: 7.5,
+                    lineHeight: '12px',
                     fontWeight: '600',
-                    letterSpacing: '0.1em',
+                    letterSpacing: '0.08em',
                     textTransform: 'uppercase',
                     color: tone,
                     flexShrink: 0,
@@ -339,23 +348,23 @@ export function PlantLabelLayer({
               </div>
 
               {/* Score + Sparkline Row */}
-              <div style={{ marginTop: 5, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+              <div style={{ marginTop: 3, display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 16, fontWeight: '600', color: palette.ink, lineHeight: '18px' }}>
+                  <span style={{ fontFamily: MONO, fontSize: 13, fontWeight: '600', color: palette.ink, lineHeight: '15px' }}>
                     {telemetry.health}
                   </span>
-                  <span style={{ fontFamily: MONO, fontSize: 9, color: palette.inkFaint }}>/100</span>
+                  <span style={{ fontFamily: MONO, fontSize: 8, color: palette.inkFaint }}>/100</span>
                 </div>
 
                 {/* Inline Micro Sparkline */}
-                <svg width={52} height={14} style={{ overflow: 'visible' }}>
+                <svg width={34} height={10} style={{ overflow: 'visible' }}>
                   <path
-                    d={`M0,${12 - (telemetry.health / 100) * 8} Q13,${14 - (telemetry.health / 100) * 10} 26,${
-                      10 - (telemetry.health / 100) * 6
-                    } T52,${8 - (telemetry.health / 100) * 6}`}
+                    d={`M0,${8 - (telemetry.health / 100) * 5} Q8.5,${10 - (telemetry.health / 100) * 7} 17,${
+                      7 - (telemetry.health / 100) * 4
+                    } T34,${5.5 - (telemetry.health / 100) * 4}`}
                     fill="none"
                     stroke={tone}
-                    strokeWidth={1.4}
+                    strokeWidth={1.2}
                     strokeLinecap="round"
                   />
                 </svg>
@@ -363,7 +372,7 @@ export function PlantLabelLayer({
             </div>
 
             {open ? (
-              <div style={{ borderTop: `1px solid ${hair}`, padding: '6px 10px', display: 'grid', gap: 4 }}>
+              <div style={{ borderTop: `1px solid ${hair}`, padding: '4px 7px 5px', display: 'grid', gap: 3 }}>
                 {(
                   [
                     ['Machines', String(telemetry.machines).padStart(2, '0'), undefined],
@@ -383,11 +392,11 @@ export function PlantLabelLayer({
                   ] as [string, string, string | undefined][]
                 ).map(([label, value, valueTone]) => (
                   <div key={label} style={rowStyle}>
-                    <span style={{ fontSize: 8.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: palette.inkFaint }}>
+                    <span style={{ fontSize: 7.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: palette.inkFaint }}>
                       {label}
                     </span>
                     <span style={{ flex: 1 }} />
-                    <span style={{ fontSize: 10.5, color: valueTone ?? palette.ink }}>{value}</span>
+                    <span style={{ fontSize: 9, color: valueTone ?? palette.ink }}>{value}</span>
                   </div>
                 ))}
               </div>
