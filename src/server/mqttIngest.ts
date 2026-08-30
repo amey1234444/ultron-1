@@ -2,7 +2,6 @@ import { createHash } from 'crypto';
 
 import { buildLiveFrame, parseLiveTopic, type TopicKind } from '../../lib/liveFrame';
 import { normalizeChannelConfig } from '../../lib/rack';
-import { storeCompressedHistoryMeasurements } from './channelHistory';
 import { ensureSchema, query } from './db';
 import { publishLiveFrame } from './liveFrame';
 
@@ -716,21 +715,6 @@ async function storeChannelMeasurement(msg: MqttEnvelope, slot: Record<string, u
      ON CONFLICT (gateway_id, rack_id, slot_id, channel_id, measurement_type, source_sequence, source_timestamp_us) DO NOTHING`,
     params,
   );
-  await storeCompressedHistoryMeasurements([
-    {
-      gatewayId: String(params[0]),
-      rackId: String(params[1]),
-      slotId: Number(params[2]),
-      channelId: Number(params[3]),
-      measurementType: String(params[4]),
-      value,
-      timestampMs: Math.round(Number(params[9]) / 1000),
-      unit: String(params[6] ?? ''),
-      quality: String(params[7] ?? 'GOOD'),
-      cardType: stringValue(slot.card_type),
-      sensor: stringValue(slot.sensor),
-    },
-  ]);
 }
 
 async function handleTelemetry(msg: MqttEnvelope): Promise<number> {
