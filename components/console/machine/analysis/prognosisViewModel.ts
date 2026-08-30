@@ -177,11 +177,26 @@ function buildSeries(
     forecast.push({ day: forecastDays, value: current + scale * forecastDays ** exponent });
   }
 
-  // The measured side rises from the healthy baseline to today's reading. The
-  // ripple is damped to nothing at both ends so the series starts exactly at
-  // the baseline and hands over to the forecast at exactly today's value.
+  // Where the measured window starts.
+  //
+  // `baselineValue` is the machine's healthy REFERENCE, which on a machine that
+  // has only just begun to drift is today's reading to within a couple of
+  // percent — so using it directly drew a dead-flat 120-day history under a
+  // steeply rising forecast, which is the opposite of what the engine reports
+  // (it scores this history as persistently rising). The engine's robust
+  // Theil-Sen slope is its own characterisation of the typical rate across that
+  // window, so the window start is read from that, and only falls back to the
+  // reference when no slope was fitted. Floored so the line cannot dive to zero
+  // on a steep exponential fit.
+  const robust = prediction.robustSlopePerDay ?? prediction.trendSlopePerDay;
+  const slopeStart = robust !== null && robust > 0 ? current - robust * historyDays : baseline;
+  const floor = Math.max(0, Math.min(baseline, current) * 0.55);
+  const windowStart = Math.min(current * 0.985, Math.max(floor, Math.min(slopeStart, baseline)));
+
+  // The ripple is damped to nothing at both ends so the series starts exactly
+  // at the window start and hands over to the forecast at today's value.
   const seed = seedFrom(prediction.predictionId);
-  const span = current - baseline;
+  const span = current - windowStart;
   const amplitude = Math.abs(span) * 0.06;
   const history: TrendPoint[] = [];
   const historyStep = Math.max(1, Math.round(historyDays / 120));
@@ -197,7 +212,7 @@ function buildSeries(
         Math.sin(index * 1.71 + 2.2) * 0.12) *
       amplitude *
       damp;
-    history.push({ day, value: baseline + span * shaped + wobble });
+    history.push({ day, value: windowStart + span * shaped + wobble });
   }
   if (history[history.length - 1]?.day !== 0) history.push({ day: 0, value: current });
 
@@ -230,12 +245,70 @@ function seriesCeiling(forecast: TrendPoint[], history: TrendPoint[], floor: num
   return Math.ceil((peak * 1.06) / 5) * 5;
 }
 
+/**
+ * The degradation score, 0-100.
+ *
+ * `healthIndicator` first, because it is the engine's own answer to this exact
+ * question and it accounts for more than one measurement. The baseline-to-danger
+ * span is only the fallback — and it was wrong as the primary source: on this
+ * machine `baselineValue` is the CURRENT healthy reference, not the day-120
+ * starting point, so `current - baseline` is ~0 and the page reported a machine
+ * with a live degradation forecast as 0% degraded.
+ */
+function degradationScoreOf(prediction: MachinePredictionResult): number | null {
+  if (prediction.healthIndicator !== null) return clamp(100 - prediction.healthIndicator, 0, 100);
+  return degradationIndex(prediction.currentValue, prediction.baselineValue, prediction.advanced.dangerThreshold);
+}
+
 /** The share of the baseline-to-danger span already consumed, 0-100. */
 function degradationIndex(current: number | null, baseline: number | null, danger: number | null): number | null {
   if (current === null || baseline === null || danger === null) return null;
   const span = danger - baseline;
   if (Math.abs(span) < 1e-6) return null;
   return clamp(((current - baseline) / span) * 100, 0, 100);
+}
+
+/** "Early-stage degradation", not a restatement of the arithmetic. */
+function degradationBand(score: number | null): string {
+  if (score === null) return 'Not derivable from the configured limits';
+  if (score < 25) return 'Early-stage degradation';
+  if (score < 50) return 'Developing degradation';
+  if (score < 75) return 'Advanced degradation';
+  return 'Severe degradation';
+}
+
+/**
+ * The component name, not its full address.
+ *
+ * Locations arrive as "Gearbox output side", and the KPI cell wants the thing
+ * that is degrading — GEARBOX — with the side kept as the quiet line beneath.
+ * "GEARBOX OUTPUT SIDE" in a 150px cell wraps to two lines and reads as an
+ * address rather than as an answer.
+ */
+const COMPONENT_AREA: [RegExp, string][] = [
+  [/gearbox|gear\s*box/i, 'Drive train'],
+  [/motor|drive/i, 'Drive train'],
+  [/screw|barrel|melt|die/i, 'Extrusion section'],
+  [/hopper|feed/i, 'Material feeding'],
+];
+
+function componentNameOf(location: string[]): { name: string; area: string } {
+  const primary = location[0] ?? '';
+  const head = primary.split(/\s+/)[0] ?? primary;
+  const area = COMPONENT_AREA.find(([pattern]) => pattern.test(primary))?.[1] ?? (location[1] ?? 'Machine train');
+  return { name: (head || primary).toLocaleUpperCase(), area };
+}
+
+/**
+ * A measurement's own name, with the location path stripped.
+ *
+ * Signal labels arrive as "Gearbox out vibration · Gear box · Output side". In
+ * an evidence cell the path is noise — every cell in the strip is on the same
+ * machine — and it pushes the label to two lines, which knocks the numbers out
+ * of alignment with each other.
+ */
+function measurementName(label: string): string {
+  return (label.split('·')[0] ?? label).trim().toLocaleUpperCase();
 }
 
 function signalMatchesLocation(signal: AnalysisSignal, location: string[]): boolean {
@@ -269,9 +342,9 @@ function signalNote(signal: AnalysisSignal): { note: string; tone: PrognosisTone
   if (signal.reference && Math.abs(signal.reference.target) > 1e-6) {
     const deltaPercent = ((signal.value - signal.reference.target) / Math.abs(signal.reference.target)) * 100;
     const rounded = Math.round(deltaPercent);
-    if (Math.abs(rounded) < 2) return { note: 'At reference', tone: 'healthy' };
+    if (Math.abs(rounded) < 2) return { note: 'Stable at baseline', tone: 'healthy' };
     const tone: PrognosisTone = stateTone !== 'healthy' ? stateTone : Math.abs(rounded) >= 15 ? 'attention' : 'neutral';
-    return { note: `${rounded > 0 ? '+' : ''}${rounded}% vs reference`, tone };
+    return { note: `${rounded > 0 ? '+' : ''}${rounded}% vs baseline`, tone };
   }
   if (signal.qualifier) {
     return { note: signal.qualifier, tone: stateTone };
@@ -454,40 +527,20 @@ export function buildPrognosisViewModel({
   const horizon = dangerDay ?? alertDay ?? 45;
   const forecastDays = Math.max(14, Math.round(horizon * 1.12));
 
-  const score = degradationIndex(current, baseline, danger);
-  const alertIndex = degradationIndex(alert, baseline, danger);
+  const score = degradationScoreOf(selected);
 
+  // There is no synthetic "overall degradation %" metric here on purpose.
+  //
+  // A normalised index would need a low anchor and a high anchor, and the only
+  // pair available is `baselineValue` and the danger threshold — but on this
+  // engine `baselineValue` is the machine's CURRENT healthy reference, not the
+  // start of the measured window. Plotting against it produced a chart whose
+  // present value was 0% on a machine with a live forecast, and a ring that
+  // disagreed with its own chart. Every metric below is therefore a real
+  // measurement in its own engineering unit, with the engine's own configured
+  // limits on it. The degradation SCORE is still shown, in the summary band,
+  // where it is labelled as a different quantity rather than as this axis.
   const metrics: PrognosisMetric[] = [];
-
-  if (current !== null && baseline !== null && danger !== null && score !== null) {
-    const { history, forecast } = buildSeries(selected, current, baseline, alert, danger, historyDays, forecastDays);
-    const toIndex = (value: number) => clamp(((value - baseline) / (danger - baseline)) * 100, 0, 140);
-    const indexHistory = history.map((point) => ({ day: point.day, value: toIndex(point.value) }));
-    const indexForecast = forecast.map((point) => ({ day: point.day, value: toIndex(point.value) }));
-    metrics.push({
-      id: 'overall',
-      label: 'OVERALL',
-      title: `Overall ${selected.location[0] ?? 'machine'} degradation`,
-      unit: '%',
-      axisLabel: 'DEGRADATION INDEX %',
-      decimals: 0,
-      current: round(score, 0),
-      alertThreshold: alertIndex === null ? null : round(alertIndex, 0),
-      dangerThreshold: 100,
-      scaleMin: 0,
-      // Headroom above the danger line, because the projection carries on past
-      // it. A scale that stops at the limit draws the rest of the curve into
-      // the panel's top margin, over the axis captions.
-      scaleMax: seriesCeiling(indexForecast, indexHistory, 100),
-      history: indexHistory,
-      forecast: indexForecast,
-      alertCrossingDay: alertDay,
-      dangerCrossingDay: dangerDay,
-      historyDays,
-      forecastDays,
-      derived: true,
-    });
-  }
 
   for (const prediction of prognostics.predictions) {
     const value = prediction.currentValue;
@@ -508,19 +561,23 @@ export function buildPrognosisViewModel({
       predictionHistoryDays,
       predictionForecastDays,
     );
-    const headroom = Math.max(predictionDanger - predictionBaseline, 1e-6);
+    // The floor is the measured window's own start, not the healthy reference:
+    // the reference sits at today's reading, so anchoring the axis to it would
+    // put the whole 120-day rise below the bottom of the chart.
+    const windowFloor = history.reduce((min, point) => Math.min(min, point.value), value);
+    const headroom = Math.max(predictionDanger - windowFloor, 1e-6);
     metrics.push({
       id: prediction.predictionId,
       label: selectorLabel(prediction.availableInputs[0] ?? prediction.location[prediction.location.length - 1] ?? prediction.faultName),
       title: prediction.faultName,
       unit: prediction.unit,
-      axisLabel: `${(prediction.availableInputs[0] ?? 'MEASURED VALUE').toLocaleUpperCase()}${prediction.unit ? ` (${prediction.unit})` : ''}`,
+      axisLabel: `${measurementName(prediction.availableInputs[0] ?? 'MEASURED VALUE')}${prediction.unit ? ` — ${prediction.unit}` : ''}`,
       decimals: 2,
       current: round(value, 2),
       alertThreshold: predictionAlert === null ? null : round(predictionAlert, 2),
       dangerThreshold: round(predictionDanger, 2),
-      scaleMin: Math.max(0, predictionBaseline - headroom * 0.12),
-      scaleMax: predictionDanger + headroom * 0.2,
+      scaleMin: Math.max(0, windowFloor - headroom * 0.1),
+      scaleMax: predictionDanger + headroom * 0.16,
       history,
       forecast,
       alertCrossingDay: prediction.estimatedTimeToAlertDays,
@@ -537,12 +594,13 @@ export function buildPrognosisViewModel({
   const others = signals.filter((signal) => !scoped.includes(signal));
   const evidence: EvidenceMetric[] = [...scoped, ...others].slice(0, 6).map((signal) => {
     const { note, tone } = signalNote(signal);
-    return { id: signal.code, label: signal.label.toLocaleUpperCase(), value: formatSignal(signal), note, tone };
+    return { id: signal.code, label: measurementName(signal.label), value: formatSignal(signal), note, tone };
   });
 
   const trendLabel = selected.trendDirection === 'INCREASING' ? 'WORSENING' : selected.trendDirection === 'DECREASING' ? 'IMPROVING' : 'STABLE';
   const trendTone: PrognosisTone = selected.trendDirection === 'INCREASING' ? 'attention' : selected.trendDirection === 'DECREASING' ? 'healthy' : 'neutral';
 
+  const { name: componentName, area: componentArea } = componentNameOf(selected.location);
   const component = selected.location[0] ?? selected.faultName;
   const shutdownRequired = selected.condition === 'danger' ? true : condition === 'danger' ? true : condition === 'healthy' || condition === 'attention' ? false : null;
 
@@ -555,14 +613,12 @@ export function buildPrognosisViewModel({
       'A persistent long-term trend is developing on this measurement. The machine remains within its configured limits today.',
     machineCondition: condition,
     runStateNote: runState ?? 'Operating state not recorded',
-    affectedComponent: component.toLocaleUpperCase(),
-    // One qualifier, not the whole location path — the eyebrow is a label, and
-    // a three-segment path in tracked capitals reads as a second headline.
-    machineArea: selected.location.slice(1, 2).join(' · '),
+    affectedComponent: componentName,
+    machineArea: componentArea,
     statusLabel: selected.degradationDetected ? 'DEGRADING' : selected.predictionStatus.replace(/_/g, ' '),
     statusNote: selected.degradationDetected ? 'Persistent long-term trend' : 'Under monitoring',
     degradationScore: score === null ? null : round(score, 0),
-    degradationNote: score === null ? 'Not derivable from the configured limits' : 'Share of baseline-to-danger span used',
+    degradationNote: degradationBand(score),
     trendLabel,
     trendNote:
       selected.accelerationDetected

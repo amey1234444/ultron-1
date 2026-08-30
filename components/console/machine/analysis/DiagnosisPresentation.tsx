@@ -185,11 +185,15 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
   return (
     <View
       className="overflow-hidden border"
-      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
     >
       {/* The negative margins hide the last column's and last row's hairline
           against the container's own border, so the grid reads as a ruled frame
-          rather than as a comb with a loose tooth on each edge. */}
+          rather than as a comb with a loose tooth on each edge.
+          The rules are `lineStrong`, not `line`: at 7.5% white on a raised
+          panel the divider between two cells is below the threshold of being
+          seen at all, which leaves eight readings running together as one block
+          of text. A rule you cannot see is not a subtle rule, it is no rule. */}
       <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
         {facts.map((fact) => (
           <Hoverable
@@ -201,7 +205,7 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
               flexBasis: fact.wide ? 300 : 178,
               borderRightWidth: 1,
               borderBottomWidth: 1,
-              borderColor: palette.line,
+              borderColor: palette.lineStrong,
               backgroundColor: hovered ? palette.hoverSurface : undefined,
             })}
           >
@@ -412,6 +416,11 @@ export function EvidenceShell({
   const palette = consolePalette(isDark);
   const accent = variantAccent(palette, variant);
 
+  // Chrome deliberately kept to lines. A hairline box with one 3px accent rule
+  // down its leading edge is enough to say "this is a column, and this is which
+  // kind" — the full-width coloured top bar and the bordered icon well this
+  // replaces turned a light frame into a heavy filled panel, and three of them
+  // in a row read as three black boxes rather than as one ruled split.
   return (
     <Hoverable
       className="overflow-hidden border"
@@ -419,27 +428,15 @@ export function EvidenceShell({
         flexBasis: basis,
         flexGrow: 1,
         minWidth,
-        borderColor: hovered ? alpha(accent, 0.55) : palette.line,
+        borderColor: hovered ? palette.hoverBorder : palette.line,
+        borderLeftWidth: 3,
+        borderLeftColor: alpha(accent, hovered ? 0.85 : 0.55),
         backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
         borderRadius: radius.md,
       })}
     >
-      <View style={{ height: 2, backgroundColor: alpha(accent, 0.6) }} />
-
-      <View className="flex-row items-start gap-2.5 px-4 pb-3 pt-3.5">
-        <View
-          className="items-center justify-center"
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: radius.sm,
-            backgroundColor: alpha(accent, 0.12),
-            borderWidth: 1,
-            borderColor: alpha(accent, 0.26),
-          }}
-        >
-          <MaterialCommunityIcons name={icon} size={14} color={accent} />
-        </View>
+      <View className="flex-row items-start gap-2 px-4 pb-2.5 pt-3">
+        <MaterialCommunityIcons name={icon} size={13} color={accent} style={{ marginTop: 3 }} />
         <View className="min-w-0 flex-1 gap-0.5">
           <Text className={text.title} style={{ color: palette.ink }}>
             {title}
@@ -451,15 +448,15 @@ export function EvidenceShell({
           ) : null}
         </View>
         {count === undefined ? null : (
-          <View className="px-2 py-[3px]" style={{ backgroundColor: alpha(accent, 0.12), borderRadius: radius.sm }}>
-            <Text className={text.data} style={[tabular, { color: accent }]}>
+          <View className="px-1.5 py-[1px]" style={{ backgroundColor: alpha(accent, 0.12), borderRadius: radius.sm }}>
+            <Text className={text.code} style={[tabular, { color: accent }]}>
               {count}
             </Text>
           </View>
         )}
       </View>
 
-      <View className="px-4 pb-3.5" style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle }}>
+      <View className="px-4 pb-3" style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle }}>
         {children}
       </View>
     </Hoverable>
@@ -597,7 +594,7 @@ export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem
     >
       <View
         className="flex-row items-center gap-3 px-3.5 py-2.5"
-        style={{ borderBottomWidth: 1, borderBottomColor: palette.line, backgroundColor: palette.panel }}
+        style={{ borderBottomWidth: 1, borderBottomColor: palette.lineStrong, backgroundColor: palette.panel }}
       >
         <Text className={text.label} style={[SENSOR_COL_MEASUREMENT, { color: palette.inkFaint }]} numberOfLines={1}>
           MEASUREMENT
@@ -621,7 +618,7 @@ export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem
             className="flex-row items-center gap-3 px-3.5 py-2.5"
             style={({ hovered }) => ({
               borderTopWidth: index === 0 ? 0 : 1,
-              borderTopColor: palette.lineSubtle,
+              borderTopColor: palette.line,
               backgroundColor: hovered ? palette.hoverSurface : undefined,
             })}
           >

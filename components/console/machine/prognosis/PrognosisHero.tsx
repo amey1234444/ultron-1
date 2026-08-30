@@ -107,10 +107,14 @@ export function PrognosisSummaryGrid({ facts }: { facts: SummaryFact[] }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
 
+  // Ruled with `lineStrong` rather than `line`. Eight readings sitting in one
+  // frame need a visible edge between them or they read as one paragraph of
+  // labels and numbers — and the reader has to use the label positions to
+  // re-derive where each cell starts, which is exactly the work a rule saves.
   return (
     <View
       className="overflow-hidden border"
-      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
     >
       <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
         {facts.map((fact) => (
@@ -123,7 +127,7 @@ export function PrognosisSummaryGrid({ facts }: { facts: SummaryFact[] }) {
               minWidth: 138,
               borderRightWidth: 1,
               borderBottomWidth: 1,
-              borderColor: palette.line,
+              borderColor: palette.lineStrong,
               backgroundColor: hovered ? palette.hoverSurface : undefined,
             })}
           >

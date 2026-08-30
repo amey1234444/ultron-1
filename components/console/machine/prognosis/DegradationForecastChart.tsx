@@ -39,7 +39,7 @@ const PLOT_SANS = Platform.select({ web: 'Inter, system-ui, sans-serif', default
 const PLOT_SANS_BOLD = Platform.select({ web: 'Inter, system-ui, sans-serif', default: 'Inter_600SemiBold' });
 const PLOT_MONO = Platform.select({ web: '"JetBrains Mono", ui-monospace, monospace', default: 'IBMPlexMono_400Regular' });
 
-const AXIS_LEFT = 54;
+const AXIS_LEFT = 66;
 const AXIS_RIGHT = 22;
 const AXIS_TOP = 26;
 const AXIS_BOTTOM = 40;
@@ -195,6 +195,22 @@ export function DegradationForecastChart({ metric }: { metric: PrognosisMetric }
             </SvgText>
           ))}
 
+          {/* The y axis says what it is measuring, once, on its side — a chart
+              whose vertical axis is only a column of bare numbers makes the
+              reader carry the unit in their head from the panel heading. */}
+          <SvgText
+            x={12}
+            y={AXIS_TOP + plotH / 2}
+            fill={palette.chartAxisText}
+            fontSize={8.5}
+            fontFamily={PLOT_SANS}
+            letterSpacing={1.2}
+            textAnchor="middle"
+            transform={`rotate(-90 12 ${(AXIS_TOP + plotH / 2).toFixed(1)})`}
+          >
+            {metric.axisLabel}
+          </SvgText>
+
           <SvgText x={AXIS_LEFT} y={13} fill={palette.chartAxisText} fontSize={8.5} fontFamily={PLOT_SANS} letterSpacing={1.3}>
             MEASURED HISTORY
           </SvgText>
@@ -217,10 +233,37 @@ export function DegradationForecastChart({ metric }: { metric: PrognosisMetric }
         <View style={{ height: h }} />
       )}
 
-      <View className="flex-row items-center justify-center gap-4 px-3 pb-2 pt-1">
-        <Text className={cn(text.micro)} style={{ color: palette.inkFaint }}>
-          {metric.axisLabel}
-        </Text>
+      {/* The key, as real text under the drawing rather than as SVG glyphs.
+          Solid vs dashed is the one distinction a reader must not have to
+          guess at, so it is stated in words as well as drawn. */}
+      <View
+        className="flex-row flex-wrap items-center justify-center gap-x-5 gap-y-1 px-3 py-2"
+        style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+      >
+        <View className="flex-row items-center gap-1.5">
+          <Svg width={16} height={8}>
+            <Line x1={0} y1={4} x2={16} y2={4} stroke={palette.forecast} strokeWidth={2} strokeLinecap="round" />
+          </Svg>
+          <Text className={cn(text.micro)} style={{ color: palette.inkMuted }}>
+            Solid = measured
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-1.5">
+          <Svg width={16} height={8}>
+            <Line x1={0} y1={4} x2={16} y2={4} stroke={palette.forecast} strokeWidth={2} strokeDasharray="4 3" strokeLinecap="round" />
+          </Svg>
+          <Text className={cn(text.micro)} style={{ color: palette.inkMuted }}>
+            Dashed = projected
+          </Text>
+        </View>
+        <View className="flex-row items-center gap-1.5">
+          <Svg width={8} height={10}>
+            <Line x1={4} y1={0} x2={4} y2={10} stroke={palette.chartCrosshair} strokeWidth={1.4} strokeDasharray="3 3" />
+          </Svg>
+          <Text className={cn(text.micro)} style={{ color: palette.inkMuted }}>
+            Vertical line = today
+          </Text>
+        </View>
       </View>
     </View>
   );

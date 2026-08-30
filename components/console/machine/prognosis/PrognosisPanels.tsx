@@ -87,7 +87,7 @@ function TrendSummary({ metric }: { metric: PrognosisMetric }) {
 
   const cells = [
     {
-      label: 'CURRENT',
+      label: 'CURRENT VALUE',
       value: metric.current === null ? '—' : `${metric.current.toFixed(metric.decimals)}${unit}`,
       note: 'Latest measured reading',
       colour: palette.accent,
@@ -113,8 +113,12 @@ function TrendSummary({ metric }: { metric: PrognosisMetric }) {
   ];
 
   return (
-    <View className="flex-row flex-wrap" style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: palette.lineSubtle }}>
-      {cells.map((cell, index) => (
+    <View
+      className="overflow-hidden border"
+      style={{ borderColor: palette.lineStrong, borderRadius: radius.sm }}
+    >
+      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
+      {cells.map((cell) => (
         <Hoverable
           key={cell.label}
           className="gap-1 px-3 py-2.5"
@@ -122,8 +126,9 @@ function TrendSummary({ metric }: { metric: PrognosisMetric }) {
             flexGrow: 1,
             flexBasis: 150,
             minWidth: 130,
-            borderLeftWidth: index === 0 ? 0 : 1,
-            borderLeftColor: palette.lineSubtle,
+            borderRightWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: palette.lineStrong,
             backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
@@ -138,6 +143,7 @@ function TrendSummary({ metric }: { metric: PrognosisMetric }) {
           </Text>
         </Hoverable>
       ))}
+      </View>
     </View>
   );
 }
@@ -231,17 +237,26 @@ export function SupportingEvidenceStrip({ items }: { items: EvidenceMetric[] }) 
       <Text className={text.label} style={{ color: palette.inkFaint }}>
         CURRENT SUPPORTING EVIDENCE
       </Text>
-      <View className="flex-row flex-wrap">
-        {items.map((item, index) => (
+      {/* A ruled grid rather than left-edges only: these wrap onto a second row
+          on anything narrower than a wide desktop, and a left-border rule leaves
+          the wrapped row floating with no edge above it. Right + bottom on every
+          cell, clipped by the container, rules correctly at any wrap point. */}
+      <View
+        className="overflow-hidden border"
+        style={{ borderColor: palette.lineStrong, borderRadius: radius.sm }}
+      >
+        <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
+          {items.map((item) => (
           <Hoverable
             key={item.id}
-            className="gap-1 px-3 py-1"
+            className="gap-1 px-3 py-2.5"
             style={({ hovered }) => ({
               flexGrow: 1,
               flexBasis: 178,
               minWidth: 150,
-              borderLeftWidth: index === 0 ? 0 : 1,
-              borderLeftColor: palette.lineSubtle,
+              borderRightWidth: 1,
+              borderBottomWidth: 1,
+              borderColor: palette.lineStrong,
               backgroundColor: hovered ? palette.hoverSurface : undefined,
             })}
           >
@@ -255,7 +270,8 @@ export function SupportingEvidenceStrip({ items }: { items: EvidenceMetric[] }) 
               {item.note}
             </Text>
           </Hoverable>
-        ))}
+          ))}
+        </View>
       </View>
     </Panel>
   );
@@ -305,18 +321,45 @@ export function EvidenceCorrelationPanel({ model }: { model: PrognosisViewModel 
   );
 }
 
-/** The forecast rail: today, alert, danger, in order and to scale. */
+/**
+ * The forecast rail: today, the inspection window, alert, danger — in order and
+ * to scale.
+ *
+ * The inspect stop is the one actionable date on it. Alert and danger are what
+ * the machine will do; inspect is what a person should do, and it has to sit
+ * visibly BEFORE the alert crossing or the rail is just a countdown to a
+ * problem with no intervention on it.
+ */
 function ForecastRail({ alertDays, dangerDays }: { alertDays: number | null; dangerDays: number | null }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const span = Math.max(dangerDays ?? alertDays ?? 1, 1);
-  const alertAt = alertDays === null ? null : Math.min(96, (alertDays / span) * 100);
-  const dangerAt = dangerDays === null ? null : Math.min(100, (dangerDays / span) * 100);
+  const inspectDays = alertDays === null ? null : Math.max(1, Math.round(alertDays * 0.45));
+  const at = (days: number | null) => (days === null ? null : Math.min(99, Math.max(0, (days / span) * 100)));
+  const inspectAt = at(inspectDays);
+  const alertAt = at(alertDays);
+  const dangerAt = at(dangerDays);
+
+  const dot = (left: number, colour: string, key: string) => (
+    <View
+      key={key}
+      style={{ position: 'absolute', left: `${left}%`, top: -2.5, width: 8, height: 8, borderRadius: 4, backgroundColor: colour }}
+    />
+  );
+
+  const stops = [
+    { label: 'TODAY', when: '0', colour: palette.accent },
+    { label: 'INSPECT', when: inspectDays === null ? '—' : `+${inspectDays}d`, colour: palette.accent },
+    { label: 'ALERT', when: alertDays === null ? '—' : `+${Math.round(alertDays)}d`, colour: palette.forecast },
+    { label: 'DANGER', when: dangerDays === null ? '—' : `+${Math.round(dangerDays)}d`, colour: palette.critical },
+  ];
 
   return (
     <View className="gap-2 pt-1">
       <View style={{ height: 3, borderRadius: 2, backgroundColor: palette.track }}>
-        <View style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${alertAt ?? 0}%`, backgroundColor: alpha(palette.accent, 0.5), borderRadius: 2 }} />
+        <View
+          style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${alertAt ?? 0}%`, backgroundColor: alpha(palette.accent, 0.5), borderRadius: 2 }}
+        />
         {alertAt !== null && dangerAt !== null ? (
           <View
             style={{
@@ -330,24 +373,22 @@ function ForecastRail({ alertDays, dangerDays }: { alertDays: number | null; dan
             }}
           />
         ) : null}
-        <View style={{ position: 'absolute', left: 0, top: -2.5, width: 8, height: 8, borderRadius: 4, backgroundColor: palette.accent }} />
-        {alertAt !== null ? (
-          <View style={{ position: 'absolute', left: `${alertAt}%`, top: -2.5, width: 8, height: 8, borderRadius: 4, backgroundColor: palette.forecast }} />
-        ) : null}
-        {dangerAt !== null ? (
-          <View style={{ position: 'absolute', left: `${Math.min(dangerAt, 99)}%`, top: -2.5, width: 8, height: 8, borderRadius: 4, backgroundColor: palette.critical }} />
-        ) : null}
+        {dot(0, palette.accent, 'today')}
+        {inspectAt === null ? null : dot(inspectAt, palette.accent, 'inspect')}
+        {alertAt === null ? null : dot(alertAt, palette.forecast, 'alert')}
+        {dangerAt === null ? null : dot(dangerAt, palette.critical, 'danger')}
       </View>
       <View className="flex-row justify-between">
-        <Text className={text.label} style={{ color: palette.accent }}>
-          TODAY
-        </Text>
-        <Text className={text.label} style={{ color: palette.forecast }}>
-          {alertDays === null ? 'ALERT —' : `+${Math.round(alertDays)}D ALERT`}
-        </Text>
-        <Text className={text.label} style={{ color: palette.critical }}>
-          {dangerDays === null ? 'DANGER —' : `+${Math.round(dangerDays)}D DANGER`}
-        </Text>
+        {stops.map((stop) => (
+          <View key={stop.label} className="gap-0.5">
+            <Text className={text.label} style={{ color: stop.colour }}>
+              {stop.label}
+            </Text>
+            <Text className={text.micro} style={{ color: palette.inkFaint }}>
+              {stop.when}
+            </Text>
+          </View>
+        ))}
       </View>
     </View>
   );
