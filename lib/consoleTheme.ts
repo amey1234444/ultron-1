@@ -52,6 +52,18 @@ export type ConsolePalette = {
   hoverSurface: string;
   /** The edge of a hovered tile, paired with `hoverSurface`. */
   hoverBorder: string;
+  /**
+   * The prognosis layer's amber.
+   *
+   * `warning` is the alarm amber — it means "a limit is being approached now".
+   * A forecast is not an alarm, and the prognosis page is built almost entirely
+   * out of it: the trend line, the projection, the degradation ring and the
+   * alert threshold are all this one colour, against graphite and white. Its
+   * own token because it needs to carry a whole screen at a slightly brighter
+   * value than an alarm badge does, and because tinting the alarm colour up
+   * would drag every alarm on every other screen with it.
+   */
+  forecast: string;
   /** Selected row, tile or menu option. */
   selected: string;
   /** Hairline border. */
@@ -182,6 +194,7 @@ const DARK: ConsolePalette = {
   hover: '#1A1D23',
   hoverSurface: '#262B36',
   hoverBorder: 'rgba(255,255,255,0.24)',
+  forecast: '#E9A11B',
   selected: '#1E222A',
   line: 'rgba(255,255,255,0.075)',
   lineSubtle: 'rgba(255,255,255,0.045)',
@@ -259,6 +272,7 @@ const LIGHT: ConsolePalette = {
   hover: '#F3F5F7',
   hoverSurface: '#E7ECF3',
   hoverBorder: 'rgba(0,0,0,0.20)',
+  forecast: '#A9660A',
   selected: '#EDF1F5',
   line: '#E1E5EA',
   lineSubtle: '#ECEFF2',
