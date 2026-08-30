@@ -217,12 +217,14 @@ function MachineDoctorGrid({ problem }: { problem: DiagnosisProblem }) {
         {cards.map((card) => (
           <Hoverable
             key={card.label}
-            className="gap-4 border px-4 py-4"
+            className="gap-3 border px-4 py-3.5"
             style={({ hovered }) => ({
               flexBasis: 300,
               flexGrow: 1,
               minWidth: 260,
-              borderColor: hovered ? alpha(palette.accent, 0.4) : palette.line,
+              borderColor: hovered ? palette.hoverBorder : palette.line,
+              borderLeftWidth: 3,
+              borderLeftColor: alpha(palette.accent, hovered ? 0.85 : 0.55),
               backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
               borderRadius: radius.md,
             })}
@@ -249,18 +251,32 @@ function MetadataStrip({ problem, dataQuality }: { problem: DiagnosisProblem; da
     ['DATA QUALITY', dataQuality],
   ];
 
+  // Ruled, like every other strip in the analysis layer. Without an edge
+  // between them these five facts run together into one line of text.
   return (
-    <View className="flex-row flex-wrap border" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
+    <View
+      className="overflow-hidden border"
+      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+    >
+      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
       {entries.map(([label, value]) => (
         <Hoverable
           key={label}
           className="gap-1 px-3 py-2.5"
-          style={({ hovered }) => ({ minWidth: 150, flexGrow: 1, backgroundColor: hovered ? palette.hoverSurface : undefined })}
+          style={({ hovered }) => ({
+            minWidth: 150,
+            flexGrow: 1,
+            borderRightWidth: 1,
+            borderBottomWidth: 1,
+            borderColor: palette.lineStrong,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
+          })}
         >
           <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
           <Text className={cn('font-mono text-[11.5px] font-bold', inkClass)}>{value}</Text>
         </Hoverable>
       ))}
+      </View>
     </View>
   );
 }
@@ -277,7 +293,7 @@ function DifferentialRow({ differential, index }: { differential: DiagnosisDiffe
       style={({ hovered }) => ({
         marginHorizontal: -8,
         borderRadius: radius.sm,
-        borderColor: palette.lineSubtle,
+        borderColor: palette.line,
         backgroundColor: hovered ? palette.hoverSurface : undefined,
       })}
     >
@@ -698,7 +714,7 @@ export function MachineDiagnosisPage({
   };
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 16, gap: 12 }}>
       <MachineHeader
         machineName={machineName}
         template={template}
@@ -851,17 +867,28 @@ export function MachineDiagnosisPage({
 
                   <View className="gap-3">
                     <SectionHeading eyebrow="CURRENT CONSEQUENCE MAP" title="Impact assessment" />
-                    <View className="flex-row flex-wrap border-y" style={{ borderColor: palette.line }}>
+                    <View
+                      className="overflow-hidden border"
+                      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+                    >
+                      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
                       {selected.impacts.map((impact) => (
                         <Hoverable
                           key={impact.label}
-                          className="gap-2 px-3 py-4"
-                          style={({ hovered }) => ({ ...IMPACT, backgroundColor: hovered ? palette.hoverSurface : undefined })}
+                          className="gap-2 px-3 py-3"
+                          style={({ hovered }) => ({
+                            ...IMPACT,
+                            borderRightWidth: 1,
+                            borderBottomWidth: 1,
+                            borderColor: palette.lineStrong,
+                            backgroundColor: hovered ? palette.hoverSurface : undefined,
+                          })}
                         >
                           <Text className="font-mono text-[9.5px] font-bold tracking-wider text-accent">{impact.label}</Text>
                           <Text className={cn('font-body text-[11.5px] leading-4', mutedClass)}>{impact.value}</Text>
                         </Hoverable>
                       ))}
+                      </View>
                     </View>
                   </View>
 

@@ -339,10 +339,25 @@ function toneForSignalState(state: AnalysisSignal['state']): PrognosisTone {
 function signalNote(signal: AnalysisSignal): { note: string; tone: PrognosisTone } {
   const stateTone = toneForSignalState(signal.state);
 
+  // Headroom first, because it is the line that actually varies.
+  //
+  // The delta-vs-baseline reading below came out as "Stable at baseline" on
+  // every single card — on this data `reference.target` tracks the live value,
+  // so the delta is ~0 everywhere and six readings all captioned identically
+  // tell the reader nothing about which one to look at. How close each reading
+  // sits to its own limit does vary, and it is the thing a maintenance reader
+  // is actually scanning for.
+  const ceiling = signal.limit ?? (signal.range.max > 0 ? signal.range.max : null);
+  if (ceiling !== null && ceiling > 1e-6) {
+    const used = Math.round((signal.value / ceiling) * 100);
+    const tone: PrognosisTone = stateTone !== 'healthy' ? stateTone : used >= 80 ? 'attention' : used >= 60 ? 'neutral' : 'healthy';
+    return { note: `${clamp(used, 0, 999)}% of limit`, tone };
+  }
+
   if (signal.reference && Math.abs(signal.reference.target) > 1e-6) {
     const deltaPercent = ((signal.value - signal.reference.target) / Math.abs(signal.reference.target)) * 100;
     const rounded = Math.round(deltaPercent);
-    if (Math.abs(rounded) < 2) return { note: 'Stable at baseline', tone: 'healthy' };
+    if (Math.abs(rounded) < 2) return { note: 'At reference', tone: 'healthy' };
     const tone: PrognosisTone = stateTone !== 'healthy' ? stateTone : Math.abs(rounded) >= 15 ? 'attention' : 'neutral';
     return { note: `${rounded > 0 ? '+' : ''}${rounded}% vs baseline`, tone };
   }
@@ -588,6 +603,111 @@ export function buildPrognosisViewModel({
     });
     const pushed = metrics[metrics.length - 1];
     pushed.scaleMax = Math.max(pushed.scaleMax, seriesCeiling(forecast, history, predictionDanger));
+  }
+
+  // --- derived channels ----------------------------------------------------
+  //
+  // The engine fits a forecast model to ONE measurement. The other monitored
+  // channels have real readings, real commissioned baselines and real limits,
+  // but no model of their own — so their trends are projected by borrowing the
+  // driving measurement's shape and hanging it between each channel's own two
+  // real endpoints (its baseline and today's reading).
+  //
+  // That is a derived series, and it is marked `derived` so the panel says so
+  // under the title. What is NOT derived: every endpoint, both limits, and the
+  // crossing days on the driving channel. A channel sitting at its baseline
+  // draws flat, because it is flat — the borrowed shape scales by that
+  // channel's own measured rise, so a stable reading cannot be made to look
+  // like a developing one.
+  const driverMetric = metrics[0] ?? null;
+  if (driverMetric && driverMetric.history.length > 1) {
+    const windowStartValue = driverMetric.history[0].value;
+    const todayValue = driverMetric.current ?? windowStartValue;
+    const denominator = Math.abs(todayValue - windowStartValue) < 1e-9 ? 1 : todayValue - windowStartValue;
+    /** 0 at the start of the measured window, 1 today, >1 into the forecast. */
+    const progressOf = (value: number) => (value - windowStartValue) / denominator;
+    const shapeHistory = driverMetric.history.map((point) => ({ day: point.day, r: progressOf(point.value) }));
+    const shapeForecast = driverMetric.forecast.map((point) => ({ day: point.day, r: progressOf(point.value) }));
+
+    const firstCrossing = (series: TrendPoint[], threshold: number | null): number | null => {
+      if (threshold === null) return null;
+      const hit = series.find((point) => point.value >= threshold);
+      return hit ? hit.day : null;
+    };
+
+    // OVERALL: the engine's degradation score, carried along the same shape.
+    // Its limits are the score the machine will be at when the driving
+    // measurement reaches ALERT and DANGER, so the crossings on this axis are
+    // the engine's own dates rather than a second opinion.
+    if (score !== null && score > 0) {
+      const scoreAt = (r: number) => clamp(score * r, 0, 400);
+      const overallHistory = shapeHistory.map((point) => ({ day: point.day, value: scoreAt(point.r) }));
+      const overallForecast = shapeForecast.map((point) => ({ day: point.day, value: scoreAt(point.r) }));
+      const rAt = (day: number | null) =>
+        day === null ? null : (shapeForecast.find((point) => point.day >= day) ?? shapeForecast[shapeForecast.length - 1])?.r ?? null;
+      const alertScore = rAt(alertDay);
+      const dangerScore = rAt(dangerDay);
+
+      metrics.unshift({
+        id: 'overall',
+        label: 'OVERALL',
+        title: `Overall ${componentNameOf(selected.location).name.toLocaleLowerCase()} degradation`,
+        unit: '%',
+        axisLabel: `OVERALL ${componentNameOf(selected.location).name} DEGRADATION — %`,
+        decimals: 0,
+        current: round(score, 0),
+        alertThreshold: alertScore === null ? null : round(scoreAt(alertScore), 0),
+        dangerThreshold: dangerScore === null ? null : round(scoreAt(dangerScore), 0),
+        scaleMin: 0,
+        scaleMax: seriesCeiling(overallForecast, overallHistory, dangerScore === null ? 100 : scoreAt(dangerScore)),
+        history: overallHistory,
+        forecast: overallForecast,
+        alertCrossingDay: alertDay,
+        dangerCrossingDay: dangerDay,
+        historyDays: driverMetric.historyDays,
+        forecastDays: driverMetric.forecastDays,
+        derived: true,
+      });
+    }
+
+    const driverInput = (selected.availableInputs[0] ?? '').toLocaleLowerCase();
+    const channelSignals = signals
+      .filter((signal) => signal.limit !== undefined && !signal.label.toLocaleLowerCase().includes(driverInput))
+      .slice(0, 5);
+
+    for (const signal of channelSignals) {
+      const dangerLimit = signal.limit;
+      if (dangerLimit === undefined) continue;
+      const channelBaseline = signal.reference?.target ?? signal.value;
+      const channelAlert = signal.reference ? channelBaseline + signal.reference.tolerance : dangerLimit * 0.7;
+      const channelSpan = signal.value - channelBaseline;
+
+      const channelHistory = shapeHistory.map((point) => ({ day: point.day, value: channelBaseline + channelSpan * point.r }));
+      const channelForecast = shapeForecast.map((point) => ({ day: point.day, value: channelBaseline + channelSpan * point.r }));
+      const floorValue = Math.min(channelBaseline, ...channelHistory.map((point) => point.value));
+      const headroom = Math.max(dangerLimit - floorValue, 1e-6);
+
+      metrics.push({
+        id: `signal-${signal.code}`,
+        label: selectorLabel(measurementName(signal.label)),
+        title: measurementName(signal.label).toLocaleLowerCase().replace(/^./, (c) => c.toLocaleUpperCase()),
+        unit: signal.unit,
+        axisLabel: `${measurementName(signal.label)}${signal.unit ? ` — ${signal.unit}` : ''}`,
+        decimals: signal.decimals,
+        current: round(signal.value, signal.decimals),
+        alertThreshold: round(channelAlert, signal.decimals),
+        dangerThreshold: round(dangerLimit, signal.decimals),
+        scaleMin: Math.max(0, floorValue - headroom * 0.1),
+        scaleMax: dangerLimit + headroom * 0.16,
+        history: channelHistory,
+        forecast: channelForecast,
+        alertCrossingDay: firstCrossing(channelForecast, channelAlert),
+        dangerCrossingDay: firstCrossing(channelForecast, dangerLimit),
+        historyDays: driverMetric.historyDays,
+        forecastDays: driverMetric.forecastDays,
+        derived: true,
+      });
+    }
   }
 
   const scoped = signals.filter((signal) => signalMatchesLocation(signal, selected.location));

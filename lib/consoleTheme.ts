@@ -198,7 +198,10 @@ const DARK: ConsolePalette = {
   selected: '#1E222A',
   line: 'rgba(255,255,255,0.075)',
   lineSubtle: 'rgba(255,255,255,0.045)',
-  lineStrong: 'rgba(255,255,255,0.15)',
+  // The visible-rule token. At 0.15 a 1px divider between two cells of a strip
+  // was below the threshold of being seen, so eight readings ran together as
+  // one line of text. This is the token whose entire job is to be seen.
+  lineStrong: 'rgba(255,255,255,0.22)',
 
   ink: '#F7F6F2',
   inkStrong: '#FFFFFF',
@@ -276,7 +279,7 @@ const LIGHT: ConsolePalette = {
   selected: '#EDF1F5',
   line: '#E1E5EA',
   lineSubtle: '#ECEFF2',
-  lineStrong: '#CCD2DA',
+  lineStrong: '#BFC7D2',
 
   ink: '#171A1F',
   inkStrong: '#101318',

@@ -257,33 +257,47 @@ export function StateTagGrid({
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
 
+  // One ruled box, not a scatter of tinted tiles.
+  //
+  // Every tag in these grids is HEALTHY, so twenty individually-tinted, gapped
+  // pills spend twenty green boxes saying one thing — the colour carries no
+  // information when nothing differs, and the gaps stop the labels lining up
+  // into columns a reader can run an eye down. Ruled cells inside a single
+  // frame line up, and the state word sits at the same x on every row, so the
+  // exception is what catches the eye rather than the fill.
   return (
-    <View className="flex-row flex-wrap gap-2">
-      {items.map((item) => {
-        const colour = conditionColour(item.condition, isDark);
-        return (
-          <Hoverable
-            key={item.label}
-            className="flex-row items-center gap-2.5 border px-3 py-2.5"
-            style={({ hovered }) => ({
-              minWidth,
-              flexGrow: 1,
-              flexBasis: minWidth,
-              borderColor: alpha(colour, hovered ? 0.5 : 0.26),
-              backgroundColor: alpha(colour, hovered ? (isDark ? 0.16 : 0.1) : isDark ? 0.08 : 0.05),
-              borderRadius: radius.md,
-            })}
-          >
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colour }} />
-            <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: palette.ink }}>
-              {item.label}
-            </Text>
-            <Text className={text.chip} style={{ color: colour }}>
-              {CONDITION_LABEL[item.condition]}
-            </Text>
-          </Hoverable>
-        );
-      })}
+    <View
+      className="overflow-hidden border"
+      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+    >
+      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
+        {items.map((item) => {
+          const colour = conditionColour(item.condition, isDark);
+          return (
+            <Hoverable
+              key={item.label}
+              className="flex-row items-center gap-2.5 px-3 py-2.5"
+              style={({ hovered }) => ({
+                minWidth,
+                flexGrow: 1,
+                flexBasis: minWidth,
+                borderRightWidth: 1,
+                borderBottomWidth: 1,
+                borderColor: palette.lineStrong,
+                backgroundColor: hovered ? palette.hoverSurface : undefined,
+              })}
+            >
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colour }} />
+              <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: palette.ink }}>
+                {item.label}
+              </Text>
+              <Text className={text.chip} style={{ color: colour }}>
+                {CONDITION_LABEL[item.condition]}
+              </Text>
+            </Hoverable>
+          );
+        })}
+      </View>
     </View>
   );
 }
@@ -456,7 +470,7 @@ export function EvidenceShell({
         )}
       </View>
 
-      <View className="px-4 pb-3" style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle }}>
+      <View className="px-4 pb-3" style={{ borderTopWidth: 1, borderTopColor: palette.line }}>
         {children}
       </View>
     </Hoverable>
