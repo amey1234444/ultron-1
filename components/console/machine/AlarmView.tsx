@@ -91,7 +91,7 @@ function AlarmRow({
       <View className="flex-row items-center gap-2.5">
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colour }} />
         <View className={cn('rounded-full border px-1.5 py-0.5', lineClass)}>
-          <Text className={cn('font-mono text-[10px]', mutedClass)}>{channel.code}</Text>
+          <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{channel.code}</Text>
         </View>
         <Text numberOfLines={1} className={cn('font-body text-xs', isDark ? 'text-ink' : 'text-ink-inverse')}>
           {label}
@@ -101,17 +101,17 @@ function AlarmRow({
         <Text style={{ color: colour }} className="font-mono text-xs font-bold">
           {hasReading ? `${value.toFixed(2)} ${channel.unit}` : NO_VALUE_TEXT}
         </Text>
-        <Text style={{ color: colour }} className="font-body-bold text-[11px] uppercase tracking-wider">
+        <Text style={{ color: colour }} className="font-body-bold text-[12.5px] uppercase tracking-wider">
           {statusLabel}
         </Text>
         {status === 'active-unacked' && (
           <Pressable onPress={onAcknowledge} className="rounded-full border border-accent/35 bg-accent/10 px-2.5 py-1">
-            <Text className="font-body-bold text-[10px] text-accent">Acknowledge</Text>
+            <Text className="font-body-bold text-[11.5px] text-accent">Acknowledge</Text>
           </Pressable>
         )}
         {status === 'return-unacked' && (
           <Pressable onPress={onClear} className={cn('rounded-full border px-2.5 py-1', lineClass)}>
-            <Text className={cn('font-body-bold text-[10px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Clear</Text>
+            <Text className={cn('font-body-bold text-[11.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>Clear</Text>
           </Pressable>
         )}
       </View>
@@ -188,7 +188,7 @@ export function AlarmView({ mappedChannels, devices, machineId, expectedPoints }
   return (
     <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 16 }}>
       {expectedPoints > 0 && (
-        <Text className={cn('font-body text-[11px]', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px]', mutedClass)}>
           {mappedChannels.length} of {expectedPoints} expected points mapped
         </Text>
       )}

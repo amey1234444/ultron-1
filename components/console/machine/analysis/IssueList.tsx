@@ -22,7 +22,7 @@ function ConditionBadge({ condition }: { condition: Issue['condition'] }) {
   const colour = conditionHexes(isDark)[condition];
   return (
     <View className="rounded border px-1.5 py-[1px]" style={{ borderColor: `${colour}66`, backgroundColor: `${colour}14` }}>
-      <Text style={{ color: colour }} className="font-mono text-[9px] font-bold tracking-wider">
+      <Text style={{ color: colour }} className="font-mono text-[10.5px] font-bold tracking-wider">
         {CONDITION_LABEL[condition]}
       </Text>
     </View>
@@ -35,8 +35,8 @@ function Field({ label, value, tint }: { label: string; value: string; tint?: st
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   return (
     <View className="flex-1 gap-0.5" style={{ minWidth: 84 }}>
-      <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
-      <Text numberOfLines={1} style={tint ? { color: tint } : undefined} className={cn('font-body text-[11px]', !tint && inkClass)}>
+      <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
+      <Text numberOfLines={1} style={tint ? { color: tint } : undefined} className={cn('font-body text-[12.5px]', !tint && inkClass)}>
         {value}
       </Text>
     </View>
@@ -73,10 +73,10 @@ function IssueCard({ issue, onOpenDiagnosis }: { issue: Issue; onOpenDiagnosis?:
       <View className="gap-3 px-3.5 py-3">
         <View className="flex-row items-start justify-between gap-2">
           <View className="flex-1 gap-0.5">
-            <Text numberOfLines={1} className={cn('font-body-bold text-[13px]', inkClass)}>
+            <Text numberOfLines={1} className={cn('font-body-bold text-[14.5px]', inkClass)}>
               {issue.title}
             </Text>
-            <Text numberOfLines={1} className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>
+            <Text numberOfLines={1} className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>
               {issue.componentLabel.toUpperCase()} · {CATEGORY_LABEL[issue.category].toUpperCase()}
             </Text>
           </View>
@@ -87,13 +87,13 @@ function IssueCard({ issue, onOpenDiagnosis }: { issue: Issue; onOpenDiagnosis?:
             never be skimmed as mechanical damage. */}
         {!aboutMachine ? (
           <View className="self-start rounded px-1.5 py-[1px]" style={{ backgroundColor: `${conditionHex.offline}26` }}>
-            <Text className={cn('font-mono text-[8px] font-bold tracking-wider', mutedClass)}>
+            <Text className={cn('font-mono text-[9.5px] font-bold tracking-wider', mutedClass)}>
               DATA QUALITY — NOT MACHINE DAMAGE
             </Text>
           </View>
         ) : null}
 
-        <Text className={cn('font-body text-[11px] leading-[16px]', mutedClass)}>{issue.description}</Text>
+        <Text className={cn('font-body text-[12.5px] leading-[18px]', mutedClass)}>{issue.description}</Text>
 
         <View className="flex-row flex-wrap gap-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: hairline }}>
           <Field label="STARTED" value={`${issueAgeLabel(issue)} ago`} />
@@ -108,7 +108,7 @@ function IssueCard({ issue, onOpenDiagnosis }: { issue: Issue; onOpenDiagnosis?:
         </View>
 
         <View className="flex-row items-center justify-between gap-2">
-          <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[11px]', inkClass)}>
+          <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[12.5px]', inkClass)}>
             {issue.action}
           </Text>
           {onOpenDiagnosis ? (
@@ -117,7 +117,7 @@ function IssueCard({ issue, onOpenDiagnosis }: { issue: Issue; onOpenDiagnosis?:
               accessibilityRole="button"
               accessibilityLabel={`Open diagnosis for ${issue.title}`}
             >
-              <Text className="font-body-medium text-[11px] text-accent">View diagnosis ›</Text>
+              <Text className="font-body-medium text-[12.5px] text-accent">View diagnosis ›</Text>
             </Pressable>
           ) : null}
         </View>
@@ -138,16 +138,16 @@ export function IssueList({ issues, onOpenDiagnosis }: { issues: Issue[]; onOpen
     <View className="gap-3">
       <View className="flex-row flex-wrap items-end justify-between gap-2">
         <View>
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Active issues</Text>
-          <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Active issues</Text>
+          <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>
             SORTED BY SEVERITY, THEN DETERIORATION, CONSEQUENCE, CONFIDENCE, AGE
           </Text>
         </View>
-        <Text className={cn('font-mono text-[10px]', mutedClass)}>{ordered.length} open</Text>
+        <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{ordered.length} open</Text>
       </View>
 
       {ordered.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>
           No open issues. Every monitored parameter is inside its limits.
         </Text>
       ) : (
@@ -175,14 +175,14 @@ export function CategoryBreakdown({ issues }: { issues: Issue[] }) {
   return (
     <View className="gap-3">
       <View>
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Issue categories</Text>
-        <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Issue categories</Text>
+        <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>
           MACHINE FAULTS AND SENSOR PROBLEMS COUNTED SEPARATELY
         </Text>
       </View>
 
       {summaries.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>Nothing open in any category.</Text>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>Nothing open in any category.</Text>
       ) : (
         <View className="flex-row flex-wrap gap-3">
           {summaries.map((summary) => {
@@ -202,20 +202,20 @@ export function CategoryBreakdown({ issues }: { issues: Issue[] }) {
                 }}
                 className="gap-1.5 rounded-xl border px-3.5 py-3"
               >
-                <Text numberOfLines={1} className={cn('font-body-medium text-[11px]', inkClass)}>
+                <Text numberOfLines={1} className={cn('font-body-medium text-[12.5px]', inkClass)}>
                   {CATEGORY_LABEL[summary.category]}
                 </Text>
 
                 <View className="flex-row items-baseline gap-2">
-                  <Text style={{ color: colour }} className="font-mono text-[22px] font-bold tabular-nums">
+                  <Text style={{ color: colour }} className="font-mono text-[24px] font-bold tabular-nums">
                     {summary.count}
                   </Text>
-                  <Text style={{ color: colour }} className="font-mono text-[9px] font-bold tracking-wider">
+                  <Text style={{ color: colour }} className="font-mono text-[10.5px] font-bold tracking-wider">
                     {CONDITION_LABEL[summary.worst]}
                   </Text>
                 </View>
 
-                <Text numberOfLines={2} className={cn('font-body text-[10px] leading-[14px]', mutedClass)}>
+                <Text numberOfLines={2} className={cn('font-body text-[11.5px] leading-[16px]', mutedClass)}>
                   {summary.where || CATEGORY_BLURB[summary.category]}
                 </Text>
               </View>

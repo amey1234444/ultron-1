@@ -43,22 +43,22 @@ export function SignalStrip({
       className={cn('flex-1 gap-2 rounded-xl border px-3.5 py-3', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
     >
       <View className="flex-row items-center justify-between gap-2">
-        <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[12px]', inkClass)}>
+        <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[13.5px]', inkClass)}>
           {signal.label}
         </Text>
         <View className="flex-row items-center gap-1.5">
           <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colour }} />
-          <Text style={{ color: colour }} className="font-mono text-[9px] font-bold tracking-wider">
+          <Text style={{ color: colour }} className="font-mono text-[10.5px] font-bold tracking-wider">
             {unverified ? 'UNVERIFIED' : SIGNAL_STATE_LABEL[signal.state]}
           </Text>
         </View>
       </View>
 
       <View className="flex-row items-baseline gap-1.5">
-        <Text style={{ color: colour }} className="font-mono text-[24px] font-bold tabular-nums">
+        <Text style={{ color: colour }} className="font-mono text-[26px] font-bold tabular-nums">
           {signal.value.toFixed(signal.decimals)}
         </Text>
-        <Text className={cn('font-mono text-[11px]', mutedClass)}>{signal.unit}</Text>
+        <Text className={cn('font-mono text-[12.5px]', mutedClass)}>{signal.unit}</Text>
       </View>
 
       <View style={{ height: 8, borderRadius: 4, backgroundColor: track }} className="relative w-full">
@@ -108,10 +108,10 @@ export function SignalStrip({
       </View>
 
       <View className="flex-row items-center justify-between gap-2">
-        <Text numberOfLines={1} className={cn('flex-1 font-mono text-[9px]', mutedClass)}>
+        <Text numberOfLines={1} className={cn('flex-1 font-mono text-[10.5px]', mutedClass)}>
           {signal.qualifier ?? (signal.reference ? `ref ${signal.reference.target} ±${signal.reference.tolerance}` : '')}
         </Text>
-        <Text className={cn('font-mono text-[9px]', mutedClass)}>{signal.code}</Text>
+        <Text className={cn('font-mono text-[10.5px]', mutedClass)}>{signal.code}</Text>
       </View>
     </View>
   );

@@ -7,7 +7,7 @@ import { Text, View, type LayoutChangeEvent } from 'react-native';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { CONDITION_LABEL, type OverviewCondition } from '../../../../lib/analysisOverview';
 import { cn } from '../../../../lib/cn';
-import { alpha, consolePalette, radius, tabular, text, type IconName, type Variant } from '../../../ui';
+import { Hoverable, alpha, consolePalette, radius, tabular, text, type IconName, type Variant } from '../../../ui';
 
 /**
  * The presentation layer for the diagnosis pages.
@@ -138,7 +138,7 @@ export function VerdictHeader({
                 {eyebrow}
               </Text>
             </View>
-            <Text className="font-body-bold text-[24px] leading-[30px] tracking-[-0.03em]" style={{ color: palette.ink }}>
+            <Text className="font-body-bold text-[26px] leading-[33px] tracking-[-0.03em]" style={{ color: palette.ink }}>
               {title}
             </Text>
             <Text className={cn('max-w-[880px]', text.lede)} style={{ color: palette.inkMuted }}>
@@ -190,27 +190,28 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
     >
       <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
         {facts.map((fact) => (
-          <View
+          <Hoverable
             key={fact.label}
-            className="gap-1.5 px-3.5 py-3"
-            style={{
-              minWidth: fact.wide ? 260 : 148,
+            className="gap-1.5 px-4 py-3.5"
+            style={({ hovered }) => ({
+              minWidth: fact.wide ? 300 : 176,
               flexGrow: fact.wide ? 2.4 : 1,
-              flexBasis: fact.wide ? 260 : 148,
+              flexBasis: fact.wide ? 300 : 176,
               borderRightWidth: 1,
               borderBottomWidth: 1,
               borderColor: palette.line,
-            }}
+              backgroundColor: hovered ? palette.hover : undefined,
+            })}
           >
             <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
               {fact.label}
             </Text>
             <View className="flex-row flex-wrap items-baseline gap-x-1.5">
               <Text
-                className={fact.wide ? text.bodyStrong : text.data}
+                className={fact.wide ? text.bodyStrong : text.dataMd}
                 style={[
                   fact.wide ? null : tabular,
-                  { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink },
+                  { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink, fontWeight: '600' },
                 ]}
               >
                 {fact.value}
@@ -226,7 +227,7 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
                 {fact.note}
               </Text>
             ) : null}
-          </View>
+          </Hoverable>
         ))}
       </View>
     </View>
@@ -255,17 +256,17 @@ export function StateTagGrid({
       {items.map((item) => {
         const colour = conditionColour(item.condition, isDark);
         return (
-          <View
+          <Hoverable
             key={item.label}
             className="flex-row items-center gap-2.5 border px-3 py-2.5"
-            style={{
+            style={({ hovered }) => ({
               minWidth,
               flexGrow: 1,
               flexBasis: minWidth,
-              borderColor: alpha(colour, 0.26),
-              backgroundColor: alpha(colour, isDark ? 0.08 : 0.05),
+              borderColor: alpha(colour, hovered ? 0.5 : 0.26),
+              backgroundColor: alpha(colour, hovered ? (isDark ? 0.16 : 0.1) : isDark ? 0.08 : 0.05),
               borderRadius: radius.md,
-            }}
+            })}
           >
             <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colour }} />
             <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: palette.ink }}>
@@ -274,7 +275,7 @@ export function StateTagGrid({
             <Text className={text.chip} style={{ color: colour }}>
               {CONDITION_LABEL[item.condition]}
             </Text>
-          </View>
+          </Hoverable>
         );
       })}
     </View>
@@ -330,21 +331,27 @@ export function StatementList({
   return (
     <View>
       {items.map((item, index) => (
-        <View
+        <Hoverable
           key={item}
-          className={cn('flex-row items-start', dense ? 'gap-2.5 py-2' : 'gap-3 py-2.5')}
-          style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+          className={cn('flex-row items-start', dense ? 'gap-2.5 px-2 py-2' : 'gap-3 px-2 py-2.5')}
+          style={({ hovered }) => ({
+            marginHorizontal: -8,
+            borderRadius: radius.sm,
+            borderTopWidth: index === 0 ? 0 : 1,
+            borderTopColor: palette.lineSubtle,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
         >
           <Text
             className={text.code}
-            style={[tabular, { color: alpha(rail, 0.85), width: 15, paddingTop: dense ? 1 : 2 }]}
+            style={[tabular, { color: alpha(rail, 0.85), width: 17, paddingTop: dense ? 1 : 2 }]}
           >
             {String(index + 1).padStart(2, '0')}
           </Text>
           <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.ink }}>
             {item}
           </Text>
-        </View>
+        </Hoverable>
       ))}
     </View>
   );
@@ -384,16 +391,16 @@ export function EvidenceCard({
     variant === 'success' ? palette.accent : variant === 'warning' ? palette.warning : variant === 'destructive' ? palette.critical : palette.neutral;
 
   return (
-    <View
+    <Hoverable
       className="overflow-hidden border"
-      style={{
+      style={({ hovered }) => ({
         flexBasis: 300,
         flexGrow: 1,
         minWidth: 268,
-        borderColor: palette.line,
+        borderColor: hovered ? alpha(accent, 0.42) : palette.line,
         backgroundColor: palette.panelRaised,
         borderRadius: radius.md,
-      }}
+      })}
     >
       <View style={{ height: 2, backgroundColor: alpha(accent, 0.6) }} />
 
@@ -434,7 +441,7 @@ export function EvidenceCard({
       >
         <StatementList items={items} empty={empty} accent={accent} dense />
       </View>
-    </View>
+    </Hoverable>
   );
 }
 
@@ -467,10 +474,14 @@ export function DefinitionRows({
       style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
     >
       {rows.map(([label, value], index) => (
-        <View
+        <Hoverable
           key={label}
           className="flex-row flex-wrap items-baseline gap-x-6 gap-y-1 px-4 py-3"
-          style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+          style={({ hovered }) => ({
+            borderTopWidth: index === 0 ? 0 : 1,
+            borderTopColor: palette.lineSubtle,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
         >
           <Text className={text.label} style={{ color: palette.inkFaint, width: labelWidth }}>
             {label.toLocaleUpperCase()}
@@ -478,7 +489,7 @@ export function DefinitionRows({
           <Text className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: colour }}>
             {value}
           </Text>
-        </View>
+        </Hoverable>
       ))}
     </View>
   );
@@ -537,18 +548,18 @@ export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem
       {items.map((item) => {
         const colour = conditionColour(item.condition, isDark);
         return (
-          <View
+          <Hoverable
             key={item.id}
             className="gap-2 border px-3.5 py-3"
-            style={{
+            style={({ hovered }) => ({
               width: cardWidth,
               flexGrow: columns === 2 ? 0 : 1,
               flexBasis: cardWidth ?? '100%',
               minWidth: 0,
-              borderColor: palette.line,
-              backgroundColor: palette.panelRaised,
+              borderColor: hovered ? alpha(colour, 0.4) : palette.line,
+              backgroundColor: hovered ? palette.hover : palette.panelRaised,
               borderRadius: radius.md,
-            }}
+            })}
           >
             <View className="flex-row items-start justify-between gap-3">
               <View className="min-w-0 flex-1 gap-0.5">
@@ -574,7 +585,7 @@ export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem
                 {item.trend}
               </Text>
             </View>
-          </View>
+          </Hoverable>
         );
       })}
     </View>
@@ -592,16 +603,16 @@ export function DoctorCard({ label, value }: { label: string; value: string }) {
   const palette = consolePalette(isDark);
 
   return (
-    <View
+    <Hoverable
       className="gap-2.5 border px-4 py-3.5"
-      style={{
+      style={({ hovered }) => ({
         flexBasis: 250,
         flexGrow: 1,
         minWidth: 220,
-        borderColor: palette.line,
-        backgroundColor: palette.panelRaised,
+        borderColor: hovered ? alpha(palette.accent, 0.4) : palette.line,
+        backgroundColor: hovered ? palette.hover : palette.panelRaised,
         borderRadius: radius.md,
-      }}
+      })}
     >
       <View className="flex-row items-center gap-1.5">
         <View style={{ width: 3, height: 10, borderRadius: 2, backgroundColor: alpha(palette.accent, 0.8) }} />
@@ -612,7 +623,7 @@ export function DoctorCard({ label, value }: { label: string; value: string }) {
       <Text className={text.body} style={{ color: palette.ink }}>
         {value}
       </Text>
-    </View>
+    </Hoverable>
   );
 }
 
@@ -627,7 +638,7 @@ export function RegionHeading({ eyebrow, title, trailing }: { eyebrow: string; t
         <Text className={text.label} style={{ color: palette.inkFaint }}>
           {eyebrow}
         </Text>
-        <Text className="font-body-bold text-[16px] leading-[21px] tracking-[-0.02em]" style={{ color: palette.ink }}>
+        <Text className="font-body-bold text-[17px] leading-[23px] tracking-[-0.02em]" style={{ color: palette.ink }}>
           {title}
         </Text>
       </View>

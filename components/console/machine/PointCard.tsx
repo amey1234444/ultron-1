@@ -85,7 +85,7 @@ export function PointCard({ code, point }: PointCardProps) {
           {code}
         </Text>
         <View className={cn('rounded-full border px-1.5 py-0.5', lineClass)}>
-          <Text className={cn('font-mono text-[10px]', mutedClass)}>{code}</Text>
+          <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{code}</Text>
         </View>
       </View>
 

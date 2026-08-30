@@ -32,17 +32,17 @@ export function KpiTile({
       style={{ width }}
       className={cn('gap-1 rounded-xl border px-3 py-2.5', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
     >
-      <Text className={cn('font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>{label}</Text>
+      <Text className={cn('font-body-medium text-[11.5px] uppercase tracking-wider', mutedClass)}>{label}</Text>
 
       <View className="flex-row items-baseline gap-1">
         <Text style={tone ? { color: tone } : undefined} className={cn('font-mono text-xl font-bold tabular-nums', !tone && inkClass)}>
           {value}
         </Text>
-        {unit ? <Text className={cn('font-mono text-[11px]', mutedClass)}>{unit}</Text> : null}
+        {unit ? <Text className={cn('font-mono text-[12.5px]', mutedClass)}>{unit}</Text> : null}
       </View>
 
       {hint ? (
-        <Text numberOfLines={1} className={cn('font-body text-[10px]', mutedClass)}>
+        <Text numberOfLines={1} className={cn('font-body text-[11.5px]', mutedClass)}>
           {hint}
         </Text>
       ) : null}

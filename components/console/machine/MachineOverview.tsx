@@ -582,13 +582,13 @@ export function OpenSection({
     <View className={cn('gap-2.5', className)}>
       <View className="flex-row items-center gap-3">
         <View className={cn('self-start rounded-md px-2 py-[3px]', isDark ? 'bg-white/[0.055]' : 'bg-black/[0.045]')}>
-          <Text className="font-mono text-[8.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
+          <Text className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
             {label}
           </Text>
         </View>
         <View className="min-w-0 flex-1 flex-row items-center justify-end gap-3">
           {meta ? (
-            <Text numberOfLines={1} className="font-mono text-[9.5px]" style={{ color: palette.inkMuted }}>
+            <Text numberOfLines={1} className="font-mono text-[11px]" style={{ color: palette.inkMuted }}>
               {meta}
             </Text>
           ) : null}
@@ -607,13 +607,13 @@ export function SectionTitle({ title, action, onAction }: { title: string; actio
   return (
     <View className="flex-row items-center justify-between">
       <View className={cn('self-start rounded-md px-2 py-[3px]', isDark ? 'bg-white/[0.055]' : 'bg-black/[0.045]')}>
-        <Text className="font-mono text-[8.5px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
+        <Text className="font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: palette.inkMuted }}>
           {title}
         </Text>
       </View>
       {action && onAction ? (
         <Pressable onPress={onAction} accessibilityRole="button">
-          <Text style={{ color: palette.accent }} className="font-body text-[10.5px]">
+          <Text style={{ color: palette.accent }} className="font-body text-[12px]">
             {action}
           </Text>
         </Pressable>
@@ -648,17 +648,17 @@ export function StatusPanel({
     <View className={cn('min-w-[240px] flex-1 gap-2', className)} style={width ? { width } : undefined}>
       <View className="flex-row items-center gap-2">
         <MaterialCommunityIcons name={icon} size={14} color={colour} />
-        <Text className={cn('min-w-0 flex-1 font-mono text-[9px] uppercase tracking-[0.14em]', mutedClass)}>{title}</Text>
+        <Text className={cn('min-w-0 flex-1 font-mono text-[10.5px] uppercase tracking-[0.14em]', mutedClass)}>{title}</Text>
         {meta ? (
-          <Text style={{ color: colour }} className="font-mono text-[10.5px]">
+          <Text style={{ color: colour }} className="font-mono text-[12px]">
             {meta}
           </Text>
         ) : null}
       </View>
-      <Text style={{ color: colour }} className="font-display text-[24px] leading-[27px]">
+      <Text style={{ color: colour }} className="font-display text-[26px] leading-[30px]">
         {value}
       </Text>
-      <Text className={cn('font-body text-[11px] leading-4', mutedClass)}>{detail}</Text>
+      <Text className={cn('font-body text-[12.5px] leading-4', mutedClass)}>{detail}</Text>
     </View>
   );
 }
@@ -673,12 +673,12 @@ function MetricTile({ label, value, detail, tone, icon }: { label: string; value
     >
       <View className="flex-row items-center gap-2">
         <MaterialCommunityIcons name={icon} size={15} color={colour} />
-        <Text className={cn('flex-1 font-body-medium text-[10px] uppercase tracking-[1.4px]', mutedClass)}>{label}</Text>
+        <Text className={cn('flex-1 font-body-medium text-[11.5px] uppercase tracking-[1.4px]', mutedClass)}>{label}</Text>
       </View>
-      <Text style={{ color: colour }} className="font-display text-[28px] leading-9">
+      <Text style={{ color: colour }} className="font-display text-[30px] leading-9">
         {value}
       </Text>
-      <Text className={cn('font-body text-[10px]', mutedClass)}>{detail}</Text>
+      <Text className={cn('font-body text-[11.5px]', mutedClass)}>{detail}</Text>
     </View>
   );
 }
@@ -734,7 +734,7 @@ function HealthGauge({ score, label, tone }: { score: number; label: string; ton
       <Text style={{ color: colour }} className="font-body-bold text-base">
         {label}
       </Text>
-      <Text className={cn('font-body text-[11px]', score >= 88 ? mutedClass : textClass)}>
+      <Text className={cn('font-body text-[12.5px]', score >= 88 ? mutedClass : textClass)}>
         {score >= 88 ? 'Continue monitoring' : score >= 72 ? 'Watch the flagged evidence' : 'Investigate the flagged evidence'}
       </Text>
     </View>
@@ -831,7 +831,7 @@ function TrendPanel({
       <SectionTitle title={title} />
       <View className="mt-2">
         {points.length === 0 ? (
-          <Text className={cn('font-body text-[11px] leading-4', mutedClass)}>{emptyHint}</Text>
+          <Text className={cn('font-body text-[12.5px] leading-4', mutedClass)}>{emptyHint}</Text>
         ) : (
           <TrendChart points={points} colour={colour} suffix={suffix} />
         )}
@@ -858,7 +858,7 @@ function OverviewCard({ mapped, value }: { mapped: MappedChannel; value: number 
           {channel.code}
         </Text>
         <View className={cn('rounded-full border px-1.5 py-0.5', lineClass)}>
-          <Text className={cn('font-mono text-[10px]', mutedClass)}>{KIND_LABEL[channel.letter]}</Text>
+          <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{KIND_LABEL[channel.letter]}</Text>
         </View>
       </View>
 
@@ -909,7 +909,7 @@ export function BulletList({ title, items, tone, emptyLabel }: { title: string; 
           size={15}
           color={items.length === 0 ? LIVE_COLOUR : TONE_COLOUR[tone]}
         />
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-[1.6px]', mutedClass)}>{title}</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-[1.6px]', mutedClass)}>{title}</Text>
       </View>
       <View className="mt-2.5 gap-1.5">
         {items.length === 0 ? (
@@ -939,12 +939,12 @@ export function FindingPanel({ finding }: { finding: Finding }) {
     <Panel className="max-w-[720px] gap-3">
       <View className="flex-row flex-wrap items-center justify-between gap-2">
         <Text className={cn('font-body-bold text-sm', textClass)}>{finding.title}</Text>
-        <Text style={{ color: TONE_COLOUR[tone] }} className="font-body-bold text-[11px] uppercase tracking-wider">
+        <Text style={{ color: TONE_COLOUR[tone] }} className="font-body-bold text-[12.5px] uppercase tracking-wider">
           {finding.urgency} / {finding.confidence}%
         </Text>
       </View>
       <View className="gap-1">
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Supporting evidence</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Supporting evidence</Text>
         {finding.evidence.map((item) => (
           <Text key={item} className={cn('font-body text-xs leading-4', textClass)}>
             - {item}
@@ -953,7 +953,7 @@ export function FindingPanel({ finding }: { finding: Finding }) {
       </View>
       {finding.contradictions.length > 0 && (
         <View className="gap-1">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Contradictions</Text>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Contradictions</Text>
           {finding.contradictions.map((item) => (
             <Text key={item} className={cn('font-body text-xs leading-4', mutedClass)}>
               - {item}
@@ -1050,13 +1050,13 @@ function EvidenceRow({ rank, signal }: { rank: number; signal: SignalValue }) {
     <View
       className={cn('min-w-[190px] flex-1 flex-row items-center gap-2.5 rounded-2xl border px-3 py-2.5', isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel')}
     >
-      <Text className={cn('font-mono text-[11px]', mutedClass)}>{rank}</Text>
+      <Text className={cn('font-mono text-[12.5px]', mutedClass)}>{rank}</Text>
       <View className="min-w-0 flex-1">
         <Text className={cn('font-body-bold text-xs', textClass)}>{signal.mapped.channel.code}</Text>
-        <Text numberOfLines={1} className={cn('font-body text-[10px]', mutedClass)}>
+        <Text numberOfLines={1} className={cn('font-body text-[11.5px]', mutedClass)}>
           {signal.mapped.label}
         </Text>
-        <Text style={{ color: TONE_COLOUR[tone] }} className="font-mono text-[11px] font-bold">
+        <Text style={{ color: TONE_COLOUR[tone] }} className="font-mono text-[12.5px] font-bold">
           {formatValue(signal.value, signal.mapped.channel.letter, signal.mapped.channel.unit)}
         </Text>
       </View>
@@ -1083,7 +1083,7 @@ function ActivityFeed({ history, nowMs }: { history: OverviewHistoryPoint[]; now
       <SectionTitle title="Recent activity" />
       <View className="mt-2.5 gap-2.5">
         {entries.length === 0 ? (
-          <Text className={cn('font-body text-[11px] leading-4', mutedClass)}>
+          <Text className={cn('font-body text-[12.5px] leading-4', mutedClass)}>
             Saved analysis history will appear here once the first snapshot is stored.
           </Text>
         ) : (
@@ -1091,10 +1091,10 @@ function ActivityFeed({ history, nowMs }: { history: OverviewHistoryPoint[]; now
             <View key={entry.at} className="flex-row gap-2">
               <View className="mt-1 h-1.5 w-1.5 rounded-full" style={{ backgroundColor: TONE_COLOUR[entry.tone] }} />
               <View className="min-w-0 flex-1">
-                <Text numberOfLines={2} className={cn('font-body-medium text-[11px] leading-4', textClass)}>
+                <Text numberOfLines={2} className={cn('font-body-medium text-[12.5px] leading-4', textClass)}>
                   {entry.title}
                 </Text>
-                <Text className={cn('font-body text-[10px]', mutedClass)}>
+                <Text className={cn('font-body text-[11.5px]', mutedClass)}>
                   {entry.detail} · {formatAgo(entry.at, nowMs)}
                 </Text>
               </View>
@@ -1335,8 +1335,8 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
               <View key={check.label} className="flex-row gap-2">
                 <MaterialCommunityIcons name="check-circle-outline" size={14} color={TONE_COLOUR[check.tone]} />
                 <View className="min-w-0 flex-1">
-                  <Text className={cn('font-body-medium text-[11px]', textClass)}>{check.label}</Text>
-                  <Text numberOfLines={2} className={cn('font-body text-[10px] leading-3.5', mutedClass)}>
+                  <Text className={cn('font-body-medium text-[12.5px]', textClass)}>{check.label}</Text>
+                  <Text numberOfLines={2} className={cn('font-body text-[11.5px] leading-3.5', mutedClass)}>
                     {check.detail}
                   </Text>
                 </View>
@@ -1375,12 +1375,12 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
             rotary-airlock operating rules, then saved to the analysis history.
           </Text>
           {expectedPoints > 0 && (
-            <Text className={cn('font-body text-[11px]', mutedClass)}>
+            <Text className={cn('font-body text-[12.5px]', mutedClass)}>
               {mappedChannels.length} of {expectedPoints} expected points mapped
             </Text>
           )}
           {saveError ? (
-            <Text style={{ color: CRITICAL_COLOUR }} className="font-body text-[11px]">
+            <Text style={{ color: CRITICAL_COLOUR }} className="font-body text-[12.5px]">
               {saveError}
             </Text>
           ) : null}
@@ -1398,7 +1398,7 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
               size={15}
               color={saveState === 'error' ? CRITICAL_COLOUR : ACCENT_COLOUR}
             />
-            <Text className={cn('font-body-medium text-[11px]', textClass)}>{saveLabel}</Text>
+            <Text className={cn('font-body-medium text-[12.5px]', textClass)}>{saveLabel}</Text>
           </Pressable>
         ) : null}
       </View>
@@ -1420,10 +1420,10 @@ export function MachineOverview({ mappedChannels, devices, cards, live, expected
 
           <View className="flex-row flex-wrap items-center gap-2 py-0.5">
             <MaterialCommunityIcons name="stethoscope" size={14} color={ACCENT_COLOUR} />
-            <Text className={cn('font-body text-[11.5px]', mutedClass)}>
+            <Text className={cn('font-body text-[12.5px]', mutedClass)}>
               Condition, probable cause and evidence ranking are in the Analysis tab.
             </Text>
-            <Text className="font-mono text-[10px]" style={{ color: analysis.conditionTone === 'critical' ? CRITICAL_COLOUR : ACCENT_COLOUR }}>
+            <Text className="font-mono text-[11.5px]" style={{ color: analysis.conditionTone === 'critical' ? CRITICAL_COLOUR : ACCENT_COLOUR }}>
               {analysis.conditionLabel} · {analysis.conditionScore}/100
             </Text>
           </View>

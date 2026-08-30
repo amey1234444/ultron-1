@@ -153,7 +153,7 @@ function TrendPlot({
           </Svg>
         ) : (
           <View className="flex-1 items-center justify-center">
-            <Text className={cn('font-body text-[11px] italic', mutedClass)}>Not enough history to plot.</Text>
+            <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>Not enough history to plot.</Text>
           </View>
         )}
       </View>
@@ -162,21 +162,21 @@ function TrendPlot({
       <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
         <View className="flex-row items-center gap-1.5">
           <View style={{ width: 12, height: 2, backgroundColor: trace }} />
-          <Text className={cn('font-mono text-[9px]', mutedClass)}>measured {unit}</Text>
+          <Text className={cn('font-mono text-[10.5px]', mutedClass)}>measured {unit}</Text>
         </View>
         {reference !== undefined ? (
           <View className="flex-row items-center gap-1.5">
             <View style={{ width: 12, height: 1.5, backgroundColor: seriesMutedColour(isDark) }} />
-            <Text className={cn('font-mono text-[9px]', mutedClass)}>reference {reference.toFixed(decimals)}</Text>
+            <Text className={cn('font-mono text-[10.5px]', mutedClass)}>reference {reference.toFixed(decimals)}</Text>
           </View>
         ) : null}
         <View className="flex-row items-center gap-1.5">
           <View style={{ width: 12, height: 2, backgroundColor: conditionHex.alert }} />
-          <Text className={cn('font-mono text-[9px]', mutedClass)}>alert {alert.toFixed(decimals)}</Text>
+          <Text className={cn('font-mono text-[10.5px]', mutedClass)}>alert {alert.toFixed(decimals)}</Text>
         </View>
         <View className="flex-row items-center gap-1.5">
           <View style={{ width: 12, height: 2, backgroundColor: conditionHex.danger }} />
-          <Text className={cn('font-mono text-[9px]', mutedClass)}>danger {danger.toFixed(decimals)}</Text>
+          <Text className={cn('font-mono text-[10.5px]', mutedClass)}>danger {danger.toFixed(decimals)}</Text>
         </View>
       </View>
     </View>
@@ -198,25 +198,25 @@ function CapabilityNotice({ mode, missing }: { mode: AnalysisMode; missing: Retu
   return (
     <View className="gap-3 rounded-xl border px-4 py-4" style={{ borderColor: hairline }}>
       <View className="flex-row items-center gap-2">
-        <Text style={{ color: conditionHex.offline }} className="font-mono text-[10px] font-bold tracking-wider">
+        <Text style={{ color: conditionHex.offline }} className="font-mono text-[11.5px] font-bold tracking-wider">
           NOT AVAILABLE
         </Text>
-        <Text className={cn('font-body-medium text-[12px]', inkClass)}>{MODE_LABEL[mode]} analysis cannot be performed</Text>
+        <Text className={cn('font-body-medium text-[13.5px]', inkClass)}>{MODE_LABEL[mode]} analysis cannot be performed</Text>
       </View>
 
-      <Text className={cn('font-body text-[11px] leading-[17px]', mutedClass)} style={{ maxWidth: 620 }}>
+      <Text className={cn('font-body text-[12.5px] leading-[19px]', mutedClass)} style={{ maxWidth: 620 }}>
         {MODE_PURPOSE[mode]} This machine's configuration does not supply what that needs. Nothing is plotted here rather
         than a placeholder trace, because a fabricated spectrum is a number an analyst would act on.
       </Text>
 
       <View className="gap-2 pt-1" style={{ borderTopWidth: 1, borderTopColor: hairline }}>
-        <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>MISSING</Text>
+        <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>MISSING</Text>
         {missing.map((prerequisite) => (
           <View key={prerequisite} className="flex-row gap-2.5">
-            <Text style={{ width: 132 }} className={cn('font-mono text-[10px]', inkClass)}>
+            <Text style={{ width: 132 }} className={cn('font-mono text-[11.5px]', inkClass)}>
               {PREREQUISITE_LABEL[prerequisite]}
             </Text>
-            <Text className={cn('flex-1 font-body text-[10px] leading-[15px]', mutedClass)}>
+            <Text className={cn('flex-1 font-body text-[11.5px] leading-[17px]', mutedClass)}>
               {PREREQUISITE_WHY[prerequisite]}
             </Text>
           </View>
@@ -272,8 +272,8 @@ export function SignalLab({
 
   const fact = (label: string, value: string, tint?: string) => (
     <View className="gap-0.5" style={{ minWidth: 108 }}>
-      <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
-      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[11px]', !tint && inkClass)}>
+      <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
+      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[12.5px]', !tint && inkClass)}>
         {value}
       </Text>
     </View>
@@ -282,9 +282,9 @@ export function SignalLab({
   return (
     <View className="gap-4">
       <View className="gap-1">
-        <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">SIGNAL LAB · VALIDATE</Text>
-        <Text className={cn('font-heading-medium text-[17px]', inkClass)}>{pointLabel}</Text>
-        <Text numberOfLines={1} className={cn('font-mono text-[9px]', mutedClass)}>
+        <Text className="font-mono text-[10.5px] font-bold tracking-wider text-accent">SIGNAL LAB · VALIDATE</Text>
+        <Text className={cn('font-heading-medium text-[19px]', inkClass)}>{pointLabel}</Text>
+        <Text numberOfLines={1} className={cn('font-mono text-[10.5px]', mutedClass)}>
           {pathLabel}
         </Text>
       </View>
@@ -309,18 +309,18 @@ export function SignalLab({
         >
           <Text
             style={{ color: rateVerdict.ok ? conditionHex.healthy : conditionHex.alert }}
-            className="font-mono text-[9px] font-bold tracking-wider"
+            className="font-mono text-[10.5px] font-bold tracking-wider"
           >
             {rateVerdict.ok ? 'RATE OK' : 'RATE LIMITS ANALYSIS'}
           </Text>
-          <Text className={cn('flex-1 font-body text-[10px] leading-[15px]', inkClass)}>{rateVerdict.text}</Text>
+          <Text className={cn('flex-1 font-body text-[11.5px] leading-[17px]', inkClass)}>{rateVerdict.text}</Text>
         </View>
       ) : null}
 
       <View className="gap-2">
         <View className="flex-row flex-wrap items-center justify-between gap-2">
-          <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>ANALYSIS</Text>
-          <Text className={cn('font-mono text-[9px]', mutedClass)}>
+          <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>ANALYSIS</Text>
+          <Text className={cn('font-mono text-[10.5px]', mutedClass)}>
             {availableCount} of {capabilities.length} available on this configuration
           </Text>
         </View>
@@ -342,7 +342,7 @@ export function SignalLab({
                 )}
                 style={isActive ? undefined : { borderColor: hairline }}
               >
-                <Text className={cn('font-mono text-[9px] tracking-wider', isActive ? 'text-accent' : mutedClass)}>
+                <Text className={cn('font-mono text-[10.5px] tracking-wider', isActive ? 'text-accent' : mutedClass)}>
                   {MODE_LABEL[capabilityItem.mode].toUpperCase()}
                   {capabilityItem.available ? '' : ' ·'}
                 </Text>
@@ -355,7 +355,7 @@ export function SignalLab({
       {current.available ? (
         <View className="gap-3">
           <View className="flex-row flex-wrap items-end justify-between gap-2">
-            <Text className={cn('font-body-medium text-[12px]', inkClass)}>
+            <Text className={cn('font-body-medium text-[13.5px]', inkClass)}>
               {MODE_LABEL[mode]} · {pointLabel}
             </Text>
             {onAddEvidence ? (
@@ -365,7 +365,7 @@ export function SignalLab({
                 accessibilityLabel="Add this view to the evidence tray"
                 className="rounded border border-accent/35 bg-accent/10 px-2 py-1"
               >
-                <Text className="font-mono text-[9px] text-accent">ADD TO EVIDENCE</Text>
+                <Text className="font-mono text-[10.5px] text-accent">ADD TO EVIDENCE</Text>
               </Pressable>
             ) : null}
           </View>
@@ -384,8 +384,8 @@ export function SignalLab({
                capability gap, and labelled as such so the two are never
                conflated. */
             <View className="gap-2 rounded-xl border px-4 py-4" style={{ borderColor: hairline }}>
-              <Text className={cn('font-mono text-[10px] font-bold tracking-wider', mutedClass)}>NOT IMPLEMENTED</Text>
-              <Text className={cn('font-body text-[11px] leading-[17px]', mutedClass)}>
+              <Text className={cn('font-mono text-[11.5px] font-bold tracking-wider', mutedClass)}>NOT IMPLEMENTED</Text>
+              <Text className={cn('font-body text-[12.5px] leading-[19px]', mutedClass)}>
                 The data for {MODE_LABEL[mode].toLowerCase()} analysis is available, but this view has not been built yet.
               </Text>
             </View>

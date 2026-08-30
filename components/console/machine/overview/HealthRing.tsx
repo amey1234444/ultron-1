@@ -60,7 +60,7 @@ export function HealthRing({
           under it the same amber is three sayings of one thing, and it is what
           made the light overview read as an orange panel rather than as a
           machine with one amber score on it. */}
-      <Text style={{ color: palette.inkMuted }} className="font-body-medium text-[10px] uppercase tracking-wider">
+      <Text style={{ color: palette.inkMuted }} className="font-body-medium text-[11.5px] uppercase tracking-wider">
         {caption ?? 'health'}
       </Text>
     </View>

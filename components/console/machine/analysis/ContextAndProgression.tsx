@@ -32,8 +32,8 @@ export function OperatingContext({
   return (
     <View className="gap-3">
       <View>
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Operating context</Text>
-        <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Operating context</Text>
+        <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>
           OPERATING STATE IS NOT MACHINE CONDITION
         </Text>
       </View>
@@ -68,12 +68,12 @@ export function FaultProgression({ events }: { events: ProgressionEvent[] }) {
   return (
     <View className="gap-3">
       <View>
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Fault progression</Text>
-        <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>ESCALATION, NOT AN EVENT LOG</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Fault progression</Text>
+        <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>ESCALATION, NOT AN EVENT LOG</Text>
       </View>
 
       {events.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>
           No progression recorded. Nothing has changed condition on this machine.
         </Text>
       ) : (
@@ -84,7 +84,7 @@ export function FaultProgression({ events }: { events: ProgressionEvent[] }) {
               className="flex-row gap-3 py-2.5"
               style={index > 0 ? { borderTopWidth: 1, borderTopColor: hairline } : undefined}
             >
-              <Text style={{ width: 54 }} className={cn('font-mono text-[10px]', mutedClass)}>
+              <Text style={{ width: 54 }} className={cn('font-mono text-[11.5px]', mutedClass)}>
                 {event.at}
               </Text>
 
@@ -95,7 +95,7 @@ export function FaultProgression({ events }: { events: ProgressionEvent[] }) {
                 {index < events.length - 1 ? <View style={{ width: 1, flex: 1, marginTop: 3, backgroundColor: hairline }} /> : null}
               </View>
 
-              <Text className={cn('flex-1 font-body text-[11px] leading-[16px]', inkClass)}>{event.text}</Text>
+              <Text className={cn('flex-1 font-body text-[12.5px] leading-[18px]', inkClass)}>{event.text}</Text>
             </View>
           ))}
         </View>
@@ -136,18 +136,18 @@ export function GoDeeper({
       style={{ flexGrow: 1, flexBasis: 300, minWidth: 260, borderColor: hairline }}
       className={cn('gap-2 rounded-xl border px-3.5 py-3', !available && 'opacity-50')}
     >
-      <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">{eyebrow}</Text>
-      <Text className={cn('font-body-bold text-[13px] leading-[18px]', inkClass)}>{title}</Text>
-      <Text className={cn('font-mono text-[9px] leading-[14px]', mutedClass)}>{chain}</Text>
-      {!available ? <Text className={cn('font-body text-[10px] italic', mutedClass)}>Not available yet</Text> : null}
+      <Text className="font-mono text-[10.5px] font-bold tracking-wider text-accent">{eyebrow}</Text>
+      <Text className={cn('font-body-bold text-[14.5px] leading-[20px]', inkClass)}>{title}</Text>
+      <Text className={cn('font-mono text-[10.5px] leading-[16px]', mutedClass)}>{chain}</Text>
+      {!available ? <Text className={cn('font-body text-[11.5px] italic', mutedClass)}>Not available yet</Text> : null}
     </Pressable>
   );
 
   return (
     <View className="gap-3">
       <View>
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Go deeper</Text>
-        <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>PROGRESSIVE DISCLOSURE</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Go deeper</Text>
+        <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>PROGRESSIVE DISCLOSURE</Text>
       </View>
 
       <View className="flex-row flex-wrap gap-3">

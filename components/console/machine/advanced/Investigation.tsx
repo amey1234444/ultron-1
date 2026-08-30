@@ -47,8 +47,8 @@ function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
     <View className="gap-2.5 rounded-xl border px-3.5 py-3" style={{ borderColor: hairline }}>
       <View className="flex-row items-start justify-between gap-2">
         <View className="flex-1">
-          <Text className={cn('font-body-bold text-[12px]', inkClass)}>{hypothesis.name}</Text>
-          <Text style={{ color: tint }} className="mt-0.5 font-mono text-[8px] font-bold tracking-wider">
+          <Text className={cn('font-body-bold text-[13.5px]', inkClass)}>{hypothesis.name}</Text>
+          <Text style={{ color: tint }} className="mt-0.5 font-mono text-[9.5px] font-bold tracking-wider">
             {HYPOTHESIS_STATUS_LABEL[hypothesis.status]}
           </Text>
         </View>
@@ -56,33 +56,33 @@ function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
         {/* Labelled as a ranking every time it appears. */}
         {hypothesis.matchScore !== undefined ? (
           <View className="items-end">
-            <Text className={cn('font-mono text-[14px] tabular-nums', inkClass)}>{hypothesis.matchScore}</Text>
-            <Text className={cn('font-mono text-[7px] tracking-wider', mutedClass)}>MATCH RANK</Text>
+            <Text className={cn('font-mono text-[15px] tabular-nums', inkClass)}>{hypothesis.matchScore}</Text>
+            <Text className={cn('font-mono text-[8.5px] tracking-wider', mutedClass)}>MATCH RANK</Text>
           </View>
         ) : null}
       </View>
 
       <View className="flex-row flex-wrap gap-3">
         <View style={{ flexGrow: 1, flexBasis: 170, minWidth: 150 }} className="gap-1">
-          <Text style={{ color: conditionHex.healthy }} className="font-mono text-[8px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex.healthy }} className="font-mono text-[9.5px] font-bold tracking-wider">
             SUPPORTS
           </Text>
           {hypothesis.supporting.map((line) => (
-            <Text key={line} className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+            <Text key={line} className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
               + {line}
             </Text>
           ))}
         </View>
 
         <View style={{ flexGrow: 1, flexBasis: 170, minWidth: 150 }} className="gap-1">
-          <Text style={{ color: conditionHex.danger }} className="font-mono text-[8px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex.danger }} className="font-mono text-[9.5px] font-bold tracking-wider">
             CONTRADICTS
           </Text>
           {hypothesis.contradicting.length === 0 ? (
-            <Text className={cn('font-body text-[10px] italic', mutedClass)}>nothing recorded against it</Text>
+            <Text className={cn('font-body text-[11.5px] italic', mutedClass)}>nothing recorded against it</Text>
           ) : (
             hypothesis.contradicting.map((line) => (
-              <Text key={line} className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+              <Text key={line} className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
                 − {line}
               </Text>
             ))
@@ -92,12 +92,12 @@ function HypothesisCard({ hypothesis }: { hypothesis: AnalystHypothesis }) {
 
       {hypothesis.discriminator ? (
         <View className="pt-2" style={{ borderTopWidth: 1, borderTopColor: hairline }}>
-          <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>WOULD SETTLE IT</Text>
-          <Text className={cn('mt-0.5 font-body text-[10px] leading-[15px]', inkClass)}>{hypothesis.discriminator}</Text>
+          <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>WOULD SETTLE IT</Text>
+          <Text className={cn('mt-0.5 font-body text-[11.5px] leading-[17px]', inkClass)}>{hypothesis.discriminator}</Text>
         </View>
       ) : (
         <View className="pt-2" style={{ borderTopWidth: 1, borderTopColor: hairline }}>
-          <Text style={{ color: conditionHex.attention }} className="font-mono text-[8px] tracking-wider">
+          <Text style={{ color: conditionHex.attention }} className="font-mono text-[9.5px] tracking-wider">
             NO DISCRIMINATING TEST RECORDED
           </Text>
         </View>
@@ -125,20 +125,20 @@ function RootCauseChain({ steps }: { steps: ChainStep[] }) {
             style={{ borderColor: hairline, borderStyle: step.established ? 'solid' : 'dashed' }}
           >
             <View className="flex-row items-center justify-between gap-2">
-              <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{step.label}</Text>
+              <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{step.label}</Text>
               <Text
                 style={{ color: step.established ? conditionHex.healthy : conditionHex.attention }}
-                className="font-mono text-[7px] font-bold tracking-wider"
+                className="font-mono text-[8.5px] font-bold tracking-wider"
               >
                 {step.established ? 'MEASURED' : 'ASSUMED'}
               </Text>
             </View>
-            <Text className={cn('font-body text-[11px]', inkClass)}>{step.value}</Text>
+            <Text className={cn('font-body text-[12.5px]', inkClass)}>{step.value}</Text>
           </View>
 
           {index < steps.length - 1 ? (
             <View className="items-center py-0.5">
-              <Text className={cn('font-mono text-[11px]', mutedClass)}>↓</Text>
+              <Text className={cn('font-mono text-[12.5px]', mutedClass)}>↓</Text>
             </View>
           ) : null}
         </View>
@@ -165,8 +165,8 @@ function AnalystConclusion({
 
   const field = (label: string, value: string | null, pending?: string) => (
     <View style={{ flexGrow: 1, flexBasis: 220, minWidth: 200, borderColor: hairline }} className="gap-1 rounded-lg border px-3 py-2">
-      <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
-      <Text className={cn('font-body text-[11px]', value === null ? mutedClass : inkClass)}>
+      <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
+      <Text className={cn('font-body text-[12.5px]', value === null ? mutedClass : inkClass)}>
         {value ?? pending ?? 'not recorded'}
       </Text>
     </View>
@@ -186,8 +186,8 @@ function AnalystConclusion({
   return (
     <View className="gap-3">
       <View className="flex-row flex-wrap items-center justify-between gap-2">
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Analyst conclusion</Text>
-        <Text style={{ color: conditionHex.attention }} className="font-mono text-[9px] font-bold tracking-wider">
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Analyst conclusion</Text>
+        <Text style={{ color: conditionHex.attention }} className="font-mono text-[10.5px] font-bold tracking-wider">
           {CONCLUSION_STATUS_LABEL[conclusion.status]}
         </Text>
       </View>
@@ -239,15 +239,15 @@ export function InvestigationWorkArea({
 
       <View className="flex-row flex-wrap gap-4">
         <View style={{ flexGrow: 2, flexBasis: 420, minWidth: 300 }} className="gap-2">
-          <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>HYPOTHESES · RANKED</Text>
+          <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>HYPOTHESES · RANKED</Text>
           {ranked.map((hypothesis) => (
             <HypothesisCard key={hypothesis.id} hypothesis={hypothesis} />
           ))}
-          <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>{MATCH_SCORE_CAVEAT}</Text>
+          <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>{MATCH_SCORE_CAVEAT}</Text>
         </View>
 
         <View style={{ flexGrow: 1, flexBasis: 300, minWidth: 260 }} className="gap-2">
-          <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>CAUSE → MECHANISM → FAULT → SYMPTOM</Text>
+          <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>CAUSE → MECHANISM → FAULT → SYMPTOM</Text>
           <RootCauseChain steps={chain} />
         </View>
       </View>

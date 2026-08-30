@@ -58,10 +58,10 @@ export function AnalysisTabs({
               !enabled && 'opacity-45',
             )}
           >
-            <Text className={cn('font-mono text-[10px] font-bold tracking-wider', isActive ? 'text-accent' : mutedClass)}>
+            <Text className={cn('font-mono text-[11.5px] font-bold tracking-wider', isActive ? 'text-accent' : mutedClass)}>
               {tab.label}
             </Text>
-            <Text className={cn('font-body text-[9px]', mutedClass)}>{enabled ? tab.hint : 'not available yet'}</Text>
+            <Text className={cn('font-body text-[10.5px]', mutedClass)}>{enabled ? tab.hint : 'not available yet'}</Text>
           </Pressable>
         );
       })}

@@ -136,7 +136,7 @@ export function ConditionTrend({
   return (
     <View className="gap-3">
       <View className="flex-row flex-wrap items-center justify-between gap-2">
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Condition trend</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Condition trend</Text>
 
         <View className="flex-row items-center gap-1">
           {ranges.map((r) => {
@@ -149,7 +149,7 @@ export function ConditionTrend({
                 accessibilityLabel={`Show ${r.label} of trend`}
                 className={cn('rounded border px-1.5 py-0.5', active ? 'border-accent/50 bg-accent/10' : lineClass)}
               >
-                <Text className={cn('font-mono text-[9px]', active ? 'text-accent' : mutedClass)}>{r.label}</Text>
+                <Text className={cn('font-mono text-[10.5px]', active ? 'text-accent' : mutedClass)}>{r.label}</Text>
               </Pressable>
             );
           })}
@@ -157,16 +157,16 @@ export function ConditionTrend({
       </View>
 
       <View className="flex-row flex-wrap items-baseline gap-2">
-        <Text numberOfLines={1} className={cn('font-body-medium text-[12px]', inkClass)}>
+        <Text numberOfLines={1} className={cn('font-body-medium text-[13.5px]', inkClass)}>
           {label}
         </Text>
         {onSelectSensor ? (
           <Pressable onPress={onSelectSensor} accessibilityRole="button" accessibilityLabel="Change trended sensor">
-            <Text className="font-body-medium text-[10px] text-accent">change ›</Text>
+            <Text className="font-body-medium text-[11.5px] text-accent">change ›</Text>
           </Pressable>
         ) : null}
         <View className="flex-1" />
-        <Text className={cn('font-mono text-[9px]', mutedClass)}>
+        <Text className={cn('font-mono text-[10.5px]', mutedClass)}>
           {spanHours >= 48 ? `${Math.round(spanHours / 24)} d` : `${Math.round(spanHours)} h`} · {shown.length} samples · {unit}
         </Text>
       </View>
@@ -231,7 +231,7 @@ export function ConditionTrend({
           </Svg>
         ) : (
           <View className="flex-1 items-center justify-center">
-            <Text className={cn('font-body text-[11px] italic', mutedClass)}>Not enough history to draw a trend yet.</Text>
+            <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>Not enough history to draw a trend yet.</Text>
           </View>
         )}
       </View>
@@ -240,22 +240,22 @@ export function ConditionTrend({
         {thresholds.lowDanger !== undefined ? (
           <View className="flex-row items-center gap-1.5">
             <View style={{ width: 12, height: 2, backgroundColor: levels.danger }} />
-            <Text className={cn('font-mono text-[9px]', mutedClass)}>LL {thresholds.lowDanger.toFixed(decimals)}</Text>
+            <Text className={cn('font-mono text-[10.5px]', mutedClass)}>LL {thresholds.lowDanger.toFixed(decimals)}</Text>
           </View>
         ) : null}
         {thresholds.lowAlert !== undefined ? (
           <View className="flex-row items-center gap-1.5">
             <View style={{ width: 12, height: 2, backgroundColor: levels.alert }} />
-            <Text className={cn('font-mono text-[9px]', mutedClass)}>L {thresholds.lowAlert.toFixed(decimals)}</Text>
+            <Text className={cn('font-mono text-[10.5px]', mutedClass)}>L {thresholds.lowAlert.toFixed(decimals)}</Text>
           </View>
         ) : null}
         <View className="flex-row items-center gap-1.5">
           <View style={{ width: 12, height: 2, backgroundColor: levels.alert }} />
-          <Text className={cn('font-mono text-[9px]', mutedClass)}>ALERT {thresholds.alert.toFixed(decimals)}</Text>
+          <Text className={cn('font-mono text-[10.5px]', mutedClass)}>ALERT {thresholds.alert.toFixed(decimals)}</Text>
         </View>
         <View className="flex-row items-center gap-1.5">
           <View style={{ width: 12, height: 2, backgroundColor: levels.danger }} />
-          <Text className={cn('font-mono text-[9px]', mutedClass)}>DANGER {thresholds.danger.toFixed(decimals)}</Text>
+          <Text className={cn('font-mono text-[10.5px]', mutedClass)}>DANGER {thresholds.danger.toFixed(decimals)}</Text>
         </View>
       </View>
     </View>

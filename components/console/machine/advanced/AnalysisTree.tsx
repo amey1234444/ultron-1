@@ -51,13 +51,13 @@ export function AnalysisTree({
               className={cn('flex-row items-center gap-1.5 rounded py-1.5 pr-1.5', selected && 'bg-accent/10')}
               style={{ paddingLeft: 6 + depth * 11 }}
             >
-              <Text style={{ width: 9 }} className={cn('font-mono text-[8px]', mutedClass)}>
+              <Text style={{ width: 9 }} className={cn('font-mono text-[9.5px]', mutedClass)}>
                 {KIND_MARK[node.kind]}
               </Text>
 
               <Text
                 numberOfLines={1}
-                className={cn('flex-1 font-body text-[11px]', selected ? 'text-accent' : node.kind === 'signal' ? mutedClass : inkClass)}
+                className={cn('flex-1 font-body text-[12.5px]', selected ? 'text-accent' : node.kind === 'signal' ? mutedClass : inkClass)}
               >
                 {node.name}
               </Text>

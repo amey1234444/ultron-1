@@ -70,8 +70,8 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
     <View className="gap-3">
       <View className="flex-row flex-wrap items-end justify-between gap-3">
         <View>
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>What raised it</Text>
-          <Text className={cn('mt-1 font-body text-[11px]', mutedClass)}>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>What raised it</Text>
+          <Text className={cn('mt-1 font-body text-[12.5px]', mutedClass)}>
             Grouped by the kind of claim. One signal can trip several rules.
           </Text>
         </View>
@@ -89,7 +89,7 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
                 className="rounded border px-1.5 py-0.5"
                 style={{ borderColor: active ? tint ?? '#C9A15C' : hairline, backgroundColor: active ? `${tint ?? '#C9A15C'}1A` : undefined }}
               >
-                <Text style={active ? { color: tint ?? '#C9A15C' } : undefined} className={cn('font-mono text-[9px]', !active && mutedClass)}>
+                <Text style={active ? { color: tint ?? '#C9A15C' } : undefined} className={cn('font-mono text-[10.5px]', !active && mutedClass)}>
                   {FILTER_LABEL[f]} {countFor(f)}
                 </Text>
               </Pressable>
@@ -97,22 +97,22 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
           })}
 
           <Pressable onPress={toggleAll} accessibilityRole="button" accessibilityLabel="Expand all findings" className="px-1.5 py-0.5">
-            <Text className="font-mono text-[9px] text-accent">{allExpanded ? 'COLLAPSE ALL' : 'EXPAND ALL'}</Text>
+            <Text className="font-mono text-[10.5px] text-accent">{allExpanded ? 'COLLAPSE ALL' : 'EXPAND ALL'}</Text>
           </Pressable>
         </View>
       </View>
 
       {/* Column header. Kept once at the top rather than repeated per group. */}
       <View className="flex-row items-center gap-2 pb-1" style={{ borderBottomWidth: 1, borderBottomColor: hairline }}>
-        <Text className={cn('flex-1 font-mono text-[8px] uppercase tracking-wider', mutedClass)}>Finding</Text>
-        <Text style={{ width: 84 }} className={cn('font-mono text-[8px] uppercase tracking-wider', mutedClass)}>Class</Text>
-        <Text style={{ width: 92 }} className={cn('text-right font-mono text-[8px] uppercase tracking-wider', mutedClass)}>Exceedance</Text>
-        <Text style={{ width: 66 }} className={cn('text-right font-mono text-[8px] uppercase tracking-wider', mutedClass)}>Active for</Text>
-        <Text style={{ width: 14 }} className="font-mono text-[8px]"> </Text>
+        <Text className={cn('flex-1 font-mono text-[9.5px] uppercase tracking-wider', mutedClass)}>Finding</Text>
+        <Text style={{ width: 84 }} className={cn('font-mono text-[9.5px] uppercase tracking-wider', mutedClass)}>Class</Text>
+        <Text style={{ width: 92 }} className={cn('text-right font-mono text-[9.5px] uppercase tracking-wider', mutedClass)}>Exceedance</Text>
+        <Text style={{ width: 66 }} className={cn('text-right font-mono text-[9.5px] uppercase tracking-wider', mutedClass)}>Active for</Text>
+        <Text style={{ width: 14 }} className="font-mono text-[9.5px]"> </Text>
       </View>
 
       {shown.length === 0 ? (
-        <Text className={cn('py-3 font-body text-[11px] italic', mutedClass)}>Nothing matches this filter.</Text>
+        <Text className={cn('py-3 font-body text-[12.5px] italic', mutedClass)}>Nothing matches this filter.</Text>
       ) : (
         SEVERITY_ORDER.map((severity) => {
           const group = shown.filter((f) => f.severity === severity);
@@ -123,10 +123,10 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
             <View key={severity} className="gap-0">
               <View className="mt-1 flex-row items-center gap-2 rounded px-2 py-1" style={{ backgroundColor: `${tint}14` }}>
                 <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: tint }} />
-                <Text style={{ color: tint }} className="font-mono text-[9px] font-bold tracking-wider">
+                <Text style={{ color: tint }} className="font-mono text-[10.5px] font-bold tracking-wider">
                   {SEVERITY_LABEL[severity].toUpperCase()} {group.length}
                 </Text>
-                <Text className={cn('font-mono text-[9px]', mutedClass)}>· {SEVERITY_BLURB[severity]}</Text>
+                <Text className={cn('font-mono text-[10.5px]', mutedClass)}>· {SEVERITY_BLURB[severity]}</Text>
               </View>
 
               {group.map((finding) => {
@@ -146,10 +146,10 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
                       className="flex-row items-center gap-2 py-2.5"
                     >
                       <View className="flex-1 gap-0.5">
-                        <Text numberOfLines={1} className={cn('font-body text-[12px]', inkClass)}>
+                        <Text numberOfLines={1} className={cn('font-body text-[13.5px]', inkClass)}>
                           {finding.headline}
                         </Text>
-                        <Text numberOfLines={1} className={cn('font-mono text-[9px]', mutedClass)}>
+                        <Text numberOfLines={1} className={cn('font-mono text-[10.5px]', mutedClass)}>
                           {finding.signalCode} · {finding.signalLabel} · {finding.unit} · {finding.rules.length}{' '}
                           {finding.rules.length === 1 ? 'rule' : 'rules'}
                         </Text>
@@ -160,19 +160,19 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
                       <View style={{ width: 84 }}>
                         <Text
                           style={{ color: cls === 'machine' ? inkColour(isDark) : cls === 'chain' ? '#8A8A8A' : severityHex.limit }}
-                          className="font-mono text-[8px] font-bold tracking-wider"
+                          className="font-mono text-[9.5px] font-bold tracking-wider"
                         >
                           {cls === 'machine' ? 'MACHINE' : cls === 'chain' ? 'CHAIN' : 'MIXED'}
                         </Text>
                       </View>
 
-                      <Text style={{ width: 92, color: tint }} className="text-right font-mono text-[10px] font-bold tabular-nums">
+                      <Text style={{ width: 92, color: tint }} className="text-right font-mono text-[11.5px] font-bold tabular-nums">
                         {formatExceedance(worstRule?.exceedance ?? null)}
                       </Text>
-                      <Text style={{ width: 66 }} className={cn('text-right font-mono text-[10px] tabular-nums', mutedClass)}>
+                      <Text style={{ width: 66 }} className={cn('text-right font-mono text-[11.5px] tabular-nums', mutedClass)}>
                         {worstRule ? formatDuration(worstRule.activeForMinutes) : '--'}
                       </Text>
-                      <Text style={{ width: 14 }} className={cn('text-right font-mono text-[9px]', mutedClass)}>
+                      <Text style={{ width: 14 }} className={cn('text-right font-mono text-[10.5px]', mutedClass)}>
                         {open ? '▾' : '▸'}
                       </Text>
                     </Pressable>
@@ -182,8 +182,8 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
                         {finding.rules.map((rule) => (
                           <View key={rule.id} className="flex-row items-center gap-2 py-1.5 pl-3">
                             <View className="flex-1 flex-row items-baseline gap-2">
-                              <Text className={cn('font-mono text-[9px]', mutedClass)}>{rule.code}</Text>
-                              <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
+                              <Text className={cn('font-mono text-[10.5px]', mutedClass)}>{rule.code}</Text>
+                              <Text numberOfLines={1} className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
                                 {rule.label}
                               </Text>
                             </View>
@@ -191,28 +191,28 @@ export function EvidenceTable({ findings, onOpenTrend }: { findings: Finding[]; 
                             <View style={{ width: 84 }}>
                               <Text
                                 style={{ color: rule.evidenceClass === 'chain' ? '#8A8A8A' : inkColour(isDark) }}
-                                className="font-mono text-[8px] tracking-wider"
+                                className="font-mono text-[9.5px] tracking-wider"
                               >
                                 {rule.evidenceClass === 'chain' ? 'CHAIN' : 'MACHINE'}
                               </Text>
                             </View>
 
-                            <Text style={{ width: 92 }} className={cn('text-right font-mono text-[9px] tabular-nums', mutedClass)}>
+                            <Text style={{ width: 92 }} className={cn('text-right font-mono text-[10.5px] tabular-nums', mutedClass)}>
                               {rule.reference} → {rule.observed}
                             </Text>
-                            <Text style={{ width: 66 }} className={cn('text-right font-mono text-[9px] tabular-nums', mutedClass)}>
+                            <Text style={{ width: 66 }} className={cn('text-right font-mono text-[10.5px] tabular-nums', mutedClass)}>
                               {formatDuration(rule.activeForMinutes)}
                             </Text>
-                            <Text style={{ width: 14 }} className="font-mono text-[9px]"> </Text>
+                            <Text style={{ width: 14 }} className="font-mono text-[10.5px]"> </Text>
                           </View>
                         ))}
 
                         {finding.note ? (
                           <View className="flex-row items-start gap-2 px-3 pt-2">
-                            <Text className={cn('flex-1 font-body text-[11px] leading-[16px]', mutedClass)}>{finding.note}</Text>
+                            <Text className={cn('flex-1 font-body text-[12.5px] leading-[18px]', mutedClass)}>{finding.note}</Text>
                             {onOpenTrend ? (
                               <Pressable onPress={() => onOpenTrend(finding)} accessibilityRole="button" accessibilityLabel="Open trend">
-                                <Text className="font-body-medium text-[10px] text-accent">Open trend ›</Text>
+                                <Text className="font-body-medium text-[11.5px] text-accent">Open trend ›</Text>
                               </Pressable>
                             ) : null}
                           </View>

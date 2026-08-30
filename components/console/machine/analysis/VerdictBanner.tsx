@@ -59,11 +59,11 @@ export function VerdictBanner({
 
       <View className="gap-3 px-5 py-4">
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1.5">
-          <Text className={cn('font-mono text-[9px] tracking-[0.16em]', mutedClass)}>MACHINE STATUS</Text>
-          {runState ? <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>· {runState}</Text> : null}
+          <Text className={cn('font-mono text-[10.5px] tracking-[0.16em]', mutedClass)}>MACHINE STATUS</Text>
+          {runState ? <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>· {runState}</Text> : null}
           {advisoryOnly ? (
             <View className={cn('rounded border px-1.5 py-[1px]', lineClass)}>
-              <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>ADVISORY ONLY</Text>
+              <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>ADVISORY ONLY</Text>
             </View>
           ) : null}
         </View>
@@ -77,7 +77,7 @@ export function VerdictBanner({
               not tell you whether to send a fitter or a technician. */}
           {hypothesis ? (
             <View className="rounded border px-2 py-1" style={{ borderColor: `${colour}66` }}>
-              <Text style={{ color: colour }} className="font-mono text-[9px] font-bold tracking-wider">
+              <Text style={{ color: colour }} className="font-mono text-[10.5px] font-bold tracking-wider">
                 {hypothesis.cause === 'chain' ? 'SENSOR CAUSE SUSPECTED' : 'MACHINE CAUSE SUSPECTED'}
               </Text>
             </View>
@@ -86,7 +86,7 @@ export function VerdictBanner({
 
         {hypothesis ? (
           <View className="gap-2" style={{ maxWidth: 720 }}>
-            <Text className={cn('font-body text-[13px] leading-[19px]', inkClass)}>
+            <Text className={cn('font-body text-[14.5px] leading-[21px]', inkClass)}>
               Leading hypothesis is{' '}
               <Text className="font-body-bold" style={{ color: colour }}>
                 {hypothesis.label.toLowerCase()}
@@ -95,24 +95,24 @@ export function VerdictBanner({
             </Text>
 
             <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1">
-              <Text className={cn('font-mono text-[10px]', mutedClass)}>
+              <Text className={cn('font-mono text-[11.5px]', mutedClass)}>
                 CLASS <Text style={{ color: colour }}>{EVIDENCE_LABEL[hypothesis.cause].toUpperCase()}</Text>
               </Text>
-              <Text className={cn('font-mono text-[10px]', mutedClass)}>
+              <Text className={cn('font-mono text-[11.5px]', mutedClass)}>
                 SUBSYSTEM <Text className={inkClass}>{hypothesis.affectedSubsystem}</Text>
               </Text>
               {verdict.machineUnconfirmable ? (
-                <Text style={{ color: colour }} className="font-mono text-[10px] font-bold">
+                <Text style={{ color: colour }} className="font-mono text-[11.5px] font-bold">
                   MACHINE CONDITION UNCONFIRMABLE
                 </Text>
               ) : null}
             </View>
 
             {/* Certainty, stated as what it actually is. */}
-            <Text className={cn('font-body text-[11px] leading-[17px]', mutedClass)}>{confidenceStatement(hypothesis)}</Text>
+            <Text className={cn('font-body text-[12.5px] leading-[19px]', mutedClass)}>{confidenceStatement(hypothesis)}</Text>
           </View>
         ) : (
-          <Text className={cn('font-body text-[13px]', mutedClass)}>
+          <Text className={cn('font-body text-[14.5px]', mutedClass)}>
             No rule has fired. Every signal is inside its registered reference.
           </Text>
         )}
@@ -126,7 +126,7 @@ export function VerdictBanner({
                 accessibilityLabel={primaryActionLabel}
                 className={cn('rounded-lg px-3.5 py-2', isDark ? 'bg-ink' : 'bg-ink-inverse')}
               >
-                <Text className={cn('font-body-bold text-[12px]', isDark ? 'text-ink-inverse' : 'text-ink')}>
+                <Text className={cn('font-body-bold text-[13.5px]', isDark ? 'text-ink-inverse' : 'text-ink')}>
                   {primaryActionLabel}
                 </Text>
               </Pressable>
@@ -134,7 +134,7 @@ export function VerdictBanner({
 
             {onOpenTrend ? (
               <Pressable onPress={onOpenTrend} accessibilityRole="button" accessibilityLabel="Open trend" className="px-2 py-2">
-                <Text className="font-body-medium text-[12px] text-accent">Open trend ›</Text>
+                <Text className="font-body-medium text-[13.5px] text-accent">Open trend ›</Text>
               </Pressable>
             ) : null}
           </View>

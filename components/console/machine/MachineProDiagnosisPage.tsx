@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text, View, type LayoutChangeEvent } from 'react-native';
+import { Platform, ScrollView, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -14,7 +14,7 @@ import {
 import { QUALITY_LABEL, type AnalystHypothesis, type ChainStep, type Conclusion, type DataQuality } from '../../../lib/advancedDiagnosis';
 import { cn } from '../../../lib/cn';
 import { Panel } from '../../Panel';
-import { alpha, consolePalette, radius, tabular, text } from '../../ui';
+import { Hoverable, alpha, consolePalette, radius, tabular, text } from '../../ui';
 import { AnalysisTabs, type AnalysisDepth } from './analysis/AnalysisTabs';
 import type { ActionPriority } from './analysis/ActionList';
 import {
@@ -34,9 +34,12 @@ import {
   FAULTY_SSE_OPTIONAL_SHORT_HISTORY,
   FAULTY_SSE_PROGNOSIS_ROWS,
   FAULTY_SSE_PROGNOSIS_WHAT,
+  HEALTHY_SSE_FORECAST,
+  HEALTHY_SSE_PROGNOSIS_CONDITION,
+  HEALTHY_SSE_PROGNOSIS_MESSAGE,
+  HEALTHY_SSE_PROGNOSIS_PLOTS,
   PREDICTIVE_SSE_FORECAST_PLOTS,
   PREDICTIVE_SSE_MAINTENANCE_GUIDANCE,
-  PREDICTIVE_SSE_PROGNOSIS_ROWS,
   PREDICTIVE_SSE_PROGNOSIS_WHAT,
 } from './demoSseDocs';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
@@ -258,9 +261,27 @@ function predictionSseDetailsFor(forecast: MachinePredictionResult): {
   };
 }
 
+function demoWords(value: string): Set<string> {
+  return new Set(value.toLocaleLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+}
+
 function hasPredictionSseDemoWords(value: string): boolean {
-  const words = new Set(value.toLocaleLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  const words = demoWords(value);
   return words.has('sse') && words.has('prediction') && words.has('demo');
+}
+
+/**
+ * The healthy demo, recognised by its words rather than by an exact name.
+ *
+ * It used to be `machineName === 'Healthy SSE Demo'`, which matched exactly one
+ * spelling — and the machine an engineer actually creates in the tree is called
+ * things like "sse healthy". So the check said false, and separately the page
+ * said "if this is the healthy demo, render nothing at all", which is how the
+ * healthy machine ended up with a blank prognosis either way.
+ */
+function hasHealthySseDemoWords(value: string): boolean {
+  const words = demoWords(value);
+  return words.has('sse') && words.has('healthy');
 }
 
 /** How many things a region is listing. Sits on the region heading, not in it. */
@@ -334,10 +355,16 @@ function PlotSpecList({ rows }: { rows: readonly (readonly string[])[] }) {
   return (
     <View>
       {rows.map((row, index) => (
-        <View
+        <Hoverable
           key={row[0]}
-          className="gap-1.5 py-3"
-          style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+          className="gap-1.5 px-2 py-3"
+          style={({ hovered }) => ({
+            marginHorizontal: -8,
+            borderRadius: radius.sm,
+            borderTopWidth: index === 0 ? 0 : 1,
+            borderTopColor: palette.lineSubtle,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
         >
           <Text className={text.bodyStrong} style={{ color: palette.ink }}>
             {row[0]}
@@ -354,7 +381,7 @@ function PlotSpecList({ rows }: { rows: readonly (readonly string[])[] }) {
               </View>
             ))}
           </View>
-        </View>
+        </Hoverable>
       ))}
     </View>
   );
@@ -669,17 +696,17 @@ function ForecastButton({ forecast, selected, onPress }: { forecast: MachinePred
   const hasDanger = forecast.estimatedTimeToDangerDays !== null;
 
   return (
-    <Pressable
+    <Hoverable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={`${forecast.faultName}, ${CONDITION_LABEL[forecast.condition]}, ${predictionListValue(forecast)}`}
       className="border px-3 py-3"
-      style={({ pressed }) => ({
-        borderColor: selected ? alpha(colour, 0.55) : palette.line,
+      style={({ pressed, hovered }) => ({
+        borderColor: selected || hovered ? alpha(colour, 0.55) : palette.line,
         borderLeftColor: colour,
         borderLeftWidth: 3,
-        backgroundColor: pressed ? palette.hover : selected ? palette.selected : palette.panelRaised,
+        backgroundColor: pressed || hovered ? palette.hover : selected ? palette.selected : palette.panelRaised,
         borderRadius: radius.md,
       })}
     >
@@ -708,7 +735,7 @@ function ForecastButton({ forecast, selected, onPress }: { forecast: MachinePred
           {forecast.thresholdProjectionWording ?? forecast.predictionStatus}
         </Text>
       </View>
-    </Pressable>
+    </Hoverable>
   );
 }
 
@@ -725,9 +752,18 @@ function HealthyPrognosisState({
   model: MachinePrognosticsResult;
   isHealthySseDemo?: boolean;
 }) {
-  const stableSignals = signals.slice(0, 6).map((signal) => `${signal.label}: ${fmt(signal.value, signal.decimals)} ${signal.unit} stable`);
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const stableSignals = signals.map((signal) => `${signal.label}: ${fmt(signal.value, signal.decimals)} ${signal.unit} stable`);
 
-  if (isHealthySseDemo) return null;
+  // The healthy demo used to `return null` here, so the one machine whose whole
+  // point is "a healthy machine still gets a prognosis, and it says nothing is
+  // coming" showed an empty page — which reads as a broken screen rather than as
+  // a stated result. It now renders the same instrument as every other healthy
+  // machine, carrying the demo script's own wording where there is some.
+  const forecastPoints = isHealthySseDemo ? HEALTHY_SSE_FORECAST : HEALTHY_PROGNOSIS_POINTS;
+  const conditionPoints = isHealthySseDemo ? HEALTHY_SSE_PROGNOSIS_CONDITION : null;
+  const plotPoints = isHealthySseDemo ? HEALTHY_SSE_PROGNOSIS_PLOTS : HEALTHY_PROGNOSIS_PLOTS;
 
   const facts: Fact[] = [
     { label: 'CURRENT CONDITION', value: 'HEALTHY', tone: 'healthy', note: runState ?? 'Running normally' },
@@ -758,9 +794,19 @@ function HealthyPrognosisState({
           caption="What the history does and does not support"
           variant="success"
           icon="chart-timeline-variant"
-          items={HEALTHY_PROGNOSIS_POINTS}
+          items={forecastPoints}
           empty="No healthy forecast statement is available."
         />
+        {conditionPoints ? (
+          <EvidenceCard
+            title="Condition and history"
+            caption="What 120 days of measured history show"
+            variant="success"
+            icon="history"
+            items={conditionPoints}
+            empty="No condition statement is available."
+          />
+        ) : null}
         <EvidenceCard
           title="Stable evidence"
           caption="Live readings holding at the healthy baseline"
@@ -774,10 +820,21 @@ function HealthyPrognosisState({
           caption="What the prognosis draws for this machine"
           variant="info"
           icon="chart-line"
-          items={HEALTHY_PROGNOSIS_PLOTS}
+          items={plotPoints}
           empty="No plot definitions are available."
         />
       </View>
+
+      {isHealthySseDemo ? (
+        <View
+          className="px-3 py-2.5"
+          style={{ borderLeftWidth: 2, borderLeftColor: palette.accent, backgroundColor: palette.panelRaised }}
+        >
+          <Text className={text.micro} style={{ color: palette.inkMuted }}>
+            {HEALTHY_SSE_PROGNOSIS_MESSAGE}
+          </Text>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -814,7 +871,7 @@ export function MachineProDiagnosisPage({
   const chainIssueCount = findings.filter((finding) => finding.rules.some((rule) => rule.evidenceClass === 'chain')).length;
   const goodSignalCount = Math.max(0, signals.length - chainIssueCount);
   const healthyOutlook = condition === 'healthy' && issues.length === 0 && findings.length === 0 && forecasts.length === 0;
-  const isHealthySseDemo = machineName === 'Healthy SSE Demo';
+  const isHealthySseDemo = hasHealthySseDemoWords(machineName);
   const isPredictionSseDemo = hasPredictionSseDemoWords(machineName);
   const processRestrictionPrognosis = selected?.predictionId === 'dx-process-downstream-restriction';
   const predictiveGearboxPrognosis =
@@ -982,9 +1039,8 @@ export function MachineProDiagnosisPage({
               {bestPrediction ? (
                 <>
                   {processRestrictionPrognosis ? <DefinitionRows rows={FAULTY_SSE_PROGNOSIS_ROWS} tone="warning" /> : null}
-                  {bestPredictionGearboxDetails ? <DefinitionRows rows={PREDICTIVE_SSE_PROGNOSIS_ROWS} tone="accent" /> : null}
-                  {bestPredictionGearboxDetails ? <ForecastPlot /> : null}
                   <FactStrip facts={outlookFacts} />
+                  {bestPredictionGearboxDetails ? <ForecastPlot /> : null}
                 </>
               ) : (
                 <View
@@ -1049,7 +1105,7 @@ export function MachineProDiagnosisPage({
                         <Text className={text.label} style={{ color: palette.inkFaint }}>
                           PREDICTION / DISPLAY-READY PART 2 OUTPUT
                         </Text>
-                        <Text className="font-body-bold text-[22px] leading-[27px] tracking-[-0.03em]" style={{ color: palette.ink }}>
+                        <Text className="font-body-bold text-[24px] leading-[30px] tracking-[-0.03em]" style={{ color: palette.ink }}>
                           {selected.faultName}
                         </Text>
                         <Text className={text.code} style={{ color: palette.inkMuted }}>

@@ -310,7 +310,7 @@ function SmallButton({
       className={cn('rounded-lg border px-2.5 py-1.5', active && 'border-accent/50 bg-accent/10')}
       style={active ? undefined : { borderColor: hairline }}
     >
-      <Text className={cn('font-mono text-[9px] font-bold tracking-wider', active ? 'text-accent' : mutedClass)}>{label}</Text>
+      <Text className={cn('font-mono text-[10.5px] font-bold tracking-wider', active ? 'text-accent' : mutedClass)}>{label}</Text>
     </Pressable>
   );
 }
@@ -323,11 +323,11 @@ function MetricTile({ label, value, note, tint }: { label: string; value: string
 
   return (
     <View style={{ flexGrow: 1, flexBasis: 148, minWidth: 132, borderColor: hairline }} className="gap-1 rounded-lg border px-3 py-2.5">
-      <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
-      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[16px] tabular-nums', !tint && inkClass)}>
+      <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
+      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[17px] tabular-nums', !tint && inkClass)}>
         {value}
       </Text>
-      {note ? <Text numberOfLines={2} className={cn('font-body text-[9px] leading-[13px]', mutedClass)}>{note}</Text> : null}
+      {note ? <Text numberOfLines={2} className={cn('font-body text-[10.5px] leading-[15px]', mutedClass)}>{note}</Text> : null}
     </View>
   );
 }
@@ -340,9 +340,9 @@ function Unavailable({ title, reason }: { title: string; reason: string }) {
 
   return (
     <View className="items-center gap-1 rounded-xl border px-4 py-5" style={{ borderColor: hairline, borderStyle: 'dashed' }}>
-      <Text className={cn('font-body-medium text-[12px]', inkClass)}>{title}</Text>
-      <Text className={cn('font-mono text-[9px] font-bold tracking-wider', mutedClass)}>UNAVAILABLE</Text>
-      <Text className={cn('text-center font-body text-[10px] leading-[15px]', mutedClass)}>{reason}</Text>
+      <Text className={cn('font-body-medium text-[13.5px]', inkClass)}>{title}</Text>
+      <Text className={cn('font-mono text-[10.5px] font-bold tracking-wider', mutedClass)}>UNAVAILABLE</Text>
+      <Text className={cn('text-center font-body text-[11.5px] leading-[17px]', mutedClass)}>{reason}</Text>
     </View>
   );
 }
@@ -388,7 +388,7 @@ function MultiTrendPlot({ signals }: { signals: SignalStat[] }) {
         {usable.map((signal, index) => (
           <View key={signal.id} className="flex-row items-center gap-1.5">
             <View style={{ width: 12, height: 2, backgroundColor: colours[index % colours.length] }} />
-            <Text className={cn('font-mono text-[9px]', mutedClass)}>
+            <Text className={cn('font-mono text-[10.5px]', mutedClass)}>
               {signal.label} / {fmt(signal.current, signal.decimals)} {signal.unit}
             </Text>
           </View>
@@ -734,8 +734,8 @@ export function AdvancedDiagnosisPage({
 
   const contextItem = (label: string, value: string, tint?: string) => (
     <View className="gap-0.5 rounded border px-2 py-1" style={{ borderColor: hairline }}>
-      <Text className={cn('font-mono text-[7px] tracking-wider', mutedClass)}>{label}</Text>
-      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[10px]', !tint && inkClass)}>
+      <Text className={cn('font-mono text-[8.5px] tracking-wider', mutedClass)}>{label}</Text>
+      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[11.5px]', !tint && inkClass)}>
         {value}
       </Text>
     </View>
@@ -860,7 +860,7 @@ export function AdvancedDiagnosisPage({
             ))}
           </View>
           <MultiTrendPlot signals={selectedTrendStats} />
-          <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+          <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
             Window: {days === 1 ? '24 hours' : `${days} days`}. Series are normalized per signal for comparison.
           </Text>
         </View>
@@ -874,7 +874,7 @@ export function AdvancedDiagnosisPage({
         <View className="gap-4">
           <CorrelationWorkArea rows={correlation} caveat={correlationCaveat} />
           <View className="gap-2">
-            <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>CORRELATION DETAIL</Text>
+            <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>CORRELATION DETAIL</Text>
             <View className="flex-row flex-wrap gap-1.5">
               {correlation.map((row) => (
                 <SmallButton key={row.pair} label={row.pair.toUpperCase()} active={selectedCorrelation?.pair === row.pair} onPress={() => setSelectedCorrelationPair(row.pair)} />
@@ -882,8 +882,8 @@ export function AdvancedDiagnosisPage({
             </View>
             {selectedCorrelation ? (
               <View className="gap-2 rounded-lg border px-3 py-3" style={{ borderColor: hairline }}>
-                <Text className={cn('font-body-medium text-[12px]', inkClass)}>{selectedCorrelation.pair}</Text>
-                <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+                <Text className={cn('font-body-medium text-[13.5px]', inkClass)}>{selectedCorrelation.pair}</Text>
+                <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
                   Strength {fmt(selectedCorrelation.strength, 2)}, {selectedCorrelation.positive ? 'positive' : 'negative'} association,
                   lag {selectedCorrelation.lagMinutes === null ? 'not established' : `${selectedCorrelation.lagMinutes} minutes`}. Association is not treated as causation.
                 </Text>
@@ -916,7 +916,7 @@ export function AdvancedDiagnosisPage({
             multiline
             placeholder="Enter analyst hypothesis, conclusion or case note..."
             placeholderTextColor={isDark ? 'rgba(255,255,255,0.36)' : 'rgba(0,0,0,0.36)'}
-            className={cn('min-h-[88px] rounded-lg border px-3 py-2 font-body text-[11px]', inkClass)}
+            className={cn('min-h-[88px] rounded-lg border px-3 py-2 font-body text-[12.5px]', inkClass)}
             style={{ borderColor: hairline, backgroundColor: inputBg, textAlignVertical: 'top' }}
           />
           <View className="flex-row flex-wrap gap-1.5">
@@ -975,14 +975,14 @@ export function AdvancedDiagnosisPage({
             <View className="gap-2">
               {prognosisModel.predictions.map((prediction) => (
                 <View key={prediction.predictionId} className="flex-row flex-wrap items-center gap-3 rounded-lg border px-3 py-2" style={{ borderColor: hairline }}>
-                  <Text style={{ width: 72, color: conditionHex[prediction.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
+                  <Text style={{ width: 72, color: conditionHex[prediction.condition] }} className="font-mono text-[10.5px] font-bold tracking-wider">
                     {prediction.faultId}
                   </Text>
-                  <Text style={{ width: 126 }} className={cn('font-mono text-[9px]', mutedClass)}>
+                  <Text style={{ width: 126 }} className={cn('font-mono text-[10.5px]', mutedClass)}>
                     {prediction.estimatedTimeToDangerDays === null ? prediction.predictionStatus : `${fmt(prediction.estimatedTimeToDangerDays, 0)} days`}
                   </Text>
-                  <Text className={cn('min-w-[180px] flex-1 font-body text-[10px] leading-[15px]', inkClass)}>{prediction.faultName}</Text>
-                  <Text className={cn('font-mono text-[9px]', mutedClass)}>
+                  <Text className={cn('min-w-[180px] flex-1 font-body text-[11.5px] leading-[17px]', inkClass)}>{prediction.faultName}</Text>
+                  <Text className={cn('font-mono text-[10.5px]', mutedClass)}>
                     {prediction.modelType} / {prediction.modelFit === null ? '--' : `${fmt(prediction.modelFit * 100, 0)}%`}
                   </Text>
                 </View>
@@ -1005,7 +1005,7 @@ export function AdvancedDiagnosisPage({
               />
             </View>
           ) : null}
-          <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+          <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
             {modelCaveat ?? 'Threshold projection is not Remaining Useful Life. Functional-failure forecasts stay unavailable until a validated failure model exists.'}
           </Text>
         </View>
@@ -1044,7 +1044,7 @@ export function AdvancedDiagnosisPage({
           multiline
           placeholder="Add timestamped analyst note..."
           placeholderTextColor={isDark ? 'rgba(255,255,255,0.36)' : 'rgba(0,0,0,0.36)'}
-          className={cn('min-h-[78px] rounded-lg border px-3 py-2 font-body text-[11px]', inkClass)}
+          className={cn('min-h-[78px] rounded-lg border px-3 py-2 font-body text-[12.5px]', inkClass)}
           style={{ borderColor: hairline, backgroundColor: inputBg, textAlignVertical: 'top' }}
         />
         <View className="flex-row flex-wrap gap-1.5">
@@ -1055,11 +1055,11 @@ export function AdvancedDiagnosisPage({
           {records.map((record) => (
             <View key={record.id} className="gap-1 rounded-lg border px-3 py-2" style={{ borderColor: hairline }}>
               <View className="flex-row flex-wrap items-center gap-2">
-                <Text className={cn('font-mono text-[8px]', mutedClass)}>{new Date(record.timestamp).toLocaleString()}</Text>
-                <Text className="font-mono text-[8px] font-bold tracking-wider text-accent">{RECORD_LABEL[record.type]}</Text>
-                <Text className={cn('font-body-medium text-[11px]', inkClass)}>{record.status ?? RECORD_LABEL[record.type]}</Text>
+                <Text className={cn('font-mono text-[9.5px]', mutedClass)}>{new Date(record.timestamp).toLocaleString()}</Text>
+                <Text className="font-mono text-[9.5px] font-bold tracking-wider text-accent">{RECORD_LABEL[record.type]}</Text>
+                <Text className={cn('font-body-medium text-[12.5px]', inkClass)}>{record.status ?? RECORD_LABEL[record.type]}</Text>
               </View>
-              <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>{record.text}</Text>
+              <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>{record.text}</Text>
             </View>
           ))}
         </View>
@@ -1073,12 +1073,12 @@ export function AdvancedDiagnosisPage({
           which machine, which point, and at what speed and load. */}
       <View className="flex-row flex-wrap items-start justify-between gap-3">
         <View className="gap-1">
-          <Text className={cn('font-mono text-[9px] tracking-[0.16em]', mutedClass)}>ULTRON / ANALYSIS / ADVANCED DIAGNOSIS</Text>
+          <Text className={cn('font-mono text-[10.5px] tracking-[0.16em]', mutedClass)}>ULTRON / ANALYSIS / ADVANCED DIAGNOSIS</Text>
           <View className="flex-row flex-wrap items-baseline gap-1.5">
-            <Text className={cn('font-heading-medium text-[19px]', inkClass)}>{machineName}</Text>
-            <Text className={cn('font-body text-[12px]', mutedClass)}>· {template}</Text>
+            <Text className={cn('font-heading-medium text-[21px]', inkClass)}>{machineName}</Text>
+            <Text className={cn('font-body text-[13.5px]', mutedClass)}>· {template}</Text>
           </View>
-          <Text numberOfLines={1} className={cn('font-mono text-[9px]', mutedClass)}>
+          <Text numberOfLines={1} className={cn('font-mono text-[10.5px]', mutedClass)}>
             {activeExplorer?.trail.join(' / ') ?? (trail.length > 0 ? trail.map((n) => n.name).join(' / ') : 'no selection')}
           </Text>
         </View>
@@ -1135,7 +1135,7 @@ export function AdvancedDiagnosisPage({
                   onChangeText={setQuery}
                   placeholder="Search signal, problem, tab..."
                   placeholderTextColor={isDark ? 'rgba(255,255,255,0.36)' : 'rgba(0,0,0,0.36)'}
-                  className={cn('rounded-lg border px-3 py-2 font-body text-[11px]', inkClass)}
+                  className={cn('rounded-lg border px-3 py-2 font-body text-[12.5px]', inkClass)}
                   style={{ borderColor: hairline, backgroundColor: inputBg }}
                 />
                 {searchResults.length > 0 ? (
@@ -1154,9 +1154,9 @@ export function AdvancedDiagnosisPage({
                         }}
                         className="gap-0.5 rounded px-2 py-1.5"
                       >
-                        <Text className="font-mono text-[7px] font-bold tracking-wider text-accent">{result.type}</Text>
-                        <Text numberOfLines={1} className={cn('font-body-medium text-[11px]', inkClass)}>{result.label}</Text>
-                        <Text numberOfLines={1} className={cn('font-body text-[9px]', mutedClass)}>{result.detail}</Text>
+                        <Text className="font-mono text-[8.5px] font-bold tracking-wider text-accent">{result.type}</Text>
+                        <Text numberOfLines={1} className={cn('font-body-medium text-[12.5px]', inkClass)}>{result.label}</Text>
+                        <Text numberOfLines={1} className={cn('font-body text-[10.5px]', mutedClass)}>{result.detail}</Text>
                       </Pressable>
                     ))}
                   </View>
@@ -1177,8 +1177,8 @@ export function AdvancedDiagnosisPage({
                           >
                             <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: conditionHex[node.condition] }} />
                             <View className="min-w-0 flex-1">
-                              <Text numberOfLines={1} className={cn('font-body-medium text-[11px]', active ? 'text-accent' : inkClass)}>{node.label}</Text>
-                              <Text numberOfLines={1} className={cn('font-mono text-[8px]', mutedClass)}>{node.kind} / {node.detail}</Text>
+                              <Text numberOfLines={1} className={cn('font-body-medium text-[12.5px]', active ? 'text-accent' : inkClass)}>{node.label}</Text>
+                              <Text numberOfLines={1} className={cn('font-mono text-[9.5px]', mutedClass)}>{node.kind} / {node.detail}</Text>
                             </View>
                           </Pressable>
                         );
@@ -1266,12 +1266,12 @@ export function AdvancedDiagnosisPage({
             />
           </View>
           {missingEvidence.length > 0 ? (
-            <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+            <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
               Recommended additional evidence: {missingEvidence.join(' / ')}
             </Text>
           ) : null}
           {doThis.length > 0 ? (
-            <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+            <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
               Current corrective actions: {doThis.join(' / ')}
             </Text>
           ) : null}

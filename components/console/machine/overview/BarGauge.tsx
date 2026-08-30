@@ -199,10 +199,10 @@ export function BarGauge({
   const callout = (label: string, limit: number, tint: string) => (
     <View style={{ position: 'absolute', left: 0, width: p.calloutWidth, bottom: fromFloor(toPx(limit)) - 1 }}>
       <View className="flex-row items-baseline gap-2 pb-1">
-        <Text style={{ color: tint }} className="font-mono text-[11px] font-bold tracking-wide">
+        <Text style={{ color: tint }} className="font-mono text-[12.5px] font-bold tracking-wide">
           {label}
         </Text>
-        <Text className={cn('font-mono text-[11px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{limit.toFixed(decimals)}</Text>
+        <Text className={cn('font-mono text-[12.5px]', isDark ? 'text-ink' : 'text-ink-inverse')}>{limit.toFixed(decimals)}</Text>
       </View>
       <LinearGradient
         colors={[tint, hexAlpha(tint, 0.7), 'rgba(0,0,0,0)']}

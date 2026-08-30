@@ -35,7 +35,7 @@ import {
   StateTagGrid,
   VerdictHeader,
 } from './analysis/DiagnosisPresentation';
-import { Button, alpha, radius, tabular, text } from '../../ui';
+import { Button, Hoverable, alpha, radius, tabular, text } from '../../ui';
 
 const MASTER_WIDE = { flexBasis: 300, flexGrow: 3, minWidth: 280 } as const;
 const DETAIL_WIDE = { flexBasis: 660, flexGrow: 7, minWidth: 280 } as const;
@@ -91,36 +91,36 @@ function ProblemRow({ problem, selected, onPress }: { problem: DiagnosisProblem;
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
   return (
-    <Pressable
+    <Hoverable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={`${problem.title}, ${problem.component}, ${CONDITION_LABEL[problem.condition]}`}
       className="border px-3 py-3"
-      style={({ pressed }) => ({
-        borderColor: selected ? `${conditionColour}8C` : palette.line,
+      style={({ pressed, hovered }) => ({
+        borderColor: selected || hovered ? `${conditionColour}8C` : palette.line,
         borderLeftColor: conditionColour,
         borderLeftWidth: 3,
-        backgroundColor: pressed ? palette.hover : selected ? palette.selected : palette.panelRaised,
-        borderRadius: 4,
+        backgroundColor: pressed || hovered ? palette.hover : selected ? palette.selected : palette.panelRaised,
+        borderRadius: radius.md,
       })}
     >
       <View className="gap-2">
         <View className="flex-row items-start justify-between gap-3">
           <View className="min-w-0 flex-1 gap-1">
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{problem.component.toLocaleUpperCase()}</Text>
-            <Text className={cn('font-body-medium text-[12px]', inkClass)}>{problem.title}</Text>
+            <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{problem.component.toLocaleUpperCase()}</Text>
+            <Text className={cn('font-body-medium text-[13.5px]', inkClass)}>{problem.title}</Text>
           </View>
           <ConditionBadge condition={problem.condition} />
         </View>
-        <Text className={cn('font-body text-[10px] leading-4', mutedClass)}>{problem.primaryFinding}</Text>
+        <Text className={cn('font-body text-[11.5px] leading-4', mutedClass)}>{problem.primaryFinding}</Text>
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
-          <Text className="font-mono text-[9px] font-bold text-accent">{problem.scoreLabel}</Text>
-          <Text className={cn('font-mono text-[8px]', mutedClass)}>{problem.trend.toLocaleUpperCase()}</Text>
-          <Text className={cn('font-mono text-[8px]', mutedClass)}>{problem.lifecycle}</Text>
+          <Text className="font-mono text-[10.5px] font-bold text-accent">{problem.scoreLabel}</Text>
+          <Text className={cn('font-mono text-[9.5px]', mutedClass)}>{problem.trend.toLocaleUpperCase()}</Text>
+          <Text className={cn('font-mono text-[9.5px]', mutedClass)}>{problem.lifecycle}</Text>
         </View>
       </View>
-    </Pressable>
+    </Hoverable>
   );
 }
 
@@ -133,10 +133,16 @@ function DiagnosticChain({ steps }: { steps: DiagnosisChainStep[] }) {
   return (
     <View className="flex-row flex-wrap" style={{ gap: 12 }}>
       {steps.map((step, index) => (
-        <View
+        <Hoverable
           key={step.label}
-          className="gap-2 border-t pt-4"
-          style={{ ...COLUMN, borderColor: step.established ? palette.accentBorder : palette.lineStrong }}
+          className="gap-2 border-t px-2 pb-2 pt-4"
+          style={({ hovered }) => ({
+            ...COLUMN,
+            marginHorizontal: -8,
+            borderRadius: radius.sm,
+            borderColor: step.established ? palette.accentBorder : palette.lineStrong,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
         >
           <View className="flex-row items-center gap-2">
             <View
@@ -147,12 +153,12 @@ function DiagnosticChain({ steps }: { steps: DiagnosisChainStep[] }) {
                 backgroundColor: step.established ? palette.accent : palette.neutral,
               }}
             />
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>
+            <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>
               {String(index + 1).padStart(2, '0')} / {step.label.toLocaleUpperCase()}
             </Text>
           </View>
-          <Text className={cn('font-body-medium text-[11px] leading-5', inkClass)}>{step.value}</Text>
-        </View>
+          <Text className={cn('font-body-medium text-[12.5px] leading-5', inkClass)}>{step.value}</Text>
+        </Hoverable>
       ))}
     </View>
   );
@@ -206,24 +212,24 @@ function MachineDoctorGrid({ problem }: { problem: DiagnosisProblem }) {
 
   return (
     <View className="gap-3">
-      <Text className={cn('font-heading-medium text-[20px]', inkClass)}>{problem.title}</Text>
+      <Text className={cn('font-heading-medium text-[22px]', inkClass)}>{problem.title}</Text>
       <View className="flex-row flex-wrap" style={{ gap: 14 }}>
         {cards.map((card) => (
-          <View
+          <Hoverable
             key={card.label}
             className="gap-4 border px-4 py-4"
-            style={{
+            style={({ hovered }) => ({
               flexBasis: 300,
               flexGrow: 1,
               minWidth: 260,
-              borderColor: palette.line,
-              backgroundColor: palette.panelRaised,
-              borderRadius: 8,
-            }}
+              borderColor: hovered ? alpha(palette.accent, 0.4) : palette.line,
+              backgroundColor: hovered ? palette.hover : palette.panelRaised,
+              borderRadius: radius.md,
+            })}
           >
-            <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">{card.label}</Text>
-            <Text className={cn('font-body-medium text-[14px] leading-5', inkClass)}>{card.value}</Text>
-          </View>
+            <Text className="font-mono text-[10.5px] font-bold tracking-wider text-accent">{card.label}</Text>
+            <Text className={cn('font-body-medium text-[15px] leading-5', inkClass)}>{card.value}</Text>
+          </Hoverable>
         ))}
       </View>
     </View>
@@ -246,10 +252,14 @@ function MetadataStrip({ problem, dataQuality }: { problem: DiagnosisProblem; da
   return (
     <View className="flex-row flex-wrap border" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
       {entries.map(([label, value]) => (
-        <View key={label} className="gap-1 px-3 py-2.5" style={{ minWidth: 150, flexGrow: 1 }}>
-          <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
-          <Text className={cn('font-mono text-[10px] font-bold', inkClass)}>{value}</Text>
-        </View>
+        <Hoverable
+          key={label}
+          className="gap-1 px-3 py-2.5"
+          style={({ hovered }) => ({ minWidth: 150, flexGrow: 1, backgroundColor: hovered ? palette.hover : undefined })}
+        >
+          <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
+          <Text className={cn('font-mono text-[11.5px] font-bold', inkClass)}>{value}</Text>
+        </Hoverable>
       ))}
     </View>
   );
@@ -262,44 +272,61 @@ function DifferentialRow({ differential, index }: { differential: DiagnosisDiffe
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
   return (
-    <View className="flex-row items-start gap-3 border-b py-4" style={{ borderColor: palette.lineSubtle }}>
-      <Text className="font-mono text-[10px] font-bold text-accent">{String(index + 1).padStart(2, '0')}</Text>
+    <Hoverable
+      className="flex-row items-start gap-3 border-b px-2 py-4"
+      style={({ hovered }) => ({
+        marginHorizontal: -8,
+        borderRadius: radius.sm,
+        borderColor: palette.lineSubtle,
+        backgroundColor: hovered ? palette.hover : undefined,
+      })}
+    >
+      <Text className="font-mono text-[11.5px] font-bold text-accent">{String(index + 1).padStart(2, '0')}</Text>
       <View className="min-w-0 flex-1 gap-2">
         <View className="flex-row flex-wrap items-baseline gap-2">
-          <Text className={cn('font-body-medium text-[13px]', inkClass)}>{differential.name}</Text>
-          <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{differential.status}</Text>
+          <Text className={cn('font-body-medium text-[14.5px]', inkClass)}>{differential.name}</Text>
+          <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{differential.status}</Text>
         </View>
-        <Text className={cn('font-body text-[10px] leading-4', mutedClass)}>{differential.mechanism}</Text>
-        <Text className={cn('font-mono text-[8px] leading-4', mutedClass)}>
+        <Text className={cn('font-body text-[11.5px] leading-4', mutedClass)}>{differential.mechanism}</Text>
+        <Text className={cn('font-mono text-[9.5px] leading-4', mutedClass)}>
           {differential.limiting.length > 0
             ? `LIMITED BY: ${differential.limiting.join(' / ')}`
             : 'AVAILABLE EXPECTED EVIDENCE IS PRESENT'}
         </Text>
       </View>
       <View className="items-end gap-1">
-        <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>MATCH</Text>
-        <Text className="font-mono text-[22px] text-accent" style={{ fontWeight: '300' }}>
+        <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>MATCH</Text>
+        <Text className="font-mono text-[24px] text-accent" style={{ fontWeight: '300' }}>
           {differential.matchScore ?? '--'}
         </Text>
       </View>
-    </View>
+    </Hoverable>
   );
 }
 
 function OrderedList({ items, empty }: { items: string[]; empty: string }) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
-  if (items.length === 0) return <Text className={cn('font-body text-[10px] leading-4', mutedClass)}>{empty}</Text>;
+  if (items.length === 0) return <Text className={cn('font-body text-[11.5px] leading-4', mutedClass)}>{empty}</Text>;
 
   return (
-    <View className="gap-2">
+    <View>
       {items.map((item, index) => (
-        <View key={item} className="flex-row items-start gap-2">
-          <Text className="font-mono text-[9px] font-bold text-accent">{String(index + 1).padStart(2, '0')}</Text>
-          <Text className={cn('min-w-0 flex-1 font-body text-[10px] leading-4', inkClass)}>{item}</Text>
-        </View>
+        <Hoverable
+          key={item}
+          className="flex-row items-start gap-2 px-2 py-1.5"
+          style={({ hovered }) => ({
+            marginHorizontal: -8,
+            borderRadius: radius.sm,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
+        >
+          <Text className="font-mono text-[10.5px] font-bold text-accent">{String(index + 1).padStart(2, '0')}</Text>
+          <Text className={cn('min-w-0 flex-1 font-body text-[11.5px] leading-4', inkClass)}>{item}</Text>
+        </Hoverable>
       ))}
     </View>
   );
@@ -312,10 +339,10 @@ function DemoDocList({ title, items }: { title: string; items: readonly string[]
 
   return (
     <View className="gap-2">
-      <Text className={cn('font-mono text-[9px] font-bold uppercase tracking-wider', mutedClass)}>{title}</Text>
+      <Text className={cn('font-mono text-[10.5px] font-bold uppercase tracking-wider', mutedClass)}>{title}</Text>
       <View className="gap-1.5">
         {items.map((item) => (
-          <Text key={item} className={cn('font-body text-[11px] leading-4', inkClass)}>
+          <Text key={item} className={cn('font-body text-[12.5px] leading-4', inkClass)}>
             {item}
           </Text>
         ))}
@@ -346,10 +373,10 @@ function DemoDiagnosisDocBlock({
       <View className="gap-3">
         {rows.map(([label, value]) => (
           <View key={label} className="flex-row flex-wrap items-baseline gap-x-8 gap-y-1">
-            <Text className={cn('font-body-medium text-[11px]', mutedClass)} style={{ width: 240 }}>
+            <Text className={cn('font-body-medium text-[12.5px]', mutedClass)} style={{ width: 240 }}>
               {label}
             </Text>
-            <Text className="min-w-0 flex-1 font-body-bold text-[12px]" style={{ color: valueColor }}>
+            <Text className="min-w-0 flex-1 font-body-bold text-[13.5px]" style={{ color: valueColor }}>
               {value}
             </Text>
           </View>
@@ -363,8 +390,8 @@ function DemoDiagnosisDocBlock({
             className="gap-3 border px-3 py-3"
             style={{ flexBasis: 230, flexGrow: 1, minWidth: 210, borderColor: palette.line, backgroundColor: palette.panelRaised, borderRadius: 6 }}
           >
-            <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">{label}</Text>
-            <Text className={cn('font-body-medium text-[12px] leading-5', inkClass)}>{value}</Text>
+            <Text className="font-mono text-[10.5px] font-bold tracking-wider text-accent">{label}</Text>
+            <Text className={cn('font-body-medium text-[13.5px] leading-5', inkClass)}>{value}</Text>
           </View>
         ))}
       </View>
@@ -702,7 +729,7 @@ export function MachineDiagnosisPage({
                   title="Active problem groups"
                   trailing={
                     <View className="border px-2 py-1" style={{ borderColor: palette.line, borderRadius: 4 }}>
-                      <Text className={cn('font-mono text-[10px] font-bold', inkClass)}>{model.problems.length}</Text>
+                      <Text className={cn('font-mono text-[11.5px] font-bold', inkClass)}>{model.problems.length}</Text>
                     </View>
                   }
                 />
@@ -739,11 +766,11 @@ export function MachineDiagnosisPage({
 
                   <View className="flex-row flex-wrap items-start justify-between gap-4 border-b pb-5" style={{ borderColor: palette.line }}>
                     <View className="min-w-0 flex-1 gap-2">
-                      <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>
+                      <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>
                         MACHINE DOCTOR / SELECTED PROBLEM
                       </Text>
-                      <Text className={cn('font-heading-medium text-[22px]', inkClass)}>{selected.title}</Text>
-                      <Text className={cn('font-body text-[11px]', mutedClass)}>
+                      <Text className={cn('font-heading-medium text-[24px]', inkClass)}>{selected.title}</Text>
+                      <Text className={cn('font-body text-[12.5px]', mutedClass)}>
                         {selected.component} / {selected.category} / {selected.consequence}
                       </Text>
                     </View>
@@ -757,8 +784,8 @@ export function MachineDiagnosisPage({
                           className="flex-row items-center gap-2 border border-accent/45 bg-accent/10 px-3 py-2"
                           style={{ borderRadius: 4 }}
                         >
-                          <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">OPEN PROGNOSIS</Text>
-                          <Text className="font-mono text-[11px] text-accent">&gt;</Text>
+                          <Text className="font-mono text-[10.5px] font-bold tracking-wider text-accent">OPEN PROGNOSIS</Text>
+                          <Text className="font-mono text-[12.5px] text-accent">&gt;</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -772,12 +799,12 @@ export function MachineDiagnosisPage({
                     className="border-l-2 px-3 py-2"
                     style={{ borderLeftColor: palette.warning, backgroundColor: palette.panelRaised }}
                   >
-                    <Text className={cn('font-body text-[10px] leading-4', mutedClass)}>{model.modelCaveat}</Text>
+                    <Text className={cn('font-body text-[11.5px] leading-4', mutedClass)}>{model.modelCaveat}</Text>
                   </View>
 
                   <View className="gap-1">
                     <SectionHeading eyebrow="RANKED EXPLANATIONS" title="Differential cause ranking" />
-                    <Text className={cn('font-body text-[9px] leading-4', mutedClass)}>
+                    <Text className={cn('font-body text-[10.5px] leading-4', mutedClass)}>
                       Match scores order explanations against each other. They are not calibrated probabilities.
                     </Text>
                     <View>
@@ -826,10 +853,14 @@ export function MachineDiagnosisPage({
                     <SectionHeading eyebrow="CURRENT CONSEQUENCE MAP" title="Impact assessment" />
                     <View className="flex-row flex-wrap border-y" style={{ borderColor: palette.line }}>
                       {selected.impacts.map((impact) => (
-                        <View key={impact.label} className="gap-2 px-3 py-4" style={IMPACT}>
-                          <Text className="font-mono text-[8px] font-bold tracking-wider text-accent">{impact.label}</Text>
-                          <Text className={cn('font-body text-[10px] leading-4', mutedClass)}>{impact.value}</Text>
-                        </View>
+                        <Hoverable
+                          key={impact.label}
+                          className="gap-2 px-3 py-4"
+                          style={({ hovered }) => ({ ...IMPACT, backgroundColor: hovered ? palette.hover : undefined })}
+                        >
+                          <Text className="font-mono text-[9.5px] font-bold tracking-wider text-accent">{impact.label}</Text>
+                          <Text className={cn('font-body text-[11.5px] leading-4', mutedClass)}>{impact.value}</Text>
+                        </Hoverable>
                       ))}
                     </View>
                   </View>
@@ -843,7 +874,7 @@ export function MachineDiagnosisPage({
                       <SectionHeading eyebrow="CAUSE-SPECIFIC RESPONSE" title="Corrective options by cause" />
                       {selected.differentials.map((differential) => (
                         <View key={differential.id} className="gap-2 border-b pb-3" style={{ borderColor: palette.lineSubtle }}>
-                          <Text className={cn('font-body-medium text-[10px]', inkClass)}>{differential.name}</Text>
+                          <Text className={cn('font-body-medium text-[11.5px]', inkClass)}>{differential.name}</Text>
                           <OrderedList
                             items={differential.correctiveActions}
                             empty="No corrective option is established until the cause is discriminated."
@@ -857,7 +888,7 @@ export function MachineDiagnosisPage({
                         items={selected.verification}
                         empty="No verification window can be established from the current data."
                       />
-                      <Text className={cn('font-mono text-[8px] leading-4', mutedClass)}>
+                      <Text className={cn('font-mono text-[9.5px] leading-4', mutedClass)}>
                         Observation window: not established by the current live analysis contract.
                       </Text>
                     </View>

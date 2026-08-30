@@ -23,7 +23,7 @@ function Count({ label, count, colour }: { label: string; count: number; colour:
       <Text style={{ color: colour }} className="font-mono text-lg font-bold tabular-nums">
         {count}
       </Text>
-      <Text style={{ color: colour }} className="font-body-medium text-[10px] uppercase tracking-wider">
+      <Text style={{ color: colour }} className="font-body-medium text-[11.5px] uppercase tracking-wider">
         {label}
       </Text>
     </View>
@@ -65,10 +65,10 @@ export function AlarmSummaryCard({
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
-        <Text className={cn('font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>Alarm State</Text>
+        <Text className={cn('font-body-medium text-[11.5px] uppercase tracking-wider', mutedClass)}>Alarm State</Text>
         {onOpenAlarms ? (
           <Pressable onPress={onOpenAlarms}>
-            <Text className="font-body-medium text-[10px] text-accent">Open alarms ›</Text>
+            <Text className="font-body-medium text-[11.5px] text-accent">Open alarms ›</Text>
           </Pressable>
         ) : null}
       </View>
@@ -81,7 +81,7 @@ export function AlarmSummaryCard({
 
       {/* Unacknowledged is the number that says whether anyone has looked, which
           is a different question from how many are active. */}
-      <Text className={cn('font-body text-[11px]', mutedClass)}>
+      <Text className={cn('font-body text-[12.5px]', mutedClass)}>
         {unacked === 0 ? 'Nothing awaiting acknowledgement.' : `${unacked} active, not yet acknowledged.`}
       </Text>
 
@@ -90,11 +90,11 @@ export function AlarmSummaryCard({
           {elevated.map((condition) => (
             <View key={condition.id} className={cn('flex-row items-center gap-2 rounded-lg border px-2.5 py-1.5', lineClass)}>
               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: levels[condition.level] }} />
-              <Text className={cn('font-mono text-[10px]', mutedClass)}>{condition.code}</Text>
-              <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
+              <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{condition.code}</Text>
+              <Text numberOfLines={1} className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
                 {condition.label}
               </Text>
-              <Text style={{ color: levels[condition.level] }} className="font-mono text-[11px] font-bold tabular-nums">
+              <Text style={{ color: levels[condition.level] }} className="font-mono text-[12.5px] font-bold tabular-nums">
                 {condition.value.toFixed(condition.band.decimals)} {condition.unit}
               </Text>
             </View>

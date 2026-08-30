@@ -37,15 +37,15 @@ export function ConditionSummary({
   return (
     <View className="gap-4">
       <View>
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Machine condition summary</Text>
-        <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>PLAIN-LANGUAGE INTERPRETATION</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Machine condition summary</Text>
+        <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>PLAIN-LANGUAGE INTERPRETATION</Text>
       </View>
 
       <View className="flex-row flex-wrap gap-4">
         <View style={{ flexGrow: 3, flexBasis: 420, minWidth: 300 }} className="gap-2">
-          <Text className={cn('font-mono text-[9px] font-bold tracking-wider text-accent')}>WHAT IS HAPPENING</Text>
-          <Text className={cn('font-body-bold text-[15px] leading-[21px]', inkClass)}>{summary.headline}</Text>
-          <Text className={cn('font-body text-[12px] leading-[19px]', mutedClass)} style={{ maxWidth: 620 }}>
+          <Text className={cn('font-mono text-[10.5px] font-bold tracking-wider text-accent')}>WHAT IS HAPPENING</Text>
+          <Text className={cn('font-body-bold text-[16px] leading-[23px]', inkClass)}>{summary.headline}</Text>
+          <Text className={cn('font-body text-[13.5px] leading-[21px]', mutedClass)} style={{ maxWidth: 620 }}>
             {summary.body}
           </Text>
         </View>
@@ -87,12 +87,12 @@ export function PriorityActions({ actions }: { actions: PriorityAction[] }) {
   return (
     <View className="gap-3">
       <View>
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>What needs attention now</Text>
-        <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>TOP PRIORITY ACTIONS</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>What needs attention now</Text>
+        <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>TOP PRIORITY ACTIONS</Text>
       </View>
 
       {actions.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>Nothing requires action.</Text>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>Nothing requires action.</Text>
       ) : (
         <View className="flex-row flex-wrap gap-3">
           {actions.map((action) => {
@@ -104,17 +104,17 @@ export function PriorityActions({ actions }: { actions: PriorityAction[] }) {
                 className="gap-2 rounded-xl border px-3.5 py-3"
               >
                 <View className="flex-row items-center gap-2">
-                  <Text style={{ color: colour }} className="font-mono text-[10px] font-bold tracking-wider">
+                  <Text style={{ color: colour }} className="font-mono text-[11.5px] font-bold tracking-wider">
                     {action.priority}
                   </Text>
                   <View style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: hairline }} />
-                  <Text numberOfLines={1} className={cn('flex-1 font-mono text-[10px] tracking-wider', mutedClass)}>
+                  <Text numberOfLines={1} className={cn('flex-1 font-mono text-[11.5px] tracking-wider', mutedClass)}>
                     {action.area}
                   </Text>
                 </View>
 
-                <Text className={cn('font-body-bold text-[13px] leading-[18px]', inkClass)}>{action.title}</Text>
-                <Text className={cn('font-body text-[11px] leading-[16px]', mutedClass)}>{action.description}</Text>
+                <Text className={cn('font-body-bold text-[14.5px] leading-[20px]', inkClass)}>{action.title}</Text>
+                <Text className={cn('font-body text-[12.5px] leading-[18px]', mutedClass)}>{action.description}</Text>
               </View>
             );
           })}

@@ -56,26 +56,26 @@ function Node({ node, onPress }: { node: TrainNode; onPress?: (node: TrainNode) 
       <View className="flex-row items-start justify-between gap-2">
         <View className="flex-1 flex-row items-center gap-1.5">
           {node.type ? <ComponentTypeIcon type={node.type} color={isDark ? '#F5F5F5' : '#0A0A0A'} size={14} /> : null}
-          <Text numberOfLines={1} className={cn('flex-1 font-body-bold text-[12px]', inkClass)}>
+          <Text numberOfLines={1} className={cn('flex-1 font-body-bold text-[13.5px]', inkClass)}>
             {node.name}
           </Text>
         </View>
         <View style={{ width: 7, height: 7, borderRadius: 4, marginTop: 3, backgroundColor: colour }} />
       </View>
 
-      <Text numberOfLines={1} className={cn('font-mono text-[9px]', mutedClass)}>
+      <Text numberOfLines={1} className={cn('font-mono text-[10.5px]', mutedClass)}>
         {node.detail}
       </Text>
 
       {monitored ? (
         <>
           <View className="flex-row items-end justify-between">
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>HEALTH</Text>
+            <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>HEALTH</Text>
             <View className="flex-row items-baseline gap-1.5">
-              <Text style={{ color: colour }} className="font-mono text-[17px] font-bold tabular-nums">
+              <Text style={{ color: colour }} className="font-mono text-[19px] font-bold tabular-nums">
                 {Math.round(node.health as number)}%
               </Text>
-              <Text style={{ color: colour }} className="font-mono text-[8px] font-bold tracking-wider">
+              <Text style={{ color: colour }} className="font-mono text-[9.5px] font-bold tracking-wider">
                 {CONDITION_LABEL[node.condition]}
               </Text>
             </View>
@@ -84,8 +84,8 @@ function Node({ node, onPress }: { node: TrainNode; onPress?: (node: TrainNode) 
           <HealthBar health={node.health} colour={colour} />
 
           <View className="flex-row items-center justify-between gap-2 pt-2" style={{ borderTopWidth: 1, borderTopColor: hairline }}>
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{node.metricLabel}</Text>
-            <Text numberOfLines={1} className={cn('font-mono text-[11px] tabular-nums', inkClass)}>
+            <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{node.metricLabel}</Text>
+            <Text numberOfLines={1} className={cn('font-mono text-[12.5px] tabular-nums', inkClass)}>
               {node.metricValue}
             </Text>
           </View>
@@ -95,14 +95,14 @@ function Node({ node, onPress }: { node: TrainNode; onPress?: (node: TrainNode) 
            healthy would make an unmonitored component the most reassuring thing
            on the page. */
         <View className="py-1">
-          <Text className={cn('font-body text-[10px] italic', mutedClass)}>Not monitored</Text>
+          <Text className={cn('font-body text-[11.5px] italic', mutedClass)}>Not monitored</Text>
         </View>
       )}
 
       {/* Pushed to the bottom of the card rather than following the block above
           it, so the observation lines read across the train as one row instead
           of stepping with whatever each element had to say above them. */}
-      <Text numberOfLines={2} className={cn('mt-auto font-body text-[10px] leading-[14px]', mutedClass)}>
+      <Text numberOfLines={2} className={cn('mt-auto font-body text-[11.5px] leading-[16px]', mutedClass)}>
         {node.observation}
       </Text>
     </View>
@@ -165,16 +165,16 @@ export function TrainHealth({
     <View className="gap-3">
       <View className="flex-row flex-wrap items-end justify-between gap-2">
         <View>
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Machine train health</Text>
-          <Text numberOfLines={1} className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Machine train health</Text>
+          <Text numberOfLines={1} className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>
             {nodes.map((n) => n.name.toUpperCase()).join('  →  ')}
           </Text>
         </View>
-        {mix ? <Text className={cn('font-mono text-[9px]', mutedClass)}>{mix}</Text> : null}
+        {mix ? <Text className={cn('font-mono text-[10.5px]', mutedClass)}>{mix}</Text> : null}
       </View>
 
       {nodes.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>
           This machine has no components configured, so there is no train to show.
         </Text>
       ) : (
@@ -185,7 +185,7 @@ export function TrainHealth({
                 {index > 0 ? (
                   <View className="flex-row items-center" style={{ width: 26 }}>
                     <View style={{ flex: 1, height: 1, backgroundColor: connector }} />
-                    <Text style={{ color: connector }} className="font-mono text-[12px]">
+                    <Text style={{ color: connector }} className="font-mono text-[13.5px]">
                       ›
                     </Text>
                   </View>
@@ -201,7 +201,7 @@ export function TrainHealth({
           than as decoration. */}
       {criticalPath ? (
         <View className="rounded-lg border px-3.5 py-2.5" style={{ borderColor: hairline }}>
-          <Text className={cn('font-body text-[11px] leading-[17px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
+          <Text className={cn('font-body text-[12.5px] leading-[19px]', isDark ? 'text-ink' : 'text-ink-inverse')}>
             <Text style={{ color: conditionHex.danger }} className="font-body-bold">
               Critical path:{' '}
             </Text>

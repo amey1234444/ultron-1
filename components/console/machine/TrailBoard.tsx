@@ -1211,10 +1211,10 @@ export function TrailBoard({
                   paddingVertical: 5,
                 }}
               >
-                <Text className="font-body-bold text-[12px]" style={{ color: palette.ink }} numberOfLines={1}>
+                <Text className="font-body-bold text-[13.5px]" style={{ color: palette.ink }} numberOfLines={1}>
                   {magnetTarget.connector.label}
                 </Text>
-                <Text className="font-mono text-[10px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
+                <Text className="font-mono text-[11.5px]" style={{ color: palette.inkMuted }} numberOfLines={1}>
                   {magnetTarget.connector.analyzerTag
                     ? `locks to analyzer tag ${magnetTarget.connector.analyzerTag}`
                     : 'recorded, not read by the analysis layer'}

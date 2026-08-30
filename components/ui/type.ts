@@ -49,25 +49,47 @@
 //    console that shouts on a normal day has nothing left for a bad one.
 //  - Nothing outside this file may declare a font size. If a size is needed
 //    that is not here, the right change is to this file.
+//
+// Sizing note (the scale moved up one rung)
+// -----------------------------------------
+// Every size here is ~1px larger than the scale this layer shipped with. The
+// original was drawn on a laptop panel and read as dense-but-precise there; on
+// the 1600px+ displays the console is actually mounted on it read as small,
+// and small is the one thing a plant console cannot be — the reader is often a
+// metre back from the screen and not wearing their close-up glasses. The
+// relationships between the rungs are unchanged, so nothing about the hierarchy
+// moves; the whole system just stopped whispering.
 import type { TextStyle } from 'react-native';
 
 export const text = {
   /** The one number or word a screen exists to show. Pair with `displayWeight`. */
-  display: 'font-body text-[26px] leading-[30px] tracking-[-0.03em]',
+  display: 'font-body text-[28px] leading-[34px] tracking-[-0.03em]',
   /** A number singled out inside a panel — a tooltip's value, a stat's figure. */
-  dataLg: 'font-mono text-[17px] leading-[21px] tracking-[-0.02em]',
+  dataLg: 'font-mono text-[19px] leading-[24px] tracking-[-0.02em]',
+  /**
+   * The value in a KPI cell.
+   *
+   * The rung between `data` and `dataLg`, and it exists because the fact strips
+   * needed one. At `data` a strip of eight cells has no figure in it — label and
+   * value are the same weight and the same size, so the band reads as a block of
+   * grey text rather than as eight readings. At `dataLg` the long ones
+   * ("FORECAST_AVAILABLE", "EXPONENTIAL / 91%") break mid-word inside their cell,
+   * which is worse than being small. This is the size at which the longest value
+   * the analysis layer actually produces still fits one cell.
+   */
+  dataMd: 'font-mono text-[14px] leading-[19px] tracking-[-0.01em]',
   /** What a region is. */
-  title: 'font-body-bold text-[14px] leading-[19px] tracking-[-0.02em]',
+  title: 'font-body-bold text-[15px] leading-[20px] tracking-[-0.02em]',
   /** The sentence under a title. */
-  lede: 'font-body text-[12.5px] leading-[18px]',
+  lede: 'font-body text-[13.5px] leading-[19px]',
   /** Ordinary prose. */
-  body: 'font-body text-[11.5px] leading-[16px]',
+  body: 'font-body text-[12.5px] leading-[18px]',
   /** Emphasised prose at body size — a finding's headline, a row's subject. */
-  bodyStrong: 'font-body-bold text-[11.5px] leading-[16px]',
+  bodyStrong: 'font-body-bold text-[12.5px] leading-[18px]',
   /** A number in a table or a fact cell. Pair with `tabular`. */
-  data: 'font-mono text-[11.5px] leading-[16px]',
+  data: 'font-mono text-[12.5px] leading-[18px]',
   /** Small print: caveats, provenance, axis captions. */
-  micro: 'font-body text-[10.5px] leading-[14px]',
+  micro: 'font-body text-[11.5px] leading-[15.5px]',
   /**
    * The name of a field. The only uppercase style in the console, and rationed
    * to the three jobs listed above.
@@ -76,7 +98,7 @@ export const text = {
    * tree in the sidebar and the eyebrow on a card are visibly the same mark
    * rather than two near-misses.
    */
-  label: 'font-mono text-[9px] leading-[12px] uppercase tracking-[0.18em]',
+  label: 'font-mono text-[10px] leading-[13px] uppercase tracking-[0.16em]',
   /**
    * A pill or a control: "Medium priority", "Scenario injection", "Normal".
    *
@@ -84,7 +106,7 @@ export const text = {
    * not codes they match, and setting them as capitals was most of why the
    * layer read as shouting — a screen can carry one stencilled voice, not six.
    */
-  chip: 'font-body-bold text-[10px] leading-[13px] tracking-[0.005em]',
+  chip: 'font-body-bold text-[11px] leading-[14px] tracking-[0.005em]',
   /**
    * A machine identifier: a tag, a threshold id, a channel address.
    *
@@ -92,13 +114,13 @@ export const text = {
    * or a controller, and NOT uppercase — they arrive already cased and the
    * console has no business restyling somebody's tag name into a headline.
    */
-  code: 'font-mono text-[9.5px] leading-[13px] tracking-[0.02em]',
+  code: 'font-mono text-[10.5px] leading-[14px] tracking-[0.02em]',
   /**
    * A qualifier attached to a value: "this machine", "2 rules fired", "within
    * reference". Small and quiet, and deliberately not a label — it says
    * something *about* the number beside it rather than naming a field.
    */
-  meta: 'font-body text-[10px] leading-[13px]',
+  meta: 'font-body text-[11px] leading-[14px]',
 } as const;
 
 /**

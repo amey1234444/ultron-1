@@ -44,7 +44,7 @@ export function DiagnosisBanner({
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: levels.normal }} />
         <Text className={cn('font-body-medium text-xs', inkClass)}>No active condition</Text>
         {worst && worst.value !== null ? (
-          <Text className={cn('flex-1 font-body text-[11px]', mutedClass)} numberOfLines={1}>
+          <Text className={cn('flex-1 font-body text-[12.5px]', mutedClass)} numberOfLines={1}>
             Closest to a limit: {worst.code} {worst.label} at {worst.value.toFixed(worst.band.decimals)} {worst.unit}, alert at{' '}
             {worst.thresholds.alert.toFixed(worst.band.decimals)}.
           </Text>
@@ -80,11 +80,11 @@ export function DiagnosisBanner({
         <Text className={cn('font-body text-xs', mutedClass)}>on {diagnosis.componentLabel}</Text>
 
         <View className="rounded-full border px-1.5 py-0.5" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
-          <Text className={cn('font-mono text-[9px] uppercase tracking-wide', mutedClass)}>{diagnosis.confidence} confidence</Text>
+          <Text className={cn('font-mono text-[10.5px] uppercase tracking-wide', mutedClass)}>{diagnosis.confidence} confidence</Text>
         </View>
 
         {diagnosis.rulDays !== null ? (
-          <Text style={{ color: colour }} className="font-mono text-[11px] font-bold tabular-nums">
+          <Text style={{ color: colour }} className="font-mono text-[12.5px] font-bold tabular-nums">
             {formatRul(diagnosis.rulDays)} to limit
           </Text>
         ) : null}
@@ -97,16 +97,16 @@ export function DiagnosisBanner({
             className="rounded-full border px-2.5 py-1"
             style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft }}
           >
-            <Text style={{ color: palette.accent }} className="font-body-bold text-[10px]">
+            <Text style={{ color: palette.accent }} className="font-body-bold text-[11.5px]">
               {actionLabel}
             </Text>
           </Pressable>
         ) : null}
       </View>
 
-      <Text className={cn('font-mono text-[10px]', mutedClass)}>{evidenceLine(diagnosis.evidence)}</Text>
+      <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{evidenceLine(diagnosis.evidence)}</Text>
 
-      <Text className={cn('font-body text-[11px]', inkClass)}>{diagnosis.recommendation}</Text>
+      <Text className={cn('font-body text-[12.5px]', inkClass)}>{diagnosis.recommendation}</Text>
 
       {/* The ranked diagnoses are built per component, and readings that could not
           be attributed to one produce no diagnosis at all — so the machine's most
@@ -114,7 +114,7 @@ export function DiagnosisBanner({
           quietly talk about the second-worst problem while the header reported the
           worst. Name it when that happens. */}
       {unrepresentedWorst && unrepresentedWorst.value !== null ? (
-        <Text className={cn('font-body text-[11px]', mutedClass)} numberOfLines={1}>
+        <Text className={cn('font-body text-[12.5px]', mutedClass)} numberOfLines={1}>
           Also: {unrepresentedWorst.code} {unrepresentedWorst.label} at{' '}
           {unrepresentedWorst.value.toFixed(unrepresentedWorst.band.decimals)} {unrepresentedWorst.unit} is{' '}
           {unrepresentedWorst.level === 'danger' ? 'over its limit' : 'elevated'}, and is not covered by this diagnosis.

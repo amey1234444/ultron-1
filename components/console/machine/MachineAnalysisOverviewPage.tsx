@@ -147,7 +147,7 @@ export function MachineAnalysisOverviewPage({
         {header}
         {tabs}
         <Panel>
-          <Text className={cn('font-body text-[12px] italic', mutedClass)}>Loading analysis for this machine…</Text>
+          <Text className={cn('font-body text-[13.5px] italic', mutedClass)}>Loading analysis for this machine…</Text>
         </Panel>
       </ScrollView>
     );
@@ -165,10 +165,10 @@ export function MachineAnalysisOverviewPage({
           className="flex-row flex-wrap items-center gap-2 rounded-xl border px-4 py-3"
           style={{ borderColor: `${conditionHex.offline}59`, backgroundColor: `${conditionHex.offline}14` }}
         >
-          <Text style={{ color: conditionHex.offline }} className="font-mono text-[11px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex.offline }} className="font-mono text-[12.5px] font-bold tracking-wider">
             OFFLINE
           </Text>
-          <Text className={cn('flex-1 font-body text-[11px]', inkClass)}>
+          <Text className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
             No live data from this machine. Everything below is the last valid picture, not the current one.
           </Text>
         </View>

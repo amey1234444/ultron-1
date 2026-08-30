@@ -43,8 +43,8 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Machine train</Text>
-        <Text className={cn('font-body text-[10px]', mutedClass)}>score · to limit</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Machine train</Text>
+        <Text className={cn('font-body text-[11.5px]', mutedClass)}>score · to limit</Text>
       </View>
 
       {summaries.length === 0 ? (
@@ -88,19 +88,19 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
                       <View style={{ width: 15 }} />
                     )}
 
-                    <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[12px]', inkClass)}>
+                    <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[13.5px]', inkClass)}>
                       {summary.label}
                     </Text>
 
                     {monitored ? (
                       <>
-                        <Text style={{ color: colour }} className="font-mono text-[12px] font-bold tabular-nums">
+                        <Text style={{ color: colour }} className="font-mono text-[13.5px] font-bold tabular-nums">
                           {summary.health === null ? '--' : Math.round(summary.health)}
                         </Text>
-                        <Text style={{ color: colour }} className="w-14 text-right font-mono text-[8px] font-bold tracking-wider">
+                        <Text style={{ color: colour }} className="w-14 text-right font-mono text-[9.5px] font-bold tracking-wider">
                           {verdict}
                         </Text>
-                        <Text className={cn('w-11 text-right font-mono text-[9px] tabular-nums', mutedClass)}>
+                        <Text className={cn('w-11 text-right font-mono text-[10.5px] tabular-nums', mutedClass)}>
                           {formatRul(summary.soonestRulDays)}
                         </Text>
                       </>
@@ -108,7 +108,7 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
                       /* A component with nothing mapped has no condition. Saying so
                          matters: an unmonitored element silently scoring 100 would
                          be the most dangerous number on the page. */
-                      <Text className={cn('font-body text-[10px] italic', mutedClass)}>not monitored</Text>
+                      <Text className={cn('font-body text-[11.5px] italic', mutedClass)}>not monitored</Text>
                     )}
                   </View>
 

@@ -22,9 +22,9 @@ export function WorkAreaHeader({ step, title, description }: { step: string; tit
 
   return (
     <View className="gap-1.5">
-      <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">{step}</Text>
-      <Text className={cn('font-heading-medium text-[17px]', inkClass)}>{title}</Text>
-      <Text className={cn('font-body text-[11px] leading-[17px]', mutedClass)} style={{ maxWidth: 720 }}>
+      <Text className="font-mono text-[10.5px] font-bold tracking-wider text-accent">{step}</Text>
+      <Text className={cn('font-heading-medium text-[19px]', inkClass)}>{title}</Text>
+      <Text className={cn('font-body text-[12.5px] leading-[19px]', mutedClass)} style={{ maxWidth: 720 }}>
         {description}
       </Text>
     </View>
@@ -47,7 +47,7 @@ function HeadCell({ label, width, right }: { label: string; width?: number; righ
   return (
     <Text
       style={width ? { width } : undefined}
-      className={cn('font-mono text-[8px] uppercase tracking-wider', !width && 'flex-1', right && 'text-right', mutedClass)}
+      className={cn('font-mono text-[9.5px] uppercase tracking-wider', !width && 'flex-1', right && 'text-right', mutedClass)}
     >
       {label}
     </Text>
@@ -88,15 +88,15 @@ export function MachineWorkArea({
             style={{ flexGrow: 1, flexBasis: 130, minWidth: 120, borderColor: hairline }}
             className="gap-1 rounded-lg border px-3 py-2.5"
           >
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{item.label}</Text>
-            <Text className={cn('font-mono text-[14px] tabular-nums', inkClass)}>{item.value}</Text>
-            {item.note ? <Text className={cn('font-body text-[9px]', mutedClass)}>{item.note}</Text> : null}
+            <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{item.label}</Text>
+            <Text className={cn('font-mono text-[15px] tabular-nums', inkClass)}>{item.value}</Text>
+            {item.note ? <Text className={cn('font-body text-[10.5px]', mutedClass)}>{item.note}</Text> : null}
           </View>
         ))}
       </View>
 
       <View>
-        <Text className={cn('mb-1 font-mono text-[9px] tracking-wider', mutedClass)}>CONDITION BY DOMAIN</Text>
+        <Text className={cn('mb-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>CONDITION BY DOMAIN</Text>
 
         <Row>
           <HeadCell label="Area" />
@@ -110,25 +110,25 @@ export function MachineWorkArea({
 
         {rows.map((row) => (
           <Row key={row.area}>
-            <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
+            <Text numberOfLines={1} className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
               {row.area}
             </Text>
-            <Text style={{ width: 54 }} className={cn('text-right font-mono text-[11px] tabular-nums', inkClass)}>
+            <Text style={{ width: 54 }} className={cn('text-right font-mono text-[12.5px] tabular-nums', inkClass)}>
               {row.health === null ? '--' : `${row.health}%`}
             </Text>
-            <Text numberOfLines={1} style={{ width: 168 }} className={cn('font-mono text-[10px]', mutedClass)}>
+            <Text numberOfLines={1} style={{ width: 168 }} className={cn('font-mono text-[11.5px]', mutedClass)}>
               {row.indicator}
             </Text>
-            <Text numberOfLines={1} style={{ width: 112 }} className={cn('font-body text-[10px]', mutedClass)}>
+            <Text numberOfLines={1} style={{ width: 112 }} className={cn('font-body text-[11.5px]', mutedClass)}>
               {row.trend}
             </Text>
-            <Text style={{ width: 76, color: conditionHex[row.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
+            <Text style={{ width: 76, color: conditionHex[row.condition] }} className="font-mono text-[10.5px] font-bold tracking-wider">
               {CONDITION_LABEL[row.condition]}
             </Text>
-            <Text style={{ width: 92, color: qualityHex(row.quality, isDark) }} className="font-mono text-[9px] tracking-wider">
+            <Text style={{ width: 92, color: qualityHex(row.quality, isDark) }} className="font-mono text-[10.5px] tracking-wider">
               {QUALITY_LABEL[row.quality]}
             </Text>
-            <Text style={{ width: 62 }} className={cn('text-right font-mono text-[10px]', mutedClass)}>
+            <Text style={{ width: 62 }} className={cn('text-right font-mono text-[11.5px]', mutedClass)}>
               {row.lastChange}
             </Text>
           </Row>
@@ -183,27 +183,27 @@ export function TrainWorkArea({ rows, note }: { rows: PropagationRow[]; note: st
             <Row key={row.location}>
               <View className="flex-1 flex-row items-center gap-2">
                 <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: tint }} />
-                <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
+                <Text numberOfLines={1} className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
                   {row.location}
                 </Text>
               </View>
 
               <Text
                 style={{ width: 78, color: isStrongest ? tint : undefined }}
-                className={cn('text-right font-mono text-[11px] tabular-nums', !isStrongest && inkClass)}
+                className={cn('text-right font-mono text-[12.5px] tabular-nums', !isStrongest && inkClass)}
               >
                 {row.current.toFixed(2)}
               </Text>
-              <Text style={{ width: 78 }} className={cn('text-right font-mono text-[11px] tabular-nums', mutedClass)}>
+              <Text style={{ width: 78 }} className={cn('text-right font-mono text-[12.5px] tabular-nums', mutedClass)}>
                 {row.baseline === null ? '--' : row.baseline.toFixed(2)}
               </Text>
               <Text
                 style={{ width: 76, color: isStrongest ? tint : undefined }}
-                className={cn('text-right font-mono text-[11px] font-bold tabular-nums', !isStrongest && mutedClass)}
+                className={cn('text-right font-mono text-[12.5px] font-bold tabular-nums', !isStrongest && mutedClass)}
               >
                 {change === null ? '--' : `${change > 0 ? '+' : ''}${Math.round(change)}%`}
               </Text>
-              <Text numberOfLines={1} style={{ width: 186 }} className={cn('font-body text-[10px]', mutedClass)}>
+              <Text numberOfLines={1} style={{ width: 186 }} className={cn('font-body text-[11.5px]', mutedClass)}>
                 {row.role}
               </Text>
             </Row>
@@ -211,7 +211,7 @@ export function TrainWorkArea({ rows, note }: { rows: PropagationRow[]; note: st
         })}
       </View>
 
-      <Text className={cn('font-body text-[11px] leading-[17px]', inkClass)}>{note}</Text>
+      <Text className={cn('font-body text-[12.5px] leading-[19px]', inkClass)}>{note}</Text>
     </View>
   );
 }
@@ -248,7 +248,7 @@ export function CorrelationWorkArea({ rows, caveat }: { rows: CorrelationRow[]; 
 
         {rows.map((row) => (
           <Row key={row.pair}>
-            <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
+            <Text numberOfLines={1} className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
               {row.pair}
             </Text>
 
@@ -263,23 +263,23 @@ export function CorrelationWorkArea({ rows, caveat }: { rows: CorrelationRow[]; 
                   }}
                 />
               </View>
-              <Text className={cn('font-mono text-[10px] tabular-nums', inkClass)}>{row.strength.toFixed(2)}</Text>
+              <Text className={cn('font-mono text-[11.5px] tabular-nums', inkClass)}>{row.strength.toFixed(2)}</Text>
             </View>
 
-            <Text style={{ width: 62 }} className={cn('font-mono text-[10px]', mutedClass)}>
+            <Text style={{ width: 62 }} className={cn('font-mono text-[11.5px]', mutedClass)}>
               {row.positive ? 'positive' : 'negative'}
             </Text>
-            <Text style={{ width: 62 }} className={cn('text-right font-mono text-[10px] tabular-nums', mutedClass)}>
+            <Text style={{ width: 62 }} className={cn('text-right font-mono text-[11.5px] tabular-nums', mutedClass)}>
               {row.lagMinutes === null ? '--' : `${row.lagMinutes > 0 ? '+' : ''}${row.lagMinutes}m`}
             </Text>
-            <Text numberOfLines={1} style={{ width: 190 }} className={cn('font-body text-[10px]', mutedClass)}>
+            <Text numberOfLines={1} style={{ width: 190 }} className={cn('font-body text-[11.5px]', mutedClass)}>
               {row.interpretation}
             </Text>
           </Row>
         ))}
       </View>
 
-      <Text className={cn('font-body text-[11px] leading-[17px]', mutedClass)}>{caveat}</Text>
+      <Text className={cn('font-body text-[12.5px] leading-[19px]', mutedClass)}>{caveat}</Text>
     </View>
   );
 }
@@ -303,7 +303,7 @@ export function EventsWorkArea({ events }: { events: AnalystEvent[] }) {
       />
 
       {events.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>
           No event source is wired to this machine, so there is no history to line up against.
         </Text>
       ) : (
@@ -317,16 +317,16 @@ export function EventsWorkArea({ events }: { events: AnalystEvent[] }) {
 
           {events.map((event) => (
             <Row key={event.id}>
-              <Text style={{ width: 104 }} className={cn('font-mono text-[10px]', mutedClass)}>
+              <Text style={{ width: 104 }} className={cn('font-mono text-[11.5px]', mutedClass)}>
                 {event.at}
               </Text>
-              <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
+              <Text numberOfLines={1} className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
                 {event.event}
               </Text>
-              <Text style={{ width: 96 }} className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>
+              <Text style={{ width: 96 }} className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>
                 {EVENT_KIND_LABEL[event.kind]}
               </Text>
-              <Text numberOfLines={1} style={{ width: 228 }} className={cn('font-body text-[10px]', mutedClass)}>
+              <Text numberOfLines={1} style={{ width: 228 }} className={cn('font-body text-[11.5px]', mutedClass)}>
                 {event.analystValue}
               </Text>
             </Row>

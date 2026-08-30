@@ -31,10 +31,10 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
 
   return (
     <View className="gap-3">
-      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>What the evidence is about</Text>
+      <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>What the evidence is about</Text>
 
       {total === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>No rules have fired.</Text>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>No rules have fired.</Text>
       ) : (
         <>
           <View style={{ height: 10, borderRadius: 5, backgroundColor: track }} className="w-full flex-row overflow-hidden">
@@ -46,10 +46,10 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
             <View className="gap-0.5">
               <View className="flex-row items-center gap-1.5">
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: severityHex.fault }} />
-                <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>MACHINE</Text>
+                <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>MACHINE</Text>
               </View>
-              <Text className={cn('font-mono text-[19px] font-bold tabular-nums', inkClass)}>{counts.machineRules}</Text>
-              <Text className={cn('font-body text-[10px]', mutedClass)}>
+              <Text className={cn('font-mono text-[21px] font-bold tabular-nums', inkClass)}>{counts.machineRules}</Text>
+              <Text className={cn('font-body text-[11.5px]', mutedClass)}>
                 rules about the machine
                 {counts.machineRulesOnUnverifiedSignals > 0 ? ` · ${standing} still standing` : ''}
               </Text>
@@ -58,12 +58,12 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
             <View className="gap-0.5">
               <View className="flex-row items-center gap-1.5">
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: CHAIN_HEX }} />
-                <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>MEASUREMENT CHAIN</Text>
+                <Text className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>MEASUREMENT CHAIN</Text>
               </View>
-              <Text style={{ color: chainDominant ? severityHex.limit : undefined } } className={cn('font-mono text-[19px] font-bold tabular-nums', !chainDominant && inkClass)}>
+              <Text style={{ color: chainDominant ? severityHex.limit : undefined } } className={cn('font-mono text-[21px] font-bold tabular-nums', !chainDominant && inkClass)}>
                 {counts.chainRules}
               </Text>
-              <Text className={cn('font-body text-[10px]', mutedClass)}>rules about the instrument</Text>
+              <Text className={cn('font-body text-[11.5px]', mutedClass)}>rules about the instrument</Text>
             </View>
           </View>
 
@@ -74,7 +74,7 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
               the sentence is built from how much machine evidence still stands,
               not from which side has more rules. */}
           {counts.machineRulesOnUnverifiedSignals > 0 ? (
-            <Text className={cn('font-body text-[11px] leading-[17px]', inkClass)}>
+            <Text className={cn('font-body text-[12.5px] leading-[19px]', inkClass)}>
               {standing === 0
                 ? 'Every machine rule that fired sits on a signal whose measurement chain is in doubt, so none of it is usable evidence about the machine yet.'
                 : `${standing} machine rule${standing === 1 ? ' stands' : 's stand'} on verified signals; ${counts.machineRulesOnUnverifiedSignals} ${
@@ -83,26 +83,26 @@ export function EvidenceSplit({ counts, unverifiedCount }: { counts: AnalysisCou
               Verify the chain before any mechanical work.
             </Text>
           ) : chainDominant ? (
-            <Text className={cn('font-body text-[11px] leading-[17px]', inkClass)}>
+            <Text className={cn('font-body text-[12.5px] leading-[19px]', inkClass)}>
               Most of what fired describes the measurement chain, not the machine. Verify the chain before any mechanical work.
             </Text>
           ) : counts.chainRules > 0 ? (
-            <Text className={cn('font-body text-[11px] leading-[17px]', mutedClass)}>
+            <Text className={cn('font-body text-[12.5px] leading-[19px]', mutedClass)}>
               Machine evidence stands on its own signals, but {counts.chainRules} chain rule
               {counts.chainRules === 1 ? '' : 's'} elsewhere still needs clearing.
             </Text>
           ) : (
-            <Text className={cn('font-body text-[11px] leading-[17px]', mutedClass)}>
+            <Text className={cn('font-body text-[12.5px] leading-[19px]', mutedClass)}>
               Nothing suggests an instrumentation problem. Every rule describes the machine.
             </Text>
           )}
 
           {unverifiedCount > 0 ? (
             <View className="flex-row items-center gap-2 rounded-lg px-2.5 py-2" style={{ backgroundColor: `${severityHex.limit}14` }}>
-              <Text style={{ color: severityHex.limit }} className="font-mono text-[9px] font-bold tracking-wider">
+              <Text style={{ color: severityHex.limit }} className="font-mono text-[10.5px] font-bold tracking-wider">
                 {unverifiedCount} SIGNAL{unverifiedCount === 1 ? '' : 'S'} UNVERIFIED
               </Text>
-              <Text className={cn('flex-1 font-body text-[10px]', mutedClass)}>Treat their values as suspect until the chain is checked.</Text>
+              <Text className={cn('flex-1 font-body text-[11.5px]', mutedClass)}>Treat their values as suspect until the chain is checked.</Text>
             </View>
           ) : null}
         </>

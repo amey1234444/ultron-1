@@ -145,22 +145,22 @@ export function SensorGaugeTile({
     <View className="flex-1 items-center">
       <Text
         style={tint ? { color: tint } : undefined}
-        className={cn('font-mono', compact ? 'text-[9px]' : 'text-[10px]', !tint && mutedClass)}
+        className={cn('font-mono', compact ? 'text-[10.5px]' : 'text-[11.5px]', !tint && mutedClass)}
       >
         {label}
       </Text>
-      <Text className={cn('mt-0.5 font-mono tabular-nums', compact ? 'text-[10px]' : 'text-[12px]', inkClass)}>{text}</Text>
+      <Text className={cn('mt-0.5 font-mono tabular-nums', compact ? 'text-[11.5px]' : 'text-[13.5px]', inkClass)}>{text}</Text>
     </View>
   );
 
   const infoRow = (label: string, text: string, strong?: boolean) => (
     <View className="flex-row items-baseline" style={{ minHeight: compact ? 15 : 22 }}>
-      <Text style={{ width: compact ? 54 : 84 }} className={cn('font-mono', compact ? 'text-[9px]' : 'text-[11px]', mutedClass)}>
+      <Text style={{ width: compact ? 54 : 84 }} className={cn('font-mono', compact ? 'text-[10.5px]' : 'text-[12.5px]', mutedClass)}>
         {label}
       </Text>
       <Text
         numberOfLines={1}
-        className={cn('flex-1 font-mono', compact ? 'text-[9px]' : 'text-[11px]', strong ? cn(inkClass, 'font-bold') : mutedClass)}
+        className={cn('flex-1 font-mono', compact ? 'text-[10.5px]' : 'text-[12.5px]', strong ? cn(inkClass, 'font-bold') : mutedClass)}
       >
         {text}
       </Text>
@@ -195,11 +195,11 @@ export function SensorGaugeTile({
               className={cn('rounded-md border', compact ? 'px-1.5 py-[1px]' : 'px-2 py-1')}
               style={{ borderColor: quiet ? palette.line : `${colour}8C`, backgroundColor: quiet ? palette.panelRaised : undefined }}
             >
-              <Text style={{ color: colour }} className={cn('font-mono font-bold', compact ? 'text-[11px]' : 'text-[13px]')}>
+              <Text style={{ color: colour }} className={cn('font-mono font-bold', compact ? 'text-[12.5px]' : 'text-[14.5px]')}>
                 {condition.code}
               </Text>
             </View>
-            <Text numberOfLines={1} className={cn('flex-1 font-mono tracking-wider', compact ? 'text-[8px]' : 'text-[10px]', mutedClass)}>
+            <Text numberOfLines={1} className={cn('flex-1 font-mono tracking-wider', compact ? 'text-[9.5px]' : 'text-[11.5px]', mutedClass)}>
               {condition.kind.toUpperCase()}
             </Text>
           </View>
@@ -207,7 +207,7 @@ export function SensorGaugeTile({
               depend on colour vision alone. */}
           <View className="flex-row items-center gap-1.5">
             {!compact && (
-              <Text style={{ color: colour }} className="font-mono text-[9px] font-bold tracking-wider">
+              <Text style={{ color: colour }} className="font-mono text-[10.5px] font-bold tracking-wider">
                 {STATE_LABEL[condition.state]}
               </Text>
             )}
@@ -216,10 +216,10 @@ export function SensorGaugeTile({
         </View>
 
         <View className={compact ? 'mt-2' : 'mt-3'}>
-          <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[12px]' : 'text-[17px]', inkClass)}>
+          <Text numberOfLines={1} className={cn('font-body-bold', compact ? 'text-[13.5px]' : 'text-[19px]', inkClass)}>
             {condition.label}
           </Text>
-          <Text numberOfLines={1} className={cn('mt-0.5 font-body', compact ? 'text-[9px]' : 'text-[12px]', mutedClass)}>
+          <Text numberOfLines={1} className={cn('mt-0.5 font-body', compact ? 'text-[10.5px]' : 'text-[13.5px]', mutedClass)}>
             {identity.location}
           </Text>
         </View>
@@ -235,7 +235,7 @@ export function SensorGaugeTile({
           />
 
           <View className={cn('flex-1 justify-center', compact ? 'pl-1.5' : 'pl-3')}>
-            <Text className={cn('font-mono tracking-widest', compact ? 'text-[8px]' : 'text-[10px]', mutedClass)}>
+            <Text className={cn('font-mono tracking-widest', compact ? 'text-[9.5px]' : 'text-[11.5px]', mutedClass)}>
               {/* Keyed off where the buffer came from, not off the condition.
                   A held buffer whose feed has gone quiet is still a real
                   measurement, but it is not a current one, and labelling it LIVE
@@ -249,12 +249,12 @@ export function SensorGaugeTile({
             >
               {hasReading ? value.toFixed(decimals) : NO_VALUE_TEXT}
             </Text>
-            <Text className={cn('font-mono', compact ? 'text-[10px]' : 'text-[14px]', mutedClass)}>{condition.unit}</Text>
+            <Text className={cn('font-mono', compact ? 'text-[11.5px]' : 'text-[15px]', mutedClass)}>{condition.unit}</Text>
 
             {!offline && (
               <Text
                 style={isFlat ? undefined : { color: colour }}
-                className={cn('font-mono font-bold tabular-nums', compact ? 'mt-1.5 text-[10px]' : 'mt-3 text-[15px]', isFlat && mutedClass)}
+                className={cn('font-mono font-bold tabular-nums', compact ? 'mt-1.5 text-[11.5px]' : 'mt-3 text-[16px]', isFlat && mutedClass)}
               >
                 {trendGlyph(condition.changeFraction)}
                 {isFlat ? '' : ' '}
@@ -264,7 +264,7 @@ export function SensorGaugeTile({
             )}
 
             {compact && (
-              <Text style={{ color: colour }} className="mt-1.5 font-mono text-[8px] font-bold tracking-wider">
+              <Text style={{ color: colour }} className="mt-1.5 font-mono text-[9.5px] font-bold tracking-wider">
                 {STATE_LABEL[condition.state]}
               </Text>
             )}
@@ -274,7 +274,7 @@ export function SensorGaugeTile({
                 className={cn('self-start rounded border', compact ? 'mt-1.5 px-1 py-[1px]' : 'mt-3 px-2.5 py-1')}
                 style={{ borderColor: quiet ? palette.line : `${colour}99` }}
               >
-                <Text style={{ color: colour }} className={cn('font-mono font-bold', compact ? 'text-[8px]' : 'text-[11px]')}>
+                <Text style={{ color: colour }} className={cn('font-mono font-bold', compact ? 'text-[9.5px]' : 'text-[12.5px]')}>
                   ISO {condition.isoZone}
                 </Text>
               </View>
@@ -311,7 +311,7 @@ export function SensorGaugeTile({
 
         {/* Limits nobody configured must not read as commissioned ones. */}
         {!thresholds.configured && (
-          <Text style={{ color: palette.accent }} className={cn('mt-1 text-center font-mono', compact ? 'text-[8px]' : 'text-[10px]')}>
+          <Text style={{ color: palette.accent }} className={cn('mt-1 text-center font-mono', compact ? 'text-[9.5px]' : 'text-[11.5px]')}>
             limits inferred, not configured
           </Text>
         )}
@@ -330,7 +330,7 @@ export function SensorGaugeTile({
           {showClock && <ClockIcon colour={colour} size={compact ? 11 : 15} />}
           <Text
             style={showClock ? { color: colour } : undefined}
-            className={cn('font-mono', compact ? 'text-[9px]' : 'text-[12px]', showClock && 'font-bold', !showClock && mutedClass)}
+            className={cn('font-mono', compact ? 'text-[10.5px]' : 'text-[13.5px]', showClock && 'font-bold', !showClock && mutedClass)}
           >
             {footerText}
           </Text>

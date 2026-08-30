@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -162,6 +162,26 @@ function DeviceBranch({
   );
 }
 
+/**
+ * Where each tree was last scrolled to.
+ *
+ * Deliberately module-level rather than component state, and deliberately not
+ * lifted into the console screen either. The panel does not stay mounted: open
+ * a machine and the workspace takes the full width, which unmounts the sidebar
+ * outright (see `showSidebar` in app/index.tsx). Any state inside this
+ * component — or any ref inside its parent's render tree — dies with it, so
+ * coming back from a machine always dropped the engineer at the top of a tree
+ * they may have scrolled a long way down. A plant hierarchy is hundreds of rows
+ * on a real site, and re-finding your place in it after every machine visit is
+ * the kind of small tax that makes a console feel hostile.
+ *
+ * Keyed by tree, because the hierarchy and the devices list are different
+ * lengths and restoring one's offset onto the other would be worse than not
+ * restoring at all. Session-lived on purpose: a fresh page load should start at
+ * the top.
+ */
+const scrollMemory: Record<'hierarchy' | 'devices', number> = { hierarchy: 0, devices: 0 };
+
 export function LeftPanel({
   collapsed,
   onCollapsedChange,
@@ -198,6 +218,22 @@ export function LeftPanel({
     selected.kind === 'devices' || selected.kind === 'device' || selected.kind === 'simulation' ? 'devices' : 'hierarchy';
   const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
 
+  const scrollRef = useRef<ScrollView>(null);
+  const restoredRef = useRef(false);
+
+  // Each tree restores its own offset once, on the first layout pass that has
+  // content in it. Switching trees re-arms the restore for the new one.
+  useEffect(() => {
+    restoredRef.current = false;
+  }, [activeTab]);
+
+  const restoreScroll = useCallback(() => {
+    if (restoredRef.current) return;
+    restoredRef.current = true;
+    const y = scrollMemory[activeTab];
+    if (y > 0) scrollRef.current?.scrollTo({ y, animated: false });
+  }, [activeTab]);
+
   return (
     <>
       {collapsed ? (
@@ -212,9 +248,15 @@ export function LeftPanel({
           className={cn('w-64 border-r', isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light')}
         >
           <ScrollView
+            ref={scrollRef}
             className="flex-1"
             contentContainerStyle={{ paddingTop: 12, paddingBottom: 16 }}
             showsVerticalScrollIndicator={false}
+            scrollEventThrottle={16}
+            onScroll={(event) => {
+              scrollMemory[activeTab] = event.nativeEvent.contentOffset.y;
+            }}
+            onContentSizeChange={restoreScroll}
           >
           {activeTab === 'hierarchy' && (
             <View className="mb-5">

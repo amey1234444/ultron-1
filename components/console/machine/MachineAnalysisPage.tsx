@@ -37,6 +37,8 @@ import {
   type DiagnosisSensorEvidence,
 } from './analysis/diagnosisModel';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
+import { EvidenceCard } from './analysis/DiagnosisPresentation';
+import { Hoverable, radius } from '../../ui';
 
 // Two-column blocks: grow to fill, drop to one column rather than squeezing a
 // rule table and a checklist into 150px each.
@@ -47,7 +49,6 @@ const SIGNAL_GAP = 12;
 const SIGNAL_MIN_WIDTH = 236;
 const PROBLEM_RAIL = { flexGrow: 3, flexBasis: 320, minWidth: 280 } as const;
 const CASE_DETAIL = { flexGrow: 7, flexBasis: 700, minWidth: 320 } as const;
-const REPORT_COLUMN = { flexGrow: 1, flexBasis: 245, minWidth: 220 } as const;
 const IMPACT_CELL = { flexGrow: 1, flexBasis: 220, minWidth: 190 } as const;
 
 const DEFAULT_CONCLUSION: Conclusion = {
@@ -67,11 +68,11 @@ function EmptyCase({ modelCaveat }: { modelCaveat?: string }) {
 
   return (
     <View className="items-center gap-2 rounded-xl border px-5 py-8" style={{ borderColor: hairline, borderStyle: 'dashed' }}>
-      <Text className={cn('font-heading-medium text-[18px]', inkClass)}>No active Prognosis case</Text>
-      <Text className={cn('max-w-[540px] text-center font-body text-[11px] leading-[17px]', mutedClass)}>
+      <Text className={cn('font-heading-medium text-[19px]', inkClass)}>No active Prognosis case</Text>
+      <Text className={cn('max-w-[540px] text-center font-body text-[12.5px] leading-[19px]', mutedClass)}>
         Available findings are inside the configured diagnostic envelope, so the page is holding a healthy state instead of inventing a fault.
       </Text>
-      {modelCaveat ? <Text className={cn('max-w-[540px] text-center font-mono text-[9px]', mutedClass)}>{modelCaveat}</Text> : null}
+      {modelCaveat ? <Text className={cn('max-w-[540px] text-center font-mono text-[10.5px]', mutedClass)}>{modelCaveat}</Text> : null}
     </View>
   );
 }
@@ -89,58 +90,72 @@ function ProblemCaseButton({
   const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const palette = consolePalette(isDark);
   const line = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
   const tint = conditionHex[problem.condition];
 
   return (
-    <Pressable
+    <Hoverable
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected }}
       accessibilityLabel={`Open Prognosis case ${problem.title}`}
       className={cn('rounded-lg border px-3 py-2.5', selected && 'bg-accent/10')}
-      style={{ borderColor: selected ? `${tint}99` : line }}
+      style={({ hovered }) => ({
+        borderColor: selected || hovered ? `${tint}99` : line,
+        backgroundColor: hovered && !selected ? palette.hover : undefined,
+      })}
     >
       <View className="flex-row items-start gap-2">
         <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: tint }} />
         <View className="min-w-0 flex-1 gap-1">
           <View className="flex-row items-center justify-between gap-2">
-            <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[12px]', selected ? 'text-accent' : inkClass)}>
+            <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[13.5px]', selected ? 'text-accent' : inkClass)}>
               {problem.title}
             </Text>
-            <Text style={{ color: tint }} className="font-mono text-[8px] font-bold tracking-wider">
+            <Text style={{ color: tint }} className="font-mono text-[9.5px] font-bold tracking-wider">
               {CONDITION_LABEL[problem.condition]}
             </Text>
           </View>
-          <Text numberOfLines={1} className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>
+          <Text numberOfLines={1} className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>
             {problem.component.toUpperCase()} / {problem.category}
           </Text>
-          <Text numberOfLines={2} className={cn('font-body text-[10px] leading-[14px]', mutedClass)}>
+          <Text numberOfLines={2} className={cn('font-body text-[11.5px] leading-[16px]', mutedClass)}>
             {problem.primaryFinding}
           </Text>
           <View className="flex-row flex-wrap gap-x-3 gap-y-1">
-            <Text className={cn('font-mono text-[8px]', mutedClass)}>{problem.scoreLabel}</Text>
-            <Text className={cn('font-mono text-[8px]', mutedClass)}>{problem.coverageLabel}</Text>
+            <Text className={cn('font-mono text-[9.5px]', mutedClass)}>{problem.scoreLabel}</Text>
+            <Text className={cn('font-mono text-[9.5px]', mutedClass)}>{problem.coverageLabel}</Text>
           </View>
         </View>
       </View>
-    </Pressable>
+    </Hoverable>
   );
 }
 
 function FactTile({ label, value, tint }: { label: string; value: string; tint?: string }) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
 
   return (
-    <View className="gap-1 rounded-lg border px-3 py-2" style={{ flexGrow: 1, flexBasis: 160, minWidth: 140, borderColor: hairline }}>
-      <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
-      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[12px] tabular-nums', !tint && inkClass)}>
+    <Hoverable
+      className="gap-1 rounded-lg border px-3 py-2"
+      style={({ hovered }) => ({
+        flexGrow: 1,
+        flexBasis: 160,
+        minWidth: 140,
+        borderColor: hairline,
+        backgroundColor: hovered ? palette.hover : undefined,
+      })}
+    >
+      <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
+      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[13.5px] tabular-nums', !tint && inkClass)}>
         {value}
       </Text>
-    </View>
+    </Hoverable>
   );
 }
 
@@ -149,7 +164,7 @@ function ProSection({ title, children }: { title: string; children: ReactNode })
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   return (
     <View className="gap-2">
-      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>{title}</Text>
+      <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>{title}</Text>
       {children}
     </View>
   );
@@ -167,14 +182,14 @@ function ChainStepper({ steps }: { steps: DiagnosisChainStep[] }) {
       {steps.map((step, index) => (
         <View key={`${step.label}-${index}`} className="rounded-lg border px-3 py-2.5" style={{ flexGrow: 1, flexBasis: 220, minWidth: 190, borderColor: line }}>
           <View className="mb-1 flex-row items-center justify-between gap-2">
-            <Text className={cn('font-mono text-[8px] font-bold tracking-wider', mutedClass)}>
+            <Text className={cn('font-mono text-[9.5px] font-bold tracking-wider', mutedClass)}>
               {String(index + 1).padStart(2, '0')} / {step.label.toUpperCase()}
             </Text>
-            <Text style={{ color: step.established ? palette.accent : palette.warning }} className="font-mono text-[8px] font-bold tracking-wider">
+            <Text style={{ color: step.established ? palette.accent : palette.warning }} className="font-mono text-[9.5px] font-bold tracking-wider">
               {step.established ? 'ESTABLISHED' : 'TO CONFIRM'}
             </Text>
           </View>
-          <Text className={cn('font-body text-[11px] leading-[16px]', inkClass)}>{step.value}</Text>
+          <Text className={cn('font-body text-[12.5px] leading-[18px]', inkClass)}>{step.value}</Text>
         </View>
       ))}
     </View>
@@ -183,6 +198,7 @@ function ChainStepper({ steps }: { steps: DiagnosisChainStep[] }) {
 
 function CauseRanking({ differentials }: { differentials: DiagnosisDifferential[] }) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -190,21 +206,28 @@ function CauseRanking({ differentials }: { differentials: DiagnosisDifferential[
   return (
     <View className="gap-2">
       {differentials.map((item, index) => (
-        <View key={item.id} className="flex-row gap-3 rounded-lg border px-3 py-2.5" style={{ borderColor: hairline }}>
-          <Text className="font-mono text-[11px] font-bold tabular-nums text-accent">{String(index + 1).padStart(2, '0')}</Text>
+        <Hoverable
+          key={item.id}
+          className="flex-row gap-3 rounded-lg border px-3 py-2.5"
+          style={({ hovered }) => ({
+            borderColor: hairline,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
+        >
+          <Text className="font-mono text-[12.5px] font-bold tabular-nums text-accent">{String(index + 1).padStart(2, '0')}</Text>
           <View className="min-w-0 flex-1 gap-1">
             <View className="flex-row flex-wrap items-center justify-between gap-2">
-              <Text className={cn('font-body-medium text-[12px]', inkClass)}>{item.name}</Text>
-              <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>
+              <Text className={cn('font-body-medium text-[13.5px]', inkClass)}>{item.name}</Text>
+              <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>
                 {item.status} / {item.matchScore === null ? 'MATCH SCORE NOT RATED' : `MATCH SCORE ${item.matchScore}`}
               </Text>
             </View>
-            <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>{item.mechanism}</Text>
-            <Text className={cn('font-mono text-[8px]', mutedClass)}>
+            <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>{item.mechanism}</Text>
+            <Text className={cn('font-mono text-[9.5px]', mutedClass)}>
               {item.limiting.length > 0 ? `Limited by: ${item.limiting.join(' / ')}` : 'Available expected evidence is present.'}
             </Text>
           </View>
-        </View>
+        </Hoverable>
       ))}
     </View>
   );
@@ -212,59 +235,45 @@ function CauseRanking({ differentials }: { differentials: DiagnosisDifferential[
 
 function EvidenceRows({ items }: { items: DiagnosisSensorEvidence[] }) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const conditionHex = conditionHexes(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
 
   if (items.length === 0) {
-    return <Text className={cn('font-body text-[11px] italic', mutedClass)}>No sensor rows are scoped to this problem.</Text>;
+    return <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>No sensor rows are scoped to this problem.</Text>;
   }
 
   return (
     <View className="gap-1">
       {items.map((item) => (
-        <View key={item.id} className="flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: hairline }}>
-          <Text numberOfLines={1} className={cn('min-w-[180px] flex-1 font-body-medium text-[11px]', inkClass)}>
+        <Hoverable
+          key={item.id}
+          className="flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
+          style={({ hovered }) => ({
+            borderColor: hovered ? `${conditionHex[item.condition]}66` : hairline,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
+        >
+          <Text numberOfLines={1} className={cn('min-w-[180px] flex-1 font-body-medium text-[12.5px]', inkClass)}>
             {item.measurement}
           </Text>
-          <Text className={cn('w-[92px] font-mono text-[10px] tabular-nums', inkClass)}>{item.value}</Text>
-          <Text className={cn('w-[108px] font-mono text-[9px]', mutedClass)}>{item.trend}</Text>
-          <Text className={cn('w-[92px] font-mono text-[9px]', mutedClass)}>{item.quality}</Text>
-          <Text style={{ color: conditionHex[item.condition] }} className="w-[78px] font-mono text-[8px] font-bold tracking-wider">
+          <Text className={cn('w-[92px] font-mono text-[11.5px] tabular-nums', inkClass)}>{item.value}</Text>
+          <Text className={cn('w-[108px] font-mono text-[10.5px]', mutedClass)}>{item.trend}</Text>
+          <Text className={cn('w-[92px] font-mono text-[10.5px]', mutedClass)}>{item.quality}</Text>
+          <Text style={{ color: conditionHex[item.condition] }} className="w-[78px] font-mono text-[9.5px] font-bold tracking-wider">
             {CONDITION_LABEL[item.condition]}
           </Text>
-        </View>
+        </Hoverable>
       ))}
-    </View>
-  );
-}
-
-function EvidenceColumn({ title, items, empty }: { title: string; items: string[]; empty: string }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
-
-  return (
-    <View className="gap-2 rounded-lg border px-3 py-2.5" style={{ ...REPORT_COLUMN, borderColor: hairline }}>
-      <Text className={cn('font-body-medium text-[11px]', inkClass)}>{title}</Text>
-      {items.length > 0 ? (
-        items.map((item) => (
-          <View key={item} className="flex-row gap-2">
-            <Text className={cn('font-mono text-[9px]', mutedClass)}>+</Text>
-            <Text className={cn('flex-1 font-body text-[10px] leading-[15px]', mutedClass)}>{item}</Text>
-          </View>
-        ))
-      ) : (
-        <Text className={cn('font-body text-[10px] italic leading-[15px]', mutedClass)}>{empty}</Text>
-      )}
     </View>
   );
 }
 
 function ImpactGrid({ impacts }: { impacts: DiagnosisProblem['impacts'] }) {
   const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
@@ -272,10 +281,18 @@ function ImpactGrid({ impacts }: { impacts: DiagnosisProblem['impacts'] }) {
   return (
     <View className="flex-row flex-wrap gap-2">
       {impacts.map((impact) => (
-        <View key={impact.label} className="gap-1 rounded-lg border px-3 py-2.5" style={{ ...IMPACT_CELL, borderColor: hairline }}>
-          <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{impact.label}</Text>
-          <Text className={cn('font-body text-[10px] leading-[15px]', inkClass)}>{impact.value}</Text>
-        </View>
+        <Hoverable
+          key={impact.label}
+          className="gap-1 rounded-lg border px-3 py-2.5"
+          style={({ hovered }) => ({
+            ...IMPACT_CELL,
+            borderColor: hairline,
+            backgroundColor: hovered ? palette.hover : undefined,
+          })}
+        >
+          <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{impact.label}</Text>
+          <Text className={cn('font-body text-[11.5px] leading-[17px]', inkClass)}>{impact.value}</Text>
+        </Hoverable>
       ))}
     </View>
   );
@@ -452,7 +469,7 @@ export function MachineAnalysisPage({
       />
 
       <View className="gap-3">
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Signals</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Signals</Text>
         <View
           className="flex-row flex-wrap"
           style={{ gap: SIGNAL_GAP }}
@@ -473,14 +490,14 @@ export function MachineAnalysisPage({
             <View className="gap-3">
               <View className="flex-row items-start justify-between gap-2">
                 <View className="flex-1">
-                  <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>
+                  <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>
                     Prognosis cases
                   </Text>
-                  <Text className={cn('mt-1 font-mono text-[9px]', mutedClass)}>
+                  <Text className={cn('mt-1 font-mono text-[10.5px]', mutedClass)}>
                     {diagnosisModel.problems.length} active / data {diagnosisModel.dataQuality}
                   </Text>
                 </View>
-                <Text style={{ color: conditionHex[selectedProblem?.condition ?? condition] }} className="font-mono text-[9px] font-bold tracking-wider">
+                <Text style={{ color: conditionHex[selectedProblem?.condition ?? condition] }} className="font-mono text-[10.5px] font-bold tracking-wider">
                   {CONDITION_LABEL[selectedProblem?.condition ?? condition]}
                 </Text>
               </View>
@@ -509,16 +526,16 @@ export function MachineAnalysisPage({
               <View className="gap-5">
                 <View className="flex-row flex-wrap items-start justify-between gap-3">
                   <View className="min-w-0 flex-1 gap-1">
-                    <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">
+                    <Text className="font-mono text-[10.5px] font-bold tracking-wider text-accent">
                       MACHINE DOCTOR / SELECTED PROBLEM
                     </Text>
-                    <Text className={cn('font-heading-medium text-[22px]', inkClass)}>{selectedProblem.title}</Text>
-                    <Text className={cn('font-mono text-[9px]', mutedClass)}>
+                    <Text className={cn('font-heading-medium text-[24px]', inkClass)}>{selectedProblem.title}</Text>
+                    <Text className={cn('font-mono text-[10.5px]', mutedClass)}>
                       {machineName} / {selectedProblem.component} / {selectedProblem.category}
                     </Text>
                   </View>
                   <View className="rounded-lg border px-3 py-2" style={{ borderColor: `${conditionHex[selectedProblem.condition]}66` }}>
-                    <Text style={{ color: conditionHex[selectedProblem.condition] }} className="font-mono text-[10px] font-bold tracking-wider">
+                    <Text style={{ color: conditionHex[selectedProblem.condition] }} className="font-mono text-[11.5px] font-bold tracking-wider">
                       {CONDITION_LABEL[selectedProblem.condition]}
                     </Text>
                   </View>
@@ -536,7 +553,7 @@ export function MachineAnalysisPage({
 
                 <ProSection title="Differential Cause Ranking">
                   <>
-                    <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
+                    <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
                       Engineering support ranking only. These numbers are not calibrated failure probabilities.
                     </Text>
                     <CauseRanking differentials={selectedProblem.differentials} />
@@ -544,18 +561,27 @@ export function MachineAnalysisPage({
                 </ProSection>
 
                 <View className="flex-row flex-wrap gap-2">
-                  <EvidenceColumn
+                  <EvidenceCard
                     title="Supporting evidence"
+                    caption="Observations that hold the conclusion up"
+                    variant="destructive"
+                    icon="check-decagram-outline"
                     items={selectedProblem.supportingEvidence}
                     empty="No supporting evidence is scoped to this problem yet."
                   />
-                  <EvidenceColumn
+                  <EvidenceCard
                     title="Contradicting evidence"
+                    caption="Observations that argue the other way"
+                    variant="warning"
+                    icon="scale-balance"
                     items={selectedProblem.contradictingEvidence}
                     empty="No material contradiction detected."
                   />
-                  <EvidenceColumn
+                  <EvidenceCard
                     title="Missing evidence"
+                    caption="What must be measured before this can be settled"
+                    variant="info"
+                    icon="clipboard-text-search-outline"
                     items={selectedProblem.missingEvidence}
                     empty="No expected evidence is currently missing."
                   />
@@ -587,13 +613,13 @@ export function MachineAnalysisPage({
                   <View style={NARROW}>
                     <Panel fill>
                       <View className="gap-3">
-                        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>
+                        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>
                           Confirmation checks
                         </Text>
                         {(selectedProblem.confirmationChecks.length > 0 ? selectedProblem.confirmationChecks : thenConfirm).map((item, index) => (
                           <View key={`${item}-${index}`} className="flex-row gap-2.5">
-                            <Text className="w-[14px] font-mono text-[10px] text-accent">{index + 1}</Text>
-                            <Text className={cn('flex-1 font-body text-[11px] leading-[17px]', inkClass)}>{item}</Text>
+                            <Text className="w-[14px] font-mono text-[11.5px] text-accent">{index + 1}</Text>
+                            <Text className={cn('flex-1 font-body text-[12.5px] leading-[19px]', inkClass)}>{item}</Text>
                           </View>
                         ))}
                         {onVerifyChain ? (
@@ -603,7 +629,7 @@ export function MachineAnalysisPage({
                             accessibilityLabel="Verify this Prognosis chain"
                             className="rounded-lg border border-accent/35 bg-accent/10 px-3 py-2"
                           >
-                            <Text className="text-center font-mono text-[9px] font-bold tracking-wider text-accent">
+                            <Text className="text-center font-mono text-[10.5px] font-bold tracking-wider text-accent">
                               VERIFY CHAIN
                             </Text>
                           </Pressable>
@@ -618,11 +644,11 @@ export function MachineAnalysisPage({
                     <View className="gap-1.5">
                       {progression.slice(0, 4).map((item) => (
                         <View key={item.id} className="flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2" style={{ borderColor: hairline }}>
-                          <Text style={{ width: 86, color: conditionHex[item.condition] }} className="font-mono text-[8px] font-bold tracking-wider">
+                          <Text style={{ width: 86, color: conditionHex[item.condition] }} className="font-mono text-[9.5px] font-bold tracking-wider">
                             {CONDITION_LABEL[item.condition]}
                           </Text>
-                          <Text className={cn('w-[68px] font-mono text-[9px]', mutedClass)}>{item.at}</Text>
-                          <Text className={cn('min-w-[220px] flex-1 font-body text-[10px] leading-[15px]', inkClass)}>{item.text}</Text>
+                          <Text className={cn('w-[68px] font-mono text-[10.5px]', mutedClass)}>{item.at}</Text>
+                          <Text className={cn('min-w-[220px] flex-1 font-body text-[11.5px] leading-[17px]', inkClass)}>{item.text}</Text>
                         </View>
                       ))}
                     </View>

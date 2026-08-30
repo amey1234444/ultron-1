@@ -138,9 +138,9 @@ function ActionReceipt({ message, onDismiss }: { message: string; onDismiss: () 
   return (
     <View className="absolute inset-x-0 top-0 z-10 items-center px-4 pt-3">
       <View className="flex-row items-center gap-3 rounded-lg border border-accent/40 bg-accent/10 px-3.5 py-2">
-        <Text className={cn('font-body text-[11px]', inkClass)}>{message}</Text>
+        <Text className={cn('font-body text-[12.5px]', inkClass)}>{message}</Text>
         <Pressable onPress={onDismiss} accessibilityRole="button" accessibilityLabel="Dismiss">
-          <Text className="font-mono text-[11px] text-accent">×</Text>
+          <Text className="font-mono text-[12.5px] text-accent">×</Text>
         </Pressable>
       </View>
     </View>
@@ -186,8 +186,8 @@ function MachinePicker({
               accessibilityLabel={`${machine.name}, ${machine.template}`}
               className={cn('gap-0.5 rounded-lg px-2.5 py-2', active && 'bg-accent/10')}
             >
-              <Text className={cn('font-body-medium text-[12px]', active ? 'text-accent' : inkClass)}>{machine.name}</Text>
-              <Text className={cn('font-body text-[10px]', mutedClass)}>
+              <Text className={cn('font-body-medium text-[13.5px]', active ? 'text-accent' : inkClass)}>{machine.name}</Text>
+              <Text className={cn('font-body text-[11.5px]', mutedClass)}>
                 {machine.template}
                 {machine.hierarchyPath ? ` · ${machine.hierarchyPath}` : ''}
               </Text>
@@ -369,7 +369,7 @@ export function AnalysisWorkspace({
             accessibilityLabel="Open the machine overview for this machine"
             className="rounded-lg border border-accent/40 bg-accent/10 px-3 py-2"
           >
-            <Text className="font-mono text-[10px] font-bold tracking-wider text-accent">‹ MACHINE OVERVIEW</Text>
+            <Text className="font-mono text-[11.5px] font-bold tracking-wider text-accent">‹ MACHINE OVERVIEW</Text>
           </Pressable>
         ),
       }
@@ -516,7 +516,7 @@ export function AnalysisWorkspace({
       {conclusionOverride !== null || evidence !== null ? (
         <View className="absolute inset-x-0 bottom-0 items-center px-4 pb-2">
           <View className="rounded border border-accent/30 bg-accent/10 px-2.5 py-1">
-            <Text className="font-mono text-[9px] tracking-wider text-accent">
+            <Text className="font-mono text-[10.5px] tracking-wider text-accent">
               SESSION ONLY · analyst decisions and evidence are not yet persisted
             </Text>
           </View>

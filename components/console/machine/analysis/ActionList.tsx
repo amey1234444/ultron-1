@@ -33,9 +33,9 @@ export function DoThisList({
   return (
     <View className="gap-3">
       <View className="flex-row items-center gap-2">
-        <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>{title}</Text>
+        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>{title}</Text>
         <View className="rounded border px-1.5 py-[1px]" style={{ borderColor: `${tint}66`, backgroundColor: `${tint}14` }}>
-          <Text style={{ color: tint }} className="font-mono text-[8px] font-bold tracking-wider">
+          <Text style={{ color: tint }} className="font-mono text-[9.5px] font-bold tracking-wider">
             {priority.toUpperCase()} PRIORITY
           </Text>
         </View>
@@ -44,10 +44,10 @@ export function DoThisList({
       <View className="gap-2">
         {steps.map((step, index) => (
           <View key={step} className="flex-row gap-2.5">
-            <Text style={{ width: 14, color: tint }} className="font-mono text-[10px] tabular-nums">
+            <Text style={{ width: 14, color: tint }} className="font-mono text-[11.5px] tabular-nums">
               {index + 1}
             </Text>
-            <Text className={cn('flex-1 font-body text-[12px] leading-[18px]', inkClass)}>{step}</Text>
+            <Text className={cn('flex-1 font-body text-[13.5px] leading-[20px]', inkClass)}>{step}</Text>
           </View>
         ))}
       </View>
@@ -70,21 +70,21 @@ export function ThenConfirmList({ criteria, footnote }: { criteria: string[]; fo
 
   return (
     <View className="gap-3">
-      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Then confirm</Text>
+      <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Then confirm</Text>
 
       <View className="gap-2">
         {criteria.map((item) => (
           <View key={item} className="flex-row gap-2.5">
-            <Text style={{ width: 12 }} className={cn('font-mono text-[10px]', mutedClass)}>
+            <Text style={{ width: 12 }} className={cn('font-mono text-[11.5px]', mutedClass)}>
               ✓
             </Text>
-            <Text className={cn('flex-1 font-body text-[11px] leading-[17px]', inkClass)}>{item}</Text>
+            <Text className={cn('flex-1 font-body text-[12.5px] leading-[19px]', inkClass)}>{item}</Text>
           </View>
         ))}
       </View>
 
       {footnote ? (
-        <Text className={cn('font-body text-[10px] leading-[15px] pt-1', mutedClass)} style={{ borderTopWidth: 1, borderTopColor: hairline }}>
+        <Text className={cn('font-body text-[11.5px] leading-[17px] pt-1', mutedClass)} style={{ borderTopWidth: 1, borderTopColor: hairline }}>
           {footnote}
         </Text>
       ) : null}

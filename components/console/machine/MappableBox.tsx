@@ -327,7 +327,7 @@ export function MappableBox({
             />
 
             <Pressable onPress={() => setPickerOpen((v) => !v)} className={cn('border-t px-2.5 py-1.5', lineClass)}>
-              <Text className={cn('font-body text-[11px]', mutedClass)}>⚭ Pick rack channel</Text>
+              <Text className={cn('font-body text-[12.5px]', mutedClass)}>⚭ Pick rack channel</Text>
             </Pressable>
           </>
         )}
@@ -346,10 +346,10 @@ export function MappableBox({
             }}
           >
             {pickerChannels.length === 0 ? (
-              <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No active rack channels yet.</Text>
+              <Text className={cn('px-2.5 py-2 font-body text-[12.5px] italic', mutedClass)}>No active rack channels yet.</Text>
             ) : devices.length > 0 && !selectedGateway ? (
               <ScrollView style={{ maxHeight: 220 }} keyboardShouldPersistTaps="handled">
-                <Text className={cn('px-2.5 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                <Text className={cn('px-2.5 pb-1 pt-2 font-body-medium text-[11.5px] uppercase tracking-wider', mutedClass)}>
                   Gateways
                 </Text>
                 {pickerGateways.map((gateway) => {
@@ -371,11 +371,11 @@ export function MappableBox({
                         <Text numberOfLines={1} style={{ minWidth: 0 }} className={cn('font-body-medium flex-1 text-xs', inkClass)}>
                           {gateway.name}
                         </Text>
-                        <Text className={cn('font-body-medium text-[10px]', gateway.status === 'Online' ? 'text-status-success' : mutedClass)}>
+                        <Text className={cn('font-body-medium text-[11.5px]', gateway.status === 'Online' ? 'text-status-success' : mutedClass)}>
                           {gateway.status === 'Online' ? 'active' : 'offline'}
                         </Text>
                       </View>
-                      <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
+                      <Text numberOfLines={1} className={cn('font-mono text-[11.5px]', mutedClass)}>
                         {gateway.ip || 'no ip'} - {racks.length} racks - {activeCount} active channels
                       </Text>
                     </Pressable>
@@ -391,13 +391,13 @@ export function MappableBox({
                   }}
                   className={cn('border-b px-2.5 py-1.5', lineClass)}
                 >
-                  <Text className={cn('font-body-medium text-[11px]', mutedClass)}>Back to gateways</Text>
+                  <Text className={cn('font-body-medium text-[12.5px]', mutedClass)}>Back to gateways</Text>
                 </Pressable>
-                <Text className={cn('px-2.5 pb-1 pt-2 font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>
+                <Text className={cn('px-2.5 pb-1 pt-2 font-body-medium text-[11.5px] uppercase tracking-wider', mutedClass)}>
                   {selectedGateway.name} racks
                 </Text>
                 {selectedGatewayRacks.length === 0 ? (
-                  <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>No racks under this gateway.</Text>
+                  <Text className={cn('px-2.5 py-2 font-body text-[12.5px] italic', mutedClass)}>No racks under this gateway.</Text>
                 ) : (
                   selectedGatewayRacks.map((rack) => {
                     const activeCount = pickerChannels.filter((c) => c.rackId === rack.id).length;
@@ -411,11 +411,11 @@ export function MappableBox({
                           <Text numberOfLines={1} style={{ minWidth: 0 }} className={cn('font-body-medium flex-1 text-xs', inkClass)}>
                             {rack.name}
                           </Text>
-                          <Text className={cn('font-body-medium text-[10px]', rack.status === 'Online' ? 'text-status-success' : mutedClass)}>
+                          <Text className={cn('font-body-medium text-[11.5px]', rack.status === 'Online' ? 'text-status-success' : mutedClass)}>
                             {rack.status === 'Online' ? 'active' : 'offline'}
                           </Text>
                         </View>
-                        <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
+                        <Text numberOfLines={1} className={cn('font-mono text-[11.5px]', mutedClass)}>
                           {rack.ip || 'no ip'} - {activeCount} active channels
                         </Text>
                       </Pressable>
@@ -428,7 +428,7 @@ export function MappableBox({
                 <View className={cn('border-b px-2.5 py-1.5', lineClass)}>
                   {devices.length > 0 && selectedGateway && selectedRack && (
                     <Pressable onPress={() => setSelectedRackId(null)} className="pb-1">
-                      <Text className={cn('font-body-medium text-[11px]', mutedClass)}>Back to racks</Text>
+                      <Text className={cn('font-body-medium text-[12.5px]', mutedClass)}>Back to racks</Text>
                     </Pressable>
                   )}
                   <TextInput
@@ -438,13 +438,13 @@ export function MappableBox({
                     placeholderTextColor={isDark ? '#A1A3A0' : '#5F625F'}
                     className={cn('font-body text-xs', inkClass)}
                   />
-                  <Text className={cn('mt-1 font-body text-[10px]', mutedClass)}>
+                  <Text className={cn('mt-1 font-body text-[11.5px]', mutedClass)}>
                     {filteredPickerChannels.length} of {pickerChannelsForRack.length} active channels
                   </Text>
                 </View>
 
                 {filteredPickerChannels.length === 0 ? (
-                  <Text className={cn('px-2.5 py-2 font-body text-[11px] italic', mutedClass)}>
+                  <Text className={cn('px-2.5 py-2 font-body text-[12.5px] italic', mutedClass)}>
                     {pickerChannelsForRack.length === 0 ? 'No active channels for this rack.' : 'No channels match this search.'}
                   </Text>
                 ) : (
@@ -459,12 +459,12 @@ export function MappableBox({
                         className={cn('border-b px-2.5 py-1.5', lineClass)}
                       >
                         <View className="flex-row items-center gap-2">
-                          <Text className="font-body-bold text-[11px] text-accent">{c.code}</Text>
+                          <Text className="font-body-bold text-[12.5px] text-accent">{c.code}</Text>
                           <Text numberOfLines={1} style={{ minWidth: 0 }} className={cn('font-body-medium flex-1 text-xs', inkClass)}>
                             {c.deviceName}
                           </Text>
                         </View>
-                        <Text numberOfLines={1} className={cn('font-mono text-[10px]', mutedClass)}>
+                        <Text numberOfLines={1} className={cn('font-mono text-[11.5px]', mutedClass)}>
                           {channelLocation(c)} - {c.label}
                         </Text>
                       </Pressable>

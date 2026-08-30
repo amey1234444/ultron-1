@@ -49,15 +49,15 @@ export function MaintenanceCard({
 
   return (
     <View className="gap-3">
-      <Text className={cn('font-body-medium text-[10px] uppercase tracking-wider', mutedClass)}>Maintenance</Text>
+      <Text className={cn('font-body-medium text-[11.5px] uppercase tracking-wider', mutedClass)}>Maintenance</Text>
 
       <View className="flex-row items-baseline gap-4">
         <View>
-          <Text className={cn('font-body text-[10px]', mutedClass)}>predicted</Text>
+          <Text className={cn('font-body text-[11.5px]', mutedClass)}>predicted</Text>
           <Text className={cn('font-mono text-lg font-bold tabular-nums', inkClass)}>{formatRul(soonestRulDays)}</Text>
         </View>
         <View>
-          <Text className={cn('font-body text-[10px]', mutedClass)}>planned</Text>
+          <Text className={cn('font-body text-[11.5px]', mutedClass)}>planned</Text>
           <Text className={cn('font-mono text-lg font-bold tabular-nums', inkClass)}>
             {nextPlanned ? formatDate(nextPlanned.date) : '--'}
           </Text>
@@ -67,21 +67,21 @@ export function MaintenanceCard({
       {/* Not fabricating a service history: an invented "last serviced" date on a
           maintenance screen is the kind of number someone plans around. */}
       {!records || records.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>
           No maintenance source is wired to this machine yet, so nothing here is scheduled against the prediction.
         </Text>
       ) : (
         <View className="gap-1.5">
           {records.slice(0, 4).map((record) => (
             <View key={record.id} className={cn('flex-row items-center gap-2 rounded-lg border px-2.5 py-1.5', lineClass)}>
-              <Text className={cn('w-12 font-mono text-[10px]', mutedClass)}>{formatDate(record.date)}</Text>
-              <Text numberOfLines={1} className={cn('flex-1 font-body text-[11px]', inkClass)}>
+              <Text className={cn('w-12 font-mono text-[11.5px]', mutedClass)}>{formatDate(record.date)}</Text>
+              <Text numberOfLines={1} className={cn('flex-1 font-body text-[12.5px]', inkClass)}>
                 {record.summary}
                 {record.componentLabel ? ` · ${record.componentLabel}` : ''}
               </Text>
               <Text
                 style={record.kind === 'overdue' ? { color: levels.danger } : undefined}
-                className={cn('font-body-medium text-[9px] uppercase tracking-wide', record.kind !== 'overdue' && mutedClass)}
+                className={cn('font-body-medium text-[10.5px] uppercase tracking-wide', record.kind !== 'overdue' && mutedClass)}
               >
                 {KIND_LABEL[record.kind]}
               </Text>

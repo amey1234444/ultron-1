@@ -24,3 +24,4 @@ export { LimitBar, MagnitudeBars, Meter, StatTile, type MagnitudeDatum } from '.
 export { Cell, DataTable, type Column } from './DataTable';
 export { alpha, consolePalette, variantStyle, type ConsolePalette, type IconName, type Variant } from './tokens';
 export { text, tabular, displayWeight, radius } from './type';
+export { Hoverable, hoverGround, type HoverState } from './Hover';

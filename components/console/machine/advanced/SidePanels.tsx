@@ -22,12 +22,12 @@ export function PanelHeader({
   return (
     <View className="flex-row items-start justify-between gap-2 pb-2.5" style={{ borderBottomWidth: 1, borderBottomColor: hairline }}>
       <View className="flex-1">
-        <Text className={cn('font-body-medium text-[11px]', inkClass)}>{title}</Text>
-        <Text className={cn('mt-0.5 font-mono text-[8px] tracking-wider', mutedClass)}>{subtitle}</Text>
+        <Text className={cn('font-body-medium text-[12.5px]', inkClass)}>{title}</Text>
+        <Text className={cn('mt-0.5 font-mono text-[9.5px] tracking-wider', mutedClass)}>{subtitle}</Text>
       </View>
       {onCollapse ? (
         <Pressable onPress={onCollapse} accessibilityRole="button" accessibilityLabel={`Hide ${title}`} className="px-1.5">
-          <Text className={cn('font-mono text-[12px]', mutedClass)}>×</Text>
+          <Text className={cn('font-mono text-[13.5px]', mutedClass)}>×</Text>
         </Pressable>
       ) : null}
     </View>
@@ -66,10 +66,10 @@ export function IntelligencePanel({
 
   const card = (label: string, text: string, tint?: string) => (
     <View className="gap-1 rounded-lg border px-2.5 py-2" style={{ borderColor: hairline }}>
-      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[8px] font-bold tracking-wider', !tint && mutedClass)}>
+      <Text style={tint ? { color: tint } : undefined} className={cn('font-mono text-[9.5px] font-bold tracking-wider', !tint && mutedClass)}>
         {label}
       </Text>
-      <Text className={cn('font-body text-[10px] leading-[15px]', inkClass)}>{text}</Text>
+      <Text className={cn('font-body text-[11.5px] leading-[17px]', inkClass)}>{text}</Text>
     </View>
   );
 
@@ -89,7 +89,7 @@ export function IntelligencePanel({
           accessibilityLabel={`Open evidence tray, ${evidenceCount} items`}
           className="rounded-lg border border-accent/35 bg-accent/10 px-2.5 py-2"
         >
-          <Text className="text-center font-mono text-[9px] font-bold tracking-wider text-accent">
+          <Text className="text-center font-mono text-[10.5px] font-bold tracking-wider text-accent">
             EVIDENCE TRAY · {evidenceCount}
           </Text>
         </Pressable>
@@ -132,22 +132,22 @@ export function EvidenceTray({
     <View className="gap-3">
       <View className="flex-row items-start justify-between gap-2">
         <View className="flex-1">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>
             Evidence tray · {evidence.length}
           </Text>
-          <Text className={cn('mt-1 font-mono text-[9px] tracking-wider', mutedClass)}>
+          <Text className={cn('mt-1 font-mono text-[10.5px] tracking-wider', mutedClass)}>
             {counts.supports ?? 0} SUPPORTS · {counts.contradicts ?? 0} CONTRADICTS · {counts.context ?? 0} CONTEXT
           </Text>
         </View>
         {onClose ? (
           <Pressable onPress={onClose} accessibilityRole="button" accessibilityLabel="Close evidence tray" className="px-1.5">
-            <Text className={cn('font-mono text-[12px]', mutedClass)}>×</Text>
+            <Text className={cn('font-mono text-[13.5px]', mutedClass)}>×</Text>
           </Pressable>
         ) : null}
       </View>
 
       {evidence.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>
           Nothing collected yet. Add a view from any work area to start building a case.
         </Text>
       ) : (
@@ -159,23 +159,23 @@ export function EvidenceTray({
               className="gap-1 rounded-lg border px-2.5 py-2"
             >
               <View className="flex-row items-center justify-between gap-2">
-                <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[11px]', inkClass)}>
+                <Text numberOfLines={1} className={cn('flex-1 font-body-medium text-[12.5px]', inkClass)}>
                   {item.title}
                 </Text>
-                <Text style={{ color: roleHexes(isDark)[item.role] }} className="font-mono text-[8px] font-bold tracking-wider">
+                <Text style={{ color: roleHexes(isDark)[item.role] }} className="font-mono text-[9.5px] font-bold tracking-wider">
                   {item.role.toUpperCase()}
                 </Text>
               </View>
 
-              <Text className={cn('font-body text-[10px] leading-[14px]', mutedClass)}>{item.detail}</Text>
+              <Text className={cn('font-body text-[11.5px] leading-[16px]', mutedClass)}>{item.detail}</Text>
 
               <View className="flex-row items-center justify-between gap-2">
-                <Text numberOfLines={1} className={cn('flex-1 font-mono text-[8px]', mutedClass)}>
+                <Text numberOfLines={1} className={cn('flex-1 font-mono text-[9.5px]', mutedClass)}>
                   {item.source}
                 </Text>
                 {onRemove ? (
                   <Pressable onPress={() => onRemove(item.id)} accessibilityRole="button" accessibilityLabel={`Remove ${item.title}`}>
-                    <Text className={cn('font-mono text-[8px]', mutedClass)}>REMOVE</Text>
+                    <Text className={cn('font-mono text-[9.5px]', mutedClass)}>REMOVE</Text>
                   </Pressable>
                 ) : null}
               </View>

@@ -4,6 +4,7 @@ import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import { levelHexes } from '../../../../lib/condition';
 import { consolePalette } from '../../../../lib/consoleTheme';
+import { Hoverable, radius } from '../../../ui';
 
 // There is no event log in the data model — nothing records that a machine
 // started, that a channel dropped out, or that a trend crossed a limit. This is
@@ -56,46 +57,53 @@ export function RecentEvents({ events, limit = 6 }: { events?: MachineEvent[]; l
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const hairline = isDark ? 'rgba(255,255,255,0.08)' : consolePalette(isDark).lineSubtle;
+  const palette = consolePalette(isDark);
+  const hairline = isDark ? 'rgba(255,255,255,0.08)' : palette.lineSubtle;
   const kindHex = kindHexes(isDark);
 
   const shown = (events ?? []).slice(0, limit);
 
   return (
     <View className="gap-3">
-      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Recent events</Text>
+      <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Recent events</Text>
 
       {shown.length === 0 ? (
-        <Text className={cn('font-body text-[11px] italic', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>
           No event source is wired to this machine yet, so nothing is recorded here.
         </Text>
       ) : (
         <View className="gap-0">
           {shown.map((event, index) => (
-            <View
+            <Hoverable
               key={event.id}
-              className="flex-row gap-3 py-2"
-              style={index > 0 ? { borderTopWidth: 1, borderTopColor: hairline } : undefined}
+              className="flex-row gap-3 px-2 py-2"
+              style={({ hovered }) => ({
+                marginHorizontal: -8,
+                borderRadius: radius.sm,
+                borderTopWidth: index > 0 ? 1 : 0,
+                borderTopColor: hairline,
+                backgroundColor: hovered ? palette.hover : undefined,
+              })}
             >
-              <Text className={cn('w-10 font-mono text-[10px] tabular-nums', mutedClass)}>{timeLabel(event.at)}</Text>
+              <Text className={cn('w-10 font-mono text-[11.5px] tabular-nums', mutedClass)}>{timeLabel(event.at)}</Text>
 
               <View style={{ width: 6, height: 6, borderRadius: 3, marginTop: 4, backgroundColor: kindHex[event.kind] }} />
 
               <View className="flex-1">
-                <Text numberOfLines={1} className={cn('font-body text-[11px]', inkClass)}>
+                <Text numberOfLines={1} className={cn('font-body text-[12.5px]', inkClass)}>
                   {event.summary}
                 </Text>
                 {event.detail ? (
-                  <Text numberOfLines={1} className={cn('font-mono text-[9px]', mutedClass)}>
+                  <Text numberOfLines={1} className={cn('font-mono text-[10.5px]', mutedClass)}>
                     {event.detail}
                   </Text>
                 ) : null}
               </View>
 
-              <Text style={{ color: kindHex[event.kind] }} className="font-mono text-[8px] font-bold tracking-wider">
+              <Text style={{ color: kindHex[event.kind] }} className="font-mono text-[9.5px] font-bold tracking-wider">
                 {KIND_LABEL[event.kind]}
               </Text>
-            </View>
+            </Hoverable>
           ))}
         </View>
       )}

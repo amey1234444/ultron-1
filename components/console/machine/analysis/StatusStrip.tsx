@@ -41,7 +41,7 @@ export function MetricBox({
       className={cn('flex-1 gap-1.5 rounded-xl border px-3.5 py-3', isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
       style={{ borderColor: emphasis && colour ? `${colour}4D` : hairline, minWidth: 150 }}
     >
-      <Text numberOfLines={1} className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>
+      <Text numberOfLines={1} className={cn('font-mono text-[10.5px] tracking-wider', mutedClass)}>
         {label}
       </Text>
 
@@ -54,7 +54,7 @@ export function MetricBox({
       </Text>
 
       {subtitle ? (
-        <Text numberOfLines={2} className={cn('font-body text-[10px] leading-[14px]', mutedClass)}>
+        <Text numberOfLines={2} className={cn('font-body text-[11.5px] leading-[16px]', mutedClass)}>
           {subtitle}
         </Text>
       ) : null}
@@ -149,10 +149,10 @@ export function StatusStrip({
           className="flex-row flex-wrap items-center gap-2 rounded-lg px-3 py-2"
           style={{ backgroundColor: `${conditionHex[state.condition]}12` }}
         >
-          <Text style={{ color: conditionHex[state.condition] }} className="font-mono text-[9px] font-bold tracking-wider">
+          <Text style={{ color: conditionHex[state.condition] }} className="font-mono text-[10.5px] font-bold tracking-wider">
             HEALTH SCORE UNDERSTATES THIS MACHINE
           </Text>
-          <Text className={cn('flex-1 font-body text-[10px]', mutedClass)}>
+          <Text className={cn('flex-1 font-body text-[11.5px]', mutedClass)}>
             The average reads {CONDITION_LABEL[state.healthSuggests].toLowerCase()}, but a component is in{' '}
             {CONDITION_LABEL[state.condition].toLowerCase()}. Condition wins.
           </Text>

@@ -231,13 +231,13 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
     <Panel className="gap-3" style={{ borderLeftWidth: 3, borderLeftColor: colour }}>
       <View className="flex-row flex-wrap items-center justify-between gap-2">
         <Text className={cn('font-body-bold text-lg tracking-[-0.02em]', textClass)}>{diagnosis.title}</Text>
-        <Text style={{ color: colour }} className="font-mono text-[10px] uppercase tracking-[0.16em]">
+        <Text style={{ color: colour }} className="font-mono text-[11.5px] uppercase tracking-[0.16em]">
           {formatUrgency(diagnosis.urgency)} · {Math.round(diagnosis.confidence * 100)}%
         </Text>
       </View>
       {diagnosis.supporting.length > 0 && (
         <View className="gap-1">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Supporting evidence</Text>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Supporting evidence</Text>
           {diagnosis.supporting.map((item) => (
             <Text key={item} className={cn('font-body text-xs leading-4', textClass)}>
               - {item}
@@ -247,7 +247,7 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
       )}
       {diagnosis.contradicting.length > 0 && (
         <View className="gap-1">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Contradictions</Text>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Contradictions</Text>
           {diagnosis.contradicting.map((item) => (
             <Text key={item} className={cn('font-body text-xs leading-4', mutedClass)}>
               - {item}
@@ -257,13 +257,13 @@ function DiagnosisCard({ diagnosis }: { diagnosis: DiagnosisCandidate }) {
       )}
       {diagnosis.immediateAction && (
         <View className="gap-1">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Immediate action</Text>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Immediate action</Text>
           <Text className={cn('font-body text-xs leading-4', textClass)}>{diagnosis.immediateAction}</Text>
         </View>
       )}
       {diagnosis.inspection.length > 0 && (
         <View className="gap-1">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Inspection</Text>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Inspection</Text>
           {diagnosis.inspection.map((item) => (
             <Text key={item} className={cn('font-body text-xs leading-4', textClass)}>
               - {item}
@@ -405,7 +405,7 @@ function RotaryAirlockAnalysisView({
       >
         <View className="min-w-0 gap-1.5">
           <View className="flex-row flex-wrap items-center gap-2">
-            <Text className={cn('font-body-bold text-[18px] tracking-[-0.025em]', textClass)}>Rotary airlock analysis</Text>
+            <Text className={cn('font-body-bold text-[19px] tracking-[-0.025em]', textClass)}>Rotary airlock analysis</Text>
             <Badge variant="muted" icon="hand-back-right-outline">Advisory only</Badge>
           </View>
           <View className="flex-row flex-wrap items-center gap-2">
@@ -422,7 +422,7 @@ function RotaryAirlockAnalysisView({
           style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}
         >
           <StatusDot variant={liveSignalCount > 0 ? 'success' : 'muted'} />
-          <Text className="font-mono text-[9.5px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
+          <Text className="font-mono text-[11px] uppercase tracking-[0.14em]" style={{ color: palette.inkMuted }}>
             {liveSignalCount > 0 ? `${liveSignalCount} live signal${liveSignalCount === 1 ? '' : 's'}` : 'No live data'}
           </Text>
         </View>
@@ -539,8 +539,8 @@ function RotaryAirlockAnalysisView({
                 return (
                   <Panel key={contributor.code} className="min-w-[240px] flex-1 gap-1">
                     <Text className={cn('font-body-medium text-xs', textClass)}>{contributor.code}</Text>
-                    <Text className={cn('font-body text-[11px] leading-4', mutedClass)}>{contributor.description}</Text>
-                    <Text style={{ color: TONE_COLOUR[contributorTone] }} className="font-mono text-[11px] font-bold">
+                    <Text className={cn('font-body text-[12.5px] leading-4', mutedClass)}>{contributor.description}</Text>
+                    <Text style={{ color: TONE_COLOUR[contributorTone] }} className="font-mono text-[12.5px] font-bold">
                       {contributor.direction} · {contributor.score.toFixed(1)}
                     </Text>
                   </Panel>
@@ -612,7 +612,7 @@ function RotaryAirlockAnalysisView({
               <Panel key={maintenanceCase.id} className="gap-2">
                 <View className="flex-row flex-wrap items-center justify-between gap-2">
                   <Text className={cn('font-body-bold text-sm', textClass)}>{maintenanceCase.title}</Text>
-                  <Text className={cn('font-body-medium text-[11px]', mutedClass)}>
+                  <Text className={cn('font-body-medium text-[12.5px]', mutedClass)}>
                     {maintenanceCase.status} · {maintenanceCase.priority}
                   </Text>
                 </View>
@@ -647,7 +647,7 @@ function RotaryAirlockAnalysisView({
                 <Panel key={ep.id} className="gap-2">
                   <View className="flex-row flex-wrap items-center justify-between gap-2">
                     <Text className={cn('font-body-bold text-sm', textClass)}>{ep.state.replace(/_/g, ' ')}</Text>
-                    <Text style={{ color: TONE_COLOUR[tone] }} className="font-body-medium text-[11px]">
+                    <Text style={{ color: TONE_COLOUR[tone] }} className="font-body-medium text-[12.5px]">
                       {ep.severity} · {ep.score.toFixed(1)}
                     </Text>
                   </View>

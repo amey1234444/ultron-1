@@ -358,7 +358,7 @@ export function MachineOverviewPage({
       <View className="flex-row flex-wrap items-center gap-x-5 gap-y-2">
         <View className="flex-row items-center gap-2">
           <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: levels[summary.level] }} />
-          <Text style={{ color: levels[summary.level] }} className="font-mono text-[11px] font-bold tracking-wider">
+          <Text style={{ color: levels[summary.level] }} className="font-mono text-[12.5px] font-bold tracking-wider">
             {STATE_LABEL[summary.level]}
           </Text>
         </View>
@@ -366,17 +366,17 @@ export function MachineOverviewPage({
             shipped RAV layout wires eleven against a template that lists six —
             so "11 of 6 expected" is a real state, and phrasing it as a fraction
             reads as a broken counter. Say it the way round that is true. */}
-        <Text className={cn('font-body text-[11px]', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px]', mutedClass)}>
           {mappedChannels.length <= expectedPoints
             ? `${mappedChannels.length} of ${expectedPoints} expected points mapped`
             : `${mappedChannels.length} points mapped · template defines ${expectedPoints}`}
         </Text>
-        <Text className={cn('font-body text-[11px]', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px]', mutedClass)}>
           {formatHours(windowHours)} of history · {ISO_10816_GROUPS[isoGroup].label}
         </Text>
         {/* How much of this page's own judgement rests on limits nobody set. */}
         {summary.inferredLimitCount > 0 && (
-          <Text style={{ color: palette.accent }} className="font-body text-[11px]">
+          <Text style={{ color: palette.accent }} className="font-body text-[12.5px]">
             {summary.inferredLimitCount} point{summary.inferredLimitCount === 1 ? '' : 's'} judged against inferred limits
           </Text>
         )}
@@ -413,12 +413,12 @@ export function MachineOverviewPage({
 
       <Panel status={statusForLevel(summary.level)}>
         <View className="gap-4">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Machine health overview</Text>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Machine health overview</Text>
 
           <View className="flex-row flex-wrap items-start gap-6">
             <View className="items-center gap-2">
               <HealthRing score={summary.health} level={summary.level} />
-              <Text style={{ color: levels[summary.level] }} className="font-mono text-[11px] font-bold tracking-widest">
+              <Text style={{ color: levels[summary.level] }} className="font-mono text-[12.5px] font-bold tracking-widest">
                 {STATE_LABEL[summary.level]}
               </Text>
             </View>
@@ -449,9 +449,9 @@ export function MachineOverviewPage({
 
       <View className="gap-3">
         <View className="flex-row items-center gap-3">
-          <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Live sensor overview</Text>
+          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Live sensor overview</Text>
           <View className={cn('flex-1 border-t', lineClass)} />
-          <Text className={cn('font-mono text-[10px]', mutedClass)}>
+          <Text className={cn('font-mono text-[11.5px]', mutedClass)}>
             {orderedChannels.length} sensors · rack order
           </Text>
         </View>
@@ -502,7 +502,7 @@ export function MachineOverviewPage({
                 decimals={trended.band.decimals}
               />
             ) : (
-              <Text className={cn('font-body text-[11px] italic', mutedClass)}>No sensor to trend yet.</Text>
+              <Text className={cn('font-body text-[12.5px] italic', mutedClass)}>No sensor to trend yet.</Text>
             )}
           </Panel>
         </View>

@@ -50,7 +50,7 @@ function ComponentBox({
       {component.points.length > 0 && (
         <Text
           className={cn(
-            'font-body text-[10px]',
+            'font-body text-[11.5px]',
             selected ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
           )}
         >

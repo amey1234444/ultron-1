@@ -79,7 +79,7 @@ function ActualSubTab({ label, active, onPress }: { label: string; active: boole
     >
       <Text
         className={cn(
-          'font-mono text-[10px] uppercase tracking-[0.16em]',
+          'font-mono text-[11.5px] uppercase tracking-[0.16em]',
           active ? (isDark ? 'text-ink-inverse' : 'text-ink') : isDark ? 'text-ink-muted' : 'text-ink-inverse-muted',
         )}
       >
@@ -104,7 +104,7 @@ function ZoomControls({ zoom, onZoomOut, onReset, onZoomIn }: { zoom: number; on
           <Text className={cn('font-body-bold text-sm', zoom <= MIN_ZOOM ? mutedClass : inkClass)}>−</Text>
         </Pressable>
         <Pressable onPress={onReset} className="px-2">
-          <Text className={cn('font-body-medium text-[11px] tabular-nums', mutedClass)}>{Math.round(zoom * 100)}%</Text>
+          <Text className={cn('font-body-medium text-[12.5px] tabular-nums', mutedClass)}>{Math.round(zoom * 100)}%</Text>
         </Pressable>
         <Pressable onPress={onZoomIn} disabled={zoom >= MAX_ZOOM} className="h-7 w-7 items-center justify-center rounded-full">
           <Text className={cn('font-body-bold text-sm', zoom >= MAX_ZOOM ? mutedClass : inkClass)}>+</Text>
@@ -125,7 +125,7 @@ export function ComponentRow({ component, selected, onPress }: { component: Mach
         <Text numberOfLines={1} className={cn('font-body-medium text-sm', isDark ? 'text-ink' : 'text-ink-inverse')}>
           {component.label}
         </Text>
-        <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+        <Text className={cn('font-body text-[12.5px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
           {component.type} · {component.points.length} point{component.points.length === 1 ? '' : 's'}
         </Text>
       </View>
@@ -303,7 +303,7 @@ export function MachineWorkspace({
       <Text numberOfLines={1} className={cn('font-body-bold text-base leading-tight tracking-[-0.025em] md:text-lg', isDark ? 'text-ink' : 'text-ink-inverse')}>
         {machine.name}
       </Text>
-      <Text numberOfLines={1} className={cn('font-mono text-[9px] uppercase leading-tight tracking-[0.18em]', mutedClass)}>
+      <Text numberOfLines={1} className={cn('font-mono text-[10.5px] uppercase leading-tight tracking-[0.18em]', mutedClass)}>
         {machine.template}
       </Text>
     </View>

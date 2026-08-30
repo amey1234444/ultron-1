@@ -70,14 +70,14 @@ export function MachineHeader({
   return (
     <View className="flex-row flex-wrap items-start justify-between gap-4">
       <View className="gap-1">
-        <Text className={cn('font-mono text-[10px] tracking-[0.18em]', mutedClass)}>ULTRON / {section}</Text>
+        <Text className={cn('font-mono text-[11.5px] tracking-[0.18em]', mutedClass)}>ULTRON / {section}</Text>
 
         <View className="flex-row flex-wrap items-baseline gap-2">
-          <Text className={cn('font-heading-medium text-[22px]', inkClass)}>{machineName}</Text>
-          <Text className={cn('font-body text-[14px]', mutedClass)}>· {template}</Text>
+          <Text className={cn('font-heading-medium text-[24px]', inkClass)}>{machineName}</Text>
+          <Text className={cn('font-body text-[15px]', mutedClass)}>· {template}</Text>
         </View>
 
-        <Text className={cn('font-body text-[11px]', mutedClass)}>
+        <Text className={cn('font-body text-[12.5px]', mutedClass)}>
           {path ? `${path} • ` : ''}
           {subtitle}
         </Text>
@@ -86,15 +86,15 @@ export function MachineHeader({
       <View className="flex-row items-center gap-2">
         <View className={cn('flex-row items-center gap-2 rounded-full border px-2.5 py-1.5', lineClass)}>
           <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: feedColour }} />
-          <Text style={{ color: feedColour }} className="font-mono text-[10px] font-bold tracking-wider">
+          <Text style={{ color: feedColour }} className="font-mono text-[11.5px] font-bold tracking-wider">
             {FEED_LABEL[feed]}
           </Text>
-          {age ? <Text className={cn('font-mono text-[10px]', mutedClass)}>· {age}</Text> : null}
+          {age ? <Text className={cn('font-mono text-[11.5px]', mutedClass)}>· {age}</Text> : null}
         </View>
 
         {onRefresh ? (
           <Pressable onPress={onRefresh} accessibilityRole="button" accessibilityLabel="Refresh data" className={cn('rounded-full border px-2.5 py-1.5', lineClass)}>
-            <Text className={cn('font-mono text-[10px] tracking-wider', mutedClass)}>REFRESH</Text>
+            <Text className={cn('font-mono text-[11.5px] tracking-wider', mutedClass)}>REFRESH</Text>
           </Pressable>
         ) : null}
 
@@ -105,8 +105,8 @@ export function MachineHeader({
             accessibilityLabel="Change machine"
             className="flex-row items-center gap-2 rounded-full border border-accent/35 bg-accent/10 px-3 py-1.5"
           >
-            <Text className="font-body-bold text-[11px] text-accent">{machineName}</Text>
-            <Text className="font-mono text-[10px] text-accent">▾</Text>
+            <Text className="font-body-bold text-[12.5px] text-accent">{machineName}</Text>
+            <Text className="font-mono text-[11.5px] text-accent">▾</Text>
           </Pressable>
         ) : null}
       </View>

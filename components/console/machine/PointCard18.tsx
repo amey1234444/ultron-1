@@ -88,7 +88,7 @@ export function PointCard18({
           {title}
         </Text>
         <View className="rounded-md border border-accent/35 bg-accent/10 px-1.5 py-0.5">
-          <Text className="font-body-bold text-[10px] text-accent">{channel ?? tag}</Text>
+          <Text className="font-body-bold text-[11.5px] text-accent">{channel ?? tag}</Text>
         </View>
         {interactive && onDelete && (
           <Pressable onPress={onDelete} hitSlop={6}>
@@ -101,7 +101,7 @@ export function PointCard18({
         {/* Space Grotesk SemiBold — matches the app's own wordmark/heading
             font instead of introducing an unrelated serif; the unit stays in
             mono for a technical, label-like contrast beside it. */}
-        <Text numberOfLines={1} style={{ color: statusColour }} className="font-wordmark text-[30px] leading-none">
+        <Text numberOfLines={1} style={{ color: statusColour }} className="font-wordmark text-[32px] leading-none">
           {value}
         </Text>
         <Text numberOfLines={1} style={{ color: statusColour }} className="font-mono text-sm">
@@ -114,7 +114,7 @@ export function PointCard18({
       <View style={{ height: POINT_CARD_FOOTER_HEIGHT, justifyContent: 'flex-end', alignItems: 'flex-start' }}>
         {interactive && onUnlink && !hideUnlink && (
           <Pressable onPress={onUnlink} hitSlop={6}>
-            <Text className={cn('font-body text-[10px] underline', mutedClass)}>Unlink</Text>
+            <Text className={cn('font-body text-[11.5px] underline', mutedClass)}>Unlink</Text>
           </Pressable>
         )}
       </View>
