@@ -1,8 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
-import { useCallback, useState } from 'react';
-import { Text, View, type LayoutChangeEvent } from 'react-native';
+import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { CONDITION_LABEL, type OverviewCondition } from '../../../../lib/analysisOverview';
@@ -184,46 +183,55 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
   const palette = consolePalette(isDark);
 
   return (
-    <View className="flex-row flex-wrap" style={{ gap: 10 }}>
-      {facts.map((fact) => (
-        <Hoverable
-          key={fact.label}
-          className="gap-1.5 border px-4 py-3"
-          style={({ hovered }) => ({
-            minWidth: fact.wide ? 300 : 178,
-            flexGrow: fact.wide ? 2.4 : 1,
-            flexBasis: fact.wide ? 300 : 178,
-            borderColor: hovered ? palette.hoverBorder : palette.line,
-            backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
-            borderRadius: radius.md,
-          })}
-        >
-          <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
-            {fact.label}
-          </Text>
-          <View className="flex-row flex-wrap items-baseline gap-x-1.5">
-            <Text
-              className={fact.wide ? text.bodyStrong : text.dataMd}
-              style={[
-                fact.wide ? null : tabular,
-                { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink, fontWeight: '600' },
-              ]}
-            >
-              {fact.value}
+    <View
+      className="overflow-hidden border"
+      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+    >
+      {/* The negative margins hide the last column's and last row's hairline
+          against the container's own border, so the grid reads as a ruled frame
+          rather than as a comb with a loose tooth on each edge. */}
+      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
+        {facts.map((fact) => (
+          <Hoverable
+            key={fact.label}
+            className="gap-1.5 px-4 py-3.5"
+            style={({ hovered }) => ({
+              minWidth: fact.wide ? 300 : 178,
+              flexGrow: fact.wide ? 2.4 : 1,
+              flexBasis: fact.wide ? 300 : 178,
+              borderRightWidth: 1,
+              borderBottomWidth: 1,
+              borderColor: palette.line,
+              backgroundColor: hovered ? palette.hoverSurface : undefined,
+            })}
+          >
+            <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
+              {fact.label}
             </Text>
-            {fact.unit ? (
-              <Text className={text.meta} style={{ color: palette.inkMuted }}>
-                {fact.unit}
+            <View className="flex-row flex-wrap items-baseline gap-x-1.5">
+              <Text
+                className={fact.wide ? text.bodyStrong : text.dataMd}
+                style={[
+                  fact.wide ? null : tabular,
+                  { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink, fontWeight: '600' },
+                ]}
+              >
+                {fact.value}
+              </Text>
+              {fact.unit ? (
+                <Text className={text.meta} style={{ color: palette.inkMuted }}>
+                  {fact.unit}
+                </Text>
+              ) : null}
+            </View>
+            {fact.note ? (
+              <Text className={text.micro} style={{ color: palette.inkFaint }} numberOfLines={2}>
+                {fact.note}
               </Text>
             ) : null}
-          </View>
-          {fact.note ? (
-            <Text className={text.micro} style={{ color: palette.inkFaint }} numberOfLines={2}>
-              {fact.note}
-            </Text>
-          ) : null}
-        </Hoverable>
-      ))}
+          </Hoverable>
+        ))}
+      </View>
     </View>
   );
 }
@@ -544,33 +552,35 @@ export type SensorEvidenceItem = {
   condition: OverviewCondition;
 };
 
-/** Two columns once there is room for two readable ones, otherwise one. */
-const SENSOR_CARD_MIN = 340;
-const SENSOR_GAP = 10;
+// The column widths, as flex rules rather than fixed pixels.
+//
+// The table this restores was five hard-coded columns behind an 820px minimum
+// and its own horizontal scrollbar, so on a narrow window the reading — the one
+// column anybody came for — sat off-screen. Same columns, but the two prose
+// ones flex and the two short ones hold a fixed width, so the grid stays a grid
+// at any panel width and never scrolls sideways.
+const SENSOR_COL_MEASUREMENT = { flexGrow: 3, flexBasis: 200, minWidth: 150 } as const;
+const SENSOR_COL_VALUE = { flexGrow: 1, flexBasis: 120, minWidth: 96 } as const;
+const SENSOR_COL_TREND = { flexGrow: 4, flexBasis: 240, minWidth: 160 } as const;
+const SENSOR_COL_CONDITION = { flexGrow: 0, flexBasis: 116, minWidth: 116 } as const;
 
 /**
- * Live sensor evidence, as cards rather than as a table.
+ * Live sensor evidence, in columns.
  *
- * The table this replaces was five columns wide with a 820px minimum and its own
- * horizontal scrollbar, so on any window narrower than a desktop the reading —
- * the one column anybody came for — was off-screen behind a scroll. Cards carry
- * the same fields at whatever width is available and pack two-up when the region
- * is wide enough, which is most of the time on the console.
+ * Fifteen readings of the same shape are a table, not fifteen cards: the whole
+ * job here is comparing one row against the next, and that only works when the
+ * value of row 4 is directly above the value of row 5. Cards put every field at
+ * a different x for every row, which is exactly the wrong shape for scanning a
+ * column of numbers.
  *
- * The data-quality column is gone on purpose. It repeated one page-level fact —
- * the feed is either good or it is not — once per row, fifteen times, in the
- * position a reader scans for something that varies. The fact itself is still
- * stated, once, in the fact strip at the top of the page.
+ * The data-quality column stays gone on purpose. It repeated one page-level
+ * fact — the feed is either good or it is not — once per row, fifteen times, in
+ * the position a reader scans for something that varies. That fact is still
+ * stated once, in the fact strip at the top of the page.
  */
 export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem[]; empty: string }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const [width, setWidth] = useState(0);
-
-  const onLayout = useCallback((event: LayoutChangeEvent) => {
-    const next = Math.round(event.nativeEvent.layout.width);
-    setWidth((previous) => (Math.abs(previous - next) < 2 ? previous : next));
-  }, []);
 
   if (items.length === 0) {
     return (
@@ -580,50 +590,63 @@ export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem
     );
   }
 
-  const columns = width >= SENSOR_CARD_MIN * 2 + SENSOR_GAP ? 2 : 1;
-  const cardWidth = columns === 2 ? Math.floor((width - SENSOR_GAP) / 2) : undefined;
-
   return (
-    <View className="flex-row flex-wrap" style={{ gap: SENSOR_GAP }} onLayout={onLayout}>
-      {items.map((item) => {
+    <View
+      className="overflow-hidden border"
+      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+    >
+      <View
+        className="flex-row items-center gap-3 px-3.5 py-2.5"
+        style={{ borderBottomWidth: 1, borderBottomColor: palette.line, backgroundColor: palette.panel }}
+      >
+        <Text className={text.label} style={[SENSOR_COL_MEASUREMENT, { color: palette.inkFaint }]} numberOfLines={1}>
+          MEASUREMENT
+        </Text>
+        <Text className={text.label} style={[SENSOR_COL_VALUE, { color: palette.inkFaint }]} numberOfLines={1}>
+          VALUE
+        </Text>
+        <Text className={text.label} style={[SENSOR_COL_TREND, { color: palette.inkFaint }]} numberOfLines={1}>
+          TREND / QUALIFIER
+        </Text>
+        <Text className={text.label} style={[SENSOR_COL_CONDITION, { color: palette.inkFaint }]} numberOfLines={1}>
+          CONDITION
+        </Text>
+      </View>
+
+      {items.map((item, index) => {
         const colour = conditionColour(item.condition, isDark);
         return (
           <Hoverable
             key={item.id}
-            className="gap-2 border px-3.5 py-3"
+            className="flex-row items-center gap-3 px-3.5 py-2.5"
             style={({ hovered }) => ({
-              width: cardWidth,
-              flexGrow: columns === 2 ? 0 : 1,
-              flexBasis: cardWidth ?? '100%',
-              minWidth: 0,
-              borderColor: hovered ? alpha(colour, 0.4) : palette.line,
-              backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
-              borderRadius: radius.md,
+              borderTopWidth: index === 0 ? 0 : 1,
+              borderTopColor: palette.lineSubtle,
+              backgroundColor: hovered ? palette.hoverSurface : undefined,
             })}
           >
-            <View className="flex-row items-start justify-between gap-3">
-              <View className="min-w-0 flex-1 gap-0.5">
-                <Text numberOfLines={1} className={text.bodyStrong} style={{ color: palette.ink }}>
-                  {item.measurement}
-                </Text>
-                <Text className={text.code} style={{ color: palette.inkFaint }}>
-                  {item.code}
-                </Text>
-              </View>
-              <ConditionPill condition={item.condition} size="sm" />
-            </View>
-
-            <View className="flex-row items-baseline justify-between gap-3">
-              <Text className={text.dataLg} style={[tabular, { color: colour }]} numberOfLines={1}>
-                {item.value}
+            <View style={SENSOR_COL_MEASUREMENT} className="gap-0.5">
+              <Text numberOfLines={1} className={text.bodyStrong} style={{ color: palette.ink }}>
+                {item.measurement}
+              </Text>
+              <Text numberOfLines={1} className={text.code} style={{ color: palette.inkFaint }}>
+                {item.code}
               </Text>
             </View>
 
-            <View className="flex-row items-start gap-2 pt-0.5" style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle, paddingTop: 8 }}>
-              <MaterialCommunityIcons name="chart-line-variant" size={11} color={palette.inkFaint} style={{ marginTop: 1 }} />
+            <Text numberOfLines={1} className={text.data} style={[SENSOR_COL_VALUE, tabular, { color: colour }]}>
+              {item.value}
+            </Text>
+
+            <View style={SENSOR_COL_TREND} className="flex-row items-start gap-2">
+              <MaterialCommunityIcons name="chart-line-variant" size={12} color={palette.inkFaint} style={{ marginTop: 2 }} />
               <Text className={cn('min-w-0 flex-1', text.micro)} style={{ color: palette.inkMuted }}>
                 {item.trend}
               </Text>
+            </View>
+
+            <View style={SENSOR_COL_CONDITION}>
+              <ConditionPill condition={item.condition} size="sm" />
             </View>
           </Hoverable>
         );
