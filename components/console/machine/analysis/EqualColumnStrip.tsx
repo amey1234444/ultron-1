@@ -54,8 +54,8 @@ export function EqualCardRow({
     if (items.length === 0) return 1;
     const ceiling = Math.min(columns, items.length);
     if (width === 0) return ceiling;
-    return Math.min(ceiling, Math.max(1, Math.floor(width / minColumnWidth)));
-  }, [items.length, columns, width, minColumnWidth]);
+    return Math.min(ceiling, Math.max(1, Math.floor((width + gap) / (minColumnWidth + gap))));
+  }, [items.length, columns, width, minColumnWidth, gap]);
 
   const rows = useMemo(() => {
     const chunked: ReactNode[][] = [];
@@ -64,7 +64,6 @@ export function EqualCardRow({
     }
     return chunked;
   }, [items, activeColumns]);
-
   if (items.length === 0) return null;
 
   const onLayout = (event: LayoutChangeEvent) => {
@@ -74,25 +73,51 @@ export function EqualCardRow({
 
   return (
     <View onLayout={onLayout} style={{ gap }}>
-      {rows.map((row, rowIndex) => (
-        <View key={rowIndex} className="flex-row items-stretch" style={{ gap }}>
-          {/* The wrapper is a ROW, not the default column. These cards set their
-              own `flexBasis`/`flexGrow` for the wrapping layout they used to
-              live in, and on a column parent that basis would size their HEIGHT
-              and collapse them. As a row it means what the card intended, and
-              the card fills the equal share this wrapper was given. */}
-          {row.map((child, index) => (
-            <View key={index} className="flex-row" style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }}>
-              {child}
-            </View>
-          ))}
-          {padLastRow && row.length < activeColumns
-            ? Array.from({ length: activeColumns - row.length }, (_, filler) => (
-                <View key={`filler-${filler}`} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }} />
-              ))
-            : null}
-        </View>
-      ))}
+      {rows.map((row, rowIndex) => {
+        const rowColumns = padLastRow ? activeColumns : row.length;
+        const measuredColumnWidth = width > 0 ? (width - gap * (rowColumns - 1)) / rowColumns : undefined;
+        return (
+          <View key={rowIndex} className="flex-row items-stretch" style={{ gap }}>
+            {/* The wrapper is a ROW, not the default column. These cards set their
+                own `flexBasis`/`flexGrow` for the wrapping layout they used to
+                live in, and on a column parent that basis would size their HEIGHT
+                and collapse them. As a row it means what the card intended, and
+                the card fills the equal share this wrapper was given. */}
+            {row.map((child, index) => (
+              <View
+                key={index}
+                className="flex-row"
+                style={{
+                  flexGrow: measuredColumnWidth === undefined ? 1 : 0,
+                  flexShrink: measuredColumnWidth === undefined ? 1 : 0,
+                  flexBasis: measuredColumnWidth ?? 0,
+                  width: measuredColumnWidth,
+                  maxWidth: measuredColumnWidth,
+                  minWidth: 0,
+                  overflow: 'hidden',
+                }}
+              >
+                {child}
+              </View>
+            ))}
+            {padLastRow && row.length < activeColumns
+              ? Array.from({ length: activeColumns - row.length }, (_, filler) => (
+                  <View
+                    key={`filler-${filler}`}
+                    style={{
+                      flexGrow: measuredColumnWidth === undefined ? 1 : 0,
+                      flexShrink: measuredColumnWidth === undefined ? 1 : 0,
+                      flexBasis: measuredColumnWidth ?? 0,
+                      width: measuredColumnWidth,
+                      maxWidth: measuredColumnWidth,
+                      minWidth: 0,
+                    }}
+                  />
+                ))
+              : null}
+          </View>
+        );
+      })}
     </View>
   );
 }
@@ -135,6 +160,7 @@ export function EqualColumnStrip({
     }
     return chunked;
   }, [cells, columns]);
+  const measuredColumnWidth = width > 0 ? width / columns : undefined;
 
   if (cells.length === 0) return null;
 
@@ -156,11 +182,14 @@ export function EqualColumnStrip({
               key={cell.key}
               className="gap-1 px-3.5 py-3"
               style={({ hovered }) => ({
-                flexGrow: 1,
-                flexShrink: 1,
-                flexBasis: 0,
+                flexGrow: measuredColumnWidth === undefined ? 1 : 0,
+                flexShrink: measuredColumnWidth === undefined ? 1 : 0,
+                flexBasis: measuredColumnWidth ?? 0,
+                width: measuredColumnWidth,
+                maxWidth: measuredColumnWidth,
                 minWidth: 0,
                 position: 'relative',
+                overflow: 'hidden',
                 backgroundColor: hovered ? palette.hoverSurface : undefined,
               })}
             >
@@ -181,7 +210,17 @@ export function EqualColumnStrip({
               peers. Empty cells of the same flex hold the grid open instead. */}
           {row.length < columns
             ? Array.from({ length: columns - row.length }, (_, filler) => (
-                <View key={`filler-${filler}`} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 0, minWidth: 0 }} />
+                <View
+                  key={`filler-${filler}`}
+                  style={{
+                    flexGrow: measuredColumnWidth === undefined ? 1 : 0,
+                    flexShrink: measuredColumnWidth === undefined ? 1 : 0,
+                    flexBasis: measuredColumnWidth ?? 0,
+                    width: measuredColumnWidth,
+                    maxWidth: measuredColumnWidth,
+                    minWidth: 0,
+                  }}
+                />
               ))
             : null}
         </View>

@@ -341,11 +341,11 @@ export function StatementList({
         >
           <Text
             className={text.code}
-            style={[tabular, { color: alpha(rail, 0.85), width: 17, paddingTop: dense ? 1 : 2 }]}
+            style={[tabular, { color: alpha(rail, 0.85), width: 17, flexShrink: 0, paddingTop: dense ? 1 : 2 }]}
           >
             {String(index + 1).padStart(2, '0')}
           </Text>
-          <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.ink }}>
+          <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.ink, flexShrink: 1, minWidth: 0 }}>
             {item}
           </Text>
         </Hoverable>
@@ -679,7 +679,7 @@ export function DoctorCard({ label, value, variant = 'success' }: { label: strin
         <Text className={text.label} style={{ color: accent }}>
           {label}
         </Text>
-        <Text className={text.body} style={{ color: palette.ink }}>
+        <Text className={text.body} style={{ color: palette.ink, flexShrink: 1, minWidth: 0 }}>
           {value}
         </Text>
       </View>
