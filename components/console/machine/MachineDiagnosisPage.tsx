@@ -101,7 +101,7 @@ function ProblemRow({ problem, selected, onPress }: { problem: DiagnosisProblem;
         borderColor: selected || hovered ? `${conditionColour}8C` : palette.line,
         borderLeftColor: conditionColour,
         borderLeftWidth: 3,
-        backgroundColor: pressed || hovered ? palette.hover : selected ? palette.selected : palette.panelRaised,
+        backgroundColor: pressed || hovered ? palette.hoverSurface : selected ? palette.selected : palette.panelRaised,
         borderRadius: radius.md,
       })}
     >
@@ -141,7 +141,7 @@ function DiagnosticChain({ steps }: { steps: DiagnosisChainStep[] }) {
             marginHorizontal: -8,
             borderRadius: radius.sm,
             borderColor: step.established ? palette.accentBorder : palette.lineStrong,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <View className="flex-row items-center gap-2">
@@ -223,7 +223,7 @@ function MachineDoctorGrid({ problem }: { problem: DiagnosisProblem }) {
               flexGrow: 1,
               minWidth: 260,
               borderColor: hovered ? alpha(palette.accent, 0.4) : palette.line,
-              backgroundColor: hovered ? palette.hover : palette.panelRaised,
+              backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
               borderRadius: radius.md,
             })}
           >
@@ -255,7 +255,7 @@ function MetadataStrip({ problem, dataQuality }: { problem: DiagnosisProblem; da
         <Hoverable
           key={label}
           className="gap-1 px-3 py-2.5"
-          style={({ hovered }) => ({ minWidth: 150, flexGrow: 1, backgroundColor: hovered ? palette.hover : undefined })}
+          style={({ hovered }) => ({ minWidth: 150, flexGrow: 1, backgroundColor: hovered ? palette.hoverSurface : undefined })}
         >
           <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
           <Text className={cn('font-mono text-[11.5px] font-bold', inkClass)}>{value}</Text>
@@ -278,7 +278,7 @@ function DifferentialRow({ differential, index }: { differential: DiagnosisDiffe
         marginHorizontal: -8,
         borderRadius: radius.sm,
         borderColor: palette.lineSubtle,
-        backgroundColor: hovered ? palette.hover : undefined,
+        backgroundColor: hovered ? palette.hoverSurface : undefined,
       })}
     >
       <Text className="font-mono text-[11.5px] font-bold text-accent">{String(index + 1).padStart(2, '0')}</Text>
@@ -321,7 +321,7 @@ function OrderedList({ items, empty }: { items: string[]; empty: string }) {
           style={({ hovered }) => ({
             marginHorizontal: -8,
             borderRadius: radius.sm,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <Text className="font-mono text-[10.5px] font-bold text-accent">{String(index + 1).padStart(2, '0')}</Text>
@@ -856,7 +856,7 @@ export function MachineDiagnosisPage({
                         <Hoverable
                           key={impact.label}
                           className="gap-2 px-3 py-4"
-                          style={({ hovered }) => ({ ...IMPACT, backgroundColor: hovered ? palette.hover : undefined })}
+                          style={({ hovered }) => ({ ...IMPACT, backgroundColor: hovered ? palette.hoverSurface : undefined })}
                         >
                           <Text className="font-mono text-[9.5px] font-bold tracking-wider text-accent">{impact.label}</Text>
                           <Text className={cn('font-body text-[11.5px] leading-4', mutedClass)}>{impact.value}</Text>

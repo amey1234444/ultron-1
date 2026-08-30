@@ -39,6 +39,19 @@ export type ConsolePalette = {
   panelRaised: string;
   /** Hovered row or tile. */
   hover: string;
+  /**
+   * The hover ground for a tile or row that sits on `panelRaised`.
+   *
+   * `hover` is three RGB values away from `panelRaised` — it was drawn as the
+   * hover state for rows on `panel`, and on the raised surface the analysis
+   * layer actually uses it is invisible. Not "subtle": invisible. A hover state
+   * nobody can see is the same as no hover state, so this is a real step, wide
+   * enough to read on a dim plant display without turning the row into a
+   * selection.
+   */
+  hoverSurface: string;
+  /** The edge of a hovered tile, paired with `hoverSurface`. */
+  hoverBorder: string;
   /** Selected row, tile or menu option. */
   selected: string;
   /** Hairline border. */
@@ -167,6 +180,8 @@ const DARK: ConsolePalette = {
   panel: '#111318',
   panelRaised: '#171A20',
   hover: '#1A1D23',
+  hoverSurface: '#262B36',
+  hoverBorder: 'rgba(255,255,255,0.24)',
   selected: '#1E222A',
   line: 'rgba(255,255,255,0.075)',
   lineSubtle: 'rgba(255,255,255,0.045)',
@@ -242,6 +257,8 @@ const LIGHT: ConsolePalette = {
   panel: '#FFFFFF',
   panelRaised: '#F7F8FA',
   hover: '#F3F5F7',
+  hoverSurface: '#E7ECF3',
+  hoverBorder: 'rgba(0,0,0,0.20)',
   selected: '#EDF1F5',
   line: '#E1E5EA',
   lineSubtle: '#ECEFF2',

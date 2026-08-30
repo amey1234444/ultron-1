@@ -40,7 +40,7 @@ export function HealthFactorList({ factors }: { factors: HealthFactor[] }) {
             style={({ hovered }) => ({
               marginHorizontal: -8,
               borderRadius: radius.sm,
-              backgroundColor: hovered ? palette.hover : undefined,
+              backgroundColor: hovered ? palette.hoverSurface : undefined,
             })}
           >
             <View className="flex-row items-baseline gap-2">

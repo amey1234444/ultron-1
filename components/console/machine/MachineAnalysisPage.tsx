@@ -148,7 +148,7 @@ function FactTile({ label, value, tint }: { label: string; value: string; tint?:
         flexBasis: 160,
         minWidth: 140,
         borderColor: hairline,
-        backgroundColor: hovered ? palette.hover : undefined,
+        backgroundColor: hovered ? palette.hoverSurface : undefined,
       })}
     >
       <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{label}</Text>
@@ -211,7 +211,7 @@ function CauseRanking({ differentials }: { differentials: DiagnosisDifferential[
           className="flex-row gap-3 rounded-lg border px-3 py-2.5"
           style={({ hovered }) => ({
             borderColor: hairline,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <Text className="font-mono text-[12.5px] font-bold tabular-nums text-accent">{String(index + 1).padStart(2, '0')}</Text>
@@ -253,7 +253,7 @@ function EvidenceRows({ items }: { items: DiagnosisSensorEvidence[] }) {
           className="flex-row flex-wrap items-center gap-2 rounded-lg border px-3 py-2"
           style={({ hovered }) => ({
             borderColor: hovered ? `${conditionHex[item.condition]}66` : hairline,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <Text numberOfLines={1} className={cn('min-w-[180px] flex-1 font-body-medium text-[12.5px]', inkClass)}>
@@ -287,7 +287,7 @@ function ImpactGrid({ impacts }: { impacts: DiagnosisProblem['impacts'] }) {
           style={({ hovered }) => ({
             ...IMPACT_CELL,
             borderColor: hairline,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <Text className={cn('font-mono text-[9.5px] tracking-wider', mutedClass)}>{impact.label}</Text>

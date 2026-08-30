@@ -82,7 +82,7 @@ export function RecentEvents({ events, limit = 6 }: { events?: MachineEvent[]; l
                 borderRadius: radius.sm,
                 borderTopWidth: index > 0 ? 1 : 0,
                 borderTopColor: hairline,
-                backgroundColor: hovered ? palette.hover : undefined,
+                backgroundColor: hovered ? palette.hoverSurface : undefined,
               })}
             >
               <Text className={cn('w-10 font-mono text-[11.5px] tabular-nums', mutedClass)}>{timeLabel(event.at)}</Text>

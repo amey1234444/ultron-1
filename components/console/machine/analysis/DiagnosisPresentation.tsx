@@ -184,52 +184,46 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
   const palette = consolePalette(isDark);
 
   return (
-    <View
-      className="overflow-hidden border"
-      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
-    >
-      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
-        {facts.map((fact) => (
-          <Hoverable
-            key={fact.label}
-            className="gap-1.5 px-4 py-3.5"
-            style={({ hovered }) => ({
-              minWidth: fact.wide ? 300 : 176,
-              flexGrow: fact.wide ? 2.4 : 1,
-              flexBasis: fact.wide ? 300 : 176,
-              borderRightWidth: 1,
-              borderBottomWidth: 1,
-              borderColor: palette.line,
-              backgroundColor: hovered ? palette.hover : undefined,
-            })}
-          >
-            <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
-              {fact.label}
+    <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+      {facts.map((fact) => (
+        <Hoverable
+          key={fact.label}
+          className="gap-1.5 border px-4 py-3"
+          style={({ hovered }) => ({
+            minWidth: fact.wide ? 300 : 178,
+            flexGrow: fact.wide ? 2.4 : 1,
+            flexBasis: fact.wide ? 300 : 178,
+            borderColor: hovered ? palette.hoverBorder : palette.line,
+            backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
+            borderRadius: radius.md,
+          })}
+        >
+          <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
+            {fact.label}
+          </Text>
+          <View className="flex-row flex-wrap items-baseline gap-x-1.5">
+            <Text
+              className={fact.wide ? text.bodyStrong : text.dataMd}
+              style={[
+                fact.wide ? null : tabular,
+                { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink, fontWeight: '600' },
+              ]}
+            >
+              {fact.value}
             </Text>
-            <View className="flex-row flex-wrap items-baseline gap-x-1.5">
-              <Text
-                className={fact.wide ? text.bodyStrong : text.dataMd}
-                style={[
-                  fact.wide ? null : tabular,
-                  { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink, fontWeight: '600' },
-                ]}
-              >
-                {fact.value}
-              </Text>
-              {fact.unit ? (
-                <Text className={text.meta} style={{ color: palette.inkMuted }}>
-                  {fact.unit}
-                </Text>
-              ) : null}
-            </View>
-            {fact.note ? (
-              <Text className={text.micro} style={{ color: palette.inkFaint }} numberOfLines={2}>
-                {fact.note}
+            {fact.unit ? (
+              <Text className={text.meta} style={{ color: palette.inkMuted }}>
+                {fact.unit}
               </Text>
             ) : null}
-          </Hoverable>
-        ))}
-      </View>
+          </View>
+          {fact.note ? (
+            <Text className={text.micro} style={{ color: palette.inkFaint }} numberOfLines={2}>
+              {fact.note}
+            </Text>
+          ) : null}
+        </Hoverable>
+      ))}
     </View>
   );
 }
@@ -339,7 +333,7 @@ export function StatementList({
             borderRadius: radius.sm,
             borderTopWidth: index === 0 ? 0 : 1,
             borderTopColor: palette.lineSubtle,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <Text
@@ -369,36 +363,56 @@ export function StatementList({
  * "contradicting evidence: 0" is a stated result. A reader must never have to
  * decide whether an empty column means nothing was found or nothing was run.
  */
-export function EvidenceCard({
+export function variantAccent(palette: ReturnType<typeof consolePalette>, variant: Variant): string {
+  if (variant === 'success') return palette.accent;
+  if (variant === 'warning') return palette.warning;
+  if (variant === 'destructive') return palette.critical;
+  return palette.neutral;
+}
+
+/**
+ * The box an evidence column lives in, on its own.
+ *
+ * Split out of `EvidenceCard` because the analysis layer has several regions
+ * with the same anatomy — a titled box carrying a count and a body — whose body
+ * is not a list of sentences: a maintenance window, a table of plot
+ * specifications. Those were being promoted to full-width headed regions
+ * instead, which quietly dissolved a row of boxes into a stack of loose
+ * sections. Same chrome, any body.
+ */
+export function EvidenceShell({
   title,
-  items,
-  empty,
+  caption,
   variant,
   icon,
-  caption,
+  count,
+  children,
+  basis = 300,
+  minWidth = 268,
 }: {
   title: string;
-  items: readonly string[];
-  empty: string;
+  caption?: string;
   variant: Variant;
   icon: IconName;
-  /** What this column is for, in one clause. Sits under the title, in small print. */
-  caption?: string;
+  /** Shown in the corner chip. Left off, the chip is not drawn. */
+  count?: number;
+  children: ReactNode;
+  basis?: number;
+  minWidth?: number;
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const accent =
-    variant === 'success' ? palette.accent : variant === 'warning' ? palette.warning : variant === 'destructive' ? palette.critical : palette.neutral;
+  const accent = variantAccent(palette, variant);
 
   return (
     <Hoverable
       className="overflow-hidden border"
       style={({ hovered }) => ({
-        flexBasis: 300,
+        flexBasis: basis,
         flexGrow: 1,
-        minWidth: 268,
-        borderColor: hovered ? alpha(accent, 0.42) : palette.line,
-        backgroundColor: palette.panelRaised,
+        minWidth,
+        borderColor: hovered ? alpha(accent, 0.55) : palette.line,
+        backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
         borderRadius: radius.md,
       })}
     >
@@ -428,20 +442,46 @@ export function EvidenceCard({
             </Text>
           ) : null}
         </View>
-        <View className="px-2 py-[3px]" style={{ backgroundColor: alpha(accent, 0.12), borderRadius: radius.sm }}>
-          <Text className={text.data} style={[tabular, { color: accent }]}>
-            {items.length}
-          </Text>
-        </View>
+        {count === undefined ? null : (
+          <View className="px-2 py-[3px]" style={{ backgroundColor: alpha(accent, 0.12), borderRadius: radius.sm }}>
+            <Text className={text.data} style={[tabular, { color: accent }]}>
+              {count}
+            </Text>
+          </View>
+        )}
       </View>
 
-      <View
-        className="px-4 pb-3.5"
-        style={items.length > 0 ? { borderTopWidth: 1, borderTopColor: palette.lineSubtle } : undefined}
-      >
-        <StatementList items={items} empty={empty} accent={accent} dense />
+      <View className="px-4 pb-3.5" style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle }}>
+        {children}
       </View>
     </Hoverable>
+  );
+}
+
+export function EvidenceCard({
+  title,
+  items,
+  empty,
+  variant,
+  icon,
+  caption,
+}: {
+  title: string;
+  items: readonly string[];
+  empty: string;
+  variant: Variant;
+  icon: IconName;
+  /** What this column is for, in one clause. Sits under the title, in small print. */
+  caption?: string;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const accent = variantAccent(palette, variant);
+
+  return (
+    <EvidenceShell title={title} caption={caption} variant={variant} icon={icon} count={items.length}>
+      <StatementList items={items} empty={empty} accent={accent} dense />
+    </EvidenceShell>
   );
 }
 
@@ -480,7 +520,7 @@ export function DefinitionRows({
           style={({ hovered }) => ({
             borderTopWidth: index === 0 ? 0 : 1,
             borderTopColor: palette.lineSubtle,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <Text className={text.label} style={{ color: palette.inkFaint, width: labelWidth }}>
@@ -557,7 +597,7 @@ export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem
               flexBasis: cardWidth ?? '100%',
               minWidth: 0,
               borderColor: hovered ? alpha(colour, 0.4) : palette.line,
-              backgroundColor: hovered ? palette.hover : palette.panelRaised,
+              backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
               borderRadius: radius.md,
             })}
           >
@@ -610,7 +650,7 @@ export function DoctorCard({ label, value }: { label: string; value: string }) {
         flexGrow: 1,
         minWidth: 220,
         borderColor: hovered ? alpha(palette.accent, 0.4) : palette.line,
-        backgroundColor: hovered ? palette.hover : palette.panelRaised,
+        backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
         borderRadius: radius.md,
       })}
     >

@@ -21,6 +21,7 @@ import {
   ConditionPill,
   DefinitionRows,
   EvidenceCard,
+  EvidenceShell,
   FactStrip,
   RegionHeading,
   StatementList,
@@ -77,16 +78,63 @@ const HEALTHY_PROGNOSIS_PLOTS = [
   'Maintenance/event timeline: routine events only when present.',
 ];
 
+// The plot's vertical geometry, and the two dates the demo script quotes.
+const PLOT_MIN = 1.0;
+const PLOT_MAX = 8.6;
+const PLOT_ALERT = 2.8;
+const PLOT_DANGER = 7.1;
+const PLOT_TODAY = 2.45;
+const PLOT_BASELINE = 1.58;
+const PLOT_VALUE_TICKS = [2, 3, 4, 5, 6, 7, 8];
+const PLOT_DAY_TICKS = [-120, -90, -60, -30, 0, 30, 60, 90];
+const FORECAST_ALERT_DAY = 15;
+const FORECAST_DANGER_DAY = 80;
+
+/**
+ * The forecast curve, solved through its own two crossings.
+ *
+ * It used to be `2.45 + (7.1 - 2.45) * t ** 1.24` over a normalised t, with the
+ * ALERT and DANGER markers separately hardcoded at day 15 and day 80. Those are
+ * two different claims about the same curve, and they did not agree: that
+ * exponent puts the curve at 2.98 on day 15 and 6.03 on day 80, so the amber dot
+ * floated below the line it was supposed to mark and the red dot sat well above
+ * it. The chart was contradicting itself in the one place a reader looks.
+ *
+ * Fitting `v = today + k·d^p` through (15, H) and (80, HH) makes the crossings
+ * a property of the curve rather than an annotation laid on top of it, so the
+ * markers are on the line by construction and stay there if the thresholds or
+ * the quoted days ever change.
+ */
+const FORECAST_EXPONENT =
+  Math.log((PLOT_DANGER - PLOT_TODAY) / (PLOT_ALERT - PLOT_TODAY)) / Math.log(FORECAST_DANGER_DAY / FORECAST_ALERT_DAY);
+const FORECAST_SCALE = (PLOT_ALERT - PLOT_TODAY) / FORECAST_ALERT_DAY ** FORECAST_EXPONENT;
+
+const PREDICTIVE_DEMO_FORECAST = Array.from(
+  { length: 91 },
+  (_, day) => PLOT_TODAY + FORECAST_SCALE * day ** FORECAST_EXPONENT,
+);
+
+/**
+ * 120 days of measured history.
+ *
+ * Four incommensurate harmonics rather than one: a weekly-sampled vibration
+ * trend is not a smooth line, and a demo curve that looks drawn rather than
+ * measured undercuts the whole point of the screen. The ripple is damped to
+ * nothing at both ends so the series starts cleanly at the healthy baseline and
+ * hands over to the forecast at exactly today's reading.
+ */
 const PREDICTIVE_DEMO_HISTORY = Array.from({ length: 121 }, (_, index) => {
   const t = index / 120;
   const trend = t < 0.45 ? t * 0.32 : 0.144 + ((t - 0.45) / 0.55) ** 1.5 * 0.856;
-  const ripple = index === 0 || index === 120 ? 0 : Math.sin(index * 0.39) * 0.025 + Math.sin(index * 0.11 + 1.4) * 0.016;
-  return Math.min(2.45, Math.max(1.58, 1.58 + (2.45 - 1.58) * trend + ripple));
-});
-
-const PREDICTIVE_DEMO_FORECAST = Array.from({ length: 91 }, (_, index) => {
-  const t = index / 90;
-  return 2.45 + (7.1 - 2.45) * t ** 1.24;
+  const base = PLOT_BASELINE + (PLOT_TODAY - PLOT_BASELINE) * trend;
+  const damp = Math.max(0, Math.min(1, index / 6, (120 - index) / 10));
+  const ripple =
+    (Math.sin(index * 0.39) * 0.046 +
+      Math.sin(index * 0.11 + 1.4) * 0.034 +
+      Math.sin(index * 0.93 + 0.6) * 0.023 +
+      Math.sin(index * 1.71 + 2.2) * 0.013) *
+    damp;
+  return Math.max(1.42, base + ripple);
 });
 
 export type MachineProDiagnosisPageProps = {
@@ -363,7 +411,7 @@ function PlotSpecList({ rows }: { rows: readonly (readonly string[])[] }) {
             borderRadius: radius.sm,
             borderTopWidth: index === 0 ? 0 : 1,
             borderTopColor: palette.lineSubtle,
-            backgroundColor: hovered ? palette.hover : undefined,
+            backgroundColor: hovered ? palette.hoverSurface : undefined,
           })}
         >
           <Text className={text.bodyStrong} style={{ color: palette.ink }}>
@@ -412,14 +460,6 @@ function pointsPath(values: number[], xFor: (index: number) => number, yFor: (va
     .join(' ');
 }
 
-const PLOT_MIN = 1.0;
-const PLOT_MAX = 8.2;
-const PLOT_ALERT = 2.8;
-const PLOT_DANGER = 7.1;
-const PLOT_TODAY = 2.45;
-const PLOT_VALUE_TICKS = [2, 3, 4, 5, 6, 7, 8];
-const PLOT_DAY_TICKS = [-120, -90, -60, -30, 0, 30, 60, 90];
-
 /**
  * The demo forecast plot: 120 days measured, 90 days projected.
  *
@@ -465,7 +505,7 @@ function ForecastPlot() {
   const historyPath = pointsPath(PREDICTIVE_DEMO_HISTORY, historyX, yValue);
   const forecastPath = pointsPath(PREDICTIVE_DEMO_FORECAST, forecastX, yValue);
   const uncertaintyTop = pointsPath(
-    PREDICTIVE_DEMO_FORECAST.map((value, index) => value + 0.12 + index * 0.004),
+    PREDICTIVE_DEMO_FORECAST.map((value, index) => value + 0.12 + index * 0.003),
     forecastX,
     yValue,
   );
@@ -595,10 +635,10 @@ function ForecastPlot() {
             {/* Halo rings, so a marker still reads where the curve passes under it. */}
             <Circle cx={xDay(0)} cy={yValue(PLOT_TODAY)} r={7} fill={palette.chartBg} />
             <Circle cx={xDay(0)} cy={yValue(PLOT_TODAY)} r={5} fill={palette.accent} />
-            <Circle cx={xDay(15)} cy={yValue(PLOT_ALERT)} r={7} fill={palette.chartBg} />
-            <Circle cx={xDay(15)} cy={yValue(PLOT_ALERT)} r={5} fill={palette.warning} />
-            <Circle cx={xDay(80)} cy={yValue(PLOT_DANGER)} r={7} fill={palette.chartBg} />
-            <Circle cx={xDay(80)} cy={yValue(PLOT_DANGER)} r={5} fill={palette.critical} />
+            <Circle cx={xDay(FORECAST_ALERT_DAY)} cy={yValue(PLOT_ALERT)} r={7} fill={palette.chartBg} />
+            <Circle cx={xDay(FORECAST_ALERT_DAY)} cy={yValue(PLOT_ALERT)} r={5} fill={palette.warning} />
+            <Circle cx={xDay(FORECAST_DANGER_DAY)} cy={yValue(PLOT_DANGER)} r={7} fill={palette.chartBg} />
+            <Circle cx={xDay(FORECAST_DANGER_DAY)} cy={yValue(PLOT_DANGER)} r={5} fill={palette.critical} />
 
             {PLOT_VALUE_TICKS.map((value) => (
               <SvgText
@@ -654,7 +694,7 @@ function ForecastPlot() {
               Today 2.45
             </SvgText>
             <SvgText
-              x={xDay(15) + 12}
+              x={xDay(FORECAST_ALERT_DAY) + 12}
               y={yValue(PLOT_ALERT) + 19}
               fill={palette.warning}
               fontSize={11.5}
@@ -664,7 +704,7 @@ function ForecastPlot() {
               ALERT in about 15 days
             </SvgText>
             <SvgText
-              x={xDay(80) - 12}
+              x={xDay(FORECAST_DANGER_DAY) - 12}
               y={yValue(PLOT_DANGER) + 21}
               fill={palette.critical}
               fontSize={11.5}
@@ -706,7 +746,7 @@ function ForecastButton({ forecast, selected, onPress }: { forecast: MachinePred
         borderColor: selected || hovered ? alpha(colour, 0.55) : palette.line,
         borderLeftColor: colour,
         borderLeftWidth: 3,
-        backgroundColor: pressed || hovered ? palette.hover : selected ? palette.selected : palette.panelRaised,
+        backgroundColor: pressed || hovered ? palette.hoverSurface : selected ? palette.selected : palette.panelRaised,
         borderRadius: radius.md,
       })}
     >
@@ -1153,18 +1193,32 @@ export function MachineProDiagnosisPage({
                       </Region>
                     ) : null}
 
-                    <Region eyebrow="RECOMMENDED WINDOW" title="Maintenance plan">
-                      <DefinitionRows
-                        rows={[
-                          ['Inspection', selected.recommendedInspectionWindow ?? 'Continue monitoring'],
-                          ['Maintenance', selected.recommendedMaintenanceWindow ?? 'Not scheduled'],
-                        ]}
-                        tone="ink"
-                        labelWidth={110}
-                      />
-                    </Region>
-
                     <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                      <EvidenceShell
+                        title="Maintenance plan"
+                        caption="The window this forecast recommends"
+                        variant="warning"
+                        icon="calendar-clock"
+                      >
+                        <View className="gap-2.5 pt-3">
+                          <View className="gap-1">
+                            <Text className={text.label} style={{ color: palette.inkFaint }}>
+                              INSPECTION
+                            </Text>
+                            <Text className={text.bodyStrong} style={{ color: palette.ink }}>
+                              {selected.recommendedInspectionWindow ?? 'Continue monitoring'}
+                            </Text>
+                          </View>
+                          <View className="gap-1">
+                            <Text className={text.label} style={{ color: palette.inkFaint }}>
+                              MAINTENANCE
+                            </Text>
+                            <Text className={text.bodyStrong} style={{ color: palette.ink }}>
+                              {selected.recommendedMaintenanceWindow ?? 'Not scheduled'}
+                            </Text>
+                          </View>
+                        </View>
+                      </EvidenceShell>
                       <EvidenceCard
                         title="Available inputs"
                         caption="What this forecast was actually computed from"
@@ -1216,15 +1270,19 @@ export function MachineProDiagnosisPage({
                     ) : null}
 
                     {predictiveGearboxDetails ? (
-                      <Region
-                        eyebrow="FORECAST PLOTS SHOWN"
-                        title="Plot specification"
-                        trailing={<CountChip count={PREDICTIVE_SSE_FORECAST_PLOTS.length} suffix="plots" />}
-                      >
-                        <Surface>
+                      <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                        <EvidenceShell
+                          title="Forecast plots shown"
+                          caption="What each prognosis chart draws, and on which axes"
+                          variant="info"
+                          icon="chart-line"
+                          count={PREDICTIVE_SSE_FORECAST_PLOTS.length}
+                          basis={620}
+                          minWidth={300}
+                        >
                           <PlotSpecList rows={PREDICTIVE_SSE_FORECAST_PLOTS} />
-                        </Surface>
-                      </Region>
+                        </EvidenceShell>
+                      </View>
                     ) : null}
 
                     <Region eyebrow="MODEL DIAGNOSTICS" title="Advanced model evidence">

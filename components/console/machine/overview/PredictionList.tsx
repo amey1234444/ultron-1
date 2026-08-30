@@ -58,7 +58,7 @@ export function PredictionList({ diagnoses, forecasts = [] }: { diagnoses: Ranke
                 className={cn('flex-row items-center gap-2 rounded-lg border px-2.5 py-2', lineClass)}
                 style={({ hovered }) => ({
                   borderColor: hovered ? `${colour}66` : undefined,
-                  backgroundColor: hovered ? palette.hover : undefined,
+                  backgroundColor: hovered ? palette.hoverSurface : undefined,
                 })}
               >
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colour }} />
@@ -88,7 +88,7 @@ export function PredictionList({ diagnoses, forecasts = [] }: { diagnoses: Ranke
                 className={cn('flex-row items-center gap-2 rounded-lg border px-2.5 py-2', lineClass)}
                 style={({ hovered }) => ({
                   borderColor: hovered ? `${colour}66` : undefined,
-                  backgroundColor: hovered ? palette.hover : undefined,
+                  backgroundColor: hovered ? palette.hoverSurface : undefined,
                 })}
               >
                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colour }} />
