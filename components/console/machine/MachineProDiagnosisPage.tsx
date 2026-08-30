@@ -222,6 +222,11 @@ function predictionSseDetailsFor(forecast: MachinePredictionResult): {
   };
 }
 
+function hasPredictionSseDemoWords(value: string): boolean {
+  const words = new Set(value.toLocaleLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  return words.has('sse') && words.has('prediction') && words.has('demo');
+}
+
 function StatusPill({ condition }: { condition: OverviewCondition }) {
   const { isDark } = useAppTheme();
   const tint = conditionHexes(isDark)[condition];
@@ -488,9 +493,10 @@ export function MachineProDiagnosisPage({
   const goodSignalCount = Math.max(0, signals.length - chainIssueCount);
   const healthyOutlook = condition === 'healthy' && issues.length === 0 && findings.length === 0 && forecasts.length === 0;
   const isHealthySseDemo = machineName === 'Healthy SSE Demo';
+  const isPredictionSseDemo = hasPredictionSseDemoWords(machineName);
   const processRestrictionPrognosis = selected?.predictionId === 'dx-process-downstream-restriction';
   const predictiveGearboxPrognosis =
-    machineName === 'SSE Prediction Demo' &&
+    isPredictionSseDemo &&
     selected?.predictionId.startsWith('pred-') &&
     selected.faultName === 'Gearbox Output Bearing Degradation';
   const predictiveGearboxDetails = useMemo(
@@ -499,12 +505,12 @@ export function MachineProDiagnosisPage({
   );
   const bestPredictionGearboxDetails = useMemo(
     () =>
-      machineName === 'SSE Prediction Demo' &&
+      isPredictionSseDemo &&
       bestPrediction?.predictionId.startsWith('pred-') &&
       bestPrediction.faultName === 'Gearbox Output Bearing Degradation'
         ? predictionSseDetailsFor(bestPrediction)
         : null,
-    [bestPrediction, machineName],
+    [bestPrediction, isPredictionSseDemo],
   );
 
   const choose = (forecast: MachinePredictionResult) => {

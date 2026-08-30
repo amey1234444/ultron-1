@@ -79,11 +79,14 @@ function isVelocityInMillimetresPerSecond(letter: LiveKindLetter, unit: string) 
   return letter === 'V' && unit.replace(/\s/g, '').toLowerCase() === 'mm/s';
 }
 
-function predictiveDemoSamples(start: number, end: number, count = 121): number[] {
+function predictionSseDemoSamples(start: number, end: number, count = 121): number[] {
+  const span = end - start;
   return Array.from({ length: count }, (_, index) => {
     const t = count <= 1 ? 1 : index / (count - 1);
     const accelerated = t < 0.45 ? t * 0.35 : 0.1575 + ((t - 0.45) / 0.55) ** 1.55 * 0.8425;
-    return start + (end - start) * accelerated;
+    const ripple = index === 0 || index === count - 1 ? 0 : (Math.sin(index * 0.47) * 0.018 + Math.sin(index * 0.13 + 1.7) * 0.012) * span;
+    const value = start + span * accelerated + ripple;
+    return Math.min(end, Math.max(start, value));
   });
 }
 
@@ -112,6 +115,7 @@ export function usePointCondition(
     // real gateway/rack ids is unreachable on the measurement bus and is only
     // resolvable through this, which is how the canvas reads it.
     live?: LiveState;
+    machineName?: string;
   },
 ): PointCondition {
   const { channel, label } = mapped;
@@ -143,8 +147,21 @@ export function usePointCondition(
   const channelIndex = channelNumberFor(channel) - 1;
 
   return useMemo(
-    () => derivePointCondition({ mapped, card, channelIndex, history, reading, isoGroup, componentId, online, label }),
-    [mapped, card, channelIndex, history, reading, isoGroup, componentId, online, label],
+    () =>
+      derivePointCondition({
+        machineId,
+        machineName: options?.machineName,
+        mapped,
+        card,
+        channelIndex,
+        history,
+        reading,
+        isoGroup,
+        componentId,
+        online,
+        label,
+      }),
+    [machineId, options?.machineName, mapped, card, channelIndex, history, reading, isoGroup, componentId, online, label],
   );
 }
 
@@ -154,6 +171,8 @@ export function usePointCondition(
 // scenario checks can drive the exact same code the console runs, rather than a
 // re-implementation of it that could agree with the page while both are wrong.
 export type DerivePointConditionInput = {
+  machineId?: string;
+  machineName?: string;
   mapped: MappedChannel;
   // The card behind the channel and which of its channels this is; null when the
   // caller has no card list, in which case the letter's display band is used.
@@ -167,6 +186,15 @@ export type DerivePointConditionInput = {
   // Defaults to the mapped channel's own label, which is what the canvas shows.
   label?: string;
 };
+
+function hasPredictionSseDemoWords(value?: string): boolean {
+  const words = new Set((value ?? '').toLocaleLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+  return words.has('sse') && words.has('prediction') && words.has('demo');
+}
+
+function isPredictionSseDemoMachine(input: Pick<DerivePointConditionInput, 'machineId' | 'machineName'>): boolean {
+  return hasPredictionSseDemoWords(input.machineName) || hasPredictionSseDemoWords(input.machineId);
+}
 
 export function derivePointCondition(input: DerivePointConditionInput): PointCondition {
   const { mapped, card, channelIndex, history, reading } = input;
@@ -193,20 +221,20 @@ export function derivePointCondition(input: DerivePointConditionInput): PointCon
     const liveValue = typeof reading.value === 'number' && Number.isFinite(reading.value) ? reading.value : null;
     const analysisValue = configuredPredictiveValue ?? liveValue ?? configuredValue;
     const thresholds = resolveThresholds(channel, band);
-    const syntheticPredictive =
-      configuredPredictiveValue !== null && history.samples.length < 30
-        ? predictiveDemoSamples(thresholds.healthy ?? configuredPredictiveValue, configuredPredictiveValue)
+    const predictionSseDemoHistory =
+      configuredPredictiveValue !== null && isPredictionSseDemoMachine(input)
+        ? predictionSseDemoSamples(thresholds.healthy ?? configuredPredictiveValue, configuredPredictiveValue)
         : null;
     const samples =
-      syntheticPredictive ??
+      predictionSseDemoHistory ??
       (analysisValue !== null && history.samples[history.samples.length - 1] !== analysisValue
         ? [...history.samples, analysisValue]
         : history.samples);
     const hasReading = samples.length > 0 && Number.isFinite(samples[samples.length - 1]);
     const value = hasReading ? samples[samples.length - 1] : null;
     const first = samples[0];
-    const sampleIntervalHours = syntheticPredictive ? 24 : history.sampleIntervalHours;
-    const windowHours = syntheticPredictive ? (syntheticPredictive.length - 1) * sampleIntervalHours : history.windowHours;
+    const sampleIntervalHours = predictionSseDemoHistory ? 24 : history.sampleIntervalHours;
+    const windowHours = predictionSseDemoHistory ? (predictionSseDemoHistory.length - 1) * sampleIntervalHours : history.windowHours;
     // Nothing is judged without a reading. A channel the gateway has not
     // reported is not "normal" — it is unknown, and the difference is the whole
     // point of keeping `source` on the condition.

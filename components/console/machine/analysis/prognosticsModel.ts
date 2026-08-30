@@ -402,9 +402,11 @@ function predictionBounds(days: number | null, confidence: number): { lower: num
 }
 
 function isPredictionSseDemo(input: BuildInput): boolean {
-  const name = input.machineName.toLocaleLowerCase();
-  const id = input.machineId.toLocaleLowerCase();
-  return name === 'sse prediction demo' || (id.includes('sse') && id.includes('prediction'));
+  const hasWords = (value: string) => {
+    const words = new Set(value.toLocaleLowerCase().split(/[^a-z0-9]+/).filter(Boolean));
+    return words.has('sse') && words.has('prediction') && words.has('demo');
+  };
+  return hasWords(input.machineName) || hasWords(input.machineId);
 }
 
 function isGearboxOutputPrediction(issue: Issue, point: PointCondition | null): boolean {

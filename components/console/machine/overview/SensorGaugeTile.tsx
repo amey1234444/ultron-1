@@ -96,7 +96,7 @@ export function SensorGaugeTile({
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : palette.lineSubtle;
 
-  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards, live });
+  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards, live, machineName });
   // A state is a word, a dot and a number, and each wants a different amount of
   // chroma to read as the same colour on a white ground — see `statusTone`.
   const tone = stateTone(condition.state, isDark);

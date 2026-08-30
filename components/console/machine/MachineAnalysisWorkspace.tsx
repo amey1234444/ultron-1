@@ -32,6 +32,7 @@ import type { MappedChannel } from './RackOccupancyView';
 function ConditionProbe({
   mapped,
   machineId,
+  machineName,
   isoGroup,
   componentId,
   online,
@@ -42,6 +43,7 @@ function ConditionProbe({
 }: {
   mapped: MappedChannel;
   machineId: string;
+  machineName: string;
   isoGroup: IsoGroup;
   componentId: string | null;
   online: boolean;
@@ -50,7 +52,7 @@ function ConditionProbe({
   live?: LiveState;
   onCondition: (condition: PointCondition) => void;
 }) {
-  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards, live });
+  const condition = usePointCondition(mapped, machineId, { isoGroup, componentId, online, devices, cards, live, machineName });
 
   useEffect(() => {
     onCondition(condition);
@@ -181,6 +183,7 @@ export function MachineAnalysisWorkspace({
           key={mapped.id}
           mapped={mapped}
           machineId={machine.id}
+          machineName={machine.name}
           isoGroup={isoGroup}
           componentId={componentIdByBox[mapped.id] ?? null}
           online={onlineByRack[mapped.channel.rackId] ?? false}

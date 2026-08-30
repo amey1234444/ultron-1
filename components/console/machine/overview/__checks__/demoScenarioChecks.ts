@@ -173,7 +173,7 @@ function buildScenario(profile: keyof typeof RACK_IDS, devices: DeviceNode[], ca
     id: `sse-${profile}`,
     projectId: 'demo',
     folderId: 'demo',
-    name: 'Single Screw Extruder',
+    name: profile === 'prediction' ? 'SSE Prediction Demo' : 'Single Screw Extruder',
     template: 'Single Screw Extruder',
     components: componentsForTemplate('Single Screw Extruder', () => `c-${profile}-${seq++}`),
   };
@@ -190,6 +190,8 @@ function buildScenario(profile: keyof typeof RACK_IDS, devices: DeviceNode[], ca
   const conditions = mappedChannels.map((mapped) => {
     const card = cards.find((c) => c.deviceId === mapped.channel.rackId && c.slot === mapped.channel.slot) ?? null;
     return derivePointCondition({
+      machineId: machine.id,
+      machineName: profile === 'prediction' ? 'SSE Prediction Demo' : machine.name,
       mapped,
       card,
       channelIndex: channelNumberFor(mapped.channel) - 1,
