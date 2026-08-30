@@ -35,6 +35,7 @@ import {
   StateTagGrid,
   VerdictHeader,
 } from './analysis/DiagnosisPresentation';
+import { EqualCardRow } from './analysis/EqualColumnStrip';
 import { Button, Hoverable, alpha, radius, tabular, text } from '../../ui';
 
 const MASTER_WIDE = { flexBasis: 300, flexGrow: 3, minWidth: 280 } as const;
@@ -584,16 +585,29 @@ function HealthyState({
         <Panel>
           <View className="gap-4">
             <SectionHeading eyebrow="MACHINE DOCTOR" title="Predictive diagnosis separation" />
-            <View className="flex-row flex-wrap" style={{ gap: 12 }}>
-              <DoctorCard label="WHAT" value="No present operating limit is exceeded; the machine is currently HEALTHY." />
-              <DoctorCard label="WHERE" value="Historical evidence is localized primarily to the gearbox output-side vibration measurement." />
+            {/* Two equal columns, paired by what the question answers: WHAT
+                beside WHERE, WHY beside IMPACT NOW. The closing RISK card is
+                alone on the last row and is left to span it, because it is the
+                conclusion the four above it lead to, not a fifth peer. */}
+            <EqualCardRow columns={2} minColumnWidth={320}>
+              <DoctorCard variant="success" label="WHAT" value="No present operating limit is exceeded; the machine is currently HEALTHY." />
               <DoctorCard
-                label="WHY IT IS BEING WATCHED"
-                value="waveform-derived impulsiveness/envelope features are progressively increasing even though overall RMS remains below ALERT."
+                variant="info"
+                label="WHERE"
+                value="Historical evidence is localized primarily to the gearbox output-side vibration measurement."
               />
-              <DoctorCard label="IMPACT NOW" value="no confirmed current process or production impairment." />
-              <DoctorCard label="RISK IF CONTINUES" value="A gearbox-output bearing condition may develop into an ALERT condition in the future." />
-            </View>
+              <DoctorCard
+                variant="warning"
+                label="WHY IT IS BEING WATCHED"
+                value="Waveform-derived impulsiveness and envelope features are progressively increasing even though overall RMS remains below ALERT."
+              />
+              <DoctorCard variant="muted" label="IMPACT NOW" value="No confirmed current process or production impairment." />
+              <DoctorCard
+                variant="destructive"
+                label="RISK IF CONTINUES"
+                value="A gearbox-output bearing condition may develop into an ALERT condition in the future."
+              />
+            </EqualCardRow>
           </View>
         </Panel>
       ) : null}
@@ -601,7 +615,11 @@ function HealthyState({
       <Panel>
         <View className="gap-4">
           <SectionHeading eyebrow="HEALTHY EVIDENCE" title={predictive ? 'Why this is not a current fault' : 'Why no fault was raised'} />
-          <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+          {/* Three columns, held. These three are a single argument read across
+              — what holds the conclusion up, what argues against it, what is
+              still missing — and that reading only works if they sit side by
+              side at the same width. */}
+          <EqualCardRow columns={3} minColumnWidth={264} padLastRow>
             <EvidenceCard
               title="Supporting evidence"
               caption="Observations that hold the conclusion up"
@@ -640,7 +658,7 @@ function HealthyState({
               }
               empty="None for this healthy machine snapshot."
             />
-          </View>
+          </EqualCardRow>
         </View>
       </Panel>
 

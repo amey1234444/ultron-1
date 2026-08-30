@@ -196,9 +196,14 @@ const DARK: ConsolePalette = {
   hoverBorder: 'rgba(255,255,255,0.24)',
   forecast: '#E9A11B',
   selected: '#1E222A',
-  line: 'rgba(255,255,255,0.075)',
-  lineSubtle: 'rgba(255,255,255,0.045)',
-  lineStrong: 'rgba(255,255,255,0.15)',
+  // Faint WHITE hairlines, not dark edges. At 7.5% and 4.5% a 1px border on a
+  // near-black panel does not read as a light rule at all — it reads as a
+  // slightly blacker seam, which is why every card on these screens looked
+  // like it was outlined in black. A rule on a dark ground has to be lighter
+  // than the ground to read as a rule.
+  line: 'rgba(255,255,255,0.13)',
+  lineSubtle: 'rgba(255,255,255,0.08)',
+  lineStrong: 'rgba(255,255,255,0.2)',
 
   ink: '#F7F6F2',
   inkStrong: '#FFFFFF',

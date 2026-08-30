@@ -256,15 +256,22 @@ export function StateTagGrid({
         return {
           key: item.label,
           node: (
-            <View className="flex-row items-center gap-2.5">
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colour }} />
-              <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: palette.ink }}>
+            // Label over state, not label beside state. Side by side, a long
+            // subsystem name pushed the state word around and the column of
+            // states stopped lining up — which is the only thing a reader is
+            // scanning this grid for. Stacked, every state sits at the same
+            // place in its cell and the odd one out is visible immediately.
+            <>
+              <Text numberOfLines={2} className={cn(text.bodyStrong)} style={{ color: palette.ink }}>
                 {item.label}
               </Text>
-              <Text className={text.chip} style={{ color: colour }}>
-                {CONDITION_LABEL[item.condition]}
-              </Text>
-            </View>
+              <View className="flex-row items-center gap-1.5">
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colour }} />
+                <Text className={text.chip} style={{ color: colour }}>
+                  {CONDITION_LABEL[item.condition]}
+                </Text>
+              </View>
+            </>
           ),
         };
       })}
@@ -363,6 +370,10 @@ export function variantAccent(palette: ReturnType<typeof consolePalette>, varian
   if (variant === 'success') return palette.accent;
   if (variant === 'warning') return palette.warning;
   if (variant === 'destructive') return palette.critical;
+  // `info` has its own token and was being collapsed into the same grey as
+  // `muted`, which left the two variants indistinguishable at the one place
+  // the distinction is the whole point — a row of cards keyed by kind.
+  if (variant === 'info') return palette.info;
   return palette.neutral;
 }
 
@@ -642,31 +653,36 @@ export function SensorEvidenceGrid({ items, empty }: { items: SensorEvidenceItem
  * Same tile in both the healthy and the predictive layouts, so WHAT / WHERE /
  * WHY read as one instrument in both rather than as two similar ones.
  */
-export function DoctorCard({ label, value }: { label: string; value: string }) {
+export function DoctorCard({ label, value, variant = 'success' }: { label: string; value: string; variant?: Variant }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
+  const accent = variantAccent(palette, variant);
 
+  // The rule runs the full height of the card and is tinted per question, so
+  // the five cards read as five different kinds of statement at a glance —
+  // what is true now, where it is, why it is watched, what it costs today,
+  // what it becomes. Painted in one colour they read as one repeated note.
   return (
     <Hoverable
-      className="gap-2.5 border px-4 py-3.5"
+      className="flex-row gap-3 border py-3.5 pl-3 pr-4"
       style={({ hovered }) => ({
         flexBasis: 250,
         flexGrow: 1,
         minWidth: 220,
-        borderColor: hovered ? alpha(palette.accent, 0.4) : palette.line,
+        borderColor: hovered ? alpha(accent, 0.4) : palette.line,
         backgroundColor: hovered ? palette.hoverSurface : palette.panelRaised,
         borderRadius: radius.md,
       })}
     >
-      <View className="flex-row items-center gap-1.5">
-        <View style={{ width: 3, height: 10, borderRadius: 2, backgroundColor: alpha(palette.accent, 0.8) }} />
-        <Text className={text.label} style={{ color: palette.inkMuted }}>
+      <View style={{ width: 3, alignSelf: 'stretch', borderRadius: 2, backgroundColor: alpha(accent, 0.75) }} />
+      <View className="min-w-0 flex-1 gap-1.5">
+        <Text className={text.label} style={{ color: accent }}>
           {label}
         </Text>
+        <Text className={text.body} style={{ color: palette.ink }}>
+          {value}
+        </Text>
       </View>
-      <Text className={text.body} style={{ color: palette.ink }}>
-        {value}
-      </Text>
     </Hoverable>
   );
 }
