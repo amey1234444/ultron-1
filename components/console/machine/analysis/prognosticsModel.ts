@@ -110,6 +110,16 @@ type TrendModel = {
   predict: (day: number) => number;
 };
 
+type PredictionTiming = {
+  alert: number | null;
+  danger: number | null;
+  confidence: number;
+  rSquared: number;
+  residualError: number;
+  trendAcceleration: number | null;
+  degradationOnset: string | null;
+};
+
 const MODEL_VERSION = '1.0.0';
 const DEFAULT_OPERATING_HOURS_PER_DAY = 16;
 const SESSION_PROGNOSTIC_SAMPLE_INTERVAL_HOURS = 6;
@@ -391,25 +401,97 @@ function predictionBounds(days: number | null, confidence: number): { lower: num
   return { lower: Math.max(0, days - interval), upper: days + interval };
 }
 
-function gearboxOutputPredictiveTiming(
-  issue: Issue,
-  point: PointCondition | null,
-  current: number | null,
-  baseline: number | null,
-): { alert: number; danger: number; confidence: number } | null {
-  if (!point || current === null || baseline === null) return null;
+function isPredictionSseDemo(input: BuildInput): boolean {
+  const name = input.machineName.toLocaleLowerCase();
+  const id = input.machineId.toLocaleLowerCase();
+  return name === 'sse prediction demo' || (id.includes('sse') && id.includes('prediction'));
+}
+
+function isGearboxOutputPrediction(issue: Issue, point: PointCondition | null): boolean {
+  if (!point || !issue.id.startsWith('pred-')) return false;
   const label = `${issue.componentLabel} ${point.label} ${point.code}`.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ');
   const outputSide = label.includes('output') || /\bout\b/.test(label) || label.includes('gearbox vib');
-  if (!issue.id.startsWith('pred-') || !(label.includes('gearbox') || label.includes('gb')) || !outputSide) return null;
-  if (current >= point.thresholds.alert || point.windowHours < 24 * 100) return null;
+  return (label.includes('gearbox') || label.includes('gb')) && outputSide;
+}
+
+function recentSlope(points: Array<{ day: number; value: number }>, count: number): number | null {
+  if (points.length < 2) return null;
+  const window = points.slice(-Math.min(count, points.length));
+  if (window.length < 2) return null;
+  const first = window[0];
+  const last = window[window.length - 1];
+  return last.day === first.day ? null : (last.value - first.value) / (last.day - first.day);
+}
+
+function firstSustainedRiseDay(points: Array<{ day: number; value: number }>, baseline: number, residualError: number): number | null {
+  const threshold = baseline + Math.max(Math.abs(baseline) * 0.05, residualError * 2);
+  for (let i = 0; i < points.length; i += 1) {
+    const tail = points.slice(i);
+    if (tail.length < 4) return null;
+    if (tail.every((point) => point.value >= threshold)) return points[i].day;
+  }
+  return null;
+}
+
+function predictionSseGearboxTiming(
+  issue: Issue,
+  point: PointCondition | null,
+  series: Array<{ day: number; value: number }>,
+  current: number | null,
+  baseline: number | null,
+): PredictionTiming | null {
+  if (!isGearboxOutputPrediction(issue, point) || current === null || baseline === null || series.length < 20) return null;
+  const targetPoint = point;
+  if (!targetPoint) return null;
+  if (current >= targetPoint.thresholds.alert || targetPoint.windowHours < 24 * 60) return null;
 
   const rise = current - baseline;
   if (rise <= 0) return null;
 
-  const historyDays = point.windowHours / 24;
-  const alert = clamp(((point.thresholds.alert - current) / rise) * (historyDays / 3), 12, 18);
-  const danger = clamp(((point.thresholds.danger - current) / rise) * (historyDays / 8), 70, 90);
-  return { alert, danger, confidence: 82 };
+  const values = series.map((sample) => sample.value);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const floor = min - Math.max(Math.abs(min) * 0.01, (max - min) * 0.05);
+  const transformed = series.map((sample) => ({ day: sample.day, value: Math.log(Math.max(1e-9, sample.value - floor)) }));
+  const model = linearModel(transformed);
+  if (model.slope <= 0) return null;
+
+  const coefficient = Math.exp(model.intercept);
+  const predict = (day: number) => floor + coefficient * Math.exp(model.slope * day);
+  const lastDay = series[series.length - 1]?.day ?? 0;
+  const crossing = (threshold: number) => {
+    if (current >= threshold) return 0;
+    if (threshold <= floor || coefficient <= 0) return null;
+    const day = Math.log((threshold - floor) / coefficient) / model.slope;
+    const remaining = day - lastDay;
+    return Number.isFinite(remaining) && remaining >= 0 && remaining <= 3650 ? remaining : null;
+  };
+
+  const residuals = series.map((sample) => sample.value - predict(sample.day));
+  const average = mean(values);
+  const sse = residuals.reduce((sum, value) => sum + value ** 2, 0);
+  const sst = values.reduce((sum, value) => sum + (value - average) ** 2, 0);
+  const rSquared = sst ? Math.max(0, 1 - sse / sst) : 0;
+  const residualError = Math.sqrt(sse / Math.max(1, series.length - 2));
+  const early = recentSlope(series.slice(0, Math.ceil(series.length / 3)), Math.ceil(series.length / 4));
+  const late = recentSlope(series, Math.ceil(series.length / 4));
+  const trendAcceleration = early === null || late === null ? null : late - early;
+  const onsetDay = firstSustainedRiseDay(series, baseline, residualError);
+  const confidence = clamp(
+    Math.round(30 + rSquared * 35 + monotonicity(values, 'UP') * 20 + Math.min(1, values.length / 120) * 10 - Math.min(12, residualError * 80)),
+    0,
+    95,
+  );
+
+  return {
+    alert: crossing(targetPoint.thresholds.alert),
+    danger: crossing(targetPoint.thresholds.danger),
+    confidence,
+    rSquared,
+    residualError,
+    trendAcceleration,
+    degradationOnset: onsetDay === null ? null : `Day -${Math.round(Math.max(0, lastDay - onsetDay))}`,
+  };
 }
 
 function forecastDayPhrase(days: number): string {
@@ -419,7 +501,13 @@ function forecastDayPhrase(days: number): string {
   return `${rounded} ${rounded === 1 ? 'day' : 'days'}`;
 }
 
-function buildPrediction(issue: Issue, conditions: PointCondition[], signals: AnalysisSignal[], hypotheses: AnalystHypothesis[]): MachinePredictionResult {
+function buildPrediction(
+  issue: Issue,
+  conditions: PointCondition[],
+  signals: AnalysisSignal[],
+  hypotheses: AnalystHypothesis[],
+  options?: { predictionSseDemo?: boolean },
+): MachinePredictionResult {
   const relatedPoints = conditionsForIssue(issue, conditions);
   const point = bestPoint(relatedPoints);
   const values = point?.samples.filter((value) => Number.isFinite(value)) ?? [];
@@ -433,13 +521,13 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
   const modelSlope = model?.slope ?? point?.prognosis.slopePerDay ?? null;
   const rising = Boolean(modelSlope !== null && modelSlope > 0 && mono >= 0.58);
   const detected = Boolean(point && rising && model && model.rSquared >= 0.35);
-  const acceleratedTiming = gearboxOutputPredictiveTiming(issue, point, current, baseline);
+  const predictionTiming = options?.predictionSseDemo ? predictionSseGearboxTiming(issue, point, series, current, baseline) : null;
   const danger =
-    acceleratedTiming?.danger ?? (current === null || !point || modelSlope === null ? null : projectedDangerDays(point, current, modelSlope));
+    predictionTiming?.danger ?? (current === null || !point || modelSlope === null ? null : projectedDangerDays(point, current, modelSlope));
   const alert =
-    acceleratedTiming?.alert ?? (current === null || !point || modelSlope === null ? null : projectedAlertDays(point, current, modelSlope));
+    predictionTiming?.alert ?? (current === null || !point || modelSlope === null ? null : projectedAlertDays(point, current, modelSlope));
   const confidence = Math.max(
-    acceleratedTiming?.confidence ?? 0,
+    predictionTiming?.confidence ?? 0,
     confidencePercent(model, mono, values.length, detected || danger !== null),
   );
   const status = forecastStatus(point, danger, confidence, issue, rising);
@@ -459,7 +547,7 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
     predictabilityClass: point ? PREDICTABILITY_FOR_KIND[point.kind] ?? 'DETECTION_ONLY' : 'DETECTION_ONLY',
     predictionStatus: status,
     degradationDetected: detected,
-    degradationOnset: acceleratedTiming ? 'Day -70' : null,
+    degradationOnset: predictionTiming?.degradationOnset ?? null,
     historyDurationDays: point ? point.windowHours / 24 : 0,
     sampleCount: values.length,
     currentValue: current,
@@ -469,11 +557,11 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
     trendDirection: trendDirection(model?.slope ?? point?.prognosis.slopePerDay ?? null),
     trendSlopePerDay: model?.slope ?? point?.prognosis.slopePerDay ?? null,
     robustSlopePerDay: robust?.slope ?? point?.prognosis.slopePerDay ?? null,
-    trendAcceleration: null,
-    modelType: acceleratedTiming ? 'EXPONENTIAL' : (model?.type ?? 'NONE'),
+    trendAcceleration: predictionTiming?.trendAcceleration ?? null,
+    modelType: predictionTiming ? 'EXPONENTIAL' : (model?.type ?? 'NONE'),
     modelVersion: MODEL_VERSION,
-    modelFit: acceleratedTiming ? Math.max(0.78, model?.rSquared ?? point?.prognosis.r2 ?? 0) : (model?.rSquared ?? point?.prognosis.r2 ?? null),
-    residualError: model?.residualError ?? null,
+    modelFit: predictionTiming?.rSquared ?? (model?.rSquared ?? point?.prognosis.r2 ?? null),
+    residualError: predictionTiming?.residualError ?? (model?.residualError ?? null),
     backtestError: model?.backtestError ?? null,
     estimatedTimeToAlertDays: alert,
     estimatedTimeToDangerDays: danger,
@@ -499,7 +587,7 @@ function buildPrediction(issue: Issue, conditions: PointCondition[], signals: An
     functionalFailureValidated: false,
     previousForecastDays: null,
     forecastChangeDays: null,
-    accelerationDetected: false,
+    accelerationDetected: predictionTiming ? predictionTiming.trendAcceleration !== null && predictionTiming.trendAcceleration > 0 : false,
     advanced: {
       movingAverage: values.length > 0 ? mean(values.slice(-7)) : null,
       ewma: ewma(values),
@@ -592,10 +680,13 @@ export function emptyPrognostics(now = new Date()): MachinePrognosticsResult {
 }
 
 export function buildMachinePrognostics(input: BuildInput): MachinePrognosticsResult {
+  const predictionSseDemo = isPredictionSseDemo(input);
   const predictions = [
-    ...prioritiseIssues(input.issues).map((issue) => buildPrediction(issue, input.conditions, input.signals, input.hypotheses)),
+    ...prioritiseIssues(input.issues).map((issue) =>
+      buildPrediction(issue, input.conditions, input.signals, input.hypotheses, { predictionSseDemo }),
+    ),
     ...predictiveCandidates(input.conditions).map((point) =>
-      buildPrediction(predictiveIssueForPoint(point), input.conditions, input.signals, input.hypotheses),
+      buildPrediction(predictiveIssueForPoint(point), input.conditions, input.signals, input.hypotheses, { predictionSseDemo }),
     ),
   ];
   const activeForecasts = predictions

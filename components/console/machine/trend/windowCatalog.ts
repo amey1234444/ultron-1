@@ -94,7 +94,7 @@ export const WINDOW_GROUP_LABEL: Record<WindowUnit, string> = {
   days: 'Days',
 };
 
-export const DEFAULT_WINDOW_ID = 's30';
+export const DEFAULT_WINDOW_ID = 'm5';
 
 export function windowById(id: string): TrendWindow {
   return TREND_WINDOWS.find((option) => option.id === id) ?? TREND_WINDOWS.find((o) => o.id === DEFAULT_WINDOW_ID)!;

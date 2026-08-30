@@ -224,6 +224,74 @@ export function useSmoothTimedValues<T extends TimedValue>(target: T[], duration
   return shown;
 }
 
+/**
+ * Eases only the newest sample of a live series, and leaves every settled one
+ * exactly where it was measured.
+ *
+ * `useSmoothTimedValues` above resamples the whole previous series onto the new
+ * one every time a packet lands, which gives every historical point a fresh
+ * start value and slides the entire line — history visibly rewriting itself
+ * under the reader. On a trend that is the worst thing the renderer can do: the
+ * samples behind the leading edge were measured, they are not going to change,
+ * and a line that moves where nothing moved is a lie about the plant.
+ *
+ * So: everything but the last point is passed through untouched, and the last
+ * point glides from wherever the previous last point sat to its own value. The
+ * line grows to the right smoothly, and nothing behind it moves.
+ */
+export function useSmoothLeadingValue<T extends TimedValue>(target: T[], duration = DEFAULT_DURATION_MS): T[] {
+  const [eased, setEased] = useState<number | null>(null);
+  const fromRef = useRef<number | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const last = target.length > 0 ? target[target.length - 1] : null;
+  const key = last ? `${last.t}:${last.v}` : 'none';
+
+  useEffect(() => {
+    if (frameRef.current !== null) cancelFrame(frameRef.current);
+    frameRef.current = null;
+    if (!last || duration <= 0) {
+      fromRef.current = last?.v ?? null;
+      setEased(null);
+      return undefined;
+    }
+
+    const start = fromRef.current;
+    fromRef.current = last.v;
+    // First sample, or a jump so large that easing across it would draw a value
+    // the channel never held for long enough to matter. Snap instead.
+    if (start === null || !Number.isFinite(start)) {
+      setEased(null);
+      return undefined;
+    }
+
+    const startedAt = Date.now();
+    const tick = () => {
+      const t = Math.min(1, (Date.now() - startedAt) / duration);
+      setEased(start + (last.v - start) * easeOutCubic(t));
+      if (t < 1) frameRef.current = scheduleFrame(tick);
+      else {
+        frameRef.current = null;
+        setEased(null);
+      }
+    };
+    frameRef.current = scheduleFrame(tick);
+    return () => {
+      if (frameRef.current !== null) cancelFrame(frameRef.current);
+      frameRef.current = null;
+    };
+    // `key` stands in for the sample identity so a re-render with the same
+    // reading does not restart the animation.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key, duration]);
+
+  return useMemo(() => {
+    if (eased === null || target.length === 0) return target;
+    const out = target.slice();
+    out[out.length - 1] = { ...out[out.length - 1], v: eased };
+    return out;
+  }, [target, eased]);
+}
+
 export function linePath(points: XYPoint[]): string {
   return points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x.toFixed(1)},${point.y.toFixed(1)}`).join(' ');
 }

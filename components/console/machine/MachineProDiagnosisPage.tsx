@@ -27,10 +27,6 @@ import {
   HEALTHY_SSE_PROGNOSIS_CONDITION,
   HEALTHY_SSE_PROGNOSIS_MESSAGE,
   HEALTHY_SSE_PROGNOSIS_PLOTS,
-  PREDICTIVE_SSE_FORECAST_PLOTS,
-  PREDICTIVE_SSE_MAINTENANCE_GUIDANCE,
-  PREDICTIVE_SSE_PROGNOSIS_ROWS,
-  PREDICTIVE_SSE_PROGNOSIS_WHAT,
 } from './demoSseDocs';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
 
@@ -128,6 +124,102 @@ function formatSlope(value: number | null): string {
 function formatCurrentBaseline(forecast: MachinePredictionResult): string {
   const unit = forecast.unit ? ` ${forecast.unit}` : '';
   return `${fmt(forecast.currentValue, 2)} / ${fmt(forecast.baselineValue, 2)}${unit}`;
+}
+
+function formatValue(value: number | null, unit: string, digits = 2): string {
+  const suffix = unit ? ` ${unit}` : '';
+  return `${fmt(value, digits)}${suffix}`;
+}
+
+function forecastStatusText(forecast: MachinePredictionResult): string {
+  return forecast.degradationDetected ? `${forecast.predictionStatus} / DEGRADATION DETECTED` : forecast.predictionStatus;
+}
+
+function predictionTargetText(forecast: MachinePredictionResult): string {
+  const alert = forecast.advanced.alertThreshold === null ? 'configured ALERT' : `configured ALERT (${formatValue(forecast.advanced.alertThreshold, forecast.unit)})`;
+  const danger =
+    forecast.advanced.dangerThreshold === null ? 'configured DANGER' : `configured DANGER (${formatValue(forecast.advanced.dangerThreshold, forecast.unit)})`;
+  return `Time to ${alert} and ${danger} thresholds - not automatic RUL`;
+}
+
+function signedPercent(value: number | null, baseline: number | null): string {
+  if (value === null || baseline === null || Math.abs(baseline) < 1e-6) return '--';
+  const percent = ((value - baseline) / Math.abs(baseline)) * 100;
+  return `${percent >= 0 ? '+' : ''}${fmt(percent, 0)}%`;
+}
+
+function thresholdDistance(forecast: MachinePredictionResult, threshold: number | null): string {
+  if (forecast.currentValue === null || threshold === null) return '--';
+  const distance = threshold - forecast.currentValue;
+  return `${formatValue(Math.max(0, distance), forecast.unit)} below`;
+}
+
+function predictionSseDetailsFor(forecast: MachinePredictionResult): {
+  rows: readonly (readonly [string, string])[];
+  status: string;
+  target: string;
+  what: readonly string[];
+  plots: readonly string[];
+  maintenance: readonly string[];
+} {
+  const alertPhrase =
+    forecast.estimatedTimeToAlertDays === null
+      ? 'No reliable ALERT crossing is currently projected from the selected history.'
+      : `Projected ALERT crossing: ${formatDayPhrase(forecast.estimatedTimeToAlertDays)} from the selected history.`;
+  const dangerPhrase =
+    forecast.estimatedTimeToDangerDays === null
+      ? 'No reliable DANGER crossing is currently projected from the selected history.'
+      : `Projected DANGER crossing: ${formatDayPhrase(forecast.estimatedTimeToDangerDays)} from the selected history.`;
+  const range =
+    forecast.predictionLowerBoundDays === null || forecast.predictionUpperBoundDays === null
+      ? 'Prediction interval: unavailable until a threshold horizon is fitted.'
+      : `Prediction interval: ${predictionRange(forecast)} around the projected DANGER crossing.`;
+  const history = `${formatDayNumber(forecast.historyDurationDays)} days / ${forecast.sampleCount} samples`;
+  const current = formatValue(forecast.currentValue, forecast.unit);
+  const baseline = formatValue(forecast.baselineValue, forecast.unit);
+  const alertLimit = formatValue(forecast.advanced.alertThreshold, forecast.unit);
+  const dangerLimit = formatValue(forecast.advanced.dangerThreshold, forecast.unit);
+  const fit = forecast.modelFit === null ? '--' : `${fmt(forecast.modelFit * 100, 0)}%`;
+  const backtest = forecast.backtestError === null ? 'not enough holdout history' : `${formatValue(forecast.backtestError, forecast.unit)} mean error`;
+
+  return {
+    rows: [
+      ['Current condition', CONDITION_LABEL[forecast.condition].toLocaleUpperCase()],
+      ['Prediction status', forecastStatusText(forecast)],
+      ['Prediction target', predictionTargetText(forecast)],
+      ['Measured history', history],
+      ['Current / baseline', `${current} / ${baseline} (${signedPercent(forecast.currentValue, forecast.baselineValue)})`],
+      ['Model / fit', `${forecast.modelType} / ${fit}`],
+    ],
+    status: forecastStatusText(forecast),
+    target: predictionTargetText(forecast),
+    what: [
+      `${history} of gearbox-output history are used for this demo prognosis.`,
+      forecast.degradationOnset
+        ? `Degradation onset is inferred from the history near ${forecast.degradationOnset}.`
+        : 'Degradation onset is not separately identified from the available history.',
+      `Current gearbox output reading is ${current}, still ${thresholdDistance(forecast, forecast.advanced.alertThreshold)} the ALERT threshold of ${alertLimit}.`,
+      alertPhrase,
+      dangerPhrase,
+      range,
+      `Prediction confidence is ${fmt(forecast.predictionConfidence, 0)}%, derived from model fit, monotonicity, sample count and residual error.`,
+      'Prediction wording remains a threshold projection, not a machine failure date.',
+    ],
+    plots: [
+      `Degradation trend: ${history} of ${forecast.unit || 'indicator'} history with the current point marked.`,
+      `Forecast + threshold crossing: ${alertLimit} ALERT and ${dangerLimit} DANGER limits overlaid with the selected model.`,
+      range,
+      `Health forecast: current health indicator ${fmt(forecast.healthIndicator, 0)}/100.`,
+      `Backtest: ${backtest}.`,
+      `Forecast history: previous forecast ${forecast.previousForecastDays === null ? 'not available' : formatDayPhrase(forecast.previousForecastDays)}.`,
+    ],
+    maintenance: [
+      `Increase monitoring frequency for ${forecast.availableInputs.join(', ') || 'the gearbox output vibration point'}.`,
+      `Inspect ${forecast.location.join(' / ')} ${forecast.recommendedInspectionWindow?.toLocaleLowerCase() ?? 'during the next planned maintenance window'}.`,
+      `Plan maintenance ${forecast.recommendedMaintenanceWindow?.toLocaleLowerCase() ?? 'after inspection evidence is confirmed'}.`,
+      'After maintenance, verify the measured degradation trend stabilizes or falls toward baseline.',
+    ],
+  };
 }
 
 function StatusPill({ condition }: { condition: OverviewCondition }) {
@@ -398,7 +490,22 @@ export function MachineProDiagnosisPage({
   const isHealthySseDemo = machineName === 'Healthy SSE Demo';
   const processRestrictionPrognosis = selected?.predictionId === 'dx-process-downstream-restriction';
   const predictiveGearboxPrognosis =
-    selected?.predictionId.startsWith('pred-') && selected.faultName === 'Gearbox Output Bearing Degradation';
+    machineName === 'SSE Prediction Demo' &&
+    selected?.predictionId.startsWith('pred-') &&
+    selected.faultName === 'Gearbox Output Bearing Degradation';
+  const predictiveGearboxDetails = useMemo(
+    () => (predictiveGearboxPrognosis && selected ? predictionSseDetailsFor(selected) : null),
+    [predictiveGearboxPrognosis, selected],
+  );
+  const bestPredictionGearboxDetails = useMemo(
+    () =>
+      machineName === 'SSE Prediction Demo' &&
+      bestPrediction?.predictionId.startsWith('pred-') &&
+      bestPrediction.faultName === 'Gearbox Output Bearing Degradation'
+        ? predictionSseDetailsFor(bestPrediction)
+        : null,
+    [bestPrediction, machineName],
+  );
 
   const choose = (forecast: MachinePredictionResult) => {
     setSelectedId(forecast.predictionId);
@@ -455,16 +562,16 @@ export function MachineProDiagnosisPage({
           {bestPrediction ? (
             <>
               {processRestrictionPrognosis ? <PrognosisDocRows rows={FAULTY_SSE_PROGNOSIS_ROWS} /> : null}
-              {predictiveGearboxPrognosis ? <PrognosisDocRows rows={PREDICTIVE_SSE_PROGNOSIS_ROWS} valueTone="accent" /> : null}
+              {bestPredictionGearboxDetails ? <PrognosisDocRows rows={bestPredictionGearboxDetails.rows} valueTone="accent" /> : null}
               <View className="flex-row flex-wrap gap-2">
                 <Kpi label="Current condition" value={CONDITION_LABEL[condition].toLocaleUpperCase()} condition={condition} note="Predictive risk is separate from current condition" />
                 {processRestrictionPrognosis ? (
                   <Kpi label="Prediction Mode" value="Limited unless sufficient time history is available" />
                 ) : null}
-                {predictiveGearboxPrognosis ? (
+                {bestPredictionGearboxDetails ? (
                   <>
-                    <Kpi label="Prediction Status" value="FORECAST AVAILABLE / DEGRADATION DETECTED" />
-                    <Kpi label="Prediction Target" value="Time to configured ALERT and DANGER thresholds - not automatic RUL" />
+                    <Kpi label="Prediction Status" value={bestPredictionGearboxDetails.status} />
+                    <Kpi label="Prediction Target" value={bestPredictionGearboxDetails.target} />
                   </>
                 ) : null}
                 <Kpi
@@ -571,8 +678,8 @@ export function MachineProDiagnosisPage({
               <Section title="What Happens Next">
                 {processRestrictionPrognosis ? (
                   <BulletList items={FAULTY_SSE_PROGNOSIS_WHAT} empty="No Demo 2 prognosis statement is available." />
-                ) : predictiveGearboxPrognosis ? (
-                  <BulletList items={PREDICTIVE_SSE_PROGNOSIS_WHAT} empty="No Demo 3 prognosis statement is available." />
+                ) : predictiveGearboxDetails ? (
+                  <BulletList items={predictiveGearboxDetails.what} empty="No Demo 3 prognosis statement is available." />
                 ) : (
                   <Text className={cn('font-body text-[12px] leading-[18px]', inkClass)}>
                     {selected.thresholdProjectionWording ?? 'No defensible threshold horizon is currently available.'}
@@ -610,13 +717,13 @@ export function MachineProDiagnosisPage({
                 </View>
               ) : null}
 
-              {predictiveGearboxPrognosis ? (
+              {predictiveGearboxDetails ? (
                 <View className="flex-row flex-wrap gap-2">
                   <DetailBox title="Forecast plots shown">
-                    <BulletList items={PREDICTIVE_SSE_FORECAST_PLOTS.map((row) => row.join(': '))} empty="No Demo 3 forecast plot statement is available." />
+                    <BulletList items={predictiveGearboxDetails.plots} empty="No Demo 3 forecast plot statement is available." />
                   </DetailBox>
                   <DetailBox title="Maintenance guidance shown">
-                    <BulletList items={PREDICTIVE_SSE_MAINTENANCE_GUIDANCE} empty="No Demo 3 maintenance guidance is available." />
+                    <BulletList items={predictiveGearboxDetails.maintenance} empty="No Demo 3 maintenance guidance is available." />
                   </DetailBox>
                 </View>
               ) : null}

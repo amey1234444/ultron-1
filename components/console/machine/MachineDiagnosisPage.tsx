@@ -34,11 +34,47 @@ import {
   type DiagnosisSensorEvidence,
 } from './analysis/diagnosisModel';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
+import {
+  ConditionPill,
+  DoctorCard,
+  EvidenceCard,
+  FactStrip,
+  RegionHeading,
+  SensorEvidenceGrid,
+  StateTagGrid,
+  VerdictHeader,
+} from './analysis/DiagnosisPresentation';
+import { Button, alpha, radius, tabular, text } from '../../ui';
 
 const MASTER_WIDE = { flexBasis: 300, flexGrow: 3, minWidth: 280 } as const;
 const DETAIL_WIDE = { flexBasis: 660, flexGrow: 7, minWidth: 280 } as const;
 const COLUMN = { flexBasis: 240, flexGrow: 1, minWidth: 220 } as const;
 const IMPACT = { flexBasis: 210, flexGrow: 1, minWidth: 190 } as const;
+// Two panels that share a row on a desktop and stack on anything narrower. The
+// pair has to break together — one full-width panel beside a half-width one
+// reads as a layout accident rather than as two peers.
+const TAG_COLUMN = { flexBasis: 420, flexGrow: 1, minWidth: 300 } as const;
+
+/** How many things a region is listing. Sits on the region heading, not in it. */
+function CountChip({ count, suffix }: { count: number; suffix?: string }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  return (
+    <View
+      className="flex-row items-baseline gap-1 px-2 py-[3px]"
+      style={{ backgroundColor: alpha(palette.neutral, 0.12), borderRadius: radius.sm }}
+    >
+      <Text className={text.code} style={[tabular, { color: palette.ink }]}>
+        {count}
+      </Text>
+      {suffix ? (
+        <Text className={text.meta} style={{ color: palette.inkMuted }}>
+          {suffix}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
 
 type SectionHeadingProps = {
   eyebrow: string;
@@ -47,35 +83,13 @@ type SectionHeadingProps = {
 };
 
 function SectionHeading({ eyebrow, title, trailing }: SectionHeadingProps) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  return (
-    <View className="flex-row flex-wrap items-end justify-between gap-3">
-      <View className="gap-1">
-        <Text className={cn('font-mono text-[9px] tracking-wider', mutedClass)}>{eyebrow}</Text>
-        <Text className={cn('font-heading-medium text-[16px]', inkClass)}>{title}</Text>
-      </View>
-      {trailing}
-    </View>
-  );
+  return <RegionHeading eyebrow={eyebrow} title={title} trailing={trailing} />;
 }
 
+// One pill for every condition rung on this page, so the badge on a problem row
+// and the one on a sensor card cannot drift apart. See DiagnosisPresentation.
 function ConditionBadge({ condition }: { condition: OverviewCondition }) {
-  const { isDark } = useAppTheme();
-  const colour = conditionHexes(isDark)[condition];
-
-  return (
-    <View
-      className="self-start border px-2 py-1"
-      style={{ borderColor: `${colour}66`, backgroundColor: `${colour}14`, borderRadius: 4 }}
-    >
-      <Text className="font-mono text-[9px] font-bold tracking-wider" style={{ color: colour }}>
-        {CONDITION_LABEL[condition]}
-      </Text>
-    </View>
-  );
+  return <ConditionPill condition={condition} />;
 }
 
 function ProblemRow({ problem, selected, onPress }: { problem: DiagnosisProblem; selected: boolean; onPress: () => void }) {
@@ -281,96 +295,6 @@ function DifferentialRow({ differential, index }: { differential: DiagnosisDiffe
   );
 }
 
-function EvidenceColumn({ title, items, empty }: { title: string; items: string[]; empty: string }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  return (
-    <View className="gap-3 border-t pt-3" style={{ ...COLUMN, borderColor: palette.line }}>
-      <Text className={cn('font-body-medium text-[11px]', inkClass)}>{title}</Text>
-      {items.length > 0 ? (
-        <View className="gap-2">
-          {items.map((item) => (
-            <View key={item} className="flex-row items-start gap-2">
-              <View className="mt-1.5 h-1 w-1 rounded-full bg-accent" />
-              <Text className={cn('min-w-0 flex-1 font-body text-[10px] leading-4', mutedClass)}>{item}</Text>
-            </View>
-          ))}
-        </View>
-      ) : (
-        <Text className={cn('font-body text-[10px] leading-4', mutedClass)}>{empty}</Text>
-      )}
-    </View>
-  );
-}
-
-function SensorEvidenceTable({ items }: { items: DiagnosisSensorEvidence[] }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  if (items.length === 0) {
-    return (
-      <Text className={cn('font-body text-[10px] leading-4', mutedClass)}>
-        No sensor evidence can be scoped to this problem from the current live analysis contract.
-      </Text>
-    );
-  }
-
-  const Cell = ({ children, width, flex = 0 }: { children: ReactNode; width?: number; flex?: number }) => (
-    <View style={{ width, flexGrow: flex, flexBasis: width ?? 0, minWidth: width }} className="justify-center pr-3">
-      {children}
-    </View>
-  );
-
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ minWidth: 820 }}>
-      <View style={{ minWidth: 820, flex: 1, borderColor: palette.line, borderWidth: 1 }}>
-        <View className="flex-row px-3 py-2.5" style={{ backgroundColor: palette.panelRaised }}>
-          <Cell width={250}>
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>MEASUREMENT</Text>
-          </Cell>
-          <Cell width={125}>
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>VALUE</Text>
-          </Cell>
-          <Cell width={235}>
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>TREND / QUALIFIER</Text>
-          </Cell>
-          <Cell width={110}>
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>QUALITY</Text>
-          </Cell>
-          <Cell width={100}>
-            <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>CONDITION</Text>
-          </Cell>
-        </View>
-        {items.map((item) => (
-          <View key={item.id} className="flex-row border-t px-3 py-3" style={{ borderColor: palette.lineSubtle }}>
-            <Cell width={250}>
-              <Text className={cn('font-body-medium text-[10px]', inkClass)}>{item.measurement}</Text>
-              <Text className={cn('font-mono text-[8px]', mutedClass)}>{item.code}</Text>
-            </Cell>
-            <Cell width={125}>
-              <Text className={cn('font-mono text-[10px]', inkClass)}>{item.value}</Text>
-            </Cell>
-            <Cell width={235}>
-              <Text className={cn('font-body text-[9px] leading-4', mutedClass)}>{item.trend}</Text>
-            </Cell>
-            <Cell width={110}>
-              <Text className={cn('font-mono text-[8px]', mutedClass)}>{item.quality}</Text>
-            </Cell>
-            <Cell width={100}>
-              <ConditionBadge condition={item.condition} />
-            </Cell>
-          </View>
-        ))}
-      </View>
-    </ScrollView>
-  );
-}
-
 function OrderedList({ items, empty }: { items: string[]; empty: string }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
@@ -501,40 +425,6 @@ const HEALTHY_EVIDENCE = [
   'No meaningful contradictory cross-sensor pattern is present.',
 ];
 
-function HealthyTag({ label }: { label: string }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  return (
-    <View
-      className="flex-row items-center justify-between gap-3 border px-3 py-2"
-      style={{ borderColor: palette.accentBorder, backgroundColor: palette.accentSoft, borderRadius: 4, minWidth: 210, flexGrow: 1 }}
-    >
-      <Text numberOfLines={1} className={cn('min-w-0 flex-1 font-body-medium text-[11px]', inkClass)}>
-        {label}
-      </Text>
-      <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">HEALTHY</Text>
-    </View>
-  );
-}
-
-function DoctorMiniCard({ label, value }: { label: string; value: string }) {
-  const { isDark } = useAppTheme();
-  const palette = consolePalette(isDark);
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-
-  return (
-    <View
-      className="gap-3 border px-3 py-3"
-      style={{ flexBasis: 230, flexGrow: 1, minWidth: 210, borderColor: palette.line, backgroundColor: palette.panelRaised, borderRadius: 6 }}
-    >
-      <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">{label}</Text>
-      <Text className={cn('font-body-medium text-[12px] leading-5', inkClass)}>{value}</Text>
-    </View>
-  );
-}
-
 function HealthyState({
   data,
   isPredictiveSseDemo,
@@ -601,30 +491,23 @@ function HealthyState({
             />
           ) : null}
 
-          <View className="flex-row flex-wrap items-start justify-between gap-4">
-            <View className="min-w-0 flex-1 gap-2">
-              <ConditionBadge condition="healthy" />
-              <Text className={cn('font-heading-medium text-[22px]', inkClass)}>
-                {predictive ? 'HEALTHY - no current ALERT/DANGER fault' : 'No active fault detected'}
-              </Text>
-              <Text className={cn('max-w-[820px] font-body text-[11px] leading-5', mutedClass)}>
-                {predictive
-                  ? 'Current machine condition is HEALTHY. Historical vibration processing indicates an early localized degradation pattern at the gearbox output side that warrants predictive monitoring, not an immediate current-fault alarm.'
-                  : 'Diagnosis: no active mechanical, thermal, feeding, pressure, speed or process fault detected. No immediate corrective action is required; continue normal monitoring.'}
-              </Text>
-            </View>
-            {onOpenPrognosis ? (
-              <Pressable
-                onPress={onOpenPrognosis}
-                accessibilityRole="button"
-                accessibilityLabel="Open Prognosis"
-                className="border border-accent/45 bg-accent/10 px-3 py-2"
-                style={{ borderRadius: 4 }}
-              >
-                <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">OPEN PROGNOSIS</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          <VerdictHeader
+            condition="healthy"
+            eyebrow={predictive ? 'CURRENT DIAGNOSIS' : 'DIAGNOSIS RESULT'}
+            title={predictive ? 'HEALTHY - no current ALERT/DANGER fault' : 'No active fault detected'}
+            detail={
+              predictive
+                ? 'Current machine condition is HEALTHY. Historical vibration processing indicates an early localized degradation pattern at the gearbox output side that warrants predictive monitoring, not an immediate current-fault alarm.'
+                : 'Diagnosis: no active mechanical, thermal, feeding, pressure, speed or process fault detected. No immediate corrective action is required; continue normal monitoring.'
+            }
+            action={
+              onOpenPrognosis ? (
+                <Button onPress={onOpenPrognosis} tone="secondary" size="sm" iconRight="arrow-right" accessibilityLabel="Open Prognosis">
+                  Open prognosis
+                </Button>
+              ) : null
+            }
+          />
 
           {predictive && isPredictiveSseDemo ? (
             <DemoDiagnosisDocBlock
@@ -639,50 +522,55 @@ function HealthyState({
             />
           ) : null}
 
-          <View className="flex-row flex-wrap border" style={{ borderColor: palette.line, backgroundColor: palette.panelRaised }}>
-            {[
-              ['OVERALL CONDITION', 'HEALTHY'],
-              ['CURRENT FAULTS', '0'],
-              ['PREDICTIVE FINDINGS', predictive ? '1' : '0'],
-              ['OBSERVED EARLY PATTERN', predictive ? 'Gearbox-output bearing-related degradation indicators under observation' : 'NONE'],
-              ['CURRENT FAULT SEVERITY', predictive ? 'No current fault escalation; predictive evidence only' : 'NONE'],
-              ['PROJECTED ALERT', predictive ? dayPhrase(predictive.estimatedTimeToAlertDays).toLocaleUpperCase() : '--'],
-              ['PROJECTED DANGER', predictive ? dayPhrase(predictive.estimatedTimeToDangerDays).toLocaleUpperCase() : '--'],
-              ['DATA QUALITY', data.dataQuality.toUpperCase()],
-            ].map(([label, value]) => (
-              <View key={label} className="gap-1 px-3 py-2.5" style={{ minWidth: 150, flexGrow: 1 }}>
-                <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{label}</Text>
-                <Text className={cn('font-mono text-[10px] font-bold', value === 'HEALTHY' ? 'text-accent' : inkClass)}>
-                  {value}
-                </Text>
-              </View>
-            ))}
-          </View>
+          <FactStrip
+            facts={[
+              { label: 'OVERALL CONDITION', value: 'HEALTHY', tone: 'healthy' },
+              { label: 'CURRENT FAULTS', value: '0' },
+              { label: 'PREDICTIVE FINDINGS', value: predictive ? '1' : '0', tone: predictive ? 'attention' : undefined },
+              {
+                label: 'OBSERVED EARLY PATTERN',
+                value: predictive ? 'Gearbox-output bearing-related degradation indicators under observation' : 'NONE',
+                wide: Boolean(predictive),
+              },
+              {
+                label: 'CURRENT FAULT SEVERITY',
+                value: predictive ? 'No current fault escalation; predictive evidence only' : 'NONE',
+                wide: Boolean(predictive),
+              },
+              { label: 'PROJECTED ALERT', value: predictive ? dayPhrase(predictive.estimatedTimeToAlertDays).toLocaleUpperCase() : '--' },
+              { label: 'PROJECTED DANGER', value: predictive ? dayPhrase(predictive.estimatedTimeToDangerDays).toLocaleUpperCase() : '--' },
+              { label: 'DATA QUALITY', value: data.dataQuality.toUpperCase(), tone: data.dataQuality === 'good' ? 'healthy' : 'attention' },
+            ]}
+          />
         </View>
       </Panel>
 
-      <View className="flex-row flex-wrap gap-4">
-        <Panel>
-          <View className="gap-4">
-            <SectionHeading eyebrow="COMPLETE MACHINE AND PROCESS HEALTH" title="Healthy subsystem tags" />
-            <View className="flex-row flex-wrap gap-2">
-              {SYSTEM_HEALTH_TAGS.map((label) => (
-                <HealthyTag key={label} label={label} />
-              ))}
+      <View className="flex-row flex-wrap" style={{ gap: 16 }}>
+        <View style={TAG_COLUMN}>
+          <Panel>
+            <View className="gap-4">
+              <SectionHeading
+                eyebrow="COMPLETE MACHINE AND PROCESS HEALTH"
+                title="Healthy subsystem tags"
+                trailing={<CountChip count={SYSTEM_HEALTH_TAGS.length} />}
+              />
+              <StateTagGrid items={SYSTEM_HEALTH_TAGS.map((label) => ({ label, condition: 'healthy' as const }))} minWidth={190} />
             </View>
-          </View>
-        </Panel>
+          </Panel>
+        </View>
 
-        <Panel>
-          <View className="gap-4">
-            <SectionHeading eyebrow="MACHINE TRAIN / PART HEALTH" title="Healthy part tags" />
-            <View className="flex-row flex-wrap gap-2">
-              {TRAIN_HEALTH_TAGS.map((label) => (
-                <HealthyTag key={label} label={label} />
-              ))}
+        <View style={TAG_COLUMN}>
+          <Panel>
+            <View className="gap-4">
+              <SectionHeading
+                eyebrow="MACHINE TRAIN / PART HEALTH"
+                title="Healthy part tags"
+                trailing={<CountChip count={TRAIN_HEALTH_TAGS.length} />}
+              />
+              <StateTagGrid items={TRAIN_HEALTH_TAGS.map((label) => ({ label, condition: 'healthy' as const }))} minWidth={190} />
             </View>
-          </View>
-        </Panel>
+          </Panel>
+        </View>
       </View>
 
       {predictive ? (
@@ -690,14 +578,14 @@ function HealthyState({
           <View className="gap-4">
             <SectionHeading eyebrow="MACHINE DOCTOR" title="Predictive diagnosis separation" />
             <View className="flex-row flex-wrap" style={{ gap: 12 }}>
-              <DoctorMiniCard label="WHAT" value="No present operating limit is exceeded; the machine is currently HEALTHY." />
-              <DoctorMiniCard label="WHERE" value="Historical evidence is localized primarily to the gearbox output-side vibration measurement." />
-              <DoctorMiniCard
+              <DoctorCard label="WHAT" value="No present operating limit is exceeded; the machine is currently HEALTHY." />
+              <DoctorCard label="WHERE" value="Historical evidence is localized primarily to the gearbox output-side vibration measurement." />
+              <DoctorCard
                 label="WHY IT IS BEING WATCHED"
                 value="waveform-derived impulsiveness/envelope features are progressively increasing even though overall RMS remains below ALERT."
               />
-              <DoctorMiniCard label="IMPACT NOW" value="no confirmed current process or production impairment." />
-              <DoctorMiniCard label="RISK IF CONTINUES" value="A gearbox-output bearing condition may develop into an ALERT condition in the future." />
+              <DoctorCard label="IMPACT NOW" value="no confirmed current process or production impairment." />
+              <DoctorCard label="RISK IF CONTINUES" value="A gearbox-output bearing condition may develop into an ALERT condition in the future." />
             </View>
           </View>
         </Panel>
@@ -706,10 +594,18 @@ function HealthyState({
       <Panel>
         <View className="gap-4">
           <SectionHeading eyebrow="HEALTHY EVIDENCE" title={predictive ? 'Why this is not a current fault' : 'Why no fault was raised'} />
-          <View className="flex-row flex-wrap" style={{ gap: 16 }}>
-            <EvidenceColumn title="Supporting evidence" items={evidenceItems} empty="No healthy evidence is available." />
-            <EvidenceColumn
+          <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+            <EvidenceCard
+              title="Supporting evidence"
+              variant="success"
+              icon="check-decagram-outline"
+              items={evidenceItems}
+              empty="No healthy evidence is available."
+            />
+            <EvidenceCard
               title="Contradicting evidence"
+              variant="warning"
+              icon="scale-balance"
               items={
                 predictive
                   ? [
@@ -723,8 +619,10 @@ function HealthyState({
               }
               empty="No material contradiction against a healthy conclusion."
             />
-            <EvidenceColumn
+            <EvidenceCard
               title="Additional evidence required"
+              variant="info"
+              icon="clipboard-text-search-outline"
               items={
                 predictive
                   ? ['No specific outer-race/inner-race conclusion should be shown unless the actual envelope spectrum and metadata support it.']
@@ -737,9 +635,16 @@ function HealthyState({
       </Panel>
 
       <Panel>
-        <View className="gap-3">
-          <SectionHeading eyebrow="LIVE EVIDENCE AND TREND" title="Current healthy sensor values" />
-          <SensorEvidenceTable items={sensorEvidence} />
+        <View className="gap-4">
+          <SectionHeading
+            eyebrow="LIVE EVIDENCE AND TREND"
+            title="Current healthy sensor values"
+            trailing={<CountChip count={sensorEvidence.length} suffix="points" />}
+          />
+          <SensorEvidenceGrid
+            items={sensorEvidence}
+            empty="No sensor evidence can be scoped to this problem from the current live analysis contract."
+          />
         </View>
       </Panel>
     </View>
@@ -925,19 +830,25 @@ export function MachineDiagnosisPage({
                     </View>
                   </View>
 
-                  <View className="flex-row flex-wrap" style={{ gap: 16 }}>
-                    <EvidenceColumn
+                  <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                    <EvidenceCard
                       title="Supporting evidence"
+                      variant="destructive"
+                      icon="check-decagram-outline"
                       items={selected.supportingEvidence}
                       empty="No supporting evidence is scoped to this problem."
                     />
-                    <EvidenceColumn
+                    <EvidenceCard
                       title="Contradicting evidence"
+                      variant="warning"
+                      icon="scale-balance"
                       items={selected.contradictingEvidence}
                       empty="No material contradiction is recorded in the current analysis."
                     />
-                    <EvidenceColumn
+                    <EvidenceCard
                       title="Missing evidence"
+                      variant="info"
+                      icon="clipboard-text-search-outline"
                       items={selected.missingEvidence}
                       empty="No expected evidence gap is recorded."
                     />
@@ -945,7 +856,10 @@ export function MachineDiagnosisPage({
 
                   <View className="gap-3">
                     <SectionHeading eyebrow="SCOPED LIVE INPUTS" title="Supporting sensor evidence" />
-                    <SensorEvidenceTable items={selected.sensorEvidence} />
+                    <SensorEvidenceGrid
+                      items={selected.sensorEvidence}
+                      empty="No sensor evidence can be scoped to this problem from the current live analysis contract."
+                    />
                   </View>
 
                   <View className="gap-3">

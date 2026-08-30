@@ -3,7 +3,7 @@ import { Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
-import { splinePath, useSmoothTimedValues } from '../../../../lib/chartMotion';
+import { splinePath, useSmoothLeadingValue } from '../../../../lib/chartMotion';
 import { cn } from '../../../../lib/cn';
 import { alpha, consolePalette, floatingElevation } from '../../../../lib/consoleTheme';
 import type { TrendSample } from '../../../../lib/liveChannelValue';
@@ -132,10 +132,12 @@ export function TrendChart({
     () => (plotW > 0 ? decimate(visible, from, to, Math.max(2, Math.round(plotW))) : visible),
     [visible, from, to, plotW],
   );
-  const flowingDrawn = useSmoothTimedValues(drawn, stale ? 900 : 650);
+  const flowingDrawn = useSmoothLeadingValue(drawn, stale ? 900 : 650);
 
-  const domain = useMemo(() => {
-    const values = [...visible, ...flowingDrawn].map((sample) => sample.v);
+  // The value axis the incoming data asks for. Recomputed every packet, and
+  // therefore never used directly — see the sticky domain below.
+  const targetDomain = useMemo(() => {
+    const values = visible.map((sample) => sample.v);
     const references = [limits.alert, limits.danger].filter((v): v is number => typeof v === 'number');
     if (values.length === 0) {
       return references.length > 0
@@ -148,7 +150,34 @@ export function TrendChart({
     // in the middle of the plot rather than welded to an edge.
     const pad = (hi - lo) * 0.12 || Math.max(Math.abs(hi) * 0.05, 0.5);
     return niceDomain(lo - pad, hi + pad, Y_TICKS);
-  }, [visible, flowingDrawn, limits.alert, limits.danger]);
+  }, [visible, limits.alert, limits.danger]);
+
+  // The axis actually drawn, held still between packets.
+  //
+  // Recomputing the extent from the visible samples on every frame re-scales
+  // the axis whenever the newest reading nudges the min or the max, and the
+  // whole line then shifts vertically — the reader sees the history move when
+  // only the last sample changed. So the domain is sticky: it widens the moment
+  // data or a limit leaves it, and it only contracts once the data has fallen
+  // well inside it (under 55% of the current span), which is a real change of
+  // operating range rather than one quiet packet. Zoom, pan and a change of
+  // signal reset it, because those are the reader asking for a new scale.
+  const domainRef = useRef(targetDomain);
+  const domainKey = `${limits.alert ?? ''}|${limits.danger ?? ''}|${decimals}`;
+  const lastDomainKey = useRef(domainKey);
+  if (lastDomainKey.current !== domainKey) {
+    lastDomainKey.current = domainKey;
+    domainRef.current = targetDomain;
+  }
+  const domain = useMemo(() => {
+    const held = domainRef.current;
+    const heldSpan = held.hi - held.lo;
+    const escapes = targetDomain.lo < held.lo || targetDomain.hi > held.hi;
+    const shrunk = heldSpan > 0 && (targetDomain.hi - targetDomain.lo) / heldSpan < 0.55;
+    const next = escapes || shrunk || heldSpan <= 0 ? targetDomain : held;
+    domainRef.current = next;
+    return next;
+  }, [targetDomain]);
 
   const valueSpan = domain.hi - domain.lo || 1;
   const y = useCallback(
