@@ -7,6 +7,7 @@ import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { CONDITION_LABEL, type OverviewCondition } from '../../../../lib/analysisOverview';
 import { cn } from '../../../../lib/cn';
 import { Hoverable, alpha, consolePalette, radius, tabular, text, type IconName, type Variant } from '../../../ui';
+import { EqualColumnStrip } from './EqualColumnStrip';
 
 /**
  * The presentation layer for the diagnosis pages.
@@ -182,43 +183,24 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
 
+  // Equal columns, for the same reason as every other strip in this layer: a
+  // reading is not more important because its value prints longer.
   return (
-    <View
-      className="overflow-hidden border"
-      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
-    >
-      {/* The negative margins hide the last column's and last row's hairline
-          against the container's own border, so the grid reads as a ruled frame
-          rather than as a comb with a loose tooth on each edge.
-          The rules are `lineStrong`, not `line`: at 7.5% white on a raised
-          panel the divider between two cells is below the threshold of being
-          seen at all, which leaves eight readings running together as one block
-          of text. A rule you cannot see is not a subtle rule, it is no rule. */}
-      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
-        {facts.map((fact) => (
-          <Hoverable
-            key={fact.label}
-            className="gap-1.5 px-4 py-3.5"
-            style={({ hovered }) => ({
-              minWidth: fact.wide ? 300 : 178,
-              flexGrow: fact.wide ? 2.4 : 1,
-              flexBasis: fact.wide ? 300 : 178,
-              borderRightWidth: 1,
-              borderBottomWidth: 1,
-              borderColor: palette.lineStrong,
-              backgroundColor: hovered ? palette.hoverSurface : undefined,
-            })}
-          >
+    <EqualColumnStrip
+      minColumnWidth={170}
+      cornerRadius={radius.md}
+      cells={facts.map((fact) => ({
+        key: fact.label,
+        node: (
+          <>
             <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
               {fact.label}
             </Text>
             <View className="flex-row flex-wrap items-baseline gap-x-1.5">
               <Text
-                className={fact.wide ? text.bodyStrong : text.dataMd}
-                style={[
-                  fact.wide ? null : tabular,
-                  { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink, fontWeight: '600' },
-                ]}
+                className={text.dataMd}
+                style={[tabular, { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink, fontWeight: '600' }]}
+                numberOfLines={1}
               >
                 {fact.value}
               </Text>
@@ -233,10 +215,10 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
                 {fact.note}
               </Text>
             ) : null}
-          </Hoverable>
-        ))}
-      </View>
-    </View>
+          </>
+        ),
+      }))}
+    />
   );
 }
 
@@ -266,27 +248,15 @@ export function StateTagGrid({
   // frame line up, and the state word sits at the same x on every row, so the
   // exception is what catches the eye rather than the fill.
   return (
-    <View
-      className="overflow-hidden border"
-      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
-    >
-      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
-        {items.map((item) => {
-          const colour = conditionColour(item.condition, isDark);
-          return (
-            <Hoverable
-              key={item.label}
-              className="flex-row items-center gap-2.5 px-3 py-2.5"
-              style={({ hovered }) => ({
-                minWidth,
-                flexGrow: 1,
-                flexBasis: minWidth,
-                borderRightWidth: 1,
-                borderBottomWidth: 1,
-                borderColor: palette.lineStrong,
-                backgroundColor: hovered ? palette.hoverSurface : undefined,
-              })}
-            >
+    <EqualColumnStrip
+      minColumnWidth={minWidth}
+      cornerRadius={radius.md}
+      cells={items.map((item) => {
+        const colour = conditionColour(item.condition, isDark);
+        return {
+          key: item.label,
+          node: (
+            <View className="flex-row items-center gap-2.5">
               <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: colour }} />
               <Text numberOfLines={1} className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: palette.ink }}>
                 {item.label}
@@ -294,11 +264,11 @@ export function StateTagGrid({
               <Text className={text.chip} style={{ color: colour }}>
                 {CONDITION_LABEL[item.condition]}
               </Text>
-            </Hoverable>
-          );
-        })}
-      </View>
-    </View>
+            </View>
+          ),
+        };
+      })}
+    />
   );
 }
 

@@ -12,6 +12,7 @@ import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
+import { EqualColumnStrip } from '../analysis/EqualColumnStrip';
 import type { EvidenceMetric, PrognosisMetric, PrognosisReason, PrognosisViewModel } from '../analysis/prognosisViewModel';
 import { Hoverable, alpha, consolePalette, radius, tabular, text } from '../../../ui';
 import { DegradationForecastChart } from './DegradationForecastChart';
@@ -113,38 +114,25 @@ function TrendSummary({ metric }: { metric: PrognosisMetric }) {
   ];
 
   return (
-    <View
-      className="overflow-hidden border"
-      style={{ borderColor: palette.lineStrong, borderRadius: radius.sm }}
-    >
-      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
-      {cells.map((cell) => (
-        <Hoverable
-          key={cell.label}
-          className="gap-1 px-3 py-2.5"
-          style={({ hovered }) => ({
-            flexGrow: 1,
-            flexBasis: 150,
-            minWidth: 130,
-            borderRightWidth: 1,
-            borderBottomWidth: 1,
-            borderColor: palette.lineStrong,
-            backgroundColor: hovered ? palette.hoverSurface : undefined,
-          })}
-        >
-          <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
-            {cell.label}
-          </Text>
-          <Text className={text.dataMd} style={[tabular, { color: cell.colour, fontWeight: '600' }]} numberOfLines={1}>
-            {cell.value}
-          </Text>
-          <Text className={text.micro} style={{ color: palette.inkFaint }} numberOfLines={1}>
-            {cell.note}
-          </Text>
-        </Hoverable>
-      ))}
-      </View>
-    </View>
+    <EqualColumnStrip
+      minColumnWidth={150}
+      cells={cells.map((cell) => ({
+        key: cell.label,
+        node: (
+          <>
+            <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
+              {cell.label}
+            </Text>
+            <Text className={text.dataMd} style={[tabular, { color: cell.colour, fontWeight: '600' }]} numberOfLines={1}>
+              {cell.value}
+            </Text>
+            <Text className={text.micro} style={{ color: palette.inkFaint }} numberOfLines={1}>
+              {cell.note}
+            </Text>
+          </>
+        ),
+      }))}
+    />
   );
 }
 
@@ -237,42 +225,28 @@ export function SupportingEvidenceStrip({ items }: { items: EvidenceMetric[] }) 
       <Text className={text.label} style={{ color: palette.inkFaint }}>
         CURRENT SUPPORTING EVIDENCE
       </Text>
-      {/* A ruled grid rather than left-edges only: these wrap onto a second row
-          on anything narrower than a wide desktop, and a left-border rule leaves
-          the wrapped row floating with no edge above it. Right + bottom on every
-          cell, clipped by the container, rules correctly at any wrap point. */}
-      <View
-        className="overflow-hidden border"
-        style={{ borderColor: palette.lineStrong, borderRadius: radius.sm }}
-      >
-        <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
-          {items.map((item) => (
-          <Hoverable
-            key={item.id}
-            className="gap-1 px-3 py-2.5"
-            style={({ hovered }) => ({
-              flexGrow: 1,
-              flexBasis: 178,
-              minWidth: 150,
-              borderRightWidth: 1,
-              borderBottomWidth: 1,
-              borderColor: palette.lineStrong,
-              backgroundColor: hovered ? palette.hoverSurface : undefined,
-            })}
-          >
-            <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={2}>
-              {item.label}
-            </Text>
-            <Text className={text.dataMd} style={[tabular, { color: palette.ink, fontWeight: '600' }]} numberOfLines={1}>
-              {item.value}
-            </Text>
-            <Text className={text.micro} style={{ color: toneHex(item.tone, isDark) }} numberOfLines={1}>
-              {item.note}
-            </Text>
-          </Hoverable>
-          ))}
-        </View>
-      </View>
+      {/* Equal columns, so the six readings are drawn as the peers they are.
+          The label is held to one line because a label that wraps pushes its
+          own value down a row and breaks the shared baseline across the strip. */}
+      <EqualColumnStrip
+        minColumnWidth={168}
+        cells={items.map((item) => ({
+          key: item.id,
+          node: (
+            <>
+              <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
+                {item.label}
+              </Text>
+              <Text className={text.dataMd} style={[tabular, { color: palette.ink, fontWeight: '600' }]} numberOfLines={1}>
+                {item.value}
+              </Text>
+              <Text className={text.micro} style={{ color: toneHex(item.tone, isDark) }} numberOfLines={1}>
+                {item.note}
+              </Text>
+            </>
+          ),
+        }))}
+      />
     </Panel>
   );
 }

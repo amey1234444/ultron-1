@@ -14,6 +14,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { CONDITION_LABEL } from '../../../../lib/analysisOverview';
 import { cn } from '../../../../lib/cn';
+import { EqualColumnStrip } from '../analysis/EqualColumnStrip';
 import type { PrognosisTone, PrognosisViewModel } from '../analysis/prognosisViewModel';
 import { Hoverable, alpha, consolePalette, radius, tabular, text } from '../../../ui';
 
@@ -107,30 +108,17 @@ export function PrognosisSummaryGrid({ facts }: { facts: SummaryFact[] }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
 
-  // Ruled with `lineStrong` rather than `line`. Eight readings sitting in one
-  // frame need a visible edge between them or they read as one paragraph of
-  // labels and numbers — and the reader has to use the label positions to
-  // re-derive where each cell starts, which is exactly the work a rule saves.
+  // Equal columns. These eight are peers — CONFIDENCE is not a lesser reading
+  // than PROGNOSIS STATUS because its value is shorter — so the width is taken
+  // from the column count, not from how long each value happens to print.
   return (
-    <View
-      className="overflow-hidden border"
-      style={{ borderColor: palette.lineStrong, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
-    >
-      <View className="flex-row flex-wrap" style={{ marginRight: -1, marginBottom: -1 }}>
-        {facts.map((fact) => (
-          <Hoverable
-            key={fact.label}
-            className="gap-1 px-3.5 py-3"
-            style={({ hovered }) => ({
-              flexGrow: 1,
-              flexBasis: 152,
-              minWidth: 138,
-              borderRightWidth: 1,
-              borderBottomWidth: 1,
-              borderColor: palette.lineStrong,
-              backgroundColor: hovered ? palette.hoverSurface : undefined,
-            })}
-          >
+    <EqualColumnStrip
+      minColumnWidth={152}
+      cornerRadius={radius.md}
+      cells={facts.map((fact) => ({
+        key: fact.label,
+        node: (
+          <>
             <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
               {fact.label}
             </Text>
@@ -146,10 +134,10 @@ export function PrognosisSummaryGrid({ facts }: { facts: SummaryFact[] }) {
                 {fact.note}
               </Text>
             ) : null}
-          </Hoverable>
-        ))}
-      </View>
-    </View>
+          </>
+        ),
+      }))}
+    />
   );
 }
 

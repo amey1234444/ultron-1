@@ -478,7 +478,13 @@ function HealthyState({
       prediction.condition === 'healthy' &&
       (prediction.predictionStatus === 'FORECAST_AVAILABLE' || prediction.degradationDetected),
   );
-  const predictive = isPredictiveSseDemo ? undefined : rawPredictive;
+  // The predictive finding is reported wherever the engine has one.
+  //
+  // This used to be blanked on the SSE demo machine, which is the machine that
+  // actually HAS the finding — so Diagnosis said "no active fault detected"
+  // with every count at zero while Prognosis, one tab away, was forecasting an
+  // ALERT crossing in 15 days. Two tabs over the same data must not disagree.
+  const predictive = rawPredictive;
   const sensorEvidence: DiagnosisSensorEvidence[] = healthySignals.map((signal) => ({
     id: signal.code,
     measurement: signal.label,
@@ -505,8 +511,8 @@ function HealthyState({
         <View className="gap-5">
           <VerdictHeader
             condition="healthy"
-            eyebrow={predictive ? 'CURRENT DIAGNOSIS' : 'DIAGNOSIS RESULT'}
-            title={predictive ? 'HEALTHY - no current ALERT/DANGER fault' : 'No active fault detected'}
+            eyebrow="DIAGNOSIS RESULT"
+            title={predictive ? '1 early-stage gearbox output bearing degradation detected' : 'No active fault detected'}
             detail={
               predictive
                 ? 'Current machine condition is HEALTHY. Historical vibration processing indicates an early localized degradation pattern at the gearbox output side that warrants predictive monitoring, not an immediate current-fault alarm.'
@@ -526,15 +532,17 @@ function HealthyState({
               { label: 'OVERALL CONDITION', value: 'HEALTHY', tone: 'healthy' },
               { label: 'CURRENT FAULTS', value: '0' },
               { label: 'PREDICTIVE FINDINGS', value: predictive ? '1' : '0', tone: predictive ? 'attention' : undefined },
+              // Short enough to sit in an equal column and still be read. The
+              // full sentence these used to carry belongs in the detail line
+              // above, not stretched across two cells of a reading strip.
               {
                 label: 'OBSERVED EARLY PATTERN',
-                value: predictive ? 'Gearbox-output bearing-related degradation indicators under observation' : 'NONE',
-                wide: Boolean(predictive),
+                value: predictive ? 'GEARBOX OUTPUT BEARING' : 'NONE',
+                tone: predictive ? 'attention' : undefined,
               },
               {
                 label: 'CURRENT FAULT SEVERITY',
-                value: predictive ? 'No current fault escalation; predictive evidence only' : 'NONE',
-                wide: Boolean(predictive),
+                value: predictive ? 'PREDICTIVE ONLY' : 'NONE',
               },
               { label: 'PROJECTED ALERT', value: predictive ? dayPhrase(predictive.estimatedTimeToAlertDays).toLocaleUpperCase() : '--' },
               { label: 'PROJECTED DANGER', value: predictive ? dayPhrase(predictive.estimatedTimeToDangerDays).toLocaleUpperCase() : '--' },
