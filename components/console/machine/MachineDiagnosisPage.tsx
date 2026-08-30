@@ -15,15 +15,6 @@ import {
   FAULTY_SSE_MACHINE_DOCTOR,
   FAULTY_SSE_RECOMMENDED_ACTION,
   FAULTY_SSE_SUPPORTING_EVIDENCE,
-  HEALTHY_SSE_DIAGNOSIS_EVIDENCE,
-  HEALTHY_SSE_DIAGNOSIS_MESSAGE,
-  HEALTHY_SSE_DIAGNOSIS_RESULT,
-  HEALTHY_SSE_EVIDENCE_STATUS,
-  PREDICTIVE_SSE_DIAGNOSIS_MESSAGE,
-  PREDICTIVE_SSE_DIAGNOSIS_ROWS,
-  PREDICTIVE_SSE_LIMITING_EVIDENCE,
-  PREDICTIVE_SSE_MACHINE_DOCTOR,
-  PREDICTIVE_SSE_SUPPORTING_EVIDENCE,
 } from './demoSseDocs';
 import {
   buildDiagnosisModel,
@@ -428,12 +419,10 @@ const HEALTHY_EVIDENCE = [
 function HealthyState({
   data,
   isPredictiveSseDemo,
-  isHealthySseDemo,
   onOpenPrognosis,
 }: {
   data: DiagnosisModelSource;
   isPredictiveSseDemo?: boolean;
-  isHealthySseDemo?: boolean;
   onOpenPrognosis?: () => void;
 }) {
   const { isDark } = useAppTheme();
@@ -441,11 +430,12 @@ function HealthyState({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const healthySignals = data.diagnosisSignals.length > 0 ? data.diagnosisSignals : data.signals;
-  const predictive = data.prognostics?.predictions.find(
+  const rawPredictive = data.prognostics?.predictions.find(
     (prediction) =>
       prediction.condition === 'healthy' &&
       (prediction.predictionStatus === 'FORECAST_AVAILABLE' || prediction.degradationDetected),
   );
+  const predictive = isPredictiveSseDemo ? undefined : rawPredictive;
   const sensorEvidence: DiagnosisSensorEvidence[] = healthySignals.map((signal) => ({
     id: signal.code,
     measurement: signal.label,
@@ -470,27 +460,6 @@ function HealthyState({
     <View className="gap-4">
       <Panel>
         <View className="gap-5">
-          {isHealthySseDemo ? (
-            <DemoDiagnosisDocBlock
-              rows={[
-                ['Complete Machine', 'HEALTHY'],
-                ['Problem groups', '0'],
-                ['Highest-priority problem', 'None'],
-                ['Corrective action', 'None required; continue normal monitoring.'],
-              ]}
-              doctor={[
-                ['Diagnosis', 'No active mechanical, thermal, feeding, pressure, speed or process fault detected.'],
-              ]}
-              valueTone="accent"
-              sections={[
-                { title: 'DIAGNOSIS RESULT', items: HEALTHY_SSE_DIAGNOSIS_RESULT },
-                { title: 'HEALTHY EVIDENCE', items: HEALTHY_SSE_DIAGNOSIS_EVIDENCE },
-                { title: 'EVIDENCE STATUS', items: HEALTHY_SSE_EVIDENCE_STATUS },
-                { title: 'DEMO MESSAGE', items: [HEALTHY_SSE_DIAGNOSIS_MESSAGE] },
-              ]}
-            />
-          ) : null}
-
           <VerdictHeader
             condition="healthy"
             eyebrow={predictive ? 'CURRENT DIAGNOSIS' : 'DIAGNOSIS RESULT'}
@@ -508,19 +477,6 @@ function HealthyState({
               ) : null
             }
           />
-
-          {predictive && isPredictiveSseDemo ? (
-            <DemoDiagnosisDocBlock
-              rows={PREDICTIVE_SSE_DIAGNOSIS_ROWS}
-              doctor={PREDICTIVE_SSE_MACHINE_DOCTOR}
-              valueTone="accent"
-              sections={[
-                { title: 'SUPPORTING EVIDENCE SHOWN', items: PREDICTIVE_SSE_SUPPORTING_EVIDENCE },
-                { title: 'CONTRADICTING / DIFFERENTIAL EVIDENCE SHOWN', items: PREDICTIVE_SSE_LIMITING_EVIDENCE },
-                { title: 'DIAGNOSIS MESSAGE', items: [PREDICTIVE_SSE_DIAGNOSIS_MESSAGE] },
-              ]}
-            />
-          ) : null}
 
           <FactStrip
             facts={[
@@ -687,7 +643,6 @@ export function MachineDiagnosisPage({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const model = useMemo(() => buildDiagnosisModel(data), [data]);
-  const isHealthySseDemo = machineName === 'Healthy SSE Demo';
   const isPredictiveSseDemo = machineName === 'SSE Prediction Demo';
   const [selectedId, setSelectedId] = useState<string | null>(() =>
     selectedProblemId && model.problems.some((problem) => problem.id === selectedProblemId)
@@ -731,7 +686,6 @@ export function MachineDiagnosisPage({
       {model.problems.length === 0 ? (
         <HealthyState
           data={data}
-          isHealthySseDemo={isHealthySseDemo}
           isPredictiveSseDemo={isPredictiveSseDemo}
           onOpenPrognosis={onSelectDepth ? () => onSelectDepth('diagnosis') : undefined}
         />

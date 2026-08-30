@@ -24,10 +24,6 @@ import {
   FAULTY_SSE_OPTIONAL_SHORT_HISTORY,
   FAULTY_SSE_PROGNOSIS_ROWS,
   FAULTY_SSE_PROGNOSIS_WHAT,
-  HEALTHY_SSE_FORECAST,
-  HEALTHY_SSE_PROGNOSIS_CONDITION,
-  HEALTHY_SSE_PROGNOSIS_MESSAGE,
-  HEALTHY_SSE_PROGNOSIS_PLOTS,
   PREDICTIVE_SSE_FORECAST_PLOTS,
   PREDICTIVE_SSE_MAINTENANCE_GUIDANCE,
   PREDICTIVE_SSE_PROGNOSIS_ROWS,
@@ -510,36 +506,12 @@ function HealthyPrognosisState({
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const stableSignals = signals.slice(0, 6).map((signal) => `${signal.label}: ${fmt(signal.value, signal.decimals)} ${signal.unit} stable`);
 
+  if (isHealthySseDemo) return null;
+
   return (
     <View className="gap-4">
       <Panel>
         <View className="gap-4">
-          {isHealthySseDemo ? (
-            <View className="gap-4 border-b pb-4" style={{ borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)' }}>
-              <PrognosisDocRows
-                rows={[
-                  ['Current machine condition', 'HEALTHY'],
-                  ['Historical period', '120 days of stable healthy operation'],
-                  ['Degradation status', 'No meaningful degradation detected'],
-                  ['Trend direction', 'STABLE'],
-                ]}
-                valueTone="accent"
-              />
-              <DetailBox title="Current and historical condition">
-                <BulletList items={HEALTHY_SSE_PROGNOSIS_CONDITION} empty="No Healthy SSE condition statement is available." />
-              </DetailBox>
-              <DetailBox title="Forecast">
-                <BulletList items={HEALTHY_SSE_FORECAST} empty="No Healthy SSE forecast statement is available." />
-              </DetailBox>
-              <DetailBox title="Plots shown">
-                <BulletList items={HEALTHY_SSE_PROGNOSIS_PLOTS} empty="No Healthy SSE plot statement is available." />
-              </DetailBox>
-              <DetailBox title="Demo message">
-                <BulletList items={[HEALTHY_SSE_PROGNOSIS_MESSAGE]} empty="No Healthy SSE demo message is available." />
-              </DetailBox>
-            </View>
-          ) : null}
-
           <View className="flex-row flex-wrap items-start justify-between gap-4">
             <View className="min-w-0 flex-1 gap-2">
               <StatusPill condition="healthy" />
