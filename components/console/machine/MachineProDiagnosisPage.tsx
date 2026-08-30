@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
+import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { AnalysisSignal, Finding, Hypothesis } from '../../../lib/analysisDiagnosis';
@@ -27,6 +28,10 @@ import {
   HEALTHY_SSE_PROGNOSIS_CONDITION,
   HEALTHY_SSE_PROGNOSIS_MESSAGE,
   HEALTHY_SSE_PROGNOSIS_PLOTS,
+  PREDICTIVE_SSE_FORECAST_PLOTS,
+  PREDICTIVE_SSE_MAINTENANCE_GUIDANCE,
+  PREDICTIVE_SSE_PROGNOSIS_ROWS,
+  PREDICTIVE_SSE_PROGNOSIS_WHAT,
 } from './demoSseDocs';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
 
@@ -49,6 +54,20 @@ const HEALTHY_PROGNOSIS_PLOTS = [
   'Forecast plot: history remains stable with no artificial threshold crossing.',
   'Maintenance/event timeline: routine events only when present.',
 ];
+
+const PREDICTIVE_DEMO_HISTORY = Array.from({ length: 121 }, (_, index) => {
+  const t = index / 120;
+  const trend = t < 0.45 ? t * 0.32 : 0.144 + ((t - 0.45) / 0.55) ** 1.5 * 0.856;
+  const ripple = index === 0 || index === 120 ? 0 : Math.sin(index * 0.39) * 0.025 + Math.sin(index * 0.11 + 1.4) * 0.016;
+  return Math.min(2.45, Math.max(1.58, 1.58 + (2.45 - 1.58) * trend + ripple));
+});
+
+const PREDICTIVE_DEMO_FORECAST = Array.from({ length: 91 }, (_, index) => {
+  const t = index / 90;
+  return 2.45 + (7.1 - 2.45) * t ** 1.24;
+});
+
+const predictivePlotBullets = PREDICTIVE_SSE_FORECAST_PLOTS.map((row) => row.join(' | '));
 
 export type MachineProDiagnosisPageProps = {
   machineName: string;
@@ -371,6 +390,108 @@ function PrognosisDocRows({
   );
 }
 
+function pointsPath(values: number[], xFor: (index: number) => number, yFor: (value: number) => number): string {
+  return values
+    .map((value, index) => `${index === 0 ? 'M' : 'L'} ${xFor(index).toFixed(1)} ${yFor(value).toFixed(1)}`)
+    .join(' ');
+}
+
+function DemoForecastPlot() {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const width = 760;
+  const height = 190;
+  const left = 42;
+  const right = 22;
+  const top = 18;
+  const bottom = 36;
+  const min = 1.3;
+  const max = 7.4;
+  const alert = 2.8;
+  const danger = 7.1;
+  const plotW = width - left - right;
+  const plotH = height - top - bottom;
+  const dayMin = -120;
+  const dayMax = 90;
+  const xDay = (day: number) => left + ((day - dayMin) / (dayMax - dayMin)) * plotW;
+  const yValue = (value: number) => top + (1 - (value - min) / (max - min)) * plotH;
+  const historyX = (index: number) => xDay(-120 + index);
+  const forecastX = (index: number) => xDay(index);
+  const historyPath = pointsPath(PREDICTIVE_DEMO_HISTORY, historyX, yValue);
+  const forecastPath = pointsPath(PREDICTIVE_DEMO_FORECAST, forecastX, yValue);
+  const uncertaintyTop = pointsPath(
+    PREDICTIVE_DEMO_FORECAST.map((value, index) => value + 0.12 + index * 0.004),
+    forecastX,
+    yValue,
+  );
+  const uncertaintyBottom = pointsPath(
+    [...PREDICTIVE_DEMO_FORECAST].reverse().map((value, reverseIndex) => {
+      const index = PREDICTIVE_DEMO_FORECAST.length - reverseIndex - 1;
+      return value - 0.1 - index * 0.003;
+    }),
+    (index) => forecastX(PREDICTIVE_DEMO_FORECAST.length - index - 1),
+    yValue,
+  );
+  const uncertaintyPath = `${uncertaintyTop} ${uncertaintyBottom.replace(/^M/, 'L')} Z`;
+
+  return (
+    <View className="overflow-hidden rounded-lg border" style={{ borderColor: palette.line, backgroundColor: palette.chartBg }}>
+      <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
+        <Rect x={0} y={0} width={width} height={height} fill={palette.chartBg} />
+        {[1.6, alert, danger].map((value) => (
+          <Line
+            key={value}
+            x1={left}
+            y1={yValue(value)}
+            x2={width - right}
+            y2={yValue(value)}
+            stroke={value === danger ? palette.critical : value === alert ? palette.warning : palette.chartGridMajor}
+            strokeWidth={1}
+            strokeDasharray={value === 1.6 ? undefined : '6 5'}
+          />
+        ))}
+        {[-120, -90, -60, -30, 0, 30, 60, 90].map((day) => (
+          <Line key={day} x1={xDay(day)} y1={top} x2={xDay(day)} y2={height - bottom} stroke={palette.chartGridMinor} strokeWidth={1} />
+        ))}
+        <Path d={uncertaintyPath} fill={palette.info} fillOpacity={0.12} />
+        <Path d={historyPath} fill="none" stroke={palette.accent} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
+        <Path d={forecastPath} fill="none" stroke={palette.info} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 5" />
+        <Line x1={xDay(0)} y1={top} x2={xDay(0)} y2={height - bottom} stroke={palette.chartCrosshair} strokeWidth={1.4} />
+        <Circle cx={xDay(0)} cy={yValue(2.45)} r={4.5} fill={palette.accent} />
+        <Circle cx={xDay(15)} cy={yValue(alert)} r={4.5} fill={palette.warning} />
+        <Circle cx={xDay(80)} cy={yValue(danger)} r={4.5} fill={palette.critical} />
+        <SvgText x={left} y={14} fill={palette.chartText} fontSize={10} fontWeight="700">
+          Gearbox Output Vibration - 120 days historical + future forecast
+        </SvgText>
+        <SvgText x={left} y={yValue(alert) - 5} fill={palette.warning} fontSize={9}>
+          H 2.8
+        </SvgText>
+        <SvgText x={left} y={yValue(danger) - 5} fill={palette.critical} fontSize={9}>
+          HH 7.1
+        </SvgText>
+        <SvgText x={xDay(0) + 7} y={yValue(2.45) - 8} fill={palette.accent} fontSize={9}>
+          Today 2.45
+        </SvgText>
+        <SvgText x={xDay(15) + 7} y={yValue(alert) + 15} fill={palette.warning} fontSize={9}>
+          ALERT about 15 d
+        </SvgText>
+        <SvgText x={xDay(80) - 88} y={yValue(danger) + 15} fill={palette.critical} fontSize={9}>
+          DANGER about 80 d
+        </SvgText>
+        <SvgText x={left} y={height - 12} fill={palette.chartAxisText} fontSize={9}>
+          Day -120
+        </SvgText>
+        <SvgText x={xDay(0) - 14} y={height - 12} fill={palette.chartAxisText} fontSize={9}>
+          Today
+        </SvgText>
+        <SvgText x={width - right - 42} y={height - 12} fill={palette.chartAxisText} fontSize={9}>
+          Day +90
+        </SvgText>
+      </Svg>
+    </View>
+  );
+}
+
 function HealthyPrognosisState({
   signals,
   dataQuality,
@@ -568,7 +689,12 @@ export function MachineProDiagnosisPage({
           {bestPrediction ? (
             <>
               {processRestrictionPrognosis ? <PrognosisDocRows rows={FAULTY_SSE_PROGNOSIS_ROWS} /> : null}
-              {bestPredictionGearboxDetails ? <PrognosisDocRows rows={bestPredictionGearboxDetails.rows} valueTone="accent" /> : null}
+              {bestPredictionGearboxDetails ? (
+                <>
+                  <PrognosisDocRows rows={PREDICTIVE_SSE_PROGNOSIS_ROWS} valueTone="accent" />
+                  <DemoForecastPlot />
+                </>
+              ) : null}
               <View className="flex-row flex-wrap gap-2">
                 <Kpi label="Current condition" value={CONDITION_LABEL[condition].toLocaleUpperCase()} condition={condition} note="Predictive risk is separate from current condition" />
                 {processRestrictionPrognosis ? (
@@ -685,7 +811,7 @@ export function MachineProDiagnosisPage({
                 {processRestrictionPrognosis ? (
                   <BulletList items={FAULTY_SSE_PROGNOSIS_WHAT} empty="No Demo 2 prognosis statement is available." />
                 ) : predictiveGearboxDetails ? (
-                  <BulletList items={predictiveGearboxDetails.what} empty="No Demo 3 prognosis statement is available." />
+                  <BulletList items={PREDICTIVE_SSE_PROGNOSIS_WHAT} empty="No Demo 3 prognosis statement is available." />
                 ) : (
                   <Text className={cn('font-body text-[12px] leading-[18px]', inkClass)}>
                     {selected.thresholdProjectionWording ?? 'No defensible threshold horizon is currently available.'}
@@ -725,11 +851,14 @@ export function MachineProDiagnosisPage({
 
               {predictiveGearboxDetails ? (
                 <View className="flex-row flex-wrap gap-2">
+                  <DetailBox title="Forecast overlay">
+                    <DemoForecastPlot />
+                  </DetailBox>
                   <DetailBox title="Forecast plots shown">
-                    <BulletList items={predictiveGearboxDetails.plots} empty="No Demo 3 forecast plot statement is available." />
+                    <BulletList items={predictivePlotBullets} empty="No Demo 3 forecast plot statement is available." />
                   </DetailBox>
                   <DetailBox title="Maintenance guidance shown">
-                    <BulletList items={predictiveGearboxDetails.maintenance} empty="No Demo 3 maintenance guidance is available." />
+                    <BulletList items={PREDICTIVE_SSE_MAINTENANCE_GUIDANCE} empty="No Demo 3 maintenance guidance is available." />
                   </DetailBox>
                 </View>
               ) : null}

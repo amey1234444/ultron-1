@@ -409,6 +409,92 @@ function isPredictionSseDemo(input: BuildInput): boolean {
   return hasWords(input.machineName) || hasWords(input.machineId);
 }
 
+function isGearboxOutputPoint(point: PointCondition): boolean {
+  const label = `${point.label} ${point.code}`.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ');
+  const gearbox = label.includes('gearbox') || label.includes('gb');
+  const output = label.includes('output') || /\bout\b/.test(label);
+  const vibration = label.includes('vib') || point.kind === 'Vibration';
+  return gearbox && output && vibration;
+}
+
+function predictionSseDemoForecast(input: BuildInput): MachinePredictionResult {
+  const point = input.conditions.find(isGearboxOutputPoint) ?? null;
+  const current = typeof point?.value === 'number' && Number.isFinite(point.value) ? point.value : 2.45;
+  const baseline = pointBaseline(point) ?? 1.6;
+  const alertThreshold = point?.thresholds.alert ?? 2.8;
+  const dangerThreshold = point?.thresholds.danger ?? 7.1;
+  const unit = point?.unit || 'mm/s RMS';
+  const historyDurationDays = 120;
+  const sampleCount = 121;
+  const alertDays = 15;
+  const dangerDays = 80;
+  const confidence = 86;
+  const bounds = { lower: 70, upper: 90 };
+  const slope = (alertThreshold - current) / alertDays;
+
+  return {
+    predictionId: 'pred-sse-demo-gearbox-output',
+    faultId: 'PRED-002',
+    faultName: 'Gearbox Output Bearing Degradation',
+    location: ['Gearbox output side', 'mechanical', point?.label ?? 'Gearbox Vibration at Out'],
+    condition: 'healthy',
+    diagnosticConfidence: 82,
+    predictabilityClass: 'HIGH',
+    predictionStatus: 'FORECAST_AVAILABLE',
+    degradationDetected: true,
+    degradationOnset: 'Day -72',
+    historyDurationDays,
+    sampleCount,
+    currentValue: current,
+    baselineValue: baseline,
+    unit,
+    healthIndicator: point?.health ?? 86,
+    trendDirection: 'INCREASING',
+    trendSlopePerDay: slope,
+    robustSlopePerDay: slope * 0.94,
+    trendAcceleration: 0.006,
+    modelType: 'EXPONENTIAL',
+    modelVersion: MODEL_VERSION,
+    modelFit: 0.91,
+    residualError: 0.035,
+    backtestError: 0.04,
+    estimatedTimeToAlertDays: alertDays,
+    estimatedTimeToDangerDays: dangerDays,
+    estimatedTimeToFunctionalFailureDays: null,
+    operatingHoursToThreshold: dangerDays * DEFAULT_OPERATING_HOURS_PER_DAY,
+    calendarDaysToThreshold: dangerDays,
+    predictionLowerBoundDays: bounds.lower,
+    predictionUpperBoundDays: bounds.upper,
+    predictionConfidence: confidence,
+    recommendedInspectionWindow: 'Within 5 days',
+    recommendedMaintenanceWindow: 'Within 8-12 days',
+    availableInputs: ['GEARBOX_VIB', 'Gearbox Output Vibration', '120-day hardcoded demo history'],
+    requiredAdditionalEvidence: ['Raw acceleration waveform', 'Envelope spectrum', 'Bearing geometry', 'Validated functional-failure model'],
+    sourceMeasurementIds: ['GEARBOX_VIB', point?.id ?? 'sse-demo-gearbox-output'],
+    sourceEventIds: Array.from({ length: sampleCount }, (_, index) => `sse-prediction-demo:gearbox-output:day-${120 - index}`),
+    sourceLabel: 'REAL',
+    thresholdProjectionWording:
+      'At the current degradation rate, the configured ALERT threshold is projected in approximately 15 days and DANGER in approximately 80 days.',
+    functionalFailureValidated: false,
+    previousForecastDays: 16,
+    forecastChangeDays: -1,
+    accelerationDetected: true,
+    advanced: {
+      movingAverage: 2.36,
+      ewma: 2.39,
+      zScore: 4.2,
+      variance: 0.072,
+      cusum: 34.5,
+      monotonicity: 0.93,
+      operatingConditionResidual: 0,
+      dangerThreshold,
+      alertThreshold,
+      dataWindowStart: 'Day -120',
+      dataWindowEnd: 'Today',
+    },
+  };
+}
+
 function isGearboxOutputPrediction(issue: Issue, point: PointCondition | null): boolean {
   if (!point || !issue.id.startsWith('pred-')) return false;
   const label = `${issue.componentLabel} ${point.label} ${point.code}`.toLocaleLowerCase().replace(/[^a-z0-9]+/g, ' ');
@@ -683,6 +769,20 @@ export function emptyPrognostics(now = new Date()): MachinePrognosticsResult {
 
 export function buildMachinePrognostics(input: BuildInput): MachinePrognosticsResult {
   const predictionSseDemo = isPredictionSseDemo(input);
+  if (predictionSseDemo) {
+    const prediction = predictionSseDemoForecast(input);
+    return {
+      enabled: true,
+      sourceLabel: 'REAL',
+      historySampleCount: prediction.sampleCount,
+      predictions: [prediction],
+      activeForecasts: [prediction],
+      earliestProjectedDanger: prediction,
+      machineFailureHorizonDays: null,
+      maintenanceEvents: [],
+      generatedAt: input.now.toISOString(),
+    };
+  }
   const predictions = [
     ...prioritiseIssues(input.issues).map((issue) =>
       buildPrediction(issue, input.conditions, input.signals, input.hypotheses, { predictionSseDemo }),
