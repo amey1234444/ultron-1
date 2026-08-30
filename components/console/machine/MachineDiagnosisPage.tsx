@@ -553,6 +553,7 @@ function HealthyState({
           <View className="flex-row flex-wrap" style={{ gap: 12 }}>
             <EvidenceCard
               title="Supporting evidence"
+              caption="Observations that hold the conclusion up"
               variant="success"
               icon="check-decagram-outline"
               items={evidenceItems}
@@ -560,6 +561,7 @@ function HealthyState({
             />
             <EvidenceCard
               title="Contradicting evidence"
+              caption="Observations that argue the other way"
               variant="warning"
               icon="scale-balance"
               items={
@@ -577,6 +579,7 @@ function HealthyState({
             />
             <EvidenceCard
               title="Additional evidence required"
+              caption="What must be measured before this can be settled"
               variant="info"
               icon="clipboard-text-search-outline"
               items={
@@ -787,6 +790,7 @@ export function MachineDiagnosisPage({
                   <View className="flex-row flex-wrap" style={{ gap: 12 }}>
                     <EvidenceCard
                       title="Supporting evidence"
+                      caption="Observations that hold the conclusion up"
                       variant="destructive"
                       icon="check-decagram-outline"
                       items={selected.supportingEvidence}
@@ -794,6 +798,7 @@ export function MachineDiagnosisPage({
                     />
                     <EvidenceCard
                       title="Contradicting evidence"
+                      caption="Observations that argue the other way"
                       variant="warning"
                       icon="scale-balance"
                       items={selected.contradictingEvidence}
@@ -801,6 +806,7 @@ export function MachineDiagnosisPage({
                     />
                     <EvidenceCard
                       title="Missing evidence"
+                      caption="What must be measured before this can be settled"
                       variant="info"
                       icon="clipboard-text-search-outline"
                       items={selected.missingEvidence}

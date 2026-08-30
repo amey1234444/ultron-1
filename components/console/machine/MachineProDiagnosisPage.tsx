@@ -1,23 +1,33 @@
 import type { ReactNode } from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Platform, Pressable, ScrollView, Text, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Circle, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import type { AnalysisSignal, Finding, Hypothesis } from '../../../lib/analysisDiagnosis';
 import {
   CONDITION_LABEL,
-  conditionHexes,
   type Issue,
   type OverviewCondition,
   type ProgressionEvent,
 } from '../../../lib/analysisOverview';
 import { QUALITY_LABEL, type AnalystHypothesis, type ChainStep, type Conclusion, type DataQuality } from '../../../lib/advancedDiagnosis';
 import { cn } from '../../../lib/cn';
-import { consolePalette } from '../../../lib/consoleTheme';
 import { Panel } from '../../Panel';
+import { alpha, consolePalette, radius, tabular, text } from '../../ui';
 import { AnalysisTabs, type AnalysisDepth } from './analysis/AnalysisTabs';
 import type { ActionPriority } from './analysis/ActionList';
+import {
+  ConditionPill,
+  DefinitionRows,
+  EvidenceCard,
+  FactStrip,
+  RegionHeading,
+  StatementList,
+  VerdictHeader,
+  conditionColour,
+  type Fact,
+} from './analysis/DiagnosisPresentation';
 import { emptyPrognostics, type MachinePredictionResult, type MachinePrognosticsResult } from './analysis/prognosticsModel';
 import {
   FAULTY_SSE_MAINTENANCE_GUIDANCE,
@@ -33,8 +43,21 @@ import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
 
 const FORECAST_LIST = { flexGrow: 3, flexBasis: 330, minWidth: 280 } as const;
 const FORECAST_DETAIL = { flexGrow: 7, flexBasis: 720, minWidth: 320 } as const;
-const DETAIL_CELL = { flexGrow: 1, flexBasis: 210, minWidth: 180 } as const;
-const ACTION_CELL = { flexGrow: 1, flexBasis: 280, minWidth: 240 } as const;
+
+/**
+ * Type inside the SVG plot.
+ *
+ * Everything that can be a real `<Text>` already is — the chart's title, its
+ * legend and its caption live in the card header above the drawing, where they
+ * get the console's own type scale. What is left inside the SVG is only the
+ * text that has to sit at a coordinate: axis ticks, threshold names and the
+ * three point callouts. Those still need a face, and `fontFamily` on an SVG
+ * node does not go through nativewind, so the two web faces are named here and
+ * the bundled families are named for the native targets.
+ */
+const PLOT_SANS = Platform.select({ web: 'Inter, system-ui, sans-serif', default: 'Inter_500Medium' });
+const PLOT_SANS_BOLD = Platform.select({ web: 'Inter, system-ui, sans-serif', default: 'Inter_600SemiBold' });
+const PLOT_MONO = Platform.select({ web: '"JetBrains Mono", ui-monospace, monospace', default: 'IBMPlexMono_400Regular' });
 
 const HEALTHY_PROGNOSIS_POINTS = [
   'No persistent upward bearing, gear, vibration, temperature, pressure or load degradation pattern.',
@@ -62,8 +85,6 @@ const PREDICTIVE_DEMO_FORECAST = Array.from({ length: 91 }, (_, index) => {
   const t = index / 90;
   return 2.45 + (7.1 - 2.45) * t ** 1.24;
 });
-
-const predictivePlotBullets = PREDICTIVE_SSE_FORECAST_PLOTS.map((row) => row.join(' | '));
 
 export type MachineProDiagnosisPageProps = {
   machineName: string;
@@ -133,7 +154,7 @@ function dayUnit(value: number | null): string | undefined {
 
 function formatSlope(value: number | null): string {
   if (value === null) return '--';
-  return `${value >= 0 ? '+' : ''}${value.toFixed(3)} / day`;
+  return `${value >= 0 ? '+' : ''}${value.toFixed(3)}`;
 }
 
 function formatCurrentBaseline(forecast: MachinePredictionResult): string {
@@ -242,146 +263,118 @@ function hasPredictionSseDemoWords(value: string): boolean {
   return words.has('sse') && words.has('prediction') && words.has('demo');
 }
 
-function StatusPill({ condition }: { condition: OverviewCondition }) {
-  const { isDark } = useAppTheme();
-  const tint = conditionHexes(isDark)[condition];
-  return (
-    <View className="rounded border px-2 py-1" style={{ borderColor: `${tint}66`, backgroundColor: `${tint}12` }}>
-      <Text style={{ color: tint }} className="font-mono text-[8px] font-bold tracking-wider">
-        {CONDITION_LABEL[condition]}
-      </Text>
-    </View>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  unit,
-  note,
-  condition,
-}: {
-  label: string;
-  value: string;
-  unit?: string;
-  note?: string;
-  condition?: OverviewCondition;
-}) {
-  const { isDark } = useAppTheme();
-  const tint = condition ? conditionHexes(isDark)[condition] : undefined;
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
-
-  return (
-    <View className="gap-1 rounded-lg border px-3 py-2.5" style={{ ...DETAIL_CELL, borderColor: hairline }}>
-      <Text className={cn('font-mono text-[8px] uppercase tracking-wider', mutedClass)}>{label}</Text>
-      <Text style={tint ? { color: tint } : undefined} className={cn('font-heading-medium text-[20px] font-light tabular-nums', !tint && inkClass)}>
-        {value}
-        {unit ? <Text className={cn('font-mono text-[10px]', mutedClass)}> {unit}</Text> : null}
-      </Text>
-      {note ? <Text numberOfLines={2} className={cn('font-body text-[9px] leading-[13px]', mutedClass)}>{note}</Text> : null}
-    </View>
-  );
-}
-
-function ForecastButton({ forecast, selected, onPress }: { forecast: MachinePredictionResult; selected: boolean; onPress: () => void }) {
-  const { isDark } = useAppTheme();
-  const tint = conditionHexes(isDark)[forecast.condition];
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-      className={cn('rounded-lg border px-3 py-2.5', selected && 'bg-accent/10')}
-      style={{ borderColor: selected ? `${tint}99` : hairline }}
-    >
-      <View className="flex-row items-start justify-between gap-2">
-        <View className="min-w-0 flex-1 gap-1">
-          <Text className={cn('font-mono text-[8px] tracking-wider', mutedClass)}>{forecast.faultId}</Text>
-          <Text numberOfLines={1} className={cn('font-body-medium text-[12px]', selected ? 'text-accent' : inkClass)}>
-            {forecast.faultName}
-          </Text>
-          <Text numberOfLines={1} className={cn('font-body text-[10px]', mutedClass)}>
-            {forecast.thresholdProjectionWording ?? forecast.predictionStatus}
-          </Text>
-        </View>
-        <Text className={cn('font-mono text-[10px] tabular-nums', inkClass)}>
-          {predictionListValue(forecast)}
-        </Text>
-      </View>
-    </Pressable>
-  );
-}
-
-function Section({ title, children }: { title: string; children: ReactNode }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  return (
-    <View className="gap-2">
-      <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>{title}</Text>
-      {children}
-    </View>
-  );
-}
-
-function BulletList({ items, empty }: { items: readonly string[]; empty: string }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  if (items.length === 0) return <Text className={cn('font-body text-[10px] italic leading-[15px]', mutedClass)}>{empty}</Text>;
-  return (
-    <View className="gap-1.5">
-      {items.map((item) => (
-        <View key={item} className="flex-row gap-2.5">
-          <Text className={cn('font-mono text-[10px]', mutedClass)}>+</Text>
-          <Text className={cn('flex-1 font-body text-[11px] leading-[17px]', inkClass)}>{item}</Text>
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function DetailBox({ title, children }: { title: string; children: ReactNode }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
-  return (
-    <View className="gap-2 rounded-lg border px-3 py-2.5" style={{ ...ACTION_CELL, borderColor: hairline }}>
-      <Text className={cn('font-body-medium text-[11px]', mutedClass)}>{title}</Text>
-      {children}
-    </View>
-  );
-}
-
-function PrognosisDocRows({
-  rows,
-  valueTone = 'warning',
-}: {
-  rows: readonly (readonly [string, string])[];
-  valueTone?: 'warning' | 'accent';
-}) {
+/** How many things a region is listing. Sits on the region heading, not in it. */
+function CountChip({ count, suffix }: { count: number; suffix?: string }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const valueColor = valueTone === 'accent' ? palette.accent : palette.warning;
+  return (
+    <View
+      className="flex-row items-baseline gap-1 px-2 py-[3px]"
+      style={{ backgroundColor: alpha(palette.neutral, 0.12), borderRadius: radius.sm }}
+    >
+      <Text className={text.code} style={[tabular, { color: palette.ink }]}>
+        {count}
+      </Text>
+      {suffix ? (
+        <Text className={text.meta} style={{ color: palette.inkMuted }}>
+          {suffix}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+/** A region: its heading, then whatever it is a heading for. */
+function Region({
+  eyebrow,
+  title,
+  trailing,
+  children,
+}: {
+  eyebrow: string;
+  title: string;
+  trailing?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <View className="gap-3">
+      <RegionHeading eyebrow={eyebrow} title={title} trailing={trailing} />
+      {children}
+    </View>
+  );
+}
+
+/** A bordered ground for a list that is a whole region rather than a card. */
+function Surface({ children, padded = true }: { children: ReactNode; padded?: boolean }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  return (
+    <View
+      className={cn('overflow-hidden border', padded && 'px-4 py-1')}
+      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+    >
+      {children}
+    </View>
+  );
+}
+
+/**
+ * A plot specification: what a chart draws, and what its two axes are.
+ *
+ * These arrive as ['Degradation Trend', 'Date / Time', 'mm/s RMS'] triples and
+ * used to be joined with " | " into one grey sentence, which threw away the one
+ * thing the triple actually says — that the second field is the X axis and the
+ * third is the Y. Naming the axes costs two characters and makes the row
+ * readable without the reader reconstructing the convention.
+ */
+function PlotSpecList({ rows }: { rows: readonly (readonly string[])[] }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
 
   return (
-    <View className="gap-3 border-b pb-4" style={{ borderColor: palette.line }}>
-      {rows.map(([label, value]) => (
-        <View key={label} className="flex-row flex-wrap items-baseline gap-x-8 gap-y-1">
-          <Text className={cn('font-body-medium text-[11px]', mutedClass)} style={{ width: 240 }}>
-            {label}
+    <View>
+      {rows.map((row, index) => (
+        <View
+          key={row[0]}
+          className="gap-1.5 py-3"
+          style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+        >
+          <Text className={text.bodyStrong} style={{ color: palette.ink }}>
+            {row[0]}
           </Text>
-          <Text className="min-w-0 flex-1 font-body-bold text-[12px]" style={{ color: valueColor }}>
-            {value}
-          </Text>
+          <View className="flex-row flex-wrap items-baseline gap-x-5 gap-y-1">
+            {row.slice(1).map((cell, cellIndex) => (
+              <View key={cell} className="flex-row items-baseline gap-1.5">
+                <Text className={text.code} style={{ color: alpha(palette.accent, 0.85) }}>
+                  {cellIndex === 0 ? 'X' : 'Y'}
+                </Text>
+                <Text className={text.micro} style={{ color: palette.inkMuted }}>
+                  {cell}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       ))}
+    </View>
+  );
+}
+
+function LegendKey({ colour, label, dashed, band }: { colour: string; label: string; dashed?: boolean; band?: boolean }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  return (
+    <View className="flex-row items-center gap-1.5">
+      <Svg width={17} height={10}>
+        {band ? (
+          <Rect x={0} y={1} width={17} height={8} rx={2} fill={colour} fillOpacity={0.22} stroke={colour} strokeOpacity={0.45} strokeWidth={1} />
+        ) : (
+          <Line x1={0} y1={5} x2={17} y2={5} stroke={colour} strokeWidth={2.4} strokeDasharray={dashed ? '4 3' : undefined} strokeLinecap="round" />
+        )}
+      </Svg>
+      <Text className={text.meta} style={{ color: palette.inkMuted }}>
+        {label}
+      </Text>
     </View>
   );
 }
@@ -392,27 +385,56 @@ function pointsPath(values: number[], xFor: (index: number) => number, yFor: (va
     .join(' ');
 }
 
-function DemoForecastPlot() {
+const PLOT_MIN = 1.0;
+const PLOT_MAX = 8.2;
+const PLOT_ALERT = 2.8;
+const PLOT_DANGER = 7.1;
+const PLOT_TODAY = 2.45;
+const PLOT_VALUE_TICKS = [2, 3, 4, 5, 6, 7, 8];
+const PLOT_DAY_TICKS = [-120, -90, -60, -30, 0, 30, 60, 90];
+
+/**
+ * The demo forecast plot: 120 days measured, 90 days projected.
+ *
+ * The version this replaces was drawn into a fixed 760x190 viewBox and mounted
+ * at `width="100%"`, which does not do what it looks like it does — an SVG with
+ * a viewBox and the default `preserveAspectRatio` *fits* the drawing inside the
+ * box rather than filling it, so on a 1350px panel the chart still drew at 760px
+ * and sat marooned in the middle of six hundred pixels of empty card. Measuring
+ * the container and drawing at 1:1 pixel units fixes both problems at once: the
+ * chart occupies the space it was given, and every stroke and glyph is at its
+ * true size instead of being scaled by whatever ratio the fit happened to pick.
+ *
+ * The chart is also now tall enough to read. A forecast whose whole point is the
+ * angle at which a curve approaches two horizontal limits cannot be shown 190px
+ * high — at that height the ALERT and DANGER lines are close enough together
+ * that the gap between "15 days" and "80 days" is about a centimetre of screen.
+ */
+function ForecastPlot() {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const width = 760;
-  const height = 190;
-  const left = 42;
-  const right = 22;
-  const top = 18;
-  const bottom = 36;
-  const min = 1.3;
-  const max = 7.4;
-  const alert = 2.8;
-  const danger = 7.1;
-  const plotW = width - left - right;
-  const plotH = height - top - bottom;
-  const dayMin = -120;
-  const dayMax = 90;
-  const xDay = (day: number) => left + ((day - dayMin) / (dayMax - dayMin)) * plotW;
-  const yValue = (value: number) => top + (1 - (value - min) / (max - min)) * plotH;
+  const [width, setWidth] = useState(0);
+
+  const onLayout = useCallback((event: LayoutChangeEvent) => {
+    const next = Math.round(event.nativeEvent.layout.width);
+    setWidth((previous) => (Math.abs(previous - next) < 2 ? previous : next));
+  }, []);
+
+  const w = width > 0 ? width : 960;
+  const h = Math.max(300, Math.min(440, Math.round(w * 0.3)));
+  const left = 62;
+  const right = 26;
+  const top = 22;
+  const bottom = 46;
+  const plotW = w - left - right;
+  const plotH = h - top - bottom;
+  const ready = width > 0 && plotW > 120;
+
+  const xDay = (day: number) => left + ((day + 120) / 210) * plotW;
+  const yValue = (value: number) => top + (1 - (value - PLOT_MIN) / (PLOT_MAX - PLOT_MIN)) * plotH;
   const historyX = (index: number) => xDay(-120 + index);
   const forecastX = (index: number) => xDay(index);
+
   const historyPath = pointsPath(PREDICTIVE_DEMO_HISTORY, historyX, yValue);
   const forecastPath = pointsPath(PREDICTIVE_DEMO_FORECAST, forecastX, yValue);
   const uncertaintyTop = pointsPath(
@@ -431,60 +453,262 @@ function DemoForecastPlot() {
   const uncertaintyPath = `${uncertaintyTop} ${uncertaintyBottom.replace(/^M/, 'L')} Z`;
 
   return (
-    <View className="overflow-hidden rounded-lg border" style={{ borderColor: palette.line, backgroundColor: palette.chartBg }}>
-      <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-        <Rect x={0} y={0} width={width} height={height} fill={palette.chartBg} />
-        {[1.6, alert, danger].map((value) => (
-          <Line
-            key={value}
-            x1={left}
-            y1={yValue(value)}
-            x2={width - right}
-            y2={yValue(value)}
-            stroke={value === danger ? palette.critical : value === alert ? palette.warning : palette.chartGridMajor}
-            strokeWidth={1}
-            strokeDasharray={value === 1.6 ? undefined : '6 5'}
-          />
-        ))}
-        {[-120, -90, -60, -30, 0, 30, 60, 90].map((day) => (
-          <Line key={day} x1={xDay(day)} y1={top} x2={xDay(day)} y2={height - bottom} stroke={palette.chartGridMinor} strokeWidth={1} />
-        ))}
-        <Path d={uncertaintyPath} fill={palette.info} fillOpacity={0.12} />
-        <Path d={historyPath} fill="none" stroke={palette.accent} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" />
-        <Path d={forecastPath} fill="none" stroke={palette.info} strokeWidth={2.2} strokeLinecap="round" strokeLinejoin="round" strokeDasharray="7 5" />
-        <Line x1={xDay(0)} y1={top} x2={xDay(0)} y2={height - bottom} stroke={palette.chartCrosshair} strokeWidth={1.4} />
-        <Circle cx={xDay(0)} cy={yValue(2.45)} r={4.5} fill={palette.accent} />
-        <Circle cx={xDay(15)} cy={yValue(alert)} r={4.5} fill={palette.warning} />
-        <Circle cx={xDay(80)} cy={yValue(danger)} r={4.5} fill={palette.critical} />
-        <SvgText x={left} y={14} fill={palette.chartText} fontSize={10} fontWeight="700">
-          Gearbox Output Vibration - 120 days historical + future forecast
-        </SvgText>
-        <SvgText x={left} y={yValue(alert) - 5} fill={palette.warning} fontSize={9}>
-          H 2.8
-        </SvgText>
-        <SvgText x={left} y={yValue(danger) - 5} fill={palette.critical} fontSize={9}>
-          HH 7.1
-        </SvgText>
-        <SvgText x={xDay(0) + 7} y={yValue(2.45) - 8} fill={palette.accent} fontSize={9}>
-          Today 2.45
-        </SvgText>
-        <SvgText x={xDay(15) + 7} y={yValue(alert) + 15} fill={palette.warning} fontSize={9}>
-          ALERT about 15 d
-        </SvgText>
-        <SvgText x={xDay(80) - 88} y={yValue(danger) + 15} fill={palette.critical} fontSize={9}>
-          DANGER about 80 d
-        </SvgText>
-        <SvgText x={left} y={height - 12} fill={palette.chartAxisText} fontSize={9}>
-          Day -120
-        </SvgText>
-        <SvgText x={xDay(0) - 14} y={height - 12} fill={palette.chartAxisText} fontSize={9}>
-          Today
-        </SvgText>
-        <SvgText x={width - right - 42} y={height - 12} fill={palette.chartAxisText} fontSize={9}>
-          Day +90
-        </SvgText>
-      </Svg>
+    <View
+      className="overflow-hidden border"
+      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+    >
+      <View className="gap-3 px-4 pb-3 pt-3.5" style={{ borderBottomWidth: 1, borderBottomColor: palette.lineSubtle }}>
+        <View className="flex-row flex-wrap items-start justify-between gap-x-6 gap-y-1">
+          <View className="min-w-0 gap-1">
+            <Text className={text.label} style={{ color: palette.inkFaint }}>
+              FORECAST + THRESHOLD CROSSING
+            </Text>
+            <Text className={text.title} style={{ color: palette.ink }}>
+              Gearbox Output Vibration
+            </Text>
+          </View>
+          <Text className={text.micro} style={{ color: palette.inkMuted }}>
+            120 days measured, 90 days projected — mm/s RMS
+          </Text>
+        </View>
+        <View className="flex-row flex-wrap items-center gap-x-4 gap-y-1.5">
+          <LegendKey colour={palette.accent} label="Measured history" />
+          <LegendKey colour={palette.info} label="Forecast" dashed />
+          <LegendKey colour={palette.info} label="Prediction interval" band />
+          <LegendKey colour={palette.warning} label="H 2.80 alert" dashed />
+          <LegendKey colour={palette.critical} label="HH 7.10 danger" dashed />
+        </View>
+      </View>
+
+      <View onLayout={onLayout} style={{ backgroundColor: palette.chartBg }}>
+        {ready ? (
+          <Svg width={w} height={h}>
+            <Rect x={0} y={0} width={w} height={h} fill={palette.chartBg} />
+
+            {/* The three configured regions, as ground rather than as lines. A
+                reader should be able to see which band the curve is in without
+                first finding the limit it is being compared against. */}
+            <Rect x={left} y={top} width={plotW} height={Math.max(0, yValue(PLOT_DANGER) - top)} fill={palette.critical} fillOpacity={0.07} />
+            <Rect
+              x={left}
+              y={yValue(PLOT_DANGER)}
+              width={plotW}
+              height={Math.max(0, yValue(PLOT_ALERT) - yValue(PLOT_DANGER))}
+              fill={palette.warning}
+              fillOpacity={0.055}
+            />
+            <Rect
+              x={left}
+              y={yValue(PLOT_ALERT)}
+              width={plotW}
+              height={Math.max(0, top + plotH - yValue(PLOT_ALERT))}
+              fill={palette.accent}
+              fillOpacity={0.045}
+            />
+
+            {PLOT_VALUE_TICKS.map((value) => (
+              <Line
+                key={`grid-y-${value}`}
+                x1={left}
+                y1={yValue(value)}
+                x2={left + plotW}
+                y2={yValue(value)}
+                stroke={palette.chartGridMinor}
+                strokeWidth={1}
+              />
+            ))}
+            {PLOT_DAY_TICKS.map((day) => (
+              <Line
+                key={`grid-x-${day}`}
+                x1={xDay(day)}
+                y1={top}
+                x2={xDay(day)}
+                y2={top + plotH}
+                stroke={palette.chartGridMinor}
+                strokeWidth={1}
+              />
+            ))}
+
+            <Line x1={left} y1={top} x2={left} y2={top + plotH} stroke={palette.chartAxis} strokeWidth={1} />
+            <Line x1={left} y1={top + plotH} x2={left + plotW} y2={top + plotH} stroke={palette.chartAxis} strokeWidth={1} />
+
+            <Line
+              x1={left}
+              y1={yValue(PLOT_ALERT)}
+              x2={left + plotW}
+              y2={yValue(PLOT_ALERT)}
+              stroke={palette.warning}
+              strokeWidth={1.4}
+              strokeDasharray="7 5"
+            />
+            <Line
+              x1={left}
+              y1={yValue(PLOT_DANGER)}
+              x2={left + plotW}
+              y2={yValue(PLOT_DANGER)}
+              stroke={palette.critical}
+              strokeWidth={1.4}
+              strokeDasharray="7 5"
+            />
+
+            <Path d={uncertaintyPath} fill={palette.info} fillOpacity={0.16} />
+            <Path d={historyPath} fill="none" stroke={palette.accent} strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" />
+            <Path
+              d={forecastPath}
+              fill="none"
+              stroke={palette.info}
+              strokeWidth={2.4}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeDasharray="8 6"
+            />
+
+            <Line x1={xDay(0)} y1={top} x2={xDay(0)} y2={top + plotH} stroke={palette.chartCrosshair} strokeWidth={1.4} />
+
+            {/* Halo rings, so a marker still reads where the curve passes under it. */}
+            <Circle cx={xDay(0)} cy={yValue(PLOT_TODAY)} r={7} fill={palette.chartBg} />
+            <Circle cx={xDay(0)} cy={yValue(PLOT_TODAY)} r={5} fill={palette.accent} />
+            <Circle cx={xDay(15)} cy={yValue(PLOT_ALERT)} r={7} fill={palette.chartBg} />
+            <Circle cx={xDay(15)} cy={yValue(PLOT_ALERT)} r={5} fill={palette.warning} />
+            <Circle cx={xDay(80)} cy={yValue(PLOT_DANGER)} r={7} fill={palette.chartBg} />
+            <Circle cx={xDay(80)} cy={yValue(PLOT_DANGER)} r={5} fill={palette.critical} />
+
+            {PLOT_VALUE_TICKS.map((value) => (
+              <SvgText
+                key={`tick-y-${value}`}
+                x={left - 10}
+                y={yValue(value) + 4}
+                fill={palette.chartAxisText}
+                fontSize={10.5}
+                fontFamily={PLOT_MONO}
+                textAnchor="end"
+              >
+                {value.toFixed(1)}
+              </SvgText>
+            ))}
+            {PLOT_DAY_TICKS.map((day) => (
+              <SvgText
+                key={`tick-x-${day}`}
+                x={xDay(day)}
+                y={top + plotH + 21}
+                fill={day === 0 ? palette.chartText : palette.chartAxisText}
+                fontSize={10.5}
+                fontFamily={day === 0 ? PLOT_SANS_BOLD : PLOT_MONO}
+                fontWeight={day === 0 ? '600' : undefined}
+                textAnchor="middle"
+              >
+                {day === 0 ? 'Today' : day > 0 ? `+${day} d` : `${day} d`}
+              </SvgText>
+            ))}
+
+            <SvgText x={left + 10} y={top + 15} fill={palette.chartAxisText} fontSize={10} fontFamily={PLOT_SANS} letterSpacing={1.2}>
+              MEASURED
+            </SvgText>
+            <SvgText x={xDay(0) + 10} y={top + 15} fill={palette.chartAxisText} fontSize={10} fontFamily={PLOT_SANS} letterSpacing={1.2}>
+              PROJECTED
+            </SvgText>
+
+            <SvgText x={left + 10} y={yValue(PLOT_DANGER) - 9} fill={palette.critical} fontSize={11} fontFamily={PLOT_MONO}>
+              HH 7.10 danger
+            </SvgText>
+            <SvgText x={left + 10} y={yValue(PLOT_ALERT) - 9} fill={palette.warning} fontSize={11} fontFamily={PLOT_MONO}>
+              H 2.80 alert
+            </SvgText>
+
+            <SvgText
+              x={xDay(0) - 12}
+              y={yValue(PLOT_TODAY) - 12}
+              fill={palette.accent}
+              fontSize={11.5}
+              fontFamily={PLOT_SANS_BOLD}
+              fontWeight="600"
+              textAnchor="end"
+            >
+              Today 2.45
+            </SvgText>
+            <SvgText
+              x={xDay(15) + 12}
+              y={yValue(PLOT_ALERT) + 19}
+              fill={palette.warning}
+              fontSize={11.5}
+              fontFamily={PLOT_SANS_BOLD}
+              fontWeight="600"
+            >
+              ALERT in about 15 days
+            </SvgText>
+            <SvgText
+              x={xDay(80) - 12}
+              y={yValue(PLOT_DANGER) + 21}
+              fill={palette.critical}
+              fontSize={11.5}
+              fontFamily={PLOT_SANS_BOLD}
+              fontWeight="600"
+              textAnchor="end"
+            >
+              DANGER in about 80 days
+            </SvgText>
+          </Svg>
+        ) : (
+          <View style={{ height: h }} />
+        )}
+      </View>
+
+      <View className="px-4 py-2.5" style={{ borderTopWidth: 1, borderTopColor: palette.lineSubtle }}>
+        <Text className={text.micro} style={{ color: palette.inkFaint }}>
+          Crossings are projections onto the configured H / HH thresholds, not a predicted failure date.
+        </Text>
+      </View>
     </View>
+  );
+}
+
+function ForecastButton({ forecast, selected, onPress }: { forecast: MachinePredictionResult; selected: boolean; onPress: () => void }) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const colour = conditionColour(forecast.condition, isDark);
+  const hasDanger = forecast.estimatedTimeToDangerDays !== null;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      accessibilityLabel={`${forecast.faultName}, ${CONDITION_LABEL[forecast.condition]}, ${predictionListValue(forecast)}`}
+      className="border px-3 py-3"
+      style={({ pressed }) => ({
+        borderColor: selected ? alpha(colour, 0.55) : palette.line,
+        borderLeftColor: colour,
+        borderLeftWidth: 3,
+        backgroundColor: pressed ? palette.hover : selected ? palette.selected : palette.panelRaised,
+        borderRadius: radius.md,
+      })}
+    >
+      <View className="gap-2">
+        <View className="flex-row items-start justify-between gap-3">
+          <View className="min-w-0 flex-1 gap-1">
+            <Text className={text.code} style={{ color: palette.inkFaint }}>
+              {forecast.faultId}
+            </Text>
+            <Text numberOfLines={2} className={text.bodyStrong} style={{ color: palette.ink }}>
+              {forecast.faultName}
+            </Text>
+          </View>
+          <View className="items-end gap-0.5">
+            <Text className={text.data} style={[tabular, { color: hasDanger ? colour : palette.inkMuted }]}>
+              {predictionListValue(forecast)}
+            </Text>
+            {hasDanger ? (
+              <Text className={text.meta} style={{ color: palette.inkFaint }}>
+                to danger
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <Text numberOfLines={2} className={text.micro} style={{ color: palette.inkMuted }}>
+          {forecast.thresholdProjectionWording ?? forecast.predictionStatus}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 
@@ -501,50 +725,58 @@ function HealthyPrognosisState({
   model: MachinePrognosticsResult;
   isHealthySseDemo?: boolean;
 }) {
-  const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const stableSignals = signals.slice(0, 6).map((signal) => `${signal.label}: ${fmt(signal.value, signal.decimals)} ${signal.unit} stable`);
 
   if (isHealthySseDemo) return null;
 
+  const facts: Fact[] = [
+    { label: 'CURRENT CONDITION', value: 'HEALTHY', tone: 'healthy', note: runState ?? 'Running normally' },
+    { label: 'HISTORICAL PERIOD', value: '120', unit: 'days', note: 'Stable healthy operation' },
+    { label: 'DEGRADATION STATUS', value: 'NONE', note: 'No meaningful degradation detected' },
+    { label: 'TREND DIRECTION', value: 'STABLE' },
+    { label: 'DATA QUALITY', value: QUALITY_LABEL[dataQuality], note: `${signals.length} available measurements` },
+    { label: 'HISTORY SAMPLES', value: String(model.historySampleCount), note: model.sourceLabel },
+  ];
+
   return (
     <View className="gap-4">
       <Panel>
-        <View className="gap-4">
-          <View className="flex-row flex-wrap items-start justify-between gap-4">
-            <View className="min-w-0 flex-1 gap-2">
-              <StatusPill condition="healthy" />
-              <Text className={cn('font-heading-medium text-[24px]', inkClass)}>Stable healthy outlook</Text>
-              <Text className={cn('max-w-[820px] font-body text-[11px] leading-[17px]', mutedClass)}>
-                Current machine condition is healthy. No significant degradation forecast is available because the evidence does not
-                support an artificial threshold crossing or a future failure date.
-              </Text>
-            </View>
-            <Text className="font-mono text-[10px] font-bold tracking-wider text-accent">PROGNOSIS</Text>
-          </View>
-
-          <View className="flex-row flex-wrap gap-2">
-            <Kpi label="Current condition" value="HEALTHY" condition="healthy" note={runState ?? 'Running normally'} />
-            <Kpi label="Historical period" value="120" unit="days" note="Stable healthy operation" />
-            <Kpi label="Degradation status" value="NONE" note="No meaningful degradation detected" />
-            <Kpi label="Trend direction" value="STABLE" />
-            <Kpi label="Data quality" value={QUALITY_LABEL[dataQuality]} note={`${signals.length} available measurements`} />
-            <Kpi label="History samples" value={String(model.historySampleCount)} note={model.sourceLabel} />
-          </View>
+        <View className="gap-5">
+          <VerdictHeader
+            condition="healthy"
+            eyebrow="FUTURE DOCTOR / PROGNOSIS"
+            title="Stable healthy outlook"
+            detail="Current machine condition is healthy. No significant degradation forecast is available because the evidence does not support an artificial threshold crossing or a future failure date."
+          />
+          <FactStrip facts={facts} />
         </View>
       </Panel>
 
-      <View className="flex-row flex-wrap gap-4">
-        <DetailBox title="Forecast">
-          <BulletList items={HEALTHY_PROGNOSIS_POINTS} empty="No healthy forecast statement is available." />
-        </DetailBox>
-        <DetailBox title="Stable evidence">
-          <BulletList items={stableSignals} empty="No live sensor values are available for the prognosis." />
-        </DetailBox>
-        <DetailBox title="Plots shown">
-          <BulletList items={HEALTHY_PROGNOSIS_PLOTS} empty="No plot definitions are available." />
-        </DetailBox>
+      <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+        <EvidenceCard
+          title="Forecast"
+          caption="What the history does and does not support"
+          variant="success"
+          icon="chart-timeline-variant"
+          items={HEALTHY_PROGNOSIS_POINTS}
+          empty="No healthy forecast statement is available."
+        />
+        <EvidenceCard
+          title="Stable evidence"
+          caption="Live readings holding at the healthy baseline"
+          variant="success"
+          icon="pulse"
+          items={stableSignals}
+          empty="No live sensor values are available for the prognosis."
+        />
+        <EvidenceCard
+          title="Plots shown"
+          caption="What the prognosis draws for this machine"
+          variant="info"
+          icon="chart-line"
+          items={HEALTHY_PROGNOSIS_PLOTS}
+          empty="No plot definitions are available."
+        />
       </View>
     </View>
   );
@@ -571,10 +803,7 @@ export function MachineProDiagnosisPage({
   onRefresh,
 }: MachineProDiagnosisPageProps) {
   const { isDark } = useAppTheme();
-  const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
-  const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
-  const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
-  const conditionHex = conditionHexes(isDark);
+  const palette = consolePalette(isDark);
 
   const model = useMemo(() => prognostics ?? emptyPrognostics(), [prognostics]);
   const forecasts = model.predictions;
@@ -606,6 +835,15 @@ export function MachineProDiagnosisPage({
     [bestPrediction, isPredictionSseDemo],
   );
 
+  // The demo scripts put their own headline rows on the page verbatim. Where
+  // those are shown, the fact strip must not say the same three things again a
+  // hand's width lower — a fact repeated twice on one screen is a fact the
+  // reader stops trusting the position of.
+  const showsScriptRows = processRestrictionPrognosis || Boolean(bestPredictionGearboxDetails);
+  // Likewise the plot: the page-level forecast and the selected forecast are
+  // usually the same one, and two identical 400px charts is not two readings.
+  const detailPlotIsPageHero = Boolean(bestPredictionGearboxDetails) && selected?.predictionId === bestPrediction?.predictionId;
+
   const choose = (forecast: MachinePredictionResult) => {
     setSelectedId(forecast.predictionId);
     onSelectProblem?.(forecast.predictionId);
@@ -621,8 +859,79 @@ export function MachineProDiagnosisPage({
     );
   }, [forecasts, model.activeForecasts, selectedProblemId]);
 
+  const outlookFacts: Fact[] = bestPrediction
+    ? [
+        {
+          label: 'CURRENT CONDITION',
+          value: CONDITION_LABEL[condition].toLocaleUpperCase(),
+          tone: condition,
+          note: 'Predictive risk is separate from current condition',
+        },
+        ...(showsScriptRows ? [] : [{ label: 'PREDICTION STATUS', value: forecastStatusText(bestPrediction), wide: true }]),
+        {
+          label: 'PROJECTED ALERT',
+          value: bestPrediction.estimatedTimeToAlertDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToAlertDays),
+          unit: dayUnit(bestPrediction.estimatedTimeToAlertDays),
+          note: 'Configured threshold crossing, not a fault today',
+        },
+        {
+          label: 'PROJECTED DANGER',
+          value: bestPrediction.estimatedTimeToDangerDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToDangerDays),
+          unit: dayUnit(bestPrediction.estimatedTimeToDangerDays),
+          note: bestPrediction.faultName,
+          tone: bestPrediction.condition,
+        },
+        {
+          label: 'OPERATING TIME',
+          value: fmt(bestPrediction.operatingHoursToThreshold, 0),
+          unit: bestPrediction.operatingHoursToThreshold === null ? undefined : 'hours',
+          note: runState ?? 'Operating state duration not recorded',
+        },
+        { label: 'PREDICTION CONFIDENCE', value: fmt(bestPrediction.predictionConfidence, 0), unit: '%' },
+        {
+          label: 'DATA COVERAGE',
+          value: `${goodSignalCount}/${signals.length}`,
+          note: `${QUALITY_LABEL[dataQuality]} data quality`,
+        },
+      ]
+    : [];
+
+  const detailFacts: Fact[] = selected
+    ? [
+        { label: 'STATUS', value: selected.predictionStatus },
+        { label: 'PREDICTABILITY', value: selected.predictabilityClass },
+        { label: 'DIAGNOSTIC CONFIDENCE', value: fmt(selected.diagnosticConfidence, 0), unit: '%' },
+        { label: 'PREDICTION CONFIDENCE', value: fmt(selected.predictionConfidence, 0), unit: '%' },
+        { label: 'CURRENT / BASELINE', value: formatCurrentBaseline(selected) },
+        {
+          label: 'PROJECTED ALERT',
+          value: selected.estimatedTimeToAlertDays === null ? '--' : formatDayPhrase(selected.estimatedTimeToAlertDays),
+        },
+        { label: 'DEGRADATION RATE', value: formatSlope(selected.trendSlopePerDay), unit: '/ day' },
+        {
+          label: 'MODEL / FIT',
+          value: `${selected.modelType} / ${selected.modelFit === null ? '--' : `${fmt(selected.modelFit * 100, 0)}%`}`,
+        },
+        { label: 'PREDICTION RANGE', value: predictionRange(selected) },
+      ]
+    : [];
+
+  const advancedFacts: Fact[] = selected
+    ? [
+        { label: 'R² MODEL FIT', value: fmt(selected.modelFit, 3) },
+        { label: 'ROBUST SLOPE', value: fmt(selected.robustSlopePerDay, 4), unit: '/ day' },
+        { label: 'MONOTONICITY', value: fmt(selected.advanced.monotonicity, 2) },
+        {
+          label: 'VALIDATED RUL',
+          value: selected.functionalFailureValidated ? fmt(selected.estimatedTimeToFunctionalFailureDays, 0) : 'UNAVAILABLE',
+          unit: selected.functionalFailureValidated ? 'days' : undefined,
+          note: 'Only stated once a validated failure model exists',
+        },
+      ]
+    : [];
+
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 18 }}>
+    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
       <MachineHeader
         machineName={machineName}
         template={template}
@@ -641,227 +950,254 @@ export function MachineProDiagnosisPage({
         <HealthyPrognosisState signals={signals} dataQuality={dataQuality} runState={runState} model={model} isHealthySseDemo={isHealthySseDemo} />
       ) : (
         <>
-      <Panel>
-        <View className="gap-4">
-          <View className="flex-row flex-wrap items-start justify-between gap-4">
-            <View className="min-w-0 flex-1 gap-1">
-              <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">FUTURE DOCTOR</Text>
-              <Text className={cn('font-heading-medium text-[24px]', inkClass)}>Predictive maintenance outlook</Text>
-              <Text className={cn('max-w-[820px] font-body text-[11px] leading-[17px]', mutedClass)}>
-                Prognosis reads active problem groups as maintenance forecasts. It does not claim functional RUL unless the production data exposes a validated failure model.
-              </Text>
-            </View>
-            <View className="rounded-lg border px-3 py-2" style={{ borderColor: bestPrediction ? `${conditionHex[bestPrediction.condition]}66` : hairline }}>
-              <Text style={bestPrediction ? { color: conditionHex[bestPrediction.condition] } : undefined} className={cn('font-mono text-[10px] font-bold tracking-wider', !bestPrediction && mutedClass)}>
-                {model.sourceLabel}
-              </Text>
-            </View>
-          </View>
-
-          {bestPrediction ? (
-            <>
-              {processRestrictionPrognosis ? <PrognosisDocRows rows={FAULTY_SSE_PROGNOSIS_ROWS} /> : null}
-              {bestPredictionGearboxDetails ? (
-                <>
-                  <PrognosisDocRows rows={PREDICTIVE_SSE_PROGNOSIS_ROWS} valueTone="accent" />
-                  <DemoForecastPlot />
-                </>
-              ) : null}
-              <View className="flex-row flex-wrap gap-2">
-                <Kpi label="Current condition" value={CONDITION_LABEL[condition].toLocaleUpperCase()} condition={condition} note="Predictive risk is separate from current condition" />
-                {processRestrictionPrognosis ? (
-                  <Kpi label="Prediction Mode" value="Limited unless sufficient time history is available" />
-                ) : null}
-                {bestPredictionGearboxDetails ? (
-                  <>
-                    <Kpi label="Prediction Status" value={bestPredictionGearboxDetails.status} />
-                    <Kpi label="Prediction Target" value={bestPredictionGearboxDetails.target} />
-                  </>
-                ) : null}
-                <Kpi
-                  label="Projected Alert"
-                  value={bestPrediction.estimatedTimeToAlertDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToAlertDays)}
-                  unit={dayUnit(bestPrediction.estimatedTimeToAlertDays)}
-                  note="Configured threshold crossing, not a fault today"
-                />
-                <Kpi
-                  label="Projected Danger"
-                  value={bestPrediction.estimatedTimeToDangerDays === null ? '--' : formatDayNumber(bestPrediction.estimatedTimeToDangerDays)}
-                  unit={dayUnit(bestPrediction.estimatedTimeToDangerDays)}
-                  note={bestPrediction.faultName}
-                  condition={bestPrediction.condition}
-                />
-                <Kpi
-                  label="Operating time"
-                  value={fmt(bestPrediction.operatingHoursToThreshold, 0)}
-                  unit={bestPrediction.operatingHoursToThreshold === null ? undefined : 'hours'}
-                  note={runState ?? 'Operating state duration not recorded'}
-                />
-                <Kpi label="Prediction confidence" value={fmt(bestPrediction.predictionConfidence, 0)} unit="%" />
-                <Kpi label="Data coverage" value={`${goodSignalCount}/${signals.length}`} note={`${QUALITY_LABEL[dataQuality]} data quality`} />
-              </View>
-            </>
-          ) : (
-            <View className="items-center gap-1 rounded-lg border px-4 py-8" style={{ borderColor: hairline, borderStyle: 'dashed' }}>
-              <Text className={cn('font-body-medium text-[13px]', inkClass)}>
-                {model.enabled ? 'No credible threshold forecast' : 'Historical simulation is off'}
-              </Text>
-              <Text className={cn('text-center font-body text-[10px] leading-[15px]', mutedClass)}>
-                {model.enabled ? 'Signals remain under monitoring or need more history.' : 'Enable historical trend capture to generate prognostic data.'}
-              </Text>
-            </View>
-          )}
-        </View>
-      </Panel>
-
-      <View className="flex-row flex-wrap items-stretch gap-4">
-        <View style={FORECAST_LIST}>
-          <Panel fill>
-            <View className="gap-3">
-              <View className="flex-row items-start justify-between gap-2">
-                <View className="flex-1">
-                  <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">INDEPENDENT FORECASTS</Text>
-                  <Text className={cn('font-body-medium text-[11px] uppercase tracking-wider', mutedClass)}>Prediction library</Text>
-                  <Text className={cn('mt-1 font-mono text-[9px]', mutedClass)}>{activeForecasts} active / {forecasts.length} total</Text>
-                </View>
-              </View>
-
-              <View className="gap-2">
-                {forecasts.length > 0 ? (
-                  forecasts.map((forecast) => (
-                    <ForecastButton
-                      key={forecast.predictionId}
-                      forecast={forecast}
-                      selected={selected ? forecast.predictionId === selected.predictionId : false}
-                      onPress={() => choose(forecast)}
-                    />
-                  ))
-                ) : (
-                  <Text className={cn('font-body text-[10px] italic leading-[15px]', mutedClass)}>
-                    No prediction definitions are active for this machine snapshot.
-                  </Text>
-                )}
-              </View>
-            </View>
-          </Panel>
-        </View>
-
-        <View style={FORECAST_DETAIL}>
-          <Panel fill>
-            {selected ? (
+          <Panel>
             <View className="gap-5">
-              <View className="flex-row flex-wrap items-start justify-between gap-3">
-                <View className="min-w-0 flex-1 gap-1">
-                  <Text className="font-mono text-[9px] font-bold tracking-wider text-accent">
-                    PREDICTION / DISPLAY-READY PART 2 OUTPUT
-                  </Text>
-                  <Text className={cn('font-heading-medium text-[22px]', inkClass)}>{selected.faultName}</Text>
-                  <Text className={cn('font-mono text-[9px]', mutedClass)}>{selected.location.join(' / ')}</Text>
-                </View>
-                <StatusPill condition={selected.condition} />
-              </View>
-
-              <View className="flex-row flex-wrap gap-2">
-                <Kpi label="STATUS" value={selected.predictionStatus} />
-                <Kpi label="PREDICTABILITY" value={selected.predictabilityClass} />
-                <Kpi label="DIAGNOSIS" value={fmt(selected.diagnosticConfidence, 0)} unit="%" />
-                <Kpi label="PREDICTION" value={fmt(selected.predictionConfidence, 0)} unit="%" />
-              </View>
-
-              <View className="flex-row flex-wrap gap-2">
-                <Kpi label="CURRENT / BASELINE" value={formatCurrentBaseline(selected)} />
-                <Kpi
-                  label="PROJECTED ALERT"
-                  value={selected.estimatedTimeToAlertDays === null ? '--' : formatDayPhrase(selected.estimatedTimeToAlertDays)}
-                />
-                <Kpi label="DEGRADATION RATE" value={formatSlope(selected.trendSlopePerDay)} />
-                <Kpi label="MODEL / FIT" value={`${selected.modelType} / ${selected.modelFit === null ? '--' : `${fmt(selected.modelFit * 100, 0)}%`}`} />
-                <Kpi label="PREDICTION RANGE" value={predictionRange(selected)} />
-              </View>
-
-              <Section title="What Happens Next">
-                {processRestrictionPrognosis ? (
-                  <BulletList items={FAULTY_SSE_PROGNOSIS_WHAT} empty="No Demo 2 prognosis statement is available." />
-                ) : predictiveGearboxDetails ? (
-                  <BulletList items={PREDICTIVE_SSE_PROGNOSIS_WHAT} empty="No Demo 3 prognosis statement is available." />
-                ) : (
-                  <Text className={cn('font-body text-[12px] leading-[18px]', inkClass)}>
-                    {selected.thresholdProjectionWording ?? 'No defensible threshold horizon is currently available.'}
-                  </Text>
-                )}
-              </Section>
-
-              <View className="flex-row flex-wrap gap-2">
-                <DetailBox title="Maintenance plan">
-                  <View className="gap-2">
-                    <Text className={cn('font-body text-[11px] leading-[17px]', inkClass)}>
-                      Inspection: {selected.recommendedInspectionWindow ?? 'Continue monitoring'}
+              <VerdictHeader
+                condition={bestPrediction?.condition ?? condition}
+                eyebrow="FUTURE DOCTOR / PROGNOSIS"
+                title="Predictive maintenance outlook"
+                detail="Prognosis reads active problem groups as maintenance forecasts. It does not claim functional RUL unless the production data exposes a validated failure model."
+                action={
+                  <View
+                    className="border px-3 py-2"
+                    style={{
+                      borderColor: bestPrediction ? alpha(conditionColour(bestPrediction.condition, isDark), 0.4) : palette.line,
+                      borderRadius: radius.sm,
+                      backgroundColor: palette.panelRaised,
+                    }}
+                  >
+                    <Text className={text.label} style={{ color: palette.inkFaint }}>
+                      SOURCE
                     </Text>
-                    <Text className={cn('font-body text-[11px] leading-[17px]', inkClass)}>
-                      Maintenance: {selected.recommendedMaintenanceWindow ?? 'Not scheduled'}
+                    <Text
+                      className={cn('mt-1', text.chip)}
+                      style={{ color: bestPrediction ? conditionColour(bestPrediction.condition, isDark) : palette.inkMuted }}
+                    >
+                      {model.sourceLabel}
                     </Text>
                   </View>
-                </DetailBox>
-                <DetailBox title="Available inputs">
-                  <BulletList items={selected.availableInputs} empty="No production inputs are available for this forecast." />
-                </DetailBox>
-                <DetailBox title="Missing inputs">
-                  <BulletList items={selected.requiredAdditionalEvidence} empty="No expected inputs are missing." />
-                </DetailBox>
-              </View>
+                }
+              />
 
-              {processRestrictionPrognosis ? (
-                <View className="flex-row flex-wrap gap-2">
-                  <DetailBox title="Optional short-history display">
-                    <BulletList items={FAULTY_SSE_OPTIONAL_SHORT_HISTORY} empty="No optional short-history statement is available." />
-                  </DetailBox>
-                  <DetailBox title="Maintenance guidance shown">
-                    <BulletList items={FAULTY_SSE_MAINTENANCE_GUIDANCE} empty="No Demo 2 maintenance guidance is available." />
-                  </DetailBox>
+              {bestPrediction ? (
+                <>
+                  {processRestrictionPrognosis ? <DefinitionRows rows={FAULTY_SSE_PROGNOSIS_ROWS} tone="warning" /> : null}
+                  {bestPredictionGearboxDetails ? <DefinitionRows rows={PREDICTIVE_SSE_PROGNOSIS_ROWS} tone="accent" /> : null}
+                  {bestPredictionGearboxDetails ? <ForecastPlot /> : null}
+                  <FactStrip facts={outlookFacts} />
+                </>
+              ) : (
+                <View
+                  className="items-center gap-1.5 px-4 py-10"
+                  style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: palette.line, borderRadius: radius.md }}
+                >
+                  <Text className={text.title} style={{ color: palette.ink }}>
+                    {model.enabled ? 'No credible threshold forecast' : 'Historical simulation is off'}
+                  </Text>
+                  <Text className={cn('max-w-[520px] text-center', text.body)} style={{ color: palette.inkMuted }}>
+                    {model.enabled
+                      ? 'Signals remain under monitoring or need more history.'
+                      : 'Enable historical trend capture to generate prognostic data.'}
+                  </Text>
                 </View>
-              ) : null}
-
-              {predictiveGearboxDetails ? (
-                <View className="flex-row flex-wrap gap-2">
-                  <DetailBox title="Forecast overlay">
-                    <DemoForecastPlot />
-                  </DetailBox>
-                  <DetailBox title="Forecast plots shown">
-                    <BulletList items={predictivePlotBullets} empty="No Demo 3 forecast plot statement is available." />
-                  </DetailBox>
-                  <DetailBox title="Maintenance guidance shown">
-                    <BulletList items={PREDICTIVE_SSE_MAINTENANCE_GUIDANCE} empty="No Demo 3 maintenance guidance is available." />
-                  </DetailBox>
-                </View>
-              ) : null}
-
-              <Section title="Advanced Model Evidence">
-                <View className="flex-row flex-wrap gap-2">
-                  <Kpi label="R²" value={fmt(selected.modelFit, 3)} />
-                  <Kpi label="ROBUST SLOPE" value={fmt(selected.robustSlopePerDay, 4)} />
-                  <Kpi label="MONOTONICITY" value={fmt(selected.advanced.monotonicity, 2)} />
-                  <Kpi
-                    label="RUL"
-                    value={selected.functionalFailureValidated ? fmt(selected.estimatedTimeToFunctionalFailureDays, 0) : 'UNAVAILABLE'}
-                  />
-                </View>
-              </Section>
-
-              <Text className={cn('font-body text-[10px] leading-[15px]', mutedClass)}>
-                Threshold projection is not Remaining Useful Life. Functional-failure forecasts stay unavailable until a validated failure model exists.
-              </Text>
+              )}
             </View>
-            ) : (
-              <View className="items-center gap-1 px-4 py-16">
-                <Text className={cn('font-body-medium text-[13px]', inkClass)}>No credible threshold forecast</Text>
-                <Text className={cn('text-center font-body text-[10px] leading-[15px]', mutedClass)}>
-                  Signals remain under monitoring or need more history.
-                </Text>
-              </View>
-            )}
           </Panel>
-        </View>
-      </View>
+
+          <View className="flex-row flex-wrap items-stretch gap-4">
+            <View style={FORECAST_LIST}>
+              <Panel fill>
+                <View className="gap-3">
+                  <RegionHeading
+                    eyebrow="INDEPENDENT FORECASTS"
+                    title="Prediction library"
+                    trailing={<CountChip count={forecasts.length} suffix="total" />}
+                  />
+                  <Text className={text.micro} style={{ color: palette.inkFaint }}>
+                    {activeForecasts} of {forecasts.length} currently projecting a threshold crossing.
+                  </Text>
+
+                  <View className="gap-2">
+                    {forecasts.length > 0 ? (
+                      forecasts.map((forecast) => (
+                        <ForecastButton
+                          key={forecast.predictionId}
+                          forecast={forecast}
+                          selected={selected ? forecast.predictionId === selected.predictionId : false}
+                          onPress={() => choose(forecast)}
+                        />
+                      ))
+                    ) : (
+                      <Text className={text.body} style={{ color: palette.inkMuted }}>
+                        No prediction definitions are active for this machine snapshot.
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              </Panel>
+            </View>
+
+            <View style={FORECAST_DETAIL}>
+              <Panel fill>
+                {selected ? (
+                  <View className="gap-6">
+                    <View
+                      className="flex-row flex-wrap items-start justify-between gap-3 pb-5"
+                      style={{ borderBottomWidth: 1, borderBottomColor: palette.line }}
+                    >
+                      <View className="min-w-0 flex-1 gap-1.5">
+                        <Text className={text.label} style={{ color: palette.inkFaint }}>
+                          PREDICTION / DISPLAY-READY PART 2 OUTPUT
+                        </Text>
+                        <Text className="font-body-bold text-[22px] leading-[27px] tracking-[-0.03em]" style={{ color: palette.ink }}>
+                          {selected.faultName}
+                        </Text>
+                        <Text className={text.code} style={{ color: palette.inkMuted }}>
+                          {selected.location.join(' / ')}
+                        </Text>
+                      </View>
+                      <ConditionPill condition={selected.condition} />
+                    </View>
+
+                    <FactStrip facts={detailFacts} />
+
+                    <Region
+                      eyebrow="THRESHOLD PROJECTION"
+                      title="What happens next"
+                      trailing={
+                        processRestrictionPrognosis ? (
+                          <CountChip count={FAULTY_SSE_PROGNOSIS_WHAT.length} suffix="statements" />
+                        ) : predictiveGearboxDetails ? (
+                          <CountChip count={PREDICTIVE_SSE_PROGNOSIS_WHAT.length} suffix="statements" />
+                        ) : undefined
+                      }
+                    >
+                      {processRestrictionPrognosis ? (
+                        <Surface>
+                          <StatementList items={FAULTY_SSE_PROGNOSIS_WHAT} empty="No Demo 2 prognosis statement is available." />
+                        </Surface>
+                      ) : predictiveGearboxDetails ? (
+                        <Surface>
+                          <StatementList items={PREDICTIVE_SSE_PROGNOSIS_WHAT} empty="No Demo 3 prognosis statement is available." />
+                        </Surface>
+                      ) : (
+                        <Surface>
+                          <View className="py-3">
+                            <Text className={text.lede} style={{ color: palette.ink }}>
+                              {selected.thresholdProjectionWording ?? 'No defensible threshold horizon is currently available.'}
+                            </Text>
+                          </View>
+                        </Surface>
+                      )}
+                    </Region>
+
+                    {predictiveGearboxDetails && !detailPlotIsPageHero ? (
+                      <Region eyebrow="FORECAST OVERLAY" title="Measured history against the configured limits">
+                        <ForecastPlot />
+                      </Region>
+                    ) : null}
+
+                    <Region eyebrow="RECOMMENDED WINDOW" title="Maintenance plan">
+                      <DefinitionRows
+                        rows={[
+                          ['Inspection', selected.recommendedInspectionWindow ?? 'Continue monitoring'],
+                          ['Maintenance', selected.recommendedMaintenanceWindow ?? 'Not scheduled'],
+                        ]}
+                        tone="ink"
+                        labelWidth={110}
+                      />
+                    </Region>
+
+                    <View className="flex-row flex-wrap" style={{ gap: 12 }}>
+                      <EvidenceCard
+                        title="Available inputs"
+                        caption="What this forecast was actually computed from"
+                        variant="success"
+                        icon="database-outline"
+                        items={selected.availableInputs}
+                        empty="No production inputs are available for this forecast."
+                      />
+                      <EvidenceCard
+                        title="Missing inputs"
+                        caption="What would have to be measured to go further"
+                        variant="info"
+                        icon="clipboard-text-search-outline"
+                        items={selected.requiredAdditionalEvidence}
+                        empty="No expected inputs are missing."
+                      />
+                      {predictiveGearboxDetails ? (
+                        <EvidenceCard
+                          title="Maintenance guidance shown"
+                          caption="What the demo tells the operator to do"
+                          variant="warning"
+                          icon="wrench-outline"
+                          items={PREDICTIVE_SSE_MAINTENANCE_GUIDANCE}
+                          empty="No Demo 3 maintenance guidance is available."
+                        />
+                      ) : null}
+                      {processRestrictionPrognosis ? (
+                        <EvidenceCard
+                          title="Maintenance guidance shown"
+                          caption="What the demo tells the operator to do"
+                          variant="warning"
+                          icon="wrench-outline"
+                          items={FAULTY_SSE_MAINTENANCE_GUIDANCE}
+                          empty="No Demo 2 maintenance guidance is available."
+                        />
+                      ) : null}
+                    </View>
+
+                    {processRestrictionPrognosis ? (
+                      <Region
+                        eyebrow="IF SHORT HISTORY IS SUPPLIED"
+                        title="Optional short-history display"
+                        trailing={<CountChip count={FAULTY_SSE_OPTIONAL_SHORT_HISTORY.length} suffix="rows" />}
+                      >
+                        <Surface>
+                          <StatementList items={FAULTY_SSE_OPTIONAL_SHORT_HISTORY} empty="No optional short-history statement is available." />
+                        </Surface>
+                      </Region>
+                    ) : null}
+
+                    {predictiveGearboxDetails ? (
+                      <Region
+                        eyebrow="FORECAST PLOTS SHOWN"
+                        title="Plot specification"
+                        trailing={<CountChip count={PREDICTIVE_SSE_FORECAST_PLOTS.length} suffix="plots" />}
+                      >
+                        <Surface>
+                          <PlotSpecList rows={PREDICTIVE_SSE_FORECAST_PLOTS} />
+                        </Surface>
+                      </Region>
+                    ) : null}
+
+                    <Region eyebrow="MODEL DIAGNOSTICS" title="Advanced model evidence">
+                      <FactStrip facts={advancedFacts} />
+                    </Region>
+
+                    <View
+                      className="px-3 py-2.5"
+                      style={{ borderLeftWidth: 2, borderLeftColor: palette.warning, backgroundColor: palette.panelRaised }}
+                    >
+                      <Text className={text.micro} style={{ color: palette.inkMuted }}>
+                        Threshold projection is not Remaining Useful Life. Functional-failure forecasts stay unavailable until a validated failure
+                        model exists.
+                      </Text>
+                    </View>
+                  </View>
+                ) : (
+                  <View className="items-center gap-1.5 px-4 py-16">
+                    <Text className={text.title} style={{ color: palette.ink }}>
+                      No credible threshold forecast
+                    </Text>
+                    <Text className={cn('max-w-[420px] text-center', text.body)} style={{ color: palette.inkMuted }}>
+                      Signals remain under monitoring or need more history.
+                    </Text>
+                  </View>
+                )}
+              </Panel>
+            </View>
+          </View>
         </>
       )}
     </ScrollView>

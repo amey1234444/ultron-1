@@ -155,6 +155,14 @@ export function VerdictHeader({
 export type Fact = {
   label: string;
   value: string;
+  /** The unit the value is in — "days", "%", "hours". Set quietly beside it, never inside it. */
+  unit?: string;
+  /**
+   * One clause qualifying the value: what it is measured against, or what it is
+   * not. Small print under the cell — a note is never a second fact, and a cell
+   * that needs two facts is two cells.
+   */
+  note?: string;
   /** Tints the value. Left off, the value is plain ink — most of them should be. */
   tone?: OverviewCondition;
   /** Long prose values wrap instead of being clipped to one line. */
@@ -197,15 +205,27 @@ export function FactStrip({ facts }: { facts: Fact[] }) {
             <Text className={text.label} style={{ color: palette.inkFaint }} numberOfLines={1}>
               {fact.label}
             </Text>
-            <Text
-              className={fact.wide ? text.body : text.data}
-              style={[
-                fact.wide ? null : tabular,
-                { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink },
-              ]}
-            >
-              {fact.value}
-            </Text>
+            <View className="flex-row flex-wrap items-baseline gap-x-1.5">
+              <Text
+                className={fact.wide ? text.bodyStrong : text.data}
+                style={[
+                  fact.wide ? null : tabular,
+                  { color: fact.tone ? conditionColour(fact.tone, isDark) : palette.ink },
+                ]}
+              >
+                {fact.value}
+              </Text>
+              {fact.unit ? (
+                <Text className={text.meta} style={{ color: palette.inkMuted }}>
+                  {fact.unit}
+                </Text>
+              ) : null}
+            </View>
+            {fact.note ? (
+              <Text className={text.micro} style={{ color: palette.inkFaint }} numberOfLines={2}>
+                {fact.note}
+              </Text>
+            ) : null}
           </View>
         ))}
       </View>
@@ -262,11 +282,85 @@ export function StateTagGrid({
 }
 
 /**
+ * A statement list — the console's one way of setting "here are the things we
+ * found".
+ *
+ * This layer had two of these and neither worked. One was a column of "+" glyphs
+ * with the prose hung off them; the other was bare stacked paragraphs. Both fail
+ * the same way: ten equally weighted sentences with no edge between them read as
+ * a wall, and a reader cannot tell where the fourth item stops and the fifth
+ * begins without going back to the start. So every item gets an ordinal and a
+ * hairline. The ordinal is the part that earns its keep — evidence gets argued
+ * about out loud ("item 4 is the one I do not believe"), and a bullet cannot be
+ * named.
+ */
+export function StatementList({
+  items,
+  empty,
+  accent,
+  dense = false,
+}: {
+  items: readonly string[];
+  empty: string;
+  /** The colour of the ordinals. Defaults to the console accent. */
+  accent?: string;
+  /** Tighter rows, for a list inside a card rather than a list that is the region. */
+  dense?: boolean;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const rail = accent ?? palette.accent;
+
+  // "Nothing here" is a finding too, so it gets a stated shape rather than an
+  // absence: a dashed well says the question was asked and came back empty.
+  if (items.length === 0) {
+    return (
+      <View
+        className="flex-row items-center gap-2 px-3 py-3"
+        style={{ borderWidth: 1, borderStyle: 'dashed', borderColor: palette.line, borderRadius: radius.sm }}
+      >
+        <MaterialCommunityIcons name="minus-circle-outline" size={12} color={palette.inkFaint} />
+        <Text className={cn('min-w-0 flex-1', text.micro)} style={{ color: palette.inkMuted }}>
+          {empty}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View>
+      {items.map((item, index) => (
+        <View
+          key={item}
+          className={cn('flex-row items-start', dense ? 'gap-2.5 py-2' : 'gap-3 py-2.5')}
+          style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+        >
+          <Text
+            className={text.code}
+            style={[tabular, { color: alpha(rail, 0.85), width: 15, paddingTop: dense ? 1 : 2 }]}
+          >
+            {String(index + 1).padStart(2, '0')}
+          </Text>
+          <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.ink }}>
+            {item}
+          </Text>
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/**
  * One column of the evidence split.
  *
- * Carries its own count, so "contradicting evidence: none" is a stated result
- * rather than an empty area the reader has to interpret as either "nothing
- * found" or "not run".
+ * Three of these sit side by side and have to be told apart from across a
+ * control room, so each says what it is four times over: a coloured top rule, a
+ * glyph in a tinted well, the count, and the title. Colour alone would not
+ * survive greyscale; a glyph alone would not survive being 13px.
+ *
+ * The count sits on the card rather than being implied by the rows, so
+ * "contradicting evidence: 0" is a stated result. A reader must never have to
+ * decide whether an empty column means nothing was found or nothing was run.
  */
 export function EvidenceCard({
   title,
@@ -274,12 +368,15 @@ export function EvidenceCard({
   empty,
   variant,
   icon,
+  caption,
 }: {
   title: string;
   items: readonly string[];
   empty: string;
   variant: Variant;
   icon: IconName;
+  /** What this column is for, in one clause. Sits under the title, in small print. */
+  caption?: string;
 }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
@@ -288,48 +385,101 @@ export function EvidenceCard({
 
   return (
     <View
-      className="gap-3 border px-4 py-3.5"
+      className="overflow-hidden border"
       style={{
-        flexBasis: 280,
+        flexBasis: 300,
         flexGrow: 1,
-        minWidth: 260,
+        minWidth: 268,
         borderColor: palette.line,
-        borderLeftWidth: 3,
-        borderLeftColor: alpha(accent, 0.55),
         backgroundColor: palette.panelRaised,
         borderRadius: radius.md,
       }}
     >
-      <View className="flex-row items-center gap-2">
-        <MaterialCommunityIcons name={icon} size={13} color={accent} />
-        <Text className={cn('min-w-0 flex-1', text.title)} style={{ color: palette.ink }}>
-          {title}
-        </Text>
+      <View style={{ height: 2, backgroundColor: alpha(accent, 0.6) }} />
+
+      <View className="flex-row items-start gap-2.5 px-4 pb-3 pt-3.5">
         <View
-          className="px-1.5 py-[1px]"
-          style={{ backgroundColor: alpha(accent, 0.12), borderRadius: radius.sm }}
+          className="items-center justify-center"
+          style={{
+            width: 26,
+            height: 26,
+            borderRadius: radius.sm,
+            backgroundColor: alpha(accent, 0.12),
+            borderWidth: 1,
+            borderColor: alpha(accent, 0.26),
+          }}
         >
-          <Text className={text.code} style={[tabular, { color: accent }]}>
+          <MaterialCommunityIcons name={icon} size={14} color={accent} />
+        </View>
+        <View className="min-w-0 flex-1 gap-0.5">
+          <Text className={text.title} style={{ color: palette.ink }}>
+            {title}
+          </Text>
+          {caption ? (
+            <Text className={text.micro} style={{ color: palette.inkFaint }}>
+              {caption}
+            </Text>
+          ) : null}
+        </View>
+        <View className="px-2 py-[3px]" style={{ backgroundColor: alpha(accent, 0.12), borderRadius: radius.sm }}>
+          <Text className={text.data} style={[tabular, { color: accent }]}>
             {items.length}
           </Text>
         </View>
       </View>
-      {items.length > 0 ? (
-        <View className="gap-2">
-          {items.map((item) => (
-            <View key={item} className="flex-row items-start gap-2.5">
-              <View className="mt-[6px]" style={{ width: 4, height: 4, borderRadius: 2, backgroundColor: alpha(accent, 0.8) }} />
-              <Text className={cn('min-w-0 flex-1', text.body)} style={{ color: palette.inkMuted }}>
-                {item}
-              </Text>
-            </View>
-          ))}
+
+      <View
+        className="px-4 pb-3.5"
+        style={items.length > 0 ? { borderTopWidth: 1, borderTopColor: palette.lineSubtle } : undefined}
+      >
+        <StatementList items={items} empty={empty} accent={accent} dense />
+      </View>
+    </View>
+  );
+}
+
+/**
+ * A definition list: the demo scripts' "Current condition / Prediction status /
+ * Prediction target" rows.
+ *
+ * These used to be free-floating baseline-aligned rows with a hard 240px label
+ * column and no edges at all, which on a wide panel put the label and its value
+ * at opposite ends of a metre of empty space. Boxing them and hairlining between
+ * them is what makes each pair read as one statement instead of two.
+ */
+export function DefinitionRows({
+  rows,
+  tone = 'accent',
+  labelWidth = 190,
+}: {
+  rows: readonly (readonly [string, string])[];
+  tone?: 'accent' | 'warning' | 'critical' | 'ink';
+  labelWidth?: number;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+  const colour =
+    tone === 'warning' ? palette.warning : tone === 'critical' ? palette.critical : tone === 'ink' ? palette.ink : palette.accent;
+
+  return (
+    <View
+      className="overflow-hidden border"
+      style={{ borderColor: palette.line, borderRadius: radius.md, backgroundColor: palette.panelRaised }}
+    >
+      {rows.map(([label, value], index) => (
+        <View
+          key={label}
+          className="flex-row flex-wrap items-baseline gap-x-6 gap-y-1 px-4 py-3"
+          style={index === 0 ? undefined : { borderTopWidth: 1, borderTopColor: palette.lineSubtle }}
+        >
+          <Text className={text.label} style={{ color: palette.inkFaint, width: labelWidth }}>
+            {label.toLocaleUpperCase()}
+          </Text>
+          <Text className={cn('min-w-0 flex-1', text.bodyStrong)} style={{ color: colour }}>
+            {value}
+          </Text>
         </View>
-      ) : (
-        <Text className={text.body} style={{ color: palette.inkMuted }}>
-          {empty}
-        </Text>
-      )}
+      ))}
     </View>
   );
 }
