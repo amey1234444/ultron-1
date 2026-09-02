@@ -22,6 +22,7 @@ import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
+import { TwinScrewExtruder } from './TwinScrewExtruder';
 import { CanvasGrid, stageBoundsForCanvas, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
 import { TrendView } from './TrendView';
@@ -56,7 +57,7 @@ const ZOOM_STEP = 0.1;
 // Templates that render a dedicated SVG schematic instead of the generic
 // component canvas. They share one 1200×760 viewBox and one wrapper, so the
 // stage geometry (and therefore every saved trail anchor) is identical.
-const ARTWORK_TEMPLATES = new Set<string>(['Rotary Airlock Valve', 'Single Screw Extruder']);
+const ARTWORK_TEMPLATES = new Set<string>(['Rotary Airlock Valve', 'Single Screw Extruder', 'Twin Screw Extruder']);
 // That wrapper has a `p-6` (24px) pad between it and the actual SVG artwork;
 // subtract it so trail anchors line up with the drawing itself rather than the
 // padded box around it.
@@ -378,6 +379,8 @@ export function MachineWorkspace({
                 <RotaryAirlockValve />
               ) : machine.template === 'Single Screw Extruder' ? (
                 <SingleScrewExtruder connectorState={connectorState} />
+              ) : machine.template === 'Twin Screw Extruder' ? (
+                <TwinScrewExtruder connectorState={connectorState} />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}

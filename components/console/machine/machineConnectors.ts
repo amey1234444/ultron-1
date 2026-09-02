@@ -12,8 +12,9 @@
 // instruments the current model does not read, and they say so.
 
 import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
+import { TWIN_SCREW_POINT_REGISTRY } from '../../../lib/twinScrewExtruderPoints';
 
-/** Both machine artworks are drawn on one shared 1200×760 viewBox. */
+/** Every machine artwork is drawn on one shared 1200×760 viewBox. */
 const ARTWORK_WIDTH = 1200;
 const ARTWORK_HEIGHT = 760;
 
@@ -71,10 +72,12 @@ export const RAV_CONNECTOR_POINTS = [
 ] as const;
 
 const EXTRUDER_CONNECTOR_LIST: MachineConnector[] = EXTRUDER_POINT_REGISTRY.map(fromArtwork);
+const TWIN_SCREW_CONNECTOR_LIST: MachineConnector[] = TWIN_SCREW_POINT_REGISTRY.map(fromArtwork);
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map(fromArtwork);
 
 const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Single Screw Extruder': EXTRUDER_CONNECTOR_LIST,
+  'Twin Screw Extruder': TWIN_SCREW_CONNECTOR_LIST,
   'Rotary Airlock Valve': RAV_CONNECTOR_LIST,
 };
 
@@ -103,7 +106,7 @@ export type ConnectorState = 'idle' | 'linked' | 'live';
  * value in it — it is not a connection at all, and the canvas refuses it rather
  * than letting the analysis layer discover the contradiction later.
  */
-export type ParameterKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Electrical' | 'Level';
+export type ParameterKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Electrical' | 'Level' | 'Flow';
 
 /**
  * The quantity a unit denotes.
@@ -123,6 +126,9 @@ export function parameterKindForUnit(unit: string | undefined | null): Parameter
   if (['mpa', 'kpa', 'pa', 'bar', 'mbar', 'psi', 'kg/cm2'].includes(value)) return 'Pressure';
   if (['a', 'amp', 'amps', 'ma', 'kw', 'w', 'mw', 'v', 'kv', 'volt', 'volts', 'pf', 'kva', 'kvar'].includes(value)) return 'Electrical';
   if (['%', 'percent', 'pct', 'fraction'].includes(value)) return 'Level';
+  // Gravimetric feeder throughput. Tested after '%' so a rate expressed as a
+  // percentage of setpoint still reads as a level, which is what it is.
+  if (['kg/h', 'kg/hr', 'kgh', 'kg/min', 'g/min', 'lb/h', 'lb/hr', 't/h', 'kg/s'].includes(value)) return 'Flow';
   return null;
 }
 
@@ -144,6 +150,8 @@ export function parameterKindForConnector(connector: MachineConnector): Paramete
       return 'Electrical';
     case 'Level':
       return 'Level';
+    case 'Flow':
+      return 'Flow';
     default:
       return null;
   }
@@ -182,6 +190,8 @@ export function connectorExpectation(connector: MachineConnector): string {
       return 'an electrical channel (A or kW)';
     case 'Level':
       return 'a level channel (%)';
+    case 'Flow':
+      return 'a feed-rate channel (kg/h)';
     default:
       return 'a matching channel';
   }

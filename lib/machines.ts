@@ -1,4 +1,5 @@
 import { EXTRUDER_POINT_REGISTRY } from './extruderPoints';
+import { TWIN_SCREW_POINT_REGISTRY } from './twinScrewExtruderPoints';
 
 export const MACHINE_TEMPLATES = [
   'Centrifugal Pump',
@@ -10,6 +11,7 @@ export const MACHINE_TEMPLATES = [
   'Turbine',
   'Rotary Airlock Valve',
   'Single Screw Extruder',
+  'Twin Screw Extruder',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -17,7 +19,10 @@ export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
 export const COMPONENT_TYPES = ['Motor', 'Pump', 'Gearbox', 'Coupling', 'Bearing', 'Fan', 'Compressor', 'Custom Component'] as const;
 export type ComponentType = (typeof COMPONENT_TYPES)[number];
 
-export type MeasurementPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Power' | 'Level';
+// 'Flow' is the gravimetric-feeder quantity (kg/h): a twin screw meters its
+// material by rate, so a feed-rate point is neither a level nor a speed and
+// must not be locked to a channel reporting either.
+export type MeasurementPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Power' | 'Level' | 'Flow';
 
 // Point lifecycle per spec Flow 5 — starts Not Configured, ends at a live-view
 // state once mapped, commissioned, and streaming.
@@ -60,6 +65,12 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
   Turbine: [{ type: 'Custom Component', label: 'Turbine' }, { type: 'Coupling' }, { type: 'Compressor' }],
   'Rotary Airlock Valve': [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Custom Component', label: 'Rotor' }],
   'Single Screw Extruder': [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Gearbox' }, { type: 'Custom Component', label: 'Screw and Barrel' }],
+  'Twin Screw Extruder': [
+    { type: 'Motor' },
+    { type: 'Coupling' },
+    { type: 'Gearbox' },
+    { type: 'Custom Component', label: 'Twin Screws and Barrel' },
+  ],
   'Custom Machine': [],
 };
 
@@ -129,11 +140,68 @@ const EXTRUDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   },
 ];
 
+// Twin Screw Extruder — the full twin-screw sensor schedule, grouped the way the
+// machine is built and in the same order the default layout drops its cards
+// (drive train first, then feed, barrel and the die head).
+//
+// Unlike the single screw, no condition model consumes these yet; the registry
+// carries that fact per point, so the canvas says so when a channel lands on one
+// instead of implying a diagnosis that is not running.
+const twinScrewPointDefs = (codes: string[]): PointDef[] =>
+  TWIN_SCREW_POINT_REGISTRY.filter((point) => codes.includes(point.code)).map((point) => ({ label: point.label, kind: point.kind }));
+
+const TWIN_SCREW_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
+  {
+    type: 'Motor',
+    label: 'Drive',
+    points: twinScrewPointDefs(['MOTOR_NDE_VIB', 'MOTOR_TEMP', 'MOTOR_DE_VIB', 'MOTOR_POWER', 'MOTOR_RPM']),
+  },
+  {
+    type: 'Gearbox',
+    label: 'Gear Box',
+    points: twinScrewPointDefs(['GEARBOX_IN_VIB', 'GEARBOX_OUT1_VIB', 'GEARBOX_OUT2_VIB', 'GEARBOX_TEMP', 'THRUST_BRG_TEMP']),
+  },
+  {
+    type: 'Custom Component',
+    label: 'Main Feeder',
+    points: twinScrewPointDefs(['HOPPER_LEVEL', 'MAIN_FEED_RATE', 'MAIN_FEED_RPM', 'MAIN_FEED_CURR', 'FEED_THROAT_TEMP']),
+  },
+  {
+    type: 'Custom Component',
+    label: 'Side Feeder',
+    points: twinScrewPointDefs(['SIDE_FEED_RATE', 'SIDE_FEED_RPM', 'SIDE_FEED_CURR']),
+  },
+  {
+    type: 'Custom Component',
+    label: 'Twin Screws and Barrel',
+    points: twinScrewPointDefs([
+      'SCREW1_RPM',
+      'SCREW2_RPM',
+      'TZ_01',
+      'TZ_02',
+      'TZ_03',
+      'TZ_04',
+      'TZ_05',
+      'TZ_06',
+      'TZ_07',
+      'TZ_08',
+      'P_INT_01',
+      'P_INT_02',
+    ]),
+  },
+  {
+    type: 'Custom Component',
+    label: 'Vent and Die Head',
+    points: twinScrewPointDefs(['VENT_PRESSURE', 'VENT_TEMP', 'MELT_TEMP', 'P_SCR_IN', 'P_SCR_OUT']),
+  },
+];
+
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.
 const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
   'Rotary Airlock Valve': RAV_ANALYSIS_COMPONENTS,
   'Single Screw Extruder': EXTRUDER_ANALYSIS_COMPONENTS,
+  'Twin Screw Extruder': TWIN_SCREW_ANALYSIS_COMPONENTS,
 };
 
 /**

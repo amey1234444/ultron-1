@@ -695,7 +695,7 @@ function buildPrediction(
 function categoryForPredictivePoint(point: PointCondition): Issue['category'] {
   if (point.kind === 'Vibration') return 'mechanical';
   if (point.kind === 'Temperature' || point.kind === 'Current' || point.kind === 'Power') return 'electrical';
-  if (point.kind === 'Pressure' || point.kind === 'Speed' || point.kind === 'Level') return 'process';
+  if (point.kind === 'Pressure' || point.kind === 'Speed' || point.kind === 'Level' || point.kind === 'Flow') return 'process';
   return 'sensor';
 }
 

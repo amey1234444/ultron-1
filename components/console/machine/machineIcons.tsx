@@ -13,6 +13,7 @@ export const MACHINE_TEMPLATE_ICON: Record<MachineTemplate, keyof typeof Materia
   Turbine: 'turbine',
   'Rotary Airlock Valve': 'valve',
   'Single Screw Extruder': 'screw-machine-flat-top',
+  'Twin Screw Extruder': 'screw-machine-round-top',
   'Custom Machine': 'shape-outline',
 };
 

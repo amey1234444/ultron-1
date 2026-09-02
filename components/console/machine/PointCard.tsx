@@ -13,6 +13,7 @@ const UNIT_FOR_KIND: Record<MeasurementPointKind, string> = {
   Current: 'A',
   Power: 'kW',
   Level: '%',
+  Flow: 'kg/h',
 };
 
 const LIVE_STATUSES: MeasurementPointStatus[] = ['Connected', 'Warning', 'Alarm'];
@@ -29,6 +30,9 @@ const KIND_LETTER: Record<MeasurementPointKind, LiveKindLetter> = {
   // No dedicated level letter — 'X' is the generic 0-100 band, which is what a
   // hopper level percentage is anyway.
   Level: 'X',
+  // Feeder rate has no letter of its own either; it arrives on a Process Card,
+  // which is exactly what 'X' covers.
+  Flow: 'X',
 };
 
 // Green is reserved for a point that is actually carrying data. The setup

@@ -2,6 +2,7 @@ import type { ChannelRef } from '../../../lib/rack';
 import { RAV_CONNECTOR_POINTS } from './machineConnectors';
 import { MAPPABLE_BOX_HEIGHT, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { EXTRUDER_CONNECTORS } from './SingleScrewExtruder';
+import { TWIN_SCREW_CONNECTORS } from './TwinScrewExtruder';
 import type { Anchor, Box, SavedLayout, Trail } from './TrailBoard';
 
 const STAGE_W = 1600;
@@ -63,43 +64,56 @@ const RAV_TEMPLATE_POINTS: TemplatePoint[] = RAV_CONNECTOR_POINTS.flatMap((conne
 });
 
 /**
- * Single Screw Extruder — the anchors come from the artwork itself.
+ * The two extruders — the anchors come from the artwork itself.
  *
- * `EXTRUDER_CONNECTORS` is the list of instrument pads the drawing renders, so
- * importing it here means a trail can only ever land on a pad that exists. The
- * old copy of these coordinates drifted out of step with the drawing the first
- * time the machine was redrawn; there is now nothing to keep in step.
+ * `EXTRUDER_CONNECTORS` / `TWIN_SCREW_CONNECTORS` are the lists of instrument
+ * pads their drawings render, so importing them here means a trail can only ever
+ * land on a pad that exists. The old copy of these coordinates drifted out of
+ * step with the drawing the first time the machine was redrawn; there is now
+ * nothing to keep in step.
  */
-const EXTRUDER_LEFT_COLUMN = 232;
-const EXTRUDER_RIGHT_COLUMN = 1208;
+const COLUMN_LEFT = 232;
+const COLUMN_RIGHT = 1208;
 // A card's connector sits 30 above its top edge and the card is 104 tall, so
 // these are the first and last connector heights that keep a whole card inside
 // the reference canvas.
-const EXTRUDER_SLOT_TOP = 32;
-const EXTRUDER_SLOT_BOTTOM = REFERENCE_CANVAS_H - MAPPABLE_BOX_HEIGHT + 30 - 4;
+const SLOT_TOP = 32;
+const SLOT_BOTTOM = REFERENCE_CANVAS_H - MAPPABLE_BOX_HEIGHT + 30 - 4;
 
 /**
  * Card heights for one column, spread evenly over the usable height.
  *
  * The number of pads on a side is whatever the artwork declares, so the slots
  * are computed from that count rather than being a fixed list a new instrument
- * would silently wrap around and stack on top of an existing card.
+ * would silently wrap around and stack on top of an existing card. Past about
+ * eight cards a column packs tighter than the 104-tall card, and the stack
+ * reads as an ordered list to be dragged apart rather than a finished layout —
+ * which is what "Reset to template" is for.
  */
-function extruderSlots(count: number): number[] {
-  if (count <= 1) return [EXTRUDER_SLOT_TOP];
-  const step = (EXTRUDER_SLOT_BOTTOM - EXTRUDER_SLOT_TOP) / (count - 1);
-  return Array.from({ length: count }, (_, index) => Math.round(EXTRUDER_SLOT_TOP + index * step));
+function columnSlots(count: number): number[] {
+  if (count <= 1) return [SLOT_TOP];
+  const step = (SLOT_BOTTOM - SLOT_TOP) / (count - 1);
+  return Array.from({ length: count }, (_, index) => Math.round(SLOT_TOP + index * step));
 }
 
-const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = (() => {
-  const leftSlots = extruderSlots(EXTRUDER_CONNECTORS.filter((connector) => connector.side === 'left').length);
-  const rightSlots = extruderSlots(EXTRUDER_CONNECTORS.filter((connector) => connector.side === 'right').length);
+type ArtworkConnector = { code: string; label: string; side: 'left' | 'right'; x: number; y: number };
+
+/**
+ * One card column per side, in registry order.
+ *
+ * The pad decides which side it stacks on, so the drive-side instruments run
+ * down the left of the canvas and the process-side ones down the right — a
+ * trail never has to cross the machine to reach its card.
+ */
+function columnTemplatePoints(connectors: readonly ArtworkConnector[]): TemplatePoint[] {
+  const leftSlots = columnSlots(connectors.filter((connector) => connector.side === 'left').length);
+  const rightSlots = columnSlots(connectors.filter((connector) => connector.side === 'right').length);
   let leftSlot = 0;
   let rightSlot = 0;
-  return EXTRUDER_CONNECTORS.map((connector) => {
+  return connectors.map((connector) => {
     const left = connector.side === 'left';
     const slotY = left ? leftSlots[leftSlot++] : rightSlots[rightSlot++];
-    const column = left ? EXTRUDER_LEFT_COLUMN : EXTRUDER_RIGHT_COLUMN;
+    const column = left ? COLUMN_LEFT : COLUMN_RIGHT;
     return {
       code: connector.code,
       label: connector.label,
@@ -111,11 +125,15 @@ const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = (() => {
       bend: { x: left ? column + 96 : column - 96, y: slotY },
     };
   });
-})();
+}
+
+const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXTRUDER_CONNECTORS);
+const TWIN_SCREW_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(TWIN_SCREW_CONNECTORS);
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
   'Single Screw Extruder': EXTRUDER_TEMPLATE_POINTS,
+  'Twin Screw Extruder': TWIN_SCREW_TEMPLATE_POINTS,
 };
 
 function makeId(prefix: string) {

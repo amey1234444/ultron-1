@@ -287,7 +287,7 @@ const CATEGORY_FOR_RULE: Record<string, IssueCategory> = {
 function categoryForKind(kind: PointCondition['kind']): IssueCategory {
   if (kind === 'Vibration') return 'mechanical';
   if (kind === 'Temperature' || kind === 'Current' || kind === 'Power') return 'electrical';
-  if (kind === 'Pressure' || kind === 'Speed' || kind === 'Level') return 'process';
+  if (kind === 'Pressure' || kind === 'Speed' || kind === 'Level' || kind === 'Flow') return 'process';
   return 'sensor';
 }
 
