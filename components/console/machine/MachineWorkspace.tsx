@@ -55,8 +55,10 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.1;
 // Templates that render a dedicated SVG schematic instead of the generic
-// component canvas. They share one 1200×760 viewBox and one wrapper, so the
-// stage geometry (and therefore every saved trail anchor) is identical.
+// component canvas. They share one wrapper, but not one viewBox — the twin
+// screw is a wider machine and is drawn on its own frame. Trail anchors are
+// fractions of the measured machine rect, so each drawing's own viewBox is
+// converted per template (`artworkSizeForTemplate`) and never assumed here.
 const ARTWORK_TEMPLATES = new Set<string>(['Rotary Airlock Valve', 'Single Screw Extruder', 'Twin Screw Extruder']);
 // That wrapper has a `p-6` (24px) pad between it and the actual SVG artwork;
 // subtract it so trail anchors line up with the drawing itself rather than the

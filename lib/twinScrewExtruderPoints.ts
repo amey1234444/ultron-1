@@ -1,16 +1,18 @@
 /**
- * Canonical commissioning registry for the 1200 x 760 twin-screw extruder artwork.
+ * Twin-screw extruder connection points.
  *
- * Same contract as `extruderPoints.ts` for the single screw: one entry per
- * instrument the drawing physically renders, positioned at the spot on the
- * artwork where that instrument actually sits. The canvas snaps trail endpoints
- * to these, the artwork renders their wiring state, and the default trail layout
- * places its cards from the same list — so a card can never be wired to a place
- * the machine has no instrument.
+ * Coordinates are SVG user units inside the artwork's own `0 0 1440 700`
+ * viewBox — never percentages, never viewport units. The drawing is rendered
+ * with `preserveAspectRatio="xMidYMid meet"`, so the machine and its points
+ * scale as one object: resizing or zooming the canvas can never slide a marker
+ * off the feature it belongs to.
  *
- * The label set is the ULTRON twin-screw sensor schedule: motor, gearbox, twin
- * screws, main and side feeders, eight barrel zones, two intermediate melt
- * pressures, the vent, final melt, and the screen section.
+ * Geometry and sensor metadata are kept apart on purpose. This file is the only
+ * place a point's position is declared; the artwork renders a green dot at each
+ * one, the canvas snaps trail endpoints to them, and the default trail layout
+ * places its cards from the same list. Nothing here is drawn as text — `code`
+ * exists so the application can later attach gateway / rack / channel data to a
+ * point without touching the machine drawing.
  */
 export type TwinScrewPointKind =
   | 'Vibration'
@@ -23,23 +25,30 @@ export type TwinScrewPointKind =
   | 'Flow';
 
 export type TwinScrewPointDefinition = {
+  /** Stable id, used for channel mapping. Never rendered on the drawing. */
   code: string;
   label: string;
   kind: TwinScrewPointKind;
+  /** Position in the artwork's own SVG coordinate space (1440 x 700). */
   x: number;
   y: number;
+  /** Which card column this point's trail runs out to. */
   side: 'left' | 'right';
-  /** Signal tag a machine analysis model reads this pad as, when one does. */
+  /** Signal tag a machine analysis model reads this point as, when one does. */
   analyzerTag?: string;
-  /** Why no model consumes this pad, when none does. */
+  /** Why no model consumes this point, when none does. */
   analyzerNote?: string;
 };
 
+/** The artwork's viewBox. Anything mapping a point onto the canvas reads these. */
+export const TWIN_SCREW_ARTWORK_WIDTH = 1440;
+export const TWIN_SCREW_ARTWORK_HEIGHT = 700;
+
 /**
- * No twin-screw condition model has been commissioned yet, so no pad carries an
- * `analyzerTag`. That is stated per section rather than left blank: the canvas
- * shows this note when a channel lands on a pad, and "recorded but not modelled"
- * is a different thing from "wired wrong".
+ * No twin-screw condition model has been commissioned yet, so no point carries
+ * an `analyzerTag`. That is stated per section rather than left blank: the
+ * canvas shows this note when a channel lands on a point, and "recorded but not
+ * modelled" is a different thing from "wired wrong".
  */
 const NOT_MODELLED = {
   drive:
@@ -51,54 +60,60 @@ const NOT_MODELLED = {
 } as const;
 
 export const TWIN_SCREW_POINT_REGISTRY: readonly TwinScrewPointDefinition[] = [
-  // Motor — fan (non-drive) end, housing, drive-end bracket, terminal box, shaft.
-  { code: 'MOTOR_NDE_VIB', label: 'Motor Non-Drive-End Vibration', kind: 'Vibration', x: 66, y: 545, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'MOTOR_TEMP', label: 'Motor Temperature', kind: 'Temperature', x: 100, y: 578, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'MOTOR_DE_VIB', label: 'Motor Drive-End Vibration', kind: 'Vibration', x: 205, y: 545, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'MOTOR_POWER', label: 'Motor Current / Power', kind: 'Power', x: 137, y: 462, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'MOTOR_RPM', label: 'Motor Speed', kind: 'Speed', x: 240, y: 545, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  // Gearbox — input bearing housing on the drive axis, the two output bearing
-  // housings on the two screw axes, and the oil sight glass.
-  { code: 'GEARBOX_IN_VIB', label: 'Gearbox Input-Side Vibration', kind: 'Vibration', x: 318, y: 545, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'GEARBOX_OUT1_VIB', label: 'Gearbox Output-1 Vibration', kind: 'Vibration', x: 434, y: 422, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'GEARBOX_OUT2_VIB', label: 'Gearbox Output-2 Vibration', kind: 'Vibration', x: 434, y: 474, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'GEARBOX_TEMP', label: 'Gearbox Temperature', kind: 'Temperature', x: 350, y: 566, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  // Thrust box — the twin-screw thrust bearing, and the two screw-speed pickups
-  // on the output shafts as they leave it into the barrel.
-  { code: 'THRUST_BRG_TEMP', label: 'Thrust Bearing Temperature', kind: 'Temperature', x: 467, y: 334, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'SCREW1_RPM', label: 'Screw 1 Speed', kind: 'Speed', x: 466, y: 422, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  { code: 'SCREW2_RPM', label: 'Screw 2 Speed', kind: 'Speed', x: 466, y: 474, side: 'left', analyzerNote: NOT_MODELLED.drive },
-  // Feed throat, then the four upstream barrel zones — all on the drive half of
-  // the machine, so their cards stack on the drive-side column.
-  { code: 'FEED_THROAT_TEMP', label: 'Feed Throat Temperature', kind: 'Temperature', x: 503, y: 344, side: 'left', analyzerNote: NOT_MODELLED.barrel },
-  { code: 'TZ_01', label: 'Barrel Temperature Zone 1', kind: 'Temperature', x: 580, y: 566, side: 'left', analyzerNote: NOT_MODELLED.barrel },
-  { code: 'TZ_02', label: 'Barrel Temperature Zone 2', kind: 'Temperature', x: 641, y: 566, side: 'left', analyzerNote: NOT_MODELLED.barrel },
-  { code: 'TZ_03', label: 'Barrel Temperature Zone 3', kind: 'Temperature', x: 703, y: 566, side: 'left', analyzerNote: NOT_MODELLED.barrel },
-  { code: 'TZ_04', label: 'Barrel Temperature Zone 4', kind: 'Temperature', x: 764, y: 566, side: 'left', analyzerNote: NOT_MODELLED.barrel },
-  // Main hopper and its gravimetric feeder.
-  { code: 'HOPPER_LEVEL', label: 'Main Hopper Level', kind: 'Level', x: 610, y: 180, side: 'right', analyzerNote: NOT_MODELLED.feed },
-  { code: 'MAIN_FEED_RATE', label: 'Main Feeder Rate', kind: 'Flow', x: 605, y: 274, side: 'right', analyzerNote: NOT_MODELLED.feed },
-  { code: 'MAIN_FEED_RPM', label: 'Main Feeder Speed', kind: 'Speed', x: 605, y: 306, side: 'right', analyzerNote: NOT_MODELLED.feed },
-  { code: 'MAIN_FEED_CURR', label: 'Main Feeder Motor Current', kind: 'Current', x: 605, y: 338, side: 'right', analyzerNote: NOT_MODELLED.feed },
-  // Side feeder / stuffer, on its own drive module beside the barrel.
-  { code: 'SIDE_FEED_RATE', label: 'Side Feeder Rate', kind: 'Flow', x: 670, y: 268, side: 'right', analyzerNote: NOT_MODELLED.feed },
-  { code: 'SIDE_FEED_RPM', label: 'Side Feeder Speed', kind: 'Speed', x: 670, y: 296, side: 'right', analyzerNote: NOT_MODELLED.feed },
-  { code: 'SIDE_FEED_CURR', label: 'Side Feeder Motor Current', kind: 'Current', x: 670, y: 324, side: 'right', analyzerNote: NOT_MODELLED.feed },
-  // Intermediate melt pressure — one transducer each side of the side-feed port.
-  { code: 'P_INT_01', label: 'Intermediate Melt Pressure 1', kind: 'Pressure', x: 700, y: 344, side: 'right', analyzerNote: NOT_MODELLED.process },
-  { code: 'P_INT_02', label: 'Intermediate Melt Pressure 2', kind: 'Pressure', x: 866, y: 344, side: 'right', analyzerNote: NOT_MODELLED.process },
-  { code: 'TZ_05', label: 'Barrel Temperature Zone 5', kind: 'Temperature', x: 826, y: 566, side: 'right', analyzerNote: NOT_MODELLED.barrel },
-  { code: 'TZ_06', label: 'Barrel Temperature Zone 6', kind: 'Temperature', x: 887, y: 566, side: 'right', analyzerNote: NOT_MODELLED.barrel },
-  { code: 'TZ_07', label: 'Barrel Temperature Zone 7', kind: 'Temperature', x: 949, y: 566, side: 'right', analyzerNote: NOT_MODELLED.barrel },
-  { code: 'TZ_08', label: 'Barrel Temperature Zone 8', kind: 'Temperature', x: 1010, y: 566, side: 'right', analyzerNote: NOT_MODELLED.barrel },
-  // Vent / devolatilisation — vacuum line pressure, and the vent-zone melt
-  // thermocouple in the barrel wall beside the vent port.
-  { code: 'VENT_PRESSURE', label: 'Vent / Vacuum Pressure', kind: 'Pressure', x: 930, y: 198, side: 'right', analyzerNote: NOT_MODELLED.process },
-  { code: 'VENT_TEMP', label: 'Vent Zone Temperature', kind: 'Temperature', x: 974, y: 331, side: 'right', analyzerNote: NOT_MODELLED.process },
-  // Final melt and screen section, in the adapter and screen-changer body.
-  { code: 'MELT_TEMP', label: 'Melt Temperature', kind: 'Temperature', x: 1052, y: 344, side: 'right', analyzerNote: NOT_MODELLED.process },
-  { code: 'P_SCR_IN', label: 'Screen Inlet Melt Pressure', kind: 'Pressure', x: 1080, y: 344, side: 'right', analyzerNote: NOT_MODELLED.process },
-  { code: 'P_SCR_OUT', label: 'Screen Outlet Melt Pressure', kind: 'Pressure', x: 1106, y: 344, side: 'right', analyzerNote: NOT_MODELLED.process },
+  // MOTOR
+  { code: 'motor-nde-vib', label: 'Motor Non-Drive-End Vibration', kind: 'Vibration', x: 88, y: 444, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'motor-current-power', label: 'Motor Current / Power', kind: 'Power', x: 197, y: 370, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'motor-temp', label: 'Motor Temperature', kind: 'Temperature', x: 236, y: 370, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'motor-de-vib', label: 'Motor Drive-End Vibration', kind: 'Vibration', x: 306, y: 443, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'motor-rpm', label: 'Motor Speed', kind: 'Speed', x: 266, y: 483, side: 'left', analyzerNote: NOT_MODELLED.drive },
+
+  // GEARBOX
+  { code: 'gearbox-in-vib', label: 'Gearbox Input-Side Vibration', kind: 'Vibration', x: 382, y: 375, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'gearbox-temp', label: 'Gearbox Temperature', kind: 'Temperature', x: 470, y: 300, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'gearbox-out-1-vib', label: 'Gearbox Output-1 Vibration', kind: 'Vibration', x: 551, y: 377, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'gearbox-out-2-vib', label: 'Gearbox Output-2 Vibration', kind: 'Vibration', x: 528, y: 570, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'thrust-bearing-temp', label: 'Thrust Bearing Temperature', kind: 'Temperature', x: 455, y: 570, side: 'left', analyzerNote: NOT_MODELLED.drive },
+
+  // SCREW DRIVE
+  { code: 'screw-1-rpm', label: 'Screw 1 Speed', kind: 'Speed', x: 621, y: 449, side: 'left', analyzerNote: NOT_MODELLED.drive },
+  { code: 'screw-2-rpm', label: 'Screw 2 Speed', kind: 'Speed', x: 621, y: 499, side: 'left', analyzerNote: NOT_MODELLED.drive },
+
+  // FEED THROAT AND THE UPSTREAM BARREL ZONES
+  { code: 'feed-throat-temp', label: 'Feed Throat Temperature', kind: 'Temperature', x: 678, y: 366, side: 'left', analyzerNote: NOT_MODELLED.barrel },
+  { code: 'tz-01', label: 'Barrel Temperature Zone 1', kind: 'Temperature', x: 752, y: 407, side: 'left', analyzerNote: NOT_MODELLED.barrel },
+  { code: 'tz-02', label: 'Barrel Temperature Zone 2', kind: 'Temperature', x: 808, y: 407, side: 'left', analyzerNote: NOT_MODELLED.barrel },
+  { code: 'tz-03', label: 'Barrel Temperature Zone 3', kind: 'Temperature', x: 864, y: 407, side: 'left', analyzerNote: NOT_MODELLED.barrel },
+  { code: 'tz-04', label: 'Barrel Temperature Zone 4', kind: 'Temperature', x: 920, y: 407, side: 'left', analyzerNote: NOT_MODELLED.barrel },
+
+  // MAIN HOPPER AND ITS GRAVIMETRIC FEEDER
+  { code: 'hopper-level', label: 'Main Hopper Level', kind: 'Level', x: 726, y: 142, side: 'right', analyzerNote: NOT_MODELLED.feed },
+  { code: 'main-feed-rate', label: 'Main Feeder Rate', kind: 'Flow', x: 717, y: 239, side: 'right', analyzerNote: NOT_MODELLED.feed },
+  { code: 'main-feed-rpm', label: 'Main Feeder Speed', kind: 'Speed', x: 709, y: 268, side: 'right', analyzerNote: NOT_MODELLED.feed },
+  { code: 'main-feed-current', label: 'Main Feeder Motor Current', kind: 'Current', x: 700, y: 296, side: 'right', analyzerNote: NOT_MODELLED.feed },
+
+  // SIDE FEEDER
+  { code: 'side-feed-rate', label: 'Side Feeder Rate', kind: 'Flow', x: 969, y: 290, side: 'right', analyzerNote: NOT_MODELLED.feed },
+  { code: 'side-feed-rpm', label: 'Side Feeder Speed', kind: 'Speed', x: 969, y: 322, side: 'right', analyzerNote: NOT_MODELLED.feed },
+  { code: 'side-feed-current', label: 'Side Feeder Motor Current', kind: 'Current', x: 969, y: 350, side: 'right', analyzerNote: NOT_MODELLED.feed },
+
+  // INTERMEDIATE PROCESS PRESSURE
+  { code: 'p-int-01', label: 'Intermediate Melt Pressure 1', kind: 'Pressure', x: 838, y: 557, side: 'right', analyzerNote: NOT_MODELLED.process },
+  { code: 'p-int-02', label: 'Intermediate Melt Pressure 2', kind: 'Pressure', x: 1065, y: 557, side: 'right', analyzerNote: NOT_MODELLED.process },
+
+  // DOWNSTREAM BARREL ZONES
+  { code: 'tz-05', label: 'Barrel Temperature Zone 5', kind: 'Temperature', x: 1037, y: 407, side: 'right', analyzerNote: NOT_MODELLED.barrel },
+  { code: 'tz-06', label: 'Barrel Temperature Zone 6', kind: 'Temperature', x: 1098, y: 407, side: 'right', analyzerNote: NOT_MODELLED.barrel },
+  { code: 'tz-07', label: 'Barrel Temperature Zone 7', kind: 'Temperature', x: 1160, y: 407, side: 'right', analyzerNote: NOT_MODELLED.barrel },
+  { code: 'tz-08', label: 'Barrel Temperature Zone 8', kind: 'Temperature', x: 1287, y: 407, side: 'right', analyzerNote: NOT_MODELLED.barrel },
+
+  // VENT / DEVOLATILISATION
+  { code: 'vent-pressure', label: 'Vent / Vacuum Pressure', kind: 'Pressure', x: 1238, y: 290, side: 'right', analyzerNote: NOT_MODELLED.process },
+  { code: 'vent-temp', label: 'Vent Zone Temperature', kind: 'Temperature', x: 1252, y: 341, side: 'right', analyzerNote: NOT_MODELLED.process },
+
+  // FINAL MELT AND SCREEN SECTION
+  { code: 'melt-temp', label: 'Melt Temperature', kind: 'Temperature', x: 1330, y: 449, side: 'right', analyzerNote: NOT_MODELLED.process },
+  { code: 'p-screw-in', label: 'Screen Inlet Melt Pressure', kind: 'Pressure', x: 1308, y: 557, side: 'right', analyzerNote: NOT_MODELLED.process },
+  { code: 'p-screw-out', label: 'Screen Outlet Melt Pressure', kind: 'Pressure', x: 1364, y: 557, side: 'right', analyzerNote: NOT_MODELLED.process },
 ] as const;
 
 export function twinScrewPointByCode(code: string | undefined): TwinScrewPointDefinition | undefined {

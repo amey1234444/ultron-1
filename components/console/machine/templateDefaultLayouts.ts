@@ -1,5 +1,5 @@
 import type { ChannelRef } from '../../../lib/rack';
-import { RAV_CONNECTOR_POINTS } from './machineConnectors';
+import { artworkSizeForTemplate, RAV_CONNECTOR_POINTS } from './machineConnectors';
 import { MAPPABLE_BOX_HEIGHT, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { EXTRUDER_CONNECTORS } from './SingleScrewExtruder';
 import { TWIN_SCREW_CONNECTORS } from './TwinScrewExtruder';
@@ -14,10 +14,9 @@ const REFERENCE_CANVAS_H = 820;
 const REFERENCE_STAGE_SCALE = Math.min(STAGE_W / REFERENCE_CANVAS_W, STAGE_H / REFERENCE_CANVAS_H);
 const REFERENCE_STAGE_X = (STAGE_W - REFERENCE_CANVAS_W * REFERENCE_STAGE_SCALE) / 2;
 const REFERENCE_STAGE_Y = (STAGE_H - REFERENCE_CANVAS_H * REFERENCE_STAGE_SCALE) / 2;
-// Both machine artworks share one 1200×760 viewBox, so anchors below are read
-// straight off the SVG drawing and converted to fractions of the machine rect.
-const SVG_W = 1200;
-const SVG_H = 760;
+// Anchors below are read straight off each SVG drawing and converted to
+// fractions of the machine rect, so the viewBox a drawing happens to use is
+// local to that drawing — `artworkSizeForTemplate` supplies it per template.
 const BOX_CONNECTOR_GAP = 8;
 const BOX_CONNECTOR_Y_OFFSET = -2.5;
 
@@ -140,8 +139,8 @@ function makeId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function machineAnchor(sx: number, sy: number): Anchor {
-  return { rx: sx / SVG_W, ry: sy / SVG_H };
+function machineAnchor(sx: number, sy: number, artwork: { width: number; height: number }): Anchor {
+  return { rx: sx / artwork.width, ry: sy / artwork.height };
 }
 
 function stageFromReference(point: ReferencePoint) {
@@ -200,9 +199,10 @@ export function createTemplateDefaultLayout(
   if (!templatePoints) return { trails: [], boxes: [] };
 
   const rect = machineRect ?? REFERENCE_MACHINE_RECT;
+  const artwork = artworkSizeForTemplate(machineTemplate);
   const svgToStage = (sx: number, sy: number) => ({
-    x: rect.x + (sx / SVG_W) * rect.width,
-    y: rect.y + (sy / SVG_H) * rect.height,
+    x: rect.x + (sx / artwork.width) * rect.width,
+    y: rect.y + (sy / artwork.height) * rect.height,
   });
 
   const trails: Trail[] = [];
@@ -221,7 +221,7 @@ export function createTemplateDefaultLayout(
     trails.push({
       id: makeId('trail'),
       points: [machineEnd, ...bends, boxEnd],
-      startMachineAnchor: machineAnchor(sx, sy),
+      startMachineAnchor: machineAnchor(sx, sy, artwork),
       // The generated trail lands on a real instrument pad, so it says which
       // one — a template connection and a hand-drawn one are then the same
       // kind of thing to everything downstream.

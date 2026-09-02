@@ -12,11 +12,31 @@
 // instruments the current model does not read, and they say so.
 
 import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
-import { TWIN_SCREW_POINT_REGISTRY } from '../../../lib/twinScrewExtruderPoints';
+import {
+  TWIN_SCREW_ARTWORK_HEIGHT,
+  TWIN_SCREW_ARTWORK_WIDTH,
+  TWIN_SCREW_POINT_REGISTRY,
+} from '../../../lib/twinScrewExtruderPoints';
 
-/** Every machine artwork is drawn on one shared 1200×760 viewBox. */
-const ARTWORK_WIDTH = 1200;
-const ARTWORK_HEIGHT = 760;
+/**
+ * The viewBox each artwork is drawn on.
+ *
+ * The Rotary Airlock Valve and the Single Screw Extruder share a 1200×760
+ * frame; the Twin Screw Extruder is a wider machine and is drawn on its own
+ * 1440×700 frame. A point is converted to a fraction of *its own* artwork, so
+ * the frame a drawing chooses never leaks into another machine's anchors.
+ */
+export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {
+  'Rotary Airlock Valve': { width: 1200, height: 760 },
+  'Single Screw Extruder': { width: 1200, height: 760 },
+  'Twin Screw Extruder': { width: TWIN_SCREW_ARTWORK_WIDTH, height: TWIN_SCREW_ARTWORK_HEIGHT },
+};
+
+const DEFAULT_ARTWORK = { width: 1200, height: 760 };
+
+export function artworkSizeForTemplate(machineTemplate: string) {
+  return ARTWORK_SIZE[machineTemplate] ?? DEFAULT_ARTWORK;
+}
 
 export type MachineConnector = {
   code: string;
@@ -32,21 +52,24 @@ export type MachineConnector = {
   analyzerNote?: string;
 };
 
-function fromArtwork(point: {
-  code: string;
-  label: string;
-  kind?: string;
-  x: number;
-  y: number;
-  analyzerTag?: string;
-  analyzerNote?: string;
-}): MachineConnector {
+function fromArtwork(
+  point: {
+    code: string;
+    label: string;
+    kind?: string;
+    x: number;
+    y: number;
+    analyzerTag?: string;
+    analyzerNote?: string;
+  },
+  artwork: { width: number; height: number },
+): MachineConnector {
   return {
     code: point.code,
     label: point.label,
     kind: point.kind,
-    rx: point.x / ARTWORK_WIDTH,
-    ry: point.y / ARTWORK_HEIGHT,
+    rx: point.x / artwork.width,
+    ry: point.y / artwork.height,
     analyzerTag: point.analyzerTag,
     analyzerNote: point.analyzerNote,
   };
@@ -71,9 +94,15 @@ export const RAV_CONNECTOR_POINTS = [
   { code: 'T2', label: 'NDE Bearing Temperature', kind: 'Temperature', x: 700, y: 522, analyzerTag: 'nde_bearing_temperature' },
 ] as const;
 
-const EXTRUDER_CONNECTOR_LIST: MachineConnector[] = EXTRUDER_POINT_REGISTRY.map(fromArtwork);
-const TWIN_SCREW_CONNECTOR_LIST: MachineConnector[] = TWIN_SCREW_POINT_REGISTRY.map(fromArtwork);
-const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map(fromArtwork);
+const EXTRUDER_CONNECTOR_LIST: MachineConnector[] = EXTRUDER_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Single Screw Extruder']),
+);
+const TWIN_SCREW_CONNECTOR_LIST: MachineConnector[] = TWIN_SCREW_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Twin Screw Extruder']),
+);
+const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
+);
 
 const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Single Screw Extruder': EXTRUDER_CONNECTOR_LIST,
