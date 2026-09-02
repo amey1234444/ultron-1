@@ -97,9 +97,18 @@ export const RAV_CONNECTOR_POINTS = [
 const EXTRUDER_CONNECTOR_LIST: MachineConnector[] = EXTRUDER_POINT_REGISTRY.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Single Screw Extruder']),
 );
-const TWIN_SCREW_CONNECTOR_LIST: MachineConnector[] = TWIN_SCREW_POINT_REGISTRY.map((point) =>
-  fromArtwork(point, ARTWORK_SIZE['Twin Screw Extruder']),
-);
+/**
+ * Twin-screw pads, derived from the registry rather than restated.
+ *
+ * Each entry carries the machine's canonical tag as well as its position, so
+ * the connection confirmation can say what signal a channel just became — and,
+ * where no commissioned rule reads it, why not.
+ */
+const TWIN_SCREW_CONNECTOR_LIST: MachineConnector[] = TWIN_SCREW_POINT_REGISTRY.map((point) => ({
+  ...fromArtwork(point, ARTWORK_SIZE['Twin Screw Extruder']),
+  analyzerTag: point.modelStatus === 'modelled' ? point.analyzerTag : undefined,
+  analyzerNote: point.analyzerNote,
+}));
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
 );

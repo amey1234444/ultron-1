@@ -17,6 +17,7 @@ import Svg, {
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
+import { MeasurementPad, padStateLabel } from './MeasurementPad';
 
 type SingleScrewExtruderProps = {
   className?: string;
@@ -629,23 +630,16 @@ export function SingleScrewExtruder({
             the states survive greyscale and colour-blindness. */}
         {EXTRUDER_CONNECTORS.map((connector) => {
           const state = connectorState?.[connector.code] ?? 'idle';
-          const wired = state !== 'idle';
-          const live = state === 'live';
           return (
-            <G key={connector.code}>
-              {live && <Circle cx={connector.x} cy={connector.y} r={12} fill={colours.accent} opacity={0.16} />}
-              <Circle cx={connector.x} cy={connector.y} r={9} fill={colours.accent} opacity={wired ? 0.18 : 0.08} />
-              <Circle
-                cx={connector.x}
-                cy={connector.y}
-                r={5}
-                fill={wired ? colours.accent : colours.panel}
-                stroke={wired ? colours.panel : colours.accent}
-                strokeWidth={wired ? 1.4 : 1.6}
-                opacity={wired ? 1 : 0.75}
-              />
-              {wired && <Circle cx={connector.x} cy={connector.y} r={2} fill="#ffffff" opacity={0.82} />}
-            </G>
+            <MeasurementPad
+              key={connector.code}
+              x={connector.x}
+              y={connector.y}
+              state={state}
+              accent={colours.accent}
+              panel={colours.panel}
+              label={`${connector.label} — ${padStateLabel(state)}`}
+            />
           );
         })}
 

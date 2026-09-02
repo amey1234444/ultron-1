@@ -1,5 +1,9 @@
 import { EXTRUDER_POINT_REGISTRY } from './extruderPoints';
-import { TWIN_SCREW_POINT_REGISTRY } from './twinScrewExtruderPoints';
+import {
+  TWIN_SCREW_COMPONENT_ORDER,
+  twinScrewPointsForComponent,
+  type TwinScrewComponent,
+} from './twinScrewExtruderPoints';
 
 export const MACHINE_TEMPLATES = [
   'Centrifugal Pump',
@@ -66,10 +70,16 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
   'Rotary Airlock Valve': [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Custom Component', label: 'Rotor' }],
   'Single Screw Extruder': [{ type: 'Motor' }, { type: 'Coupling' }, { type: 'Gearbox' }, { type: 'Custom Component', label: 'Screw and Barrel' }],
   'Twin Screw Extruder': [
-    { type: 'Motor' },
+    { type: 'Motor', label: 'Main Motor' },
     { type: 'Coupling' },
     { type: 'Gearbox' },
-    { type: 'Custom Component', label: 'Twin Screws and Barrel' },
+    { type: 'Custom Component', label: 'Main Feeder' },
+    { type: 'Custom Component', label: 'Side Feeder' },
+    { type: 'Custom Component', label: 'Screw A' },
+    { type: 'Custom Component', label: 'Screw B' },
+    { type: 'Custom Component', label: 'Barrel Zones' },
+    { type: 'Custom Component', label: 'Vent Section' },
+    { type: 'Custom Component', label: 'Die and Discharge' },
   ],
   'Custom Machine': [],
 };
@@ -140,61 +150,33 @@ const EXTRUDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   },
 ];
 
-// Twin Screw Extruder — the full twin-screw sensor schedule, grouped the way the
-// machine is built and in the same order the default layout drops its cards
-// (drive train first, then feed, barrel and the die head).
+// Twin Screw Extruder — the machine tree, derived from the point registry.
 //
-// Unlike the single screw, no condition model consumes these yet; the registry
-// carries that fact per point, so the canvas says so when a channel lands on one
-// instead of implying a diagnosis that is not running.
-const twinScrewPointDefs = (codes: string[]): PointDef[] =>
-  TWIN_SCREW_POINT_REGISTRY.filter((point) => codes.includes(point.code)).map((point) => ({ label: point.label, kind: point.kind }));
+// The hierarchy follows how the machine is actually built and runs: drive train,
+// then the two feeding systems, then the processing section (the two screws and
+// the barrel they turn in), then the vent and the discharge end. Screw A and
+// Screw B are separate components on purpose — they are two shafts with two
+// speed measurements, and a fault on one is not a fault on the other.
+//
+// Component membership is declared once, on the point itself, so a point cannot
+// be listed under two components or omitted from all of them.
+const TWIN_SCREW_COMPONENT_TYPES: Record<TwinScrewComponent, ComponentType> = {
+  'Main Motor': 'Motor',
+  Gearbox: 'Gearbox',
+  'Main Feeder': 'Custom Component',
+  'Side Feeder': 'Custom Component',
+  'Screw A': 'Custom Component',
+  'Screw B': 'Custom Component',
+  'Barrel Zones': 'Custom Component',
+  'Vent Section': 'Custom Component',
+  'Die and Discharge': 'Custom Component',
+};
 
-const TWIN_SCREW_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
-  {
-    type: 'Motor',
-    label: 'Drive',
-    points: twinScrewPointDefs(['motor-nde-vib', 'motor-current-power', 'motor-temp', 'motor-de-vib', 'motor-rpm']),
-  },
-  {
-    type: 'Gearbox',
-    label: 'Gear Box',
-    points: twinScrewPointDefs(['gearbox-in-vib', 'gearbox-temp', 'gearbox-out-1-vib', 'gearbox-out-2-vib', 'thrust-bearing-temp']),
-  },
-  {
-    type: 'Custom Component',
-    label: 'Main Feeder',
-    points: twinScrewPointDefs(['hopper-level', 'main-feed-rate', 'main-feed-rpm', 'main-feed-current', 'feed-throat-temp']),
-  },
-  {
-    type: 'Custom Component',
-    label: 'Side Feeder',
-    points: twinScrewPointDefs(['side-feed-rate', 'side-feed-rpm', 'side-feed-current']),
-  },
-  {
-    type: 'Custom Component',
-    label: 'Twin Screws and Barrel',
-    points: twinScrewPointDefs([
-      'screw-1-rpm',
-      'screw-2-rpm',
-      'tz-01',
-      'tz-02',
-      'tz-03',
-      'tz-04',
-      'tz-05',
-      'tz-06',
-      'tz-07',
-      'tz-08',
-      'p-int-01',
-      'p-int-02',
-    ]),
-  },
-  {
-    type: 'Custom Component',
-    label: 'Vent and Die Head',
-    points: twinScrewPointDefs(['vent-pressure', 'vent-temp', 'melt-temp', 'p-screw-in', 'p-screw-out']),
-  },
-];
+const TWIN_SCREW_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = TWIN_SCREW_COMPONENT_ORDER.map((component) => ({
+  type: TWIN_SCREW_COMPONENT_TYPES[component],
+  label: component,
+  points: twinScrewPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
 
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.

@@ -16,6 +16,7 @@ import { latestMeasurementForChannel, type LiveState } from '../../../lib/liveTe
 import type { CardNode } from '../../../lib/rack';
 import { apiFetch } from '../../../src/lib/apiClient';
 import { ExtruderAnalysisView } from './ExtruderAnalysisView';
+import { TwinScrewAnalysisView } from './TwinScrewAnalysisView';
 import {
   Badge,
   Body,
@@ -297,6 +298,20 @@ export function AnalysisView(props: AnalysisViewProps) {
     );
   }
   if (analyzer === 'rotary-airlock') return <RotaryAirlockAnalysisView {...props} />;
+  // The twin screw has a signal model but no commissioned threshold register.
+  // Its view says so and reports the integrity findings it *can* reach, rather
+  // than falling through to the generic "no analyzer" card — which would hide
+  // real sensor faults behind an unrelated message.
+  if (analyzer === 'twin-screw') {
+    return (
+      <TwinScrewAnalysisView
+        mappedChannels={props.mappedChannels}
+        devices={props.devices}
+        cards={props.cards}
+        live={props.live}
+      />
+    );
+  }
   return (
     <View className="flex-1 items-center justify-center px-6 py-10">
       <Card className="w-full max-w-2xl gap-3" accent="info">
@@ -310,9 +325,10 @@ export function AnalysisView(props: AnalysisViewProps) {
   );
 }
 
-const ANALYZER_REGISTRY: Record<string, 'rotary-airlock' | 'extruder'> = {
+const ANALYZER_REGISTRY: Record<string, 'rotary-airlock' | 'extruder' | 'twin-screw'> = {
   'Rotary Airlock Valve': 'rotary-airlock',
   'Single Screw Extruder': 'extruder',
+  'Twin Screw Extruder': 'twin-screw',
 };
 
 function RotaryAirlockAnalysisView({
