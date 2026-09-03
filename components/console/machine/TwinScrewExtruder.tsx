@@ -95,25 +95,79 @@ export type TwinScrewConnector = (typeof TWIN_SCREW_POINT_REGISTRY)[number];
 
 export const TWIN_SCREW_CONNECTORS: readonly TwinScrewConnector[] = TWIN_SCREW_POINT_REGISTRY;
 
-/** Part names, each anchored to a part the drawing actually contains. */
-const PART_LABELS: { x: number; y: number; text: string; size?: number; anchor?: 'start' | 'middle' | 'end' }[] = [
-  { x: 193, y: 625, text: 'MOTOR' },
-  { x: 388, y: 625, text: 'COUPLING', size: 11 },
-  { x: 497, y: 625, text: 'GEARBOX' },
-  { x: 728, y: 92, text: 'MAIN FEEDER' },
-  { x: 664, y: 336, text: 'FEED THROAT', size: 10, anchor: 'end' },
-  { x: 969, y: 268, text: 'SIDE FEEDER', size: 11 },
-  { x: 1238, y: 264, text: 'VENT', size: 11 },
-  { x: 880, y: 372, text: 'BARREL' },
-  { x: 1374, y: 392, text: 'DIE', size: 11 },
-  { x: 1300, y: 625, text: 'EXTRUDATE', size: 12 },
+/**
+ * Part names, with the dashed leader lines the reference draws.
+ *
+ * The label set is the reference's own — MOTOR, GEAR BOX, MAIN FEEDER / HOPPER,
+ * SIDE FEEDER, HEATING ZONES, the numbered barrel zones, BARREL and DIE — and
+ * nothing beyond it. Names the reference does not carry (COUPLING, VENT,
+ * EXTRUDATE) are not invented here.
+ *
+ * A leader ends on the component's silhouette, never on an instrument pad, so a
+ * dashed line can never be misread as a channel mapping. The whole layer is
+ * behind `showPartLabels` and off by default on the editor canvas.
+ */
+type PartLabel = {
+  x: number;
+  y: number;
+  text: string;
+  size?: number;
+  anchor?: 'start' | 'middle' | 'end';
+  /** Dashed leader from just below/above the text to this point. */
+  leader?: { x: number; y: number };
+};
+
+const PART_LABELS: PartLabel[] = [
+  { x: 124, y: 250, text: 'MOTOR', leader: { x: 124, y: 400 } },
+  { x: 400, y: 228, text: 'GEAR BOX', leader: { x: 400, y: 350 } },
+  { x: 728, y: 34, text: 'MAIN FEEDER /' },
+  { x: 728, y: 52, text: 'HOPPER', leader: { x: 728, y: 101 } },
+  { x: 969, y: 150, text: 'SIDE FEEDER', size: 11, leader: { x: 969, y: 276 } },
+  { x: 1120, y: 200, text: 'HEATING ZONES', size: 11, leader: { x: 1120, y: 370 } },
+  { x: 980, y: 664, text: 'BARREL' },
+  { x: 1380, y: 604, text: 'DIE', size: 11, leader: { x: 1380, y: 532 } },
 ];
 
-/** Screw-train names, on the barrel centre lines at the feed end. */
-const SCREW_LABELS: { x: number; y: number; text: string }[] = [
-  { x: 700, y: 443, text: 'SCREW A' },
-  { x: 700, y: 489, text: 'SCREW B' },
-];
+/**
+ * Barrel-zone labels, one per temperature zone, at that zone's own x.
+ *
+ * The reference stacks these below the barrel with leaders rising to the
+ * cooling blocks. Each zone is one piece of hardware seen twice — a heater band
+ * on top and a cooling block beneath — so a label below and a pad above belong
+ * to the same zone. There are eight here because this machine has eight; the
+ * reference drawing shows a five-zone barrel.
+ */
+const ZONE_LABEL_XS = [752, 808, 864, 920, 1037, 1098, 1160, 1287];
+
+/** Dashed span under the barrel, as the reference draws it. */
+const BARREL_SPAN = { x1: 645, x2: 1320, y: 646, drop: 8 };
+
+/**
+ * The screen pack's woven mesh, as a fixed lattice of dots.
+ *
+ * Built once at module load from a deterministic staggered grid — never
+ * randomised, so every render of this machine is pixel-identical to the last.
+ */
+const SCREEN_MESH: { x: number; y: number }[] = (() => {
+  const dots: { x: number; y: number }[] = [];
+  for (let row = 0; row < 21; row += 1) {
+    for (let col = 0; col < 4; col += 1) {
+      dots.push({ x: 1324 + col * 5.2 + (row % 2) * 2.6, y: 409 + row * 5.9 });
+    }
+  }
+  return dots;
+})();
+
+/**
+ * Non-interactive label layer.
+ *
+ * react-native-svg routes a `pointerEvents` prop through react-native-web's
+ * style system, which logs a deprecation warning asking for the style form;
+ * React DOM in turn rejects the kebab-case attribute. The style form is what
+ * both want, and it applies `pointer-events: none` on web while native ignores
+ * it — a label must never swallow a drag meant for a pad underneath it.
+ */
+const NO_POINTER_EVENTS = { style: { pointerEvents: 'none' as const } };
 
 export function TwinScrewExtruder({
   className,
@@ -149,6 +203,14 @@ export function TwinScrewExtruder({
       accent: '#16c84a',
       brass: isDark ? '#A8863F' : '#c9a451',
       brassEdge: isDark ? '#6B5527' : '#8a733b',
+      // The reference shows the barrel's bronze wear liner as a thin warm band
+      // top and bottom of the bore, and pelletised feedstock as a tan fill in
+      // both feeders. Both read as material rather than as machine.
+      liner: isDark ? '#8C7433' : '#d8be7e',
+      linerEdge: isDark ? '#5C4C22' : '#a68f56',
+      feedstock: isDark ? ['#B8934F', '#8A6A2E'] : ['#e6cf9a', '#c9a763'],
+      screen: isDark ? '#3A414B' : '#c8ccce',
+      screenDot: isDark ? '#8A919B' : '#7e858a',
       metal: isDark
         ? ['#2A2F38', '#1B1F26', '#333944', '#12151A']
         : ['#f3f4f4', '#d5d8da', '#fafafa', '#b7bcc0'],
@@ -156,7 +218,7 @@ export function TwinScrewExtruder({
       // Four stops, not two: a cylinder carries a highlight band below its top
       // edge and falls away to shadow underneath. Same treatment as the SSE barrel.
       root: isDark ? ['#2E343D', '#4A515B', '#3A414B', '#171B21'] : ['#9aa0a5', '#e8eaeb', '#b9bfc3', '#6f767b'],
-      flight: isDark ? ['#4A515B', '#6E7682', '#2C323A'] : ['#c3c9cd', '#f2f3f4', '#848b90'],
+      flight: isDark ? ['#5A626D', '#7E8794', '#232830'] : ['#fdfdfd', '#d3d8dc', '#6f767c'],
       kneading: isDark ? ['#39404B', '#5A626D', '#22272E'] : ['#aab0b5', '#e2e4e6', '#767d82'],
       flightStroke: isDark ? '#8A919B' : '#51575c',
       crestLit: isDark ? '#C3CAD3' : '#ffffff',
@@ -199,50 +261,20 @@ export function TwinScrewExtruder({
         />
       ))}
       {train.flights.map((flight) => (
-        <Path key={`${flight.key}-crest`} d={flight.crest} stroke={c.crestLit} strokeOpacity={0.55} strokeWidth={1.4} fill="none" />
-      ))}
-      {train.kneadingDiscs.map((disc) => (
-        <G key={disc.key} transform={`rotate(${disc.lean} ${disc.x} ${train.axisY})`}>
-          <Rect
-            x={disc.x - disc.rx}
-            y={train.axisY - disc.ry}
-            width={disc.rx * 2}
-            height={disc.ry * 2}
-            rx={disc.rx}
-            fill="url(#twinKneadGradient)"
-            stroke={c.flightStroke}
-            strokeWidth={1.3}
-          />
-        </G>
+        <Path key={`${flight.key}-crest`} d={flight.crest} stroke={c.crestLit} strokeOpacity={0.3} strokeWidth={1} fill="none" />
       ))}
     </G>
   );
 
-  /**
-   * A part name. `plate` draws a panel-coloured backing behind the text, which
-   * is what keeps the two screw names readable where they sit directly over the
-   * flights — the alternative is moving them off the part they name.
-   */
+  /** A part name, drawn in the console's label type. */
   const label = (
     x: number,
     y: number,
     text: string,
     size = 13,
     anchor: 'start' | 'middle' | 'end' = 'middle',
-    plate = false,
   ) => (
     <G key={`label-${text}-${x}-${y}`}>
-    {plate && (
-      <Rect
-        x={x - (text.length * size * 0.34) - 6}
-        y={y - size * 0.92}
-        width={text.length * size * 0.68 + 12}
-        height={size * 1.35}
-        rx={3}
-        fill={c.panel}
-        opacity={0.86}
-      />
-    )}
     <SvgText
       x={x}
       y={y}
@@ -305,10 +337,20 @@ export function TwinScrewExtruder({
             <Stop offset="1" stopColor={c.root[3]} />
           </LinearGradient>
 
+          {/* Four stops across the flight's height: lit at the crest, mid
+              through the turn, falling to shadow at the trailing edge. Two
+              stops read flat, which is what made the flights look like paper
+              ribbons rather than machined steel. */}
           <LinearGradient id="twinFlightGradient" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={c.flight[0]} />
-            <Stop offset="0.4" stopColor={c.flight[1]} />
+            <Stop offset="0.3" stopColor={c.flight[1]} />
+            <Stop offset="0.72" stopColor={c.flight[1]} />
             <Stop offset="1" stopColor={c.flight[2]} />
+          </LinearGradient>
+
+          <LinearGradient id="twinFeedstock" x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={c.feedstock[0]} />
+            <Stop offset="1" stopColor={c.feedstock[1]} />
           </LinearGradient>
 
           <LinearGradient id="twinKneadGradient" x1="0" y1="0" x2="0" y2="1">
@@ -375,6 +417,8 @@ export function TwinScrewExtruder({
           <Rect x={652} y={105} width={153} height={18} rx={5} fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={2} />
           <Path d="M660 123 H797 V205 H660 Z" fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={2} />
           <Path d="M660 205 H797 L758 321 H697 Z" fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={2} />
+          {/* Feedstock sitting in the cone, drawn inside the walls. */}
+          <Path d="M668 213 H789 L753 315 H702 Z" fill="url(#twinFeedstock)" opacity={0.9} />
           <Rect x={700} y={319} width={55} height={98} fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={2} />
           <Rect x={688} y={312} width={78} height={15} rx={3} fill={c.fillDeep} stroke={c.stroke} strokeWidth={2} />
           {/* feed-throat thermocouple boss on the upstream shoulder */}
@@ -385,6 +429,11 @@ export function TwinScrewExtruder({
         <G>
           <Rect x={638} y={397} width={690} height={145} rx={5} fill={c.fillDeep} stroke={c.stroke} strokeWidth={2} />
           <Rect x={645} y={415} width={675} height={112} rx={3} fill={c.bore} stroke={c.strokeSoft} strokeWidth={1.5} />
+          {/* Bronze wear liner. On the reference it is the one warm line in the
+              whole barrel, and it is what makes the bore read as a lined bore
+              rather than an empty window. */}
+          <Rect x={648} y={416} width={669} height={6} fill={c.liner} stroke={c.linerEdge} strokeWidth={0.8} />
+          <Rect x={648} y={520} width={669} height={6} fill={c.liner} stroke={c.linerEdge} strokeWidth={0.8} />
         </G>
 
         {/* 7 — the two screw trains, clipped to one barrel window */}
@@ -408,6 +457,21 @@ export function TwinScrewExtruder({
               strokeWidth={1.3}
             />
           ))}
+          {/* Heater-band terminal caps: the small cylinders standing on each
+              top segment in the reference. */}
+          {Array.from({ length: TOP_SHELL_COUNT }).map((_, i) => (
+            <Rect
+              key={`cap-${i}`}
+              x={TOP_SHELL_X0 + i * TOP_SHELL_STEP + 14}
+              y={374}
+              width={19}
+              height={14}
+              rx={3}
+              fill="url(#twinDarkMetal)"
+              stroke={c.strokeSoft}
+              strokeWidth={1.2}
+            />
+          ))}
           {Array.from({ length: BOTTOM_SHELL_COUNT }).map((_, i) => (
             <Rect
               key={`shell-bottom-${i}`}
@@ -421,11 +485,28 @@ export function TwinScrewExtruder({
               strokeWidth={1.3}
             />
           ))}
+          {/* Cooling-block bolt pads, one per bottom segment. */}
+          {Array.from({ length: BOTTOM_SHELL_COUNT }).map((_, i) => (
+            <Rect
+              key={`bolt-${i}`}
+              x={665 + i * 57 + 18}
+              y={539}
+              width={11}
+              height={11}
+              rx={2}
+              fill={c.glass}
+              stroke={c.strokeSoft}
+              strokeWidth={1.2}
+            />
+          ))}
         </G>
 
         {/* 9 — side feeder and vent */}
         <G>
           <Path d="M943 290 H995 L982 330 H955 Z" fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={2} />
+          <Path d="M949 296 H989 L978 325 H959 Z" fill="url(#twinFeedstock)" opacity={0.9} />
+          {/* Side-feeder drive boss on the upstream face. */}
+          <Circle cx={940} cy={344} r={7} fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={1.6} />
           <Rect x={954} y={328} width={33} height={61} fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={2} />
           <Rect x={938} y={384} width={67} height={21} rx={3} fill={c.fillDeep} stroke={c.stroke} strokeWidth={2} />
         </G>
@@ -437,7 +518,12 @@ export function TwinScrewExtruder({
 
         {/* 10 — die head, screen pressure tappings and extrudate */}
         <G>
-          <Rect x={1320} y={403} width={27} height={132} fill="url(#twinDarkMetal)" stroke={c.stroke} strokeWidth={2} />
+          {/* Screen pack / breaker plate. The reference shows it as a
+              distinctly textured cylinder between barrel and die cone. */}
+          <Rect x={1320} y={403} width={27} height={132} fill={c.screen} stroke={c.stroke} strokeWidth={2} />
+          {SCREEN_MESH.map((dot) => (
+            <Circle key={`mesh-${dot.x}-${dot.y}`} cx={dot.x} cy={dot.y} r={1.5} fill={c.screenDot} opacity={0.75} />
+          ))}
           <Path d="M1347 414 L1390 440 V500 L1347 525 Z" fill="url(#twinMetal)" stroke={c.stroke} strokeWidth={2} />
           <Circle cx={1374} cy={470} r={6} fill={c.fillSoft} stroke={c.stroke} strokeWidth={2} />
           <Rect x={1389} y={459} width={35} height={22} rx={3} fill={c.brass} stroke={c.brassEdge} strokeWidth={1.5} />
@@ -452,12 +538,41 @@ export function TwinScrewExtruder({
         {showPartLabels && (
           // The label layer never intercepts a drag; the trail board above owns
           // pointer input, and a name must not swallow a click meant for a pad.
-          <G pointerEvents="none">
-            {PART_LABELS.map((entry) => label(entry.x, entry.y, entry.text, entry.size, entry.anchor))}
-            {SCREW_LABELS.map((entry) => label(entry.x, entry.y, entry.text, 10, 'middle', true))}
-            {SCREW_ELEMENTS.filter((element) => element.kind === 'kneading').map((element) =>
-              label(element.startX + element.length / 2, 592, 'KNEAD', 8.5, 'middle'),
-            )}
+          <G {...NO_POINTER_EVENTS}>
+            {PART_LABELS.map((entry) => (
+              <G key={`pl-${entry.text}-${entry.x}`}>
+                {entry.leader && (
+                  <Line
+                    x1={entry.x}
+                    y1={entry.leader.y > entry.y ? entry.y + 10 : entry.y - 16}
+                    x2={entry.leader.x}
+                    y2={entry.leader.y}
+                    stroke={c.muted}
+                    strokeWidth={1.2}
+                    strokeDasharray="4 4"
+                    strokeOpacity={0.7}
+                  />
+                )}
+                {label(entry.x, entry.y, entry.text, entry.size, entry.anchor)}
+              </G>
+            ))}
+
+            {ZONE_LABEL_XS.map((x, index) => (
+              <G key={`zone-${index}`}>
+                <Line x1={x} y1={594} x2={x} y2={562} stroke={c.muted} strokeWidth={1.2} strokeDasharray="4 4" strokeOpacity={0.7} />
+                {label(x, 610, `Z${index + 1}`, 10.5)}
+              </G>
+            ))}
+
+            {/* Barrel extent: a dashed span with turned-down ends. */}
+            <Path
+              d={`M ${BARREL_SPAN.x1} ${BARREL_SPAN.y - BARREL_SPAN.drop} V ${BARREL_SPAN.y} H ${BARREL_SPAN.x2} V ${BARREL_SPAN.y - BARREL_SPAN.drop}`}
+              fill="none"
+              stroke={c.muted}
+              strokeWidth={1.2}
+              strokeDasharray="4 4"
+              strokeOpacity={0.7}
+            />
           </G>
         )}
 

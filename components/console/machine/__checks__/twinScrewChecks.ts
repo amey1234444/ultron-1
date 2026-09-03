@@ -147,9 +147,12 @@ check(
 );
 
 check(
-  'the two screws carry the same number of kneading discs',
-  SCREW_A_TRAIN.kneadingDiscs.length === SCREW_B_TRAIN.kneadingDiscs.length,
-  `${SCREW_A_TRAIN.kneadingDiscs.length} vs ${SCREW_B_TRAIN.kneadingDiscs.length}`,
+  'kneading sections run at a tighter pitch than the conveying sections',
+  (() => {
+    const conveying = SCREW_ELEMENTS.filter((e) => e.kind === 'conveying').map((e) => e.pitch);
+    const kneading = SCREW_ELEMENTS.filter((e) => e.kind === 'kneading').map((e) => e.pitch);
+    return kneading.length > 0 && Math.max(...kneading) < Math.min(...conveying);
+  })(),
 );
 
 check(

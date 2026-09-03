@@ -45,8 +45,6 @@ export type ScrewTrain = {
   /** Highlight line along the top of the root. */
   rootHighlight: string;
   flights: ScrewFlight[];
-  /** Kneading-block discs, drawn as staggered lobes rather than helices. */
-  kneadingDiscs: { x: number; rx: number; ry: number; lean: number; key: string }[];
   axisY: number;
 };
 
@@ -61,16 +59,37 @@ export const SCREW_START_X = 640;
 export const SCREW_END_X = 1322;
 export const SCREW_LENGTH = SCREW_END_X - SCREW_START_X;
 
-/** Flight outer radius — half the screw diameter. */
-export const FLIGHT_RADIUS = 27;
+/**
+ * Flight outer radius, root radius, flight land thickness.
+ *
+ * Traced from the reference drawing rather than chosen: on it the screw
+ * diameter is close to the full bore height and the two shafts sit barely a
+ * diameter apart, which is what produces the deeply woven appearance. Values
+ * below are the reference measurements converted into this artwork's frame.
+ */
+export const FLIGHT_RADIUS = 35;
 /** Root (shaft core) radius. Constant: a twin screw compresses by element, not by taper. */
-export const ROOT_RADIUS = 11;
-/** Thickness of a flight land, along the axis. */
-export const FLIGHT_THICKNESS = 7;
+export const ROOT_RADIUS = 12;
+/**
+ * Thickness of a flight land, along the axis.
+ *
+ * Deep intermesh puts roughly fifty flight ribbons across the barrel, so a thin
+ * land reads as spaghetti. The reference keeps them substantial — a little over
+ * a third of the pitch — which is what lets the eye follow one helix through
+ * the crossings.
+ */
+export const FLIGHT_THICKNESS = 10;
 
-/** Centrelines of the two shafts. */
-export const SCREW_A_AXIS_Y = 448;
-export const SCREW_B_AXIS_Y = 494;
+/**
+ * Centrelines of the two shafts, centred in the bore.
+ *
+ * The gap between them is the single most important number in this file. At
+ * 2 x FLIGHT_RADIUS the screws would merely touch; the reference sets it far
+ * tighter, so each flight sits deep inside the other screw's channel and the
+ * pair reads as one intermeshing assembly instead of two stacked screws.
+ */
+export const SCREW_A_AXIS_Y = 454;
+export const SCREW_B_AXIS_Y = 487;
 /** Centre distance. Below 2 x FLIGHT_RADIUS, which is what makes them intermesh. */
 export const CENTRE_DISTANCE = SCREW_B_AXIS_Y - SCREW_A_AXIS_Y;
 
@@ -87,12 +106,12 @@ export const BARREL_CLIP = { x: 638, y: 417, width: 686, height: 108 };
  * shortens downstream, which is how a twin screw builds pressure toward the die.
  */
 export const SCREW_ELEMENTS: readonly ScrewElementDefinition[] = [
-  { startX: 640, length: 152, pitch: 40, kind: 'conveying' },
-  { startX: 792, length: 76, pitch: 30, kind: 'kneading' },
-  { startX: 868, length: 132, pitch: 38, kind: 'conveying' },
-  { startX: 1000, length: 68, pitch: 28, kind: 'kneading' },
-  { startX: 1068, length: 40, pitch: 26, kind: 'reverse' },
-  { startX: 1108, length: 214, pitch: 34, kind: 'conveying' },
+  { startX: 640, length: 152, pitch: 28, kind: 'conveying' },
+  { startX: 792, length: 76, pitch: 15, kind: 'kneading' },
+  { startX: 868, length: 132, pitch: 26, kind: 'conveying' },
+  { startX: 1000, length: 68, pitch: 14, kind: 'kneading' },
+  { startX: 1068, length: 40, pitch: 18, kind: 'reverse' },
+  { startX: 1108, length: 214, pitch: 26, kind: 'conveying' },
 ] as const;
 
 /* Flight geometry ---------------------------------------------------------- */
@@ -166,10 +185,13 @@ function flightsForElement(
   keyPrefix: string,
 ): { flights: ScrewFlight[]; endPhase: number } {
   const flights: ScrewFlight[] = [];
-  // A kneading block is a stack of discs, not a helix, so it emits no flights.
-  if (element.kind === 'kneading') {
-    return { flights, endPhase: (phase + element.length) % element.pitch };
-  }
+  // A kneading block is mechanically a stack of staggered discs, and drawing it
+  // that way is tempting. The reference does not: it shows those regions as a
+  // markedly tighter-pitch run of the same helix, which reads as a denser band
+  // rather than as the knot of crossed lobes discs produce at this scale. The
+  // element keeps its own kind so the model, the QA surface and the analysis
+  // still know it is a kneading section; only the drawing follows the reference.
+  //
   // A reverse element winds the other way — that is what makes it push back.
   const hand: ScrewDirection = element.kind === 'reverse' ? (direction === 'right' ? 'left' : 'right') : direction;
   // The count is derived from the element, not from where the phase happens to
@@ -191,30 +213,6 @@ function flightsForElement(
   return { flights, endPhase: (phase + element.length) % element.pitch };
 }
 
-/** Staggered lobes of a kneading block, seen side-on. */
-function kneadingDiscsForElement(
-  element: ScrewElementDefinition,
-  axisY: number,
-  keyPrefix: string,
-): ScrewTrain['kneadingDiscs'] {
-  const discs: ScrewTrain['kneadingDiscs'] = [];
-  const spacing = 15;
-  const count = Math.max(2, Math.round(element.length / spacing));
-  const step = element.length / count;
-  for (let i = 0; i < count; i += 1) {
-    discs.push({
-      x: element.startX + step * (i + 0.5),
-      rx: 5.5,
-      ry: FLIGHT_RADIUS - 1,
-      // Successive discs are offset around the shaft, which side-on reads as an
-      // alternating lean. That stagger is what distinguishes a kneading block.
-      lean: i % 2 === 0 ? 14 : -14,
-      key: `${keyPrefix}-kd-${element.startX}-${i}`,
-    });
-  }
-  return discs;
-}
-
 /**
  * Build one complete screw train.
  *
@@ -229,19 +227,17 @@ export function createScrewElementSequence(
   keyPrefix: string,
 ): ScrewTrain {
   const flights: ScrewFlight[] = [];
-  const kneadingDiscs: ScrewTrain['kneadingDiscs'] = [];
   let phase = phaseOffset;
   for (const element of SCREW_ELEMENTS) {
     const result = flightsForElement(element, axisY, direction, phase, keyPrefix);
     flights.push(...result.flights);
     phase = result.endPhase;
-    if (element.kind === 'kneading') kneadingDiscs.push(...kneadingDiscsForElement(element, axisY, keyPrefix));
+
   }
   return {
     root: createScrewRootPath(axisY),
     rootHighlight: `M ${SCREW_START_X + 6} ${axisY - ROOT_RADIUS + 3} L ${SCREW_END_X - 6} ${axisY - ROOT_RADIUS + 3}`,
     flights,
-    kneadingDiscs,
     axisY,
   };
 }
