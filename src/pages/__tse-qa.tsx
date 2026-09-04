@@ -4,7 +4,7 @@
 // a mock. The pads, the connectors, the default layout and the analysis all come
 // from the shipped modules, so what this page shows is what the console does.
 //
-//   /__tse-qa?state=idle|linked|live|mixed&labels=on|off&width=<px>
+//   /__tse-qa?state=idle|linked|live|mixed&width=<px>
 //
 // The reference-image overlay is a development alignment aid only. It draws a
 // PNG *behind* the SVG at adjustable opacity so artwork proportions can be
@@ -33,10 +33,12 @@ const REFERENCE_IMAGE = '/references/twin-screw-extruder-reference.png';
 
 /** The parts of the machine the registry hangs measurement points off. */
 const MACHINE_PARTS = [
-  'motor',
-  'motor-coupling',
-  'gearbox',
-  'gearbox-output',
+  // The drive train comes from the artwork's rebuild pass, which is why these
+  // four carry its names rather than the base geometry's.
+  'motor-v16',
+  'motor-coupling-v16',
+  'gearbox-v16',
+  'gearbox-output-raised-v22',
   'main-hopper',
   'barrel',
   'upper-screw',
@@ -103,7 +105,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function TwinScrewQaPage() {
   const { colorScheme, setColorScheme } = useColorScheme();
   const [mode, setMode] = useState<PadMode>('mixed');
-  const [labels, setLabels] = useState(true);
   const [width, setWidth] = useState(1440);
   const [overlay, setOverlay] = useState(0);
   const [showCodes, setShowCodes] = useState(false);
@@ -153,7 +154,6 @@ export default function TwinScrewQaPage() {
 
       <Section title="Display">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-          {button(labels ? 'labels on' : 'labels off', labels, () => setLabels((v) => !v))}
           {button(dark ? 'dark' : 'light', dark, () => setColorScheme(dark ? 'light' : 'dark'))}
           {button(showCodes ? 'codes on' : 'codes off', showCodes, () => setShowCodes((v) => !v))}
         </View>
@@ -185,7 +185,7 @@ export default function TwinScrewQaPage() {
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: overlay, objectFit: 'contain' }}
             />
           )}
-          <TwinScrewExtruder connectorState={states} showPartLabels={labels} showBackground />
+          <TwinScrewExtruder connectorState={states} showBackground />
           {showCodes && (
             <View style={{ position: 'absolute', inset: 0 }} pointerEvents="none">
               {TWIN_SCREW_POINT_REGISTRY.map((point) => (

@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
@@ -6,6 +6,14 @@ import { cn } from '../../../lib/cn';
 import type { DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal } from '../../../lib/localPersist';
+import {
+  clampMachineZoom,
+  DEFAULT_MACHINE_ZOOM,
+  MACHINE_ZOOM_STEP,
+  MAX_MACHINE_ZOOM,
+  MIN_MACHINE_ZOOM,
+  resolveMachineZoom,
+} from '../../../lib/machineZoom';
 import {
   expectedPointsForTemplate,
   type MachineComponent,
@@ -51,9 +59,9 @@ type MachineWorkspaceProps = {
 };
 type ActualTab = 'machine' | 'rack' | 'overview' | 'analysis' | 'alarm' | 'trend';
 
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2;
-const ZOOM_STEP = 0.1;
+const MIN_ZOOM = MIN_MACHINE_ZOOM;
+const MAX_ZOOM = MAX_MACHINE_ZOOM;
+const ZOOM_STEP = MACHINE_ZOOM_STEP;
 // Templates that render a dedicated SVG schematic instead of the generic
 // component canvas. They share one wrapper, but not one viewBox — the twin
 // screw is a wider machine and is drawn on its own frame. Trail anchors are
@@ -167,7 +175,44 @@ export function MachineWorkspace({
     return () => onModeChange?.('design');
   }, [mode, onModeChange]);
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(machine.components[0]?.id ?? null);
-  const [zoom, setZoom] = useState(1);
+
+  /**
+   * How large the machine is drawn.
+   *
+   * Its own saved size wins, then the size saved on its template, then 100%.
+   * That order is what makes a template resize reach machines created from it
+   * afterwards while leaving alone any machine that has since been sized on its
+   * own — a template is a starting point, not an override.
+   */
+  const savedZoom = useCallback(
+    () =>
+      // The local copy is what TrailBoard itself falls back to before the shared
+      // layout has hydrated, so the size has to come from the same place or the
+      // machine would resize under the user a moment after it appeared.
+      resolveMachineZoom(layout ?? loadLocal<SavedLayout>(trailBoardStorageKey(machine.id)), templateLayout),
+    [layout, templateLayout, machine.id],
+  );
+  const [zoom, setZoom] = useState(savedZoom);
+
+  /**
+   * Two things bring a new saved size in: opening a different machine, and the
+   * shared layout arriving — on a cold load, or when another user saves while
+   * this machine is open.
+   *
+   * Applying it only when it differs from the size last applied is what keeps a
+   * resize in progress from being fought by a poll that echoes the old value
+   * back; remembering which machine that size belonged to is what stops the
+   * previous machine's size carrying over to one that has no saved size of its
+   * own, which is otherwise invisible until someone notices two machines are
+   * drawn at different scales.
+   */
+  const appliedZoom = useRef<{ machineId: string; zoom: number } | null>(null);
+  useEffect(() => {
+    const next = savedZoom();
+    if (appliedZoom.current?.machineId === machine.id && appliedZoom.current.zoom === next) return;
+    appliedZoom.current = { machineId: machine.id, zoom: next };
+    setZoom(next);
+  }, [machine.id, savedZoom]);
   // Layout of the machine wrapper in *stage coordinates* (the stage is a fixed
   // 1600×900 design space, so this never changes with window size, panels, or
   // monitor resolution — transforms don't affect onLayout). Used together with
@@ -178,7 +223,10 @@ export function MachineWorkspace({
   const roundZoom = (value: number) => Math.round(value * 100) / 100;
   const zoomIn = () => setZoom((z) => Math.min(MAX_ZOOM, roundZoom(z + ZOOM_STEP)));
   const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, roundZoom(z - ZOOM_STEP)));
-  const resetZoom = () => setZoom(1);
+  const resetZoom = () => setZoom(DEFAULT_MACHINE_ZOOM);
+  // Anything outside the canvas that asks for a size goes through the same
+  // bounds the zoom control enforces.
+  const setZoomClamped = useCallback((value: number) => setZoom(clampMachineZoom(value) ?? DEFAULT_MACHINE_ZOOM), []);
 
   const isActual = mode === 'actual';
   const readOnlyCanvas = !canConfigure || isActual;
@@ -418,6 +466,8 @@ export function MachineWorkspace({
         readOnly={readOnlyCanvas}
         hideUnlink={readOnlyCanvas}
         canSaveTemplate={canSaveTemplate}
+        machineZoom={zoom}
+        onMachineZoomChange={setZoomClamped}
         connectors={connectors}
         onConnectorStateChange={handleConnectorState}
         // The board owns the whole workspace shell so its command rail can sit

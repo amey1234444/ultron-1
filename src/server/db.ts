@@ -435,10 +435,11 @@ async function migrate(): Promise<void> {
   // view and the non-configure/actual view so both stay in sync.
   await query(`
     CREATE TABLE IF NOT EXISTS studio_machine_layouts (
-      machine_id TEXT PRIMARY KEY,
-      trails     JSONB NOT NULL DEFAULT '[]'::jsonb,
-      boxes      JSONB NOT NULL DEFAULT '[]'::jsonb,
-      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      machine_id   TEXT PRIMARY KEY,
+      trails       JSONB NOT NULL DEFAULT '[]'::jsonb,
+      boxes        JSONB NOT NULL DEFAULT '[]'::jsonb,
+      machine_zoom DOUBLE PRECISION,
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
   await query(`
@@ -446,9 +447,17 @@ async function migrate(): Promise<void> {
       machine_template TEXT PRIMARY KEY,
       trails           JSONB NOT NULL DEFAULT '[]'::jsonb,
       boxes            JSONB NOT NULL DEFAULT '[]'::jsonb,
+      machine_zoom     DOUBLE PRECISION,
       updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+  // How large the machine is drawn, saved with the canvas it was drawn against.
+  // Nullable on purpose: NULL is "no size was ever saved", which is a different
+  // answer from 100% and is what lets a machine fall back to its template's
+  // size. Added rather than baked into the CREATE so existing databases pick it
+  // up on the next boot, the same way every other late column here does.
+  await query(`ALTER TABLE studio_machine_layouts ADD COLUMN IF NOT EXISTS machine_zoom DOUBLE PRECISION;`);
+  await query(`ALTER TABLE studio_machine_templates ADD COLUMN IF NOT EXISTS machine_zoom DOUBLE PRECISION;`);
   await query(`
     CREATE TABLE IF NOT EXISTS studio_machine_canvas_cards (
       id          TEXT NOT NULL,

@@ -257,7 +257,7 @@ export const THRESHOLD_RULES: readonly ThresholdRuleSpec[] = [
     ruleId: 'ts-barrel-zone-deviation',
     name: 'Barrel zone temperature deviation',
     part: 'Barrel Zones',
-    tags: ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8'],
+    tags: ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8', 'TS-TZ9'],
     requires: 'A per-zone setpoint profile and tolerance band for the running recipe.',
     intent: 'Flags a zone running above or below its setpoint, and separates a heater failure from a cooling failure by the direction of the error.',
   },
@@ -265,7 +265,7 @@ export const THRESHOLD_RULES: readonly ThresholdRuleSpec[] = [
     ruleId: 'ts-zone-gradient',
     name: 'Excessive zone-to-zone gradient',
     part: 'Barrel Zones',
-    tags: ['TS-TZ1', 'TS-TZ8'],
+    tags: ['TS-TZ1', 'TS-TZ9'],
     requires: 'A maximum acceptable step between adjacent zones for this profile.',
     intent: 'The gradient is computed from whatever zones are mapped; only the acceptable step is missing.',
   },
@@ -326,7 +326,7 @@ export type TwinScrewAnalysis = {
   vibrationDomains: Partial<Record<TwinScrewTag, VibrationDomain>>;
 };
 
-const ZONE_ORDER: TwinScrewTag[] = ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8'];
+const ZONE_ORDER: TwinScrewTag[] = ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8', 'TS-TZ9'];
 
 /**
  * Run the twin-screw analysis over whatever is currently mapped.

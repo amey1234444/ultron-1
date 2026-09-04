@@ -2,7 +2,6 @@ import { useMemo } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { G, parse } from 'react-native-svg';
 
-import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
@@ -24,15 +23,6 @@ type TwinScrewExtruderProps = {
    * single-screw drawing uses, from the same component.
    */
   connectorState?: Record<string, MeasurementPadState>;
-
-  /**
-   * Draw the machine-part names on the artwork.
-   *
-   * Off by default: on the mapping canvas the cards and trails already name
-   * every point, and a second set of names competes with them. On in the QA
-   * surface and wherever the drawing is shown on its own.
-   */
-  showPartLabels?: boolean;
 
   /**
    * Draw the drawing sheet and its engineering grid.
@@ -58,8 +48,8 @@ const VIEWBOX_HEIGHT = TWIN_SCREW_VIEWBOX_HEIGHT;
  * The canvas snaps trail endpoints to this list and the default trail layout
  * places its cards from it, so a card can never attach to a place the artwork
  * does not actually have an instrument. The drawing renders one pad per entry
- * and never a hard-coded circle of its own — the marker dots the reference
- * drawing carried were dropped on the way in for exactly that reason.
+ * and never a circle of its own: the reference calls itself a marker-only
+ * drawing and leaves the markers to the application for exactly this reason.
  */
 export type TwinScrewConnector = (typeof TWIN_SCREW_POINT_REGISTRY)[number];
 
@@ -69,13 +59,10 @@ export const TWIN_SCREW_CONNECTORS: readonly TwinScrewConnector[] = TWIN_SCREW_P
  * The machine is one light drawing in both themes.
  *
  * It is a technical illustration — lit metal, cast shadows, a specular pass
- * over every housing — and the light it is lit by is part of the drawing rather
+ * over the housings — and the light it is lit by is part of the drawing rather
  * than a colour choice that can be inverted. Re-toning it for a dark console
  * would flatten the thing the reference does best, so it stays as drawn, the
  * way a drawing sheet on a desk stays white in a dark room.
- *
- * Only what sits *off* the machine follows the theme: the part names and their
- * leaders, which are read against the console rather than against the metal.
  */
 const SHEET = '#fbfbfa';
 
@@ -83,22 +70,17 @@ const SHEET = '#fbfbfa';
  * The pad's status colour, and the ground its hollow centre is cut out of.
  *
  * The ground is the sheet rather than the console surface because that is what
- * a pad is actually drawn on top of — an idle pad has to read as a hole in the
- * machine, not as a disc of console colour floating over it.
+ * a pad is drawn on top of — an idle pad has to read as a hole in the machine,
+ * not as a disc of console colour floating over it.
  */
 const PAD_ACCENT = '#16c84a';
 
 export function TwinScrewExtruder({
   className,
   style,
-  showPartLabels = false,
   showBackground = false,
   connectorState,
 }: TwinScrewExtruderProps) {
-  const { isDark } = useAppTheme();
-
-  const ink = isDark ? '#8B929C' : '#565c63';
-
   /**
    * The machine, parsed once per appearance.
    *
@@ -108,13 +90,12 @@ export function TwinScrewExtruder({
    * of the geometry to drift, and the parse is exact — every gradient, pattern,
    * clip path and lighting filter in the source comes out the other side.
    *
-   * Only three inputs can change the source, so this is at most a handful of
-   * parses in a session, and none of them on a re-render that did not change
-   * one of them.
+   * One input can change the source, so this is one parse in a session for each
+   * way the drawing is shown, and none on a re-render that changed neither.
    */
   const artwork = useMemo(
-    () => parse(buildTwinScrewExtruderArtwork({ showBackground, showPartLabels, ink, sheet: SHEET })),
-    [showBackground, showPartLabels, ink],
+    () => parse(buildTwinScrewExtruderArtwork({ showBackground, sheet: SHEET })),
+    [showBackground],
   );
 
   return (

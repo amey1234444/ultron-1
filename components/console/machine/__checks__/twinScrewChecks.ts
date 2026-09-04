@@ -147,8 +147,10 @@ check(
 // The machine has to actually contain the machine. Each of these is a part the
 // registry hangs points off; a silent loss of one would leave pads floating.
 const REQUIRED_PARTS = [
-  'motor', 'motor-coupling', 'gearbox', 'gearbox-output', 'main-hopper',
-  'barrel', 'upper-screw', 'lower-screw', 'side-feeder', 'vent', 'die',
+  // The drive train comes from the rebuild pass, which is why these three carry
+  // its names rather than the base geometry's.
+  'motor-v16', 'motor-coupling-v16', 'gearbox-v16', 'gearbox-output-raised-v22',
+  'main-hopper', 'barrel', 'upper-screw', 'lower-screw', 'side-feeder', 'vent', 'die',
 ];
 check(
   'every part the registry measures is present in the drawing',
@@ -171,24 +173,43 @@ const declared = new Set(Array.from(machineSvg.matchAll(/\sid="([^"]+)"/g), (m) 
 const dangling = [...referenced].filter((id) => !declared.has(id));
 check('every paint, clip and filter reference resolves', dangling.length === 0, dangling.join(', ') || undefined);
 
+/**
+ * The drawing draws no instrument of its own.
+ *
+ * The reference ships its sensor markers as a separate layer keyed by its own
+ * sensor ids. Those ids are not the ones saved layouts and channel mappings
+ * reference, so carrying the layer across would have put a second, differently
+ * named set of markers on the machine next to the registry's own — visually
+ * identical, and wired to nothing.
+ */
 check(
   'the drawing carries no instrument markers of its own',
-  !machineSvg.includes('#18b763'),
+  !machineSvg.includes('data-sensor-id') && !machineSvg.includes('configured-process-sensors'),
 );
 
-check(
-  'part names are off unless asked for',
-  !machineSvg.includes('>MOTOR<') && buildTwinScrewExtruderArtwork({ showPartLabels: true }).includes('>MOTOR<'),
-);
-
-check(
-  'part names take the caller colour, so they stay readable in both themes',
-  buildTwinScrewExtruderArtwork({ showPartLabels: true, ink: '#abcdef' }).includes('#abcdef'),
-);
+// The reference calls this a marker-only drawing: no sensor names, part names,
+// zone names or leader lines are baked in, so nothing on the machine can go
+// stale against a label the application is the actual source of.
+check('the drawing carries no baked-in text', !machineSvg.includes('<text'));
 
 check(
   'the sheet and its grid are off unless asked for',
   !machineSvg.includes('url(#grid)') && buildTwinScrewExtruderArtwork({ showBackground: true }).includes('url(#grid)'),
+);
+
+/**
+ * With the sheet off, the drawing is actually transparent.
+ *
+ * The reference draws its motor and gearbox twice and hides the first pair
+ * behind an opaque patch across the left third of the frame. Vendoring removes
+ * the hidden pair instead, which is the only reason the machine can sit on the
+ * console's own grid rather than on a white card. A re-vendoring that brought
+ * the patch back would look almost right and be wrong in exactly one way, so
+ * the absence of any opaque fill is asserted rather than assumed.
+ */
+check(
+  'nothing paints an opaque ground when the sheet is off',
+  !/<rect[^>]*fill="#[0-9a-fA-F]{6}"[^>]*width="6[0-9][0-9]"/.test(machineSvg) && !machineSvg.includes('rebuild-background-patches'),
 );
 
 check(
@@ -245,7 +266,7 @@ check('no pad sits off the machine', strays.length === 0, strays.map((p) => p.co
 // The eight barrel zones are one row of instruments along one heater band. If
 // one drifts off that line the drawing stops reading as a zone profile.
 const zonePads = TWIN_SCREW_POINT_REGISTRY.filter((point) => /^tz-\d+$/.test(point.code));
-check('all eight barrel zones are declared', zonePads.length === 8, String(zonePads.length));
+check('all nine barrel zones are declared', zonePads.length === 9, String(zonePads.length));
 check(
   'the barrel zones share one line along the heater band',
   new Set(zonePads.map((point) => point.y)).size === 1,

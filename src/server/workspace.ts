@@ -17,12 +17,23 @@ import {
 } from '../../lib/deviceUniqueness';
 import type { FolderNode, ProjectNode } from '../../lib/hierarchy';
 import type { MachineNode } from '../../lib/machines';
+import { clampMachineZoom } from '../../lib/machineZoom';
 import type { CardNode } from '../../lib/rack';
 import { createSeedData } from '../../lib/seedData';
 import { ensureSchema, isDbEnabled, query, withClient } from './db';
 import { ApiError } from './errors';
 
-export type Layout = { trails: unknown[]; boxes: unknown[] };
+/**
+ * A saved canvas.
+ *
+ * `machineZoom` is how large the machine is drawn. It travels with the layout
+ * because the trail anchors are fractions of the machine rect: a layout read
+ * back at a different size is not the layout that was saved. Clamped on the way
+ * in by `clampMachineZoom`, and `null` when none was ever set — which is not
+ * the same as 100%, and is what lets a template's size apply to a machine that
+ * has never been sized itself.
+ */
+export type Layout = { trails: unknown[]; boxes: unknown[]; machineZoom?: number | null };
 type CanvasCardBox = Record<string, unknown>;
 
 export type Workspace = {
@@ -259,8 +270,8 @@ type DeviceRow = {
   simulated: boolean | null;
 };
 type CardRow = { id: string; device_id: string; slot: number; type: string; enabled: boolean; config: unknown; simulation: unknown };
-type LayoutRow = { machine_id: string; trails: unknown; boxes: unknown };
-type TemplateLayoutRow = { machine_template: string; trails: unknown; boxes: unknown };
+type LayoutRow = { machine_id: string; trails: unknown; boxes: unknown; machine_zoom: number | null };
+type TemplateLayoutRow = { machine_template: string; trails: unknown; boxes: unknown; machine_zoom: number | null };
 
 export async function getWorkspace(): Promise<Workspace | null> {
   if (!isDbEnabled()) return null;
@@ -282,6 +293,7 @@ export async function getWorkspace(): Promise<Workspace | null> {
     layoutMap[r.machine_id] = {
       trails: Array.isArray(r.trails) ? r.trails : [],
       boxes: Array.isArray(r.boxes) ? r.boxes : [],
+      machineZoom: clampMachineZoom(r.machine_zoom),
     };
   }
   const templateMap: Record<string, Layout> = {};
@@ -289,6 +301,7 @@ export async function getWorkspace(): Promise<Workspace | null> {
     templateMap[r.machine_template] = {
       trails: Array.isArray(r.trails) ? r.trails : [],
       boxes: Array.isArray(r.boxes) ? r.boxes : [],
+      machineZoom: clampMachineZoom(r.machine_zoom),
     };
   }
 
@@ -372,12 +385,14 @@ export async function saveMachineLayout(machineId: string, layout: Layout): Prom
     try {
       const trails = Array.isArray(layout.trails) ? layout.trails : [];
       const boxes = Array.isArray(layout.boxes) ? layout.boxes : [];
+      const machineZoom = clampMachineZoom(layout.machineZoom);
       await q(
         client,
-        `INSERT INTO studio_machine_layouts (machine_id, trails, boxes, updated_at)
-         VALUES ($1, $2::jsonb, $3::jsonb, now())
-         ON CONFLICT (machine_id) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes, updated_at = now()`,
-        [machineId, JSON.stringify(trails), JSON.stringify(boxes)],
+        `INSERT INTO studio_machine_layouts (machine_id, trails, boxes, machine_zoom, updated_at)
+         VALUES ($1, $2::jsonb, $3::jsonb, $4, now())
+         ON CONFLICT (machine_id) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes,
+           machine_zoom = EXCLUDED.machine_zoom, updated_at = now()`,
+        [machineId, JSON.stringify(trails), JSON.stringify(boxes), machineZoom],
       );
       await q(client, 'DELETE FROM studio_machine_canvas_cards WHERE machine_id = $1', [machineId]);
       let sortOrder = 0;
@@ -431,12 +446,14 @@ export async function saveMachineTemplate(machineTemplate: string, layout: Layou
       if (!template) throw new ApiError(400, 'Invalid machine template.');
       const trails = Array.isArray(layout.trails) ? layout.trails : [];
       const boxes = Array.isArray(layout.boxes) ? layout.boxes : [];
+      const machineZoom = clampMachineZoom(layout.machineZoom);
       await q(
         client,
-        `INSERT INTO studio_machine_templates (machine_template, trails, boxes, updated_at)
-         VALUES ($1, $2::jsonb, $3::jsonb, now())
-         ON CONFLICT (machine_template) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes, updated_at = now()`,
-        [template, JSON.stringify(trails), JSON.stringify(boxes)],
+        `INSERT INTO studio_machine_templates (machine_template, trails, boxes, machine_zoom, updated_at)
+         VALUES ($1, $2::jsonb, $3::jsonb, $4, now())
+         ON CONFLICT (machine_template) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes,
+           machine_zoom = EXCLUDED.machine_zoom, updated_at = now()`,
+        [template, JSON.stringify(trails), JSON.stringify(boxes), machineZoom],
       );
       const cur = await client.query<{ layout_revision: string }>('SELECT layout_revision FROM studio_meta WHERE id = 1 FOR UPDATE');
       const next = Number(cur.rows[0]?.layout_revision ?? 0) + 1;

@@ -4,6 +4,7 @@ import { Pressable, Text, View, type StyleProp, type ViewStyle } from 'react-nat
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
 import { liveMeasurementKey } from '../../../lib/liveMeasurementBus';
+import { clampMachineZoom, DEFAULT_MACHINE_ZOOM } from '../../../lib/machineZoom';
 import { channelHasRecentData, channelLiveStatus, deviceHasLiveBinding, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import { loadLocal, saveLocal } from '../../../lib/localPersist';
 import { listChannels, type CardNode, type ChannelRef } from '../../../lib/rack';
@@ -123,6 +124,22 @@ type TrailBoardProps = {
   // TrailBoard keeps ownership of edit state while the workspace decides where
   // the command rail and stage layers are hosted.
   renderWorkspace?: (layers: TrailBoardLayers) => ReactNode;
+  /**
+   * The size the machine is currently drawn at.
+   *
+   * The canvas owns the zoom control; this board owns every write of the
+   * layout, so the current size has to reach it to be saved with one.
+   */
+  machineZoom?: number;
+  /**
+   * Ask the canvas to resize the machine.
+   *
+   * Used when a template layout is applied: the template's cards were arranged
+   * against the machine at the size the template was saved at, and every anchor
+   * is a fraction of the machine rect, so applying the cards without the size
+   * would land them on the wrong features.
+   */
+  onMachineZoomChange?: (zoom: number) => void;
 };
 
 export type TrailBoardLayers = {
@@ -130,7 +147,16 @@ export type TrailBoardLayers = {
   board: ReactNode;
 };
 
-export type SavedLayout = { trails: Trail[]; boxes: Box[] };
+/**
+ * A saved canvas.
+ *
+ * `machineZoom` is the size the machine is drawn at, and it belongs to the
+ * layout rather than to the session: the trail anchors are fractions of the
+ * machine rect, so the size a layout was built against is part of what makes it
+ * reproducible. Absent means no size was ever saved, which is not the same as
+ * 100% — see `resolveMachineZoom`.
+ */
+export type SavedLayout = { trails: Trail[]; boxes: Box[]; machineZoom?: number };
 
 // v3: coordinates are stage units on the fixed 1600×900 design stage, so saved
 // layouts are resolution-independent. Shared with MachineWorkspace, which reads
@@ -356,6 +382,8 @@ export function TrailBoard({
   connectors = [],
   onConnectorStateChange,
   renderWorkspace,
+  machineZoom = DEFAULT_MACHINE_ZOOM,
+  onMachineZoomChange,
 }: TrailBoardProps) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
@@ -452,6 +480,7 @@ export function TrailBoard({
   const boxesRef = useRef(boxes);
   const boxSizesRef = useRef(boxSizes);
   const readOnlyRef = useRef(readOnly);
+  const machineZoomRef = useRef(machineZoom);
   const onSaveLayoutRef = useRef(onSaveLayout);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingLayout = useRef<SavedLayout | null>(null);
@@ -461,6 +490,7 @@ export function TrailBoard({
   boxesRef.current = boxes;
   boxSizesRef.current = boxSizes;
   readOnlyRef.current = readOnly;
+  machineZoomRef.current = machineZoom;
   onSaveLayoutRef.current = onSaveLayout;
 
   const readingText = useCallback((reading: LiveMeasurement | undefined, channel: ChannelRef): string | null => {
@@ -551,6 +581,9 @@ export function TrailBoard({
     return {
       trails: nextTrails,
       boxes: nextBoxes.map((box) => withBoxCenter(box, channelsRef.current, boxSizesRef.current[box.id])),
+      // Read through a ref rather than closed over, so a save triggered by a
+      // stale callback still records the size on screen at the time it fires.
+      machineZoom: machineZoomRef.current,
     };
   }, []);
 
@@ -575,6 +608,22 @@ export function TrailBoard({
     },
     [layoutWithCenters, machineId, storageKey],
   );
+
+  /**
+   * Resizing the machine is an edit to the layout, so it saves like one.
+   *
+   * Without this the size would only ever reach the server alongside some other
+   * change, and a person who resized the machine and nothing else would find it
+   * back at the old size on their next visit. Skipped on the first run: arriving
+   * at a saved size is not a change to it.
+   */
+  const savedMachineZoom = useRef(machineZoom);
+  useEffect(() => {
+    if (savedMachineZoom.current === machineZoom) return;
+    savedMachineZoom.current = machineZoom;
+    if (readOnlyRef.current) return;
+    persistLayout(trailsRef.current, boxesRef.current);
+  }, [machineZoom, persistLayout]);
 
   const replaceTrails = useCallback(
     (next: Trail[] | ((current: Trail[]) => Trail[]), shouldPersist = true) => {
@@ -611,9 +660,16 @@ export function TrailBoard({
   }, [initialLayout]);
 
   const applyTemplateLayout = () => {
-    // Generate against the machine's *current* rect (it shrinks/grows with
-    // zoom) — endpoints and bends land exactly on the artwork as rendered
-    // right now, not where it would sit at 100%.
+    // A saved template carries the size it was arranged at, so take that first:
+    // its cards are placed as fractions of the machine rect, and applying them
+    // at a different size would put every one of them somewhere else.
+    const templateZoom = clampMachineZoom(templateLayout?.machineZoom);
+    if (templateZoom !== null && templateZoom !== machineZoom) onMachineZoomChange?.(templateZoom);
+
+    // Without a saved template there is nothing to match, so generate against
+    // the machine's *current* rect (it shrinks and grows with zoom) — endpoints
+    // and bends land exactly on the artwork as rendered right now, not where it
+    // would sit at 100%.
     const layout = templateLayout ?? createTemplateDefaultLayout(machineTemplate, pickableChannels, machineRect);
     trailsRef.current = layout.trails;
     boxesRef.current = layout.boxes;
@@ -632,7 +688,7 @@ export function TrailBoard({
     savedFlashTimer.current = setTimeout(() => setJustSaved(false), 1600);
   };
 
-  const templateSafeLayout = () => {
+  const templateSafeLayout = (): SavedLayout => {
     const layout = layoutWithCenters(trailsRef.current, boxesRef.current);
     return {
       trails: layout.trails,
@@ -640,6 +696,11 @@ export function TrailBoard({
         const { channelId: _channelId, ...rest } = box;
         return rest;
       }),
+      // The size is deliberately kept. A template carries how large the machine
+      // is drawn, so a machine created from it later opens at the size it was
+      // designed against — and the card positions, which are fractions of the
+      // machine rect, land where they were placed.
+      machineZoom: layout.machineZoom,
     };
   };
 

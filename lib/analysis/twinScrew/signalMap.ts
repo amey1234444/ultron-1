@@ -61,6 +61,7 @@ export const CANONICAL_UNITS: Record<TwinScrewTag, string> = {
   'TS-TZ6': 'degC',
   'TS-TZ7': 'degC',
   'TS-TZ8': 'degC',
+  'TS-TZ9': 'degC',
   'TS-P1': 'MPa',
   'TS-P2': 'MPa',
   'TS-PV': 'MPa',
@@ -167,10 +168,10 @@ const LABEL_TO_TAG: { match: RegExp; tag: TwinScrewTag; speedDomain?: SpeedDomai
 ];
 
 /** Barrel zones resolve by number rather than by nine near-identical patterns. */
-const ZONE_TAGS: TwinScrewTag[] = ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8'];
+const ZONE_TAGS: TwinScrewTag[] = ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8', 'TS-TZ9'];
 
 function zoneTagFor(label: string): TwinScrewTag | null {
-  const match = /(?:barrel\s*)?(?:temperature\s*)?zone\s*0*([1-8])\b/i.exec(label);
+  const match = /(?:barrel\s*)?(?:temperature\s*)?zone\s*0*([1-9])\b/i.exec(label);
   if (!match) return null;
   return ZONE_TAGS[Number(match[1]) - 1] ?? null;
 }

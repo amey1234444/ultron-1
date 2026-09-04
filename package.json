@@ -66,7 +66,8 @@
     "lint": "next lint",
     "check:demo": "npx --yes esbuild components/console/machine/overview/__checks__/demoScenarioChecks.ts --bundle --platform=node --format=esm --external:react --external:react-native --outfile=node_modules/.cache/demoScenarioChecks.mjs && node node_modules/.cache/demoScenarioChecks.mjs",
     "typecheck": "tsc --noEmit",
-    "check:twin-screw": "npx --yes esbuild components/console/machine/__checks__/twinScrewChecks.ts --bundle --platform=node --format=cjs --alias:react-native=react-native-web --alias:react-native-svg=./node_modules/react-native-svg/lib/commonjs/ReactNativeSVG.web.js --resolve-extensions=.web.tsx,.web.ts,.web.jsx,.web.js,.tsx,.ts,.jsx,.js,.json --loader:.js=jsx --outfile=node_modules/.cache/twinScrewChecks.cjs && node node_modules/.cache/twinScrewChecks.cjs"
+    "check:twin-screw": "npx --yes esbuild components/console/machine/__checks__/twinScrewChecks.ts --bundle --platform=node --format=cjs --alias:react-native=react-native-web --alias:react-native-svg=./node_modules/react-native-svg/lib/commonjs/ReactNativeSVG.web.js --resolve-extensions=.web.tsx,.web.ts,.web.jsx,.web.js,.tsx,.ts,.jsx,.js,.json --loader:.js=jsx --outfile=node_modules/.cache/twinScrewChecks.cjs && node node_modules/.cache/twinScrewChecks.cjs",
+    "check:machine-zoom": "npx --yes esbuild components/console/machine/__checks__/machineZoomChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/machineZoomChecks.cjs && node node_modules/.cache/machineZoomChecks.cjs"
   },
   "private": true
 }

@@ -1,40 +1,43 @@
 
 /**
- * Twin Screw Extruder artwork.
+ * Twin Screw Extruder — the machine itself.
  *
- * This is the refined machine drawing (iteration 14), vendored as the template
- * artwork rather than redrawn: it is emitted as SVG source and parsed once into
- * react-native-svg nodes by `TwinScrewExtruder`, so the console renders the
- * reference drawing itself and not an approximation of it. Every element
- * survives that round trip — gradients, patterns, clip paths and the lighting
- * filters all map onto react-native-svg primitives, on web and on native alike.
+ * Vendored from the reference drawing (iteration 24, the marker-only channel-
+ * mapping build) rather than redrawn. It is emitted as SVG source and parsed
+ * once into react-native-svg nodes by `TwinScrewExtruder`, so the console
+ * renders the reference drawing and not an approximation of it: gradients,
+ * patterns, clip paths and lighting filters all survive that round trip, on
+ * web and on native alike.
  *
- * Four things were changed on the way in, and only these four:
+ * What changed on the way in, and nothing else:
  *
- * 1. The instrument markers baked into the drawing are gone. Pads are drawn by
- *    the template from `TWIN_SCREW_POINT_REGISTRY`, with their wiring state, so
- *    a dot on this machine always means a place a card can actually attach.
- * 2. The sheet and its grid are optional. On the editor canvas the workspace
- *    already paints a grid, and a second one beats against it.
- * 3. Part names and their leaders are optional and take their colour from the
- *    caller, so they stay readable in both themes and stay out of the way of
- *    the trail labels on the mapping canvas.
- * 4. The iteration-14 lighting pass is applied as filter attributes on the part
- *    groups rather than as a CSS block. react-native-svg has no CSS cascade, so
- *    a stylesheet would have rendered the machine flat on native.
+ * 1. The motor, coupling and gearbox this file used to draw are gone. The
+ *    rebuild pass in `rebuild.ts` draws all three again from scratch and the
+ *    reference hides the originals behind an opaque patch; removing them is
+ *    what lets the drawing sit on a transparent canvas instead of on a card.
+ *    Verified equivalent to the reference composition by pixel diff.
+ * 2. The sheet and its grid became optional, for the same reason.
+ * 3. The lighting pass is applied as filter attributes rather than as a CSS
+ *    block, because react-native-svg has no cascade to hang a stylesheet off.
+ * 4. The dead intermesh layer and the empty annotation marker are dropped;
+ *    each carries a note where it stood.
  *
- * The frame is the registry's frame: point coordinates and this drawing are the
- * same coordinate space, which is what lets a pad sit on the feature it
- * measures at every zoom level.
+ * Sensor markers are deliberately absent. This drawing is marker-only by
+ * design, and the markers are the app's own: `TwinScrewExtruder` draws one pad
+ * per `TWIN_SCREW_POINT_REGISTRY` entry, carrying that pad's wiring state.
  */
 
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
-} from '../../../lib/twinScrewExtruderPoints';
+} from '../../../../lib/twinScrewExtruderPoints';
 
+/** The frame the point registry places instruments in. One coordinate space. */
 export const WIDTH = TWIN_SCREW_ARTWORK_WIDTH;
 export const HEIGHT = TWIN_SCREW_ARTWORK_HEIGHT;
+
+/** Iteration 22 removes every raised separator rod between heater modules. */
+export const TEMPERATURE_ZONE_SEPARATOR_LAYOUT = [] as const;
 
 const f = (n: number) => Number(n.toFixed(2));
 
@@ -99,242 +102,6 @@ function heaterBolt(x: number, y: number): string {
 
 
 
-function motor(): string {
-  const fins = Array.from({ length: 22 }, (_, i) => {
-    const y = 490 + i * 6.05;
-    return `
-      <path d="M 76 ${f(y)} H 218" stroke="#51575b" stroke-width="2.15" stroke-linecap="round"/>
-      <path d="M 78 ${f(y + 2.05)} H 216" stroke="#ffffff" stroke-width=".88" stroke-linecap="round" opacity=".88"/>`;
-  }).join("");
-
-  return `
-  <g id="motor" filter="url(#tse14-metal-depth)">
-    <!-- LOWER FOUNDATION: front face + right bevel -->
-    <path d="M 36 681 H 252 L 262 676 V 725 H 36 Z"
-          fill="url(#baseMetal)" stroke="#343a3e" stroke-width="1.45"/>
-    <path d="M 36 681 H 252 L 262 676 H 47 Z" fill="#ffffff" opacity=".38"/>
-    <path d="M 252 681 L 262 676 V 725 L 252 720 Z" fill="url(#sidePlane)" opacity=".56"/>
-    <rect x="42" y="720" width="212" height="4" rx="2" fill="#2f3538" opacity=".12"/>
-    <path d="M 39 686 H 256" stroke="#ffffff" stroke-width="1.25" opacity=".7"/>
-    ${studNut(69, 695, 6.0, 7)}
-    ${studNut(203, 695, 6.0, 7)}
-
-    <!-- intermediate sole plate -->
-    <path d="M 53 650 H 231 L 240 656 V 681 H 53 Z"
-          fill="url(#plateV)" stroke="#383e42" stroke-width="1.28"/>
-    <path d="M 57 654 H 234" stroke="#ffffff" stroke-width="1.05" opacity=".65"/>
-    <path d="M 231 650 L 240 656 V 681 L 231 676 Z" fill="#91979a" opacity=".18"/>
-
-    <!-- cast mounting feet, slightly separated from body -->
-    <path d="M 73 621 H 96 V 647 H 101 V 657 H 67 V 647 H 72 Z"
-          fill="url(#metalV)" stroke="#50565a" stroke-width="1"/>
-    <path d="M 194 621 H 217 V 647 H 223 V 657 H 188 V 647 H 193 Z"
-          fill="url(#metalV)" stroke="#50565a" stroke-width="1"/>
-    ${hexNut(85,650,4.2)} ${hexNut(207,650,4.2)}
-    <path d="M 73 624 H 96 M 194 624 H 217" stroke="#ffffff" stroke-width=".9" opacity=".62"/>
-
-    <!-- FRONT FAN / END BELL: rounded, tapered and with lower-right edge shadow -->
-    <path d="M 76 485 H 50
-             C 31 485 19 502 16 529
-             V 588
-             C 18 617 31 636 49 641
-             H 64 Q 72 637 76 628 Z"
-          fill="url(#motorFrontBell)" stroke="#30363a" stroke-width="1.45"/>
-    <path d="M 49 491 C 34 508 29 529 29 557 C 29 588 36 613 50 628"
-          fill="none" stroke="#ffffff" stroke-width="1.75" opacity=".66"/>
-    <path d="M 61 491 C 51 510 48 532 48 557 C 48 586 54 610 63 626"
-          fill="none" stroke="#c6cac9" stroke-width="1.05" opacity=".62"/>
-    <path d="M 35 501 C 27 520 24 539 24 557 C 24 582 29 605 39 620"
-          fill="none" stroke="#ffffff" stroke-width="2.5" opacity=".32"/>
-    <path d="M 68 493 V 624" stroke="#50565a" stroke-width="2.0" opacity=".16"/>
-    <path d="M 69 493 V 624" stroke="#858b8e" stroke-width=".8" opacity=".35"/>
-
-    <!-- FINNED STATOR: body is slightly barrelled by the end-ring transitions -->
-    <path d="M 75 485 H 213 Q 221 485 223 493 V 621 Q 221 629 213 630 H 75 Z"
-          fill="url(#motorBody)" stroke="#343a3e" stroke-width="1.25"/>
-    <path d="M 77 488 H 216" stroke="#ffffff" stroke-width="1.15" opacity=".62"/>
-    ${fins}
-    <!-- broad cylindrical gloss and lower form shadow -->
-    <rect x="82" y="489" width="32" height="137" rx="9" fill="url(#cylGloss)" opacity=".34"/>
-    <rect x="189" y="489" width="25" height="137" rx="8" fill="url(#cylShade)" opacity=".32"/>
-    <path d="M 80 624 H 214" stroke="#3f4549" stroke-width="2.1" opacity=".19"/>
-    <path d="M 77 488 V 627" stroke="#858b8f" stroke-width="1.05" opacity=".72"/>
-    <path d="M 217 488 V 627" stroke="#73797d" stroke-width="1.08" opacity=".78"/>
-
-    <!-- TOP TERMINAL BOX: cap, seam and body -->
-    <rect x="112" y="449" width="76" height="15" rx="4" fill="url(#plateV)" stroke="#34393d" stroke-width="1.18"/>
-    <path d="M 116 452 H 184" stroke="#ffffff" stroke-width="1" opacity=".75"/>
-    <rect x="120" y="463" width="60" height="25" rx="3" fill="url(#metalV)" stroke="#454b4f" stroke-width="1.05"/>
-    <path d="M 122 468 H 178" stroke="#ffffff" stroke-width="1.1" opacity=".76"/>
-    <path d="M 123 485 H 177" stroke="#7b8185" stroke-width=".75" opacity=".5"/>
-
-    <!-- REAR END BELL: three-step curved carrier -->
-    <path d="M 216 486
-             Q 230 489 238 502
-             Q 246 519 248 553
-             Q 247 587 240 607
-             Q 233 622 219 630
-             L 210 621 V 496 Z"
-          fill="url(#endBell)" stroke="#343a3e" stroke-width="1.28"/>
-    <path d="M 221 497 C 231 514 234 533 234 557 C 234 583 231 602 222 616"
-          fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".66"/>
-    <path d="M 232 501 C 241 520 242 539 242 557 C 242 579 239 599 232 612"
-          fill="none" stroke="#797f83" stroke-width=".9" opacity=".5"/>
-    <ellipse cx="238" cy="557" rx="9.2" ry="50.5" fill="none" stroke="#6f7579" stroke-width=".85" opacity=".55"/>
-  </g>
-
-  <g id="motor-coupling" filter="url(#tse14-chrome-depth)">
-    <!-- shaft from motor end bell -->
-    <rect x="247" y="536" width="15" height="47" rx="6" fill="url(#deepMetal)" stroke="#343a3e" stroke-width="1.08"/>
-    <path d="M 259 539 V 580" stroke="#ffffff" stroke-width=".8" opacity=".48"/>
-    <!-- axial gap 1 -->
-    <rect x="262" y="541" width="3" height="37" fill="#454b4f" opacity=".55"/>
-
-    <!-- flexible coupling: larger collar with bright crown -->
-    <rect x="265" y="524" width="39" height="69" rx="5" fill="url(#metalH)" stroke="#343a3e" stroke-width="1.23"/>
-    <path d="M 270 529 H 299 M 270 588 H 299" stroke="#ffffff" stroke-width="1.0" opacity=".72"/>
-    <path d="M 275 527 V 590 M 296 527 V 590" stroke="#ffffff" stroke-width=".95" opacity=".58"/>
-    <path d="M 301 530 V 588" stroke="#70767a" stroke-width=".75" opacity=".55"/>
-    <!-- axial gap 2 -->
-    <rect x="304" y="540" width="3" height="38" fill="#454b4f" opacity=".5"/>
-
-    <!-- short shaft -->
-    <rect x="307" y="537" width="14" height="45" rx="3" fill="url(#deepMetal)" stroke="#343a3e" stroke-width="1.05"/>
-    <!-- spacer/bearing collar -->
-    <rect x="321" y="529" width="20" height="60" rx="3" fill="url(#metalH)" stroke="#343a3e" stroke-width="1.08"/>
-    <path d="M 325 533 V 585" stroke="#ffffff" stroke-width=".85" opacity=".54"/>
-    <path d="M 338 533 V 585" stroke="#777d81" stroke-width=".7" opacity=".5"/>
-    <!-- axial gap 3 -->
-    <rect x="341" y="540" width="3" height="38" fill="#454b4f" opacity=".5"/>
-
-    <!-- gearbox input nose -->
-    <path d="M 344 519 H 353 Q 359 521 361 531 V 585 Q 359 595 353 598 H 344 Z"
-          fill="url(#metalV)" stroke="#454b4f" stroke-width="1.05"/>
-    <path d="M 347 523 V 594" stroke="#ffffff" stroke-width=".8" opacity=".5"/>
-  </g>`;
-}
-
-function gearbox(): string {
-  return `
-  <g id="gearbox" filter="url(#tse14-metal-depth)">
-    <!-- BASE: front plate, top face and right bevel -->
-    <path d="M 285 692 H 574 L 584 687 V 726 H 285 Z"
-          fill="url(#baseMetal)" stroke="#343a3e" stroke-width="1.45"/>
-    <path d="M 285 692 H 574 L 584 687 H 296 Z" fill="#ffffff" opacity=".36"/>
-    <path d="M 574 692 L 584 687 V 726 L 574 721 Z" fill="#979c9f" opacity=".18"/>
-    <path d="M 288 697 H 578" stroke="#ffffff" stroke-width="1.28" opacity=".66"/>
-    ${studNut(317, 687, 6.1, 7)}
-    ${studNut(544, 687, 6.1, 7)}
-
-    <!-- LEFT SUPPORT WEB: sloped cast foot with internal highlight -->
-    <path d="M 294 668 H 318
-             C 333 656 339 643 343 625
-             L 350 588 V 691 H 294 Z"
-          fill="url(#metalV)" stroke="#676d71" stroke-width="1.05"/>
-    <path d="M 304 658 C 324 647 335 629 340 605" fill="none" stroke="#ffffff" stroke-width="1.45" opacity=".5"/>
-    <path d="M 318 668 H 348" stroke="#8f9598" stroke-width=".8" opacity=".38"/>
-
-    <!-- cast contact shadow under housing -->
-    <path d="M 349 687 H 524" stroke="#343a3e" stroke-width="2.2" opacity=".12"/>
-
-    <!-- RIGHT FOOT: directly below output side -->
-    <path d="M 519 654 H 543 V 673 H 554 L 566 684 V 691 H 518 Z"
-          fill="url(#metalV)" stroke="#676d71" stroke-width="1.0"/>
-    <path d="M 523 657 H 542" stroke="#ffffff" stroke-width=".9" opacity=".58"/>
-
-    <!-- MAIN CASTING: exact top-left chamfer and nearly vertical front walls -->
-    <path d="M 350 401 L 363 390 H 507
-             Q 518 390 524 397
-             L 531 410 V 681
-             Q 531 690 522 692 H 350 Z"
-          fill="url(#gearboxBody)" stroke="#34393d" stroke-width="1.58"/>
-    <!-- cast edge planes -->
-    <path d="M 350 401 L 363 390 V 692 H 350 Z" fill="url(#gearboxSide)" stroke="#666c70" stroke-width=".72"/>
-    <!-- top face has visible depth instead of a single highlight line -->
-    <path d="M 350 401 L 363 390 H 507 Q 517 390 522 395 L 514 401 H 361 Z"
-          fill="url(#topPlane)" stroke="#8a9093" stroke-width=".65" opacity=".88"/>
-    <!-- right cast side plane -->
-    <path d="M 524 399 L 531 410 V 681 Q 531 689 523 692 L 517 684 V 411 Z"
-          fill="url(#sidePlane)" opacity=".48"/>
-    <path d="M 526 410 V 681" stroke="#676d71" stroke-width=".9" opacity=".5"/>
-
-    <!-- LARGE INSPECTION COVER: larger radius and subtle bottom-right shadow -->
-    <rect x="375" y="441" width="104" height="227" rx="9"
-          fill="url(#coverFace)" stroke="#8c9194" stroke-width="1.12"/>
-    <path d="M 382 447 H 471" stroke="#ffffff" stroke-width="1.65" opacity=".82"/>
-    <path d="M 477 451 V 659 Q 477 665 471 666" fill="none" stroke="#858b8f" stroke-width=".75" opacity=".34"/>
-    <path d="M 382 666 H 469" stroke="#9aa0a3" stroke-width=".7" opacity=".4"/>
-    <!-- subtle recessed cover shadow on bottom/right -->
-    <path d="M 470 448 Q 476 449 476 455 V 657 Q 475 664 469 665"
-          fill="none" stroke="#33393d" stroke-width="2.3" opacity=".08"/>
-
-    <!-- RIGHT SERVICE COVER: slightly stepped forward -->
-    <path d="M 479 441 H 526 V 668 H 479 Z" fill="url(#gearboxRib)" stroke="#9da2a5" stroke-width=".86"/>
-    <path d="M 484 447 H 521" stroke="#ffffff" stroke-width="1.22" opacity=".58"/>
-    <path d="M 522 447 V 663" stroke="#858b8e" stroke-width=".68" opacity=".34"/>
-
-    <!-- TOP LIFTING EYE -->
-    <circle cx="458" cy="375" r="16" fill="none" stroke="#41474b" stroke-width="3"/>
-    <circle cx="458" cy="375" r="8.9" fill="#f7f7f5" stroke="#777d80" stroke-width="1"/>
-    <path d="M 447 390 H 469" stroke="#41474b" stroke-width="3"/>
-
-    <!-- INSPECTION BOSSES: concentric metal rings -->
-    <circle cx="436" cy="514" r="15" fill="url(#boltGrad)" stroke="#41474b" stroke-width="1.7"/>
-    <circle cx="436" cy="514" r="9.1" fill="#e8eae8" stroke="#8c9295" stroke-width=".8"/>
-    <circle cx="436" cy="514" r="6.5" fill="#f9f9f7" stroke="#656b6f" stroke-width="1"/>
-    <circle cx="436" cy="600" r="13.2" fill="url(#boltGrad)" stroke="#41474b" stroke-width="1.65"/>
-    <circle cx="436" cy="600" r="8.0" fill="#e8eae8" stroke="#8c9295" stroke-width=".75"/>
-    <circle cx="436" cy="600" r="5.7" fill="#f9f9f7" stroke="#656b6f" stroke-width=".95"/>
-
-    <!-- CAST FASTENERS / PLUGS -->
-    ${socketBolt(372,421,5.3)}
-    ${socketBolt(500,437,5.25)}
-    ${socketBolt(500,556,4.95)}
-    ${socketBolt(500,616,4.95)}
-    ${socketBolt(500,684,4.5)}
-    <rect x="393" y="386" width="13" height="7" rx="2" fill="url(#plateV)" stroke="#666c70" stroke-width=".82"/>
-    <rect x="488" y="386" width="13" height="7" rx="2" fill="url(#plateV)" stroke="#666c70" stroke-width=".82"/>
-    <rect x="346" y="467" width="8" height="26" rx="4" fill="url(#metalH)" stroke="#555b5f" stroke-width=".88"/>
-  </g>
-
-  <g id="gearbox-output" filter="url(#tse14-metal-depth)">
-    <!-- Large output casting immediately attached to gearbox wall -->
-    <path d="M 531 418 H 548
-             Q 558 419 563 430
-             V 640 Q 561 651 552 654 H 531 Z"
-          fill="url(#metalH)" stroke="#343a3e" stroke-width="1.22"/>
-
-    <!-- rounded bell / reducer housing -->
-    <path d="M 548 425
-             H 556 Q 566 428 571 441
-             L 574 452 V 622
-             L 570 637 Q 564 647 554 650 H 548 Z"
-          fill="url(#outputBell)" stroke="#50565a" stroke-width="1.12"/>
-    <path d="M 554 435 C 563 462 567 498 567 538 C 567 577 563 612 555 640"
-          fill="none" stroke="#ffffff" stroke-width="1.28" opacity=".62"/>
-    <path d="M 568 449 V 627" stroke="#73797d" stroke-width=".78" opacity=".38"/>
-    <path d="M 550 466 C 558 463 566 463 572 466" fill="none" stroke="#ffffff" stroke-width="1.0" opacity=".44"/>
-    <path d="M 550 603 C 558 606 565 606 571 603" fill="none" stroke="#4a5054" stroke-width=".9" opacity=".28"/>
-
-    <!-- short bearing carrier directly after bell -->
-    <rect x="573" y="448" width="12" height="188" rx="3"
-          fill="url(#deepMetal)" stroke="#4c5256" stroke-width=".95"/>
-    <path d="M 576 452 V 632" stroke="#ffffff" stroke-width=".72" opacity=".44"/>
-
-    <!-- vertical bolted flange plate -->
-    <rect x="585" y="441" width="27" height="204" rx="4"
-          fill="url(#metalH)" stroke="#3d4347" stroke-width="1.08"/>
-    <path d="M 589 445 H 608" stroke="#ffffff" stroke-width=".95" opacity=".67"/>
-    <path d="M 608 445 V 641" stroke="#73797d" stroke-width=".72" opacity=".4"/>
-    ${socketBolt(598,474,5.0)}
-    ${socketBolt(598,548,5.0)}
-    ${socketBolt(598,622,5.0)}
-
-    <!-- tiny assembly seam before the two screw journals -->
-    <rect x="612" y="456" width="3" height="173" rx="1" fill="#343a3e" opacity=".62"/>
-  </g>`;
-}
-
 function mainHopper(): string {
   return `
   <g id="main-hopper" filter="url(#tse14-glass-depth)">
@@ -375,7 +142,7 @@ function mainHopper(): string {
 
 function sideFeeder(): string {
   return `
-  <g id="side-feeder" filter="url(#tse14-metal-depth)">
+  <g id="side-feeder" transform="translate(80 0)" filter="url(#tse14-metal-depth)">
     <!-- =========================================================
          SIDE FEEDER — reference-driven multi-plane reconstruction
          ========================================================= -->
@@ -400,24 +167,38 @@ function sideFeeder(): string {
     <path d="M 916 329 H 986" stroke="#ffffff" stroke-width="1.0" opacity=".72"/>
     <path d="M 918 337 H 983" stroke="#4e5458" stroke-width=".7" opacity=".33"/>
 
-    <!-- 2) CLEAR TAPERED HOPPER -->
-    <path d="M 918 339 H 982
+    <!-- 2) CLEAR TAPERED HOPPER: wider mouth and deeper reference taper -->
+    <path d="M 914 336 H 986
              L 972 370
              Q 971 373 967 374
              H 934 Q 930 373 929 370 Z"
-          fill="url(#hopperGlass)" stroke="#3b4144" stroke-width="1.15"/>
+          fill="url(#hopperGlass)" stroke="#343a3e" stroke-width="1.65"/>
+
+    <!-- inner glass panel makes the hopper read as a separate transparent vessel -->
+    <path d="M 920 340 H 980 L 969 369 H 936 Z"
+          fill="#ffffff" fill-opacity=".16" stroke="#ffffff" stroke-opacity=".58" stroke-width=".8"/>
 
     <!-- glass highlight and right-side shade -->
-    <path d="M 926 342 L 934 368" stroke="#ffffff" stroke-width="3.6" opacity=".28"/>
-    <path d="M 973 342 L 967 369" stroke="#6f7579" stroke-width="2.0" opacity=".11"/>
+    <path d="M 921 339 L 934 369" stroke="#ffffff" stroke-width="3.8" opacity=".38"/>
+    <path d="M 978 339 L 967 370" stroke="#5e6569" stroke-width="2.2" opacity=".15"/>
 
     <!-- material bed follows actual hopper taper -->
-    <path d="M 927 344
-             C 940 343 960 343 974 344
-             L 967 370 H 936 Z"
+    <path d="M 920 347
+             C 935 343 964 343 980 347
+             L 969 371 H 936 Z"
           fill="url(#pelletFill)" opacity=".94"/>
-    <path d="M 936 345 L 943 369" stroke="#f7d99a" stroke-width="2.4" opacity=".54"/>
-    <path d="M 964 345 L 960 369" stroke="#b77c20" stroke-width="1.5" opacity=".15"/>
+    <path d="M 921 347 C 938 343 963 343 979 347" fill="none" stroke="#f7dc9a" stroke-width="1.4" opacity=".86"/>
+    <path d="M 936 348 L 943 369" stroke="#f7d99a" stroke-width="2.4" opacity=".54"/>
+    <path d="M 970 347 L 961 370" stroke="#a97522" stroke-width="1.6" opacity=".20"/>
+
+    <!-- visible pellet/granule cues, kept inside the tapered material bed -->
+    <g id="side-hopper-pellets" fill="#bd892d" opacity=".52" stroke="#f3ce7b" stroke-width=".35">
+      <circle cx="932" cy="351" r="1.25"/><circle cx="944" cy="349" r="1.1"/>
+      <circle cx="957" cy="350" r="1.3"/><circle cx="970" cy="352" r="1.05"/>
+      <circle cx="938" cy="358" r="1.15"/><circle cx="951" cy="356" r="1.25"/>
+      <circle cx="964" cy="359" r="1.15"/><circle cx="943" cy="365" r="1.05"/>
+      <circle cx="956" cy="364" r="1.2"/><circle cx="965" cy="366" r=".95"/>
+    </g>
 
     <!-- 3) LEFT ADJUSTMENT / DRIVE CLUSTER -->
     <!-- cast triangular link bracket -->
@@ -510,6 +291,16 @@ function sideFeeder(): string {
     <rect x="948" y="492" width="21" height="7" rx="1.5" fill="url(#plateV)" stroke="#555b5f" stroke-width=".78"/>
     <!-- final contact shadow to barrel -->
     <rect x="951" y="499" width="15" height="3" rx="1" fill="#42484c" opacity=".62"/>
+
+    <!-- Reference-strength silhouette: only assembly boundaries are reinforced. -->
+    <g id="side-feeder-reference-outline" fill="none" stroke="#343a3e" stroke-linejoin="round" stroke-linecap="round" style="pointer-events: none">
+      <path d="M907 318Q905 318 905 321V323Q905 326 909 326H991Q995 326 995 323V321Q995 318 991 318Z" stroke-width="2.15"/>
+      <path d="M914 336H986L972 370Q971 373 967 374H934Q930 373 929 370Z" stroke-width="2.15"/>
+      <rect x="918" y="373" width="70" height="17" rx="3" stroke-width="1.95"/>
+      <path d="M923 390H939V451L923 429ZM938 390H978Q982 390 982 395V446Q982 451 977 454H943Q938 451 938 446Z" stroke-width="2.15"/>
+      <path d="M937 449H986V469Q986 474 979 476H939Z" stroke-width="1.95"/>
+      <path d="M944 476H973V489Q972 492 969 493H948Q945 492 944 489Z" stroke-width="1.8"/>
+    </g>
   </g>`;
 }
 function screwRibbon(x: number, cy: number, phase = 0, mirror = false): string {
@@ -637,13 +428,9 @@ function bottomHeater(x: number, w: number): string {
     </g>`;
 }
 
-function zoneJoint(x: number): string {
+function bottomZoneJoint(x: number): string {
   return `
     <g class="zone-joint">
-      <!-- top clamp strip -->
-      <rect x="${x-3.5}" y="463" width="7" height="32" rx="1.5" fill="url(#jointMetal)" stroke="#5c6266" stroke-width=".78"/>
-      <path d="M ${x-1.7} 465 V 493" stroke="#fff" stroke-width=".65" opacity=".48"/>
-      <circle cx="${x}" cy="487" r="2.35" fill="url(#boltGrad)" stroke="#555b5f" stroke-width=".68"/>
       <!-- bottom clamp strip -->
       <rect x="${x-3.5}" y="614" width="7" height="41" rx="1.5" fill="url(#jointMetal)" stroke="#5c6266" stroke-width=".78"/>
       <path d="M ${x-1.7} 616 V 653" stroke="#fff" stroke-width=".65" opacity=".48"/>
@@ -651,18 +438,34 @@ function zoneJoint(x: number): string {
     </g>`;
 }
 
+function temperatureZoneLink(x: number): string {
+  return `
+    <rect class="temperature-zone-link" x="${x}" y="474" width="1" height="10" rx=".5"
+          fill="url(#jointMetal)" stroke="none" style="pointer-events: none"/>`;
+}
+
 function barrel(): string {
+  // The four-module bank between the main hopper and side feeder is lengthened
+  // gently from 60 to 64 units. The downstream banks remain 60 units so the
+  // side-feeder and vent mounting clearances stay mechanically correct.
   const tops = [
-    [704,94,750],[804,96,853],[902,95,936],[1002,118,1064],
-    [1124,106,1187],[1236,100,1289],[1336,104,1389]
+    [736,64,768],[801,64,833],[866,64,898],[931,64,963],
+    [1072,60,1102],[1133,60,1163],[1194,60,1224],[1255,60,1285],
+    [1378,60,1408]
   ].map(v => topHeater(v[0], v[1], v[2])).join("");
+
+  const zoneLinks = [800,865,930,1132,1193,1254]
+    .map(temperatureZoneLink)
+    .join("");
 
   const bottoms = [
     [612,92],[708,92],[804,92],[900,92],
     [996,92],[1092,92],[1188,92],[1284,92],[1380,58]
   ].map(v => bottomHeater(v[0], v[1])).join("");
 
-  const joints = [704,800,896,992,1088,1184,1280,1376].map(zoneJoint).join("");
+  const bottomJoints = [704,800,896,992,1088,1184,1280,1376]
+    .map(bottomZoneJoint)
+    .join("");
 
   return `
   <g id="barrel" filter="url(#tse14-barrel-depth)">
@@ -711,14 +514,15 @@ function barrel(): string {
       ${screwFlights(637, 1438, 578, 42, 15, true)}
     </g>
 
-    <!-- The reference drawing carries a further "dense intermeshing" layer here,
-         clipped to #intermeshClip. No such clip path is ever defined, so a
-         browser drops the layer outright and it is absent from the reference
-         render this template was matched against. It is left out rather than
-         carried across dead: react-native-svg ignores the dangling reference
-         instead of dropping the layer, so keeping it would have put marks on
-         the native drawing that the drawing it came from has never shown.
-         intermeshBridge() below is what it drew, if it is ever wanted back. -->
+    <!-- dense intermeshing region -->
+    <!-- Drawn unclipped. The reference clips this layer to a clip path it never
+         declares anywhere; librsvg, which rendered the reference image, ignores
+         the dangling reference and draws the layer, while a browser would drop
+         the layer outright. Removing the attribute is what makes every renderer
+         agree with the image this drawing was matched against. -->
+    <g opacity=".84">
+      ${[905,949,993,1037,1081,1125,1169,1213,1257,1301].map(x => intermeshBridge(x,552)).join("")}
+    </g>
 
     <path d="M 850 549 C 900 543 945 547 989 566 C 1031 585 1085 588 1135 569 C 1191 548 1240 543 1293 555"
           fill="none" stroke="#f8f8f6" stroke-width="2.0" opacity=".47"/>
@@ -726,14 +530,15 @@ function barrel(): string {
           fill="none" stroke="#606669" stroke-width="1.3" opacity=".54"/>
 
     ${tops}
+    ${zoneLinks}
     ${bottoms}
-    ${joints}
+    ${bottomJoints}
   </g>`;
 }
 
 function ventDie(): string {
   return `
-  <g id="vent" filter="url(#tse14-metal-depth)">
+  <g id="vent" transform="translate(4 0)" filter="url(#tse14-metal-depth)">
     <!-- vent body -->
     <rect x="1324" y="376" width="45" height="89" rx="3"
           fill="url(#metalH)" stroke="#373d41" stroke-width="1.25"/>
@@ -746,6 +551,31 @@ function ventDie(): string {
     ${socketBolt(1321,411,3.2)} ${socketBolt(1360,411,3.2)}
     <rect x="1330" y="417" width="30" height="47"
           fill="url(#mesh)" stroke="#4b5155" stroke-width="1"/>
+
+    <!-- rigid vent-to-machine throat: the vent now lands on the barrel rail -->
+    <g id="vent-machine-connection-v23" stroke="#3b4145" stroke-linejoin="round">
+      <rect x="1334" y="463" width="22" height="25" rx="2"
+            fill="url(#metalV)" stroke-width="1.25"/>
+      <path d="M1338 465V486M1352 465V486" stroke="#ffffff" stroke-width=".8" opacity=".58"/>
+      <rect x="1328" y="461" width="34" height="8" rx="2"
+            fill="url(#plateV)" stroke-width="1.15"/>
+      <rect x="1326" y="486" width="38" height="8" rx="2"
+            fill="url(#plateV)" stroke-width="1.25"/>
+      <path d="M1330 489H1360" stroke="#ffffff" stroke-width=".8" opacity=".7"/>
+      ${socketBolt(1332,490,2.5)} ${socketBolt(1358,490,2.5)}
+    </g>
+
+    <!-- physically mounted vent-temperature probe, threaded boss and rigid arm -->
+    <g id="vent-temperature-probe" stroke="#3d4347" stroke-linejoin="round">
+      <rect x="1365" y="416" width="10" height="10" rx="2"
+            fill="url(#metalH)" stroke-width="1.05"/>
+      <path d="M1372 417H1379L1385 421L1379 425H1372Z"
+            fill="url(#plateV)" stroke-width="1.05"/>
+      <path d="M1368 418V424" stroke="#ffffff" stroke-width=".75" opacity=".72"/>
+      <path d="M1378 421H1384" stroke="#343a3e" stroke-width="3.2"/>
+      <path d="M1378 420H1384" stroke="#ffffff" stroke-width=".8" opacity=".7"/>
+      <circle cx="1384" cy="421" r="2.4" fill="url(#boltGrad)" stroke-width=".75"/>
+    </g>
   </g>
 
   <g id="die" filter="url(#tse14-metal-depth)">
@@ -780,99 +610,6 @@ function ventDie(): string {
 }
 
 
-function motorDetailLayer(): string {
-  return `
-  <g id="motor-detail-layer" style="pointer-events: none">
-    <path d="M 48 493 C 35 509 30 531 30 557 C 30 586 36 610 49 626"
-          fill="none" stroke="#ffffff" stroke-width="1.6" opacity=".58"/>
-    <path d="M 57 492 C 46 511 42 533 42 557 C 42 584 47 607 57 624"
-          fill="none" stroke="#d8dcda" stroke-width="1.05" opacity=".52"/>
-    <path d="M 66 491 C 59 511 56 533 56 557 C 56 582 59 603 66 621"
-          fill="none" stroke="#5a6064" stroke-width=".95" opacity=".34"/>
-    <path d="M 74 489 V 626" stroke="#ffffff" stroke-width=".95" opacity=".44"/>
-
-    <path d="M 35 501 C 26 521 22 541 22 557 C 22 583 28 607 38 620"
-          fill="none" stroke="#ffffff" stroke-width="2.7" opacity=".22"/>
-    <path d="M 67 494 V 623" stroke="#2f3538" stroke-width="1.8" opacity=".08"/>
-
-    <rect x="75" y="489" width="6" height="137" rx="2" fill="#555b5f" opacity=".10"/>
-    <rect x="211" y="489" width="7" height="137" rx="2" fill="#33393d" opacity=".14"/>
-
-    <path d="M 83 493.00 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 499.05 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 505.10 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 511.15 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 517.20 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 523.25 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 529.30 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 535.35 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 541.40 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 547.45 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 553.50 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 559.55 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 565.60 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 571.65 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 577.70 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 583.75 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 589.80 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 595.85 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 601.90 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 607.95 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/><path d="M 83 614.00 H 208" stroke="#ffffff" stroke-width=".42" opacity=".24"/>
-
-    <ellipse cx="228" cy="557" rx="10.8" ry="58" fill="none" stroke="#ffffff" stroke-width=".72" opacity=".26"/>
-    <ellipse cx="233" cy="557" rx="12.7" ry="55.5" fill="none" stroke="#ffffff" stroke-width=".82" opacity=".36"/>
-    <ellipse cx="239" cy="557" rx="7.5" ry="47.5" fill="none" stroke="#5b6165" stroke-width=".85" opacity=".46"/>
-
-    <path d="M 113 451 H 187" stroke="#ffffff" stroke-width=".9" opacity=".62"/>
-    <path d="M 121 464 V 487" stroke="#6a7074" stroke-width=".6" opacity=".32"/>
-    <path d="M 179 464 V 487" stroke="#6a7074" stroke-width=".6" opacity=".32"/>
-
-    <path d="M 54 650 H 230 L 238 655 H 62 Z" fill="#ffffff" opacity=".20"/>
-    <path d="M 60 653 H 233" stroke="#ffffff" stroke-width=".9" opacity=".38"/>
-    <path d="M 38 681 H 251 L 259 677 H 47 Z" fill="#ffffff" opacity=".22"/>
-    <path d="M 46 684 H 254" stroke="#3a4044" stroke-width=".85" opacity=".14"/>
-
-    <path d="M 269 527 V 590" stroke="#5d6367" stroke-width=".85" opacity=".52"/>
-    <path d="M 300 527 V 590" stroke="#5d6367" stroke-width=".85" opacity=".52"/>
-    <path d="M 322 533 V 585" stroke="#ffffff" stroke-width=".78" opacity=".42"/>
-    <path d="M 340 533 V 585" stroke="#555b5f" stroke-width=".72" opacity=".44"/>
-    <path d="M 264 544 H 304" stroke="#ffffff" stroke-width=".6" opacity=".24"/>
-    <path d="M 321 544 H 342" stroke="#ffffff" stroke-width=".56" opacity=".22"/>
-    <path d="M 264 572 H 304" stroke="#2f3538" stroke-width=".6" opacity=".18"/>
-    <path d="M 321 573 H 342" stroke="#2f3538" stroke-width=".55" opacity=".16"/>
-
-    <rect x="184" y="491" width="25" height="133" rx="8" fill="#13181b" opacity=".06"/>
-  </g>`;
-}
-
-function gearboxDetailLayer(): string {
-  return `
-  <g id="gearbox-detail-layer" style="pointer-events: none">
-    <path d="M 362 392 H 505 Q 514 392 519 398" fill="none" stroke="#ffffff" stroke-width="1.28" opacity=".54"/>
-    <path d="M 351 405 V 684" stroke="#ffffff" stroke-width="1.0" opacity=".44"/>
-    <path d="M 527 412 V 677" stroke="#4b5155" stroke-width="1.08" opacity=".28"/>
-    <path d="M 364 399 H 513" stroke="#ffffff" stroke-width=".86" opacity=".34"/>
-
-    <path d="M 350 402 L 363 390 V 692" fill="none" stroke="#666c70" stroke-width=".82" opacity=".42"/>
-    <path d="M 357 401 V 690" stroke="#ffffff" stroke-width=".62" opacity=".18"/>
-
-    <path d="M 378 447 H 473" stroke="#ffffff" stroke-width="1.12" opacity=".58"/>
-    <path d="M 381 448 V 662" stroke="#ffffff" stroke-width=".55" opacity=".16"/>
-    <path d="M 474 451 V 657" stroke="#555b5f" stroke-width=".95" opacity=".24"/>
-    <path d="M 382 665 H 469" stroke="#4b5155" stroke-width=".84" opacity=".20"/>
-    <path d="M 470 448 Q 476 449 476 455 V 657 Q 475 664 469 665"
-          fill="none" stroke="#2b3134" stroke-width="1.8" opacity=".08"/>
-
-    <path d="M 480 444 V 665" stroke="#ffffff" stroke-width=".70" opacity=".42"/>
-    <path d="M 487 446 H 521" stroke="#ffffff" stroke-width=".78" opacity=".22"/>
-    <path d="M 524 445 V 664" stroke="#4f5559" stroke-width=".80" opacity=".32"/>
-    <path d="M 520 448 V 662" stroke="#22282b" stroke-width=".6" opacity=".10"/>
-
-    <circle cx="436" cy="514" r="11.7" fill="none" stroke="#ffffff" stroke-width=".75" opacity=".28"/>
-    <circle cx="436" cy="600" r="10.0" fill="none" stroke="#ffffff" stroke-width=".72" opacity=".24"/>
-
-    <path d="M 289 694 H 579" stroke="#ffffff" stroke-width=".9" opacity=".30"/>
-    <path d="M 303 658 C 323 647 334 629 340 605" fill="none" stroke="#ffffff" stroke-width="1.0" opacity=".22"/>
-    <path d="M 520 656 H 544" stroke="#ffffff" stroke-width=".9" opacity=".22"/>
-
-    <path d="M 548 451 C 557 447 565 448 572 453" fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".48"/>
-    <path d="M 549 473 C 559 470 566 470 573 474" fill="none" stroke="#ffffff" stroke-width=".90" opacity=".22"/>
-    <path d="M 549 489 C 559 486 566 486 572 490" fill="none" stroke="#ffffff" stroke-width=".90" opacity=".30"/>
-    <path d="M 549 589 C 558 593 565 593 572 589" fill="none" stroke="#50565a" stroke-width=".94" opacity=".32"/>
-    <path d="M 549 626 C 557 631 564 631 570 626" fill="none" stroke="#454b4f" stroke-width="1.02" opacity=".34"/>
-
-    <rect x="572" y="454" width="2.6" height="176" fill="#2f3538" opacity=".16"/>
-    <rect x="583" y="452" width="2.2" height="184" fill="#30363a" opacity=".22"/>
-    <path d="M 589 445 H 607" stroke="#ffffff" stroke-width=".84" opacity=".44"/>
-    <path d="M 591 639 H 607" stroke="#2e3437" stroke-width=".7" opacity=".14"/>
-    <path d="M 608 446 V 640" stroke="#3e4448" stroke-width=".78" opacity=".34"/>
-
-    <circle cx="593" cy="470" r="1.6" fill="#ffffff" opacity=".46"/>
-    <circle cx="593" cy="611" r="1.6" fill="#ffffff" opacity=".38"/>
-  </g>`;
-}
-
 function hopperDetailLayer(): string {
   return `
   <g id="hopper-detail-layer" style="pointer-events: none">
@@ -898,7 +635,7 @@ function hopperDetailLayer(): string {
 
 function sideFeederDetailLayer(): string {
   return `
-  <g id="side-feeder-detail-layer" style="pointer-events: none">
+  <g id="side-feeder-detail-layer" transform="translate(80 0)" style="pointer-events: none">
     <!-- top cap cylindrical depth -->
     <path d="M 910 319 C 934 316 968 316 991 319" fill="none" stroke="#ffffff" stroke-width="1.1" opacity=".50"/>
     <path d="M 914 327 H 987" stroke="#50565a" stroke-width=".7" opacity=".24"/>
@@ -982,143 +719,12 @@ function ventDieDetailLayer(): string {
 
 
 /**
- * Part names and their leader lines.
- *
- * The label set is the drawing's own — MOTOR, GEAR BOX, MAIN FEEDER / HOPPER,
- * SIDE FEEDER, HEATING ZONES, the numbered barrel zones, BARREL and DIE — and
- * nothing beyond it.
- *
- * Colour comes from the caller rather than the drawing. The machine itself is
- * a light technical illustration in both themes, the way a drawing sheet is,
- * but text that sits off the machine is read against the console behind it and
- * has to follow the console.
- *
- * Each leader now runs the full distance to its label. It used to stop short
- * of a marker dot that filled the last stretch; that dot is a wired instrument
- * pad now, and pads belong to the registry, not to the artwork.
+ * The machine, as SVG body text: definitions followed by the parts, in the
+ * order they are painted. No <svg> wrapper — `buildTwinScrewExtruderArtwork`
+ * owns that, because the overlay passes have to land inside the same one.
  */
-function annotations(ink: string): string {
+export function buildMachineSvg({ showBackground, sheet }: { showBackground: boolean; sheet: string }): string {
   return `
-  <g font-family="Inter_600SemiBold, Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif"
-     fill="${ink}" text-anchor="middle" font-weight="700">
-    <g font-size="17" letter-spacing="3">
-      <text x="142" y="341">MOTOR</text>
-      <text x="436" y="275">GEAR BOX</text>
-      <text x="660" y="42">MAIN FEEDER /</text>
-      <text x="660" y="67">HOPPER</text>
-      <text x="944" y="191">SIDE FEEDER</text>
-      <text x="1182" y="296">HEATING ZONES</text>
-    </g>
-    <g font-size="16" letter-spacing="2">
-      <text x="744" y="747">Z1</text>
-      <text x="920" y="747">Z2</text>
-      <text x="1033" y="747">Z3</text>
-      <text x="1161" y="747">Z4</text>
-      <text x="1278" y="747">Z5</text>
-      <text x="981" y="834">BARREL</text>
-      <text x="1499" y="747">DIE</text>
-    </g>
-  </g>
-
-  <g fill="none" stroke="${ink}" stroke-width="2" stroke-dasharray="8 6" opacity=".85">
-    <path d="M 142 351 V 424"/>
-    <path d="M 436 286 V 350"/>
-    <path d="M 659 78 V 112"/>
-    <path d="M 944 205 V 290"/>
-    <path d="M 1182 309 V 426"/>
-    <path d="M 1059 426 V 370 Q 1059 352 1077 352 H 1267 Q 1285 352 1285 370 V 426"/>
-
-    <path d="M 744 660 V 731"/>
-    <path d="M 920 660 V 731"/>
-    <path d="M 1033 660 V 731"/>
-    <path d="M 1161 660 V 731"/>
-    <path d="M 1278 660 V 731"/>
-    <path d="M 1364 660 V 731"/>
-    <path d="M 1499 660 V 731"/>
-
-    <path d="M 1364 731 V 766 Q 1364 783 1347 783 H 622 Q 605 783 605 766 V 750"/>
-    <path d="M 981 785 V 813"/>
-  </g>`;
-}
-
-/**
- * The iteration-14 lighting pass.
- *
- * Form shadows and edge highlights that the per-part filters cannot produce,
- * because they describe where this machine sits rather than what it is made
- * of: the contact shadow it casts on the floor, the way the motor's barrel
- * turns away from the light, the top plane of the gearbox catching it.
- *
- * Drawn over the machine and under the labels, and never over a pad — it takes
- * no pointer events, so it cannot come between a pad and a cursor.
- */
-function lightingOverlay(): string {
-  return `
-  <g id="tse14-lighting-overlay" style="pointer-events: none">
-    <ellipse cx="805" cy="715" rx="650" ry="18"
-      fill="url(#tse14-contact-shadow)" filter="url(#tse14-ground-blur)" opacity=".62"/>
-
-    <path d="M 42 496 C 28 513 24 534 24 558 C 24 589 31 614 45 631"
-      fill="none" stroke="url(#tse14-overlay-white)" stroke-width="5.8" opacity=".34"/>
-    <path d="M 197 489 C 208 512 211 536 211 558 C 211 583 207 607 198 625"
-      fill="none" stroke="#11171a" stroke-width="6.5" opacity=".075"/>
-    <rect x="85" y="489" width="23" height="136" rx="8" fill="#ffffff" opacity=".07"/>
-    <rect x="185" y="489" width="20" height="136" rx="8" fill="#13181b" opacity=".05"/>
-
-    <path d="M 356 401 L 366 393 H 506 Q 516 393 521 399 L 513 404 H 364 Z"
-      fill="url(#tse14-overlay-white)" opacity=".40"/>
-    <path d="M 514 405 H 526 V 680 L 517 686 Z"
-      fill="url(#tse14-overlay-dark)" opacity=".50"/>
-    <path d="M 378 444 H 469"
-      fill="none" stroke="#ffffff" stroke-width="1.7" opacity=".14"/>
-    <path d="M 479 444 H 526"
-      fill="none" stroke="#ffffff" stroke-width="1.2" opacity=".10"/>
-
-    <path d="M 546 454 C 560 447 573 449 582 457"
-      fill="none" stroke="#ffffff" stroke-width="2.2" opacity=".18"/>
-    <path d="M 550 620 C 560 628 570 628 578 622"
-      fill="none" stroke="#11171a" stroke-width="2.0" opacity=".08"/>
-  </g>`;
-}
-
-/** What the caller wants drawn, beyond the machine itself. */
-export type TwinScrewArtworkOptions = {
-  /**
-   * Draw the sheet and its engineering grid.
-   *
-   * Left off on the machine canvas: the workspace paints its own grid behind
-   * the stage, and a second one inside the artwork beats against it.
-   */
-  showBackground?: boolean;
-  /**
-   * Draw the part names and their leader lines.
-   *
-   * Off on the mapping canvas, where the cards and trails already name every
-   * point and a second set of names competes with them. On wherever the
-   * drawing is shown on its own.
-   */
-  showPartLabels?: boolean;
-  /** Colour for the part names and leaders. Follows the console, not the sheet. */
-  ink?: string;
-  /** Fill for the sheet, when `showBackground` is set. */
-  sheet?: string;
-};
-
-/**
- * The machine, as SVG source.
- *
- * Deterministic for a given set of options: the same options always produce
- * the same string, which is what lets the template parse it once per option
- * set and hold on to the parsed nodes.
- */
-export function buildTwinScrewExtruderArtwork({
-  showBackground = false,
-  showPartLabels = false,
-  ink = '#565c63',
-  sheet = 'url(#bg)',
-}: TwinScrewArtworkOptions = {}): string {
-  return `
-<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fbfbfa"/>
@@ -1396,85 +1002,11 @@ export function buildTwinScrewExtruderArtwork({
 
     <clipPath id="upperClip"><rect x="630" y="496" width="812" height="60" rx="4"/></clipPath>
     <clipPath id="lowerClip"><rect x="630" y="548" width="812" height="64" rx="4"/></clipPath>
-
-    <!-- Iteration-14 lighting. The reference hangs these off a CSS block; a
-         stylesheet has no cascade to hang off outside the browser, so each one
-         is applied as a filter attribute on the part group instead. Every
-         primitive here round-trips through react-native-svg's parser, so the
-         machine is lit the same way on the web console and on a device. -->
-    <filter id="tse14-ground-blur" x="-20%" y="-100%" width="140%" height="300%">
-      <feGaussianBlur stdDeviation="10"/>
-    </filter>
-
-    <filter id="tse14-metal-depth" x="-20%" y="-20%" width="150%" height="155%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="1.55" result="alphaBlur"/>
-      <feSpecularLighting in="alphaBlur" surfaceScale="4.3" specularConstant=".55" specularExponent="24"
-        lighting-color="#ffffff" result="specular">
-        <feDistantLight azimuth="224" elevation="58"/>
-      </feSpecularLighting>
-      <feComposite in="specular" in2="SourceAlpha" operator="in" result="specularClip"/>
-      <feBlend in="SourceGraphic" in2="specularClip" mode="screen" result="lit"/>
-      <feTurbulence type="fractalNoise" baseFrequency=".34" numOctaves="2" seed="24" result="noise"/>
-      <feColorMatrix in="noise" type="matrix"
-        values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .030 0" result="microGrain"/>
-      <feBlend in="lit" in2="microGrain" mode="soft-light" result="textured"/>
-      <feDropShadow dx="2.0" dy="2.9" stdDeviation="2.25" flood-color="#171c1f" flood-opacity=".25"/>
-    </filter>
-
-    <filter id="tse14-chrome-depth" x="-20%" y="-22%" width="145%" height="150%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="1.1" result="alphaBlur"/>
-      <feSpecularLighting in="alphaBlur" surfaceScale="4.8" specularConstant=".72" specularExponent="32"
-        lighting-color="#ffffff" result="specular">
-        <feDistantLight azimuth="220" elevation="59"/>
-      </feSpecularLighting>
-      <feComposite in="specular" in2="SourceAlpha" operator="in" result="specularClip"/>
-      <feBlend in="SourceGraphic" in2="specularClip" mode="screen" result="lit"/>
-      <feDropShadow dx="1.5" dy="2.25" stdDeviation="1.65" flood-color="#101416" flood-opacity=".26"/>
-    </filter>
-
-    <filter id="tse14-glass-depth" x="-15%" y="-15%" width="135%" height="140%" color-interpolation-filters="sRGB">
-      <feGaussianBlur in="SourceAlpha" stdDeviation=".75" result="blur"/>
-      <feSpecularLighting in="blur" surfaceScale="2.1" specularConstant=".38" specularExponent="24"
-        lighting-color="#ffffff" result="spec">
-        <feDistantLight azimuth="220" elevation="62"/>
-      </feSpecularLighting>
-      <feComposite in="spec" in2="SourceAlpha" operator="in" result="specClip"/>
-      <feBlend in="SourceGraphic" in2="specClip" mode="screen" result="lit"/>
-      <feDropShadow dx="1.3" dy="2.2" stdDeviation="1.6" flood-color="#161b1e" flood-opacity=".14"/>
-    </filter>
-
-    <!-- The barrel's own contact shadow, which the reference applies through a
-         CSS drop-shadow() that has no equivalent outside the browser. -->
-    <filter id="tse14-barrel-depth" x="-8%" y="-12%" width="120%" height="128%" color-interpolation-filters="sRGB">
-      <feDropShadow dx="1.2" dy="2" stdDeviation="1.5" flood-color="#111619" flood-opacity=".18"/>
-    </filter>
-
-    <linearGradient id="tse14-overlay-white" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#ffffff" stop-opacity=".72"/>
-      <stop offset=".35" stop-color="#ffffff" stop-opacity=".18"/>
-      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
-    </linearGradient>
-
-    <linearGradient id="tse14-overlay-dark" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#13181b" stop-opacity="0"/>
-      <stop offset=".70" stop-color="#13181b" stop-opacity=".05"/>
-      <stop offset="1" stop-color="#13181b" stop-opacity=".28"/>
-    </linearGradient>
-
-    <radialGradient id="tse14-contact-shadow">
-      <stop offset="0" stop-color="#171c1f" stop-opacity=".25"/>
-      <stop offset=".66" stop-color="#171c1f" stop-opacity=".10"/>
-      <stop offset="1" stop-color="#171c1f" stop-opacity="0"/>
-    </radialGradient>
   </defs>
 
   ${showBackground ? `<rect width="${WIDTH}" height="${HEIGHT}" fill="${sheet}"/>
   <rect width="${WIDTH}" height="${HEIGHT}" fill="url(#grid)" opacity=".88"/>` : ''}
 
-  ${motor()}
-  ${motorDetailLayer()}
-  ${gearbox()}
-  ${gearboxDetailLayer()}
   ${mainHopper()}
   ${hopperDetailLayer()}
   ${barrel()}
@@ -1482,8 +1014,5 @@ export function buildTwinScrewExtruderArtwork({
   ${sideFeeder()}
   ${sideFeederDetailLayer()}
   ${ventDie()}
-  ${ventDieDetailLayer()}
-  ${lightingOverlay()}
-  ${showPartLabels ? annotations(ink) : ''}
-</svg>`;
+  ${ventDieDetailLayer()}`;
 }
