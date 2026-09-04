@@ -1,10 +1,10 @@
 # Direct WebSocket Gateway Ingest
 
-Use this deployment when the Ultron gateway should send data directly to the
+Use this deployment when the BlackGATE gateway should send data directly to the
 application without EMQX/MQTT in the live path.
 
 ```text
-Ultron gateway
+BlackGATE gateway
   -> wss://YOUR-RENDER-APP/ws/gateway
   -> validated live frame
   -> wss://YOUR-RENDER-APP/ws/live -> frontend
@@ -81,7 +81,7 @@ DIRECT_WS_URL=wss://YOUR-RENDER-APP.onrender.com/ws/gateway
 DIRECT_WS_TOKEN=same-value-as-DIRECT_WS_GATEWAY_SECRET
 ```
 
-The gateway continues to send the same Ultron envelope and topic contract. The
+The gateway continues to send the same BlackGATE envelope and topic contract. The
 only change is the transport.
 
 ## Frontend

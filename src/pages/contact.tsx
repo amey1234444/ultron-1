@@ -7,6 +7,8 @@
 
 import Head from 'next/head';
 
+import { COMPANY_ADDRESS_INLINE } from '../../lib/company';
+
 import Ambience from '../components/home/Ambience';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
@@ -14,10 +16,14 @@ import { Arrow, Button, Reveal } from '../components/home/primitives';
 import SiteNav from '../components/web/SiteNav';
 import { useAuth } from '../context/AuthContext';
 
+// The office is the registered office from `lib/company`, which the footer
+// reads too. This page used to carry a second, different address — a San
+// Francisco street that matched nothing else on the site — alongside a 555
+// placeholder phone number. Both are gone: one address, and no number until
+// there is a real one to publish.
 const DETAILS: { label: string; value: string; href?: string }[] = [
   { label: 'Email', value: 'hello@ultron.io', href: 'mailto:hello@ultron.io' },
-  { label: 'Phone', value: '+1 (800) 555-1234', href: 'tel:+18005551234' },
-  { label: 'HQ', value: '548 Market Street, San Francisco, CA 94104' },
+  { label: 'Office', value: COMPANY_ADDRESS_INLINE },
   { label: 'Response time', value: 'Under one business day' },
 ];
 

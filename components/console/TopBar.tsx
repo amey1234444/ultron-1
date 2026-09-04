@@ -370,7 +370,16 @@ export function TopBar({
       style={glassStyle}
     >
       <View className="flex-row items-center gap-3">
-        <Pressable onPress={onLogoPress} accessibilityRole="button" accessibilityLabel="Go to main page">
+        {/* A little more room after the wordmark than between the controls that
+            follow it. The row gap is tuned for sibling controls; the logo is not
+            one of them, and at this size its own right sidebearing is only a
+            couple of pixels, so the same gap reads as the menu crowding it. */}
+        <Pressable
+          onPress={onLogoPress}
+          accessibilityRole="button"
+          accessibilityLabel="Go to main page"
+          className="mr-2"
+        >
           <Image
             source={isDark ? LOGO_DARK : LOGO_LIGHT}
             style={{ height: LOGO_HEIGHT, width: LOGO_HEIGHT * LOGO_ASPECT }}

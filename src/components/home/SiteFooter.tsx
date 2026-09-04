@@ -4,15 +4,18 @@
 // line. No blurb, no glow, no status pill — everything the old footer said in
 // prose is either on a page of its own now or was never load-bearing.
 //
-// "Where we are" is the registered office in Bhilwara and is set as a real
-// <address> element, so it is announced as contact information rather than as
-// four more lines of footer text.
+// "Where we are" is the registered office and is set as a real <address>
+// element, so it is announced as contact information rather than as four more
+// lines of footer text. The lines themselves come from `lib/company`, which is
+// the one place the company's address is written down — the contact page reads
+// the same constant, so the site cannot end up naming two different offices.
 //
 // Only destinations that exist: real pages, real anchors on the landing page,
 // or a real mailbox.
 
 import Link from 'next/link';
 
+import { COMPANY_ADDRESS_BLOCK, COMPANY_NAME } from '../../../lib/company';
 import logoDark from '../../../assets/brand/logo-dark.png';
 import styles from './SiteFooter.module.css';
 
@@ -43,8 +46,8 @@ export default function SiteFooter() {
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
-        <Link href="/home" className={styles.brand} aria-label="BlackGATE home">
-          <img src={LOGO_SRC} alt="BlackGATE" className={styles.brandLogo} />
+        <Link href="/home" className={styles.brand} aria-label={`${COMPANY_NAME} home`}>
+          <img src={LOGO_SRC} alt={COMPANY_NAME} className={styles.brandLogo} />
         </Link>
 
         {COLUMNS.map((column) => (
@@ -66,13 +69,12 @@ export default function SiteFooter() {
           <h2 className={styles.colTitle}>Where we are</h2>
 
           <address className={styles.address}>
-            BlackGATE Technologies
-            <br />
-            E 342, RIICO Growth Centre
-            <br />
-            Bhilwara, Rajasthan 311025
-            <br />
-            India
+            {COMPANY_ADDRESS_BLOCK.map((line, index) => (
+              <span key={line}>
+                {index > 0 && <br />}
+                {line}
+              </span>
+            ))}
           </address>
 
           <a href="mailto:hello@ultron.io" className={styles.addressLink}>
@@ -86,7 +88,7 @@ export default function SiteFooter() {
           href="https://www.linkedin.com/company/ultron-industrial"
           target="_blank"
           rel="noreferrer noopener"
-          aria-label="BlackGATE on LinkedIn"
+          aria-label={`${COMPANY_NAME} on LinkedIn`}
           className={styles.social}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">

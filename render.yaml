@@ -1,4 +1,4 @@
-# Single-service Render Blueprint for Ultron.
+# Single-service Render Blueprint for BlackGATE.
 #
 # This one web service serves the Next.js app and terminates gateway/live
 # WebSockets on the same public Render URL:

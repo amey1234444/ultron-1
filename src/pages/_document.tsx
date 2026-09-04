@@ -10,7 +10,7 @@ export default function Document() {
             keeps the app from rendering inside a frame even if those headers are
             ever stripped by an intermediary or a mis-serving host. */}
         <script src="/anti-clickjack.js" />
-        {/* Tab mark — the U from the BlackGATE wordmark, white on the product
+        {/* Tab mark — the B from the BlackGATE wordmark, white on the product
             black. The SVG is what Chrome, Edge and Firefox actually draw, so
             the mark stays sharp at any zoom or pixel ratio; the .ico is the
             fallback for the bare /favicon.ico request and for pinned sites,

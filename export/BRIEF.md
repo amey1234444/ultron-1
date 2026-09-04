@@ -1,10 +1,10 @@
-# Ultron landing page — build brief
+# BlackGATE landing page — build brief
 
-Reference implementation: `ultron-landing.html` (19 KB, plain HTML + CSS, no framework).
+Reference implementation: `blackgate-landing.html` (19 KB, plain HTML + CSS, no framework).
 Images: `assets/plant.png`, `assets/team.png` (referenced by relative path, not inlined).
 
 ## How to use this with an AI coding agent
-Give it `ultron-landing.html` only. Do NOT paste any bundled/standalone version —
+Give it `blackgate-landing.html` only. Do NOT paste any bundled/standalone version —
 those inline the images as base64 and blow the context limit.
 
 ## Design system
@@ -29,7 +29,7 @@ falls with no visible edge.
 
 ## Sections, in order
 1. **Hero** — centred. Mono eyebrow, two-line headline (second line in muted grey),
-   ONE button, then a large ghost "Ultron" wordmark at 4.2% white in its own clear band.
+   ONE button, then a large ghost "BlackGATE" wordmark at 4.2% white in its own clear band.
    Extra cool-blue and violet radial tints at low opacity for colour depth.
 2. **What changes after cutover** — four cards, each: mono label, new figure in green,
    "From X" reference line. Footer row: caveat + "Read the method".

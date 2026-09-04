@@ -1,4 +1,4 @@
-<title>Gigaton teardown — and what Ultron should take from it</title>
+<title>Gigaton teardown — and what BlackGATE should take from it</title>
 
 <style>
   /* ---------------------------------------------------------------
@@ -8,7 +8,7 @@
      misrepresent the very thing being measured. So the palette is
      painted explicitly rather than inherited, and holds on either
      host ground.
-     Palette is Ultron's own --u-* system, lifted from global.css:
+     Palette is BlackGATE's own --u-* system, lifted from global.css:
      the analysis is written in the language it argues for.
      --------------------------------------------------------------- */
   :root {
@@ -23,7 +23,7 @@
     --line-strong: rgba(255,255,255,0.14);
     --rule:        rgba(255,255,255,0.042);
 
-    /* Ultron's two rationed colours. */
+    /* BlackGATE's two rationed colours. */
     --green:       #64e58b;
     --blue:        #6fa8ff;
     --amber:       #e3b341;
@@ -336,12 +336,12 @@
 <div class="wrap">
 
   <header class="doc">
-    <span class="chip">Design teardown &middot; Ultron</span>
-    <h1>What makes Gigaton read as premium &mdash; and what Ultron should actually take from it</h1>
+    <span class="chip">Design teardown &middot; BlackGATE</span>
+    <h1>What makes Gigaton read as premium &mdash; and what BlackGATE should actually take from it</h1>
     <p class="lede">
       A technique-by-technique breakdown of the reference screenshots, with each device rebuilt
       as a live specimen rather than shown as a picture. The verdict on each one is specific to
-      the Ultron landing page as it stands today, not generic advice.
+      the BlackGATE landing page as it stands today, not generic advice.
     </p>
     <div class="meta">
       <span>Subject &mdash; gigaton.co homepage</span>
@@ -371,7 +371,7 @@
     <div class="stack">
       <p>
         The single most important finding, and the one that changes the plan: Gigaton's page is
-        <strong>calmer than Ultron's</strong>. Its polish comes from a small number of devices executed
+        <strong>calmer than BlackGATE's</strong>. Its polish comes from a small number of devices executed
         with precision and repeated without variation &mdash; not from a rich ambient field.
       </p>
       <p>
@@ -380,7 +380,7 @@
         sections. That is the entire background system. Nothing moves except on scroll.
       </p>
       <p>
-        Ultron's <code>Ambience.tsx</code> currently runs, simultaneously and permanently:
+        BlackGATE's <code>Ambience.tsx</code> currently runs, simultaneously and permanently:
         three drifting aurora glows, a dot mesh on a 34-second loop, five travelling pulses on the
         column rules, two scrolling telemetry waves, a 17-second scan sweep, grain, and a vignette.
         It is more technically accomplished than anything on the reference site. It is also the
@@ -388,7 +388,7 @@
       </p>
       <p>
         <strong>So the work is asymmetric:</strong> take the four structural devices Gigaton has that
-        Ultron lacks, and retire roughly half of the ambient layer that Ultron has and Gigaton
+        BlackGATE lacks, and retire roughly half of the ambient layer that BlackGATE has and Gigaton
         deliberately does without.
       </p>
     </div>
@@ -400,14 +400,14 @@
       <span class="chip">Colour</span>
       <h2>Sampled palette</h2>
       <p style="font-size:14.5px;color:var(--ink-2);">
-        Values read off the frames. The lime is quoted for reference only &mdash; Ultron already owns a
+        Values read off the frames. The lime is quoted for reference only &mdash; BlackGATE already owns a
         green with a defined meaning, and adopting a second one would break the rule that makes the
         existing system work.
       </p>
     </div>
 
     <div class="swatches">
-      <div class="sw"><i style="background:#0a0a0a;"></i><b>#0A0A0A</b><span>Page ground<br>identical to Ultron</span></div>
+      <div class="sw"><i style="background:#0a0a0a;"></i><b>#0A0A0A</b><span>Page ground<br>identical to BlackGATE</span></div>
       <div class="sw"><i style="background:#141414;"></i><b>#141414</b><span>Panel</span></div>
       <div class="sw"><i style="background:#1c1c1c;"></i><b>#1C1C1C</b><span>Stat card</span></div>
       <div class="sw"><i style="background:#c6f45e;"></i><b>#C6F45E</b><span>Lime CTA<br>do not adopt</span></div>
@@ -427,9 +427,9 @@
         property of data, never of furniture.
       </p>
       <p>
-        Ultron already codifies this more strictly than Gigaton does &mdash; green means measured-now,
+        BlackGATE already codifies this more strictly than Gigaton does &mdash; green means measured-now,
         blue means predicted &mdash; and that rule is written into <code>global.css</code>. Keep it.
-        The gap is that Ultron's <em>ambience</em> currently leaks blue, violet and green into the
+        The gap is that BlackGATE's <em>ambience</em> currently leaks blue, violet and green into the
         background, which is exactly the furniture the rule says should stay grey.
       </p>
     </div>
@@ -494,7 +494,7 @@
           </div>
           <div class="verdict">
             <span class="chip chip-amber">Replace</span>
-            <p>Ultron runs three saturated drifting glows (blue, violet, green). Collapse to one near-achromatic plume anchored behind the hero. This is the highest-impact single change on the page.</p>
+            <p>BlackGATE runs three saturated drifting glows (blue, violet, green). Collapse to one near-achromatic plume anchored behind the hero. This is the highest-impact single change on the page.</p>
           </div>
         </div>
         <div class="tech-demo">
@@ -528,7 +528,7 @@
           </div>
           <div class="verdict">
             <span class="chip chip-blue">Gap &mdash; build it</span>
-            <p>Ultron has vertical column rules but nothing horizontal binding the sections. This is the one genuinely new structure to add, and it should replace the scrolling telemetry waves.</p>
+            <p>BlackGATE has vertical column rules but nothing horizontal binding the sections. This is the one genuinely new structure to add, and it should replace the scrolling telemetry waves.</p>
           </div>
         </div>
         <div class="tech-demo">
@@ -569,7 +569,7 @@
           </div>
           <div class="verdict">
             <span class="chip chip-green">Partly have</span>
-            <p>Ultron uses bare mono eyebrows without the chip. Adding the chip is a two-line change that immediately buys most of the instrument-panel feel.</p>
+            <p>BlackGATE uses bare mono eyebrows without the chip. Adding the chip is a two-line change that immediately buys most of the instrument-panel feel.</p>
           </div>
         </div>
         <div class="tech-demo">
@@ -608,7 +608,7 @@
           </div>
           <div class="verdict">
             <span class="chip chip-blue">Gap &mdash; adopt</span>
-            <p>Ultron's <code>.font-display</code> forces <code>font-weight: 600</code> on hero numerals. Add a light display variant for statistics specifically.</p>
+            <p>BlackGATE's <code>.font-display</code> forces <code>font-weight: 600</code> on hero numerals. Add a light display variant for statistics specifically.</p>
           </div>
         </div>
         <div class="tech-demo">
@@ -646,7 +646,7 @@
           </div>
           <div class="verdict">
             <span class="chip chip-blue">Gap &mdash; adopt</span>
-            <p>Fits Ultron's existing green/blue split exactly: green ticks for measured contribution, blue for predicted. Use in the capabilities panel.</p>
+            <p>Fits BlackGATE's existing green/blue split exactly: green ticks for measured contribution, blue for predicted. Use in the capabilities panel.</p>
           </div>
         </div>
         <div class="tech-demo">
@@ -697,7 +697,7 @@
           </div>
           <div class="verdict">
             <span class="chip chip-blue">Gap &mdash; adopt</span>
-            <p>Ultron's <code>Industries.tsx</code> already frames five materials as specimens. The marks are a natural fit and give each material an identity without adding copy.</p>
+            <p>BlackGATE's <code>Industries.tsx</code> already frames five materials as specimens. The marks are a natural fit and give each material an identity without adding copy.</p>
           </div>
         </div>
         <div class="tech-demo">
@@ -747,7 +747,7 @@
             <div style="background:#101011;color:var(--ink-3);"><span>Results</span><span>#101011</span></div>
             <div style="background:#0a0a0a;color:var(--ink-3);"><span>Signals</span><span>#0A0A0A</span></div>
           </div>
-          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);">Ultron's existing band ladder &mdash; the inversion is already correctly placed</span>
+          <span style="font-family:var(--mono);font-size:9px;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-3);">BlackGATE's existing band ladder &mdash; the inversion is already correctly placed</span>
         </div>
       </article>
 
@@ -773,7 +773,7 @@
         </div>
         <div class="tech-demo">
           <div class="demo-frame" style="display:flex;align-items:flex-end;overflow:hidden;">
-            <span style="font-size:62px;font-weight:700;letter-spacing:-0.05em;color:#151516;line-height:0.78;margin-left:-4px;user-select:none;">ULTRON</span>
+            <span style="font-size:62px;font-weight:700;letter-spacing:-0.05em;color:#151516;line-height:0.78;margin-left:-4px;user-select:none;">BlackGATE</span>
           </div>
         </div>
       </article>
@@ -785,7 +785,7 @@
   <section>
     <div class="sec-head">
       <span class="chip">Audit</span>
-      <h2>Ultron today, against each device</h2>
+      <h2>BlackGATE today, against each device</h2>
     </div>
 
     <div class="table-scroll">
@@ -879,14 +879,14 @@
     </div>
     <div class="stack">
       <p>
-        Copying all nine devices would produce a competent Gigaton clone. The thing Ultron has that
+        Copying all nine devices would produce a competent Gigaton clone. The thing BlackGATE has that
         Gigaton does not is a <strong>colour rule with semantic meaning</strong> &mdash; green is measured,
         blue is predicted, everything else is grey &mdash; enforced in <code>global.css</code> and already
         respected across the console.
       </p>
       <p>
         Gigaton's four chart hues are decorative; they distinguish series but carry no meaning you
-        could state. Ultron's two carry a claim about the product: this number is real, that number
+        could state. BlackGATE's two carry a claim about the product: this number is real, that number
         is a forecast. Applied consistently to the tick meters, the belt marker, the prediction
         traces and the live pills, that reads as a system rather than a style &mdash; and a system is the
         thing that cannot be copied off a screenshot.
