@@ -20,13 +20,7 @@ import { useColorScheme } from 'nativewind';
 import { TwinScrewExtruder } from '../../components/console/machine/TwinScrewExtruder';
 import { connectorsForTemplate } from '../../components/console/machine/machineConnectors';
 import { createTemplateDefaultLayout } from '../../components/console/machine/templateDefaultLayouts';
-import {
-  SCREW_A_TRAIN,
-  SCREW_B_TRAIN,
-  SCREW_ELEMENTS,
-  CENTRE_DISTANCE,
-  FLIGHT_RADIUS,
-} from '../../components/console/machine/twinScrewGeometry';
+import { buildTwinScrewExtruderArtwork } from '../../components/console/machine/twinScrewArtwork';
 import type { MeasurementPadState } from '../../components/console/machine/MeasurementPad';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
@@ -36,6 +30,40 @@ import {
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
 
 const REFERENCE_IMAGE = '/references/twin-screw-extruder-reference.png';
+
+/** The parts of the machine the registry hangs measurement points off. */
+const MACHINE_PARTS = [
+  'motor',
+  'motor-coupling',
+  'gearbox',
+  'gearbox-output',
+  'main-hopper',
+  'barrel',
+  'upper-screw',
+  'lower-screw',
+  'side-feeder',
+  'vent',
+  'die',
+];
+
+/**
+ * What the drawing actually contains.
+ *
+ * Read off the shipped artwork rather than restated here, so this panel can
+ * only ever describe the machine the console renders. A dangling `url(#…)` is
+ * called out because it is the one fault in an SVG that changes what you see
+ * depending on which renderer opened it, and shows up in no diff.
+ */
+const ARTWORK = (() => {
+  const svg = buildTwinScrewExtruderArtwork();
+  const referenced = new Set(Array.from(svg.matchAll(/url\(#([^)]+)\)/g), (m) => m[1]));
+  const declared = new Set(Array.from(svg.matchAll(/\sid="([^"]+)"/g), (m) => m[1]));
+  return {
+    elements: (svg.match(/<(?!\/|\?|!)/g) ?? []).length,
+    parts: MACHINE_PARTS.map((id) => (declared.has(id) ? id : `${id} MISSING`)),
+    dangling: [...referenced].filter((id) => !declared.has(id)),
+  };
+})();
 
 type PadMode = 'idle' | 'linked' | 'live' | 'mixed';
 
@@ -114,8 +142,7 @@ export default function TwinScrewQaPage() {
       <Text style={{ ...mono, fontSize: 16, marginBottom: 4 }}>Twin Screw Extruder — template QA</Text>
       <Text style={{ ...mono, opacity: 0.6, marginBottom: 16 }}>
         viewBox {TWIN_SCREW_ARTWORK_WIDTH}x{TWIN_SCREW_ARTWORK_HEIGHT} · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
-        {SCREW_A_TRAIN.flights.length}+{SCREW_B_TRAIN.flights.length} flights · centre distance {CENTRE_DISTANCE} vs diameter{' '}
-        {FLIGHT_RADIUS * 2} (overlap {FLIGHT_RADIUS * 2 - CENTRE_DISTANCE})
+        {ARTWORK.elements} drawn elements · {ARTWORK.parts.length} named parts
       </Text>
 
       <Section title="Pad state">
@@ -201,12 +228,13 @@ export default function TwinScrewQaPage() {
         })}
       </Section>
 
-      <Section title="Screw configuration">
-        {SCREW_ELEMENTS.map((element) => (
-          <Text key={element.startX} style={mono}>
-            x {element.startX}–{element.startX + element.length} · {element.kind} · pitch {element.pitch}
-          </Text>
-        ))}
+      <Section title="Artwork">
+        <Text style={mono}>{ARTWORK.parts.join(' · ')}</Text>
+        <Text style={{ ...mono, opacity: 0.55, marginTop: 4 }}>
+          {ARTWORK.dangling.length === 0
+            ? 'every paint, clip and filter reference resolves'
+            : `DANGLING REFERENCES: ${ARTWORK.dangling.join(', ')}`}
+        </Text>
       </Section>
 
       <Section title={`Default layout (${layout.trails.length} trails, ${layout.boxes.length} cards)`}>

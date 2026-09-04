@@ -22,8 +22,8 @@ import {
  * The viewBox each artwork is drawn on.
  *
  * The Rotary Airlock Valve and the Single Screw Extruder share a 1200×760
- * frame; the Twin Screw Extruder is a wider machine and is drawn on its own
- * 1440×700 frame. A point is converted to a fraction of *its own* artwork, so
+ * frame; the Twin Screw Extruder is a longer machine and is drawn on its own
+ * 1648×928 frame. A point is converted to a fraction of *its own* artwork, so
  * the frame a drawing chooses never leaks into another machine's anchors.
  */
 export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {

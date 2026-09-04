@@ -17,16 +17,8 @@
 import { connectorsForTemplate, artworkSizeForTemplate } from '../machineConnectors';
 import { createTemplateDefaultLayout, hasDefaultLayout } from '../templateDefaultLayouts';
 import { TWIN_SCREW_CONNECTORS } from '../TwinScrewExtruder';
-import {
-  BARREL_CLIP,
-  SCREW_A_TRAIN,
-  SCREW_B_TRAIN,
-  SCREW_ELEMENTS,
-  SCREW_END_X,
-  SCREW_START_X,
-  FLIGHT_RADIUS,
-  CENTRE_DISTANCE,
-} from '../twinScrewGeometry';
+import { parse } from 'react-native-svg';
+import { buildTwinScrewExtruderArtwork, WIDTH, HEIGHT } from '../twinScrewArtwork';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
@@ -132,65 +124,136 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-console.log('\n--- Screw geometry ---');
+console.log('\n--- Artwork ---');
+
+const machineSvg = buildTwinScrewExtruderArtwork();
 
 check(
-  'both screw trains span the same axial envelope',
-  SCREW_A_TRAIN.root.includes(String(SCREW_START_X)) && SCREW_B_TRAIN.root.includes(String(SCREW_START_X)) &&
-    SCREW_A_TRAIN.root.includes(String(SCREW_END_X)) && SCREW_B_TRAIN.root.includes(String(SCREW_END_X)),
+  'the artwork is drawn on the frame the registry places points in',
+  WIDTH === TWIN_SCREW_ARTWORK_WIDTH && HEIGHT === TWIN_SCREW_ARTWORK_HEIGHT,
+  `${WIDTH}x${HEIGHT} vs ${TWIN_SCREW_ARTWORK_WIDTH}x${TWIN_SCREW_ARTWORK_HEIGHT}`,
 );
 
 check(
-  'the two screws carry the same number of flights',
-  SCREW_A_TRAIN.flights.length === SCREW_B_TRAIN.flights.length,
-  `${SCREW_A_TRAIN.flights.length} vs ${SCREW_B_TRAIN.flights.length}`,
+  'the artwork declares that frame as its viewBox',
+  machineSvg.includes(`viewBox="0 0 ${TWIN_SCREW_ARTWORK_WIDTH} ${TWIN_SCREW_ARTWORK_HEIGHT}"`),
 );
 
 check(
-  'kneading sections run at a tighter pitch than the conveying sections',
+  'the same options always produce the same drawing',
+  buildTwinScrewExtruderArtwork() === machineSvg,
+);
+
+// The machine has to actually contain the machine. Each of these is a part the
+// registry hangs points off; a silent loss of one would leave pads floating.
+const REQUIRED_PARTS = [
+  'motor', 'motor-coupling', 'gearbox', 'gearbox-output', 'main-hopper',
+  'barrel', 'upper-screw', 'lower-screw', 'side-feeder', 'vent', 'die',
+];
+check(
+  'every part the registry measures is present in the drawing',
+  REQUIRED_PARTS.every((id) => machineSvg.includes(`id="${id}"`)),
+  REQUIRED_PARTS.filter((id) => !machineSvg.includes(`id="${id}"`)).join(', ') || undefined,
+);
+
+/**
+ * Every `url(#…)` the drawing uses resolves to something the drawing defines.
+ *
+ * This is not a style check. A paint server or clip path that is referenced but
+ * never declared is silently destructive and platform-dependent: a browser
+ * drops the element that references it, react-native-svg renders it unclipped.
+ * The reference drawing shipped with exactly that fault — a `#intermeshClip`
+ * that was never defined — so the drawing looked different depending on which
+ * renderer opened it. Nothing about that is visible in a diff.
+ */
+const referenced = new Set(Array.from(machineSvg.matchAll(/url\(#([^)]+)\)/g), (m) => m[1]));
+const declared = new Set(Array.from(machineSvg.matchAll(/\sid="([^"]+)"/g), (m) => m[1]));
+const dangling = [...referenced].filter((id) => !declared.has(id));
+check('every paint, clip and filter reference resolves', dangling.length === 0, dangling.join(', ') || undefined);
+
+check(
+  'the drawing carries no instrument markers of its own',
+  !machineSvg.includes('#18b763'),
+);
+
+check(
+  'part names are off unless asked for',
+  !machineSvg.includes('>MOTOR<') && buildTwinScrewExtruderArtwork({ showPartLabels: true }).includes('>MOTOR<'),
+);
+
+check(
+  'part names take the caller colour, so they stay readable in both themes',
+  buildTwinScrewExtruderArtwork({ showPartLabels: true, ink: '#abcdef' }).includes('#abcdef'),
+);
+
+check(
+  'the sheet and its grid are off unless asked for',
+  !machineSvg.includes('url(#grid)') && buildTwinScrewExtruderArtwork({ showBackground: true }).includes('url(#grid)'),
+);
+
+check(
+  'the whole drawing parses into renderable nodes',
   (() => {
-    const conveying = SCREW_ELEMENTS.filter((e) => e.kind === 'conveying').map((e) => e.pitch);
-    const kneading = SCREW_ELEMENTS.filter((e) => e.kind === 'kneading').map((e) => e.pitch);
-    return kneading.length > 0 && Math.max(...kneading) < Math.min(...conveying);
+    const ast = parse(machineSvg);
+    return Boolean(ast) && Array.isArray(ast?.children) && ast.children.length > 0;
   })(),
 );
 
+/**
+ * Nothing is lost between the drawing and what the console mounts.
+ *
+ * The template does not transcribe the machineSvg into JSX, it parses it — so the
+ * question worth asking is whether the parse is lossy. Counting the elements on
+ * both sides answers it for every element type at once.
+ */
+const parsedCount = (() => {
+  let n = 0;
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    n += 1;
+    const kids = (node as { props?: { children?: unknown[] } }).props?.children;
+    if (Array.isArray(kids)) kids.forEach(walk);
+  };
+  parse(machineSvg)?.children.forEach(walk);
+  return n;
+})();
+const sourceCount = (machineSvg.match(/<(?!\/|\?|!)/g) ?? []).length - 1; // less the <svg> root
 check(
-  'the screws intermesh (centre distance is under one full diameter)',
-  CENTRE_DISTANCE < FLIGHT_RADIUS * 2,
-  `centre ${CENTRE_DISTANCE}, diameter ${FLIGHT_RADIUS * 2}, overlap ${FLIGHT_RADIUS * 2 - CENTRE_DISTANCE}`,
+  'the parse keeps every element the drawing declares',
+  parsedCount === sourceCount,
+  `${parsedCount} parsed vs ${sourceCount} in source`,
 );
 
-check(
-  'the screws do not occupy the same axis',
-  SCREW_A_TRAIN.axisY !== SCREW_B_TRAIN.axisY,
-);
+// ---------------------------------------------------------------------------
+console.log('\n--- Pads sit on the machine ---');
 
-check(
-  'both screws fit inside the shared barrel clip',
-  SCREW_A_TRAIN.axisY - FLIGHT_RADIUS >= BARREL_CLIP.y &&
-    SCREW_B_TRAIN.axisY + FLIGHT_RADIUS <= BARREL_CLIP.y + BARREL_CLIP.height,
+/**
+ * A pad that has drifted off the machine is still a valid connection point and
+ * still passes every check above it — it just measures thin air. These bound it
+ * to the drawn extent of the machine rather than to the sheet.
+ */
+const MACHINE = { x: 16, y: 119, width: 1618 - 16, height: 726 - 119 };
+const strays = TWIN_SCREW_POINT_REGISTRY.filter(
+  (point) =>
+    point.x < MACHINE.x ||
+    point.x > MACHINE.x + MACHINE.width ||
+    point.y < MACHINE.y ||
+    point.y > MACHINE.y + MACHINE.height,
 );
+check('no pad sits off the machine', strays.length === 0, strays.map((p) => p.code).join(', ') || undefined);
 
+// The eight barrel zones are one row of instruments along one heater band. If
+// one drifts off that line the drawing stops reading as a zone profile.
+const zonePads = TWIN_SCREW_POINT_REGISTRY.filter((point) => /^tz-\d+$/.test(point.code));
+check('all eight barrel zones are declared', zonePads.length === 8, String(zonePads.length));
 check(
-  'the screw configuration includes kneading elements',
-  SCREW_ELEMENTS.some((element) => element.kind === 'kneading'),
+  'the barrel zones share one line along the heater band',
+  new Set(zonePads.map((point) => point.y)).size === 1,
+  [...new Set(zonePads.map((p) => p.y))].join(', '),
 );
-
 check(
-  'element sequence is contiguous with no gaps or overlaps',
-  SCREW_ELEMENTS.every((element, index) => index === 0 || element.startX === SCREW_ELEMENTS[index - 1].startX + SCREW_ELEMENTS[index - 1].length),
-);
-
-check(
-  'every flight path is a well-formed SVG path',
-  SCREW_A_TRAIN.flights.every((flight) => flight.band.startsWith('M ') && flight.band.endsWith(' Z') && flight.band.includes(' C ')),
-);
-
-check(
-  'flight keys are unique, so React never reuses a node',
-  new Set([...SCREW_A_TRAIN.flights, ...SCREW_B_TRAIN.flights].map((f) => f.key)).size ===
-    SCREW_A_TRAIN.flights.length + SCREW_B_TRAIN.flights.length,
+  'the barrel zones run upstream to downstream in registry order',
+  zonePads.every((point, index) => index === 0 || point.x > zonePads[index - 1].x),
 );
 
 // ---------------------------------------------------------------------------
