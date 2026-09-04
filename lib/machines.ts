@@ -116,7 +116,7 @@ const RAV_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = [
   },
 ];
 
-// Single Screw Extruder — the ULTRON pilot sensor package, in the same order the
+// Single Screw Extruder — the BlackGATE pilot sensor package, in the same order the
 // default layout drops its cards (drive side first, then feed and barrel).
 //
 // These labels are what the extruder analysis model resolves onto its canonical

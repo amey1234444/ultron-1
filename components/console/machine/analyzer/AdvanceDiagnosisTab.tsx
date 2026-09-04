@@ -1208,7 +1208,7 @@ export function AdvanceDiagnosisTab({
           >
             <View className="gap-2">
               <Text className={text.label} style={{ color: palette.inkFaint }}>
-                How ULTRON reached this conclusion
+                How BlackGATE reached this conclusion
               </Text>
               <ReasoningChain view={view} />
             </View>

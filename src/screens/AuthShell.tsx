@@ -13,7 +13,7 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { LOGO_DARK } from '../../lib/brandLogos';
+import { LOGO_ASPECT, LOGO_DARK } from '../../lib/brandLogos';
 import { apiFetch } from '../lib/apiClient';
 
 // Auth pages share the landing page's typography — Inter for everything, with
@@ -42,7 +42,6 @@ const FAINT = '#6B6D6B';
 const LINE = 'rgba(255,255,255,0.09)';
 const LINE_STRONG = 'rgba(255,255,255,0.16)';
 const DANGER = '#F2624A';
-const LOGO_ASPECT = 284 / 77;
 
 // Both auth pages must fit a single viewport. Below this height the shell falls
 // back to a scroll container so short windows stay usable.
@@ -101,7 +100,7 @@ export function AuthShell({
         <Column paddingHorizontal={compact ? 18 : 28}>
           <View style={{ width: '100%', maxWidth: 432, alignSelf: 'center' }}>
             <View style={{ alignItems: 'center', gap: 6 }}>
-              <Image source={LOGO_DARK} style={{ height: 30, width: 30 * LOGO_ASPECT }} resizeMode="contain" accessibilityLabel="ULTRON" />
+              <Image source={LOGO_DARK} style={{ height: 30, width: 30 * LOGO_ASPECT }} resizeMode="contain" accessibilityLabel="BlackGATE" />
               <Text style={{ fontFamily: AUTH_FONT_MONO, fontSize: 10, letterSpacing: 3.4, color: MUTED }}>
                 ASSET MONITORING
               </Text>
@@ -175,7 +174,7 @@ export function AuthShell({
           }}
         >
           <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>
-            (c) {new Date().getFullYear()} ULTRON. All rights reserved.
+            (c) {new Date().getFullYear()} BlackGATE. All rights reserved.
           </Text>
           <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>Legal</Text>
         </View>

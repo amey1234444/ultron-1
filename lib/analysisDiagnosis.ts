@@ -45,7 +45,7 @@ export const SEVERITY_BLURB: Record<Severity, string> = {
   boundary: 'Outside its registered reference',
 };
 
-// Stays inside the existing ULTRON palette rather than introducing a fourth hue:
+// Stays inside the existing BlackGATE palette rather than introducing a fourth hue:
 // faults take critical, limits take warning, and a crossed boundary takes the gold
 // accent — notable, not yet alarming.
 export const SEVERITY_HEX: Record<Severity, string> = {

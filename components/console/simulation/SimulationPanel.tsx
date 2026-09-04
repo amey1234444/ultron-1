@@ -216,7 +216,7 @@ export function SimulationPanel({
         <EmptyState
           eyebrow="Simulation Mode"
           title="No simulated hardware"
-          description="Create a simulated gateway to build a virtual plant — racks, cards and channels that publish exactly like real Ultron hardware, with no sensors attached."
+          description="Create a simulated gateway to build a virtual plant — racks, cards and channels that publish exactly like real BlackGATE hardware, with no sensors attached."
         >
           {canConfigure && <ActionButton label="Add Simulated Gateway" onPress={onAddGateway} />}
         </EmptyState>

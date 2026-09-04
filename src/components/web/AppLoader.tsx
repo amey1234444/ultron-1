@@ -2,9 +2,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, View, type ViewStyle } from 'react-native';
 
-import { LOGO_DARK } from '../../../lib/brandLogos';
+import { LOGO_ASPECT, LOGO_DARK } from '../../../lib/brandLogos';
 
-const LOGO_ASPECT = 284 / 77;
 const LOGO_HEIGHT = 26;
 
 const TRACK_WIDTH = 132;
@@ -76,7 +75,7 @@ export function AppLoader({ overlay = false }: { overlay?: boolean }) {
           source={LOGO_DARK}
           style={{ height: LOGO_HEIGHT, width: LOGO_HEIGHT * LOGO_ASPECT }}
           resizeMode="contain"
-          accessibilityLabel="ULTRON"
+          accessibilityLabel="BlackGATE"
         />
 
         <View

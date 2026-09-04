@@ -12,7 +12,7 @@
 import { useEffect, useRef } from 'react';
 
 import { SplitText, clamp01, useReducedMotion } from '../home/primitives';
-import styles from './UltronHero.module.css';
+import styles from './BrandHero.module.css';
 
 /** Scrubs the hero's custom properties against scroll position over one fold. */
 function useHeroScrub(reduced: boolean) {
@@ -51,7 +51,7 @@ function useHeroScrub(reduced: boolean) {
   return ref;
 }
 
-export default function UltronHero() {
+export default function BrandHero() {
   const reduced = useReducedMotion();
   const heroRef = useHeroScrub(reduced);
 

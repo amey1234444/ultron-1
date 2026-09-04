@@ -1,4 +1,4 @@
-// Build on ULTRON — the developer band.
+// Build on BLACKGATE — the developer band.
 //
 // The headline names three protocols, so the drawing beside it shows the three
 // protocols. Each strip animates its own actual semantics rather than being
@@ -18,7 +18,7 @@
 //
 // The isometric construction mark this section used to carry is gone. It was
 // well drawn and said nothing — three working protocol diagrams are a better
-// answer to "build anything on ULTRON" than an abstract solid is.
+// answer to "build anything on BLACKGATE" than an abstract solid is.
 
 import Link from 'next/link';
 
@@ -82,7 +82,7 @@ function Rest() {
       </text>
 
       <Node x={40} label="You" wide={44} />
-      <Node x={W - 40} label="ULTRON" wide={56} strong />
+      <Node x={W - 40} label="BLACKGATE" wide={56} strong />
     </svg>
   );
 }
@@ -127,7 +127,7 @@ function WebSocketStrip() {
       </text>
 
       <Node x={40} label="You" wide={44} />
-      <Node x={W - 40} label="ULTRON" wide={56} strong />
+      <Node x={W - 40} label="BLACKGATE" wide={56} strong />
     </svg>
   );
 }
@@ -209,7 +209,7 @@ export default function BuildOn() {
             <span className={styles.proto}>WebSocket.</span>{' '}
             <span className={styles.proto}>MQTT.</span>
             <br />
-            <span className={styles.titleMuted}>Build anything on ULTRON.</span>
+            <span className={styles.titleMuted}>Build anything on BLACKGATE.</span>
           </h2>
           <p className={styles.body}>
             The console has no privileged back door. Every channel, window and asset it reads is

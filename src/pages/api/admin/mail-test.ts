@@ -83,8 +83,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!to || !to.includes('@')) return res.status(400).json({ error: 'Provide a "to" address.' });
       const result = await sendMail({
         to,
-        subject: 'ULTRON — mail transport test',
-        text: 'This is a test message from the ULTRON mail diagnostics endpoint. If you received it, password-reset email will work.',
+        subject: 'BlackGATE — mail transport test',
+        text: 'This is a test message from the BlackGATE mail diagnostics endpoint. If you received it, password-reset email will work.',
       });
       return res.status(200).json({ env, result });
     }

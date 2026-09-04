@@ -3,7 +3,7 @@
 // This replaces a solar-system collapse that was doing the wrong job. That
 // section was *heavy*: nine orbiting bodies, labels, an accretion disc, and
 // three and a half viewport-heights of scrubbing to get through it. It was the
-// loudest thing on a page whose whole argument is that ULTRON is the quiet one.
+// loudest thing on a page whose whole argument is that BlackGATE is the quiet one.
 //
 // The reference works the opposite way — a lot of empty black, a field of very
 // fine lines, and exactly one thing worth looking at. So this is a single
@@ -70,7 +70,7 @@ export default function SignalBand() {
         </h2>
         <p className={styles.lead}>
           A mid-size line publishes tens of thousands of readings an hour. On any given morning three
-          of them are worth your attention. ULTRON&rsquo;s job is to be certain which three.
+          of them are worth your attention. BlackGATE&rsquo;s job is to be certain which three.
         </p>
 
         <div

@@ -33,10 +33,10 @@ export default function AboutPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>About — ULTRON</title>
+        <title>About — BlackGATE</title>
         <meta
           name="description"
-          content="Why ULTRON is built the way it is, and the questions engineering teams ask us before deploying it."
+          content="Why BlackGATE is built the way it is, and the questions engineering teams ask us before deploying it."
         />
         <meta name="theme-color" content="#0A0A0A" />
       </Head>
@@ -50,7 +50,7 @@ export default function AboutPage() {
             <p className={styles.pageEyebrow}>About</p>
             <h1 className={styles.pageTitle}>Built by people who have been on the floor at 3am</h1>
             <p className={styles.pageLead}>
-              ULTRON exists because the data needed to prevent a failure is almost always already
+              BlackGATE exists because the data needed to prevent a failure is almost always already
               being emitted — it is just scattered across systems that do not talk, in units that do
               not agree, at a resolution nobody keeps.
             </p>

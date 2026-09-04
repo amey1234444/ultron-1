@@ -42,10 +42,10 @@ export default function ContactPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>Contact — ULTRON</title>
+        <title>Contact — BlackGATE</title>
         <meta
           name="description"
-          content="Talk to an engineer about deploying ULTRON on your plant network, or request console access."
+          content="Talk to an engineer about deploying BlackGATE on your plant network, or request console access."
         />
         <meta name="theme-color" content="#0A0A0A" />
       </Head>

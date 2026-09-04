@@ -4,11 +4,10 @@ import { Image, Modal, Pressable, ScrollView, Text, useWindowDimensions, View, t
 
 import { ThemeToggle } from '../ThemeToggle';
 import { useAppTheme } from '../../hooks/useAppTheme';
-import { LOGO_DARK, LOGO_LIGHT } from '../../lib/brandLogos';
+import { LOGO_ASPECT, LOGO_DARK, LOGO_LIGHT } from '../../lib/brandLogos';
 import { cn } from '../../lib/cn';
 import { deviceWithGatewayConnectionState, racksForGateway, type DeviceNode } from '../../lib/devices';
 
-const LOGO_ASPECT = 284 / 77;
 const LOGO_HEIGHT = 19;
 
 /** The three top-level destinations the console opens onto. */

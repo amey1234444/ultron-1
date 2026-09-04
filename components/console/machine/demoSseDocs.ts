@@ -53,7 +53,7 @@ export const HEALTHY_SSE_LIVE_EVIDENCE = [
 ] as const;
 
 export const HEALTHY_SSE_OVERVIEW_MESSAGE =
-  'The operator should understand in a few seconds: the machine is running normally, the process is healthy, all measurements are available, and ULTRON is not creating a false fault.';
+  'The operator should understand in a few seconds: the machine is running normally, the process is healthy, all measurements are available, and BlackGATE is not creating a false fault.';
 
 export const HEALTHY_SSE_DIAGNOSIS_RESULT = [
   'Complete Machine: HEALTHY.',
@@ -108,7 +108,7 @@ export const HEALTHY_SSE_PROGNOSIS_PLOTS = [
 ] as const;
 
 export const HEALTHY_SSE_PROGNOSIS_MESSAGE =
-  'Demo 1 should prove that ULTRON does not create a future failure date when the historical evidence does not support one.';
+  'Demo 1 should prove that BlackGATE does not create a future failure date when the historical evidence does not support one.';
 
 export const HEALTHY_SSE_ADVANCED_DEFAULT = [
   'Gearbox Output Vibration - healthy reference signal.',

@@ -1,4 +1,4 @@
-// Numeric checks for the three ULTRON single-screw-extruder demo scenarios.
+// Numeric checks for the three BlackGATE single-screw-extruder demo scenarios.
 //
 // These assert that feeding the exact Part 1 input values from the demo scripts
 // through the real console pipeline produces the exact overview / diagnosis /

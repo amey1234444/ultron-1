@@ -9,17 +9,17 @@ import NextStep from '../components/home/NextStep';
 import Operators from '../components/home/Operators';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
-import UltronHero from '../components/hero/UltronHero';
+import BrandHero from '../components/hero/BrandHero';
 import SiteNav from '../components/web/SiteNav';
 
 export default function HomePage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>ULTRON — Condition monitoring for rotating equipment</title>
+        <title>BlackGATE — Condition monitoring for rotating equipment</title>
         <meta
           name="description"
-          content="Stop finding out after it breaks. ULTRON turns plant telemetry into a named component, an evidence trail and a window to take the machine out in."
+          content="Stop finding out after it breaks. BlackGATE turns plant telemetry into a named component, an evidence trail and a window to take the machine out in."
         />
         <meta name="theme-color" content="#070707" />
       </Head>
@@ -48,7 +48,7 @@ export default function HomePage() {
             in the room who opens a finding, and what each of them checks
             operators  the same thing, in their words                        */}
       <div className={styles.content}>
-        <UltronHero />
+        <BrandHero />
 
         {/* Owns `#condition` — the four outcome figures against their baseline. */}
         <Cutover />

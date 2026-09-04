@@ -74,7 +74,7 @@ const COMMON_UNITS: Record<string, string[]> = {
 };
 
 // Which end of the electrical range maps to which end of the operating range.
-// Ultron performs the linear conversion internally — no slope or intercept
+// BlackGATE performs the linear conversion internally — no slope or intercept
 // field is exposed — so this is a statement of what the card will do rather
 // than something to configure.
 const ELECTRICAL_MAPPING: Record<ProcessInputType, string> = {
@@ -419,7 +419,7 @@ function HardwareFields({
           })}
         </View>
         <Text className={cn('font-body text-[11px]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-          {ELECTRICAL_MAPPING[process.inputType]} - Ultron maps the electrical input to the configured full engineering range.
+          {ELECTRICAL_MAPPING[process.inputType]} - BlackGATE maps the electrical input to the configured full engineering range.
         </Text>
         {error && <Text className="font-body text-xs text-status-critical">{error}</Text>}
       </View>
@@ -729,7 +729,7 @@ export function ChannelConfigFields({
 
   return (
     <View className="gap-4">
-      <SectionPanel index="01" title="Identification" note="Name the signal first: the display name is what the rest of Ultron labels this channel with.">
+      <SectionPanel index="01" title="Identification" note="Name the signal first: the display name is what the rest of BlackGATE labels this channel with.">
         <View className="flex-row flex-wrap gap-3">
           <FieldCell>
             <FormField

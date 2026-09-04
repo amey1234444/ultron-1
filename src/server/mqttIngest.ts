@@ -329,7 +329,7 @@ async function ensureWorkspaceRackAndSlots(msg: MqttEnvelope, slots: Record<stri
         rackDeviceId,
         msg.rack_id,
         currentIp,
-        'Auto-discovered from Ultron MQTT live state',
+        'Auto-discovered from BlackGATE MQTT live state',
         gatewayDevice.project_id,
         gatewayDevice.id,
         msg.gateway_id,

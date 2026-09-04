@@ -197,8 +197,8 @@ export default function SiteNav() {
     <>
       <header className={`${styles.shell} ${scrolled || open ? styles.scrolled : ''}`}>
         <div className={styles.inner}>
-          <Link href="/home" className={styles.brand} aria-label="ULTRON home" onClick={close}>
-            <img src={LOGO_SRC} alt="ULTRON" className={styles.brandLogo} />
+          <Link href="/home" className={styles.brand} aria-label="BlackGATE home" onClick={close}>
+            <img src={LOGO_SRC} alt="BlackGATE" className={styles.brandLogo} />
           </Link>
 
           <nav className={styles.nav} aria-label="Primary">

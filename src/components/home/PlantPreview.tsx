@@ -202,7 +202,7 @@ export default function PlantPreview() {
       <div className={styles.bar}>
         <span className={styles.mark}>
           <span className={styles.markGlyph} aria-hidden="true" />
-          ULTRON
+          BLACKGATE
         </span>
 
         <span className={styles.select}>

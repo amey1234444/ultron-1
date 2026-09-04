@@ -667,7 +667,7 @@ async function migrate(): Promise<void> {
   `);
   await query(`CREATE INDEX IF NOT EXISTS mqtt_quarantine_live_conflict ON mqtt_quarantine (reason, received_at DESC, gateway_id, gateway_ip);`);
 
-  // --- Ultron MQTT v2 current state ---------------------------------------
+  // --- BlackGATE MQTT v2 current state ---------------------------------------
   await query(`ALTER TABLE racks ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;`);
   await query(`ALTER TABLE mqtt_messages ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;`);
   await query(`ALTER TABLE rack_inventory_slots ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;`);

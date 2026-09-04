@@ -1,7 +1,7 @@
 // /how-it-works — the mechanism, in one place.
 //
 // These three sections used to be spread through the landing page, which left
-// the landing page arguing two things at once: what ULTRON is for, and how it is
+// the landing page arguing two things at once: what BlackGATE is for, and how it is
 // built. They are different questions asked by different readers, so the "how"
 // now has its own page and the landing page keeps the "what".
 //
@@ -23,7 +23,7 @@ export default function HowItWorksPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>How it works — ULTRON</title>
+        <title>How it works — BlackGATE</title>
         <meta
           name="description"
           content="How a reading travels from the machine to your screen: reconciled onto one measurement model, published sub-second, and recorded without gaps."

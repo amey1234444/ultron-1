@@ -279,7 +279,7 @@ export function EvidenceCorrelationPanel({ model }: { model: PrognosisViewModel 
 
   return (
     <Panel style={{ flexGrow: 1, flexBasis: 320, minWidth: 280 }}>
-      <PanelHeading eyebrow="EVIDENCE CORRELATION" title="Why ULTRON detected it" />
+      <PanelHeading eyebrow="EVIDENCE CORRELATION" title="Why BlackGATE detected it" />
       {model.reasons.length === 0 ? (
         <Text className={text.body} style={{ color: palette.inkMuted }}>
           The engine did not report the features behind this projection.

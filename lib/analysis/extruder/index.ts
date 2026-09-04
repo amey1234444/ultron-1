@@ -1,6 +1,6 @@
 // Single-screw-extruder diagnostic model.
 //
-// A TypeScript port of the diagnostic layer of the ULTRON single-screw-extruder
+// A TypeScript port of the diagnostic layer of the BlackGATE single-screw-extruder
 // digital twin (`03_src/ultron_extruder/diagnostics/*`), together with its
 // governed registers. The twin's engineering discipline is carried over intact:
 //

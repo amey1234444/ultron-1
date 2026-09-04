@@ -115,7 +115,7 @@ const GEARBOX_BOLTS = [
  * place the artwork does not actually have an instrument — move a pad here and
  * the trail that lands on it moves with it.
  *
- * These are the ULTRON single-screw-extruder pilot tags, and the codes below
+ * These are the BlackGATE single-screw-extruder pilot tags, and the codes below
  * are the tag names the extruder analysis model reads (`lib/analysis/extruder`).
  * Two of them are easy to get wrong and are therefore worth stating:
  *

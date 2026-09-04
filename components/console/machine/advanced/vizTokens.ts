@@ -1,12 +1,12 @@
 // Data-series colours for the analysis charts.
 //
-// These are deliberately NOT the status palette. ULTRON's success / warning /
+// These are deliberately NOT the status palette. BlackGATE's success / warning /
 // critical and the gold accent all mean something — a trace drawn in warning amber
 // reads as an alarmed signal whether or not it is one. A chart needs a colour that
 // means "this is data", and the app had no such token, so this is the gap being
 // filled rather than a second theme.
 //
-// The single series hue was validated against ULTRON's own surfaces with the
+// The single series hue was validated against BlackGATE's own surfaces with the
 // dataviz validator (lightness band, chroma floor, CVD separation, normal-vision
 // floor, contrast) and passes all checks on #0A0A0A. It is one hue on purpose:
 //

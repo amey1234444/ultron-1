@@ -272,7 +272,7 @@ function FlexibleVisual() {
 const ROWS = [
   {
     tag: 'Adaptive',
-    heading: 'Most monitoring is accurate on day one, then quietly drifts. ULTRON re-baselines itself.',
+    heading: 'Most monitoring is accurate on day one, then quietly drifts. BlackGATE re-baselines itself.',
     body: 'Every model retrains against the plant it is actually running on. When the feed, the fuel or the duty cycle changes, the baseline moves with it — you are never comparing today against a machine that no longer exists.',
     label: 'Models update autonomously',
     visual: <AdaptiveVisual />,
@@ -286,7 +286,7 @@ const ROWS = [
   },
   {
     tag: 'Predictive',
-    heading: 'Most systems react to a breach. ULTRON tells you the shift before it happens.',
+    heading: 'Most systems react to a breach. BlackGATE tells you the shift before it happens.',
     body: 'Channels are forecast forward against their own alarm thresholds, with the spread shown rather than hidden. You get the window to act in, and an honest picture of how wide that window is.',
     label: 'Bearing temperature · DE · RAV-01',
     visual: <PredictiveVisual />,

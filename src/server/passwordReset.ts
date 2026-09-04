@@ -153,7 +153,7 @@ export function resetEmail(name: string, url: string, expiresAt: Date) {
   const text = [
     greeting,
     '',
-    'We received a request to reset the password on your ULTRON account.',
+    'We received a request to reset the password on your BlackGATE account.',
     '',
     `Open this link to choose a new password (valid for ${minutes} minutes, single use):`,
     url,
@@ -161,17 +161,17 @@ export function resetEmail(name: string, url: string, expiresAt: Date) {
     'If you did not request this, you can ignore this email — your password has not changed,',
     'and the link above will expire on its own.',
     '',
-    'ULTRON',
+    'BlackGATE',
   ].join('\n');
 
   const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:15px;line-height:1.55;color:#111">
   <p>${greeting}</p>
-  <p>We received a request to reset the password on your ULTRON account.</p>
+  <p>We received a request to reset the password on your BlackGATE account.</p>
   <p><a href="${url}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px">Choose a new password</a></p>
   <p style="color:#555;font-size:13px">This link is valid for ${minutes} minutes and can be used once.</p>
   <p style="color:#555;font-size:13px">If you did not request this you can ignore this email — your password has not changed, and the link will expire on its own.</p>
   <p style="color:#555;font-size:13px">If the button does not work, paste this into your browser:<br><span style="word-break:break-all">${url}</span></p>
 </div>`;
 
-  return { subject: 'Reset your ULTRON password', text, html };
+  return { subject: 'Reset your BlackGATE password', text, html };
 }

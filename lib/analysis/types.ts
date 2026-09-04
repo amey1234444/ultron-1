@@ -2,7 +2,7 @@
 //
 // Two condition-monitoring models now live in the app — the rotary-airlock
 // analyzer and the single-screw-extruder diagnostic pipeline ported from the
-// ULTRON extruder digital twin. Both produce this shape, so the Analysis tab,
+// BlackGATE extruder digital twin. Both produce this shape, so the Analysis tab,
 // the Overview deep-analyzer panel, and the durable `analysis_*` tables stay
 // model-agnostic and only the model-specific extension blocks differ.
 

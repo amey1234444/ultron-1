@@ -9,7 +9,7 @@
 //   SMTP_SECURE    'true' for implicit TLS on 465; inferred from the port otherwise
 //   SMTP_USER      omit both credentials for an unauthenticated relay
 //   SMTP_PASS      SMTP_PASSWORD is accepted as a fallback name
-//   SMTP_FROM      e.g. "ULTRON <no-reply@example.com>"
+//   SMTP_FROM      e.g. "BlackGATE <no-reply@example.com>"
 //
 // Local development note: antivirus products that scan mail (Avast, ESET,
 // Kaspersky) intercept the TLS connection and re-sign it with their own root,

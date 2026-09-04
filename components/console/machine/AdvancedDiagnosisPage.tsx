@@ -921,8 +921,8 @@ export function AdvancedDiagnosisPage({
           />
           <View className="flex-row flex-wrap gap-1.5">
             <SmallButton label="ADD HYPOTHESIS" onPress={() => addRecord('hypothesis')} />
-            <SmallButton label="CONFIRM ULTRON" onPress={() => addRecord('conclusion', 'CONFIRMED', draft || 'Automatic diagnosis confirmed by analyst.')} />
-            <SmallButton label="REJECT ULTRON" onPress={() => addRecord('conclusion', 'REJECTED', draft || 'Automatic diagnosis rejected by analyst.')} />
+            <SmallButton label="CONFIRM BLACKGATE" onPress={() => addRecord('conclusion', 'CONFIRMED', draft || 'Automatic diagnosis confirmed by analyst.')} />
+            <SmallButton label="REJECT BLACKGATE" onPress={() => addRecord('conclusion', 'REJECTED', draft || 'Automatic diagnosis rejected by analyst.')} />
             <SmallButton label="INCONCLUSIVE" onPress={() => addRecord('conclusion', 'INCONCLUSIVE', draft || 'Diagnosis remains inconclusive.')} />
           </View>
         </View>
@@ -1073,7 +1073,7 @@ export function AdvancedDiagnosisPage({
           which machine, which point, and at what speed and load. */}
       <View className="flex-row flex-wrap items-start justify-between gap-3">
         <View className="gap-1">
-          <Text className={cn('font-mono text-[10.5px] tracking-[0.16em]', mutedClass)}>ULTRON / ANALYSIS / ADVANCED DIAGNOSIS</Text>
+          <Text className={cn('font-mono text-[10.5px] tracking-[0.16em]', mutedClass)}>BLACKGATE / ANALYSIS / ADVANCED DIAGNOSIS</Text>
           <View className="flex-row flex-wrap items-baseline gap-1.5">
             <Text className={cn('font-heading-medium text-[21px]', inkClass)}>{machineName}</Text>
             <Text className={cn('font-body text-[13.5px]', mutedClass)}>· {template}</Text>

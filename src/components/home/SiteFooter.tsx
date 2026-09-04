@@ -43,8 +43,8 @@ export default function SiteFooter() {
   return (
     <footer className={styles.footer}>
       <div className={styles.inner}>
-        <Link href="/home" className={styles.brand} aria-label="ULTRON home">
-          <img src={LOGO_SRC} alt="ULTRON" className={styles.brandLogo} />
+        <Link href="/home" className={styles.brand} aria-label="BlackGATE home">
+          <img src={LOGO_SRC} alt="BlackGATE" className={styles.brandLogo} />
         </Link>
 
         {COLUMNS.map((column) => (
@@ -66,7 +66,7 @@ export default function SiteFooter() {
           <h2 className={styles.colTitle}>Where we are</h2>
 
           <address className={styles.address}>
-            ULTRON Technologies
+            BlackGATE Technologies
             <br />
             E 342, RIICO Growth Centre
             <br />
@@ -86,7 +86,7 @@ export default function SiteFooter() {
           href="https://www.linkedin.com/company/ultron-industrial"
           target="_blank"
           rel="noreferrer noopener"
-          aria-label="ULTRON on LinkedIn"
+          aria-label="BlackGATE on LinkedIn"
           className={styles.social}
         >
           <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -95,13 +95,13 @@ export default function SiteFooter() {
         </a>
 
         <p className={styles.legal}>
-          © {new Date().getFullYear()} ULTRON Technologies. All rights reserved.
+          © {new Date().getFullYear()} BlackGATE Technologies. All rights reserved.
         </p>
       </div>
 
       {/* The page signs its name on the way out. Decorative only. */}
       <div className={styles.wordmark} aria-hidden="true">
-        ULTRON
+        BlackGATE
       </div>
     </footer>
   );

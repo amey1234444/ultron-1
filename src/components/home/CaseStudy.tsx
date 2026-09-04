@@ -110,7 +110,7 @@ export default function CaseStudy() {
               <p className={styles.body}>
                 The line was already well run. What it did not have was a baseline that moved with
                 the raw mix — so every change in feed chemistry was absorbed by an operator, and the
-                result depended on which operator. ULTRON took the burning zone, and the spread
+                result depended on which operator. BlackGATE took the burning zone, and the spread
                 closed within five weeks of cutover.
               </p>
 

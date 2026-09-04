@@ -1,6 +1,6 @@
 // Governed registers for the single-screw-extruder diagnostic model.
 //
-// Ported verbatim from the ULTRON extruder digital twin:
+// Ported verbatim from the BlackGATE extruder digital twin:
 //   02_config/diagnostics/diagnostic_threshold_register.csv
 //   02_config/diagnostics/fault_identifiability.csv
 //   02_config/faults/fault_catalogue.csv
