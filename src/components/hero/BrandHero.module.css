@@ -207,17 +207,28 @@
   border-radius: 50%;
 }
 
+/* The light on the limb, and the bloom that carries it.
+
+   Gold the whole way across, so the rim and the highlight travelling along it
+   are the same light rather than a warm spot sliding over a cold edge. The
+   brightest point is a warm near-white rather than #fff: pure white at the
+   centre is what made the arc read as silver, and it left the golden sweep
+   looking like a stain on it instead of a reflection in it.
+
+   The two limbs are deliberately not the same gold — deep amber at one end,
+   a paler brass at the other — which is what keeps a 4000px circle from
+   looking like a flat stroke. */
 .arc,
 .arcGlow {
   background: linear-gradient(
     90deg,
-    rgba(100, 229, 139, 0.75) 0%,
-    rgba(180, 245, 200, 0.35) 14%,
-    rgba(255, 255, 255, 0.3) 30%,
-    #ffffff 50%,
-    rgba(255, 255, 255, 0.3) 70%,
-    rgba(190, 220, 255, 0.35) 86%,
-    rgba(111, 168, 255, 0.7) 100%
+    rgba(198, 126, 40, 0.75) 0%,
+    rgba(236, 182, 100, 0.35) 14%,
+    rgba(255, 220, 158, 0.32) 30%,
+    #ffe7bd 50%,
+    rgba(255, 220, 158, 0.32) 70%,
+    rgba(232, 190, 126, 0.35) 86%,
+    rgba(206, 152, 66, 0.7) 100%
   );
 }
 
