@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
+import { StatusDot } from './StatusDot';
 import { cn } from '../../../../lib/cn';
 import { levelHexes } from '../../../../lib/condition';
 import { consolePalette } from '../../../../lib/consoleTheme';
@@ -122,17 +123,7 @@ export function MachineHeader({
           className="flex-row items-center gap-2.5 rounded-xl border px-3.5 py-2.5"
           style={{ borderColor: palette.lineStrong, backgroundColor: isDark ? '#080A0A' : palette.panel }}
         >
-          <View
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: 4,
-              backgroundColor: feedColour,
-              shadowColor: feedColour,
-              shadowOpacity: feed === 'live' ? 0.6 : 0,
-              shadowRadius: 7,
-            }}
-          />
+          <StatusDot colour={feedColour} glow={feed === 'live'} />
           <Text style={{ color: feedColour }} className="font-mono text-[13px] font-bold tracking-wider">
             {FEED_LABEL[feed]}
           </Text>

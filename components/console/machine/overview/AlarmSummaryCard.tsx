@@ -1,7 +1,9 @@
+import { ChevronRight } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
+import { consolePalette } from '../../../../lib/consoleTheme';
 import { cn } from '../../../../lib/cn';
 import { loadLocal } from '../../../../lib/localPersist';
 import { levelHexes } from '../../../../lib/condition';
@@ -46,6 +48,7 @@ export function AlarmSummaryCard({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const levels = levelHexes(isDark);
+  const palette = consolePalette(isDark);
 
   // Read once per machine rather than polling: the operator acknowledges alarms
   // on the Alarm tab, and remounting this view is what brings the fresh count.
@@ -67,8 +70,9 @@ export function AlarmSummaryCard({
       <View className="flex-row items-center justify-between">
         <Text className={cn('font-body-medium text-[11.5px] uppercase tracking-wider', mutedClass)}>Alarm State</Text>
         {onOpenAlarms ? (
-          <Pressable onPress={onOpenAlarms}>
-            <Text className="font-body-medium text-[11.5px] text-accent">Open alarms ›</Text>
+          <Pressable onPress={onOpenAlarms} className="flex-row items-center gap-1">
+            <Text className="font-body-medium text-[11.5px] text-accent">Open alarms</Text>
+            <ChevronRight color={palette.accent} size={14} strokeWidth={1.7} />
           </Pressable>
         ) : null}
       </View>

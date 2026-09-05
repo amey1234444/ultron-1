@@ -7,6 +7,7 @@ import { formatRul, levelHexes } from '../../../../lib/condition';
 import type { MachinePredictionResult } from '../analysis/prognosticsModel';
 import type { RankedDiagnosis } from './rollup';
 import { consolePalette } from '../../../../lib/consoleTheme';
+import { StatusDot } from './StatusDot';
 import { Hoverable } from '../../../ui';
 
 const CONFIDENCE_LABEL: Record<RankedDiagnosis['confidence'], string> = { high: 'HIGH', medium: 'MEDIUM', low: 'LOW' };
@@ -61,7 +62,7 @@ export function PredictionList({ diagnoses, forecasts = [] }: { diagnoses: Ranke
                   backgroundColor: hovered ? palette.hoverSurface : undefined,
                 })}
               >
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colour }} />
+                <StatusDot colour={colour} size={6} glow={false} />
 
                 <View className="flex-1">
                   <Text numberOfLines={1} className={cn('font-body-medium text-xs', inkClass)}>
@@ -91,7 +92,7 @@ export function PredictionList({ diagnoses, forecasts = [] }: { diagnoses: Ranke
                   backgroundColor: hovered ? palette.hoverSurface : undefined,
                 })}
               >
-                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colour }} />
+                <StatusDot colour={colour} size={6} glow={false} />
 
                 <View className="flex-1">
                   <Text numberOfLines={1} className={cn('font-body-medium text-xs', inkClass)}>

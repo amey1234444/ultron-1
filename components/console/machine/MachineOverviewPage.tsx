@@ -416,7 +416,6 @@ export function MachineOverviewPage({
         />
         <KpiTile
           icon={Play}
-          iconTone={feed === 'live' ? palette.accent : palette.neutral}
           label="Machine state"
           value={runState.label}
           hint={runState.detail ?? undefined}
@@ -479,7 +478,7 @@ export function MachineOverviewPage({
 
       <View className="gap-3">
         <View className="flex-row items-center gap-3">
-          <Activity color={palette.accent} size={18} strokeWidth={1.7} />
+          <Activity color={palette.inkMuted} size={18} strokeWidth={1.7} />
           <Text className={cn('font-body-medium text-[12px] uppercase tracking-wider', isDark ? 'text-ink' : 'text-ink-inverse')}>
             Live sensor overview
           </Text>

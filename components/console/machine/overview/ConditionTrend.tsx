@@ -1,3 +1,4 @@
+import { ChevronRight } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import Svg, { Line, Path } from 'react-native-svg';
@@ -161,8 +162,14 @@ export function ConditionTrend({
           {label}
         </Text>
         {onSelectSensor ? (
-          <Pressable onPress={onSelectSensor} accessibilityRole="button" accessibilityLabel="Change trended sensor">
-            <Text className="font-body-medium text-[11.5px] text-accent">change ›</Text>
+          <Pressable
+            onPress={onSelectSensor}
+            accessibilityRole="button"
+            accessibilityLabel="Change trended sensor"
+            className="flex-row items-center gap-1"
+          >
+            <Text className="font-body-medium text-[11.5px] text-accent">change</Text>
+            <ChevronRight color={palette.accent} size={14} strokeWidth={1.7} />
           </Pressable>
         ) : null}
         <View className="flex-1" />

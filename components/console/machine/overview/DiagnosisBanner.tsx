@@ -5,6 +5,7 @@ import { cn } from '../../../../lib/cn';
 import { formatRul, levelHexes, type PointEvidence } from '../../../../lib/condition';
 import { consolePalette } from '../../../../lib/consoleTheme';
 import type { MachineSummary, RankedDiagnosis } from './rollup';
+import { StatusDot } from './StatusDot';
 
 type BannerDiagnosis = Pick<RankedDiagnosis, 'label' | 'confidence' | 'recommendation' | 'evidence' | 'componentLabel' | 'rulDays'>;
 
@@ -73,7 +74,7 @@ export function DiagnosisBanner({
       <View style={{ width: 3, backgroundColor: colour }} />
       <View className="min-w-0 flex-1 gap-2 px-4 py-3">
       <View className="flex-row flex-wrap items-center gap-2">
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colour }} />
+        <StatusDot colour={colour} />
         <Text style={{ color: colour }} className="font-body-bold text-sm">
           {diagnosis.label}
         </Text>
