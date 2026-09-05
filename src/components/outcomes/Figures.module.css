@@ -1,0 +1,159 @@
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--u-line);
+}
+
+.figure {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
+  gap: 40px;
+  align-items: center;
+  padding: 36px 0;
+  border-bottom: 1px solid var(--u-line);
+  opacity: 0;
+  transform: translate3d(0, 12px, 0);
+  transition:
+    opacity 700ms var(--u-ease),
+    transform 700ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .figure {
+  opacity: 1;
+  transform: none;
+}
+
+.label {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  color: var(--u-ink-2);
+}
+
+.index {
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: var(--u-bronze);
+}
+
+.value {
+  margin: 12px 0 0;
+  font-size: clamp(40px, 4.2vw, 58px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: var(--u-ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.unit {
+  margin-left: 10px;
+  font-family: var(--u-font-mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  color: var(--u-ink-3);
+  vertical-align: 0.9em;
+}
+
+.from {
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--u-ink-3);
+}
+
+.from b {
+  font-weight: 500;
+  color: var(--u-ink-2);
+}
+
+/* The bar. */
+.track {
+  position: relative;
+  height: 64px;
+}
+
+.trackLine {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--u-line);
+}
+
+.band {
+  position: absolute;
+  top: 50%;
+  height: 14px;
+  transform: translateY(-50%) scaleX(0);
+  transform-origin: left center;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--u-bronze-2), var(--u-bronze) 60%, var(--u-bronze-pale));
+  box-shadow: 0 0 0 5px var(--u-bronze-soft);
+  transition: transform 1100ms var(--u-ease);
+  transition-delay: calc(var(--delay, 0ms) + 200ms);
+}
+
+.shown .band {
+  transform: translateY(-50%) scaleX(1);
+}
+
+.mark {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 30px;
+  transform: translate(-50%, -50%);
+  background: var(--u-ink-2);
+}
+
+.markLabel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+  white-space: nowrap;
+}
+
+.arrow {
+  position: absolute;
+  top: 0;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.12em;
+  color: var(--u-ink-3);
+}
+
+.arrow[data-better='lower'] {
+  left: 0;
+}
+
+.arrow[data-better='higher'] {
+  right: 0;
+}
+
+.note {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--u-ink-2);
+}
+
+@media (max-width: 900px) {
+  .figure {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}

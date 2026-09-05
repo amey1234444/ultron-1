@@ -1,95 +1,28 @@
-/* Method — the study design, and what it leaves out.
-
-   Two columns that are not equal on purpose: the design is the argument and
-   takes the measure, the exclusions are the footnote and sit in a narrower
-   column beside it, on the page's own hairline. Nothing here is coloured. The
-   band above spends the page's one warm colour on the figures; repeating it
-   under the method would make the method look like more marketing. */
-
-.section {
-  position: relative;
-  padding: clamp(84px, 11vw, 148px) var(--u-gutter);
-  scroll-margin-top: 76px;
-  border-top: 1px solid var(--u-line);
-}
-
-.inner {
-  position: relative;
-  max-width: var(--u-max);
-  margin: 0 auto;
-}
-
 .grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
-  gap: clamp(32px, 5vw, 72px);
-  margin-top: clamp(40px, 5vw, 64px);
+  grid-template-columns: minmax(0, 1.5fr) minmax(280px, 0.7fr);
+  gap: 48px;
   align-items: start;
 }
 
-.terms {
-  margin: 0;
-  border-top: 1px solid var(--u-line);
-}
-
-.row {
-  padding: clamp(20px, 2.4vw, 28px) 0;
-  border-bottom: 1px solid var(--u-line);
-  opacity: 0;
-  transform: translate3d(0, 12px, 0);
-  transition:
-    opacity 700ms var(--u-ease),
-    transform 700ms var(--u-ease);
-  transition-delay: var(--delay, 0ms);
-}
-
-.shown .row,
-.shown .aside {
-  opacity: 1;
-  transform: none;
-}
-
-/* Mono, because these are the names of parameters of a study rather than
-   headings — the same treatment the console gives a measured quantity. */
-.term {
-  margin: 0;
-  font-family: var(--u-font-mono);
-  font-size: 11px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
-}
-
-.detail {
-  max-width: 62ch;
-  margin: 10px 0 0;
-  font-size: clamp(14.5px, 1.25vw, 16px);
-  line-height: 1.66;
-  color: var(--u-ink-2);
-  text-wrap: pretty;
-}
-
-/* The footnote column. A single hairline down its leading edge rather than a
-   panel: it is an aside to the list beside it, not a card of its own. */
 .aside {
-  padding-left: clamp(18px, 2vw, 28px);
-  border-left: 1px solid var(--u-line);
-  opacity: 0;
-  transform: translate3d(0, 12px, 0);
-  transition:
-    opacity 700ms var(--u-ease),
-    transform 700ms var(--u-ease);
-  transition-delay: var(--delay, 0ms);
+  position: sticky;
+  top: 96px;
+  padding: 28px;
+  border-radius: 18px;
+  border: 1px solid var(--u-bronze-line);
+  background:
+    radial-gradient(90% 60% at 100% 0%, var(--u-bronze-glow) 0%, transparent 60%),
+    rgba(255, 255, 255, 0.02);
 }
 
-.asideTitle {
+.asideEyebrow {
   margin: 0;
   font-family: var(--u-font-mono);
-  font-size: 11px;
-  font-weight: 400;
-  letter-spacing: 0.14em;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--u-ink-3);
+  color: var(--u-bronze);
 }
 
 .exclusions {
@@ -100,45 +33,48 @@
 
 .exclusion {
   position: relative;
-  padding-left: 18px;
+  padding: 14px 0 14px 22px;
+  border-top: 1px solid var(--u-line);
   font-size: 14px;
   line-height: 1.6;
   color: var(--u-ink-2);
-  text-wrap: pretty;
+  opacity: 0;
+  transform: translate3d(0, 8px, 0);
+  transition:
+    opacity 600ms var(--u-ease),
+    transform 600ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
 }
 
-.exclusion + .exclusion {
-  margin-top: 14px;
+.shown .exclusion {
+  opacity: 1;
+  transform: none;
 }
 
-/* A dash rather than a bullet: a bullet reads as a feature list, and this is a
-   list of things that were taken out. */
 .exclusion::before {
   content: '';
   position: absolute;
-  top: 0.68em;
   left: 0;
-  width: 8px;
+  top: 22px;
+  width: 10px;
   height: 1px;
-  background: var(--u-line-strong);
+  background: var(--u-bronze);
 }
 
 .asideFoot {
-  margin: clamp(20px, 2.4vw, 26px) 0 0;
+  margin: 18px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--u-line);
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--u-ink-3);
 }
 
-@media (max-width: 860px) {
+@media (max-width: 900px) {
   .grid {
     grid-template-columns: minmax(0, 1fr);
   }
-
   .aside {
-    padding-left: 0;
-    padding-top: clamp(24px, 4vw, 32px);
-    border-left: none;
-    border-top: 1px solid var(--u-line);
+    position: static;
   }
 }

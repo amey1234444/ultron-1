@@ -1,18 +1,18 @@
 // Boundaries — the four things this deliberately does not do.
 //
-// The site makes four capability claims. A page that only makes claims is a
-// brochure, and the reader this site is written for has read a lot of those:
+// The page above makes four capability claims. A page that only makes claims is
+// a brochure, and the reader this site is written for has read a lot of those:
 // the question they arrive with is not "what can it do" but "where does it stop
 // pretending". So each limit is stated first and flatly, and what the system
-// does instead is stated under it — which is the same shape as the outcome
-// figures, where the baseline sits under the range.
+// does instead is stated under it.
 //
-// No colour and no artwork. This is the one section on the site that is only
-// sentences, and that is the point: the argument here is candour, and candour
-// with a diagram on it looks like a sales technique.
+// No artwork. The argument here is candour, and candour with a diagram on it
+// looks like a sales technique — so this is the one section on the page that is
+// only sentences, set on a paper band so the change of register is visible.
 
 import styles from './Boundaries.module.css';
-import { Reveal, SectionHead, useInView } from '../home/primitives';
+import { Reveal, useInView } from '../home/primitives';
+import { innerStyles } from '../pages/inner';
 
 type Limit = {
   /** The claim we decline to make, in the reader's own words. */
@@ -49,12 +49,17 @@ export default function Boundaries() {
 
   return (
     <section id="boundaries" className={styles.section}>
-      <div className={styles.inner}>
-        <SectionHead
-          eyebrow="Boundaries"
-          title="What it will not tell you"
-          lead="Four claims the system declines to make, and what it does in place of each. These are enforced in the analysis layer, not in the copy."
-        />
+      <div className={innerStyles.inner}>
+        <div className={styles.head}>
+          <div>
+            <p className={styles.eyebrow}>Boundaries</p>
+            <h2 className={styles.title}>What it will not tell you</h2>
+          </div>
+          <p className={styles.lead}>
+            Four claims the system declines to make, and what it does in place of each. These
+            are enforced in the analysis layer, not in the copy.
+          </p>
+        </div>
 
         <div ref={ref} className={`${styles.list} ${inView ? styles.shown : ''}`}>
           {LIMITS.map((entry, index) => (
