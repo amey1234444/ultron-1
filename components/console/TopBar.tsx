@@ -386,6 +386,7 @@ export function TopBar({
             resizeMode="contain"
           />
         </Pressable>
+        {authenticated && onViewChange ? <View style={{ width: 1, height: 14, backgroundColor: dividerColor }} /> : null}
         {authenticated && onViewChange ? <NavSelect value={view} options={VIEWS} onChange={onViewChange} /> : null}
         {/* The plant picker only means anything inside the overview, so it only
             exists there — a disabled or irrelevant control in the nav is worse
