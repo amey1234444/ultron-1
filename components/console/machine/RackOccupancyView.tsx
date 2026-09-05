@@ -4,11 +4,13 @@ import { Pressable, ScrollView, Text, View } from 'react-native';
 import { EmptyState } from '../EmptyState';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
-import { cardElevation, consolePalette, statusTone, type ConsolePalette } from '../../../lib/consoleTheme';
+import { levelFor, resolveThresholds } from '../../../lib/condition';
+import { cardElevation, consolePalette, statusTone, type ConsolePalette, type ToneName } from '../../../lib/consoleTheme';
 import { deviceWithGatewayConnectionState, gatewayForRack, type DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import { TOTAL_SLOTS, type CardNode, type ChannelRef } from '../../../lib/rack';
-import { useChannelReading } from '../../../lib/liveChannelValue';
+import { getLiveMeasurement, subscribeLiveMeasurement } from '../../../lib/liveMeasurementBus';
+import { channelNumberFor, liveMeasurementKeyForChannel, useChannelReading } from '../../../lib/liveChannelValue';
 import { text } from '../../ui';
 import { RackFaceplate } from '../rack/RackFaceplate';
 import { LIVE_RANGE_FOR_LETTER, NO_VALUE_TEXT } from './liveValue';
@@ -31,6 +33,13 @@ export type MappedChannel = { id: string; channel: ChannelRef; label: string; te
 // scanned in a second or two, and the detail — faceplate, slots, live
 // readings — opens for the rack that is selected. Nothing was removed; the
 // secondary half of it stopped being permanently on screen.
+const RACK_STATUS_LABEL: Record<ToneName, string> = {
+  normal: 'Healthy',
+  alert: 'Warning',
+  danger: 'Alarm',
+  offline: 'Offline',
+};
+
 const TILE_MIN_WIDTH = 164;
 const TILE_MAX_WIDTH = 196;
 const TILE_PAD = 9;
@@ -40,8 +49,65 @@ const TILE_GAP = 8;
 const SLOT_CELL_HEIGHT = 9;
 const SLOT_CELL_GAP = 2;
 
-function statusToneFor(online: boolean) {
-  return online ? ('normal' as const) : ('offline' as const);
+/**
+ * What one channel's current reading is worth, as a tone.
+ *
+ * This used to be written inline in the readout row, comparing only against the
+ * two high limits. Two things were wrong with that. A channel below its *low*
+ * limit — a pump losing suction, a drive losing speed — read as comfortably
+ * normal, and the rack tile above the row had no way to ask the question at all,
+ * so a rack containing an alarming channel still called itself healthy. Both
+ * now go through here, so the tile and the row cannot disagree.
+ *
+ * Thresholds come from `resolveThresholds`, which is what the overview and the
+ * analysis layer use, but only when they were actually commissioned. That
+ * function will infer limits from the measurement band when a card carries none,
+ * and colouring a rack from an inferred limit would raise alarms nobody set.
+ */
+function channelToneFor(channel: ChannelRef, value: number | null | undefined): ToneName {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 'offline';
+  const thresholds = resolveThresholds(channel, LIVE_RANGE_FOR_LETTER[channel.letter]);
+  if (!thresholds.configured) return 'normal';
+  return levelFor(value, thresholds);
+}
+
+/** Worst wins: one alarming channel makes the rack it sits in alarming. */
+const TONE_RANK: Record<ToneName, number> = { offline: 0, normal: 1, alert: 2, danger: 3 };
+
+function worstTone(tones: ToneName[], fallback: ToneName): ToneName {
+  return tones.reduce((worst, tone) => (TONE_RANK[tone] > TONE_RANK[worst] ? tone : worst), fallback);
+}
+
+/**
+ * The live tone of every channel on a rack, in one subscription set.
+ *
+ * A rack tile has to judge a list whose length changes, so it cannot call the
+ * per-channel reading hook in a loop. This subscribes to all of the keys at once
+ * and re-reads them on any frame, which is the same data the rows below use and
+ * arrives on the same tick.
+ */
+function useChannelTones(channels: MappedChannel[], devices: DeviceNode[]): ToneName[] {
+  const keyed = useMemo(
+    () =>
+      channels.map((mapped) => ({
+        channel: mapped.channel,
+        key: liveMeasurementKeyForChannel(mapped.channel, channelNumberFor(mapped.channel), devices),
+      })),
+    [channels, devices],
+  );
+  const signature = keyed.map((entry) => entry.key ?? '').join('|');
+  const [, setFrame] = useState(0);
+
+  useEffect(() => {
+    const bump = () => setFrame((n) => n + 1);
+    const unsubscribes = keyed.map((entry) => subscribeLiveMeasurement(entry.key, bump));
+    return () => unsubscribes.forEach((off) => off());
+    // `signature` is the identity of the key set; `keyed` itself is a new array
+    // on every render of the parent and would resubscribe on each one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
+  return keyed.map((entry) => channelToneFor(entry.channel, getLiveMeasurement(entry.key)?.value));
 }
 
 function ChannelReadout({
@@ -58,13 +124,7 @@ function ChannelReadout({
   const value = reading.value;
   const hasReading = typeof value === 'number';
   // No reading means no alarm colour — an absent value is grey, not green.
-  const tone = !hasReading
-    ? statusTone(palette, 'offline')
-    : channel.alarmCritical !== undefined && value >= channel.alarmCritical
-      ? statusTone(palette, 'danger')
-      : channel.alarmWarning !== undefined && value >= channel.alarmWarning
-        ? statusTone(palette, 'alert')
-        : statusTone(palette, 'normal');
+  const tone = statusTone(palette, channelToneFor(channel, value));
   const range = LIVE_RANGE_FOR_LETTER[channel.letter];
 
   return (
@@ -210,7 +270,14 @@ function RackTile({
     [group.rack, devices],
   );
   const online = rackWithState?.status === 'Online';
-  const tone = statusTone(palette, statusToneFor(online));
+
+  // Connectivity first — an offline rack has nothing to report a condition
+  // about — and otherwise the worst channel mapped to this machine. The tile
+  // drove its colour from connectivity alone, which is why a rack could hold a
+  // channel over its limit and still call itself healthy.
+  const channelTones = useChannelTones(group.channels, devices);
+  const toneName: ToneName = online ? worstTone(channelTones, 'normal') : 'offline';
+  const tone = statusTone(palette, toneName);
 
   const installed = useMemo(() => new Set(rackCards.map((card) => card.slot)), [rackCards]);
   const mappedSlots = useMemo(() => new Set(group.slots), [group.slots]);
@@ -224,7 +291,7 @@ function RackTile({
       onHoverOut={() => setHovered(false)}
       accessibilityRole="tab"
       accessibilityState={{ selected }}
-      accessibilityLabel={`${group.rack?.name ?? 'Unknown rack'}, ${online ? 'online' : 'offline'}, ${installed.size} of ${TOTAL_SLOTS} slots populated, ${group.channels.length} channels mapped to this machine`}
+      accessibilityLabel={`${group.rack?.name ?? 'Unknown rack'}, ${RACK_STATUS_LABEL[toneName].toLowerCase()}, ${installed.size} of ${TOTAL_SLOTS} slots populated, ${group.channels.length} channels mapped to this machine`}
       style={{
         width,
         borderWidth: 1,
@@ -243,7 +310,7 @@ function RackTile({
           {group.rack?.name ?? 'Unknown rack'}
         </Text>
         <Text className={text.meta} style={{ color: tone.fg }}>
-          {online ? 'Healthy' : 'Offline'}
+          {RACK_STATUS_LABEL[toneName]}
         </Text>
       </View>
 

@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { G, parse } from 'react-native-svg';
 
+import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
@@ -56,15 +57,18 @@ export type TwinScrewConnector = (typeof TWIN_SCREW_POINT_REGISTRY)[number];
 export const TWIN_SCREW_CONNECTORS: readonly TwinScrewConnector[] = TWIN_SCREW_POINT_REGISTRY;
 
 /**
- * The machine is one light drawing in both themes.
+ * The sheet the machine is drawn on, per theme.
  *
- * It is a technical illustration — lit metal, cast shadows, a specular pass
- * over the housings — and the light it is lit by is part of the drawing rather
- * than a colour choice that can be inverted. Re-toning it for a dark console
- * would flatten the thing the reference does best, so it stays as drawn, the
- * way a drawing sheet on a desk stays white in a dark room.
+ * The drawing itself is re-toned by `buildTwinScrewExtruderArtwork({ dark })`,
+ * the same way the single-screw drawing swaps its palette — a light machine on
+ * a dark console is a slab, whatever the artwork was drawn as.
+ *
+ * These two also stand in for the ground behind a pad: an idle pad is a hole
+ * cut in the machine, so its centre has to be the colour the machine sits on,
+ * not the colour of the console around it.
  */
-const SHEET = '#fbfbfa';
+const SHEET_LIGHT = '#fbfbfa';
+const SHEET_DARK = '#0d0e10';
 
 /**
  * The pad's status colour, and the ground its hollow centre is cut out of.
@@ -81,6 +85,8 @@ export function TwinScrewExtruder({
   showBackground = false,
   connectorState,
 }: TwinScrewExtruderProps) {
+  const { isDark } = useAppTheme();
+  const sheet = isDark ? SHEET_DARK : SHEET_LIGHT;
   /**
    * The machine, parsed once per appearance.
    *
@@ -90,12 +96,13 @@ export function TwinScrewExtruder({
    * of the geometry to drift, and the parse is exact — every gradient, pattern,
    * clip path and lighting filter in the source comes out the other side.
    *
-   * One input can change the source, so this is one parse in a session for each
-   * way the drawing is shown, and none on a re-render that changed neither.
+   * Two inputs can change the source — the sheet and the theme — so this is at
+   * most a handful of parses in a session, and none on a re-render that changed
+   * neither.
    */
   const artwork = useMemo(
-    () => parse(buildTwinScrewExtruderArtwork({ showBackground, sheet: SHEET })),
-    [showBackground],
+    () => parse(buildTwinScrewExtruderArtwork({ showBackground, sheet, dark: isDark })),
+    [showBackground, sheet, isDark],
   );
 
   return (
@@ -104,7 +111,7 @@ export function TwinScrewExtruder({
       style={[
         {
           aspectRatio: VIEWBOX_WIDTH / VIEWBOX_HEIGHT,
-          backgroundColor: showBackground ? SHEET : 'transparent',
+          backgroundColor: showBackground ? sheet : 'transparent',
         },
         style,
       ]}
@@ -128,7 +135,7 @@ export function TwinScrewExtruder({
                 y={point.y}
                 state={state}
                 accent={PAD_ACCENT}
-                panel={SHEET}
+                panel={sheet}
                 label={`${point.label} — ${padStateLabel(state)}`}
               />
             );

@@ -19,6 +19,7 @@ import { buildLightingOverlaySvg } from './lighting';
 import { TSE_LIGHTING_DEFS } from './materials';
 import { buildAssemblyRebuildSvg } from './rebuild';
 import { buildProductionRefinementSvg } from './refinements';
+import { toDarkArtwork } from './theme';
 
 export { HEIGHT, WIDTH } from './geometry';
 
@@ -35,6 +36,14 @@ export type TwinScrewArtworkOptions = {
   showBackground?: boolean;
   /** Fill for the sheet, when `showBackground` is set. */
   sheet?: string;
+  /**
+   * Re-tone the drawing for a dark surface.
+   *
+   * The supplied artwork is a light illustration; on a dark console it is a
+   * white slab. Colours are inverted in lightness, keeping hue and saturation —
+   * see `./theme` for why that is a re-tone rather than a negative.
+   */
+  dark?: boolean;
 };
 
 /**
@@ -47,12 +56,23 @@ export type TwinScrewArtworkOptions = {
 export function buildTwinScrewExtruderArtwork({
   showBackground = false,
   sheet = 'url(#bg)',
+  dark = false,
 }: TwinScrewArtworkOptions = {}): string {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
+  // The sheet is the one colour the caller has already picked for the theme it
+  // is asking for, so it must not be re-toned along with the drawing. It goes in
+  // as a token and is substituted afterwards, which keeps it out of the
+  // transform's way rather than relying on the transform to special-case it.
+  const SHEET_TOKEN = '__sheet__';
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${WIDTH}" height="${HEIGHT}" viewBox="0 0 ${WIDTH} ${HEIGHT}">
 ${TSE_LIGHTING_DEFS}
-${buildMachineSvg({ showBackground, sheet })}
+${buildMachineSvg({ showBackground, sheet: SHEET_TOKEN })}
 ${buildProductionRefinementSvg()}
 ${buildAssemblyRebuildSvg()}
 ${buildLightingOverlaySvg()}
 </svg>`;
+
+  // Toned last, over the finished document, so one rule covers every pass and a
+  // layer added here later cannot be missed.
+  return (dark ? toDarkArtwork(svg) : svg).split(SHEET_TOKEN).join(sheet);
 }
