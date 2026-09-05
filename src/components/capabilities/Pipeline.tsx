@@ -1,7 +1,7 @@
 // Pipeline — how a reading becomes an instruction, in five stages.
 //
 // A horizontal rail of five stages, each with a one-line artefact under it so
-// the reader can see what leaves each stage. The rail is drawn once, in bronze,
+// the reader can see what leaves each stage. The rail is drawn once, in white,
 // and the stages are drawn on top of it.
 
 import styles from './Pipeline.module.css';

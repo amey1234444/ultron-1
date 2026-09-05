@@ -1,6 +1,6 @@
 // Pillars — the four capability claims, each with the artefact that proves it.
 //
-// Four plates on the wall: one paper, one bronze, two dark. Each carries a small
+// Four plates on the wall: one paper, one raised, two dark. Each carries a small
 // drawing of the thing the claim is about — a baseline that re-learns, a finding
 // with its evidence, a forecast drawn as a cone, an instruction with a window —
 // because a capability without its artefact is a slogan.

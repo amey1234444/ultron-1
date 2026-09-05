@@ -1,7 +1,7 @@
 // Figures — the four outcome ranges, drawn against the baseline each moved off.
 //
 // The landing page prints these as numbers. Here each is a bar: the grey mark
-// is the twelve-month baseline, the bronze band is the observed range after
+// is the twelve-month baseline, the white band is the observed range after
 // cutover. Where lower is better the band sits left of the mark; where higher
 // is better it sits right. The same four figures as the landing page, so the
 // two never disagree.

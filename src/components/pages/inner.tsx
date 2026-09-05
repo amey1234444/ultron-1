@@ -19,16 +19,25 @@ export { styles as innerStyles };
 export type HeroFact = { label: string; value: string };
 
 /**
- * Headline with one run of words set in gold. `title` is split on `*` — the
- * segment between the asterisks is the emphasised one.
+ * Headline with one emphasised run of words. `title` is split on `*` — the
+ * segment between the asterisks is the emphasised one. Gold is reserved for the
+ * page hero; everywhere else the emphasis is the landing page's dimmed grey.
  */
-export function GoldTitle({ text, className }: { text: string; className?: string }) {
+export function GoldTitle({
+  text,
+  className,
+  tone = 'dim',
+}: {
+  text: string;
+  className?: string;
+  tone?: 'gold' | 'dim';
+}) {
   const parts = text.split('*');
   return (
     <span className={className}>
       {parts.map((part, index) =>
         index % 2 === 1 ? (
-          <span key={index} className={styles.gold}>
+          <span key={index} className={tone === 'gold' ? styles.gold : styles.dim}>
             {part}
           </span>
         ) : (
@@ -68,7 +77,7 @@ export function PageHero({
             {meta ? <span className={styles.eyebrowMeta}>· {meta}</span> : null}
           </p>
           <h1 className={styles.heroTitle}>
-            <GoldTitle text={title} />
+            <GoldTitle text={title} tone="gold" />
           </h1>
           <p className={styles.heroLead}>{lead}</p>
           {actions ? <div className={styles.heroActions}>{actions}</div> : null}
@@ -112,7 +121,7 @@ export function InnerHead({
     <div className={`${styles.head} ${cls}`}>
       <div>
         <p className={styles.eyebrow}>
-          <span className={styles.eyebrowDot} aria-hidden="true" />
+          <span className={styles.eyebrowDotDim} aria-hidden="true" />
           {eyebrow}
         </p>
         <h2 className={styles.headTitle}>
@@ -400,7 +409,7 @@ export function CtaBand({
       </span>
       <div className={styles.ctaCopy}>
         <p className={styles.eyebrow}>
-          <span className={styles.eyebrowDot} aria-hidden="true" />
+          <span className={styles.eyebrowDotDim} aria-hidden="true" />
           {eyebrow}
         </p>
         <h2 className={styles.ctaTitle}>

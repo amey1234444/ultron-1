@@ -4,8 +4,8 @@
 .manifesto {
   padding: clamp(80px, 9vw, 130px) 0;
   background:
-    radial-gradient(60% 70% at 0% 100%, rgba(223, 169, 95, 0.16) 0%, transparent 60%),
-    linear-gradient(180deg, #f7f5f0 0%, var(--u-paper) 55%, var(--u-paper-2) 100%);
+    radial-gradient(60% 70% at 0% 100%, rgba(255, 255, 255, 0.5) 0%, transparent 60%),
+    linear-gradient(180deg, #f2f2ef 0%, var(--u-paper) 55%, var(--u-paper-2) 100%);
   color: var(--u-paper-ink);
 }
 
@@ -22,7 +22,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--u-bronze-deep);
+  color: var(--u-paper-ink-2);
 }
 
 .manifestoTitle {

@@ -22,8 +22,8 @@
 .formBand {
   padding: clamp(80px, 9vw, 130px) 0;
   background:
-    radial-gradient(60% 60% at 100% 100%, rgba(223, 169, 95, 0.18) 0%, transparent 60%),
-    linear-gradient(180deg, #f7f5f0 0%, var(--u-paper) 55%, var(--u-paper-2) 100%);
+    radial-gradient(60% 60% at 100% 100%, rgba(255, 255, 255, 0.5) 0%, transparent 60%),
+    linear-gradient(180deg, #f2f2ef 0%, var(--u-paper) 55%, var(--u-paper-2) 100%);
   color: var(--u-paper-ink);
   scroll-margin-top: 64px;
 }
@@ -46,7 +46,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--u-bronze-deep);
+  color: var(--u-paper-ink-2);
 }
 
 .asideTitle {
@@ -100,7 +100,7 @@
 .details a {
   color: inherit;
   text-decoration: none;
-  border-bottom: 1px solid var(--u-bronze-deep);
+  border-bottom: 1px solid var(--u-paper-ink-2);
 }
 
 /* The form itself. */
@@ -111,9 +111,9 @@
 .form {
   padding: clamp(24px, 3vw, 40px);
   border-radius: 22px;
-  border: 1px solid rgba(18, 17, 15, 0.12);
+  border: 1px solid rgba(16, 16, 17, 0.12);
   background: rgba(255, 255, 255, 0.55);
-  box-shadow: 0 30px 80px -40px rgba(18, 17, 15, 0.35);
+  box-shadow: 0 30px 80px -40px rgba(16, 16, 17, 0.35);
 }
 
 .label {
@@ -144,7 +144,7 @@
   align-items: center;
   padding: 9px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(18, 17, 15, 0.16);
+  border: 1px solid rgba(16, 16, 17, 0.16);
   background: transparent;
   font-size: 13.5px;
   font-weight: 500;
@@ -161,17 +161,17 @@
 }
 
 .topic:hover {
-  border-color: rgba(18, 17, 15, 0.4);
+  border-color: rgba(16, 16, 17, 0.4);
 }
 
 .topicOn {
   background: var(--u-paper-ink);
   border-color: var(--u-paper-ink);
-  color: var(--u-bronze-pale);
+  color: #ffffff;
 }
 
 .topic:focus-within {
-  outline: 2px solid var(--u-bronze);
+  outline: 2px solid #ffffff;
   outline-offset: 2px;
 }
 
@@ -197,7 +197,7 @@
   margin-top: 8px;
   padding: 12px 14px;
   border-radius: 12px;
-  border: 1px solid rgba(18, 17, 15, 0.16);
+  border: 1px solid rgba(16, 16, 17, 0.16);
   background: #fff;
   color: var(--u-paper-ink);
   font: inherit;
@@ -219,8 +219,8 @@
 
 .field input:focus,
 .field textarea:focus {
-  border-color: var(--u-bronze-2);
-  box-shadow: 0 0 0 4px var(--u-bronze-soft);
+  border-color: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.07);
 }
 
 .formFoot {
@@ -244,7 +244,7 @@
 .formNote a {
   color: var(--u-paper-ink);
   text-decoration: none;
-  border-bottom: 1px solid var(--u-bronze-deep);
+  border-bottom: 1px solid var(--u-paper-ink-2);
 }
 
 .formActions {

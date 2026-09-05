@@ -39,7 +39,7 @@
   font-family: var(--u-font-mono);
   font-size: 10.5px;
   letter-spacing: 0.16em;
-  color: var(--u-bronze);
+  color: #ffffff;
 }
 
 .value {
@@ -95,8 +95,8 @@
   transform: translateY(-50%) scaleX(0);
   transform-origin: left center;
   border-radius: 999px;
-  background: linear-gradient(90deg, var(--u-bronze-2), var(--u-bronze) 60%, var(--u-bronze-pale));
-  box-shadow: 0 0 0 5px var(--u-bronze-soft);
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.55), #ffffff 60%, #ffffff);
+  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.07);
   transition: transform 1100ms var(--u-ease);
   transition-delay: calc(var(--delay, 0ms) + 200ms);
 }
