@@ -88,9 +88,9 @@ body {
   --u-sky-soft: rgba(159, 216, 255, 0.12);
   --u-sky-line: rgba(159, 216, 255, 0.4);
 
-  /* Bronze-gold — the inner pages' one warm colour (capabilities, outcomes,
-     about, FAQ, contact). Eyebrows, indices, the emphasised word in a headline,
-     and a single bronze plate per page. */
+  /* Bronze-gold — spent sparingly on the inner pages: the hero eyebrow dot, the
+     emphasised word in a hero title, and the hot tick on a timeline. Nothing
+     else is coloured. */
   --u-bronze: #dfa95f;
   --u-bronze-2: #c48f4a;
   --u-bronze-deep: #8a6230;
@@ -101,11 +101,11 @@ body {
 
   /* Paper — the off-white plate. A light card on a black page is the highest
      contrast move the palette has, so each inner page gets at most two. */
-  --u-paper: #f3f1ec;
-  --u-paper-2: #e6e2da;
-  --u-paper-ink: #12110f;
-  --u-paper-ink-2: #5b574f;
-  --u-paper-line: rgba(18, 17, 15, 0.1);
+  --u-paper: #efefec;
+  --u-paper-2: #e4e4e0;
+  --u-paper-ink: #101011;
+  --u-paper-ink-2: #4a4a4c;
+  --u-paper-line: rgba(16, 16, 17, 0.12);
 
   /* Signals. Used only where a reading genuinely warrants a colour. */
   --u-red: #f2624a;

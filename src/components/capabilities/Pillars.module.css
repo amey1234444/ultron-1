@@ -1,9 +1,9 @@
 /* Pillars — the drawings inside the four plates.
 
    Each drawing takes its ink from the plate it sits on: `currentColor` on the
-   dark plates is the page's white, on paper it is near-black, on bronze it is
-   a deep brown. Bronze is used inside the drawings only for the one element the
-   drawing is about — the re-baseline point, the limit, the window. */
+   dark plates is the page's white, on paper it is near-black. The one element
+   each drawing is about — the re-baseline point, the limit, the window — is
+   drawn at full ink; everything else is faded. */
 
 .art {
   display: block;
@@ -36,12 +36,12 @@
 
 .baseNew {
   fill: none;
-  stroke: var(--u-bronze);
-  stroke-width: 1.4;
+  stroke: currentColor;
+  stroke-width: 1.6;
 }
 
 .dotHot {
-  fill: var(--u-bronze);
+  fill: currentColor;
 }
 
 .label {
@@ -55,7 +55,8 @@
 .labelBronze {
   font-size: 9px;
   letter-spacing: 0.12em;
-  fill: var(--u-bronze);
+  fill: currentColor;
+  fill-opacity: 0.85;
 }
 
 .labelBronzeStrong {
@@ -74,7 +75,7 @@
 .paperLabel {
   font-size: 8.5px;
   letter-spacing: 0.14em;
-  fill: var(--u-bronze-deep);
+  fill: var(--u-paper-ink-2);
 }
 
 .paperRule {
@@ -83,7 +84,7 @@
 }
 
 .paperDot {
-  fill: var(--u-bronze);
+  fill: var(--u-paper-ink);
 }
 
 .paperText {
@@ -112,13 +113,13 @@
 }
 
 .cone {
-  fill: var(--u-bronze);
+  fill: #ffffff;
   fill-opacity: 0.16;
 }
 
 .coneCentre {
   fill: none;
-  stroke: var(--u-bronze);
+  stroke: #ffffff;
   stroke-width: 1.4;
 }
 
@@ -128,34 +129,35 @@
   stroke-width: 1;
 }
 
-/* Window. On the bronze plate the ink is deep brown, and the window itself is
-   the darkest thing on the plate. */
+/* Window. On the raised plate the ink is white, and the window itself is the
+   brightest thing on the plate. */
 .dayCell {
-  fill: rgba(27, 20, 11, 0.06);
-  stroke: rgba(27, 20, 11, 0.18);
+  fill: rgba(255, 255, 255, 0.05);
+  stroke: rgba(255, 255, 255, 0.16);
 }
 
 .windowCell {
-  fill: #1b140b;
-  stroke: #1b140b;
+  fill: #ffffff;
+  stroke: #ffffff;
 }
 
 .windowCell ~ .labelBronzeStrong {
-  fill: var(--u-bronze-pale);
+  fill: #0a0a0a;
 }
 
 .windowCell ~ .labelBronze {
-  fill: var(--u-bronze);
+  fill: #0a0a0a;
+  fill-opacity: 1;
 }
 
 .runLine {
-  stroke: rgba(27, 20, 11, 0.28);
+  stroke: rgba(255, 255, 255, 0.28);
   stroke-width: 3;
   stroke-linecap: round;
 }
 
 .runLineBronze {
-  stroke: #1b140b;
+  stroke: #ffffff;
   stroke-width: 3;
   stroke-linecap: round;
 }

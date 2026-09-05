@@ -3,9 +3,10 @@
    the hero, the plate cards, the stat strip, the quote wall, the CTA band, the
    timeline and the definition rows.
 
-   Palette: black, white, grey, and bronze-gold. Bronze is the eyebrow, the
-   index, the emphasised word and the one bronze plate on a page; paper (an
-   off-white plate) is spent at most twice per page. Nothing else is coloured. */
+   Palette: the landing page's — black field, white accent, grey ramp, one cool
+   light panel. Gold is spent three times at most on a page: the dot in the hero
+   eyebrow, the emphasised word in the hero title, and the hot tick on a
+   timeline. Nothing else is coloured. */
 
 /* ------------------------------------------------------------------ */
 /* Section scaffolding                                                 */
@@ -37,7 +38,7 @@
   );
 }
 
-/* The warm band. Bronze light from one side, falling to nothing well inside the
+/* The lit band. White light from one side, falling to nothing well inside the
    section so it reads as light rather than as a panel. */
 .sectionWarm {
   overflow: hidden;
@@ -51,8 +52,8 @@
   pointer-events: none;
   background: radial-gradient(
     100% 80% at 78% 30%,
-    var(--u-bronze-glow) 0%,
-    rgba(120, 84, 34, 0.04) 42%,
+    rgba(255, 255, 255, 0.05) 0%,
+    rgba(255, 255, 255, 0.015) 42%,
     rgba(10, 9, 8, 0) 70%
   );
 }
@@ -78,17 +79,13 @@
   overflow: hidden;
 }
 
-/* Two blooms behind the hero — one white from above, one bronze and lower, so
-   the top of every inner page carries the page's warm colour before a single
-   word of copy is read. */
+/* One white bloom from above, the same as the landing hero. */
 .heroLight {
   position: absolute;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background:
-    radial-gradient(60% 46% at 50% -8%, rgba(255, 255, 255, 0.075) 0%, transparent 62%),
-    radial-gradient(42% 38% at 72% 34%, rgba(196, 142, 62, 0.13) 0%, transparent 70%);
+  background: radial-gradient(60% 46% at 50% -8%, rgba(255, 255, 255, 0.085) 0%, transparent 62%);
 }
 
 .heroInner {
@@ -124,15 +121,24 @@
   font-weight: 500;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  color: var(--u-bronze);
+  color: var(--u-ink-3);
 }
 
-.eyebrowDot {
+.eyebrowDot,
+.eyebrowDotDim {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+}
+
+/* Hero only — the one gold dot on the page. */
+.eyebrowDot {
   background: var(--u-bronze);
   box-shadow: 0 0 0 4px var(--u-bronze-soft);
+}
+
+.eyebrowDotDim {
+  background: var(--u-ink-3);
 }
 
 .eyebrowMeta {
@@ -150,16 +156,22 @@
   text-wrap: balance;
 }
 
-/* The emphasised word in a headline. A metallic gradient across the letters
-   rather than a flat tint, so it catches like a plate rather than a highlight. */
+/* The emphasised word in a section headline — dimmed, as the landing page does. */
+.dim {
+  color: var(--u-ink-2);
+}
+
+/* The emphasised word in the hero — the one gold moment in the copy. A quiet
+   metallic gradient rather than a flat tint, so it reads as a plate catching
+   light, not a highlighter. */
 .gold {
   background: linear-gradient(
     100deg,
-    var(--u-bronze-deep) 0%,
-    var(--u-bronze-2) 22%,
-    var(--u-bronze-pale) 50%,
+    var(--u-bronze-2) 0%,
+    var(--u-bronze) 30%,
+    var(--u-bronze-pale) 52%,
     var(--u-bronze) 74%,
-    var(--u-bronze-deep) 100%
+    var(--u-bronze-2) 100%
   );
   background-size: 220% 100%;
   -webkit-background-clip: text;
@@ -302,30 +314,30 @@
   box-shadow: 0 26px 60px -34px rgba(0, 0, 0, 0.95);
 }
 
-/* Paper: off-white, warm. */
+/* Paper: the landing page's light panel, cool off-white. */
 .platePaper {
   border: 1px solid rgba(255, 255, 255, 0.5);
-  background:
-    radial-gradient(90% 70% at 100% 0%, rgba(223, 169, 95, 0.16) 0%, transparent 60%),
-    linear-gradient(180deg, #f7f5f0 0%, var(--u-paper) 60%, var(--u-paper-2) 100%);
+  background: linear-gradient(168deg, #efefec 0%, #e4e4e0 100%);
   color: var(--u-paper-ink);
 }
 
 .shown .platePaper:hover {
-  box-shadow: 0 30px 70px -30px rgba(243, 241, 236, 0.35);
+  box-shadow: 0 30px 70px -30px rgba(239, 239, 236, 0.3);
 }
 
-/* Bronze: the one warm plate on a page. */
+/* Raised: the one lifted grey plate on a wall. Steps the field up to the
+   raised-panel grey without leaving the black/white ramp. */
 .plateBronze {
-  border: 1px solid rgba(255, 235, 196, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   background:
-    radial-gradient(80% 70% at 80% 100%, rgba(255, 236, 200, 0.42) 0%, transparent 60%),
-    linear-gradient(160deg, #e6b56a 0%, var(--u-bronze) 40%, #b98444 100%);
-  color: #1b140b;
+    radial-gradient(80% 70% at 80% 100%, rgba(255, 255, 255, 0.07) 0%, transparent 60%),
+    linear-gradient(160deg, #202021 0%, var(--u-panel-raised) 45%, #141415 100%);
+  color: var(--u-ink);
 }
 
 .shown .plateBronze:hover {
-  box-shadow: 0 30px 70px -28px rgba(223, 169, 95, 0.55);
+  border-color: rgba(255, 255, 255, 0.3);
+  box-shadow: 0 30px 70px -28px rgba(0, 0, 0, 0.9);
 }
 
 /* Faint watermark glyph in a plate's corner — a shape, never a logo. */
@@ -345,7 +357,7 @@
 }
 
 .plateBronze .plateMark {
-  opacity: 0.16;
+  opacity: 0.12;
 }
 
 .plateHead {
@@ -361,15 +373,15 @@
   font-size: 10.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--u-bronze);
+  color: var(--u-ink-3);
 }
 
 .platePaper .plateEyebrow {
-  color: var(--u-bronze-deep);
+  color: var(--u-paper-ink-2);
 }
 
 .plateBronze .plateEyebrow {
-  color: rgba(27, 20, 11, 0.7);
+  color: var(--u-ink-2);
 }
 
 .plateIndex {
@@ -379,9 +391,8 @@
   color: var(--u-ink-3);
 }
 
-.platePaper .plateIndex,
-.plateBronze .plateIndex {
-  color: rgba(27, 20, 11, 0.5);
+.platePaper .plateIndex {
+  color: var(--u-paper-ink-2);
 }
 
 .plateTitle {
@@ -407,7 +418,7 @@
 }
 
 .plateBronze .plateBody {
-  color: rgba(27, 20, 11, 0.74);
+  color: var(--u-ink-2);
 }
 
 /* Anything pushed to the foot of a plate. */
@@ -456,9 +467,8 @@
   color: var(--u-ink-2);
 }
 
-.platePaper .plateWho,
-.plateBronze .plateWho {
-  color: rgba(27, 20, 11, 0.72);
+.platePaper .plateWho {
+  color: var(--u-paper-ink-2);
 }
 
 .plateWho b {
@@ -527,7 +537,7 @@
   font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--u-bronze);
+  color: var(--u-ink-3);
 }
 
 .statLabel {
@@ -581,7 +591,7 @@
   font-family: var(--u-font-mono);
   font-size: 10.5px;
   letter-spacing: 0.16em;
-  color: var(--u-bronze);
+  color: var(--u-ink-3);
 }
 
 .rowDetail {
@@ -621,7 +631,7 @@
   bottom: 8px;
   left: 7px;
   width: 1px;
-  background: linear-gradient(180deg, var(--u-bronze-line), var(--u-line) 40%, var(--u-line));
+  background: linear-gradient(180deg, var(--u-line-strong), var(--u-line) 40%, var(--u-line));
 }
 
 .tick {
@@ -655,7 +665,7 @@
   width: 9px;
   height: 9px;
   border-radius: 50%;
-  border: 1px solid var(--u-bronze-line);
+  border: 1px solid var(--u-line-strong);
   background: var(--u-bg);
 }
 
@@ -676,7 +686,7 @@
 }
 
 .tickHot .tickWhen {
-  color: var(--u-bronze);
+  color: var(--u-ink);
 }
 
 .tickTitle {
@@ -701,15 +711,15 @@
   margin-left: 10px;
   padding: 2px 8px;
   border-radius: 999px;
-  border: 1px solid var(--u-bronze-line);
-  background: var(--u-bronze-soft);
+  border: 1px solid var(--u-line-strong);
+  background: rgba(255, 255, 255, 0.04);
   font-family: var(--u-font-mono);
   font-size: 9.5px;
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   vertical-align: middle;
-  color: var(--u-bronze);
+  color: var(--u-ink-2);
 }
 
 /* ------------------------------------------------------------------ */
@@ -720,7 +730,7 @@
   position: relative;
   margin: 0;
   padding: clamp(28px, 4vw, 48px) 0 clamp(28px, 4vw, 48px) clamp(24px, 3vw, 40px);
-  border-left: 2px solid var(--u-bronze);
+  border-left: 2px solid rgba(255, 255, 255, 0.5);
 }
 
 .pullText {
@@ -735,7 +745,7 @@
 
 .pullText em {
   font-style: normal;
-  color: var(--u-bronze);
+  color: var(--u-ink-2);
 }
 
 .pullWho {
@@ -762,12 +772,12 @@
   border: 1px solid rgba(255, 255, 255, 0.12);
   overflow: hidden;
   background:
-    radial-gradient(70% 90% at 100% 100%, rgba(196, 142, 62, 0.22) 0%, transparent 60%),
+    radial-gradient(70% 90% at 100% 100%, rgba(255, 255, 255, 0.07) 0%, transparent 60%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
     #0d0d0e;
 }
 
-/* Signature word in the corner, gold-clipped and faint. */
+/* Signature word in the corner, faint. */
 .ctaGhost {
   position: absolute;
   right: -2%;
@@ -781,7 +791,7 @@
   pointer-events: none;
   -webkit-user-select: none;
   user-select: none;
-  background: linear-gradient(100deg, rgba(122, 88, 38, 0.28), rgba(241, 215, 173, 0.5) 50%, rgba(110, 78, 34, 0.24));
+  background: linear-gradient(100deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.04));
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -819,36 +829,38 @@
   justify-content: flex-end;
 }
 
-/* Bronze button — used only on the CTA band and the contact form. */
+/* Primary button — the landing page's plain white pill. */
 .btnBronze {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 9px;
-  height: 48px;
-  padding: 0 24px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 235, 196, 0.5);
-  background: linear-gradient(160deg, #e9bc74 0%, var(--u-bronze) 50%, #c48f4a 100%);
-  color: #1b140b;
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 11px;
+  border: 1px solid #ffffff;
+  background: #ffffff;
+  color: #0a0a0a;
   font-family: var(--u-font-sans);
   font-size: 14.5px;
-  font-weight: 600;
+  font-weight: 550;
   letter-spacing: -0.008em;
   text-decoration: none;
   white-space: nowrap;
   cursor: pointer;
-  box-shadow: 0 14px 34px -16px rgba(223, 169, 95, 0.7);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
   transition:
     transform 260ms var(--u-ease),
     box-shadow 260ms var(--u-ease),
-    filter 220ms ease;
+    background 220ms ease,
+    border-color 220ms ease;
 }
 
 .btnBronze:hover {
   transform: translateY(-1px);
-  filter: brightness(1.05);
-  box-shadow: 0 20px 44px -16px rgba(223, 169, 95, 0.85);
+  background: #e9eae8;
+  border-color: #e9eae8;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
 }
 
 .btnBronze:active {
@@ -864,7 +876,7 @@
 }
 
 /* ------------------------------------------------------------------ */
-/* Section head (bronze variant of the primitives' head)                */
+/* Section head (inner-page variant of the primitives' head)                */
 /* ------------------------------------------------------------------ */
 
 .head {
@@ -915,7 +927,7 @@
   padding-bottom: 0;
 }
 
-/* Text link with a bronze arrow. */
+/* Text link with an arrow. */
 .more {
   display: inline-flex;
   align-items: center;
@@ -929,7 +941,7 @@
 }
 
 .more svg {
-  color: var(--u-bronze);
+  color: var(--u-ink);
 }
 
 .more:hover {
@@ -951,12 +963,12 @@
 .colLabel {
   margin: 0 0 6px;
   padding-bottom: 14px;
-  border-bottom: 1px solid var(--u-bronze-line);
+  border-bottom: 1px solid var(--u-line-strong);
   font-family: var(--u-font-mono);
   font-size: 10.5px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--u-bronze);
+  color: var(--u-ink-3);
 }
 
 /* ------------------------------------------------------------------ */
@@ -1003,7 +1015,7 @@
   font-weight: 600;
   letter-spacing: -0.06em;
   line-height: 0.9;
-  color: #1b140b;
+  color: #ffffff;
   font-variant-numeric: tabular-nums;
 }
 
@@ -1020,7 +1032,7 @@
   max-width: 30ch;
   font-size: 15px;
   line-height: 1.55;
-  color: rgba(27, 20, 11, 0.78);
+  color: var(--u-ink-2);
 }
 
 /* ------------------------------------------------------------------ */

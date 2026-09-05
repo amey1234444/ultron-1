@@ -1,6 +1,6 @@
 // Ledger — the Northfield case, told as its own dates.
 //
-// A paper plate with the case summary, a bronze plate with the one number that
+// A paper plate with the case summary, a raised plate with the one number that
 // mattered on the floor, and a timeline of what happened when. The figures
 // match the landing page's EvidenceCase exactly.
 

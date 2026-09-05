@@ -5,8 +5,8 @@
   position: relative;
   padding: clamp(80px, 10vw, 140px) 0;
   background:
-    radial-gradient(70% 60% at 100% 0%, rgba(223, 169, 95, 0.18) 0%, transparent 60%),
-    linear-gradient(180deg, #f7f5f0 0%, var(--u-paper) 50%, var(--u-paper-2) 100%);
+    radial-gradient(70% 60% at 100% 0%, rgba(255, 255, 255, 0.5) 0%, transparent 60%),
+    linear-gradient(180deg, #f2f2ef 0%, var(--u-paper) 50%, var(--u-paper-2) 100%);
   color: var(--u-paper-ink);
 }
 
@@ -24,7 +24,7 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--u-bronze-deep);
+  color: var(--u-paper-ink-2);
 }
 
 .title {
@@ -75,7 +75,7 @@
 }
 
 .item:hover {
-  background: rgba(18, 17, 15, 0.03);
+  background: rgba(16, 16, 17, 0.03);
   transition-delay: 0ms;
 }
 
@@ -83,7 +83,7 @@
   font-family: var(--u-font-mono);
   font-size: 11px;
   letter-spacing: 0.16em;
-  color: var(--u-bronze-deep);
+  color: var(--u-paper-ink-2);
   padding-top: 6px;
 }
 
