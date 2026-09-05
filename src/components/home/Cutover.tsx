@@ -6,10 +6,14 @@
 // also why the ranges are ranges and not point estimates — a single figure
 // would be the more confident-looking thing to print and the less honest one.
 //
-// The word "Cutover" is set oversized behind the grid, filled with a lime
-// gradient that fades to nothing before it reaches the cards. The section's own
-// name used as ground rather than as a label, which is what lets the head stay
-// small enough to read as a statement instead of a banner.
+// The band is bronze rather than lime, and spends that colour twice: on the
+// oversized word set behind the grid, and on the figure in whichever card the
+// cursor is on. The hover colour is deliberately not decoration — at any moment
+// exactly one number on the band is warm, and it is the one being read.
+//
+// That highlight is pure CSS. The design it comes from tracks the hovered card
+// in component state; a `:hover` rule gets the same result without a re-render
+// per pointer move, and keeps working before hydration.
 
 import Link from 'next/link';
 
@@ -19,7 +23,7 @@ import { Arrow, useInView } from './primitives';
 type Metric = {
   /** What was measured. */
   label: string;
-  /** The observed range after cutover — the only lime thing in the card. */
+  /** The observed range after cutover — bronze under the cursor, white at rest. */
   value: string;
   unit: string;
   /** The twelve-month baseline the range is measured against. */
@@ -43,14 +47,28 @@ export default function Cutover() {
 
   return (
     <section id="condition" className={styles.section}>
-      {/* Decorative: the section signs itself behind the figures. */}
+      {/* Decorative: the warm cast the band sits in, and the section signing
+          itself behind the figures. */}
+      <div className={styles.glow} aria-hidden="true" />
       <span className={styles.ghost} aria-hidden="true">
         Cutover
       </span>
 
       <div className={styles.inner}>
         <header className={styles.head}>
-          <h2 className={styles.title}>What changes after cutover</h2>
+          {/* The break is set rather than left to the measure: the headline is
+              two lines of equal weight, and letting it wrap would put "after"
+              on the first line at some widths and not others. */}
+          <h2 className={styles.title}>
+            What changes
+            <br />
+            after cutover
+          </h2>
+
+          {/* Holds the middle track open so the lead sits out at the right edge
+              rather than under the headline. */}
+          <div className={styles.spacer} aria-hidden="true" />
+
           <p className={styles.lead}>
             Measured against the twelve months before monitoring went live.
           </p>
@@ -82,7 +100,7 @@ export default function Cutover() {
           <p className={styles.note}>Ranges observed across 62 monitored sites</p>
           <Link href="/how-it-works" className={styles.method}>
             Read the method
-            <Arrow size={14} />
+            <Arrow size={17} />
           </Link>
         </footer>
       </div>

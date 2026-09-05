@@ -1,11 +1,28 @@
-/* Cutover — the four outcome figures.
+/* Cutover — the four outcome figures, in bronze.
 
-   Carries the alternating band shade: a vertical gradient that begins and ends
-   fully transparent, so the section is a rise and fall in tone with no visible
-   edge at either end. That is what replaces horizontal rules between sections
-   everywhere on this page. */
+   The band's one rationed colour is a warm bronze-gold rather than the lime
+   used elsewhere on the page, and it is spent in exactly two places: the
+   oversized word behind the grid, and the figure in whichever card the cursor
+   is on. Everything else — labels, units, baselines — is grey, so the colour
+   always means "this is the thing you are looking at" and never decorates.
+
+   The section keeps the page's alternating band shade rather than painting its
+   own slab. Every section on this page begins and ends fully transparent so the
+   page reads as one surface with no rules between sections; a solid ground here
+   would put an edge above and below this band and nowhere else. The bronze wash
+   is laid over that shade instead, which gets the design's warmth without the
+   seam. */
 
 .section {
+  /* Local to this band. If bronze ever becomes a page-wide colour these move to
+     global.css beside the lime tokens; until then a section-scoped palette is
+     the honest scope for it. */
+  --c-bronze: #dfa95f;
+  --c-label: #b8b0a7;
+  --c-lead: #a8a19a;
+  --c-unit: #837c74;
+  --c-base: #6f6862;
+
   position: relative;
   padding: clamp(80px, 10vw, 104px) var(--u-gutter) clamp(84px, 11vw, 112px);
   scroll-margin-top: 76px;
@@ -19,6 +36,22 @@
   );
 }
 
+/* The warm cast the rest of the band sits in. Off-centre and falling away to
+   nothing well inside the section, so it reads as light coming from somewhere
+   rather than as a panel with a gradient on it. */
+.glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    110% 85% at 70% 40%,
+    rgba(196, 142, 62, 0.1) 0%,
+    rgba(120, 84, 34, 0.035) 40%,
+    rgba(10, 9, 8, 0) 70%
+  );
+}
+
 .inner {
   position: relative;
   z-index: 1;
@@ -26,155 +59,214 @@
   margin: 0 auto;
 }
 
-/* Filled with a gradient through `background-clip: text` rather than a flat
-   low-alpha fill: the word is brightest at its cap line and gone by its
-   baseline, so it sinks into the page instead of sitting on it as a slab. */
+/* Filled through `background-clip: text` so the word is lit across its width
+   rather than tinted flat, and the fill is wider than the word so it can be
+   moved: the highlight travels along the letters once every nine seconds, which
+   is the only motion in the band. Reduced-motion users get it stopped, from the
+   global rule in global.css. */
 .ghost {
   position: absolute;
   top: 22%;
-  right: -2%;
+  right: -3%;
   z-index: 0;
-  font-size: clamp(150px, 17vw, 250px);
-  font-weight: 700;
+  font-size: clamp(120px, 15.5vw, 252px);
+  font-weight: 600;
   letter-spacing: -0.045em;
-  line-height: 0.78;
+  line-height: 0.8;
   white-space: nowrap;
   pointer-events: none;
   -webkit-user-select: none;
   user-select: none;
   background: linear-gradient(
-    180deg,
-    rgba(182, 245, 126, 0.11),
-    rgba(182, 245, 126, 0.02) 62%,
-    transparent
+    100deg,
+    rgba(122, 88, 38, 0.3) 0%,
+    rgba(176, 124, 54, 0.42) 18%,
+    rgba(232, 186, 116, 0.62) 34%,
+    rgba(255, 235, 196, 0.85) 44%,
+    rgba(226, 178, 104, 0.55) 56%,
+    rgba(150, 106, 46, 0.36) 74%,
+    rgba(110, 78, 34, 0.26) 100%
   );
+  background-size: 300% 100%;
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
+  -webkit-text-stroke: 1px rgba(214, 164, 92, 0.16);
+  animation: sheen 9s linear infinite;
+}
+
+@keyframes sheen {
+  from {
+    background-position: 200% 50%;
+  }
+  to {
+    background-position: -100% 50%;
+  }
 }
 
 /* ------------------------------------------------------------------ */
 /* Head                                                                */
 /* ------------------------------------------------------------------ */
 
+/* Three tracks, with the middle one empty: the lead sits out at the right
+   rather than under the headline, so the eye crosses the whole band before it
+   reaches the figures. Collapses to one column before the gap closes up. */
 .head {
   position: relative;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.75fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
 }
 
 .title {
-  max-width: 18ch;
   margin: 0;
-  font-size: clamp(32px, 3.2vw, 46px);
-  font-weight: 500;
-  letter-spacing: -0.028em;
-  line-height: 1.06;
+  font-size: clamp(38px, 4.2vw, 62px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.02;
   color: #fff;
   text-wrap: pretty;
 }
 
 .lead {
-  max-width: 34ch;
+  max-width: 44ch;
   margin: 0;
-  font-size: 16px;
-  line-height: 1.55;
-  color: var(--u-ink-2);
+  padding-top: 6px;
+  font-size: 18px;
+  line-height: 1.5;
+  color: var(--c-lead);
+  text-wrap: pretty;
 }
 
 /* ------------------------------------------------------------------ */
 /* Figures                                                             */
 /* ------------------------------------------------------------------ */
 
-/* `auto-fit` with a 210px floor: four across on a wide page, two on a tablet,
+/* `auto-fit` with a 220px floor: four across on a wide page, two on a tablet,
    one on a phone, with no breakpoint doing the deciding. */
 .cards {
   position: relative;
+  z-index: 1;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 20px;
-  margin-top: 52px;
+  margin-top: 44px;
 }
 
 .card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 22px;
-  min-height: 210px;
-  padding: 28px 26px 26px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.035);
-  /* An inset ring rather than a border, so the 1px never adds to the box and
-     the four cards stay on the same grid. */
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+  gap: 42px;
+  min-height: 258px;
+  padding: 26px 26px 22px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 14px;
+  /* A sheet lit from the top, over its own near-black, so the card sits on the
+     band rather than being cut out of it. */
+  background:
+    linear-gradient(
+      180deg,
+      rgba(255, 255, 255, 0.055) 0%,
+      rgba(255, 255, 255, 0.016) 42%,
+      rgba(255, 255, 255, 0.006) 100%
+    ),
+    rgba(14, 12, 11, 0.9);
   opacity: 0;
   transform: translate3d(0, 14px, 0);
-  transition: opacity 700ms var(--u-ease), transform 700ms var(--u-ease);
+  transition:
+    opacity 700ms var(--u-ease),
+    transform 700ms var(--u-ease),
+    border-color 250ms ease,
+    box-shadow 250ms ease;
   transition-delay: var(--delay, 0ms);
 }
 
+/* The reveal. Once a card has arrived, its transform is the hover's to use, so
+   the delay is dropped — otherwise the fourth card would wait 270ms before
+   lifting under the cursor. */
 .shown .card {
   opacity: 1;
   transform: none;
+  transition-delay: var(--delay, 0ms), var(--delay, 0ms), 0ms, 0ms;
 }
 
-/* Set in the page sans, the same face as `.title` above it, rather than in the
-   mono used for units and baselines. The four labels are the names of the
-   things being measured — they belong with the headline that introduces them,
-   not with the engineering values underneath. Size, weight, tracking and case
-   are unchanged; only the family moves. */
+.shown .card:hover {
+  border-color: rgba(255, 255, 255, 0.34);
+  transform: translate3d(0, -3px, 0);
+  box-shadow: 0 20px 46px -30px rgba(0, 0, 0, 0.95);
+  transition-delay: 0ms;
+}
+
+/* Set in the mono, sized and tracked as a plate rather than as prose: these are
+   the names of measured quantities and they read as labels on instruments. */
 .cardLabel {
+  max-width: 22ch;
   margin: 0;
-  font-family: var(--u-font-sans);
-  font-size: 10px;
+  font-family: var(--u-font-mono);
+  font-size: 11.5px;
   font-weight: 400;
-  letter-spacing: 0.09em;
+  letter-spacing: 0.16em;
   line-height: 1.5;
   text-transform: uppercase;
-  color: var(--u-ink-2);
+  color: var(--c-label);
 }
 
+/* Pushed to the foot of the card so all four figures sit on one line however
+   long the label above them wraps. */
 .cardFoot {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
   margin-top: auto;
 }
 
 .cardFigure {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 7px;
+  column-gap: 10px;
+  row-gap: 4px;
   margin: 0;
-  white-space: nowrap;
 }
 
-/* The one rationed colour on this band. Lime here means measured — these are
-   readings taken off live plants, not a forecast. */
+/* White at rest and bronze under the cursor. The colour is the pointer: at any
+   moment exactly one figure on the band is warm, and it is the one being read.
+   `white-space: nowrap` keeps a range like 210–265 from breaking at its dash. */
 .cardValue {
-  font-size: clamp(24px, 2.4vw, 40px);
-  font-weight: 400;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  color: var(--u-lime);
+  flex: 0 0 auto;
+  white-space: nowrap;
+  font-size: clamp(32px, 3.05vw, 50px);
+  font-weight: 700;
+  letter-spacing: -0.032em;
+  line-height: 1.05;
+  color: #fff;
+  transition: color 220ms ease;
+}
+
+.card:hover .cardValue {
+  color: var(--c-bronze);
 }
 
 .cardUnit {
+  flex: 0 0 auto;
+  white-space: nowrap;
   font-family: var(--u-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.09em;
+  font-size: 11px;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--u-ink-2);
+  color: var(--c-unit);
 }
 
 .cardFrom {
-  margin: 12px 0 0;
+  margin: 0;
   font-family: var(--u-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.09em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  white-space: nowrap;
-  color: var(--u-ink-3);
+  color: var(--c-base);
 }
 
 /* ------------------------------------------------------------------ */
@@ -183,48 +275,81 @@
 
 .foot {
   position: relative;
+  z-index: 1;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 20px;
-  margin-top: 40px;
+  gap: 24px;
+  margin-top: 34px;
+  padding-top: 34px;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
+/* Where the figures come from. Kept beside the button rather than dropped: it
+   is the line that makes the four ranges above it readings rather than claims. */
 .note {
   margin: 0;
   font-family: var(--u-font-mono);
-  font-size: 10px;
-  letter-spacing: 0.09em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--u-ink-3);
+  color: var(--c-base);
 }
 
+/* Solid white, which makes it the brightest thing in the band and therefore the
+   one obvious way out of it. */
 .method {
   display: inline-flex;
   align-items: center;
-  gap: 9px;
-  padding: 14px 28px;
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  gap: 14px;
+  padding: 17px 26px 17px 30px;
   border-radius: 999px;
-  color: #fff;
-  font-size: 16px;
-  font-weight: 500;
-  letter-spacing: -0.008em;
+  background: #fff;
+  color: #14120f;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
   text-decoration: none;
   white-space: nowrap;
-  transition: background 200ms ease, border-color 200ms ease;
-}
-
-.method svg {
-  transition: transform 300ms var(--u-ease);
+  transition:
+    gap 220ms ease,
+    box-shadow 220ms ease;
 }
 
 .method:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.5);
+  gap: 20px;
+  box-shadow: 0 14px 34px -18px rgba(255, 255, 255, 0.4);
 }
 
-.method:hover svg {
-  transform: translateX(3px);
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+
+/* One column before the three tracks squeeze the headline. The lead loses its
+   top padding here because it is under the headline rather than beside it. */
+@media (max-width: 900px) {
+  .head {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  .spacer {
+    display: none;
+  }
+
+  .lead {
+    padding-top: 0;
+  }
+}
+
+@media (max-width: 560px) {
+  .foot {
+    justify-content: flex-start;
+  }
+
+  .method {
+    width: 100%;
+    justify-content: center;
+  }
 }
