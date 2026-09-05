@@ -13,9 +13,7 @@
 /* ------------------------------------------------------------------ */
 
 .section {
-  position: relative;
-  padding: clamp(84px, 10vw, 140px) var(--u-gutter);
-  scroll-margin-top: 76px;
+  position: relative; padding: clamp(48px, 6vw, 88px) var(--u-gutter); scroll-margin-top: 88px;
 }
 
 .sectionTight {
@@ -59,10 +57,7 @@
 }
 
 .inner {
-  position: relative;
-  z-index: 1;
-  max-width: var(--u-max);
-  margin: 0 auto;
+  position: relative; z-index: 1; max-width: 1120px; margin: 0 auto;
 }
 
 .innerNarrow {
@@ -74,29 +69,16 @@
 /* ------------------------------------------------------------------ */
 
 .hero {
-  position: relative;
-  padding: calc(64px + clamp(64px, 10vh, 120px)) var(--u-gutter) clamp(40px, 5vw, 64px);
-  overflow: hidden;
+  position: relative; padding: 156px var(--u-gutter) 48px;
 }
 
 /* One white bloom from above, the same as the landing hero. */
 .heroLight {
-  position: absolute;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background: radial-gradient(60% 46% at 50% -8%, rgba(255, 255, 255, 0.085) 0%, transparent 62%);
+  display: none;
 }
 
 .heroInner {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
-  gap: clamp(32px, 5vw, 80px);
-  align-items: end;
-  max-width: var(--u-max);
-  margin: 0 auto;
+  position: relative; max-width: 1120px; margin: 0 auto;
 }
 
 .heroCenter .heroInner {
@@ -112,29 +94,17 @@
 }
 
 .eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  margin: 0;
-  font-family: var(--u-font-mono);
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
+  display: inline-flex; align-items: center; gap: 10px; margin: 0; font-size: .875rem; font-weight: 500; color: #a5a5ad;
 }
 
 .eyebrowDot,
 .eyebrowDotDim {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
+  display: none;
 }
 
 /* Hero only — the one gold dot on the page. */
 .eyebrowDot {
-  background: var(--u-bronze);
-  box-shadow: 0 0 0 4px var(--u-bronze-soft);
+  display: none;
 }
 
 .eyebrowDotDim {
@@ -146,14 +116,7 @@
 }
 
 .heroTitle {
-  max-width: 14ch;
-  margin: 22px 0 0;
-  font-size: clamp(40px, 6.4vw, 84px);
-  font-weight: 600;
-  letter-spacing: -0.048em;
-  line-height: 0.98;
-  color: #fff;
-  text-wrap: balance;
+  max-width: 19ch; margin: 24px 0 0; font-size: clamp(2.7rem, 5.5vw, 4.75rem); font-weight: 550; letter-spacing: -.05em; line-height: 1.08; color: #f7f7f8; text-wrap: balance;
 }
 
 /* The emphasised word in a section headline — dimmed, as the landing page does. */
@@ -165,19 +128,7 @@
    metallic gradient rather than a flat tint, so it reads as a plate catching
    light, not a highlighter. */
 .gold {
-  background: linear-gradient(
-    100deg,
-    var(--u-bronze-2) 0%,
-    var(--u-bronze) 30%,
-    var(--u-bronze-pale) 52%,
-    var(--u-bronze) 74%,
-    var(--u-bronze-2) 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: goldSheen 8s linear infinite;
+  color: #96979e;
 }
 
 @keyframes goldSheen {
@@ -224,7 +175,7 @@
 
 .heroFactLabel {
   font-family: var(--u-font-mono);
-  font-size: 10.5px;
+  font-size: .75rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--u-ink-3);
@@ -249,22 +200,7 @@
 }
 
 .plate {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  min-height: 300px;
-  padding: clamp(24px, 2.6vw, 34px);
-  border-radius: 20px;
-  overflow: hidden;
-  isolation: isolate;
-  opacity: 0;
-  transform: translate3d(0, 16px, 0);
-  transition:
-    opacity 760ms var(--u-ease),
-    transform 760ms var(--u-ease),
-    box-shadow 300ms ease,
-    border-color 300ms ease;
-  transition-delay: var(--delay, 0ms);
+  position: relative; display: flex; flex-direction: column; min-height: 320px; padding: clamp(24px, 3vw, 40px); border-radius: 12px; overflow: hidden; isolation: isolate; transition: border-color 200ms ease;
 }
 
 .shown .plate {
@@ -274,8 +210,7 @@
 }
 
 .shown .plate:hover {
-  transform: translate3d(0, -4px, 0);
-  transition-delay: 0ms;
+  transform: none; transition-delay: 0ms;
 }
 
 .span3 {
@@ -302,11 +237,7 @@
 
 /* Dark: the default plate — a sheet lit from the top over near-black. */
 .plateDark {
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.012) 48%, rgba(255, 255, 255, 0) 100%),
-    #0f0f10;
-  color: var(--u-ink);
+  border: 1px solid #262629; background: #131315; color: #f4f4f5;
 }
 
 .shown .plateDark:hover {
@@ -316,9 +247,7 @@
 
 /* Paper: the landing page's light panel, cool off-white. */
 .platePaper {
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  background: linear-gradient(168deg, #efefec 0%, #e4e4e0 100%);
-  color: var(--u-paper-ink);
+  border: 1px solid #eef0f4; background: #eef0f4; color: #151519;
 }
 
 .shown .platePaper:hover {
@@ -328,11 +257,7 @@
 /* Raised: the one lifted grey plate on a wall. Steps the field up to the
    raised-panel grey without leaving the black/white ramp. */
 .plateBronze {
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  background:
-    radial-gradient(80% 70% at 80% 100%, rgba(255, 255, 255, 0.07) 0%, transparent 60%),
-    linear-gradient(160deg, #202021 0%, var(--u-panel-raised) 45%, #141415 100%);
-  color: var(--u-ink);
+  border: 1px solid #ceddf0; background: #ceddf0; color: #151b24;
 }
 
 .shown .plateBronze:hover {
@@ -370,7 +295,7 @@
 .plateEyebrow {
   margin: 0;
   font-family: var(--u-font-mono);
-  font-size: 10.5px;
+  font-size: .75rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--u-ink-3);
@@ -381,12 +306,12 @@
 }
 
 .plateBronze .plateEyebrow {
-  color: var(--u-ink-2);
+  color: #444e5d;
 }
 
 .plateIndex {
   font-family: var(--u-font-mono);
-  font-size: 10.5px;
+  font-size: .75rem;
   letter-spacing: 0.16em;
   color: var(--u-ink-3);
 }
@@ -396,21 +321,11 @@
 }
 
 .plateTitle {
-  margin: 18px 0 0;
-  font-size: clamp(20px, 1.9vw, 26px);
-  font-weight: 600;
-  letter-spacing: -0.03em;
-  line-height: 1.14;
-  color: inherit;
-  text-wrap: balance;
+  margin: 26px 0 0; max-width: 24ch; font-size: clamp(1.5rem, 2.8vw, 2.25rem); font-weight: 500; letter-spacing: -.035em; line-height: 1.16; color: inherit; text-wrap: balance;
 }
 
 .plateBody {
-  margin: 12px 0 0;
-  max-width: 44ch;
-  font-size: 14.5px;
-  line-height: 1.64;
-  color: var(--u-ink-2);
+  margin: 16px 0 0; max-width: 44ch; font-size: 1rem; line-height: 1.6; color: var(--u-ink-2);
 }
 
 .platePaper .plateBody {
@@ -418,7 +333,7 @@
 }
 
 .plateBronze .plateBody {
-  color: var(--u-ink-2);
+  color: #444e5d;
 }
 
 /* Anything pushed to the foot of a plate. */
@@ -460,11 +375,7 @@
 }
 
 .plateWho {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  font-size: 13.5px;
-  color: var(--u-ink-2);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: .875rem; line-height: 1.5; color: var(--u-ink-2);
 }
 
 .platePaper .plateWho {
@@ -534,7 +445,7 @@
 
 .statUnit {
   font-family: var(--u-font-mono);
-  font-size: 11px;
+  font-size: .75rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--u-ink-3);
@@ -589,7 +500,7 @@
 
 .rowIndex {
   font-family: var(--u-font-mono);
-  font-size: 10.5px;
+  font-size: .75rem;
   letter-spacing: 0.16em;
   color: var(--u-ink-3);
 }
@@ -679,7 +590,7 @@
   margin: 0;
   padding-top: 2px;
   font-family: var(--u-font-mono);
-  font-size: 11px;
+  font-size: .75rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--u-ink-3);
@@ -714,7 +625,7 @@
   border: 1px solid var(--u-line-strong);
   background: rgba(255, 255, 255, 0.04);
   font-family: var(--u-font-mono);
-  font-size: 9.5px;
+  font-size: .75rem;
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -751,7 +662,7 @@
 .pullWho {
   margin: 18px 0 0;
   font-family: var(--u-font-mono);
-  font-size: 11px;
+  font-size: .75rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--u-ink-3);
@@ -762,39 +673,12 @@
 /* ------------------------------------------------------------------ */
 
 .cta {
-  position: relative;
-  display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: clamp(24px, 4vw, 56px);
-  align-items: center;
-  padding: clamp(36px, 4.6vw, 64px);
-  border-radius: 24px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  overflow: hidden;
-  background:
-    radial-gradient(70% 90% at 100% 100%, rgba(255, 255, 255, 0.07) 0%, transparent 60%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
-    #0d0d0e;
+  position: relative; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 32px; align-items: center; padding: 48px 0; border-top: 1px solid var(--u-line);
 }
 
 /* Signature word in the corner, faint. */
 .ctaGhost {
-  position: absolute;
-  right: -2%;
-  bottom: -18%;
-  z-index: 0;
-  font-size: clamp(90px, 12vw, 200px);
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  line-height: 0.8;
-  white-space: nowrap;
-  pointer-events: none;
-  -webkit-user-select: none;
-  user-select: none;
-  background: linear-gradient(100deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.14) 50%, rgba(255, 255, 255, 0.04));
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  display: none;
 }
 
 .ctaCopy {
@@ -831,29 +715,7 @@
 
 /* Primary button — the landing page's plain white pill. */
 .btnBronze {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  height: 46px;
-  padding: 0 22px;
-  border-radius: 11px;
-  border: 1px solid #ffffff;
-  background: #ffffff;
-  color: #0a0a0a;
-  font-family: var(--u-font-sans);
-  font-size: 14.5px;
-  font-weight: 550;
-  letter-spacing: -0.008em;
-  text-decoration: none;
-  white-space: nowrap;
-  cursor: pointer;
-  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5);
-  transition:
-    transform 260ms var(--u-ease),
-    box-shadow 260ms var(--u-ease),
-    background 220ms ease,
-    border-color 220ms ease;
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 46px; padding: 12px 24px; border-radius: 999px; border: 1px solid #f4f4f5; background: #f4f4f5; color: #111113; font: inherit; font-size: .875rem; font-weight: 550; text-decoration: none; cursor: pointer; transition: background 180ms ease;
 }
 
 .btnBronze:hover {
@@ -965,7 +827,7 @@
   padding-bottom: 14px;
   border-bottom: 1px solid var(--u-line-strong);
   font-family: var(--u-font-mono);
-  font-size: 10.5px;
+  font-size: .75rem;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--u-ink-3);
@@ -991,7 +853,7 @@
 .factGrid dt {
   margin: 0;
   font-family: var(--u-font-mono);
-  font-size: 9.5px;
+  font-size: .75rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--u-paper-ink-2);
@@ -1120,16 +982,49 @@
   }
 }
 
+.plateBronze .bigNumber,
+.plateBronze .bigNumberLabel {
+  color: #151b24;
+}
+
+.plateBronze .plateIndex {
+  color: #444e5d;
+}
+
+.plateDark .plateEyebrow,
+.plateDark .plateIndex {
+  color: #a5a5ad;
+}
+
+.btnBronze:focus-visible {
+  outline: 2px solid #b8d4ff;
+  outline-offset: 5px;
+}
+
+@media (max-width: 640px) {
+  .hero {
+    padding-top: 120px;
+  }
+
+  .plate {
+    min-height: 280px;
+  }
+
+  .ctaActions {
+    justify-content: flex-start;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /* Disclosure                                                          */
 /* ------------------------------------------------------------------ */
 
-/* A folded section. Closed, it reads as a rule with a name on it rather than as
-   a widget — the rule runs edge to edge like `.sectionRuled` and the label sits
-   on the page measure, so the page keeps its rhythm whether the reader opens it
-   or walks past it. The disclosure itself is not width-constrained: what it
-   holds is a full page section, and a section such as the paper band on
-   `/capabilities` has to keep its bleed. */
+/* A folded section — the detail a reader asks for on the second call, kept off
+   the first read. Closed, it is a rule with a name on it rather than a widget:
+   the rule runs edge to edge like `.sectionRuled` and the label sits on the page
+   measure. The disclosure itself is not width-constrained, because what it holds
+   is a whole page section and one of those — the paper band on `/capabilities` —
+   has to keep its bleed. */
 .disclosure {
   border-top: 1px solid var(--u-line);
 }
@@ -1151,7 +1046,7 @@
 }
 
 .disclosureSummary:focus-visible {
-  outline: 1px solid var(--u-line-strong);
+  outline: 2px solid #b8d4ff;
   outline-offset: -6px;
 }
 
@@ -1203,4 +1098,17 @@
 .disclosure > section {
   padding-top: clamp(24px, 3vw, 44px);
   border-top: 0;
+}
+
+/* A disclosure nested inside a section rather than holding one: the container
+   around it already carries the measure and the gutter, so the summary drops
+   both and the content is padded on its own. */
+.disclosureSummaryInline {
+  max-width: none;
+  padding-left: 0;
+  padding-right: 0;
+}
+
+.disclosureInline {
+  padding: 0 0 clamp(16px, 2vw, 28px);
 }

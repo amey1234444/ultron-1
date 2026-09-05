@@ -1,22 +1,21 @@
 // /outcomes — what changed, measured, and how it was measured.
 //
-// Hero → the four figures drawn against their baselines → the Northfield case
-// in its own dates → the method → what the people on the floor said → the
-// next step. The figures are the landing page's figures; this page is where
-// they get their study.
+// Hero → the four figures with the baseline each moved off → the Northfield
+// case in its own dates → what the people on the floor said → the next step,
+// with the study method folded away under the case. The figures are the landing
+// page's figures; this page is where they get their study.
 
 import Head from 'next/head';
 
 import Ambience from '../components/home/Ambience';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
-import { Arrow, Button } from '../components/home/primitives';
 import Figures from '../components/outcomes/Figures';
 import Ledger from '../components/outcomes/Ledger';
 import Method from '../components/outcomes/Method';
 import {
-  BronzeButton,
   CtaBand,
+  DetailSection,
   InnerHead,
   PageHero,
   PlateWall,
@@ -44,31 +43,15 @@ export default function OutcomesPage() {
       <div className={styles.content}>
         <PageHero
           eyebrow="Outcomes"
-          meta="62 assets · 12 months either side"
-          title="Measured, *not modelled*"
-          lead="Every figure on this page is a range measured against a site's own twelve-month record, not a projection. The study design is printed under the figures, the exclusions are printed with it, and the one case we can show in full is shown in full."
-          facts={[
-            { label: 'Population', value: '62 rotating assets' },
-            { label: 'Windows', value: '12 mo before · 12 mo after' },
-            { label: 'Confirmed on inspection', value: '95 per cent' },
-            { label: 'Point estimates', value: 'None' },
-          ]}
-          actions={
-            <>
-              <BronzeButton href="#figures">
-                The four figures
-                <Arrow />
-              </BronzeButton>
-              <Button href="#method" variant="ghost">
-                How they were taken
-              </Button>
-            </>
-          }
+          title="Less downtime. *More certainty.*"
+          lead="Results against each site’s own record. 62 assets. Twelve months before and after."
         />
 
         <Figures />
         <Ledger />
-        <Method />
+        <DetailSection label="Study method & exclusions">
+          <Method />
+        </DetailSection>
 
         <section className={`${innerStyles.section} ${innerStyles.sectionRuled}`}>
           <div className={innerStyles.inner}>
@@ -111,8 +94,8 @@ export default function OutcomesPage() {
             <CtaBand
               eyebrow="Next"
               ghost="02"
-              title="Run the same study *on your record*"
-              body="Bring twelve months of your own maintenance log. We map one line, learn its baseline from its own history, and show what the figures would have been — before anyone signs anything."
+              title="See it on *your machines.*"
+              body="Start with one asset and your existing data."
               primary={{ href: '/contact', label: 'Start with one line' }}
               secondary={{ href: '/capabilities', label: 'What it does, and does not' }}
             />

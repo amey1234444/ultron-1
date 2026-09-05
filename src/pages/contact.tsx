@@ -6,8 +6,10 @@
 // up in the e-mail body; nothing typed here is silently dropped. The address
 // itself is printed beside the form for anyone who would rather just write.
 //
-// Hero → three conversation routes → the form with the details beside it →
-// what happens next → the office.
+// The page is the form. The routes-in plates and the five-step timeline that
+// used to sit around it said in two screens what the topic chips and the reply
+// time say in one line, and everything they carried is still reachable: the
+// topics pre-fill the subject, and the office and address sit beside the form.
 
 import Head from 'next/head';
 import { type FormEvent, useMemo, useState } from 'react';
@@ -18,18 +20,7 @@ import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import { Arrow, Button, Reveal } from '../components/home/primitives';
 import contact from '../components/pages/contact.module.css';
-import {
-  BronzeButton,
-  GateMark,
-  GridMark,
-  InnerHead,
-  PageHero,
-  Plate,
-  PlateWall,
-  Timeline,
-  WaveMark,
-  innerStyles,
-} from '../components/pages/inner';
+import { innerStyles } from '../components/pages/inner';
 import SiteNav from '../components/web/SiteNav';
 import { useAuth } from '../context/AuthContext';
 
@@ -38,64 +29,10 @@ const EMAIL = 'hello@ultron.io';
 type Topic = 'walkthrough' | 'pilot' | 'question' | 'access';
 
 const TOPICS: { id: Topic; label: string; subject: string }[] = [
-  { id: 'walkthrough', label: 'A walkthrough on our asset', subject: 'Walkthrough request' },
-  { id: 'pilot', label: 'A pilot on one line', subject: 'Pilot on one line' },
-  { id: 'question', label: 'A technical question', subject: 'Technical question' },
+  { id: 'walkthrough', label: 'Walkthrough', subject: 'Walkthrough request' },
+  { id: 'pilot', label: 'Pilot', subject: 'Pilot on one line' },
+  { id: 'question', label: 'Technical question', subject: 'Technical question' },
   { id: 'access', label: 'Console access', subject: 'Console access' },
-];
-
-const ROUTES = [
-  {
-    eyebrow: 'Walkthrough',
-    title: 'Thirty minutes on your worst asset',
-    body: 'Pick the machine the plant argues about. We map it to the points it already has and show you what the console would say — on a call, on your numbers.',
-    topic: 'walkthrough' as Topic,
-    mark: <WaveMark />,
-  },
-  {
-    eyebrow: 'Pilot',
-    title: 'One line, twelve months back',
-    body: 'Bring a year of your maintenance log. We learn the line\'s baseline from its own history and read what would have been caught, before anyone signs anything.',
-    topic: 'pilot' as Topic,
-    mark: <GateMark />,
-  },
-  {
-    eyebrow: 'Question',
-    title: 'Ask the person who built it',
-    body: 'Historian quirks, unit conversions, air-gapped sites, what the score is made of. The engineer who replies will have written the part you are asking about.',
-    topic: 'question' as Topic,
-    mark: <GridMark />,
-  },
-];
-
-const NEXT = [
-  {
-    when: 'Day 0',
-    title: 'You write',
-    body: 'The form on this page, or a plain e-mail. Either lands with an engineer, not a queue.',
-  },
-  {
-    when: '< 1 day',
-    title: 'An engineer replies',
-    body: 'With two or three questions about what you run, what already reports, and which asset costs the most unplanned hours.',
-  },
-  {
-    when: 'Week 1',
-    title: 'A 30-minute call',
-    body: 'Your equipment rather than our slides. We leave with a list of the points one asset already emits.',
-    hot: true,
-  },
-  {
-    when: 'Week 2–3',
-    title: 'A mapped pilot asset',
-    body: 'One machine end to end — gateway, channels, baseline, score — so the value is measured rather than argued.',
-  },
-  {
-    when: 'Week 6',
-    title: 'Your own numbers',
-    body: 'A read on what the pilot would have caught over the last two quarters, against your own maintenance record. Nothing is signed before this.',
-    tag: 'Decision',
-  },
 ];
 
 function buildMailto(fields: {
@@ -160,78 +97,16 @@ export default function ContactPage() {
       <Ambience />
 
       <div className={styles.content}>
-        <PageHero
-          eyebrow="Contact"
-          meta="Replies within one business day"
-          title="Talk to an *engineer*"
-          lead="Not a sales queue. The first conversation is with someone who has commissioned this on a plant floor, and it starts with your equipment rather than our slides. Three ways in, below — or just write."
-          facts={[
-            { label: 'E-mail', value: EMAIL },
-            { label: 'First reply', value: 'Under one business day' },
-            { label: 'First call', value: '30 minutes, your asset' },
-            { label: 'Signed before value', value: 'Nothing' },
-          ]}
-          actions={
-            <>
-              <BronzeButton href="#write">
-                Write to us
-                <Arrow />
-              </BronzeButton>
-              <Button href={user ? '/' : '/signup'} variant="ghost">
-                {user ? 'Open console' : 'Request console access'}
-              </Button>
-            </>
-          }
-        />
-
-        {/* Routes in. */}
-        <section className={innerStyles.section}>
-          <div className={innerStyles.inner}>
-            <InnerHead
-              eyebrow="Three ways in"
-              title="Start with the *conversation* you actually want"
-              lead="Each one pre-fills the form below. All three end up with the same engineers."
-            />
-            <PlateWall>
-              {ROUTES.map((route, index) => (
-                <Plate
-                  key={route.topic}
-                  tone={index === 1 ? 'bronze' : 'dark'}
-                  span={4}
-                  index={index + 1}
-                  eyebrow={route.eyebrow}
-                  title={route.title}
-                  body={route.body}
-                  delay={index * 90}
-                  mark={route.mark}
-                  foot={
-                    <a
-                      href="#write"
-                      className={contact.routeLink}
-                      onClick={() => setTopic(route.topic)}
-                    >
-                      Choose this
-                      <Arrow size={14} />
-                    </a>
-                  }
-                />
-              ))}
-            </PlateWall>
-          </div>
-        </section>
-
         {/* The form. */}
         <section id="write" className={contact.formBand}>
           <div className={innerStyles.inner}>
             <div className={contact.formGrid}>
               <div className={contact.formAside}>
                 <Reveal>
-                  <p className={contact.asideEyebrow}>Write</p>
-                  <h2 className={contact.asideTitle}>Tell us about the asset</h2>
+                  <p className={contact.asideEyebrow}>Contact</p>
+                  <h1 className={contact.asideTitle}>Let’s talk about<br />your machines.</h1>
                   <p className={contact.asideBody}>
-                    What you run, what already reports, and which machine costs the most unplanned
-                    hours. The more specific the better — the interesting questions are the specific
-                    ones.
+                    A walkthrough, a pilot, or a technical question. Start here.
                   </p>
                 </Reveal>
 
@@ -258,16 +133,19 @@ export default function ContactPage() {
                     </div>
                     <div>
                       <dt>Response</dt>
-                      <dd>Under one business day, from an engineer</dd>
+                      <dd>Within one business day</dd>
                     </div>
                   </dl>
                 </Reveal>
+                <Button href={user ? '/' : '/signup'} variant="ghost">
+                  {user ? 'Open console' : 'Request console access'}<Arrow />
+                </Button>
               </div>
 
               <Reveal delay={60} className={contact.formWrap}>
-                <form className={contact.form} onSubmit={onSubmit} noValidate>
+                <form className={contact.form} onSubmit={onSubmit}>
                   <fieldset className={contact.topics}>
-                    <legend className={contact.label}>What is this about</legend>
+                    <legend className={contact.label}>I’m interested in</legend>
                     <div className={contact.topicRow}>
                       {TOPICS.map((option) => (
                         <label
@@ -333,27 +211,24 @@ export default function ContactPage() {
                         autoComplete="organization-title"
                         value={role}
                         onChange={(event) => setRole(event.target.value)}
-                        placeholder="Reliability engineer, plant director…"
+                        placeholder="Your role (optional)"
                       />
                     </label>
                     <label className={`${contact.field} ${contact.fieldWide}`}>
-                      <span className={contact.label}>The asset, and the question</span>
+                      <span className={contact.label}>How can we help?</span>
                       <textarea
                         name="message"
-                        rows={6}
+                        rows={4}
                         value={message}
                         onChange={(event) => setMessage(event.target.value)}
-                        placeholder="Which machine, what it already reports (historian, PLC, protocol), and what you would want it to have told you."
+                        placeholder="Tell us about your equipment and what you need."
                         required
                       />
                     </label>
                   </div>
 
                   <div className={contact.formFoot}>
-                    <p className={contact.formNote}>
-                      Sending opens your mail client with everything above addressed to{' '}
-                      <a href={`mailto:${EMAIL}`}>{EMAIL}</a>. Nothing is stored here.
-                    </p>
+                    <p className={contact.formNote}>Opens your email app. Send the message there.</p>
                     <div className={contact.formActions}>
                       <button
                         type="submit"
@@ -361,33 +236,18 @@ export default function ContactPage() {
                         disabled={!ready}
                         aria-disabled={!ready}
                       >
-                        {sent ? 'Opened in your mail client' : 'Send to an engineer'}
+                        Compose email
                         <Arrow />
                       </button>
-                      <a href={href} className={contact.plainLink}>
-                        Or open as a plain e-mail
-                      </a>
+                      {/* Always in the DOM so the announcement is heard when it
+                          arrives, not when the region does. */}
+                      <p className={contact.formNote} role="status">
+                        {sent ? `Email draft opened. If it did not open, write to ${EMAIL}.` : ''}
+                      </p>
                     </div>
                   </div>
                 </form>
               </Reveal>
-            </div>
-          </div>
-        </section>
-
-        {/* What happens next. */}
-        <section className={`${innerStyles.section} ${innerStyles.sectionRuled}`}>
-          <div className={innerStyles.inner}>
-            <div className={contact.nextGrid}>
-              <div className={contact.nextSticky}>
-                <InnerHead
-                  eyebrow="What happens next"
-                  title="Five steps, *nothing signed* before the fifth"
-                  lead="In this order, every time. If a step does not earn the next one, it stops there — which is the point of starting on one line."
-                  layout="stack"
-                />
-              </div>
-              <Timeline items={NEXT} />
             </div>
           </div>
         </section>

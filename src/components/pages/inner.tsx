@@ -485,7 +485,16 @@ export function GridMark() {
  * past. A link into a folded section still lands: the hash is matched against
  * what is inside, and the disclosure opens itself before the browser scrolls.
  */
-export function DetailSection({ label, children }: { label: string; children: ReactNode }) {
+export function DetailSection({
+  label,
+  children,
+  variant = 'section',
+}: {
+  label: string;
+  children: ReactNode;
+  /** `section` holds a whole page section; `inline` sits inside one. */
+  variant?: 'section' | 'inline';
+}) {
   const ref = useRef<HTMLDetailsElement>(null);
 
   useEffect(() => {
@@ -508,13 +517,17 @@ export function DetailSection({ label, children }: { label: string; children: Re
     return () => window.removeEventListener('hashchange', revealAnchor);
   }, []);
 
+  const inline = variant === 'inline';
+
   return (
     <details ref={ref} className={styles.disclosure}>
-      <summary className={styles.disclosureSummary}>
+      <summary
+        className={`${styles.disclosureSummary} ${inline ? styles.disclosureSummaryInline : ''}`}
+      >
         <span className={styles.disclosureLabel}>{label}</span>
         <span className={styles.disclosureSign} aria-hidden="true" />
       </summary>
-      {children}
+      {inline ? <div className={styles.disclosureInline}>{children}</div> : children}
     </details>
   );
 }

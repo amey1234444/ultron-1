@@ -132,8 +132,8 @@
 /* Window. On the raised plate the ink is white, and the window itself is the
    brightest thing on the plate. */
 .dayCell {
-  fill: rgba(255, 255, 255, 0.05);
-  stroke: rgba(255, 255, 255, 0.16);
+  fill: rgba(21, 27, 36, 0.03);
+  stroke: rgba(21, 27, 36, 0.15);
 }
 
 .windowCell {

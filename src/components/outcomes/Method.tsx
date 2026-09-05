@@ -48,7 +48,6 @@ export default function Method() {
         <InnerHead
           eyebrow="Method"
           title="How those numbers were *taken*"
-          lead="Ranges rather than point estimates, measured against each site's own record. The design of the study, and what it leaves out — declared before it ran, not chosen after the figures were in."
         />
 
         <div className={styles.grid}>

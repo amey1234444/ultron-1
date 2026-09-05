@@ -13,7 +13,7 @@ import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import { Arrow, Button } from '../components/home/primitives';
 import faq from '../components/pages/faq.module.css';
-import { BronzeButton, CtaBand, PageHero, innerStyles } from '../components/pages/inner';
+import { CtaBand, PageHero, innerStyles } from '../components/pages/inner';
 import SiteNav from '../components/web/SiteNav';
 
 type Item = { q: string; a: string };
@@ -146,7 +146,7 @@ function GroupAccordion({ group, query }: { group: Group; query: string }) {
     <section id={`faq-${group.id}`} className={faq.group}>
       <div className={faq.groupHead}>
         <h2 className={faq.groupTitle}>{group.label}</h2>
-        <p className={faq.groupWho}>{group.who}</p>
+
       </div>
       <div className={faq.list}>
         {group.items.map((item, index) => {
@@ -161,7 +161,7 @@ function GroupAccordion({ group, query }: { group: Group; query: string }) {
                 aria-controls={`panel-${id}`}
                 onClick={() => setOpen(isOpen && !query ? null : index)}
               >
-                <span className={faq.index}>{String(index + 1).padStart(2, '0')}</span>
+
                 <span className={faq.question}>{item.q}</span>
                 <span className={faq.sign} aria-hidden="true" />
               </button>
@@ -216,19 +216,8 @@ export default function FaqPage() {
         <PageHero
           eyebrow="FAQ"
           meta={`${total} questions · 4 groups`}
-          title="Questions engineering teams *ask us*"
-          lead="Grouped by who is asking. These are the questions that arrive after someone has decided the product is interesting and is now checking it against their own plant. If yours is not here, an engineer will answer it."
-          actions={
-            <>
-              <BronzeButton href="#questions">
-                Browse the questions
-                <Arrow />
-              </BronzeButton>
-              <Button href="/contact" variant="ghost">
-                Ask one of your own
-              </Button>
-            </>
-          }
+          title="Good questions. *Clear answers.*"
+          lead="Getting started, the model, and your data."
         />
 
         <section id="questions" className={innerStyles.section}>
@@ -295,7 +284,7 @@ export default function FaqPage() {
                   <div className={faq.sideNote}>
                     <p className={faq.sideNoteTitle}>Not here?</p>
                     <p className={faq.sideNoteBody}>
-                      The ones we cannot answer generically are usually the interesting ones.
+                      Get an answer for your plant.
                     </p>
                     <Button href="/contact" variant="ghost">
                       Ask an engineer
@@ -310,8 +299,7 @@ export default function FaqPage() {
                   <div className={faq.empty}>
                     <p className={faq.emptyTitle}>Nothing matches &ldquo;{query}&rdquo;</p>
                     <p className={faq.emptyBody}>
-                      Try a shorter word, or send the question over — it is probably one worth
-                      adding.
+                      Try another keyword or ask an engineer.
                     </p>
                     <Button href={`mailto:hello@ultron.io?subject=${encodeURIComponent(`Question: ${query}`)}`}>
                       Send it to an engineer
@@ -333,8 +321,8 @@ export default function FaqPage() {
             <CtaBand
               eyebrow="Still asking"
               ghost="04"
-              title="The interesting questions are the *specific* ones"
-              body="Tell us about the asset, the historian and the failure you are tired of. The engineer who replies will have built the part you are asking about."
+              title="See it on *your machines.*"
+              body="Start with one asset and your existing data."
               primary={{ href: '/contact', label: 'Talk to an engineer' }}
               secondary={{ href: '/capabilities', label: 'What it does, and does not' }}
             />

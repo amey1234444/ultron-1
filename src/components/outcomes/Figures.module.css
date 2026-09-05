@@ -1,159 +1,95 @@
+/* Exact before/after values, without an unlabelled schematic axis. */
 .list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--u-line);
 }
-
 .figure {
-  display: grid;
-  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr) minmax(0, 0.8fr);
-  gap: 40px;
-  align-items: center;
-  padding: 36px 0;
-  border-bottom: 1px solid var(--u-line);
-  opacity: 0;
-  transform: translate3d(0, 12px, 0);
-  transition:
-    opacity 700ms var(--u-ease),
-    transform 700ms var(--u-ease);
-  transition-delay: var(--delay, 0ms);
+  padding: clamp(24px, 3.4vw, 44px);
+  border: 1px solid #29292d;
+  border-radius: 12px;
+  background: #151517;
 }
-
-.shown .figure {
-  opacity: 1;
-  transform: none;
+.figure:first-child {
+  background: #edf0f5;
+  color: #17191f;
 }
-
+.copy {
+  min-width: 0;
+}
 .label {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: 12px;
-  margin: 0;
-  font-size: 13px;
-  letter-spacing: 0.01em;
-  color: var(--u-ink-2);
+  margin: 0 0 40px;
+  font-size: 1rem;
+  line-height: 1.5;
+  color: #b8b8c0;
 }
-
 .index {
-  font-family: var(--u-font-mono);
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  color: #ffffff;
+  font-size: .75rem;
+  font-variant-numeric: tabular-nums;
+  opacity: .7;
 }
-
 .value {
-  margin: 12px 0 0;
-  font-size: clamp(40px, 4.2vw, 58px);
-  font-weight: 600;
-  letter-spacing: -0.05em;
-  line-height: 1;
-  color: var(--u-ink);
+  margin: 0;
+  font-size: clamp(2.75rem, 5vw, 4.5rem);
+  font-weight: 500;
+  line-height: 1.08;
+  letter-spacing: -.055em;
+  color: #f7f7f8;
   font-variant-numeric: tabular-nums;
 }
-
 .unit {
-  margin-left: 10px;
-  font-family: var(--u-font-mono);
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0.08em;
-  color: var(--u-ink-3);
-  vertical-align: 0.9em;
+  display: block;
+  margin-top: 12px;
+  color: #b8b8c0;
+  font-size: .875rem;
+  letter-spacing: 0;
 }
-
 .from {
-  margin: 12px 0 0;
-  font-size: 13px;
-  color: var(--u-ink-3);
+  margin: 28px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid #343439;
+  color: #a5a5ad;
+  font-size: .875rem;
 }
-
 .from b {
+  margin-left: 8px;
+  color: #f0f0f3;
   font-weight: 500;
-  color: var(--u-ink-2);
 }
-
-/* The bar. */
-.track {
-  position: relative;
-  height: 64px;
-}
-
-.trackLine {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background: var(--u-line);
-}
-
-.band {
-  position: absolute;
-  top: 50%;
-  height: 14px;
-  transform: translateY(-50%) scaleX(0);
-  transform-origin: left center;
-  border-radius: 999px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0.55), #ffffff 60%, #ffffff);
-  box-shadow: 0 0 0 5px rgba(255, 255, 255, 0.07);
-  transition: transform 1100ms var(--u-ease);
-  transition-delay: calc(var(--delay, 0ms) + 200ms);
-}
-
-.shown .band {
-  transform: translateY(-50%) scaleX(1);
-}
-
-.mark {
-  position: absolute;
-  top: 50%;
-  width: 2px;
-  height: 30px;
-  transform: translate(-50%, -50%);
-  background: var(--u-ink-2);
-}
-
-.markLabel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
-  white-space: nowrap;
-}
-
-.arrow {
-  position: absolute;
-  top: 0;
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.12em;
-  color: var(--u-ink-3);
-}
-
-.arrow[data-better='lower'] {
-  left: 0;
-}
-
-.arrow[data-better='higher'] {
-  right: 0;
-}
-
 .note {
-  margin: 0;
-  font-size: 13.5px;
+  margin: 14px 0 0;
+  font-size: .875rem;
   line-height: 1.6;
-  color: var(--u-ink-2);
+  color: #a5a5ad;
+  max-width: 44ch;
 }
-
-@media (max-width: 900px) {
-  .figure {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
+.figure:first-child .value,
+.figure:first-child .from b {
+  color: #17191f;
+}
+.figure:first-child .label,
+.figure:first-child .unit,
+.figure:first-child .from,
+.figure:first-child .note {
+  color: #4c5260;
+}
+.figure:first-child .from {
+  border-color: #c9ced7;
+}
+.shown {
+  visibility: visible;
+}
+@media (max-width: 640px) {
+  .list {
+    grid-template-columns: minmax(0,1fr);
+  }
+  .label {
+    margin-bottom: 28px;
   }
 }

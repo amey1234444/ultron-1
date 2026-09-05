@@ -4,7 +4,7 @@
 // mattered on the floor, and a timeline of what happened when. The figures
 // match the landing page's EvidenceCase exactly.
 
-import { GateMark, InnerHead, Plate, PlateWall, Timeline, innerStyles } from '../pages/inner';
+import { DetailSection, GateMark, InnerHead, Plate, PlateWall, Timeline, innerStyles } from '../pages/inner';
 
 const TICKS = [
   {
@@ -48,8 +48,8 @@ export default function Ledger() {
       <div className={innerStyles.inner}>
         <InnerHead
           eyebrow="Case · Northfield"
-          title="One plant, fourteen months, *in its own dates*"
-          lead="The aggregate figures above are made of cases like this one. Northfield is the one we can show in full: a polymer extrusion site, forty-one assets, no new hardware."
+          title="Northfield. *14 months later.*"
+          lead="Polymer extrusion · 41 assets · Existing instrumentation"
         />
 
         <PlateWall>
@@ -58,7 +58,7 @@ export default function Ledger() {
             span={7}
             eyebrow="Summary"
             title="Four bearings caught before they seized"
-            body="Each finding named the component, carried the points it was drawn from, and gave a range rather than a date. Each was taken out in a window the production plan already had. The one finding that was wrong is in the ledger, marked as wrong."
+            body="Four confirmed bearing findings. One unconfirmed finding. Every result counted."
             foot={
               <dl className={innerStyles.factGrid}>
                 <div>
@@ -98,7 +98,9 @@ export default function Ledger() {
         </PlateWall>
 
         <div style={{ marginTop: 56 }}>
-          <Timeline items={TICKS} />
+          <DetailSection label="View the deployment timeline" variant="inline">
+            <Timeline items={TICKS} />
+          </DetailSection>
         </div>
       </div>
     </section>
