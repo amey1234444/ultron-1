@@ -57,7 +57,7 @@ type MachineWorkspaceProps = {
   // parent uses this to hide the hierarchy sidebar while it's active.
   onModeChange?: (mode: WorkspaceMode) => void;
 };
-type ActualTab = 'machine' | 'rack' | 'overview' | 'analysis' | 'alarm' | 'trend';
+type ActualTab = 'machine' | 'overview' | 'analysis' | 'alarm' | 'trend' | 'rack';
 
 const MIN_ZOOM = MIN_MACHINE_ZOOM;
 const MAX_ZOOM = MAX_MACHINE_ZOOM;
@@ -271,7 +271,7 @@ export function MachineWorkspace({
   }, [savedBoxes, allChannels]);
   // Total measurement points the machine template defines (e.g. RAV's Motor
   // component lists 6) — the "expected" denominator for the coverage indicator
-  // shown across the Rack/Overview/Alarm/Trend sub-tabs.
+  // shown across the Overview/Alarm/Trend/Rack sub-tabs.
   const expectedPoints = useMemo(() => Math.max(expectedPointsForTemplate(machine.template), machine.components.reduce((sum, c) => sum + c.points.length, 0)), [machine.components, machine.template]);
 
   // The whole design lives on a fixed 1600×900 logical stage that gets
@@ -374,11 +374,11 @@ export function MachineWorkspace({
         )}
       >
         <ActualSubTab label="Machine" active={actualTab === 'machine'} onPress={() => setActualTab('machine')} />
-        <ActualSubTab label="Rack" active={actualTab === 'rack'} onPress={() => setActualTab('rack')} />
         <ActualSubTab label="Overview" active={actualTab === 'overview'} onPress={() => setActualTab('overview')} />
         <ActualSubTab label="Analysis" active={actualTab === 'analysis'} onPress={() => setActualTab('analysis')} />
         <ActualSubTab label="Alarm" active={actualTab === 'alarm'} onPress={() => setActualTab('alarm')} />
         <ActualSubTab label="Trend" active={actualTab === 'trend'} onPress={() => setActualTab('trend')} />
+        <ActualSubTab label="Rack" active={actualTab === 'rack'} onPress={() => setActualTab('rack')} />
       </View>
     </ScrollView>
   );
@@ -490,10 +490,6 @@ export function MachineWorkspace({
     <View className="flex-1">
       {header(actualSubTabs, !pageOwnsIdentity)}
 
-      {isActual && actualTab === 'rack' && (
-        <RackOccupancyView devices={devices} cards={cards} live={live} mappedChannels={mappedChannels} />
-      )}
-
       {isActual && actualTab === 'overview' && (
         <MachineOverviewPage
           machine={machine}
@@ -523,6 +519,10 @@ export function MachineWorkspace({
 
       {isActual && actualTab === 'trend' && (
         <TrendView mappedChannels={mappedChannels} devices={devices} machineId={machine.id} />
+      )}
+
+      {isActual && actualTab === 'rack' && (
+        <RackOccupancyView devices={devices} cards={cards} live={live} mappedChannels={mappedChannels} />
       )}
 
     </View>
