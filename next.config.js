@@ -79,6 +79,11 @@ const nextConfig = {
     'react-native-css-interop',
     'react-native-safe-area-context',
     'react-native-svg',
+    // Ships a CJS build that requires the real `react-native` at module load.
+    // Left external, Next would run that require for real while collecting page
+    // data and Node would choke on react-native's ESM source; bundled, webpack
+    // rewrites it to react-native-web through the alias above.
+    'lucide-react-native',
     '@expo/vector-icons',
     'expo',
     'expo-modules-core',
