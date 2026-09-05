@@ -1,10 +1,10 @@
+import { Box, Boxes, Cpu, Settings, type LucideIcon } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
 import { formatRul, levelHexes } from '../../../../lib/condition';
 import { consolePalette } from '../../../../lib/consoleTheme';
-import { ComponentTypeIcon } from '../machineIcons';
 import type { ComponentSummary } from './rollup';
 
 // The monitored mechanical train, in the order the machine template defines it —
@@ -31,6 +31,14 @@ function verdictHexes(isDark: boolean): Record<Verdict, string> {
   return { GOOD: levels.normal, WATCH: levels.alert, ALERT: levels.alert, DANGER: levels.danger };
 }
 
+function componentIcon(summary: ComponentSummary): LucideIcon {
+  const identity = `${summary.type} ${summary.label}`.toLocaleLowerCase();
+  if (identity.includes('gear')) return Settings;
+  if (identity.includes('screw') || identity.includes('barrel')) return Boxes;
+  if (identity.includes('motor') || identity.includes('drive')) return Cpu;
+  return Box;
+}
+
 export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
   const { isDark } = useAppTheme();
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
@@ -43,7 +51,10 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
-        <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Machine train</Text>
+        <View className="flex-row items-center gap-2">
+          <Box color={palette.inkMuted} size={17} strokeWidth={1.7} />
+          <Text className={cn('font-body-medium text-[12px] uppercase tracking-wider', inkClass)}>Machine train</Text>
+        </View>
         <Text className={cn('font-body text-[11.5px]', mutedClass)}>score · to limit</Text>
       </View>
 
@@ -57,6 +68,7 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
             const colour = monitored ? verdictHex[verdict] : palette.neutral;
             const percent = summary.health === null ? 0 : Math.max(0, Math.min(100, summary.health));
             const isTrain = summary.type !== 'Unattributed';
+            const Icon = componentIcon(summary);
 
             return (
               <View key={summary.componentId ?? 'unattributed'} className="flex-row">
@@ -83,7 +95,7 @@ export function MachineTrain({ summaries }: { summaries: ComponentSummary[] }) {
                 <View className="flex-1 gap-1 pb-3 pl-1">
                   <View className="flex-row items-center gap-2">
                     {summary.type !== 'Unattributed' ? (
-                      <ComponentTypeIcon type={summary.type} color={isDark ? '#F5F5F5' : '#0A0A0A'} size={15} />
+                      <Icon color={palette.inkMuted} size={16} strokeWidth={1.7} />
                     ) : (
                       <View style={{ width: 15 }} />
                     )}

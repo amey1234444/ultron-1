@@ -1,3 +1,5 @@
+import { ChevronDown, RefreshCw } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
@@ -42,10 +44,18 @@ function ageLabel(feed: FeedStatus, ageSeconds: number | null | undefined) {
 }
 
 function formatAge(seconds: number) {
-  if (seconds < 60) return `${Math.round(seconds)} sec`;
-  if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-  if (seconds < 86400) return `${Math.round(seconds / 3600)} h`;
-  return `${Math.round(seconds / 86400)} d`;
+  if (seconds < 60) return `${Math.round(seconds)} sec ago`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
+  if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
+  return `${Math.round(seconds / 86400)} d ago`;
+}
+
+function formatClock(date: Date) {
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+}
+
+function formatDate(date: Date) {
+  return date.toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 export function MachineHeader({
@@ -60,55 +70,97 @@ export function MachineHeader({
   onRefresh,
 }: MachineHeaderProps) {
   const { isDark } = useAppTheme();
-  const lineClass = isDark ? 'border-line-dark' : 'border-line-light';
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
+  const palette = consolePalette(isDark);
 
   const feedColour = feedHexes(isDark)[feed];
   const age = ageLabel(feed, ageSeconds);
+  const [clock, setClock] = useState<{ time: string; date: string } | null>(null);
+
+  useEffect(() => {
+    const tick = () => {
+      const now = new Date();
+      setClock({ time: formatClock(now), date: formatDate(now) });
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
-    <View className="flex-row flex-wrap items-start justify-between gap-4">
-      <View className="gap-1">
-        <Text className={cn('font-mono text-[11.5px] tracking-[0.18em]', mutedClass)}>BLACKGATE / {section}</Text>
+    <View className="flex-row flex-wrap items-start justify-between gap-5">
+      <View style={{ flexGrow: 1, flexBasis: 430, minWidth: 260 }} className="gap-1">
+        <Text className={cn('font-mono text-[11px] tracking-[0.22em]', mutedClass)}>BLACKGATE / {section}</Text>
 
-        <View className="flex-row flex-wrap items-baseline gap-2">
-          <Text className={cn('font-heading-medium text-[24px]', inkClass)}>{machineName}</Text>
-          <Text className={cn('font-body text-[15px]', mutedClass)}>· {template}</Text>
+        <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
+          <Text className={cn('font-heading-medium text-[26px] leading-[32px]', inkClass)}>{machineName}</Text>
+          {onSelectMachine ? (
+            <Pressable
+              onPress={onSelectMachine}
+              accessibilityRole="button"
+              accessibilityLabel="Change machine"
+              className="flex-row items-center gap-1.5 rounded-md border px-2 py-1"
+              style={({ pressed }) => ({
+                borderColor: palette.line,
+                backgroundColor: pressed ? palette.hoverSurface : palette.panelRaised,
+              })}
+            >
+              <Text className={cn('font-mono text-[10px] tracking-wider', mutedClass)}>SELECT</Text>
+              <ChevronDown color={palette.inkMuted} size={14} strokeWidth={1.7} />
+            </Pressable>
+          ) : null}
         </View>
 
-        <Text className={cn('font-body text-[12.5px]', mutedClass)}>
-          {path ? `${path} • ` : ''}
-          {subtitle}
+        <Text className={cn('font-body text-[13px]', mutedClass)}>
+          {template} · {path ? `${path} · ` : ''}{subtitle}
         </Text>
       </View>
 
-      <View className="flex-row items-center gap-2">
-        <View className={cn('flex-row items-center gap-2 rounded-full border px-2.5 py-1.5', lineClass)}>
-          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: feedColour }} />
-          <Text style={{ color: feedColour }} className="font-mono text-[11.5px] font-bold tracking-wider">
+      <View className="flex-row flex-wrap items-center justify-end gap-3">
+        <View
+          className="flex-row items-center gap-2.5 rounded-xl border px-3.5 py-2.5"
+          style={{ borderColor: palette.lineStrong, backgroundColor: isDark ? '#080A0A' : palette.panel }}
+        >
+          <View
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: 4,
+              backgroundColor: feedColour,
+              shadowColor: feedColour,
+              shadowOpacity: feed === 'live' ? 0.6 : 0,
+              shadowRadius: 7,
+            }}
+          />
+          <Text style={{ color: feedColour }} className="font-mono text-[13px] font-bold tracking-wider">
             {FEED_LABEL[feed]}
           </Text>
-          {age ? <Text className={cn('font-mono text-[11.5px]', mutedClass)}>· {age}</Text> : null}
+          {age ? <Text className={cn('font-body text-[11.5px]', mutedClass)}>{age}</Text> : null}
         </View>
 
         {onRefresh ? (
-          <Pressable onPress={onRefresh} accessibilityRole="button" accessibilityLabel="Refresh data" className={cn('rounded-full border px-2.5 py-1.5', lineClass)}>
-            <Text className={cn('font-mono text-[11.5px] tracking-wider', mutedClass)}>REFRESH</Text>
+          <Pressable
+            onPress={onRefresh}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh data"
+            className="items-center justify-center rounded-lg border"
+            style={({ pressed }) => ({
+              width: 38,
+              height: 38,
+              borderColor: palette.line,
+              backgroundColor: pressed ? palette.hoverSurface : palette.panelRaised,
+            })}
+          >
+            <RefreshCw color={palette.inkMuted} size={16} strokeWidth={1.7} />
           </Pressable>
         ) : null}
 
-        {onSelectMachine ? (
-          <Pressable
-            onPress={onSelectMachine}
-            accessibilityRole="button"
-            accessibilityLabel="Change machine"
-            className="flex-row items-center gap-2 rounded-full border border-accent/35 bg-accent/10 px-3 py-1.5"
-          >
-            <Text className="font-body-bold text-[12.5px] text-accent">{machineName}</Text>
-            <Text className="font-mono text-[11.5px] text-accent">▾</Text>
-          </Pressable>
-        ) : null}
+        <View style={{ width: 1, height: 42, backgroundColor: palette.line }} />
+        <View style={{ minWidth: 116 }} className="gap-0.5">
+          <Text className={cn('font-mono text-[14px] tabular-nums', inkClass)}>{clock?.time ?? '--:--:--'}</Text>
+          <Text className={cn('font-body text-[11.5px]', mutedClass)}>{clock?.date ?? '-- --- ----'}</Text>
+        </View>
       </View>
     </View>
   );

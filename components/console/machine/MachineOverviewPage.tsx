@@ -1,3 +1,12 @@
+import {
+  Activity,
+  Bell,
+  ChartNoAxesColumnIncreasing,
+  Database,
+  HeartPulse,
+  Network,
+  Play,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
@@ -9,11 +18,9 @@ import {
   attributeToComponent,
   DEFAULT_ISO_GROUP,
   formatHours,
-  formatRul,
   ISO_10816_GROUPS,
   levelHexes,
   STATE_LABEL,
-  statusForLevel,
   type IsoGroup,
   type IsoZone,
 } from '../../../lib/condition';
@@ -33,6 +40,7 @@ import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
 import { MachineTrain } from './overview/MachineTrain';
 import { MaintenanceCard, type MaintenanceRecord } from './overview/MaintenanceCard';
 import { PredictionList } from './overview/PredictionList';
+import { OverviewPanel } from './overview/OverviewPanel';
 import { RecentEvents, type MachineEvent } from './overview/RecentEvents';
 import {
   deriveRunState,
@@ -210,6 +218,7 @@ export function MachineOverviewPage({
 
   const [conditions, setConditions] = useState<Record<string, PointCondition>>({});
   const [gridWidth, setGridWidth] = useState<number | null>(null);
+  const [pageWidth, setPageWidth] = useState<number | null>(null);
 
   // Must stay referentially stable: usePointCondition returns a new object on
   // every reading tick, so an unstable callback here would re-run each tile's
@@ -317,7 +326,6 @@ export function MachineOverviewPage({
   // chart is about the machine's actual problem rather than channel one.
   const trended = summary.worstPoint;
 
-  const projectionCount = conditionList.filter((c) => c.prognosis.daysToDanger !== null).length;
   const windowHours = conditionList[0]?.windowHours ?? 0;
 
   const perRow = gridWidth ? columnsFor(gridWidth) : 6;
@@ -338,12 +346,18 @@ export function MachineOverviewPage({
   const leadIssue = prioritiseIssues(analysisData.issues)[0] ?? null;
   const leadDiagnosis = (leadIssue ? issueAsDiagnosis(leadIssue, conditionList) : null) ?? ranked[0] ?? null;
   const overviewForecasts = analysisData.prognostics?.predictions ?? [];
-  const isHealthySseDemo = machine.name === 'Healthy SSE Demo';
-  const isFaultySseDemo = machine.name === 'Faulty SSE Demo' || leadIssue?.id === 'dx-process-downstream-restriction';
-  const isPredictiveSseDemo = machine.name === 'SSE Prediction Demo';
+  const overviewNarrow = pageWidth !== null && pageWidth < 940;
 
   return (
-    <ScrollView className="flex-1" contentContainerStyle={{ padding: 24, gap: 20 }}>
+    <ScrollView
+      className="flex-1"
+      style={{ backgroundColor: isDark ? '#050505' : palette.bg }}
+      contentContainerStyle={{ padding: 18, gap: 14 }}
+      onLayout={(event) => {
+        const width = Math.max(0, event.nativeEvent.layout.width - 36);
+        setPageWidth((current) => (current !== null && Math.abs(current - width) < 1 ? current : width));
+      }}
+    >
       <MachineHeader
         machineName={machine.name}
         template={machine.template}
@@ -385,25 +399,36 @@ export function MachineOverviewPage({
       {/* KPI row — compact, one line, machine health slightly more prominent. */}
       <View className="flex-row flex-wrap gap-3">
         <KpiTile
+          icon={HeartPulse}
+          iconTone={levels[summary.level]}
           label="Machine health"
           value={summary.health === null ? '--' : `${Math.round(summary.health)}%`}
           tone={levels[summary.level]}
-          hint={STATE_LABEL[summary.level]}
-          width={176}
+          badge={STATE_LABEL[summary.level]}
         />
         <KpiTile
+          icon={Bell}
+          iconTone={activeAlerts > 0 ? levels[summary.level] : undefined}
           label="Active alerts"
           value={String(activeAlerts).padStart(2, '0')}
           tone={activeAlerts > 0 ? levels[summary.level] : undefined}
           hint={`${summary.dangerCount} danger · ${summary.alertCount} alert`}
         />
-        <KpiTile label="Machine state" value={runState.label} hint={runState.detail ?? undefined} />
         <KpiTile
+          icon={Play}
+          iconTone={feed === 'live' ? palette.accent : palette.neutral}
+          label="Machine state"
+          value={runState.label}
+          hint={runState.detail ?? undefined}
+        />
+        <KpiTile
+          icon={Network}
           label="Availability"
           value={availability ?? '--'}
           hint={availability ? 'reported' : 'no source wired'}
         />
         <KpiTile
+          icon={Database}
           label="Sensor health"
           value={`${sensors.online} / ${sensors.total}`}
           tone={sensors.online < sensors.total ? levels.alert : undefined}
@@ -411,45 +436,53 @@ export function MachineOverviewPage({
         />
       </View>
 
-      <Panel status={statusForLevel(summary.level)}>
-        <View className="gap-4">
-          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Machine health overview</Text>
-
-          <View className="flex-row flex-wrap items-start gap-6">
-            <View className="items-center gap-2">
-              <HealthRing score={summary.health} level={summary.level} />
-              <Text style={{ color: levels[summary.level] }} className="font-mono text-[12.5px] font-bold tracking-widest">
+      <View className="flex-row flex-wrap items-stretch gap-[14px]">
+        <OverviewPanel style={{ flexGrow: 1, flexBasis: overviewNarrow ? '100%' : 330, minWidth: 0 }}>
+          <View className="flex-row items-center justify-between gap-3">
+            <View className="flex-row items-center gap-2">
+              <HeartPulse color={palette.inkMuted} size={17} strokeWidth={1.7} />
+              <Text className={cn('font-body-medium text-[12px] uppercase tracking-wider', isDark ? 'text-ink' : 'text-ink-inverse')}>
+                Machine health overview
+              </Text>
+            </View>
+            <View className="rounded-md px-2 py-1" style={{ backgroundColor: `${levels[summary.level]}18` }}>
+              <Text style={{ color: levels[summary.level] }} className="font-mono text-[9.5px] font-bold tracking-wider">
                 {STATE_LABEL[summary.level]}
               </Text>
             </View>
-
-            <View style={{ flexGrow: 1, flexBasis: 340, minWidth: 260 }}>
-              <HealthFactorList factors={healthFactors} />
-            </View>
           </View>
-
-          {/* Primary observation. Driven entirely by the diagnosis passed in, so
-              the analysis layer can replace the source without touching this. */}
+          <View className="flex-1 items-center justify-center py-4">
+            <HealthRing score={summary.health} level={summary.level} size={166} />
+          </View>
           <DiagnosisBanner diagnosis={leadDiagnosis} summary={summary} />
-        </View>
-      </Panel>
+        </OverviewPanel>
+
+        <OverviewPanel style={{ flexGrow: overviewNarrow ? 1 : 2, flexBasis: overviewNarrow ? '100%' : 560, minWidth: 0 }}>
+          <View className="mb-2 flex-row items-center gap-2">
+            <ChartNoAxesColumnIncreasing color={palette.inkMuted} size={17} strokeWidth={1.7} />
+            <Text className={cn('font-body-medium text-[12px] uppercase tracking-wider', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              Parameter health
+            </Text>
+          </View>
+          <HealthFactorList factors={healthFactors} />
+        </OverviewPanel>
+      </View>
 
       <View className="flex-row flex-wrap items-stretch gap-4">
-        <View style={COLUMN}>
-          <Panel fill>
-            <MachineTrain summaries={componentSummaries} />
-          </Panel>
-        </View>
-        <View style={COLUMN}>
-          <Panel fill>
-            <PredictionList diagnoses={ranked} forecasts={overviewForecasts} />
-          </Panel>
-        </View>
+        <OverviewPanel style={{ flexGrow: 1, flexBasis: overviewNarrow ? '100%' : 430, minWidth: 0 }}>
+          <MachineTrain summaries={componentSummaries} />
+        </OverviewPanel>
+        <OverviewPanel style={{ flexGrow: 1.2, flexBasis: overviewNarrow ? '100%' : 520, minWidth: 0 }}>
+          <PredictionList diagnoses={ranked} forecasts={overviewForecasts} />
+        </OverviewPanel>
       </View>
 
       <View className="gap-3">
         <View className="flex-row items-center gap-3">
-          <Text className={cn('font-body-medium text-[12.5px] uppercase tracking-wider', mutedClass)}>Live sensor overview</Text>
+          <Activity color={palette.accent} size={18} strokeWidth={1.7} />
+          <Text className={cn('font-body-medium text-[12px] uppercase tracking-wider', isDark ? 'text-ink' : 'text-ink-inverse')}>
+            Live sensor overview
+          </Text>
           <View className={cn('flex-1 border-t', lineClass)} />
           <Text className={cn('font-mono text-[11.5px]', mutedClass)}>
             {orderedChannels.length} sensors · rack order

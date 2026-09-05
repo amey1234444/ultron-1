@@ -1,3 +1,4 @@
+import { TriangleAlert } from 'lucide-react-native';
 import { Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
@@ -8,11 +9,7 @@ import type { RankedDiagnosis } from './rollup';
 import { consolePalette } from '../../../../lib/consoleTheme';
 import { Hoverable } from '../../../ui';
 
-const CONFIDENCE_DOTS: Record<RankedDiagnosis['confidence'], string> = {
-  high: '●●●',
-  medium: '●●○',
-  low: '●○○',
-};
+const CONFIDENCE_LABEL: Record<RankedDiagnosis['confidence'], string> = { high: 'HIGH', medium: 'MEDIUM', low: 'LOW' };
 
 // Every failure mode the rules fired on, ranked, so a planner can see the second
 // and third problem rather than only the loudest one. The lead item is already in
@@ -36,7 +33,10 @@ export function PredictionList({ diagnoses, forecasts = [] }: { diagnoses: Ranke
   return (
     <View className="gap-3">
       <View className="flex-row items-center justify-between">
-        <Text className={cn('font-body-medium text-[11.5px] uppercase tracking-wider', mutedClass)}>Predicted Failure Modes</Text>
+        <View className="flex-row items-center gap-2">
+          <TriangleAlert color={palette.inkMuted} size={17} strokeWidth={1.7} />
+          <Text className={cn('font-body-medium text-[12px] uppercase tracking-wider', inkClass)}>Predicted Failure Modes</Text>
+        </View>
         <Text className={cn('font-body text-[11.5px]', mutedClass)}>to limit · confidence</Text>
       </View>
 
@@ -75,7 +75,7 @@ export function PredictionList({ diagnoses, forecasts = [] }: { diagnoses: Ranke
                 <Text style={{ color: colour }} className="font-mono text-[12.5px] font-bold tabular-nums">
                   {formatRul(diagnosis.rulDays)}
                 </Text>
-                <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{CONFIDENCE_DOTS[diagnosis.confidence]}</Text>
+                <Text className={cn('w-14 text-right font-mono text-[9.5px] tracking-wider', mutedClass)}>{CONFIDENCE_LABEL[diagnosis.confidence]}</Text>
               </Hoverable>
             );
           })}
@@ -105,7 +105,7 @@ export function PredictionList({ diagnoses, forecasts = [] }: { diagnoses: Ranke
                 <Text style={{ color: colour }} className="font-mono text-[12.5px] font-bold tabular-nums">
                   {forecastTime(forecast)}
                 </Text>
-                <Text className={cn('font-mono text-[11.5px]', mutedClass)}>{forecast.predictionConfidence}%</Text>
+                <Text className={cn('w-14 text-right font-mono text-[11px]', mutedClass)}>{forecast.predictionConfidence}%</Text>
               </Hoverable>
             );
           })}

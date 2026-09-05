@@ -21,6 +21,7 @@
     "expo-linking": "~57.0.1",
     "expo-router": "~57.0.3",
     "expo-status-bar": "~57.0.0",
+    "lucide-react-native": "^1.41.0",
     "mqtt": "^5.10.1",
     "nativewind": "^4.2.6",
     "next": "15.5.20",
