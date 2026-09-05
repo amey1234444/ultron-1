@@ -1,23 +1,16 @@
 // Method — how the outcome figures were arrived at.
 //
-// The landing page prints four ranges against four baselines. This section
-// answers the only question that matters about them: measured how, over what,
-// and with what left out. It lives on /outcomes rather than under the figures
-// because a landing page has nowhere to put a study.
-//
-// Set as a definition list rather than as prose. Each row is a decision someone
-// made when the study was designed, and a reader checking our arithmetic wants
-// to scan for the one they doubt, not read four paragraphs to find it.
+// The figures above are ranges against baselines. This section answers the
+// only question that matters about them: measured how, over what, and with
+// what left out. Set as definition rows rather than prose: each row is a
+// decision someone made when the study was designed, and a reader checking
+// our arithmetic wants to scan for the one they doubt.
 
 import styles from './Method.module.css';
-import { Reveal, SectionHead, useInView } from '../home/primitives';
+import { InnerHead, Rows, innerStyles } from '../pages/inner';
+import { useInView } from '../home/primitives';
 
-type Entry = {
-  term: string;
-  detail: string;
-};
-
-const DESIGN: Entry[] = [
+const DESIGN = [
   {
     term: 'Baseline window',
     detail:
@@ -47,45 +40,36 @@ const EXCLUSIONS: string[] = [
 ];
 
 export default function Method() {
-  const { ref, inView } = useInView<HTMLDivElement>('0px 0px -12% 0px');
+  const { ref, inView } = useInView<HTMLElement>('0px 0px -12% 0px');
 
   return (
-    <section id="method" className={styles.section}>
-      <div className={styles.inner}>
-        <SectionHead
+    <section id="method" className={`${innerStyles.section} ${innerStyles.sectionRuled}`}>
+      <div className={innerStyles.inner}>
+        <InnerHead
           eyebrow="Method"
-          title="How those numbers were taken"
-          lead="Ranges rather than point estimates, measured against each site's own record. The design of the study, and what it leaves out."
+          title="How those numbers were *taken*"
+          lead="Ranges rather than point estimates, measured against each site's own record. The design of the study, and what it leaves out — declared before it ran, not chosen after the figures were in."
         />
 
-        <div ref={ref} className={`${styles.grid} ${inView ? styles.shown : ''}`}>
-          <dl className={styles.terms}>
-            {DESIGN.map((entry, index) => (
-              <div
-                key={entry.term}
-                className={styles.row}
-                style={{ ['--delay' as string]: `${index * 80}ms` }}
-              >
-                <dt className={styles.term}>{entry.term}</dt>
-                <dd className={styles.detail}>{entry.detail}</dd>
-              </div>
-            ))}
-          </dl>
+        <div className={styles.grid}>
+          <Rows items={DESIGN} />
 
-          <aside className={styles.aside} style={{ ['--delay' as string]: '320ms' }}>
-            <h3 className={styles.asideTitle}>Excluded</h3>
+          <aside ref={ref} className={`${styles.aside} ${inView ? styles.shown : ''}`}>
+            <p className={styles.asideEyebrow}>Excluded</p>
             <ul className={styles.exclusions}>
-              {EXCLUSIONS.map((line) => (
-                <li key={line} className={styles.exclusion}>
+              {EXCLUSIONS.map((line, index) => (
+                <li
+                  key={line}
+                  className={styles.exclusion}
+                  style={{ ['--delay' as string]: `${200 + index * 90}ms` }}
+                >
                   {line}
                 </li>
               ))}
             </ul>
-            <Reveal delay={160}>
-              <p className={styles.asideFoot}>
-                Exclusions are declared before a study runs, not chosen after the figures are in.
-              </p>
-            </Reveal>
+            <p className={styles.asideFoot}>
+              Exclusions are declared before a study runs, not chosen after the figures are in.
+            </p>
           </aside>
         </div>
       </div>

@@ -1,0 +1,161 @@
+/* Pillars — the drawings inside the four plates.
+
+   Each drawing takes its ink from the plate it sits on: `currentColor` on the
+   dark plates is the page's white, on paper it is near-black, on bronze it is
+   a deep brown. Bronze is used inside the drawings only for the one element the
+   drawing is about — the re-baseline point, the limit, the window. */
+
+.art {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: inherit;
+  font-family: var(--u-font-mono);
+}
+
+.gridLines {
+  stroke: currentColor;
+  stroke-opacity: 0.08;
+  stroke-width: 1;
+}
+
+.signal {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.baseOld {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.3;
+  stroke-width: 1.2;
+}
+
+.baseNew {
+  fill: none;
+  stroke: var(--u-bronze);
+  stroke-width: 1.4;
+}
+
+.dotHot {
+  fill: var(--u-bronze);
+}
+
+.label {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  fill: currentColor;
+  fill-opacity: 0.5;
+  text-transform: uppercase;
+}
+
+.labelBronze {
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  fill: var(--u-bronze);
+}
+
+.labelBronzeStrong {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  fill: currentColor;
+}
+
+/* Evidence card, drawn as paper inside the dark plate. */
+.paperCard {
+  fill: var(--u-paper);
+  stroke: rgba(255, 255, 255, 0.35);
+}
+
+.paperLabel {
+  font-size: 8.5px;
+  letter-spacing: 0.14em;
+  fill: var(--u-bronze-deep);
+}
+
+.paperRule {
+  stroke: var(--u-paper-line);
+  stroke-width: 1;
+}
+
+.paperDot {
+  fill: var(--u-bronze);
+}
+
+.paperText {
+  font-family: var(--u-font-sans);
+  font-size: 11px;
+  font-weight: 500;
+  fill: var(--u-paper-ink);
+}
+
+.paperValue {
+  font-size: 10.5px;
+  font-weight: 600;
+  fill: var(--u-paper-ink);
+}
+
+.paperLimit {
+  font-size: 10px;
+  fill: var(--u-paper-ink-2);
+}
+
+/* Forecast. */
+.limitLine {
+  stroke: currentColor;
+  stroke-opacity: 0.35;
+  stroke-width: 1;
+}
+
+.cone {
+  fill: var(--u-bronze);
+  fill-opacity: 0.16;
+}
+
+.coneCentre {
+  fill: none;
+  stroke: var(--u-bronze);
+  stroke-width: 1.4;
+}
+
+.today {
+  stroke: currentColor;
+  stroke-opacity: 0.35;
+  stroke-width: 1;
+}
+
+/* Window. On the bronze plate the ink is deep brown, and the window itself is
+   the darkest thing on the plate. */
+.dayCell {
+  fill: rgba(27, 20, 11, 0.06);
+  stroke: rgba(27, 20, 11, 0.18);
+}
+
+.windowCell {
+  fill: #1b140b;
+  stroke: #1b140b;
+}
+
+.windowCell ~ .labelBronzeStrong {
+  fill: var(--u-bronze-pale);
+}
+
+.windowCell ~ .labelBronze {
+  fill: var(--u-bronze);
+}
+
+.runLine {
+  stroke: rgba(27, 20, 11, 0.28);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.runLineBronze {
+  stroke: #1b140b;
+  stroke-width: 3;
+  stroke-linecap: round;
+}

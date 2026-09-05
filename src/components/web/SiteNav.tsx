@@ -28,7 +28,7 @@ const NAV: NavItem[] = [
     label: 'Company',
     items: [
       { label: 'About', href: '/about', hint: 'Why we built it this way' },
-      { label: 'FAQ', href: '/about#faq', hint: 'What evaluators ask us' },
+      { label: 'FAQ', href: '/faq', hint: 'What evaluators ask us' },
     ],
   },
   { label: 'Contact', href: '/contact' },

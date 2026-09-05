@@ -1,0 +1,1109 @@
+/* Shared chrome for the inner pages — capabilities, outcomes, about, FAQ and
+   contact. Everything a page needs that is not specific to one of its sections:
+   the hero, the plate cards, the stat strip, the quote wall, the CTA band, the
+   timeline and the definition rows.
+
+   Palette: black, white, grey, and bronze-gold. Bronze is the eyebrow, the
+   index, the emphasised word and the one bronze plate on a page; paper (an
+   off-white plate) is spent at most twice per page. Nothing else is coloured. */
+
+/* ------------------------------------------------------------------ */
+/* Section scaffolding                                                 */
+/* ------------------------------------------------------------------ */
+
+.section {
+  position: relative;
+  padding: clamp(84px, 10vw, 140px) var(--u-gutter);
+  scroll-margin-top: 76px;
+}
+
+.sectionTight {
+  padding-top: clamp(24px, 4vw, 56px);
+}
+
+.sectionRuled {
+  border-top: 1px solid var(--u-line);
+}
+
+/* A band that lifts one step off the page — the same transparent-to-transparent
+   wash the landing page uses, so it never draws an edge. */
+.sectionBand {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.022) 18%,
+    rgba(255, 255, 255, 0.022) 82%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* The warm band. Bronze light from one side, falling to nothing well inside the
+   section so it reads as light rather than as a panel. */
+.sectionWarm {
+  overflow: hidden;
+}
+
+.sectionWarm::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    100% 80% at 78% 30%,
+    var(--u-bronze-glow) 0%,
+    rgba(120, 84, 34, 0.04) 42%,
+    rgba(10, 9, 8, 0) 70%
+  );
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+.innerNarrow {
+  max-width: 880px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Hero                                                                */
+/* ------------------------------------------------------------------ */
+
+.hero {
+  position: relative;
+  padding: calc(64px + clamp(64px, 10vh, 120px)) var(--u-gutter) clamp(40px, 5vw, 64px);
+  overflow: hidden;
+}
+
+/* Two blooms behind the hero — one white from above, one bronze and lower, so
+   the top of every inner page carries the page's warm colour before a single
+   word of copy is read. */
+.heroLight {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(60% 46% at 50% -8%, rgba(255, 255, 255, 0.075) 0%, transparent 62%),
+    radial-gradient(42% 38% at 72% 34%, rgba(196, 142, 62, 0.13) 0%, transparent 70%);
+}
+
+.heroInner {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.75fr);
+  gap: clamp(32px, 5vw, 80px);
+  align-items: end;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+.heroCenter .heroInner {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+}
+
+.heroCenter .heroLead,
+.heroCenter .heroTitle {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--u-bronze);
+}
+
+.eyebrowDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--u-bronze);
+  box-shadow: 0 0 0 4px var(--u-bronze-soft);
+}
+
+.eyebrowMeta {
+  color: var(--u-ink-3);
+}
+
+.heroTitle {
+  max-width: 14ch;
+  margin: 22px 0 0;
+  font-size: clamp(40px, 6.4vw, 84px);
+  font-weight: 600;
+  letter-spacing: -0.048em;
+  line-height: 0.98;
+  color: #fff;
+  text-wrap: balance;
+}
+
+/* The emphasised word in a headline. A metallic gradient across the letters
+   rather than a flat tint, so it catches like a plate rather than a highlight. */
+.gold {
+  background: linear-gradient(
+    100deg,
+    var(--u-bronze-deep) 0%,
+    var(--u-bronze-2) 22%,
+    var(--u-bronze-pale) 50%,
+    var(--u-bronze) 74%,
+    var(--u-bronze-deep) 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: goldSheen 8s linear infinite;
+}
+
+@keyframes goldSheen {
+  from {
+    background-position: 160% 50%;
+  }
+  to {
+    background-position: -60% 50%;
+  }
+}
+
+.heroLead {
+  max-width: 52ch;
+  margin: clamp(20px, 2.4vw, 28px) 0 0;
+  font-size: clamp(16px, 1.35vw, 18.5px);
+  line-height: 1.6;
+  color: var(--u-ink-2);
+  text-wrap: pretty;
+}
+
+.heroActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: clamp(26px, 3vw, 36px);
+}
+
+/* The right-hand column of the hero: a stack of facts on hairlines. */
+.heroAside {
+  display: grid;
+  gap: 0;
+  padding-bottom: 6px;
+  border-top: 1px solid var(--u-line-strong);
+}
+
+.heroFact {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--u-line);
+}
+
+.heroFactLabel {
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.heroFactValue {
+  font-size: 14.5px;
+  font-weight: 550;
+  letter-spacing: -0.012em;
+  color: var(--u-ink);
+  text-align: right;
+}
+
+/* ------------------------------------------------------------------ */
+/* Plates — the Linear-style card wall                                 */
+/* ------------------------------------------------------------------ */
+
+.plates {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.plate {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 300px;
+  padding: clamp(24px, 2.6vw, 34px);
+  border-radius: 20px;
+  overflow: hidden;
+  isolation: isolate;
+  opacity: 0;
+  transform: translate3d(0, 16px, 0);
+  transition:
+    opacity 760ms var(--u-ease),
+    transform 760ms var(--u-ease),
+    box-shadow 300ms ease,
+    border-color 300ms ease;
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .plate {
+  opacity: 1;
+  transform: none;
+  transition-delay: var(--delay, 0ms), var(--delay, 0ms), 0ms, 0ms;
+}
+
+.shown .plate:hover {
+  transform: translate3d(0, -4px, 0);
+  transition-delay: 0ms;
+}
+
+.span3 {
+  grid-column: span 3;
+}
+.span4 {
+  grid-column: span 4;
+}
+.span5 {
+  grid-column: span 5;
+}
+.span6 {
+  grid-column: span 6;
+}
+.span7 {
+  grid-column: span 7;
+}
+.span8 {
+  grid-column: span 8;
+}
+.span12 {
+  grid-column: span 12;
+}
+
+/* Dark: the default plate — a sheet lit from the top over near-black. */
+.plateDark {
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.012) 48%, rgba(255, 255, 255, 0) 100%),
+    #0f0f10;
+  color: var(--u-ink);
+}
+
+.shown .plateDark:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  box-shadow: 0 26px 60px -34px rgba(0, 0, 0, 0.95);
+}
+
+/* Paper: off-white, warm. */
+.platePaper {
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  background:
+    radial-gradient(90% 70% at 100% 0%, rgba(223, 169, 95, 0.16) 0%, transparent 60%),
+    linear-gradient(180deg, #f7f5f0 0%, var(--u-paper) 60%, var(--u-paper-2) 100%);
+  color: var(--u-paper-ink);
+}
+
+.shown .platePaper:hover {
+  box-shadow: 0 30px 70px -30px rgba(243, 241, 236, 0.35);
+}
+
+/* Bronze: the one warm plate on a page. */
+.plateBronze {
+  border: 1px solid rgba(255, 235, 196, 0.35);
+  background:
+    radial-gradient(80% 70% at 80% 100%, rgba(255, 236, 200, 0.42) 0%, transparent 60%),
+    linear-gradient(160deg, #e6b56a 0%, var(--u-bronze) 40%, #b98444 100%);
+  color: #1b140b;
+}
+
+.shown .plateBronze:hover {
+  box-shadow: 0 30px 70px -28px rgba(223, 169, 95, 0.55);
+}
+
+/* Faint watermark glyph in a plate's corner — a shape, never a logo. */
+.plateMark {
+  position: absolute;
+  right: -8%;
+  bottom: -14%;
+  width: 62%;
+  aspect-ratio: 1;
+  z-index: -1;
+  opacity: 0.08;
+  pointer-events: none;
+}
+
+.platePaper .plateMark {
+  opacity: 0.07;
+}
+
+.plateBronze .plateMark {
+  opacity: 0.16;
+}
+
+.plateHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.plateEyebrow {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-bronze);
+}
+
+.platePaper .plateEyebrow {
+  color: var(--u-bronze-deep);
+}
+
+.plateBronze .plateEyebrow {
+  color: rgba(27, 20, 11, 0.7);
+}
+
+.plateIndex {
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: var(--u-ink-3);
+}
+
+.platePaper .plateIndex,
+.plateBronze .plateIndex {
+  color: rgba(27, 20, 11, 0.5);
+}
+
+.plateTitle {
+  margin: 18px 0 0;
+  font-size: clamp(20px, 1.9vw, 26px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.14;
+  color: inherit;
+  text-wrap: balance;
+}
+
+.plateBody {
+  margin: 12px 0 0;
+  max-width: 44ch;
+  font-size: 14.5px;
+  line-height: 1.64;
+  color: var(--u-ink-2);
+}
+
+.platePaper .plateBody {
+  color: var(--u-paper-ink-2);
+}
+
+.plateBronze .plateBody {
+  color: rgba(27, 20, 11, 0.74);
+}
+
+/* Anything pushed to the foot of a plate. */
+.plateFoot {
+  margin-top: auto;
+  padding-top: 24px;
+}
+
+.plateArt {
+  position: relative;
+  margin-top: 22px;
+  width: 100%;
+}
+
+.plateArt svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Big quote plate text. */
+.plateQuote {
+  margin: 0;
+  font-size: clamp(22px, 2.2vw, 30px);
+  font-weight: 500;
+  letter-spacing: -0.028em;
+  line-height: 1.22;
+  color: inherit;
+  text-wrap: pretty;
+}
+
+.plateQuote::before {
+  content: '\201C';
+  margin-left: -0.45em;
+}
+
+.plateQuote::after {
+  content: '\201D';
+}
+
+.plateWho {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13.5px;
+  color: var(--u-ink-2);
+}
+
+.platePaper .plateWho,
+.plateBronze .plateWho {
+  color: rgba(27, 20, 11, 0.72);
+}
+
+.plateWho b {
+  font-weight: 600;
+  color: inherit;
+}
+
+.plateDark .plateWho b {
+  color: var(--u-ink);
+}
+
+.plateWhoSep {
+  width: 1px;
+  height: 14px;
+  background: currentColor;
+  opacity: 0.35;
+}
+
+/* ------------------------------------------------------------------ */
+/* Stat strip                                                          */
+/* ------------------------------------------------------------------ */
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  border-top: 1px solid var(--u-line-strong);
+  border-bottom: 1px solid var(--u-line);
+}
+
+.stat {
+  position: relative;
+  padding: clamp(22px, 2.6vw, 34px) clamp(16px, 2vw, 28px) clamp(22px, 2.6vw, 34px) 0;
+  opacity: 0;
+  transform: translate3d(0, 10px, 0);
+  transition:
+    opacity 700ms var(--u-ease),
+    transform 700ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .stat {
+  opacity: 1;
+  transform: none;
+}
+
+.stat + .stat {
+  padding-left: clamp(16px, 2vw, 28px);
+  border-left: 1px solid var(--u-line);
+}
+
+.statValue {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  margin: 0;
+  font-size: clamp(34px, 3.6vw, 54px);
+  font-weight: 650;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.statUnit {
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-bronze);
+}
+
+.statLabel {
+  margin: 12px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--u-ink-2);
+}
+
+/* ------------------------------------------------------------------ */
+/* Definition rows                                                     */
+/* ------------------------------------------------------------------ */
+
+.rows {
+  margin: 0;
+  border-top: 1px solid var(--u-line-strong);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 2fr);
+  gap: clamp(16px, 3vw, 48px);
+  padding: clamp(18px, 2.2vw, 26px) 0;
+  border-bottom: 1px solid var(--u-line);
+  opacity: 0;
+  transform: translate3d(0, 10px, 0);
+  transition:
+    opacity 700ms var(--u-ease),
+    transform 700ms var(--u-ease),
+    background 220ms ease;
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .row {
+  opacity: 1;
+  transform: none;
+}
+
+.rowTerm {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 0;
+  font-size: 15.5px;
+  font-weight: 550;
+  letter-spacing: -0.016em;
+  color: var(--u-ink);
+}
+
+.rowIndex {
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  color: var(--u-bronze);
+}
+
+.rowDetail {
+  margin: 0;
+  max-width: 66ch;
+  font-size: 15px;
+  line-height: 1.66;
+  color: var(--u-ink-2);
+  text-wrap: pretty;
+}
+
+.rowDetail code {
+  padding: 1px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--u-line-strong);
+  background: rgba(255, 255, 255, 0.04);
+  font-family: var(--u-font-mono);
+  font-size: 12.5px;
+  color: var(--u-ink);
+}
+
+/* ------------------------------------------------------------------ */
+/* Timeline                                                            */
+/* ------------------------------------------------------------------ */
+
+.timeline {
+  position: relative;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.timeline::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 7px;
+  width: 1px;
+  background: linear-gradient(180deg, var(--u-bronze-line), var(--u-line) 40%, var(--u-line));
+}
+
+.tick {
+  position: relative;
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: clamp(16px, 3vw, 40px);
+  padding: 0 0 clamp(28px, 3.4vw, 40px) 40px;
+  opacity: 0;
+  transform: translate3d(0, 10px, 0);
+  transition:
+    opacity 700ms var(--u-ease),
+    transform 700ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .tick {
+  opacity: 1;
+  transform: none;
+}
+
+.tick:last-child {
+  padding-bottom: 0;
+}
+
+.tick::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  left: 3px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  border: 1px solid var(--u-bronze-line);
+  background: var(--u-bg);
+}
+
+.tickHot::before {
+  background: var(--u-bronze);
+  border-color: var(--u-bronze);
+  box-shadow: 0 0 0 5px var(--u-bronze-soft);
+}
+
+.tickWhen {
+  margin: 0;
+  padding-top: 2px;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.tickHot .tickWhen {
+  color: var(--u-bronze);
+}
+
+.tickTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--u-ink);
+}
+
+.tickBody {
+  margin: 8px 0 0;
+  max-width: 62ch;
+  font-size: 14.5px;
+  line-height: 1.64;
+  color: var(--u-ink-2);
+  text-wrap: pretty;
+}
+
+.tickTag {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--u-bronze-line);
+  background: var(--u-bronze-soft);
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  vertical-align: middle;
+  color: var(--u-bronze);
+}
+
+/* ------------------------------------------------------------------ */
+/* Pull quote                                                          */
+/* ------------------------------------------------------------------ */
+
+.pull {
+  position: relative;
+  margin: 0;
+  padding: clamp(28px, 4vw, 48px) 0 clamp(28px, 4vw, 48px) clamp(24px, 3vw, 40px);
+  border-left: 2px solid var(--u-bronze);
+}
+
+.pullText {
+  margin: 0;
+  font-size: clamp(24px, 3vw, 40px);
+  font-weight: 500;
+  letter-spacing: -0.034em;
+  line-height: 1.16;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.pullText em {
+  font-style: normal;
+  color: var(--u-bronze);
+}
+
+.pullWho {
+  margin: 18px 0 0;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+/* ------------------------------------------------------------------ */
+/* CTA band                                                            */
+/* ------------------------------------------------------------------ */
+
+.cta {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: clamp(24px, 4vw, 56px);
+  align-items: center;
+  padding: clamp(36px, 4.6vw, 64px);
+  border-radius: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  overflow: hidden;
+  background:
+    radial-gradient(70% 90% at 100% 100%, rgba(196, 142, 62, 0.22) 0%, transparent 60%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.01)),
+    #0d0d0e;
+}
+
+/* Signature word in the corner, gold-clipped and faint. */
+.ctaGhost {
+  position: absolute;
+  right: -2%;
+  bottom: -18%;
+  z-index: 0;
+  font-size: clamp(90px, 12vw, 200px);
+  font-weight: 600;
+  letter-spacing: -0.05em;
+  line-height: 0.8;
+  white-space: nowrap;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+  background: linear-gradient(100deg, rgba(122, 88, 38, 0.28), rgba(241, 215, 173, 0.5) 50%, rgba(110, 78, 34, 0.24));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.ctaCopy {
+  position: relative;
+  z-index: 1;
+}
+
+.ctaTitle {
+  margin: 14px 0 0;
+  font-size: clamp(28px, 3.4vw, 46px);
+  font-weight: 600;
+  letter-spacing: -0.038em;
+  line-height: 1.04;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.ctaBody {
+  margin: 16px 0 0;
+  max-width: 48ch;
+  font-size: 15.5px;
+  line-height: 1.62;
+  color: var(--u-ink-2);
+}
+
+.ctaActions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+/* Bronze button — used only on the CTA band and the contact form. */
+.btnBronze {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  height: 48px;
+  padding: 0 24px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 235, 196, 0.5);
+  background: linear-gradient(160deg, #e9bc74 0%, var(--u-bronze) 50%, #c48f4a 100%);
+  color: #1b140b;
+  font-family: var(--u-font-sans);
+  font-size: 14.5px;
+  font-weight: 600;
+  letter-spacing: -0.008em;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 14px 34px -16px rgba(223, 169, 95, 0.7);
+  transition:
+    transform 260ms var(--u-ease),
+    box-shadow 260ms var(--u-ease),
+    filter 220ms ease;
+}
+
+.btnBronze:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+  box-shadow: 0 20px 44px -16px rgba(223, 169, 95, 0.85);
+}
+
+.btnBronze:active {
+  transform: translateY(0);
+}
+
+.btnBronze svg {
+  transition: transform 300ms var(--u-ease);
+}
+
+.btnBronze:hover svg {
+  transform: translateX(3px);
+}
+
+/* ------------------------------------------------------------------ */
+/* Section head (bronze variant of the primitives' head)                */
+/* ------------------------------------------------------------------ */
+
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.9fr);
+  gap: clamp(20px, 4vw, 64px);
+  align-items: end;
+  margin: 0 0 clamp(36px, 4.6vw, 60px);
+}
+
+.headStack {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+}
+
+.headCenter {
+  grid-template-columns: minmax(0, 1fr);
+  justify-items: center;
+  text-align: center;
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.headTitle {
+  margin: 16px 0 0;
+  font-size: clamp(30px, 4vw, 50px);
+  font-weight: 600;
+  letter-spacing: -0.036em;
+  line-height: 1.04;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.headLead {
+  margin: 0;
+  max-width: 46ch;
+  padding-bottom: 6px;
+  font-size: 16px;
+  line-height: 1.62;
+  color: var(--u-ink-2);
+  text-wrap: pretty;
+}
+
+.headStack .headLead,
+.headCenter .headLead {
+  margin-top: 18px;
+  padding-bottom: 0;
+}
+
+/* Text link with a bronze arrow. */
+.more {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14.5px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  color: var(--u-ink);
+  text-decoration: none;
+  transition: gap 220ms var(--u-ease), color 200ms ease;
+}
+
+.more svg {
+  color: var(--u-bronze);
+}
+
+.more:hover {
+  gap: 12px;
+  color: #fff;
+}
+
+/* ------------------------------------------------------------------ */
+/* Two columns with a label over each                                  */
+/* ------------------------------------------------------------------ */
+
+.twoCol {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 48px;
+  margin-top: 56px;
+}
+
+.colLabel {
+  margin: 0 0 6px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--u-bronze-line);
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-bronze);
+}
+
+/* ------------------------------------------------------------------ */
+/* Small fact grid inside a plate's foot; a very large number on a plate */
+/* ------------------------------------------------------------------ */
+
+.factGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--u-paper-line);
+}
+
+.plateDark .factGrid {
+  border-top-color: var(--u-line);
+}
+
+.factGrid dt {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--u-paper-ink-2);
+}
+
+.plateDark .factGrid dt {
+  color: var(--u-ink-3);
+}
+
+.factGrid dd {
+  margin: 4px 0 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: inherit;
+}
+
+.bigNumber {
+  margin: 18px 0 0;
+  font-size: clamp(88px, 10vw, 150px);
+  font-weight: 600;
+  letter-spacing: -0.06em;
+  line-height: 0.9;
+  color: #1b140b;
+  font-variant-numeric: tabular-nums;
+}
+
+.bigNumber span {
+  font-size: 0.42em;
+  letter-spacing: -0.03em;
+  margin-left: 4px;
+  vertical-align: 0.85em;
+  opacity: 0.7;
+}
+
+.bigNumberLabel {
+  margin: 18px 0 0;
+  max-width: 30ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: rgba(27, 20, 11, 0.78);
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+
+@media (max-width: 1000px) {
+  .twoCol {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 36px;
+  }
+
+  .span3,
+  .span4,
+  .span5,
+  .span7,
+  .span8 {
+    grid-column: span 6;
+  }
+}
+
+@media (max-width: 900px) {
+  .heroInner {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .heroAside {
+    max-width: 520px;
+  }
+
+  .head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .headLead {
+    padding-bottom: 0;
+  }
+
+  .cta {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ctaActions {
+    justify-content: flex-start;
+  }
+
+  .row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+@media (max-width: 640px) {
+  .span3,
+  .span4,
+  .span5,
+  .span6,
+  .span7,
+  .span8 {
+    grid-column: span 12;
+  }
+
+  .plate {
+    min-height: 240px;
+  }
+
+  .tick {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+    padding-left: 32px;
+  }
+
+  .stat + .stat {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .stat {
+    border-bottom: 1px solid var(--u-line);
+  }
+
+  .stat:last-child {
+    border-bottom: 0;
+  }
+}

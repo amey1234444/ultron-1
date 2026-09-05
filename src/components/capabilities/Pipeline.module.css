@@ -1,0 +1,147 @@
+.rail {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.line {
+  position: absolute;
+  top: 9px;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--u-bronze-line) 8%,
+    var(--u-bronze-line) 92%,
+    transparent 100%
+  );
+  transform-origin: left center;
+  transform: scaleX(0);
+  transition: transform 1200ms var(--u-ease);
+}
+
+.shown .line {
+  transform: scaleX(1);
+}
+
+.stage {
+  position: relative;
+  padding-top: 34px;
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  transition:
+    opacity 700ms var(--u-ease),
+    transform 700ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .stage {
+  opacity: 1;
+  transform: none;
+}
+
+.node {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 19px;
+  height: 19px;
+  border-radius: 999px;
+  border: 1px solid var(--u-bronze-line);
+  background: var(--u-bg);
+  display: grid;
+  place-items: center;
+}
+
+.nodeDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--u-bronze);
+  box-shadow: 0 0 0 4px var(--u-bronze-soft);
+}
+
+.index {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: var(--u-bronze);
+}
+
+.name {
+  margin: 8px 0 0;
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--u-ink);
+}
+
+.body {
+  margin: 12px 0 0;
+  font-size: 14px;
+  line-height: 1.62;
+  color: var(--u-ink-2);
+}
+
+.out {
+  margin-top: 20px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--u-line);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.outLabel {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+}
+
+.outValue {
+  margin: 6px 0 0;
+  font-family: var(--u-font-mono);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--u-ink);
+}
+
+.artefact {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--u-ink-2);
+}
+
+@media (max-width: 1000px) {
+  .rail {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 28px 18px;
+  }
+  .line {
+    display: none;
+  }
+  .stage {
+    padding-top: 0;
+    padding-left: 32px;
+  }
+  .node {
+    top: 2px;
+  }
+}
+
+@media (max-width: 640px) {
+  .rail {
+    grid-template-columns: 1fr;
+  }
+}

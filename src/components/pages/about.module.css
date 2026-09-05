@@ -1,0 +1,80 @@
+/* About — the manifesto band and the journey layout. Everything else on the
+   page is the shared inner-page language. */
+
+.manifesto {
+  padding: clamp(80px, 9vw, 130px) 0;
+  background:
+    radial-gradient(60% 70% at 0% 100%, rgba(223, 169, 95, 0.16) 0%, transparent 60%),
+    linear-gradient(180deg, #f7f5f0 0%, var(--u-paper) 55%, var(--u-paper-2) 100%);
+  color: var(--u-paper-ink);
+}
+
+.manifestoGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 56px;
+  align-items: start;
+}
+
+.manifestoEyebrow {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--u-bronze-deep);
+}
+
+.manifestoTitle {
+  margin: 16px 0 0;
+  font-size: clamp(34px, 4.2vw, 58px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+  color: var(--u-paper-ink);
+  text-wrap: balance;
+}
+
+.prose p {
+  margin: 0;
+  font-size: clamp(17px, 1.45vw, 20px);
+  line-height: 1.6;
+  letter-spacing: -0.01em;
+  color: var(--u-paper-ink-2);
+}
+
+.prose p + p {
+  margin-top: 22px;
+}
+
+.prose p:first-child {
+  color: var(--u-paper-ink);
+}
+
+.prose strong {
+  font-weight: 600;
+  color: var(--u-paper-ink);
+}
+
+.journeyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.3fr);
+  gap: 64px;
+  align-items: start;
+}
+
+.journeySticky {
+  position: sticky;
+  top: 96px;
+}
+
+@media (max-width: 900px) {
+  .manifestoGrid,
+  .journeyGrid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 28px;
+  }
+  .journeySticky {
+    position: static;
+  }
+}

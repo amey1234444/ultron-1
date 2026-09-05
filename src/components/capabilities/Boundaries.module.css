@@ -1,41 +1,71 @@
-/* Boundaries — four limits, set as text on a shared measure.
-
-   The whole section is one column of sentences against a hairline. There is no
-   panel, no tint and no artwork: every other section on this page has an
-   artefact beside the claim, and the argument here is that some claims are not
-   made at all, which is a thing you can only say in words. */
+/* Boundaries — a paper band. The only light section on the page, and it holds
+   the only text on the page that is only text. */
 
 .section {
   position: relative;
-  padding: clamp(84px, 11vw, 148px) var(--u-gutter);
-  scroll-margin-top: 76px;
-  border-top: 1px solid var(--u-line);
+  padding: clamp(80px, 10vw, 140px) 0;
+  background:
+    radial-gradient(70% 60% at 100% 0%, rgba(223, 169, 95, 0.18) 0%, transparent 60%),
+    linear-gradient(180deg, #f7f5f0 0%, var(--u-paper) 50%, var(--u-paper-2) 100%);
+  color: var(--u-paper-ink);
 }
 
-.inner {
-  position: relative;
-  max-width: var(--u-max);
-  margin: 0 auto;
+.head {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: end;
+  margin-bottom: 56px;
+}
+
+.eyebrow {
+  margin: 0;
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--u-bronze-deep);
+}
+
+.title {
+  margin: 14px 0 0;
+  font-size: clamp(34px, 4.4vw, 60px);
+  font-weight: 600;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+  color: var(--u-paper-ink);
+  text-wrap: balance;
+}
+
+.lead {
+  margin: 0;
+  padding-bottom: 8px;
+  max-width: 46ch;
+  font-size: 16.5px;
+  line-height: 1.6;
+  color: var(--u-paper-ink-2);
 }
 
 .list {
-  margin-top: clamp(40px, 5vw, 64px);
-  border-top: 1px solid var(--u-line);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid var(--u-paper-line);
+  border-left: 1px solid var(--u-paper-line);
 }
 
-/* Two tracks: the count sits in the margin so the limits themselves align on
-   one edge and read as a list of statements rather than as numbered points. */
 .item {
   display: grid;
-  grid-template-columns: 56px minmax(0, 1fr);
-  gap: clamp(12px, 2vw, 28px);
-  padding: clamp(24px, 3vw, 34px) 0;
-  border-bottom: 1px solid var(--u-line);
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 14px;
+  padding: 34px 32px 38px 28px;
+  border-right: 1px solid var(--u-paper-line);
+  border-bottom: 1px solid var(--u-paper-line);
   opacity: 0;
-  transform: translate3d(0, 14px, 0);
+  transform: translate3d(0, 12px, 0);
   transition:
     opacity 700ms var(--u-ease),
-    transform 700ms var(--u-ease);
+    transform 700ms var(--u-ease),
+    background 300ms ease;
   transition-delay: var(--delay, 0ms);
 }
 
@@ -44,54 +74,53 @@
   transform: none;
 }
 
+.item:hover {
+  background: rgba(18, 17, 15, 0.03);
+  transition-delay: 0ms;
+}
+
 .index {
   font-family: var(--u-font-mono);
   font-size: 11px;
-  line-height: 1.9;
   letter-spacing: 0.16em;
-  color: var(--u-ink-3);
+  color: var(--u-bronze-deep);
+  padding-top: 6px;
 }
 
 .body {
-  max-width: 68ch;
+  min-width: 0;
 }
 
-/* The limit is set at reading size rather than as a heading. It is a sentence,
-   and sizing it like a headline would make it sound like a boast about being
-   honest instead of a statement of what happens. */
 .limit {
   margin: 0;
-  font-size: clamp(17px, 1.7vw, 21px);
-  font-weight: 500;
-  letter-spacing: -0.018em;
-  line-height: 1.4;
-  color: #fff;
-  text-wrap: pretty;
+  font-size: clamp(19px, 1.7vw, 23px);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+  color: var(--u-paper-ink);
 }
 
 .instead {
-  margin: 12px 0 0;
-  font-size: clamp(14px, 1.2vw, 15.5px);
+  margin: 14px 0 0;
+  font-size: 14.5px;
   line-height: 1.66;
-  color: var(--u-ink-2);
-  text-wrap: pretty;
+  color: var(--u-paper-ink-2);
 }
 
 .foot {
+  margin: 36px 0 0;
   max-width: 62ch;
-  margin: clamp(28px, 3.5vw, 40px) 0 0;
   font-size: 14px;
-  line-height: 1.66;
-  color: var(--u-ink-3);
+  line-height: 1.6;
+  color: var(--u-paper-ink-2);
 }
 
-@media (max-width: 620px) {
-  .item {
+@media (max-width: 900px) {
+  .head {
     grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+    gap: 18px;
   }
-
-  .index {
-    line-height: 1.2;
+  .list {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

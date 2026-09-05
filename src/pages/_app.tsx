@@ -18,7 +18,15 @@ import { loadWebFonts } from '../lib/webFonts';
  * `/` — plus the short auth forms, where a page that eases has nothing to ease
  * and an interceptor is pure cost. See `lib/smoothScroll.ts`.
  */
-const SMOOTH_SCROLL_ROUTES = new Set(['/home', '/how-it-works', '/about', '/contact']);
+const SMOOTH_SCROLL_ROUTES = new Set([
+  '/home',
+  '/how-it-works',
+  '/capabilities',
+  '/outcomes',
+  '/about',
+  '/faq',
+  '/contact',
+]);
 
 export default function App({ Component, pageProps }: AppProps) {
   const router = useRouter();
