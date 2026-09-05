@@ -98,10 +98,7 @@ export default function Cutover() {
 
         <footer className={styles.foot}>
           <p className={styles.note}>Ranges observed across 62 monitored sites</p>
-          {/* The method now sits on this page, immediately below. The link used
-              to go to /how-it-works, which explains the mechanism rather than
-              the study — the nearest thing there was before this page existed. */}
-          <Link href="#method" className={styles.method}>
+          <Link href="/how-it-works" className={styles.method}>
             Read the method
             <Arrow size={17} />
           </Link>

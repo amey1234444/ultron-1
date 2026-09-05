@@ -1,19 +1,17 @@
-// /capabilities — the four claims, and the four things it will not claim.
+// /capabilities — where the detailed capability argument will live.
 //
-// This section used to sit on the landing page as `#platform`, which left the
-// landing page arguing two things at once: what BlackGATE is for, and what it
-// can do in detail. Those are different questions asked by different readers,
-// so the detail has its own page now — the same move `/how-it-works` made for
-// the mechanism.
+// This page is deliberately its own thing. The landing page keeps `#platform`,
+// the pinned-panel section that states what BlackGATE is for; this page is for
+// the longer answer a reader goes looking for after that, and it gets sections
+// written for it rather than the landing page's sections shown a second time.
 //
-// The order matters. Claims first, because that is what a reader arrives for;
-// limits second, because that is what decides whether they believe the claims.
+// What stands here today is the boundary list — the four claims the system
+// declines to make. The rest of the page is still to be designed.
 
 import Head from 'next/head';
 
 import Boundaries from '../components/capabilities/Boundaries';
 import Ambience from '../components/home/Ambience';
-import Capabilities from '../components/home/Capabilities';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import SiteNav from '../components/web/SiteNav';
@@ -39,18 +37,14 @@ export default function CapabilitiesPage() {
             <p className={styles.pageEyebrow}>Capabilities</p>
             <h1 className={styles.pageTitle}>Adaptive, explainable, predictive</h1>
             <p className={styles.pageLead}>
-              Four claims, each with the artefact that backs it next to the sentence that makes it.
-              Then the four things this deliberately does not do, because a capability list without
-              its boundary is a brochure.
+              What the system does, and the four things it deliberately does not do — because a
+              capability list without its boundary is a brochure.
             </p>
             <span className={styles.pageRule} aria-hidden="true" />
           </div>
         </header>
 
-        {/* The pinned-panel argument. Owns `#platform`. */}
-        <Capabilities />
-
-        {/* The counterpart: where it stops. Owns `#boundaries`. */}
+        {/* Where it stops. Owns `#boundaries`. */}
         <Boundaries />
 
         <SiteFooter />

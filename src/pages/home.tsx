@@ -1,6 +1,8 @@
 import Head from 'next/head';
 
 import Ambience from '../components/home/Ambience';
+import Capabilities from '../components/home/Capabilities';
+import Cutover from '../components/home/Cutover';
 import EvidenceCase from '../components/home/EvidenceCase';
 import InTheRoom from '../components/home/InTheRoom';
 import NextStep from '../components/home/NextStep';
@@ -48,8 +50,14 @@ export default function HomePage() {
       <div className={styles.content}>
         <BrandHero />
 
+        {/* Owns `#condition` — the four outcome figures against their baseline. */}
+        <Cutover />
+
         {/* Owns `#evidence` — Northfield, fourteen months. */}
         <EvidenceCase />
+
+        {/* Owns `#platform` — scrolling copy against a pinned panel. */}
+        <Capabilities />
 
         <NextStep />
 

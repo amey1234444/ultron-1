@@ -1,6 +1,6 @@
 // Boundaries — the four things this deliberately does not do.
 //
-// The section above it makes four claims. A page that only makes claims is a
+// The site makes four capability claims. A page that only makes claims is a
 // brochure, and the reader this site is written for has read a lot of those:
 // the question they arrive with is not "what can it do" but "where does it stop
 // pretending". So each limit is stated first and flatly, and what the system

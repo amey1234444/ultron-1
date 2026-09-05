@@ -1,10 +1,9 @@
-// Method — how the figures above were arrived at.
+// Method — how the outcome figures were arrived at.
 //
-// The section above prints four ranges against four baselines. This is the page
-// answering the only question that matters about them: measured how, over what,
-// and with what left out. It exists because "Read the method" is a link the
-// outcome band has always carried, and a link like that has to land on the
-// method rather than on a general explanation of the product.
+// The landing page prints four ranges against four baselines. This section
+// answers the only question that matters about them: measured how, over what,
+// and with what left out. It lives on /outcomes rather than under the figures
+// because a landing page has nowhere to put a study.
 //
 // Set as a definition list rather than as prose. Each row is a decision someone
 // made when the study was designed, and a reader checking our arithmetic wants

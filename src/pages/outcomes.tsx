@@ -1,15 +1,16 @@
-// /outcomes — what measurably changes, and how that was measured.
+// /outcomes — where the study behind the figures will live.
 //
-// The outcome figures used to sit on the landing page as `#condition`. They are
-// the most interrogated thing on the site — every evaluator who takes them
-// seriously immediately wants the study behind them — and a landing page has
-// nowhere to put that study. Here the figures lead and the method follows them,
-// which is also where the band's own "Read the method" link has always pointed.
+// The outcome figures themselves stay on the landing page as `#condition`;
+// they are part of the argument that page makes. This page is for what a
+// landing page has nowhere to put — how those figures were measured — and it
+// gets sections written for it rather than the landing band shown twice.
+//
+// What stands here today is the method. The rest of the page is still to be
+// designed.
 
 import Head from 'next/head';
 
 import Ambience from '../components/home/Ambience';
-import Cutover from '../components/home/Cutover';
 import SiteFooter from '../components/home/SiteFooter';
 import styles from '../components/home/home.module.css';
 import Method from '../components/outcomes/Method';
@@ -36,18 +37,15 @@ export default function OutcomesPage() {
             <p className={styles.pageEyebrow}>Outcomes</p>
             <h1 className={styles.pageTitle}>Measured, not modelled</h1>
             <p className={styles.pageLead}>
-              Every figure here is an observed range across sixty-two monitored sites, taken
+              Every figure we publish is an observed range across sixty-two monitored sites, taken
               against each site&rsquo;s own record from the twelve months before cutover. The study
-              that produced them, and what it leaves out, is set out underneath.
+              that produced them, and what it leaves out, is set out below.
             </p>
             <span className={styles.pageRule} aria-hidden="true" />
           </div>
         </header>
 
-        {/* The four figures against their baseline. Owns `#condition`. */}
-        <Cutover />
-
-        {/* The study behind them. Owns `#method` — where the band above links. */}
+        {/* The study. Owns `#method`. */}
         <Method />
 
         <SiteFooter />
