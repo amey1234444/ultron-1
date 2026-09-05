@@ -1,9 +1,10 @@
 // Pillars — the four capability claims, each with the artefact that proves it.
 //
-// Four plates on the wall: one paper, one raised, two dark. Each carries a small
-// drawing of the thing the claim is about — a baseline that re-learns, a finding
-// with its evidence, a forecast drawn as a cone, an instruction with a window —
-// because a capability without its artefact is a slogan.
+// Four equal plates, two by two: one paper, one raised, two dark. The sentence
+// on each is short enough to take in at a glance; the drawing under it is the
+// argument — a baseline that re-learns, a finding with its evidence, a forecast
+// drawn as a cone, an instruction with a window. A capability without its
+// artefact is a slogan, so the artefact is the part that stayed.
 
 import styles from './Pillars.module.css';
 import { GateMark, InnerHead, Plate, PlateWall, RingsMark, WaveMark, innerStyles } from '../pages/inner';
@@ -97,7 +98,7 @@ function ForecastArt() {
       <text className={styles.label} x="184" y="112">
         today
       </text>
-      <text className={styles.labelBronze} x="240" y="14">
+      <text className={styles.labelBronze} x="192" y="14">
         limit · 19–26 d
       </text>
     </svg>
@@ -125,11 +126,14 @@ function WindowArt() {
         </g>
       ))}
       <rect className={styles.windowCell} x="139" y="30" width="85" height="52" rx="8" />
-      <text className={styles.labelBronzeStrong} x="148" y="52">
+      <text className={styles.labelBronzeStrong} x="148" y="48">
         TAKE OUT
       </text>
-      <text className={styles.labelBronze} x="148" y="68">
-        THU 22:00 → FRI 06:00
+      <text className={styles.labelBronze} x="148" y="62">
+        THU 22:00
+      </text>
+      <text className={styles.labelBronze} x="148" y="74">
+        → FRI 06:00
       </text>
       <path className={styles.runLine} d="M4 100h130" />
       <path className={styles.runLineBronze} d="M139 100h85" />
@@ -143,22 +147,18 @@ function WindowArt() {
 
 export default function Pillars() {
   return (
-    <section id="pillars" className={innerStyles.section}>
+    <section id="pillars" className={`${innerStyles.section} ${innerStyles.sectionTight}`}>
       <div className={innerStyles.inner}>
-        <InnerHead
-          eyebrow="Four capabilities"
-          title="Each claim, with the *artefact* behind it"
-          lead="What the platform does is easy to list. What it produces at each step is the part worth reading — so every capability here is shown as the object it puts in front of an engineer."
-        />
+        <InnerHead eyebrow="Four capabilities" title="From signal to *action*" />
 
         <PlateWall>
           <Plate
             tone="paper"
-            span={7}
+            span={6}
             index={1}
             eyebrow="Adaptive"
-            title="A baseline the plant teaches, and keeps teaching"
-            body="Normal is learned from each asset's own healthy running and re-fitted as the plant drifts — a new feedstock, a rebuilt bearing, a summer. Rules are armed against what the machine does now, not what it did at commissioning."
+            title="Learns your normal"
+            body="Healthy running defines the baseline for each asset, and it is re-fitted as the plant drifts — so a rule is armed against what the machine does now."
             mark={<WaveMark />}
           >
             <div className={innerStyles.plateArt}>
@@ -168,11 +168,11 @@ export default function Pillars() {
 
           <Plate
             tone="dark"
-            span={5}
+            span={6}
             index={2}
             eyebrow="Explainable"
-            title="Findings carry their evidence"
-            body="Every finding names the component and lists the points it was drawn from, their values at the time and the limit each crossed. An engineer can disagree with the model using the same numbers."
+            title="Shows its reasoning"
+            body="Every finding carries the points it was drawn from, their values at the time, and the limit each one crossed."
             delay={80}
             mark={<RingsMark />}
           >
@@ -183,11 +183,11 @@ export default function Pillars() {
 
           <Plate
             tone="dark"
-            span={5}
+            span={6}
             index={3}
             eyebrow="Predictive"
-            title="A range, never a date"
-            body="Where a trend is monotonic and long enough to fit, the model draws it forward as a cone and reports where the cone meets the limit. The spread is the honesty; a line would be the marketing."
+            title="Forecasts a range"
+            body="Where the trend supports one, the model reports a window rather than a date. The spread is the honest part."
             delay={160}
           >
             <div className={innerStyles.plateArt}>
@@ -197,11 +197,11 @@ export default function Pillars() {
 
           <Plate
             tone="bronze"
-            span={7}
+            span={6}
             index={4}
             eyebrow="Actionable"
-            title="One instruction, in a window the plant can take"
-            body="The output of all of it is a single line per asset: which component, how sure, and when to take the machine out — placed against the production schedule so the window is one the plant can actually use."
+            title="Makes the next step clear"
+            body="One line per asset: which component, how sure, and a maintenance window the production plan can actually take."
             delay={240}
             mark={<GateMark />}
           >

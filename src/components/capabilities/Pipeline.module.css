@@ -90,39 +90,6 @@
   color: var(--u-ink-2);
 }
 
-.out {
-  margin-top: 20px;
-  padding: 14px 16px;
-  border-radius: 12px;
-  border: 1px solid var(--u-line);
-  background: rgba(255, 255, 255, 0.025);
-}
-
-.outLabel {
-  margin: 0;
-  font-family: var(--u-font-mono);
-  font-size: 9.5px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--u-ink-3);
-}
-
-.outValue {
-  margin: 6px 0 0;
-  font-family: var(--u-font-mono);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--u-ink);
-}
-
-.artefact {
-  margin: 8px 0 0;
-  font-size: 12.5px;
-  line-height: 1.5;
-  color: var(--u-ink-2);
-}
-
 @media (max-width: 1000px) {
   .rail {
     grid-template-columns: repeat(2, minmax(0, 1fr));

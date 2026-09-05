@@ -1119,3 +1119,88 @@
     border-bottom: 0;
   }
 }
+
+/* ------------------------------------------------------------------ */
+/* Disclosure                                                          */
+/* ------------------------------------------------------------------ */
+
+/* A folded section. Closed, it reads as a rule with a name on it rather than as
+   a widget — the rule runs edge to edge like `.sectionRuled` and the label sits
+   on the page measure, so the page keeps its rhythm whether the reader opens it
+   or walks past it. The disclosure itself is not width-constrained: what it
+   holds is a full page section, and a section such as the paper band on
+   `/capabilities` has to keep its bleed. */
+.disclosure {
+  border-top: 1px solid var(--u-line);
+}
+
+.disclosureSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  max-width: calc(var(--u-max) + 2 * var(--u-gutter));
+  margin: 0 auto;
+  padding: clamp(20px, 2.4vw, 30px) var(--u-gutter);
+  list-style: none;
+  cursor: pointer;
+}
+
+.disclosureSummary::-webkit-details-marker {
+  display: none;
+}
+
+.disclosureSummary:focus-visible {
+  outline: 1px solid var(--u-line-strong);
+  outline-offset: -6px;
+}
+
+.disclosureLabel {
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--u-ink-3);
+  transition: color 220ms ease;
+}
+
+.disclosure:hover .disclosureLabel,
+.disclosure[open] .disclosureLabel {
+  color: var(--u-ink);
+}
+
+/* The sign is drawn, not typed: a plus that loses its upright on open. */
+.disclosureSign {
+  position: relative;
+  flex: none;
+  width: 13px;
+  height: 13px;
+}
+
+.disclosureSign::before,
+.disclosureSign::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--u-ink-2);
+  transition: transform 360ms var(--u-ease);
+}
+
+.disclosureSign::after {
+  transform: rotate(90deg);
+}
+
+.disclosure[open] .disclosureSign::after {
+  transform: rotate(0deg);
+}
+
+/* The summary has already introduced whatever is inside, so the section drops
+   its own rule and most of the air it would have opened with — enough is left
+   that a light band does not start hard against the label above it. */
+.disclosure > section {
+  padding-top: clamp(24px, 3vw, 44px);
+  border-top: 0;
+}

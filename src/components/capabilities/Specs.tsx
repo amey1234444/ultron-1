@@ -2,7 +2,8 @@
 //
 // A stat strip and then two columns of terse definition rows: what it connects
 // to, and what it needs from the site. Nothing here is a claim about outcomes;
-// that is the outcomes page. This is the datasheet.
+// that is the outcomes page. This is the datasheet — which is why it is folded
+// away on the page: the reader who wants it goes looking for it.
 
 import { InnerHead, Rows, StatStrip, innerStyles } from '../pages/inner';
 
@@ -31,11 +32,7 @@ export default function Specs() {
   return (
     <section id="specs" className={`${innerStyles.section} ${innerStyles.sectionRuled}`}>
       <div className={innerStyles.inner}>
-        <InnerHead
-          eyebrow="Specification"
-          title="The *datasheet*, not the brochure"
-          lead="Throughput, latency, what it connects to and what the site has to provide. The numbers here are what a plant engineer asks for on the second call."
-        />
+        <InnerHead eyebrow="Specification" title="The *datasheet*, not the brochure" />
         <StatStrip items={STATS} />
         <div className={innerStyles.twoCol}>
           <div>

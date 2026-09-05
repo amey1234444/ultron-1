@@ -5,7 +5,7 @@
 // stat strip, the definition rows, the timeline and the CTA band.
 
 import Link from 'next/link';
-import { Fragment, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 
 import styles from './inner.module.css';
 import { Arrow, Button, useInView } from '../home/primitives';
@@ -472,5 +472,49 @@ export function GridMark() {
       <path d="M20 20h160v160H20z" />
       <path d="M20 80h160M20 140h160M80 20v160M140 20v160" />
     </svg>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Disclosure
+// ---------------------------------------------------------------------------
+
+/**
+ * A section folded behind its own label, for the part of a page an evaluator
+ * asks for on the second call and a first reader should not have to scroll
+ * past. A link into a folded section still lands: the hash is matched against
+ * what is inside, and the disclosure opens itself before the browser scrolls.
+ */
+export function DetailSection({ label, children }: { label: string; children: ReactNode }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const revealAnchor = () => {
+      let id: string;
+      try {
+        id = decodeURIComponent(window.location.hash.slice(1));
+      } catch {
+        return; // A malformed hash is not ours to interpret.
+      }
+      const target = id ? document.getElementById(id) : null;
+      if (target && ref.current?.contains(target)) {
+        ref.current.open = true;
+        target.scrollIntoView({ block: 'start' });
+      }
+    };
+
+    revealAnchor();
+    window.addEventListener('hashchange', revealAnchor);
+    return () => window.removeEventListener('hashchange', revealAnchor);
+  }, []);
+
+  return (
+    <details ref={ref} className={styles.disclosure}>
+      <summary className={styles.disclosureSummary}>
+        <span className={styles.disclosureLabel}>{label}</span>
+        <span className={styles.disclosureSign} aria-hidden="true" />
+      </summary>
+      {children}
+    </details>
   );
 }

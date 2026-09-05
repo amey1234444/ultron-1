@@ -53,7 +53,7 @@ export default function Boundaries() {
         <div className={styles.head}>
           <div>
             <p className={styles.eyebrow}>Boundaries</p>
-            <h2 className={styles.title}>What it will not tell you</h2>
+            <h2 className={styles.title}>Built-in safeguards</h2>
           </div>
           <p className={styles.lead}>
             Four claims the system declines to make, and what it does in place of each. These
