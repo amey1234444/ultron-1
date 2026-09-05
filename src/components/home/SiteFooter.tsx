@@ -26,8 +26,8 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     title: 'Platform',
     links: [
       { label: 'How it works', href: '/how-it-works' },
-      { label: 'Capabilities', href: '/#platform' },
-      { label: 'Outcomes', href: '/#condition' },
+      { label: 'Capabilities', href: '/capabilities' },
+      { label: 'Outcomes', href: '/outcomes' },
       { label: 'Open console', href: '/login' },
     ],
   },

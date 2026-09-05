@@ -1,0 +1,97 @@
+/* Boundaries — four limits, set as text on a shared measure.
+
+   The whole section is one column of sentences against a hairline. There is no
+   panel, no tint and no artwork: every other section on this page has an
+   artefact beside the claim, and the argument here is that some claims are not
+   made at all, which is a thing you can only say in words. */
+
+.section {
+  position: relative;
+  padding: clamp(84px, 11vw, 148px) var(--u-gutter);
+  scroll-margin-top: 76px;
+  border-top: 1px solid var(--u-line);
+}
+
+.inner {
+  position: relative;
+  max-width: var(--u-max);
+  margin: 0 auto;
+}
+
+.list {
+  margin-top: clamp(40px, 5vw, 64px);
+  border-top: 1px solid var(--u-line);
+}
+
+/* Two tracks: the count sits in the margin so the limits themselves align on
+   one edge and read as a list of statements rather than as numbered points. */
+.item {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: clamp(12px, 2vw, 28px);
+  padding: clamp(24px, 3vw, 34px) 0;
+  border-bottom: 1px solid var(--u-line);
+  opacity: 0;
+  transform: translate3d(0, 14px, 0);
+  transition:
+    opacity 700ms var(--u-ease),
+    transform 700ms var(--u-ease);
+  transition-delay: var(--delay, 0ms);
+}
+
+.shown .item {
+  opacity: 1;
+  transform: none;
+}
+
+.index {
+  font-family: var(--u-font-mono);
+  font-size: 11px;
+  line-height: 1.9;
+  letter-spacing: 0.16em;
+  color: var(--u-ink-3);
+}
+
+.body {
+  max-width: 68ch;
+}
+
+/* The limit is set at reading size rather than as a heading. It is a sentence,
+   and sizing it like a headline would make it sound like a boast about being
+   honest instead of a statement of what happens. */
+.limit {
+  margin: 0;
+  font-size: clamp(17px, 1.7vw, 21px);
+  font-weight: 500;
+  letter-spacing: -0.018em;
+  line-height: 1.4;
+  color: #fff;
+  text-wrap: pretty;
+}
+
+.instead {
+  margin: 12px 0 0;
+  font-size: clamp(14px, 1.2vw, 15.5px);
+  line-height: 1.66;
+  color: var(--u-ink-2);
+  text-wrap: pretty;
+}
+
+.foot {
+  max-width: 62ch;
+  margin: clamp(28px, 3.5vw, 40px) 0 0;
+  font-size: 14px;
+  line-height: 1.66;
+  color: var(--u-ink-3);
+}
+
+@media (max-width: 620px) {
+  .item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .index {
+    line-height: 1.2;
+  }
+}

@@ -20,8 +20,8 @@ const NAV: NavItem[] = [
     label: 'Platform',
     items: [
       { label: 'How it works', href: '/how-it-works', hint: 'Machine to decision, hop by hop' },
-      { label: 'Capabilities', href: '/#platform', hint: 'Adaptive, explainable, predictive' },
-      { label: 'Outcomes', href: '/#condition', hint: 'What changes after cutover' },
+      { label: 'Capabilities', href: '/capabilities', hint: 'Adaptive, explainable, predictive' },
+      { label: 'Outcomes', href: '/outcomes', hint: 'What changes after cutover' },
     ],
   },
   {
