@@ -349,13 +349,30 @@ function Lights({ dark }: { dark: boolean }) {
       />
       <directionalLight position={[5.6, 2.0, 3.2]} color="#dcecf5" intensity={dark ? 0.92 : 0.68} />
       <directionalLight position={[1.6, 3.2, -4.4]} color="#eef4f6" intensity={dark ? 1.2 : 0.9} />
-      {/* narrow fill into the open barrel so the screws read as machined steel
-          rather than sitting in the shadow of their own bore */}
+      {/* Rim from behind and below. On the dark console the machine's lower
+          edge otherwise runs straight into the page; this re-draws the
+          silhouette without lifting the whole body. */}
+      <directionalLight
+        position={[-1.2, -2.6, -3.4]}
+        color={dark ? '#9fc4d8' : '#c9d6de'}
+        intensity={dark ? 0.85 : 0.28}
+      />
+      {/* Two narrow fills into the open barrel so the screws read as machined
+          steel along the whole train rather than sitting in the shadow of
+          their own bore. One light with `decay={2}` cannot reach both ends of
+          a 1.5 m barrel, so the feed end and the metering end get their own. */}
       <pointLight
-        position={[2.05, 0.48, 1.18]}
+        position={[1.62, 0.48, 1.05]}
         color="#f7f3e8"
-        intensity={dark ? 3.15 : 2.45}
-        distance={3.5}
+        intensity={dark ? 2.7 : 2.1}
+        distance={2.4}
+        decay={2}
+      />
+      <pointLight
+        position={[2.42, 0.48, 1.05]}
+        color="#f7f3e8"
+        intensity={dark ? 2.7 : 2.1}
+        distance={2.4}
         decay={2}
       />
     </>

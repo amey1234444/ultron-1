@@ -17,10 +17,20 @@ PALETTE = {
     # polished hopper stainless -- long controlled brushed highlights
     "MAT_stainless":    ("#C1C5C7", 0.95, 0.24, {"brush": "Z", "aniso": 0.55}),
     "MAT_stainless_b":  ("#C7CBCD", 0.95, 0.20, {"brush": "Z", "aniso": 0.72}),
-    # machined screw steel -- crisp flight edges, darker roots
-    "MAT_screw_steel":  ("#9EA3A6", 1.00, 0.26, {"brush": "X", "aniso": 0.40}),
+    # Machined screw steel -- crisp flight edges, darker roots. Deliberately
+    # several stops below the barrel: the screws are the subject of this
+    # machine and they sit inside a pale housing, so value, not hue, is what
+    # separates them. The bore behind them is darker again, which is what gives
+    # each flight an edge to be seen against.
+    #
+    # Metalness is 0.62, not 1.0. A full metal takes its value almost entirely
+    # from what it reflects, so against the console's bright environment the
+    # screws rendered near-white however dark their base colour was set -- the
+    # colour simply had nowhere to act. Backing off metalness lets the base
+    # colour carry, and the flights read as machined steel instead of chrome.
+    "MAT_screw_steel":  ("#5F686E", 0.62, 0.30, {"brush": "X", "aniso": 0.40}),
     # barrel / heater steel -- modular readable surfaces
-    "MAT_barrel_steel": ("#AEB3B5", 0.85, 0.31, {"brush": "X", "aniso": 0.25}),
+    "MAT_barrel_steel": ("#B7BCBE", 0.85, 0.31, {"brush": "X", "aniso": 0.25}),
     # painted cast gearbox -- warmer, softer cast reflection
     "MAT_cast_gray":    ("#B4B5B2", 0.60, 0.48, {"cast": True}),
     "MAT_cast_light":   ("#BEBFBB", 0.58, 0.51, {"cast": True}),
@@ -30,7 +40,7 @@ PALETTE = {
     # cavities / gaskets -- deep separation, not pure black
     "MAT_dark":         ("#2A3238", 0.10, 0.72, {}),
     "MAT_cavity":       ("#161B1F", 0.08, 0.80, {}),
-    "MAT_bore":         ("#6A7176", 0.86, 0.40, {"brush": "X"}),
+    "MAT_bore":         ("#23292E", 0.30, 0.66, {"brush": "X"}),
     # restrained thin bronze heater accent
     "MAT_bronze":       ("#816B3D", 0.72, 0.39, {}),
     # small warm focal accent at the outlet

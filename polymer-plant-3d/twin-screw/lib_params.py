@@ -190,8 +190,12 @@ BARREL_W       = 0.420                     # outer depth (Y) - inferred
 BARREL_GOLD_H  = 0.010                     # bronze heater/seal strip height
 BARREL_SEAM    = 0.005                     # seam gap between modules
 
-BARREL_WIN_Z0  = 0.198                     # cutaway window, lower edge
-BARREL_WIN_Z1  = 0.506                     # cutaway window, upper edge
+# Cutaway window. The screw envelope runs 0.2068..0.4973, so these edges leave
+# ~19 mm of shadowed bore above and below the flights. That gap is what makes
+# the two shafts read as two: with the old 0.198/0.506 the crests touched the
+# rails and the pair had no silhouette to separate them from the housing.
+BARREL_WIN_Z0  = 0.188                     # cutaway window, lower edge
+BARREL_WIN_Z1  = 0.516                     # cutaway window, upper edge
 BARREL_Z0      = Z_SCREW - BARREL_H * 0.5  # 0.1495
 BARREL_Z1      = Z_SCREW + BARREL_H * 0.5  # 0.5545
 # half-width of the bore across Y, and its half-height across Z

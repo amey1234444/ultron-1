@@ -55,7 +55,9 @@ import {
   setPartGroupVisibility,
   TWIN_SCREW_CUTAWAY_GROUP,
   TWIN_SCREW_CUTAWAY_PART_COUNT,
+  TWIN_SCREW_ENV_INTENSITY,
   TWIN_SCREW_INSPECTION_VIEW,
+  twinScrewGradedSpec,
   twinScrewMaterialSpec,
 } from '../machine3d/modelSemantics';
 import {
@@ -361,9 +363,35 @@ const recoveredMaterial = new MeshStandardMaterial({ roughness: 1, metalness: 0 
 recoveredMaterial.name = 'MAT_screw_steel';
 const materialApplied = applyTwinScrewMaterialSpec(recoveredMaterial, true);
 check('the runtime normalizer recognizes the screw material', materialApplied);
-check('the screw roughness is restored from the authored palette', recoveredMaterial.roughness === 0.26);
-check('the screw metalness is restored from the authored palette', recoveredMaterial.metalness === 1);
-check('dark-stage reflection intensity is applied', recoveredMaterial.envMapIntensity === 1.05);
+// Asserted against the palette rather than against copied literals: these used
+// to restate 0.26/1.0 and so had to be edited by hand whenever the finish was
+// retuned, which is exactly the kind of drift the normalizer exists to prevent.
+const darkScrewSpec = twinScrewGradedSpec('MAT_screw_steel', true)!;
+check(
+  'the screw roughness is restored from the authored palette',
+  recoveredMaterial.roughness === darkScrewSpec.roughness,
+);
+check(
+  'the screw metalness is restored from the authored palette',
+  recoveredMaterial.metalness === darkScrewSpec.metalness,
+);
+check(
+  'dark-stage reflection intensity is applied',
+  recoveredMaterial.envMapIntensity === TWIN_SCREW_ENV_INTENSITY.dark,
+);
+// The grade is a theme layer over one authored palette, so the same material
+// must come back lighter on the dark stage than on the light one.
+const lightScrewSpec = twinScrewGradedSpec('MAT_screw_steel', false)!;
+check(
+  'the screw is graded lighter for the dark stage than the light one',
+  darkScrewSpec.color !== lightScrewSpec.color &&
+    darkScrewSpec.color === '#79828A' &&
+    lightScrewSpec.color === '#5F686E',
+);
+check(
+  'an ungraded material falls through to its authored value on both themes',
+  twinScrewGradedSpec('MAT_bolt', true)?.color === twinScrewGradedSpec('MAT_bolt', false)?.color,
+);
 recoveredMaterial.dispose();
 
 // ---------------------------------------------------------------------------
@@ -785,8 +813,12 @@ async function checkRuntimeAsset() {
 
   const semanticSurfaces: Readonly<Record<string, string>> = {
     'motor-nde-vib': 'MOTOR_body',
-    'screw-1-rpm': 'PIVOT_SCREW2',
-    'screw-2-rpm': 'PIVOT_SCREW1',
+    // Screw A is the upper shaft, Screw B the lower, and the asset now agrees:
+    // this pair used to be inverted because the shipped GLB predated the
+    // correction to `lib_params.SCREW_1_AXIS` and carried S1 geometry on
+    // screw 2's axis. Re-exported, S1/S2 sit on their own pivots.
+    'screw-1-rpm': 'PIVOT_SCREW1',
+    'screw-2-rpm': 'PIVOT_SCREW2',
     'side-feed-current': 'SIDE_FEEDER_HOUSING',
     'p-int-01': 'SENSOR_P_INT_01',
     'p-int-02': 'SENSOR_P_INT_02',

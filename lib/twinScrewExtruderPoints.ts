@@ -343,17 +343,20 @@ export const TWIN_SCREW_ANCHORS_3D: Readonly<Record<string, readonly [number, nu
   // --- drive train, bosses on the front face of their housings -------------
   'motor-nde-vib': [0.1158, 0.3952, 0.2070],
   'motor-current-power': [0.232059, 0.683747, 0.087325],
-  'motor-temp': [0.3399, 0.6038, 0.0],
+  'motor-temp': [0.3399, 0.6038, 0.0282],
   'motor-de-vib': [0.4434, 0.3949, 0.150],
   'motor-rpm': [0.5400, 0.3949, 0.055],
   'gearbox-in-vib': [0.6999, 0.4799, 0.215],
-  'gearbox-temp': [0.9263, 0.7799, 0.0],
+  'gearbox-temp': [0.9263, 0.7799, 0.1641],
   'gearbox-out-1-vib': [1.1897, 0.4178, 0.190],
   'gearbox-out-2-vib': [1.1897, 0.2858, 0.190],
   'thrust-bearing-temp': [1.170057, 0.215837, 0.086781],
 
   // --- camera-facing flight surfaces just beyond the thrust housing --------
-  // The exported S2/S1 names are inverse to the registry's Screw A/B labels.
+  // Screw A is the upper shaft and Screw B the lower, matching S1/S2 in the
+  // asset. They used to be inverse: the shipped GLB was exported before
+  // `lib_params.SCREW_1_AXIS` was corrected, so S1 geometry sat on screw 2's
+  // axis. The asset is rebuilt, so the names and the coordinates now agree.
   'screw-1-rpm': [1.304249, 0.424352, 0.052449],
   'screw-2-rpm': [1.304029, 0.294245, 0.049735],
 
@@ -370,18 +373,24 @@ export const TWIN_SCREW_ANCHORS_3D: Readonly<Record<string, readonly [number, nu
   'side-feed-current': [2.019168, 0.705307, 0.104],
 
   // --- barrel: zone caps on top, pressure tappings on the front face -------
-  'tz-01': [1.5415, 0.6524, 0.0],
-  'tz-02': [1.6621, 0.6524, 0.0],
-  'tz-03': [1.7827, 0.6524, 0.0],
-  'tz-04': [1.9032, 0.6524, 0.0],
-  'tz-05': [2.1636, 0.6524, 0.0],
-  'tz-06': [2.2937, 0.6524, 0.0],
-  'tz-07': [2.4238, 0.6524, 0.0],
-  'tz-08': [2.7073, 0.6524, 0.0],
+  // Depth is deliberately non-zero. An anchor on the machine's centre plane is
+  // buried inside its own casting, so the projector's occlusion ray hits the
+  // front face first and the pad renders as permanently hidden. Each anchor
+  // therefore stands ~6 mm proud of the surface it measures: far enough not to
+  // z-fight the metal, and well inside the 12 mm `occlusionClearance` that
+  // decides both whether a pad is occluded and whether it still counts as
+  // attached to the machine.
+  'tz-01': [1.5415, 0.6524, 0.0319],
+  'tz-02': [1.6621, 0.6524, 0.0319],
+  'tz-03': [1.7827, 0.6524, 0.0319],
+  'tz-04': [1.9032, 0.6524, 0.0319],
+  'tz-05': [2.1636, 0.6524, 0.0319],
+  'tz-06': [2.2937, 0.6524, 0.0319],
+  'tz-07': [2.4238, 0.6524, 0.0319],
+  'tz-08': [2.7073, 0.6524, 0.0319],
   // The asset carries eight heated modules; TZ-09 is attached to the existing
-  // die-end barrel shoulder. This is the validated surface point, not the old
-  // cap-height coordinate that floated 30 mm above the metal.
-  'tz-09': [2.767014, 0.6225, 0.0],
+  // die-end barrel shoulder.
+  'tz-09': [2.7670, 0.6225, 0.0980],
   'p-int-01': [1.661225, 0.222418, 0.2355],
   'p-int-02': [2.283064, 0.222418, 0.2355],
 
@@ -390,7 +399,7 @@ export const TWIN_SCREW_ANCHORS_3D: Readonly<Record<string, readonly [number, nu
   'vent-temp': [2.5566, 0.5659, 0.075],
 
   // --- discharge -----------------------------------------------------------
-  'melt-temp': [2.8211, 0.6269, 0.0],
+  'melt-temp': [2.8211, 0.6269, 0.0182],
   // Screen pressure ports sit on the nearest visible hardware surfaces. The
   // authored sensor centres are behind the cylindrical housings in elevation.
   'p-screw-in': [2.874280, 0.286605, 0.158639],
