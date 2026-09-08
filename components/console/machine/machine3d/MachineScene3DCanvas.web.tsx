@@ -15,15 +15,25 @@
  * trail endpoints and the snap targets all keep working through the existing
  * contract rather than a parallel one.
  *
- * Occlusion is raycast on a throttle rather than every frame: it only changes
- * when the camera moves, and 36 rays against a 130k-triangle scene every frame
- * is not free.
+ * Why the framing is done by hand
+ * -------------------------------
+ * This used drei's `<Bounds fit clip>`. `clip` sets the camera's near and far
+ * planes to tightly bracket its children — and because the model loads inside a
+ * Suspense boundary, the first fit ran against an *empty* box and bracketed
+ * nothing. The camera's position and projection stayed perfectly sane, so the
+ * pads went on projecting exactly where they belonged while every triangle of
+ * the machine fell outside the clip range. Pads on an empty stage is a very
+ * convincing impression of a canvas that never mounted.
+ *
+ * So framing is explicit here: the model's bounding box is measured once it has
+ * actually loaded, and the camera, its clip planes and the orbit target are all
+ * derived from that box. Nothing is framed before there is something to frame.
  */
 'use client';
 
-import { Bounds, OrbitControls, useBounds, useGLTF } from '@react-three/drei';
+import { OrbitControls, useGLTF } from '@react-three/drei';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Suspense, useEffect, useMemo, useRef } from 'react';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
@@ -34,6 +44,12 @@ export type { MachineScene3DCanvasProps, ProjectedPoint } from './types';
 const DRACO_PATH = '/draco/';
 const OCCLUSION_EVERY = 6; // frames
 
+/** Where the camera stands relative to the model, as a fraction of its size. */
+const VIEW_DIR = new THREE.Vector3(0.35, 0.42, 1).normalize();
+const FILL_MARGIN = 1.25;
+
+type Loaded = { box: THREE.Box3; meshes: THREE.Mesh[] };
+
 /* -------------------------------------------------------------------------- */
 /* the asset                                                                   */
 /* -------------------------------------------------------------------------- */
@@ -41,12 +57,12 @@ const OCCLUSION_EVERY = 6; // frames
 function Machine({
   modelUrl,
   closed,
-  onMeshes,
+  onLoaded,
   onSelectPart,
 }: {
   modelUrl: string;
   closed: boolean;
-  onMeshes: (meshes: THREE.Mesh[]) => void;
+  onLoaded: (loaded: Loaded) => void;
   onSelectPart?: (partId: string) => void;
 }) {
   const { scene } = useGLTF(modelUrl, DRACO_PATH);
@@ -66,8 +82,11 @@ function Machine({
       const group = (mesh.userData?.partGroup as string) ?? '';
       if (group === 'barrel_front') mesh.visible = closed;
     });
-    onMeshes(meshes);
-  }, [model, closed, onMeshes]);
+
+    model.updateWorldMatrix(true, true);
+    const box = new THREE.Box3().setFromObject(model);
+    onLoaded({ box, meshes });
+  }, [model, closed, onLoaded]);
 
   return (
     <primitive
@@ -82,13 +101,57 @@ function Machine({
   );
 }
 
-/** Frames the machine once the asset has loaded, so it fills the stage. */
-function FitOnLoad({ deps }: { deps: unknown }) {
-  const api = useBounds();
+/* -------------------------------------------------------------------------- */
+/* framing                                                                     */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Frames the model once, from its real bounding box.
+ *
+ * Runs only after the asset has loaded, so the clip planes always bracket
+ * something. Re-runs when the viewport aspect changes, because a machine this
+ * long is width-limited on a wide stage and height-limited on a narrow one.
+ */
+function Framing({
+  loaded,
+  controls,
+  resetKey,
+}: {
+  loaded: Loaded | null;
+  controls: React.RefObject<OrbitControlsImpl | null>;
+  resetKey: number;
+}) {
+  const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
+  const size = useThree((s) => s.size);
+
   useEffect(() => {
-    const t = setTimeout(() => api.refresh().clip().fit(), 0);
-    return () => clearTimeout(t);
-  }, [api, deps]);
+    if (!loaded || loaded.box.isEmpty()) return;
+
+    const centre = loaded.box.getCenter(new THREE.Vector3());
+    const extent = loaded.box.getSize(new THREE.Vector3());
+    const aspect = Math.max(size.width, 1) / Math.max(size.height, 1);
+
+    // Distance that fits the box on whichever axis is the binding constraint.
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const fitHeight = extent.y / 2 / Math.tan(vFov / 2);
+    const fitWidth = extent.x / 2 / Math.tan(vFov / 2) / aspect;
+    const distance = Math.max(fitHeight, fitWidth, 0.2) * FILL_MARGIN + extent.z / 2;
+
+    camera.position.copy(centre).addScaledVector(VIEW_DIR, distance);
+    camera.near = Math.max(distance / 200, 0.01);
+    camera.far = distance * 8 + extent.length();
+    camera.updateProjectionMatrix();
+    camera.lookAt(centre);
+
+    const c = controls.current;
+    if (c) {
+      c.target.copy(centre);
+      c.minDistance = distance * 0.2;
+      c.maxDistance = distance * 4;
+      c.update();
+    }
+  }, [loaded, camera, size.width, size.height, controls, resetKey]);
+
   return null;
 }
 
@@ -107,9 +170,9 @@ function PointProjector({
   onProjectPoints?: (points: ProjectedPoint[]) => void;
   onReady?: () => void;
 }) {
-  const { camera, size } = useThree();
+  const { camera } = useThree();
   const tick = useRef(0);
-  const ready = useRef(false);
+  const announced = useRef(false);
   const occluded = useRef<Record<string, boolean>>({});
 
   const ray = useMemo(() => new THREE.Raycaster(), []);
@@ -132,7 +195,6 @@ function PointProjector({
       ndc.copy(world).project(camera);
 
       const onScreen = ndc.z < 1 && Math.abs(ndc.x) < 1.4 && Math.abs(ndc.y) < 1.4;
-      const distance = camPos.distanceTo(world);
 
       if (doOcclusion && onScreen) {
         dir.copy(world).sub(camPos);
@@ -140,71 +202,32 @@ function PointProjector({
         dir.normalize();
         ray.set(camPos, dir);
         ray.far = Math.max(len - 0.02, 0.01);
-        occluded.current[code] = ray
-          .intersectObjects(meshes, false)
-          .some((h) => h.object.visible);
+        occluded.current[code] = ray.intersectObjects(meshes, false).some((h) => h.object.visible);
       }
 
       out.push({
         code,
         rx: (ndc.x + 1) / 2,
         ry: (1 - ndc.y) / 2,
-        distance,
+        distance: camPos.distanceTo(world),
         onScreen,
         occluded: occluded.current[code] ?? false,
       });
     }
 
     onProjectPoints(out);
-    if (!ready.current) {
-      ready.current = true;
+    if (!announced.current) {
+      announced.current = true;
       onReady?.();
     }
   });
 
-  // republish immediately on resize so pads do not lag a layout change
-  useEffect(() => {
-    tick.current = 0;
-  }, [size.width, size.height]);
-
   return null;
 }
 
 /* -------------------------------------------------------------------------- */
-/* camera + lighting                                                           */
+/* lighting                                                                    */
 /* -------------------------------------------------------------------------- */
-
-function CameraCommands({
-  command,
-  controls,
-}: {
-  command: MachineScene3DCanvasProps['cameraCommand'];
-  controls: React.RefObject<OrbitControlsImpl | null>;
-}) {
-  const api = useBounds();
-  const last = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!command || command.id === last.current) return;
-    last.current = command.id;
-    const c = controls.current;
-    switch (command.kind) {
-      case 'zoom-in':
-        if (c) c.dollyIn?.(1.2), c.update();
-        break;
-      case 'zoom-out':
-        if (c) c.dollyOut?.(1.2), c.update();
-        break;
-      case 'fit':
-      case 'reset':
-      case 'elevation':
-        api.refresh().clip().fit();
-        break;
-    }
-  }, [command, controls, api]);
-
-  return null;
-}
 
 function Lights({ dark }: { dark: boolean }) {
   return (
@@ -214,7 +237,7 @@ function Lights({ dark }: { dark: boolean }) {
         color={dark ? '#b9cbd6' : '#ffffff'}
         groundColor={dark ? '#12181d' : '#c8cbc8'}
       />
-      <directionalLight position={[-2.4, 4.6, 5.2]} intensity={dark ? 2.0 : 2.2} castShadow />
+      <directionalLight position={[-2.4, 4.6, 5.2]} intensity={dark ? 2.0 : 2.2} />
       <directionalLight position={[5.6, 2.0, 3.2]} intensity={dark ? 0.6 : 0.7} />
       <directionalLight position={[1.6, 3.2, -4.4]} intensity={dark ? 0.9 : 0.95} />
       {/* narrow fill into the open barrel so the screws read as machined steel
@@ -238,20 +261,34 @@ export default function MachineScene3DCanvas({
   onSelectPart,
 }: MachineScene3DCanvasProps) {
   const controls = useRef<OrbitControlsImpl | null>(null);
-  const meshes = useRef<THREE.Mesh[]>([]);
-  const setMeshes = useMemo(
-    () => (next: THREE.Mesh[]) => {
-      meshes.current = next;
-    },
-    [],
-  );
+  // State, not a ref: the projector needs to re-read the mesh list when it
+  // arrives, and a ref mutation does not re-render.
+  const [loaded, setLoaded] = useState<Loaded | null>(null);
+
+  const handleLoaded = useCallback((next: Loaded) => {
+    setLoaded(next);
+    const size = next.box.getSize(new THREE.Vector3());
+    // One line, once: the browser console says whether the asset actually
+    // arrived and how big it is, which is the first question every time the
+    // stage looks empty.
+    console.info(
+      '[machine-3d] loaded %d meshes, extent %sm x %sm x %sm',
+      next.meshes.length,
+      size.x.toFixed(2),
+      size.y.toFixed(2),
+      size.z.toFixed(2),
+    );
+  }, []);
+
+  const resetKey = cameraCommand?.kind === 'reset' || cameraCommand?.kind === 'fit'
+    ? (cameraCommand?.id ?? 0)
+    : 0;
 
   return (
     <Canvas
       dpr={[1, 2]}
-      shadows
       gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
-      camera={{ fov: 32, near: 0.05, far: 60, position: [1.6, 1.5, 5.2] }}
+      camera={{ fov: 32, near: 0.05, far: 200, position: [2.4, 1.6, 4.6] }}
       onCreated={({ gl }) => {
         gl.toneMapping = THREE.ACESFilmicToneMapping;
         gl.toneMappingExposure = 1.05;
@@ -261,24 +298,26 @@ export default function MachineScene3DCanvas({
       <Lights dark={dark} />
 
       <Suspense fallback={null}>
-        <Bounds fit clip observe margin={1.15}>
-          <Machine
-            modelUrl={modelUrl}
-            closed={closed}
-            onMeshes={setMeshes}
-            onSelectPart={onSelectPart}
-          />
-          <FitOnLoad deps={`${modelUrl}:${closed}`} />
-        </Bounds>
-        <CameraCommands command={cameraCommand} controls={controls} />
+        <Machine
+          modelUrl={modelUrl}
+          closed={closed}
+          onLoaded={handleLoaded}
+          onSelectPart={onSelectPart}
+        />
       </Suspense>
 
-      <PointProjector
-        anchors={anchors}
-        meshes={meshes.current}
-        onProjectPoints={onProjectPoints}
-        onReady={onReady}
-      />
+      <Framing loaded={loaded} controls={controls} resetKey={resetKey} />
+
+      {/* Only projects once the machine is actually there, so pads can never
+          again be drawn over an empty stage. */}
+      {loaded ? (
+        <PointProjector
+          anchors={anchors}
+          meshes={loaded.meshes}
+          onProjectPoints={onProjectPoints}
+          onReady={onReady}
+        />
+      ) : null}
 
       <OrbitControls
         ref={controls}
@@ -286,8 +325,6 @@ export default function MachineScene3DCanvas({
         enabled={cameraMode === 'free'}
         enableDamping
         dampingFactor={0.09}
-        minDistance={0.6}
-        maxDistance={14}
         minPolarAngle={0.08}
         maxPolarAngle={Math.PI * 0.9}
         zoomSpeed={0.8}
