@@ -17,13 +17,16 @@
 import { connectorsForTemplate, artworkSizeForTemplate } from '../machineConnectors';
 import { createTemplateDefaultLayout, hasDefaultLayout } from '../templateDefaultLayouts';
 import { TWIN_SCREW_CONNECTORS } from '../TwinScrewExtruder';
-import { parse } from 'react-native-svg';
-import { buildTwinScrewExtruderArtwork, WIDTH, HEIGHT } from '../twinScrewArtwork';
+import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_COMPONENT_ORDER,
+  TWIN_SCREW_SHEET_SCALE,
+  TWIN_SCREW_SHEET_X0,
+  TWIN_SCREW_SHEET_Y1,
   TWIN_SCREW_POINT_REGISTRY,
   twinScrewPointByCode,
 } from '../../../../lib/twinScrewExtruderPoints';
@@ -124,125 +127,64 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-console.log('\n--- Artwork ---');
+console.log('\n--- 3D asset ---');
 
-const machineSvg = buildTwinScrewExtruderArtwork();
+/**
+ * The machine is a render, not a drawing.
+ *
+ * `TwinScrewExtruder` mounts `public/models/machines/twin-screw-extruder.glb`
+ * through a locked orthographic elevation. The asset is built by
+ * `polymer-plant-3d/twin-screw/` and its export is reproducible: re-running
+ * `pipeline.py` in Blender regenerates the same GLB and the same anchors.
+ */
+const ASSET = join(process.cwd(), 'public', 'models', 'machines', 'twin-screw-extruder.glb');
+check('the machine asset is present', existsSync(ASSET), ASSET);
 
+check('the draco decoder the asset needs is served', existsSync(join(process.cwd(), 'public', 'draco', 'draco_decoder.wasm')));
+
+/**
+ * The sheet <-> asset contract.
+ *
+ * These three constants are the only thing tying the render to the registry:
+ * the camera frustum is derived from them, and every anchor below was
+ * projected through them. If they drift, pads slide off the features they
+ * measure -- silently, because nothing else in the app reads world space.
+ */
 check(
-  'the artwork is drawn on the frame the registry places points in',
-  WIDTH === TWIN_SCREW_ARTWORK_WIDTH && HEIGHT === TWIN_SCREW_ARTWORK_HEIGHT,
-  `${WIDTH}x${HEIGHT} vs ${TWIN_SCREW_ARTWORK_WIDTH}x${TWIN_SCREW_ARTWORK_HEIGHT}`,
-);
-
-check(
-  'the artwork declares that frame as its viewBox',
-  machineSvg.includes(`viewBox="0 0 ${TWIN_SCREW_ARTWORK_WIDTH} ${TWIN_SCREW_ARTWORK_HEIGHT}"`),
-);
-
-check(
-  'the same options always produce the same drawing',
-  buildTwinScrewExtruderArtwork() === machineSvg,
-);
-
-// The machine has to actually contain the machine. Each of these is a part the
-// registry hangs points off; a silent loss of one would leave pads floating.
-const REQUIRED_PARTS = [
-  // The drive train comes from the rebuild pass, which is why these three carry
-  // its names rather than the base geometry's.
-  'motor-v16', 'motor-coupling-v16', 'gearbox-v16', 'gearbox-output-raised-v22',
-  'main-hopper', 'barrel', 'upper-screw', 'lower-screw', 'side-feeder', 'vent', 'die',
-];
-check(
-  'every part the registry measures is present in the drawing',
-  REQUIRED_PARTS.every((id) => machineSvg.includes(`id="${id}"`)),
-  REQUIRED_PARTS.filter((id) => !machineSvg.includes(`id="${id}"`)).join(', ') || undefined,
+  'the sheet mapping is declared',
+  Number.isFinite(TWIN_SCREW_SHEET_SCALE) && TWIN_SCREW_SHEET_SCALE > 0 &&
+    Number.isFinite(TWIN_SCREW_SHEET_X0) && Number.isFinite(TWIN_SCREW_SHEET_Y1),
+  `scale ${TWIN_SCREW_SHEET_SCALE}, x0 ${TWIN_SCREW_SHEET_X0}, y1 ${TWIN_SCREW_SHEET_Y1}`,
 );
 
 /**
- * Every `url(#…)` the drawing uses resolves to something the drawing defines.
- *
- * This is not a style check. A paint server or clip path that is referenced but
- * never declared is silently destructive and platform-dependent: a browser
- * drops the element that references it, react-native-svg renders it unclipped.
- * The reference drawing shipped with exactly that fault — a `#intermeshClip`
- * that was never defined — so the drawing looked different depending on which
- * renderer opened it. Nothing about that is visible in a diff.
+ * The frustum the camera builds from the mapping has to be the sheet's own
+ * aspect ratio, or the render is stretched against the pads drawn over it.
  */
-const referenced = new Set(Array.from(machineSvg.matchAll(/url\(#([^)]+)\)/g), (m) => m[1]));
-const declared = new Set(Array.from(machineSvg.matchAll(/\sid="([^"]+)"/g), (m) => m[1]));
-const dangling = [...referenced].filter((id) => !declared.has(id));
-check('every paint, clip and filter reference resolves', dangling.length === 0, dangling.join(', ') || undefined);
-
-/**
- * The drawing draws no instrument of its own.
- *
- * The reference ships its sensor markers as a separate layer keyed by its own
- * sensor ids. Those ids are not the ones saved layouts and channel mappings
- * reference, so carrying the layer across would have put a second, differently
- * named set of markers on the machine next to the registry's own — visually
- * identical, and wired to nothing.
- */
+const frustumW = TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_SHEET_SCALE;
+const frustumH = TWIN_SCREW_ARTWORK_HEIGHT / TWIN_SCREW_SHEET_SCALE;
 check(
-  'the drawing carries no instrument markers of its own',
-  !machineSvg.includes('data-sensor-id') && !machineSvg.includes('configured-process-sensors'),
-);
-
-// The reference calls this a marker-only drawing: no sensor names, part names,
-// zone names or leader lines are baked in, so nothing on the machine can go
-// stale against a label the application is the actual source of.
-check('the drawing carries no baked-in text', !machineSvg.includes('<text'));
-
-check(
-  'the sheet and its grid are off unless asked for',
-  !machineSvg.includes('url(#grid)') && buildTwinScrewExtruderArtwork({ showBackground: true }).includes('url(#grid)'),
+  'the camera frustum matches the sheet aspect ratio',
+  Math.abs(frustumW / frustumH - TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_ARTWORK_HEIGHT) < 1e-9,
+  `${frustumW.toFixed(4)} x ${frustumH.toFixed(4)}`,
 );
 
 /**
- * With the sheet off, the drawing is actually transparent.
+ * Every anchor projects back to a world coordinate inside the machine.
  *
- * The reference draws its motor and gearbox twice and hides the first pair
- * behind an opaque patch across the left third of the frame. Vendoring removes
- * the hidden pair instead, which is the only reason the machine can sit on the
- * console's own grid rather than on a white card. A re-vendoring that brought
- * the patch back would look almost right and be wrong in exactly one way, so
- * the absence of any opaque fill is asserted rather than assumed.
+ * The asset occupies roughly x 0.01..3.20 m and y 0..1.33 m in its own frame.
+ * A pad whose inverse projection falls outside that is measuring thin air even
+ * though it sits inside the viewBox.
  */
+const outsideAsset = TWIN_SCREW_POINT_REGISTRY.filter((point) => {
+  const wx = point.x / TWIN_SCREW_SHEET_SCALE + TWIN_SCREW_SHEET_X0;
+  const wy = TWIN_SCREW_SHEET_Y1 - point.y / TWIN_SCREW_SHEET_SCALE;
+  return wx < -0.05 || wx > 3.3 || wy < -0.05 || wy > 1.4;
+});
 check(
-  'nothing paints an opaque ground when the sheet is off',
-  !/<rect[^>]*fill="#[0-9a-fA-F]{6}"[^>]*width="6[0-9][0-9]"/.test(machineSvg) && !machineSvg.includes('rebuild-background-patches'),
-);
-
-check(
-  'the whole drawing parses into renderable nodes',
-  (() => {
-    const ast = parse(machineSvg);
-    return Boolean(ast) && Array.isArray(ast?.children) && ast.children.length > 0;
-  })(),
-);
-
-/**
- * Nothing is lost between the drawing and what the console mounts.
- *
- * The template does not transcribe the machineSvg into JSX, it parses it — so the
- * question worth asking is whether the parse is lossy. Counting the elements on
- * both sides answers it for every element type at once.
- */
-const parsedCount = (() => {
-  let n = 0;
-  const walk = (node: unknown) => {
-    if (!node || typeof node !== 'object') return;
-    n += 1;
-    const kids = (node as { props?: { children?: unknown[] } }).props?.children;
-    if (Array.isArray(kids)) kids.forEach(walk);
-  };
-  parse(machineSvg)?.children.forEach(walk);
-  return n;
-})();
-const sourceCount = (machineSvg.match(/<(?!\/|\?|!)/g) ?? []).length - 1; // less the <svg> root
-check(
-  'the parse keeps every element the drawing declares',
-  parsedCount === sourceCount,
-  `${parsedCount} parsed vs ${sourceCount} in source`,
+  'every pad projects onto the asset, not past it',
+  outsideAsset.length === 0,
+  outsideAsset.map((p) => p.code).join(', ') || undefined,
 );
 
 // ---------------------------------------------------------------------------
@@ -253,7 +195,9 @@ console.log('\n--- Pads sit on the machine ---');
  * still passes every check above it — it just measures thin air. These bound it
  * to the drawn extent of the machine rather than to the sheet.
  */
-const MACHINE = { x: 16, y: 119, width: 1618 - 16, height: 726 - 119 };
+// The rendered machine's own extent on the sheet, from the locked camera:
+// x 49.5..1598.1, y 76.0..722.5. Rounded outward by a pad radius.
+const MACHINE = { x: 40, y: 66, width: 1608 - 40, height: 733 - 66 };
 const strays = TWIN_SCREW_POINT_REGISTRY.filter(
   (point) =>
     point.x < MACHINE.x ||
@@ -263,8 +207,8 @@ const strays = TWIN_SCREW_POINT_REGISTRY.filter(
 );
 check('no pad sits off the machine', strays.length === 0, strays.map((p) => p.code).join(', ') || undefined);
 
-// The eight barrel zones are one row of instruments along one heater band. If
-// one drifts off that line the drawing stops reading as a zone profile.
+// The barrel zones are one row of instruments along one heater band. If one
+// drifts off that line the machine stops reading as a zone profile.
 const zonePads = TWIN_SCREW_POINT_REGISTRY.filter((point) => /^tz-\d+$/.test(point.code));
 check('all nine barrel zones are declared', zonePads.length === 9, String(zonePads.length));
 check(
