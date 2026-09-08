@@ -265,3 +265,89 @@ export function twinScrewPointByTag(tag: TwinScrewTag): TwinScrewPointDefinition
 export function twinScrewPointsForComponent(component: TwinScrewComponent): TwinScrewPointDefinition[] {
   return TWIN_SCREW_POINT_REGISTRY.filter((point) => point.component === component);
 }
+
+/* -------------------------------------------------------------------------- */
+/* 3D anchors                                                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Where each instrument physically sits on the 3D asset, in model space.
+ *
+ * The machine canvas renders `public/models/machines/twin-screw-extruder.glb`
+ * on an orbitable stage. A pad can no longer be a fixed point on a sheet: as
+ * the camera moves, the instrument moves with the surface it is bolted to. So
+ * the canvas projects these anchors every frame and hands the result to
+ * `MachineWorkspace`, which feeds them to `TrailBoard` as live `rx`/`ry`
+ * fractions of the machine rect. Nothing downstream changes -- snapping,
+ * unit-locking and the analysis layer all still address pads by `code`.
+ *
+ * The glTF is +Y up: x runs along the machine, y is height, z is depth with
+ * +z toward the viewer in the reference elevation.
+ *
+ * x and y were computed by projecting each part's own geometry in Blender and
+ * are exact. z places the anchor on the surface the instrument is mounted to
+ * and is inferred -- the reference elevation gives no depth information, so a
+ * boss on the front face is placed at the front face rather than measured.
+ * The `x`/`y` fields above remain the reference-elevation coordinates and are
+ * what the 2D fallback and the saved-layout maths still use.
+ */
+export const TWIN_SCREW_ANCHORS_3D: Readonly<Record<string, readonly [number, number, number]>> = {
+  // --- drive train, bosses on the front face of their housings -------------
+  'motor-nde-vib': [0.1150, 0.3949, 0.150],
+  'motor-current-power': [0.1995, 0.6908, 0.0],
+  'motor-temp': [0.3399, 0.6038, 0.0],
+  'motor-de-vib': [0.4434, 0.3949, 0.150],
+  'motor-rpm': [0.5242, 0.3949, 0.055],
+  'gearbox-in-vib': [0.6999, 0.4799, 0.200],
+  'gearbox-temp': [0.9263, 0.7799, 0.0],
+  'gearbox-out-1-vib': [1.1897, 0.4178, 0.190],
+  'gearbox-out-2-vib': [1.1897, 0.2858, 0.190],
+  'thrust-bearing-temp': [1.1598, 0.1999, 0.190],
+
+  // --- the two shafts, on their own centrelines inside the bore ------------
+  'screw-1-rpm': [1.0998, 0.4178, 0.0],
+  'screw-2-rpm': [1.0998, 0.2858, 0.0],
+
+  // --- main feed -----------------------------------------------------------
+  'feed-throat-temp': [1.3646, 0.5898, 0.130],
+  'hopper-level': [1.3646, 1.1801, 0.225],
+  'main-feed-rate': [1.3646, 0.9499, 0.160],
+  'main-feed-rpm': [1.3646, 0.7299, 0.090],
+  'main-feed-current': [1.3646, 0.6600, 0.090],
+
+  // --- side feed -----------------------------------------------------------
+  'side-feed-rate': [2.0309, 0.8848, 0.080],
+  'side-feed-rpm': [2.0309, 0.7599, 0.070],
+  'side-feed-current': [2.0309, 0.7000, 0.070],
+
+  // --- barrel: zone caps on top, pressure tappings on the front face -------
+  'tz-01': [1.5415, 0.6524, 0.0],
+  'tz-02': [1.6621, 0.6524, 0.0],
+  'tz-03': [1.7827, 0.6524, 0.0],
+  'tz-04': [1.9032, 0.6524, 0.0],
+  'tz-05': [2.1636, 0.6524, 0.0],
+  'tz-06': [2.2937, 0.6524, 0.0],
+  'tz-07': [2.4238, 0.6524, 0.0],
+  'tz-08': [2.7073, 0.6524, 0.0],
+  // The asset carries eight heated modules; the registry declares nine, so
+  // TZ-09 sits on the die-end barrel section rather than a cap of its own.
+  'tz-09': [2.7772, 0.6524, 0.0],
+  'p-int-01': [1.6621, 0.2119, 0.210],
+  'p-int-02': [2.2937, 0.2119, 0.210],
+
+  // --- vent ----------------------------------------------------------------
+  'vent-pressure': [2.5566, 0.8220, 0.0],
+  'vent-temp': [2.5566, 0.5659, 0.075],
+
+  // --- discharge -----------------------------------------------------------
+  'melt-temp': [2.8211, 0.6269, 0.0],
+  'p-screw-in': [2.8726, 0.1900, 0.0],
+  'p-screw-out': [2.9916, 0.1900, 0.0],
+};
+
+/** The asset the machine canvas renders for this template. */
+export const TWIN_SCREW_MODEL_URL = '/models/machines/twin-screw-extruder.glb';
+
+export function twinScrewAnchor3D(code: string): readonly [number, number, number] | undefined {
+  return TWIN_SCREW_ANCHORS_3D[code];
+}

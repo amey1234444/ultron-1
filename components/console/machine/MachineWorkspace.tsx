@@ -30,7 +30,13 @@ import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
-import { TwinScrewExtruder } from './TwinScrewExtruder';
+import { MachineStage3D } from './machine3d/MachineStage3D';
+import type { ProjectedPoint } from './machine3d/types';
+import {
+  TWIN_SCREW_ANCHORS_3D,
+  TWIN_SCREW_MODEL_URL,
+  TWIN_SCREW_POINT_REGISTRY,
+} from '../../../lib/twinScrewExtruderPoints';
 import { CanvasGrid, stageBoundsForCanvas, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
 import { TrendView } from './TrendView';
@@ -67,7 +73,18 @@ const ZOOM_STEP = MACHINE_ZOOM_STEP;
 // screw is a wider machine and is drawn on its own frame. Trail anchors are
 // fractions of the measured machine rect, so each drawing's own viewBox is
 // converted per template (`artworkSizeForTemplate`) and never assumed here.
-const ARTWORK_TEMPLATES = new Set<string>(['Rotary Airlock Valve', 'Single Screw Extruder', 'Twin Screw Extruder']);
+const ARTWORK_TEMPLATES = new Set<string>(['Rotary Airlock Valve', 'Single Screw Extruder']);
+
+/**
+ * Templates whose machine is a 3D asset rather than a drawing.
+ *
+ * These are deliberately not artwork templates: the stage is full-bleed, so
+ * `machineRect` is the whole stage box and the fractions the canvas projects
+ * are fractions of exactly that rect. That is what lets the projected pads
+ * drop into the existing connector contract without a second coordinate
+ * system. The other machines keep their flat drawings until each is modelled.
+ */
+const STAGE_3D_TEMPLATES = new Set<string>(['Twin Screw Extruder']);
 // That wrapper has a `p-6` (24px) pad between it and the actual SVG artwork;
 // subtract it so trail anchors line up with the drawing itself rather than the
 // padded box around it.
@@ -328,9 +345,45 @@ export function MachineWorkspace({
     setSelectedComponentId(component.id);
   };
 
-  // Instrument pads this machine's drawing has. The canvas snaps trail
-  // endpoints to them; the drawing renders which of them are wired.
-  const connectors = useMemo(() => connectorsForTemplate(machine.template), [machine.template]);
+  // Instrument pads this machine has. The canvas snaps trail endpoints to
+  // them; the machine renders which of them are wired.
+  const staticConnectors = useMemo(() => connectorsForTemplate(machine.template), [machine.template]);
+
+  /**
+   * Where the 3D stage currently projects each instrument.
+   *
+   * On a drawing a pad is a fixed fraction of the machine rect. On a model it
+   * is a point on a surface, so it moves as the operator orbits. The stage
+   * republishes these ~30 times a second and they are folded into the same
+   * `MachineConnector` list `TrailBoard` already consumes -- snapping,
+   * unit-locking and the analysis layer are untouched, because all of them
+   * address a pad by `code` and read its position from `rx`/`ry`.
+   */
+  const [projected, setProjected] = useState<Record<string, { rx: number; ry: number }> | null>(null);
+  useEffect(() => setProjected(null), [machine.id, machine.template]);
+
+  const handleProjectConnectors = useCallback((points: ProjectedPoint[]) => {
+    const next: Record<string, { rx: number; ry: number }> = {};
+    for (const point of points) {
+      if (point.onScreen) next[point.code] = { rx: point.rx, ry: point.ry };
+    }
+    setProjected(next);
+  }, []);
+
+  const connectors = useMemo(() => {
+    if (!projected) return staticConnectors;
+    // A pad the camera cannot currently see keeps its last known position
+    // rather than collapsing to the origin and dragging trails with it.
+    return staticConnectors.map((connector) => {
+      const at = projected[connector.code];
+      return at ? { ...connector, rx: at.rx, ry: at.ry } : connector;
+    });
+  }, [staticConnectors, projected]);
+
+  const twinScrewLabels = useMemo(
+    () => Object.fromEntries(TWIN_SCREW_POINT_REGISTRY.map((point) => [point.code, point.label])),
+    [],
+  );
   const [connectorState, setConnectorState] = useState<Record<string, ConnectorState>>({});
   useEffect(() => setConnectorState({}), [machine.id]);
   // Stable identity: TrailBoard only calls this when the wiring actually
@@ -424,13 +477,22 @@ export function MachineWorkspace({
               }}
               style={{ transform: [{ scale: zoom }] }}
               className={hasTemplateArtwork ? 'w-full max-w-5xl p-6' : 'h-full w-full'}
+              // The 3D stage needs a real height; the artwork branch gets one
+              // from its aspect ratio.
             >
-              {machine.template === 'Rotary Airlock Valve' ? (
+              {machine.template === 'Twin Screw Extruder' ? (
+                <MachineStage3D
+                  modelUrl={TWIN_SCREW_MODEL_URL}
+                  anchors={TWIN_SCREW_ANCHORS_3D}
+                  labels={twinScrewLabels}
+                  connectorState={connectorState}
+                  dark={isDark}
+                  onProjectConnectors={handleProjectConnectors}
+                />
+              ) : machine.template === 'Rotary Airlock Valve' ? (
                 <RotaryAirlockValve />
               ) : machine.template === 'Single Screw Extruder' ? (
                 <SingleScrewExtruder connectorState={connectorState} />
-              ) : machine.template === 'Twin Screw Extruder' ? (
-                <TwinScrewExtruder connectorState={connectorState} />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}
