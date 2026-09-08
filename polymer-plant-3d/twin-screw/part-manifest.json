@@ -1,0 +1,1349 @@
+{
+  "parts": [
+    {
+      "id": "BARREL_FEED_THROAT_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_FEED_THROAT_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_FEED_THROAT_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_FEED_THROAT_lip",
+      "group": "barrel",
+      "spin": "",
+      "tris": 1112,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_SIDE_FEED_PORT_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_SIDE_FEED_PORT_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_SIDE_FEED_PORT_port",
+      "group": "barrel_port",
+      "spin": "",
+      "tris": 1112,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.24
+    },
+    {
+      "id": "BARREL_TZ_01_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_01_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_01_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_01_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_TZ_02_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_02_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_02_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_02_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_TZ_03_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_03_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_03_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_03_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_TZ_04_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_04_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_04_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_04_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_TZ_05_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_05_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_05_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_05_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_TZ_06_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_06_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_06_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_06_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_TZ_07_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_07_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_07_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_07_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_TZ_08_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_TZ_08_bottom",
+      "group": "barrel_bot",
+      "spin": "",
+      "tris": 464,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.28
+    },
+    {
+      "id": "BARREL_TZ_08_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_TZ_08_top",
+      "group": "barrel_top",
+      "spin": "",
+      "tris": 1084,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "BARREL_VENT_PORT_body",
+      "group": "barrel",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_VENT_PORT_front",
+      "group": "barrel_front",
+      "spin": "",
+      "tris": 748,
+      "explodeDir": [
+        0.0,
+        -1.0,
+        0.0
+      ],
+      "explodeDist": 0.55
+    },
+    {
+      "id": "BARREL_VENT_PORT_port",
+      "group": "barrel_port",
+      "spin": "",
+      "tris": 1112,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.24
+    },
+    {
+      "id": "BARREL_drive_end_flange",
+      "group": "barrel",
+      "spin": "",
+      "tris": 1036,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "BARREL_supports",
+      "group": "frame",
+      "spin": "",
+      "tris": 1360,
+      "explodeDir": [
+        0.0,
+        0.0,
+        -1.0
+      ],
+      "explodeDist": 0.2
+    },
+    {
+      "id": "COUPLING",
+      "group": "coupling",
+      "spin": "PIVOT_DRIVE",
+      "tris": 1632,
+      "explodeDir": [
+        -0.55,
+        0.0,
+        0.06
+      ],
+      "explodeDist": 0.4
+    },
+    {
+      "id": "DIE_HOUSING",
+      "group": "die",
+      "spin": "",
+      "tris": 3016,
+      "explodeDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.68
+    },
+    {
+      "id": "DIE_NOZZLE",
+      "group": "die",
+      "spin": "",
+      "tris": 384,
+      "explodeDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.68
+    },
+    {
+      "id": "EXTRUDATE",
+      "group": "die",
+      "spin": "",
+      "tris": 384,
+      "explodeDir": [
+        1.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.68
+    },
+    {
+      "id": "GEARBOX_base",
+      "group": "gearbox",
+      "spin": "",
+      "tris": 896,
+      "explodeDir": [
+        -0.3,
+        0.0,
+        0.04
+      ],
+      "explodeDist": 0.26
+    },
+    {
+      "id": "GEARBOX_fasteners",
+      "group": "gearbox",
+      "spin": "",
+      "tris": 5952,
+      "explodeDir": [
+        -0.3,
+        0.0,
+        0.04
+      ],
+      "explodeDist": 0.26
+    },
+    {
+      "id": "GEARBOX_housing",
+      "group": "gearbox",
+      "spin": "",
+      "tris": 1008,
+      "explodeDir": [
+        -0.3,
+        0.0,
+        0.04
+      ],
+      "explodeDist": 0.26
+    },
+    {
+      "id": "GEARBOX_input",
+      "group": "gearbox",
+      "spin": "",
+      "tris": 2512,
+      "explodeDir": [
+        -0.3,
+        0.0,
+        0.04
+      ],
+      "explodeDist": 0.26
+    },
+    {
+      "id": "GEARBOX_lifting_eye",
+      "group": "gearbox",
+      "spin": "",
+      "tris": 892,
+      "explodeDir": [
+        -0.3,
+        0.0,
+        0.04
+      ],
+      "explodeDist": 0.26
+    },
+    {
+      "id": "GEARBOX_output_flange",
+      "group": "gearbox",
+      "spin": "",
+      "tris": 1928,
+      "explodeDir": [
+        -0.3,
+        0.0,
+        0.04
+      ],
+      "explodeDist": 0.26
+    },
+    {
+      "id": "GEARBOX_plugs",
+      "group": "gearbox",
+      "spin": "",
+      "tris": 1984,
+      "explodeDir": [
+        -0.3,
+        0.0,
+        0.04
+      ],
+      "explodeDist": 0.26
+    },
+    {
+      "id": "MAIN_FEEDER_DRIVE",
+      "group": "main_feed",
+      "spin": "",
+      "tris": 620,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "MAIN_FEEDER_SCREW_geo",
+      "group": "main_feeder",
+      "spin": "PIVOT_MAIN_FEEDER",
+      "tris": 9596,
+      "explodeDir": [
+        0.0,
+        0.2,
+        1.0
+      ],
+      "explodeDist": 0.4
+    },
+    {
+      "id": "MAIN_FEED_CHUTE",
+      "group": "main_feed",
+      "spin": "",
+      "tris": 620,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "MAIN_FEED_THROAT",
+      "group": "main_feed",
+      "spin": "",
+      "tris": 120,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "MAIN_HOPPER_BODY",
+      "group": "main_feed",
+      "spin": "",
+      "tris": 1760,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "MAIN_HOPPER_CLAMP",
+      "group": "main_feed",
+      "spin": "",
+      "tris": 5764,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "MAIN_HOPPER_LEVEL",
+      "group": "main_feed",
+      "spin": "",
+      "tris": 256,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "MAIN_HOPPER_LID",
+      "group": "main_feed",
+      "spin": "",
+      "tris": 728,
+      "explodeDir": [
+        0.0,
+        0.0,
+        1.0
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "MELT_ADAPTER",
+      "group": "melt_adapter",
+      "spin": "",
+      "tris": 1756,
+      "explodeDir": [
+        0.62,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.3
+    },
+    {
+      "id": "MOTOR_base",
+      "group": "motor",
+      "spin": "",
+      "tris": 680,
+      "explodeDir": [
+        -1.0,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.62
+    },
+    {
+      "id": "MOTOR_body",
+      "group": "motor",
+      "spin": "",
+      "tris": 13784,
+      "explodeDir": [
+        -1.0,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.62
+    },
+    {
+      "id": "MOTOR_end_bell",
+      "group": "motor",
+      "spin": "",
+      "tris": 2416,
+      "explodeDir": [
+        -1.0,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.62
+    },
+    {
+      "id": "MOTOR_fan_shroud",
+      "group": "motor",
+      "spin": "",
+      "tris": 1936,
+      "explodeDir": [
+        -1.0,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.62
+    },
+    {
+      "id": "MOTOR_feet",
+      "group": "motor",
+      "spin": "",
+      "tris": 864,
+      "explodeDir": [
+        -1.0,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.62
+    },
+    {
+      "id": "MOTOR_shaft",
+      "group": "motor",
+      "spin": "PIVOT_DRIVE",
+      "tris": 288,
+      "explodeDir": [
+        -1.0,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.62
+    },
+    {
+      "id": "MOTOR_terminal_box",
+      "group": "motor",
+      "spin": "",
+      "tris": 1400,
+      "explodeDir": [
+        -1.0,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.62
+    },
+    {
+      "id": "S1_CONVEYING_A",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 22268,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_CONVEYING_B",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 22268,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_CONVEYING_C",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 28796,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_CORE_SHAFT",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 512,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_DISTRIBUTIVE_MIXER",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 2676,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_DRIVE_SPLINE",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 1244,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_FEED_ELEMENTS",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 37244,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_KNEADING_BLOCK_A",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 4588,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_KNEADING_BLOCK_B",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 4588,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_MELTING_ZONE",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 40316,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_METERING_ELEMENTS",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 65276,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S1_TIP",
+      "group": "screw_1",
+      "spin": "PIVOT_SCREW1",
+      "tris": 640,
+      "explodeDir": [
+        0.55,
+        0.0,
+        -0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_CONVEYING_A",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 22268,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_CONVEYING_B",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 22268,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_CONVEYING_C",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 28796,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_CORE_SHAFT",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 512,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_DISTRIBUTIVE_MIXER",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 2676,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_DRIVE_SPLINE",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 1244,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_FEED_ELEMENTS",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 37244,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_KNEADING_BLOCK_A",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 4588,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_KNEADING_BLOCK_B",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 4588,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_MELTING_ZONE",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 40316,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_METERING_ELEMENTS",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 65276,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "S2_TIP",
+      "group": "screw_2",
+      "spin": "PIVOT_SCREW2",
+      "tris": 640,
+      "explodeDir": [
+        0.55,
+        0.0,
+        0.1
+      ],
+      "explodeDist": 0.46
+    },
+    {
+      "id": "SCREEN_PACK",
+      "group": "screen_pack",
+      "spin": "",
+      "tris": 5984,
+      "explodeDir": [
+        0.88,
+        0.0,
+        0.06
+      ],
+      "explodeDist": 0.5
+    },
+    {
+      "id": "SCREEN_PACK_INLET",
+      "group": "screen_inlet",
+      "spin": "",
+      "tris": 2504,
+      "explodeDir": [
+        0.78,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.4
+    },
+    {
+      "id": "SCREEN_PACK_OUTLET",
+      "group": "screen_outlet",
+      "spin": "",
+      "tris": 2504,
+      "explodeDir": [
+        0.95,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.58
+    },
+    {
+      "id": "SENSOR_MELT_TEMP",
+      "group": "sensor",
+      "spin": "",
+      "tris": 1272,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "SENSOR_P_INT_01",
+      "group": "sensor",
+      "spin": "",
+      "tris": 1368,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "SENSOR_P_INT_02",
+      "group": "sensor",
+      "spin": "",
+      "tris": 1368,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "SENSOR_P_SCR_IN",
+      "group": "sensor",
+      "spin": "",
+      "tris": 1368,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "SENSOR_P_SCR_OUT",
+      "group": "sensor",
+      "spin": "",
+      "tris": 1368,
+      "explodeDir": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "explodeDist": 0.0
+    },
+    {
+      "id": "SENSOR_VENT_PRESSURE",
+      "group": "vent",
+      "spin": "",
+      "tris": 1368,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "SENSOR_VENT_TEMP",
+      "group": "vent",
+      "spin": "",
+      "tris": 1272,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "SIDE_FEEDER_DRIVE",
+      "group": "side_feed",
+      "spin": "",
+      "tris": 492,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "SIDE_FEEDER_HOUSING",
+      "group": "side_feed",
+      "spin": "",
+      "tris": 2992,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "SIDE_FEEDER_SCREW_geo",
+      "group": "side_feeder",
+      "spin": "PIVOT_SIDE_FEEDER",
+      "tris": 13916,
+      "explodeDir": [
+        0.0,
+        0.25,
+        1.0
+      ],
+      "explodeDist": 0.3
+    },
+    {
+      "id": "SIDE_FEED_BARREL_PORT",
+      "group": "side_feed",
+      "spin": "",
+      "tris": 604,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "SIDE_FEED_CHUTE",
+      "group": "side_feed",
+      "spin": "",
+      "tris": 108,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "SIDE_HOPPER_CONE",
+      "group": "side_feed",
+      "spin": "",
+      "tris": 1024,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    },
+    {
+      "id": "VENT_STACK",
+      "group": "vent",
+      "spin": "",
+      "tris": 8004,
+      "explodeDir": [
+        0.0,
+        0.15,
+        1.0
+      ],
+      "explodeDist": 0.34
+    }
+  ],
+  "totalTris": 603744
+}

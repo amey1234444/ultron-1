@@ -7,9 +7,9 @@
 //   /__tse-qa?state=idle|linked|live|mixed&width=<px>
 //
 // The reference-image overlay is a development alignment aid only. It draws a
-// PNG *behind* the SVG at adjustable opacity so artwork proportions can be
-// checked against the source drawing. The production machine is always the
-// vector SVG; the raster is never the rendered machine. Drop a file at
+// PNG *behind* the render at adjustable opacity so the locked camera can be
+// checked against the source photograph. The production machine is always the
+// 3D asset; the raster is never the rendered machine. Drop a file at
 // `public/references/twin-screw-extruder-reference.png` to use it — the control
 // is inert when the file is absent.
 import { useMemo, useState } from 'react';
@@ -20,52 +20,47 @@ import { useColorScheme } from 'nativewind';
 import { TwinScrewExtruder } from '../../components/console/machine/TwinScrewExtruder';
 import { connectorsForTemplate } from '../../components/console/machine/machineConnectors';
 import { createTemplateDefaultLayout } from '../../components/console/machine/templateDefaultLayouts';
-import { buildTwinScrewExtruderArtwork } from '../../components/console/machine/twinScrewArtwork';
 import type { MeasurementPadState } from '../../components/console/machine/MeasurementPad';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_POINT_REGISTRY,
+  TWIN_SCREW_SHEET_SCALE,
+  TWIN_SCREW_SHEET_X0,
+  TWIN_SCREW_SHEET_Y1,
 } from '../../lib/twinScrewExtruderPoints';
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
 
 const REFERENCE_IMAGE = '/references/twin-screw-extruder-reference.png';
 
-/** The parts of the machine the registry hangs measurement points off. */
-const MACHINE_PARTS = [
-  // The drive train comes from the artwork's rebuild pass, which is why these
-  // four carry its names rather than the base geometry's.
-  'motor-v16',
-  'motor-coupling-v16',
-  'gearbox-v16',
-  'gearbox-output-raised-v22',
-  'main-hopper',
-  'barrel',
-  'upper-screw',
-  'lower-screw',
-  'side-feeder',
-  'vent',
-  'die',
-];
-
 /**
- * What the drawing actually contains.
+ * The asset the console mounts, and the map that puts it under the pads.
  *
- * Read off the shipped artwork rather than restated here, so this panel can
- * only ever describe the machine the console renders. A dangling `url(#…)` is
- * called out because it is the one fault in an SVG that changes what you see
- * depending on which renderer opened it, and shows up in no diff.
+ * Derived from the shipped constants rather than restated, so this panel can
+ * only ever describe the machine the console actually renders. The inverse
+ * projection is shown for the two pads that bound the machine, because a
+ * mapping that has drifted shows up there first.
  */
-const ARTWORK = (() => {
-  const svg = buildTwinScrewExtruderArtwork();
-  const referenced = new Set(Array.from(svg.matchAll(/url\(#([^)]+)\)/g), (m) => m[1]));
-  const declared = new Set(Array.from(svg.matchAll(/\sid="([^"]+)"/g), (m) => m[1]));
-  return {
-    elements: (svg.match(/<(?!\/|\?|!)/g) ?? []).length,
-    parts: MACHINE_PARTS.map((id) => (declared.has(id) ? id : `${id} MISSING`)),
-    dangling: [...referenced].filter((id) => !declared.has(id)),
-  };
-})();
+const ASSET = {
+  url: '/models/machines/twin-screw-extruder.glb',
+  scale: TWIN_SCREW_SHEET_SCALE,
+  x0: TWIN_SCREW_SHEET_X0,
+  y1: TWIN_SCREW_SHEET_Y1,
+  frustum: `${(TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_SHEET_SCALE).toFixed(3)} x ${(
+    TWIN_SCREW_ARTWORK_HEIGHT / TWIN_SCREW_SHEET_SCALE
+  ).toFixed(3)} m`,
+  extent: (() => {
+    const xs = TWIN_SCREW_POINT_REGISTRY.map((p) => p.x);
+    const ys = TWIN_SCREW_POINT_REGISTRY.map((p) => p.y);
+    const toWorld = (x: number, y: number) => ({
+      x: x / TWIN_SCREW_SHEET_SCALE + TWIN_SCREW_SHEET_X0,
+      y: TWIN_SCREW_SHEET_Y1 - y / TWIN_SCREW_SHEET_SCALE,
+    });
+    const a = toWorld(Math.min(...xs), Math.max(...ys));
+    const b = toWorld(Math.max(...xs), Math.min(...ys));
+    return `world x ${a.x.toFixed(3)}..${b.x.toFixed(3)} m, y ${a.y.toFixed(3)}..${b.y.toFixed(3)} m`;
+  })(),
+};
 
 type PadMode = 'idle' | 'linked' | 'live' | 'mixed';
 
@@ -143,7 +138,7 @@ export default function TwinScrewQaPage() {
       <Text style={{ ...mono, fontSize: 16, marginBottom: 4 }}>Twin Screw Extruder — template QA</Text>
       <Text style={{ ...mono, opacity: 0.6, marginBottom: 16 }}>
         viewBox {TWIN_SCREW_ARTWORK_WIDTH}x{TWIN_SCREW_ARTWORK_HEIGHT} · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
-        {ARTWORK.elements} drawn elements · {ARTWORK.parts.length} named parts
+        3D asset at {ASSET.scale} sheet units/m
       </Text>
 
       <Section title="Pad state">
@@ -170,7 +165,7 @@ export default function TwinScrewQaPage() {
           {[0, 0.25, 0.5, 0.75].map((o) => button(`${Math.round(o * 100)}%`, overlay === o, () => setOverlay(o)))}
         </View>
         <Text style={{ ...mono, opacity: 0.55 }}>
-          Draws {REFERENCE_IMAGE} behind the SVG. The production machine is always the vector drawing; the raster is never
+          Draws {REFERENCE_IMAGE} behind the render. The production machine is always the 3D asset; the raster is never
           shipped as the rendered machine.
         </Text>
       </Section>
@@ -228,13 +223,13 @@ export default function TwinScrewQaPage() {
         })}
       </Section>
 
-      <Section title="Artwork">
-        <Text style={mono}>{ARTWORK.parts.join(' · ')}</Text>
+      <Section title="3D asset">
+        <Text style={mono}>{ASSET.url}</Text>
         <Text style={{ ...mono, opacity: 0.55, marginTop: 4 }}>
-          {ARTWORK.dangling.length === 0
-            ? 'every paint, clip and filter reference resolves'
-            : `DANGLING REFERENCES: ${ARTWORK.dangling.join(', ')}`}
+          sheet map: scale {ASSET.scale} units/m · x0 {ASSET.x0} · y1 {ASSET.y1}
         </Text>
+        <Text style={{ ...mono, opacity: 0.55 }}>ortho frustum: {ASSET.frustum}</Text>
+        <Text style={{ ...mono, opacity: 0.55 }}>pads span {ASSET.extent}</Text>
       </Section>
 
       <Section title={`Default layout (${layout.trails.length} trails, ${layout.boxes.length} cards)`}>
