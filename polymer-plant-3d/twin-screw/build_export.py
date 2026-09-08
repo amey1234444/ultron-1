@@ -163,7 +163,7 @@ def cleanup_for_export():
         lvl.hide_viewport = False
 
 
-def export_glb(path, draco=True):
+def export_glb(path, draco=False):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     for ob in bpy.context.scene.objects:
         ob.hide_viewport = False

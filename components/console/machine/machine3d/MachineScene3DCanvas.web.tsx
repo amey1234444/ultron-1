@@ -15,6 +15,16 @@
  * trail endpoints and the snap targets all keep working through the existing
  * contract rather than a parallel one.
  *
+ * Why the asset is not compressed
+ * -------------------------------
+ * It used to be Draco-compressed, which is why it never appeared: Draco
+ * decodes in a WebAssembly worker, nothing else in this app has ever used
+ * it -- every shipped GLB has an empty `extensionsUsed` and every working
+ * `useGLTF` call passes no decoder path -- and the production CSP is
+ * `script-src 'self'`, which does not permit WebAssembly at all. The loader
+ * simply never resolved, and a suspended loader is silent. The asset is now
+ * plain glTF and loads through exactly the path the plant models proved.
+ *
  * Why the framing is done by hand
  * -------------------------------
  * This used drei's `<Bounds fit clip>`. `clip` sets the camera's near and far
@@ -41,7 +51,6 @@ import type { MachineScene3DCanvasProps, ProjectedPoint } from './types';
 
 export type { MachineScene3DCanvasProps, ProjectedPoint } from './types';
 
-const DRACO_PATH = '/draco/';
 const OCCLUSION_EVERY = 6; // frames
 
 /** Where the camera stands relative to the model, as a fraction of its size. */
@@ -65,7 +74,7 @@ function Machine({
   onLoaded: (loaded: Loaded) => void;
   onSelectPart?: (partId: string) => void;
 }) {
-  const { scene } = useGLTF(modelUrl, DRACO_PATH);
+  const { scene } = useGLTF(modelUrl);
   const model = useMemo(() => scene.clone(true), [scene]);
 
   useEffect(() => {
@@ -334,4 +343,4 @@ export default function MachineScene3DCanvas({
   );
 }
 
-useGLTF.preload('/models/machines/twin-screw-extruder.glb', DRACO_PATH);
+useGLTF.preload('/models/machines/twin-screw-extruder.glb');

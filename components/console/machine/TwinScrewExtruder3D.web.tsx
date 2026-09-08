@@ -46,7 +46,6 @@ import {
 } from '../../../lib/twinScrewExtruderPoints';
 
 const MODEL_URL = '/models/machines/twin-screw-extruder.glb';
-const DRACO_PATH = '/draco/';
 
 /** Ortho frustum that maps the sheet onto world space, from the constants above. */
 const HALF_W = TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_SHEET_SCALE / 2;
@@ -91,7 +90,7 @@ function SheetFrustum() {
 }
 
 function Machine({ closed }: { closed: boolean }) {
-  const { scene } = useGLTF(MODEL_URL, DRACO_PATH);
+  const { scene } = useGLTF(MODEL_URL);
 
   // One clone per mount so two canvases on a page cannot fight over visibility.
   const model = useMemo(() => scene.clone(true), [scene]);
@@ -177,4 +176,4 @@ export default function TwinScrewExtruder3D({
   );
 }
 
-useGLTF.preload(MODEL_URL, DRACO_PATH);
+useGLTF.preload(MODEL_URL);

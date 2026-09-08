@@ -17,7 +17,7 @@
 import { connectorsForTemplate, artworkSizeForTemplate } from '../machineConnectors';
 import { createTemplateDefaultLayout, hasDefaultLayout } from '../templateDefaultLayouts';
 import { TWIN_SCREW_CONNECTORS } from '../TwinScrewExtruder';
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
@@ -140,7 +140,39 @@ console.log('\n--- 3D asset ---');
 const ASSET = join(process.cwd(), 'public', 'models', 'machines', 'twin-screw-extruder.glb');
 check('the machine asset is present', existsSync(ASSET), ASSET);
 
-check('the draco decoder the asset needs is served', existsSync(join(process.cwd(), 'public', 'draco', 'draco_decoder.wasm')));
+/**
+ * The asset carries no required glTF extension.
+ *
+ * It was Draco-compressed once, and never rendered: Draco decodes through a
+ * WebAssembly worker, no other model in this app uses it, and the production
+ * CSP is `script-src 'self'`, which does not permit WebAssembly. The loader
+ * never resolved and a suspended loader says nothing. Anything that puts a
+ * required extension back needs to answer the CSP question first.
+ */
+const assetJson = (() => {
+  const buf = readFileSync(ASSET);
+  const len = buf.readUInt32LE(12);
+  return JSON.parse(buf.subarray(20, 20 + len).toString('utf8')) as {
+    extensionsRequired?: string[];
+    nodes?: { name?: string }[];
+  };
+})();
+check(
+  'the asset needs no glTF extension the browser must decode',
+  (assetJson.extensionsRequired ?? []).length === 0,
+  (assetJson.extensionsRequired ?? []).join(', ') || undefined,
+);
+
+// The pivots are what a screw speed will drive. They are produced by the
+// export step rather than saved in the master, so an export run the wrong
+// way silently ships an asset that can never be animated.
+const PIVOTS = ['PIVOT_SCREW1', 'PIVOT_SCREW2', 'PIVOT_DRIVE'];
+const pivotNames = new Set((assetJson.nodes ?? []).map((n) => n.name));
+check(
+  'the asset carries its animation pivots',
+  PIVOTS.every((name) => pivotNames.has(name)),
+  PIVOTS.filter((name) => !pivotNames.has(name)).join(', ') || undefined,
+);
 
 /**
  * The sheet <-> asset contract.
