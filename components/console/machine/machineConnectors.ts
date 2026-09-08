@@ -46,6 +46,12 @@ export type MachineConnector = {
   /** Position as a fraction of the machine rect. */
   rx: number;
   ry: number;
+  /**
+   * Dynamic 3D target visibility. False keeps an attached trail at its last
+   * valid position while excluding an off-screen/occluded point from snapping.
+   * Flat artwork connectors leave this undefined and remain available.
+   */
+  projectionVisible?: boolean;
   /** Signal tag the machine's analysis model reads this pad as, when it reads it at all. */
   analyzerTag?: string;
   /** Why the model does not consume this pad, when it does not. */

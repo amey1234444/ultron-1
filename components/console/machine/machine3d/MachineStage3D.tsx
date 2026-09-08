@@ -15,18 +15,16 @@
  */
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Platform, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { G } from 'react-native-svg';
+import Svg, { Circle, G } from 'react-native-svg';
 
-import { MeasurementPad, padStateLabel, type MeasurementPadState } from '../MeasurementPad';
+import { consolePalette } from '../../../ui';
+import { padStateLabel, type MeasurementPadState } from '../MeasurementPad';
 import type { MachineCameraCommand, MachineCameraMode, ProjectedPoint } from './types';
 
 const LazyCanvas = lazy(() => import('./MachineScene3DCanvas'));
 
 /** Absolute fill. Written out rather than `inset`, which RN styles do not take. */
 const FILL = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const;
-
-/** The pad's status colour, shared with the flat drawings. */
-const PAD_ACCENT = '#16c84a';
 
 /**
  * How often the projection is pushed into React.
@@ -36,6 +34,49 @@ const PAD_ACCENT = '#16c84a';
  * re-rendering three dozen of them sixty times a second.
  */
 const PUBLISH_MS = 33;
+
+function markerAria(label: string | undefined): Record<string, string> {
+  return label ? { 'aria-label': label, role: 'img' } : { 'aria-hidden': 'true' };
+}
+
+/** A depth-safe marker whose idle centre leaves the machine surface visible. */
+function InstrumentMarker3D({
+  x,
+  y,
+  state,
+  accent,
+  dark,
+  label,
+}: {
+  x: number;
+  y: number;
+  state: MeasurementPadState;
+  accent: string;
+  dark: boolean;
+  label?: string;
+}) {
+  const wired = state !== 'idle';
+  const live = state === 'live';
+  const under = dark ? 'rgba(250,252,252,0.78)' : 'rgba(7,12,16,0.72)';
+
+  return (
+    <G {...markerAria(label)}>
+      {live ? <Circle cx={x} cy={y} r={12} fill={accent} opacity={0.18} /> : null}
+      {wired ? <Circle cx={x} cy={y} r={8.5} fill={accent} opacity={0.2} /> : null}
+      <Circle cx={x} cy={y} r={6.4} fill="none" stroke={under} strokeWidth={3.4} opacity={0.72} />
+      <Circle
+        cx={x}
+        cy={y}
+        r={6.1}
+        fill={wired ? accent : 'none'}
+        fillOpacity={wired ? 0.9 : 0}
+        stroke={accent}
+        strokeWidth={wired ? 1.4 : 1.8}
+      />
+      {wired ? <Circle cx={x} cy={y} r={1.8} fill="#FFFFFF" opacity={0.9} /> : null}
+    </G>
+  );
+}
 
 export type MachineStage3DProps = {
   modelUrl: string;
@@ -108,11 +149,13 @@ export function MachineStage3D({
   className,
   style,
 }: MachineStage3DProps) {
+  const palette = consolePalette(dark);
   const [mounted, setMounted] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [points, setPoints] = useState<ProjectedPoint[]>([]);
 
   useEffect(() => setMounted(true), []);
+  useEffect(() => setPoints([]), [anchors, modelUrl]);
 
   // The canvas projects every frame; this coalesces to PUBLISH_MS.
   const latest = useRef<ProjectedPoint[] | null>(null);
@@ -179,18 +222,18 @@ export function MachineStage3D({
         >
           <G>
             {points.map((point) => {
-              if (!point.onScreen) return null;
               const state = connectorState?.[point.code] ?? 'idle';
               const name = labels?.[point.code] ?? point.code;
+              const visible = point.onScreen && !point.occluded;
               return (
-                <G key={point.code} opacity={point.occluded ? 0.34 : 1}>
-                  <MeasurementPad
+                <G key={point.code} opacity={visible ? 1 : 0}>
+                  <InstrumentMarker3D
                     x={point.rx * size.width}
                     y={point.ry * size.height}
                     state={state}
-                    accent={PAD_ACCENT}
-                    panel={dark ? '#0d0e10' : '#fbfbfa'}
-                    label={`${name} — ${padStateLabel(state)}`}
+                    accent={palette.accent}
+                    dark={dark}
+                    label={visible ? `${name} — ${padStateLabel(state)}` : undefined}
                   />
                 </G>
               );

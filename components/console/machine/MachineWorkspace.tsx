@@ -31,7 +31,11 @@ import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
 import { MachineStage3D } from './machine3d/MachineStage3D';
-import type { ProjectedPoint } from './machine3d/types';
+import {
+  mergeProjectedConnectorPositions,
+  type ProjectedConnectorMap,
+  type ProjectedPoint,
+} from './machine3d/types';
 import {
   TWIN_SCREW_ANCHORS_3D,
   TWIN_SCREW_MODEL_URL,
@@ -39,6 +43,7 @@ import {
 } from '../../../lib/twinScrewExtruderPoints';
 import { CanvasGrid, stageBoundsForCanvas, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
+import { migrateTemplateLayout } from './templateDefaultLayouts';
 import { TrendView } from './TrendView';
 
 type WorkspaceMode = 'design' | 'actual';
@@ -255,18 +260,6 @@ export function MachineWorkspace({
   // TrailBoard(readOnly) instead, so it's excluded here.
   const allChannels = useMemo(() => listChannels(devices, cards), [devices, cards]);
   const [savedBoxes, setSavedBoxes] = useState<Box[]>([]);
-  useEffect(() => {
-    if (!isActual || actualTab === 'machine') return;
-    // Prefer the shared server layout; fall back to any local copy. A newly
-    // created RAV should show the machine artwork without mapping cards/trails
-    // until a user explicitly saves a canvas configuration.
-    const saved = layout ?? loadLocal<SavedLayout>(trailBoardStorageKey(machine.id));
-    if (saved?.boxes && saved.boxes.length > 0) {
-      setSavedBoxes(saved.boxes);
-      return;
-    }
-    setSavedBoxes([]);
-  }, [isActual, actualTab, machine.id, layout]);
 
   const mappedChannels = useMemo<MappedChannel[]>(() => {
     const seenChannels = new Set<string>();
@@ -341,6 +334,20 @@ export function MachineWorkspace({
     return { x: centerX - width / 2, y: centerY - height / 2, width, height };
   }, [machineLayout, zoom, machine.template]);
 
+  useEffect(() => {
+    if (!isActual || actualTab === 'machine') return;
+    // Prefer the shared server layout; fall back to any local copy. A newly
+    // created RAV should show the machine artwork without mapping cards/trails
+    // until a user explicitly saves a canvas configuration.
+    const saved = layout ?? loadLocal<SavedLayout>(trailBoardStorageKey(machine.id));
+    const resolved = saved ? migrateTemplateLayout(machine.template, saved, machineRect) : null;
+    if (resolved?.boxes && resolved.boxes.length > 0) {
+      setSavedBoxes(resolved.boxes);
+      return;
+    }
+    setSavedBoxes([]);
+  }, [isActual, actualTab, machine.id, machine.template, machineRect, layout]);
+
   const selectComponent = (component: MachineComponent) => {
     setSelectedComponentId(component.id);
   };
@@ -359,24 +366,23 @@ export function MachineWorkspace({
    * unit-locking and the analysis layer are untouched, because all of them
    * address a pad by `code` and read its position from `rx`/`ry`.
    */
-  const [projected, setProjected] = useState<Record<string, { rx: number; ry: number }> | null>(null);
+  const [projected, setProjected] = useState<ProjectedConnectorMap | null>(null);
   useEffect(() => setProjected(null), [machine.id, machine.template]);
 
   const handleProjectConnectors = useCallback((points: ProjectedPoint[]) => {
-    const next: Record<string, { rx: number; ry: number }> = {};
-    for (const point of points) {
-      if (point.onScreen) next[point.code] = { rx: point.rx, ry: point.ry };
-    }
-    setProjected(next);
+    setProjected((current) => mergeProjectedConnectorPositions(current, points));
   }, []);
 
   const connectors = useMemo(() => {
     if (!projected) return staticConnectors;
-    // A pad the camera cannot currently see keeps its last known position
-    // rather than collapsing to the origin and dragging trails with it.
+    // A pad the camera cannot currently see keeps its last valid 3D position,
+    // but is not offered as a snap target while hidden. Missing entries after
+    // the first frame are disabled rather than silently presented as 2D pads.
     return staticConnectors.map((connector) => {
       const at = projected[connector.code];
-      return at ? { ...connector, rx: at.rx, ry: at.ry } : connector;
+      return at
+        ? { ...connector, rx: at.rx, ry: at.ry, projectionVisible: at.visible }
+        : { ...connector, projectionVisible: false };
     });
   }, [staticConnectors, projected]);
 

@@ -4,63 +4,33 @@
 // a mock. The pads, the connectors, the default layout and the analysis all come
 // from the shipped modules, so what this page shows is what the console does.
 //
-//   /__tse-qa?state=idle|linked|live|mixed&width=<px>
+//   /__tse-qa?theme=dark|light&state=idle|linked|live|mixed&width=<px>&codes=1&closed=1
 //
 // The reference-image overlay is a development alignment aid only. It draws a
-// PNG *behind* the render at adjustable opacity so the locked camera can be
-// checked against the source photograph. The production machine is always the
+// PNG *behind* the render at adjustable opacity so the initial inspection view
+// can be checked against the source photograph. The production machine is always the
 // 3D asset; the raster is never the rendered machine. Drop a file at
 // `public/references/twin-screw-extruder-reference.png` to use it — the control
 // is inert when the file is absent.
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
 import { useColorScheme } from 'nativewind';
 
-import { TwinScrewExtruder } from '../../components/console/machine/TwinScrewExtruder';
 import { connectorsForTemplate } from '../../components/console/machine/machineConnectors';
+import { MachineStage3D } from '../../components/console/machine/machine3d/MachineStage3D';
+import type { ProjectedPoint } from '../../components/console/machine/machine3d/types';
 import { createTemplateDefaultLayout } from '../../components/console/machine/templateDefaultLayouts';
 import type { MeasurementPadState } from '../../components/console/machine/MeasurementPad';
+import { consolePalette } from '../../components/ui';
 import {
-  TWIN_SCREW_ARTWORK_HEIGHT,
-  TWIN_SCREW_ARTWORK_WIDTH,
+  TWIN_SCREW_ANCHORS_3D,
+  TWIN_SCREW_MODEL_URL,
   TWIN_SCREW_POINT_REGISTRY,
-  TWIN_SCREW_SHEET_SCALE,
-  TWIN_SCREW_SHEET_X0,
-  TWIN_SCREW_SHEET_Y1,
 } from '../../lib/twinScrewExtruderPoints';
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
 
 const REFERENCE_IMAGE = '/references/twin-screw-extruder-reference.png';
-
-/**
- * The asset the console mounts, and the map that puts it under the pads.
- *
- * Derived from the shipped constants rather than restated, so this panel can
- * only ever describe the machine the console actually renders. The inverse
- * projection is shown for the two pads that bound the machine, because a
- * mapping that has drifted shows up there first.
- */
-const ASSET = {
-  url: '/models/machines/twin-screw-extruder.glb',
-  scale: TWIN_SCREW_SHEET_SCALE,
-  x0: TWIN_SCREW_SHEET_X0,
-  y1: TWIN_SCREW_SHEET_Y1,
-  frustum: `${(TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_SHEET_SCALE).toFixed(3)} x ${(
-    TWIN_SCREW_ARTWORK_HEIGHT / TWIN_SCREW_SHEET_SCALE
-  ).toFixed(3)} m`,
-  extent: (() => {
-    const xs = TWIN_SCREW_POINT_REGISTRY.map((p) => p.x);
-    const ys = TWIN_SCREW_POINT_REGISTRY.map((p) => p.y);
-    const toWorld = (x: number, y: number) => ({
-      x: x / TWIN_SCREW_SHEET_SCALE + TWIN_SCREW_SHEET_X0,
-      y: TWIN_SCREW_SHEET_Y1 - y / TWIN_SCREW_SHEET_SCALE,
-    });
-    const a = toWorld(Math.min(...xs), Math.max(...ys));
-    const b = toWorld(Math.max(...xs), Math.min(...ys));
-    return `world x ${a.x.toFixed(3)}..${b.x.toFixed(3)} m, y ${a.y.toFixed(3)}..${b.y.toFixed(3)} m`;
-  })(),
-};
 
 type PadMode = 'idle' | 'linked' | 'live' | 'mixed';
 
@@ -103,13 +73,37 @@ export default function TwinScrewQaPage() {
   const [width, setWidth] = useState(1440);
   const [overlay, setOverlay] = useState(0);
   const [showCodes, setShowCodes] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const [projected, setProjected] = useState<ProjectedPoint[]>([]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedTheme = params.get('theme');
+    if (requestedTheme === 'dark' || requestedTheme === 'light') setColorScheme(requestedTheme);
+
+    const requestedMode = params.get('state');
+    if (requestedMode === 'idle' || requestedMode === 'linked' || requestedMode === 'live' || requestedMode === 'mixed') {
+      setMode(requestedMode);
+    }
+
+    const requestedWidth = Number(params.get('width'));
+    if (Number.isFinite(requestedWidth) && requestedWidth >= 320) setWidth(Math.min(requestedWidth, 1440));
+    setShowCodes(params.get('codes') === '1');
+    setClosed(params.get('closed') === '1');
+  }, [setColorScheme]);
 
   const states = useMemo(() => padStates(mode), [mode]);
   const connectors = useMemo(() => connectorsForTemplate('Twin Screw Extruder'), []);
   const layout = useMemo(() => createTemplateDefaultLayout('Twin Screw Extruder', [], null), []);
   const analysis = useMemo(() => analyseTwinScrew(SAMPLES), []);
+  const labels = useMemo(
+    () => Object.fromEntries(TWIN_SCREW_POINT_REGISTRY.map((point) => [point.code, point.label])),
+    [],
+  );
+  const handleProjection = useCallback((points: ProjectedPoint[]) => setProjected(points), []);
 
   const dark = colorScheme === 'dark';
+  const palette = consolePalette(dark);
   const fg = dark ? '#E7E9EC' : '#1A1D21';
   const bg = dark ? '#0B0D10' : '#FFFFFF';
   const mono = { fontFamily: 'monospace', fontSize: 11, color: fg } as const;
@@ -125,8 +119,8 @@ export default function TwinScrewQaPage() {
         marginRight: 6,
         marginBottom: 6,
         borderWidth: 1,
-        borderColor: active ? '#16c84a' : dark ? '#333' : '#CCC',
-        backgroundColor: active ? 'rgba(22,200,74,0.12)' : 'transparent',
+        borderColor: active ? palette.accent : dark ? '#333' : '#CCC',
+        backgroundColor: active ? `${palette.accent}1F` : 'transparent',
       }}
     >
       {text}
@@ -137,8 +131,8 @@ export default function TwinScrewQaPage() {
     <ScrollView style={{ backgroundColor: bg }} contentContainerStyle={{ padding: 24 }}>
       <Text style={{ ...mono, fontSize: 16, marginBottom: 4 }}>Twin Screw Extruder — template QA</Text>
       <Text style={{ ...mono, opacity: 0.6, marginBottom: 16 }}>
-        viewBox {TWIN_SCREW_ARTWORK_WIDTH}x{TWIN_SCREW_ARTWORK_HEIGHT} · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
-        3D asset at {ASSET.scale} sheet units/m
+        production 3D stage · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
+        {Object.keys(TWIN_SCREW_ANCHORS_3D).length} model-space anchors
       </Text>
 
       <Section title="Pad state">
@@ -150,6 +144,7 @@ export default function TwinScrewQaPage() {
       <Section title="Display">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {button(dark ? 'dark' : 'light', dark, () => setColorScheme(dark ? 'light' : 'dark'))}
+          {button(closed ? 'barrel closed' : 'cutaway open', !closed, () => setClosed((value) => !value))}
           {button(showCodes ? 'codes on' : 'codes off', showCodes, () => setShowCodes((v) => !v))}
         </View>
       </Section>
@@ -170,8 +165,18 @@ export default function TwinScrewQaPage() {
         </Text>
       </Section>
 
-      <View style={{ width, borderWidth: 1, borderColor: dark ? '#222' : '#DDD', marginBottom: 24 }}>
-        <View style={{ position: 'relative' }}>
+      <View
+        style={{
+          width,
+          maxWidth: '100%',
+          aspectRatio: 16 / 9,
+          borderWidth: 1,
+          borderColor: dark ? '#222' : '#DDD',
+          backgroundColor: dark ? '#0B0D10' : '#F7F8F8',
+          marginBottom: 24,
+        }}
+      >
+        <View style={{ position: 'relative', flex: 1 }}>
           {overlay > 0 && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
@@ -180,25 +185,35 @@ export default function TwinScrewQaPage() {
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: overlay, objectFit: 'contain' }}
             />
           )}
-          <TwinScrewExtruder connectorState={states} showBackground />
+          <MachineStage3D
+            modelUrl={TWIN_SCREW_MODEL_URL}
+            anchors={TWIN_SCREW_ANCHORS_3D}
+            labels={labels}
+            connectorState={states}
+            dark={dark}
+            closed={closed}
+            onProjectConnectors={handleProjection}
+          />
           {showCodes && (
             <View style={{ position: 'absolute', inset: 0 }} pointerEvents="none">
-              {TWIN_SCREW_POINT_REGISTRY.map((point) => (
-                <Text
-                  key={point.code}
-                  style={{
-                    position: 'absolute',
-                    left: `${(point.x / TWIN_SCREW_ARTWORK_WIDTH) * 100}%`,
-                    top: `${(point.y / TWIN_SCREW_ARTWORK_HEIGHT) * 100}%`,
-                    fontFamily: 'monospace',
-                    fontSize: 8,
-                    color: '#16c84a',
-                    transform: [{ translateX: 8 }, { translateY: -4 }],
-                  }}
-                >
-                  {point.code}
-                </Text>
-              ))}
+              {projected.map((point) =>
+                point.onScreen && !point.occluded ? (
+                  <Text
+                    key={point.code}
+                    style={{
+                      position: 'absolute',
+                      left: `${point.rx * 100}%`,
+                      top: `${point.ry * 100}%`,
+                      fontFamily: 'monospace',
+                      fontSize: 8,
+                      color: palette.accent,
+                      transform: [{ translateX: 8 }, { translateY: -4 }],
+                    }}
+                  >
+                    {point.code}
+                  </Text>
+                ) : null,
+              )}
             </View>
           )}
         </View>
@@ -224,12 +239,13 @@ export default function TwinScrewQaPage() {
       </Section>
 
       <Section title="3D asset">
-        <Text style={mono}>{ASSET.url}</Text>
+        <Text style={mono}>{TWIN_SCREW_MODEL_URL}</Text>
         <Text style={{ ...mono, opacity: 0.55, marginTop: 4 }}>
-          sheet map: scale {ASSET.scale} units/m · x0 {ASSET.x0} · y1 {ASSET.y1}
+          MachineWorkspace → MachineStage3D → MachineScene3DCanvas.web
         </Text>
-        <Text style={{ ...mono, opacity: 0.55 }}>ortho frustum: {ASSET.frustum}</Text>
-        <Text style={{ ...mono, opacity: 0.55 }}>pads span {ASSET.extent}</Text>
+        <Text style={{ ...mono, opacity: 0.55 }}>
+          {closed ? '11 front barrel groups shown' : '11 front barrel groups hidden; twin screws exposed'}
+        </Text>
       </Section>
 
       <Section title={`Default layout (${layout.trails.length} trails, ${layout.boxes.length} cards)`}>

@@ -15,21 +15,54 @@
  */
 
 import { connectorsForTemplate, artworkSizeForTemplate } from '../machineConnectors';
-import { createTemplateDefaultLayout, hasDefaultLayout } from '../templateDefaultLayouts';
+import type { SavedLayout } from '../TrailBoard';
+import { rerouteBend, withResolvedConnectors } from '../trailRouting';
+import {
+  createTemplateDefaultLayout,
+  hasDefaultLayout,
+  migrateTemplateLayout,
+} from '../templateDefaultLayouts';
 import { TWIN_SCREW_CONNECTORS } from '../TwinScrewExtruder';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import {
+  Box3,
+  MeshStandardMaterial,
+  PerspectiveCamera,
+  Raycaster,
+  Vector3,
+  type Mesh,
+} from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
+  TWIN_SCREW_ANCHORS_3D,
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_COMPONENT_ORDER,
+  TWIN_SCREW_LEGACY_CODE_ALIASES,
+  TWIN_SCREW_MODEL_URL,
   TWIN_SCREW_SHEET_SCALE,
   TWIN_SCREW_SHEET_X0,
   TWIN_SCREW_SHEET_Y1,
   TWIN_SCREW_POINT_REGISTRY,
   twinScrewPointByCode,
 } from '../../../../lib/twinScrewExtruderPoints';
+import {
+  applyTwinScrewMaterialSpec,
+  inheritedString,
+  isEffectivelyVisible,
+  setPartGroupVisibility,
+  TWIN_SCREW_CUTAWAY_GROUP,
+  TWIN_SCREW_CUTAWAY_PART_COUNT,
+  TWIN_SCREW_INSPECTION_VIEW,
+  twinScrewMaterialSpec,
+} from '../machine3d/modelSemantics';
+import {
+  clampProjectionFraction,
+  mergeProjectedConnectorPositions,
+  projectionIsOnScreen,
+} from '../machine3d/types';
 import {
   analyseTwinScrew,
   normaliseReading,
@@ -54,7 +87,23 @@ function check(name: string, condition: boolean, detail?: string) {
 console.log('\n--- Registry ---');
 
 const codes = TWIN_SCREW_POINT_REGISTRY.map((point) => point.code);
+check('the production registry exposes exactly 36 points', codes.length === 36, String(codes.length));
 check('point codes are unique', new Set(codes).size === codes.length, `${codes.length} codes, ${new Set(codes).size} unique`);
+
+const anchorCodes = Object.keys(TWIN_SCREW_ANCHORS_3D);
+check('there is exactly one model-space anchor per point', anchorCodes.length === 36, String(anchorCodes.length));
+check(
+  'registry and model-space anchor identities are one-to-one',
+  codes.length === anchorCodes.length &&
+    codes.every((code) => Object.hasOwn(TWIN_SCREW_ANCHORS_3D, code)) &&
+    anchorCodes.every((code) => codes.includes(code)),
+);
+check(
+  'every model-space anchor is a finite 3-vector',
+  Object.values(TWIN_SCREW_ANCHORS_3D).every(
+    (anchor) => anchor.length === 3 && anchor.every((value) => Number.isFinite(value)),
+  ),
+);
 
 const tags = TWIN_SCREW_POINT_REGISTRY.map((point) => point.analyzerTag);
 check('analyzer tags are unique', new Set(tags).size === tags.length, `${tags.length} tags, ${new Set(tags).size} unique`);
@@ -113,16 +162,16 @@ for (let i = 0; i < TWIN_SCREW_POINT_REGISTRY.length; i += 1) {
 check('no two pads overlap (>= 18 units apart)', closest >= 18, `closest ${closest.toFixed(1)} between ${closestPair}`);
 
 // ---------------------------------------------------------------------------
-console.log('\n--- Artwork and pads ---');
+console.log('\n--- Registry connector export ---');
 
 check(
-  'the drawing renders exactly one pad per registry entry',
+  'the connector export contains exactly one pad per registry entry',
   TWIN_SCREW_CONNECTORS.length === TWIN_SCREW_POINT_REGISTRY.length,
   `${TWIN_SCREW_CONNECTORS.length} vs ${TWIN_SCREW_POINT_REGISTRY.length}`,
 );
 
 check(
-  'the drawing draws no pad that is not in the registry',
+  'the connector export contains no pad outside the registry',
   TWIN_SCREW_CONNECTORS.every((connector) => Boolean(twinScrewPointByCode(connector.code))),
 );
 
@@ -130,14 +179,13 @@ check(
 console.log('\n--- 3D asset ---');
 
 /**
- * The machine is a render, not a drawing.
- *
- * `TwinScrewExtruder` mounts `public/models/machines/twin-screw-extruder.glb`
- * through a locked orthographic elevation. The asset is built by
- * `polymer-plant-3d/twin-screw/` and its export is reproducible: re-running
- * `pipeline.py` in Blender regenerates the same GLB and the same anchors.
+ * The production workspace mounts this GLB through
+ * `MachineWorkspace -> MachineStage3D -> MachineScene3DCanvas.web`. Its
+ * initial view is a fitted near-elevation perspective and remains orbitable.
+ * The Blender sources are retained for provenance; this check treats the
+ * shipped GLB and explicit TypeScript anchors as the production contract.
  */
-const ASSET = join(process.cwd(), 'public', 'models', 'machines', 'twin-screw-extruder.glb');
+const ASSET = join(process.cwd(), 'public', ...TWIN_SCREW_MODEL_URL.split('/').filter(Boolean));
 check('the machine asset is present', existsSync(ASSET), ASSET);
 
 /**
@@ -154,7 +202,12 @@ const assetJson = (() => {
   const len = buf.readUInt32LE(12);
   return JSON.parse(buf.subarray(20, 20 + len).toString('utf8')) as {
     extensionsRequired?: string[];
-    nodes?: { name?: string }[];
+    nodes?: {
+      name?: string;
+      mesh?: number;
+      extras?: { partId?: string; partGroup?: string; spin?: string };
+    }[];
+    materials?: { name?: string; pbrMetallicRoughness?: { roughnessFactor?: number } }[];
   };
 })();
 check(
@@ -174,13 +227,38 @@ check(
   PIVOTS.filter((name) => !pivotNames.has(name)).join(', ') || undefined,
 );
 
+const authoredFrontNodes = (assetJson.nodes ?? []).filter(
+  (node) => node.extras?.partGroup === TWIN_SCREW_CUTAWAY_GROUP,
+);
+check(
+  'the GLB declares all 11 removable front barrel objects',
+  authoredFrontNodes.length === TWIN_SCREW_CUTAWAY_PART_COUNT,
+  String(authoredFrontNodes.length),
+);
+check(
+  'every removable front object has a stable selectable part id',
+  authoredFrontNodes.every((node) => Boolean(node.extras?.partId)),
+);
+
+const assetMaterialNames = (assetJson.materials ?? [])
+  .map((material) => material.name)
+  .filter((name): name is string => Boolean(name));
+check(
+  'every material used by the GLB has an authored runtime PBR specification',
+  assetMaterialNames.every((name) => Boolean(twinScrewMaterialSpec(name))),
+  assetMaterialNames.filter((name) => !twinScrewMaterialSpec(name)).join(', ') || undefined,
+);
+check(
+  'materials whose exported roughness was lost are covered by runtime normalization',
+  ['MAT_stainless', 'MAT_stainless_b', 'MAT_screw_steel', 'MAT_barrel_steel', 'MAT_cast_gray', 'MAT_cast_light'].every(
+    (name) => twinScrewMaterialSpec(name)?.roughness !== undefined,
+  ),
+);
+
 /**
- * The sheet <-> asset contract.
- *
- * These three constants are the only thing tying the render to the registry:
- * the camera frustum is derived from them, and every anchor below was
- * projected through them. If they drift, pads slide off the features they
- * measure -- silently, because nothing else in the app reads world space.
+ * The historical sheet map remains a compatibility contract for stored 2D
+ * template anchors. Production marker positions come from the model-space
+ * registry and the live camera projection audited below.
  */
 check(
   'the sheet mapping is declared',
@@ -189,45 +267,35 @@ check(
   `scale ${TWIN_SCREW_SHEET_SCALE}, x0 ${TWIN_SCREW_SHEET_X0}, y1 ${TWIN_SCREW_SHEET_Y1}`,
 );
 
-/**
- * The frustum the camera builds from the mapping has to be the sheet's own
- * aspect ratio, or the render is stretched against the pads drawn over it.
- */
+/** Keep the compatibility map internally proportional to its old sheet. */
 const frustumW = TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_SHEET_SCALE;
 const frustumH = TWIN_SCREW_ARTWORK_HEIGHT / TWIN_SCREW_SHEET_SCALE;
 check(
-  'the camera frustum matches the sheet aspect ratio',
+  'the compatibility map preserves the sheet aspect ratio',
   Math.abs(frustumW / frustumH - TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_ARTWORK_HEIGHT) < 1e-9,
   `${frustumW.toFixed(4)} x ${frustumH.toFixed(4)}`,
 );
 
-/**
- * Every anchor projects back to a world coordinate inside the machine.
- *
- * The asset occupies roughly x 0.01..3.20 m and y 0..1.33 m in its own frame.
- * A pad whose inverse projection falls outside that is measuring thin air even
- * though it sits inside the viewBox.
- */
+/** Every historical sheet point maps back inside the broad model extent. */
 const outsideAsset = TWIN_SCREW_POINT_REGISTRY.filter((point) => {
   const wx = point.x / TWIN_SCREW_SHEET_SCALE + TWIN_SCREW_SHEET_X0;
   const wy = TWIN_SCREW_SHEET_Y1 - point.y / TWIN_SCREW_SHEET_SCALE;
   return wx < -0.05 || wx > 3.3 || wy < -0.05 || wy > 1.4;
 });
 check(
-  'every pad projects onto the asset, not past it',
+  'every historical connector maps inside the broad asset extent',
   outsideAsset.length === 0,
   outsideAsset.map((p) => p.code).join(', ') || undefined,
 );
 
 // ---------------------------------------------------------------------------
-console.log('\n--- Pads sit on the machine ---');
+console.log('\n--- Historical connector map ---');
 
 /**
- * A pad that has drifted off the machine is still a valid connection point and
- * still passes every check above it — it just measures thin air. These bound it
- * to the drawn extent of the machine rather than to the sheet.
+ * These bounds protect legacy saved-layout migration. Physical attachment of
+ * production markers is checked from the loaded GLB near the end.
  */
-// The rendered machine's own extent on the sheet, from the locked camera:
+// Historical reference-elevation extent:
 // x 49.5..1598.1, y 76.0..722.5. Rounded outward by a pad radius.
 const MACHINE = { x: 40, y: 66, width: 1608 - 40, height: 733 - 66 };
 const strays = TWIN_SCREW_POINT_REGISTRY.filter(
@@ -237,7 +305,7 @@ const strays = TWIN_SCREW_POINT_REGISTRY.filter(
     point.y < MACHINE.y ||
     point.y > MACHINE.y + MACHINE.height,
 );
-check('no pad sits off the machine', strays.length === 0, strays.map((p) => p.code).join(', ') || undefined);
+check('no historical connector sits off its reference machine', strays.length === 0, strays.map((p) => p.code).join(', ') || undefined);
 
 // The barrel zones are one row of instruments along one heater band. If one
 // drifts off that line the machine stops reading as a zone profile.
@@ -252,6 +320,51 @@ check(
   'the barrel zones run upstream to downstream in registry order',
   zonePads.every((point, index) => index === 0 || point.x > zonePads[index - 1].x),
 );
+
+// ---------------------------------------------------------------------------
+console.log('\n--- 3D projection and material contracts ---');
+
+check('projection fractions clamp below the stage', clampProjectionFraction(-0.25) === 0);
+check('projection fractions clamp above the stage', clampProjectionFraction(1.25) === 1);
+check('non-finite projection fractions never escape', clampProjectionFraction(Number.NaN) === 0.5);
+check('a finite point in front of the camera is on-screen', projectionIsOnScreen({ x: 0, y: 0, z: 0 }, -1));
+check('a point behind the camera is rejected', !projectionIsOnScreen({ x: 0, y: 0, z: 0 }, 1));
+check('an off-frustum point is rejected', !projectionIsOnScreen({ x: 1.01, y: 0, z: 0 }, -1));
+check('a non-finite point is rejected', !projectionIsOnScreen({ x: Number.NaN, y: 0, z: 0 }, -1));
+
+const firstProjection = mergeProjectedConnectorPositions(null, [
+  { code: 'tz-01', rx: 1.4, ry: -0.2, distance: 2, onScreen: true, occluded: false },
+]);
+check(
+  'published connector positions are clamped to the stage',
+  firstProjection['tz-01']?.rx === 1 && firstProjection['tz-01']?.ry === 0,
+);
+const retainedProjection = mergeProjectedConnectorPositions(firstProjection, [
+  { code: 'tz-01', rx: 0.2, ry: 0.8, distance: 2, onScreen: false, occluded: false },
+]);
+check(
+  'off-screen connectors retain their last real 3D position',
+  retainedProjection['tz-01']?.rx === 1 && retainedProjection['tz-01']?.ry === 0,
+);
+check('off-screen retained connectors are not snap targets', retainedProjection['tz-01']?.visible === false);
+check(
+  'a connector never falls back to static artwork before its first valid projection',
+  !Object.hasOwn(
+    mergeProjectedConnectorPositions(null, [
+      { code: 'tz-02', rx: 0.5, ry: 0.5, distance: 2, onScreen: false, occluded: false },
+    ]),
+    'tz-02',
+  ),
+);
+
+const recoveredMaterial = new MeshStandardMaterial({ roughness: 1, metalness: 0 });
+recoveredMaterial.name = 'MAT_screw_steel';
+const materialApplied = applyTwinScrewMaterialSpec(recoveredMaterial, true);
+check('the runtime normalizer recognizes the screw material', materialApplied);
+check('the screw roughness is restored from the authored palette', recoveredMaterial.roughness === 0.26);
+check('the screw metalness is restored from the authored palette', recoveredMaterial.metalness === 1);
+check('dark-stage reflection intensity is applied', recoveredMaterial.envMapIntensity === 1.05);
+recoveredMaterial.dispose();
 
 // ---------------------------------------------------------------------------
 console.log('\n--- Connectors and snap targets ---');
@@ -309,6 +422,108 @@ const regenerated = createTemplateDefaultLayout('Twin Screw Extruder', [], null)
 check(
   'the layout is deterministic in the positions it produces',
   JSON.stringify(regenerated.trails.map((t) => t.startMachineAnchor)) === JSON.stringify(layout.trails.map((t) => t.startMachineAnchor)),
+);
+check('every generated twin-screw trail opts into dynamic bend routing', layout.trails.every((trail) => trail.autoRoute === true));
+check(
+  'dynamic bend routing is not added to other machine templates',
+  createTemplateDefaultLayout('Rotary Airlock Valve', [], null).trails.every((trail) => trail.autoRoute === undefined) &&
+    createTemplateDefaultLayout('Single Screw Extruder', [], null).trails.every((trail) => trail.autoRoute === undefined),
+);
+
+const legacyByCurrentCode = new Map(
+  Object.entries(TWIN_SCREW_LEGACY_CODE_ALIASES).map(([legacy, current]) => [current, legacy]),
+);
+const legacyLayout: SavedLayout = {
+  boxes: layout.boxes
+    .filter((box) => box.templatePointCode !== 'tz-09')
+    .map((box) => ({
+      ...box,
+      templatePointCode: box.templatePointCode ? legacyByCurrentCode.get(box.templatePointCode) ?? box.templatePointCode : undefined,
+    })),
+  trails: layout.trails
+    .filter((trail) => trail.startMachinePointCode !== 'tz-09')
+    .map((trail) => ({
+      ...trail,
+      autoRoute: undefined,
+      startMachinePointCode: trail.startMachinePointCode
+        ? legacyByCurrentCode.get(trail.startMachinePointCode) ?? trail.startMachinePointCode
+        : undefined,
+    })),
+  machineZoom: 1.2,
+};
+const migratedLayout = migrateTemplateLayout(
+  'Twin Screw Extruder',
+  legacyLayout,
+  { x: 0, y: 0, width: 1600, height: 900 },
+);
+check('a complete historical 35-point layout restores TZ09', migratedLayout.boxes.length === 36 && migratedLayout.trails.length === 36);
+check(
+  'historical layout identities migrate to current registry codes',
+  migratedLayout.boxes.every((box) => Boolean(twinScrewPointByCode(box.templatePointCode))) &&
+    migratedLayout.trails.every((trail) => Boolean(twinScrewPointByCode(trail.startMachinePointCode))),
+);
+check('layout migration preserves the saved machine zoom', migratedLayout.machineZoom === legacyLayout.machineZoom);
+check('migrated template trails recover dynamic bend routing', migratedLayout.trails.every((trail) => trail.autoRoute === true));
+
+const explicitlyManual: SavedLayout = {
+  ...legacyLayout,
+  trails: legacyLayout.trails.map((trail, index) =>
+    index === 0 ? { ...trail, autoRoute: false } : trail,
+  ),
+};
+const migratedManual = migrateTemplateLayout(
+  'Twin Screw Extruder',
+  explicitlyManual,
+  { x: 0, y: 0, width: 1600, height: 900 },
+);
+check('migration preserves an explicitly manual bend', migratedManual.trails[0].autoRoute === false);
+
+const customPartial: SavedLayout = {
+  boxes: legacyLayout.boxes.slice(0, 4),
+  trails: legacyLayout.trails.slice(0, 4),
+};
+const migratedPartial = migrateTemplateLayout(
+  'Twin Screw Extruder',
+  customPartial,
+  { x: 0, y: 0, width: 1600, height: 900 },
+);
+check('migration never pads a partial operator layout', migratedPartial.boxes.length === 4 && migratedPartial.trails.length === 4);
+
+const routed = rerouteBend(
+  {
+    id: 'route-check',
+    points: [{ x: 10, y: 10 }, { x: 20, y: 20 }, { x: 200, y: 80 }],
+    startMachineAnchor: { rx: 0.1, ry: 0.1 },
+    endBoxId: 'box-check',
+    autoRoute: true,
+  },
+  [{ x: 20, y: 30 }, { x: 20, y: 20 }, { x: 200, y: 80 }],
+);
+check('an auto-routed bend follows a moved endpoint', routed[1].x === 70 && routed[1].y === 80);
+
+const dynamicConnector = { ...connectors[0], rx: 0.25, ry: 0.4, projectionVisible: true };
+const dynamicallyResolved = withResolvedConnectors(
+  [
+    {
+      id: 'dynamic-check',
+      points: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 1200, y: 400 }],
+      startMachineAnchor: { rx: 0, ry: 0 },
+      startMachinePointCode: dynamicConnector.code,
+      endBoxId: 'box-check',
+      autoRoute: true,
+    },
+  ],
+  [{ id: 'box-check', x: 1200, y: 400, label: 'check', templatePointCode: dynamicConnector.code }],
+  [dynamicConnector],
+  { x: 100, y: 50, width: 800, height: 400 },
+)[0];
+check(
+  'a live 3D projection moves the attached trail endpoint',
+  dynamicallyResolved.points[0].x === 300 && dynamicallyResolved.points[0].y === 210,
+);
+check(
+  'a live 3D projection reroutes the derived bend with the endpoint',
+  dynamicallyResolved.points[1].x === 490 && dynamicallyResolved.points[1].y === 400,
 );
 
 // ---------------------------------------------------------------------------
@@ -506,5 +721,183 @@ const empty = analyseTwinScrew([]);
 check('with nothing mapped, every rule reports insufficient evidence', empty.pending.every((r) => r.status === 'INSUFFICIENT_EVIDENCE'));
 check('with nothing mapped, no finding is invented', empty.findings.length === 0);
 
-console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
-process.exit(failures === 0 ? 0 : 1);
+async function checkRuntimeAsset() {
+  console.log('\n--- Loaded GLB semantics and default visibility ---');
+
+  // GLTFLoader's progress object is a browser global. No network is involved,
+  // but Node still needs the constructor to exist while parsing the local GLB.
+  if (typeof globalThis.ProgressEvent === 'undefined') {
+    Object.defineProperty(globalThis, 'ProgressEvent', {
+      configurable: true,
+      value: class ProgressEvent {},
+    });
+  }
+
+  const bytes = readFileSync(ASSET);
+  const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const gltf = await new GLTFLoader().parseAsync(arrayBuffer, '');
+  const root = gltf.scene;
+  root.updateWorldMatrix(true, true);
+
+  const meshes: Mesh[] = [];
+  let triangles = 0;
+  root.traverse((object) => {
+    const mesh = object as Mesh;
+    if (!mesh.isMesh) return;
+    meshes.push(mesh);
+    triangles += (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3;
+  });
+  check('the production GLB loads all 265 render meshes', meshes.length === 265, String(meshes.length));
+  check('the production GLB retains its complete 603744-triangle machine', triangles === 603744, String(triangles));
+
+  const hiddenCount = setPartGroupVisibility(root, TWIN_SCREW_CUTAWAY_GROUP, false);
+  check(
+    'cutaway mode hides all authored front groups through inherited metadata',
+    hiddenCount === TWIN_SCREW_CUTAWAY_PART_COUNT,
+    String(hiddenCount),
+  );
+  const hiddenOwner = root.getObjectByName('BARREL_TZ_01_front');
+  const hiddenPrimitive = hiddenOwner?.getObjectByProperty('isMesh', true);
+  check(
+    'a primitive under a hidden cutaway owner is effectively hidden',
+    Boolean(hiddenPrimitive && !isEffectivelyVisible(hiddenPrimitive)),
+  );
+
+  const groupedOwner = root.getObjectByName('GEARBOX_input');
+  const groupedPrimitive = groupedOwner?.getObjectByProperty('isMesh', true);
+  check(
+    'part selection resolves metadata inherited from a multi-primitive owner',
+    inheritedString(groupedPrimitive, 'partId') === 'GEARBOX_input',
+  );
+
+  const screwParts = { screw_1: 0, screw_2: 0 };
+  root.traverse((object) => {
+    const group = object.userData?.partGroup;
+    if (group === 'screw_1') {
+      screwParts.screw_1 += 1;
+      if (!isEffectivelyVisible(object)) screwParts.screw_1 = Number.NEGATIVE_INFINITY;
+    } else if (group === 'screw_2') {
+      screwParts.screw_2 += 1;
+      if (!isEffectivelyVisible(object)) screwParts.screw_2 = Number.NEGATIVE_INFINITY;
+    }
+  });
+  check('cutaway leaves both complete screw groups visible', screwParts.screw_1 === 12 && screwParts.screw_2 === 12);
+
+  const semanticSurfaces: Readonly<Record<string, string>> = {
+    'motor-nde-vib': 'MOTOR_body',
+    'screw-1-rpm': 'PIVOT_SCREW2',
+    'screw-2-rpm': 'PIVOT_SCREW1',
+    'side-feed-current': 'SIDE_FEEDER_HOUSING',
+    'p-int-01': 'SENSOR_P_INT_01',
+    'p-int-02': 'SENSOR_P_INT_02',
+    'tz-09': 'BARREL_TZ_08_top',
+    'p-screw-in': 'SCREEN_PACK_INLET',
+    'p-screw-out': 'SENSOR_P_SCR_OUT',
+  };
+  const surfaceDrift = Object.entries(semanticSurfaces).filter(([code, partId]) => {
+    const part = root.getObjectByName(partId);
+    const anchor = TWIN_SCREW_ANCHORS_3D[code];
+    if (!part || !anchor) return true;
+    return new Box3().setFromObject(part).distanceToPoint(new Vector3(...anchor)) > 0.003;
+  });
+  check(
+    'corrected anchors remain on their semantically appropriate hardware',
+    surfaceDrift.length === 0,
+    surfaceDrift.map(([code, part]) => `${code}:${part}`).join(', ') || undefined,
+  );
+
+  const modelBox = new Box3().setFromObject(root);
+  const anchorOutsideModel = Object.entries(TWIN_SCREW_ANCHORS_3D).filter(([, anchor]) =>
+    modelBox.distanceToPoint(new Vector3(...anchor)) > 1e-6,
+  );
+  check(
+    'all 36 anchors stay within the loaded machine extent',
+    anchorOutsideModel.length === 0,
+    anchorOutsideModel.map(([code]) => code).join(', ') || undefined,
+  );
+
+  const centre = modelBox.getCenter(new Vector3());
+  const extent = modelBox.getSize(new Vector3());
+  const aspect = 1600 / 900;
+  const vFov = (TWIN_SCREW_INSPECTION_VIEW.fov * Math.PI) / 180;
+  const fitHeight = extent.y / 2 / Math.tan(vFov / 2);
+  const fitWidth = extent.x / 2 / Math.tan(vFov / 2) / aspect;
+  const distance =
+    Math.max(fitHeight, fitWidth, 0.2) * TWIN_SCREW_INSPECTION_VIEW.fillMargin + extent.z / 2;
+  const camera = new PerspectiveCamera(
+    TWIN_SCREW_INSPECTION_VIEW.fov,
+    aspect,
+    Math.max(distance / 200, 0.01),
+    distance * 8 + extent.length(),
+  );
+  camera.position
+    .copy(centre)
+    .addScaledVector(new Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction).normalize(), distance);
+  camera.lookAt(centre);
+  camera.updateMatrixWorld(true);
+
+  const ray = new Raycaster();
+  const visibleCodes: string[] = [];
+  const detachedCodes: string[] = [];
+  const invalidProjectionCodes: string[] = [];
+  for (const [code, anchor] of Object.entries(TWIN_SCREW_ANCHORS_3D)) {
+    const world = new Vector3(...anchor).applyMatrix4(root.matrixWorld);
+    const ndc = world.clone().project(camera);
+    const view = world.clone().applyMatrix4(camera.matrixWorldInverse);
+    const onScreen = projectionIsOnScreen(ndc, view.z);
+    const rx = clampProjectionFraction((ndc.x + 1) / 2);
+    const ry = clampProjectionFraction((1 - ndc.y) / 2);
+    if (!Number.isFinite(rx) || !Number.isFinite(ry) || rx < 0 || rx > 1 || ry < 0 || ry > 1) {
+      invalidProjectionCodes.push(code);
+    }
+    if (!onScreen) continue;
+
+    const direction = world.clone().sub(camera.position);
+    const anchorDistance = direction.length();
+    ray.set(camera.position, direction.normalize());
+    ray.far = Math.max(
+      anchorDistance - TWIN_SCREW_INSPECTION_VIEW.occlusionClearance,
+      0.01,
+    );
+    const occluded = ray.intersectObjects(meshes, false).some((hit) => isEffectivelyVisible(hit.object));
+    if (!occluded) visibleCodes.push(code);
+
+    // The rendered dot needs a small stand-off so it does not z-fight with the
+    // metal. Reusing the production occlusion clearance makes that allowance
+    // explicit: the first visible triangle must still be within 12 mm along
+    // the inspection ray, in front of or immediately behind the anchor.
+    ray.far = Number.POSITIVE_INFINITY;
+    const surfaceHit = ray
+      .intersectObjects(meshes, false)
+      .find((hit) => isEffectivelyVisible(hit.object));
+    const surfaceGap = surfaceHit ? Math.abs(surfaceHit.distance - anchorDistance) : Number.POSITIVE_INFINITY;
+    if (surfaceGap > TWIN_SCREW_INSPECTION_VIEW.occlusionClearance) {
+      detachedCodes.push(`${code}:${Number.isFinite(surfaceGap) ? surfaceGap.toFixed(4) : 'no-surface'}`);
+    }
+  }
+  check(
+    'default cutaway keeps all 36 points on-screen and unoccluded',
+    visibleCodes.length === 36,
+    codes.filter((code) => !visibleCodes.includes(code)).join(', ') || undefined,
+  );
+  check(
+    'all 36 marker anchors are physically attached to a visible machine surface',
+    detachedCodes.length === 0,
+    detachedCodes.join(', ') || undefined,
+  );
+  check(
+    'default projected coordinates are finite and clamped',
+    invalidProjectionCodes.length === 0,
+    invalidProjectionCodes.join(', ') || undefined,
+  );
+}
+
+checkRuntimeAsset()
+  .catch((error: unknown) => {
+    failures += 1;
+    console.log(`  FAIL  production GLB runtime audit — ${error instanceof Error ? error.message : String(error)}`);
+  })
+  .finally(() => {
+    console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
+    process.exitCode = failures === 0 ? 0 : 1;
+  });

@@ -1,0 +1,10 @@
+
+> ultron-ui@1.0.0 start:next
+> next start -p 3000
+
+   ▲ Next.js 15.5.20
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.56.1:3000
+
+ ✓ Starting...
+ ✓ Ready in 6.2s

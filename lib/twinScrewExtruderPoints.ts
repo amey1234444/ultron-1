@@ -238,6 +238,54 @@ export const TWIN_SCREW_POINT_REGISTRY: readonly TwinScrewPointDefinition[] = [
   { code: 'p-screw-out', label: 'Screen Outlet Melt Pressure', kind: 'Pressure', x: 1496, y: 630, side: 'right', component: 'Die and Discharge', analyzerTag: 'TS-P4', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
 ] as const;
 
+/**
+ * Point IDs used by layouts saved before the 3D registry was introduced.
+ *
+ * This is deliberately an explicit list instead of a case/character rewrite:
+ * only identities that are known to mean the same physical instrument migrate.
+ */
+export const TWIN_SCREW_LEGACY_CODE_ALIASES: Readonly<Record<string, string>> = {
+  MOTOR_NDE_VIB: 'motor-nde-vib',
+  MOTOR_TEMP: 'motor-temp',
+  MOTOR_DE_VIB: 'motor-de-vib',
+  MOTOR_POWER: 'motor-current-power',
+  MOTOR_RPM: 'motor-rpm',
+  GEARBOX_IN_VIB: 'gearbox-in-vib',
+  GEARBOX_OUT1_VIB: 'gearbox-out-1-vib',
+  GEARBOX_OUT2_VIB: 'gearbox-out-2-vib',
+  GEARBOX_TEMP: 'gearbox-temp',
+  THRUST_BRG_TEMP: 'thrust-bearing-temp',
+  SCREW1_RPM: 'screw-1-rpm',
+  SCREW2_RPM: 'screw-2-rpm',
+  FEED_THROAT_TEMP: 'feed-throat-temp',
+  TZ_01: 'tz-01',
+  TZ_02: 'tz-02',
+  TZ_03: 'tz-03',
+  TZ_04: 'tz-04',
+  TZ_05: 'tz-05',
+  TZ_06: 'tz-06',
+  TZ_07: 'tz-07',
+  TZ_08: 'tz-08',
+  HOPPER_LEVEL: 'hopper-level',
+  MAIN_FEED_RATE: 'main-feed-rate',
+  MAIN_FEED_RPM: 'main-feed-rpm',
+  MAIN_FEED_CURR: 'main-feed-current',
+  SIDE_FEED_RATE: 'side-feed-rate',
+  SIDE_FEED_RPM: 'side-feed-rpm',
+  SIDE_FEED_CURR: 'side-feed-current',
+  P_INT_01: 'p-int-01',
+  P_INT_02: 'p-int-02',
+  VENT_PRESSURE: 'vent-pressure',
+  VENT_TEMP: 'vent-temp',
+  MELT_TEMP: 'melt-temp',
+  P_SCR_IN: 'p-screw-in',
+  P_SCR_OUT: 'p-screw-out',
+};
+
+export function normalizeTwinScrewPointCode(code: string | undefined): string | undefined {
+  return code ? TWIN_SCREW_LEGACY_CODE_ALIASES[code] ?? code : undefined;
+}
+
 /** Component order for the machine tree, upstream to downstream. */
 export const TWIN_SCREW_COMPONENT_ORDER: readonly TwinScrewComponent[] = [
   'Main Motor',
@@ -293,32 +341,33 @@ export function twinScrewPointsForComponent(component: TwinScrewComponent): Twin
  */
 export const TWIN_SCREW_ANCHORS_3D: Readonly<Record<string, readonly [number, number, number]>> = {
   // --- drive train, bosses on the front face of their housings -------------
-  'motor-nde-vib': [0.1150, 0.3949, 0.150],
-  'motor-current-power': [0.1995, 0.6908, 0.0],
+  'motor-nde-vib': [0.1158, 0.3952, 0.2070],
+  'motor-current-power': [0.232059, 0.683747, 0.087325],
   'motor-temp': [0.3399, 0.6038, 0.0],
   'motor-de-vib': [0.4434, 0.3949, 0.150],
-  'motor-rpm': [0.5242, 0.3949, 0.055],
-  'gearbox-in-vib': [0.6999, 0.4799, 0.200],
+  'motor-rpm': [0.5400, 0.3949, 0.055],
+  'gearbox-in-vib': [0.6999, 0.4799, 0.215],
   'gearbox-temp': [0.9263, 0.7799, 0.0],
   'gearbox-out-1-vib': [1.1897, 0.4178, 0.190],
   'gearbox-out-2-vib': [1.1897, 0.2858, 0.190],
-  'thrust-bearing-temp': [1.1598, 0.1999, 0.190],
+  'thrust-bearing-temp': [1.170057, 0.215837, 0.086781],
 
-  // --- the two shafts, on their own centrelines inside the bore ------------
-  'screw-1-rpm': [1.0998, 0.4178, 0.0],
-  'screw-2-rpm': [1.0998, 0.2858, 0.0],
+  // --- camera-facing flight surfaces just beyond the thrust housing --------
+  // The exported S2/S1 names are inverse to the registry's Screw A/B labels.
+  'screw-1-rpm': [1.304249, 0.424352, 0.052449],
+  'screw-2-rpm': [1.304029, 0.294245, 0.049735],
 
   // --- main feed -----------------------------------------------------------
   'feed-throat-temp': [1.3646, 0.5898, 0.130],
   'hopper-level': [1.3646, 1.1801, 0.225],
   'main-feed-rate': [1.3646, 0.9499, 0.160],
-  'main-feed-rpm': [1.3646, 0.7299, 0.090],
+  'main-feed-rpm': [1.3646, 0.7299, 0.0740],
   'main-feed-current': [1.3646, 0.6600, 0.090],
 
   // --- side feed -----------------------------------------------------------
   'side-feed-rate': [2.0309, 0.8848, 0.080],
   'side-feed-rpm': [2.0309, 0.7599, 0.070],
-  'side-feed-current': [2.0309, 0.7000, 0.070],
+  'side-feed-current': [2.019168, 0.705307, 0.104],
 
   // --- barrel: zone caps on top, pressure tappings on the front face -------
   'tz-01': [1.5415, 0.6524, 0.0],
@@ -329,11 +378,12 @@ export const TWIN_SCREW_ANCHORS_3D: Readonly<Record<string, readonly [number, nu
   'tz-06': [2.2937, 0.6524, 0.0],
   'tz-07': [2.4238, 0.6524, 0.0],
   'tz-08': [2.7073, 0.6524, 0.0],
-  // The asset carries eight heated modules; the registry declares nine, so
-  // TZ-09 sits on the die-end barrel section rather than a cap of its own.
-  'tz-09': [2.7772, 0.6524, 0.0],
-  'p-int-01': [1.6621, 0.2119, 0.210],
-  'p-int-02': [2.2937, 0.2119, 0.210],
+  // The asset carries eight heated modules; TZ-09 is attached to the existing
+  // die-end barrel shoulder. This is the validated surface point, not the old
+  // cap-height coordinate that floated 30 mm above the metal.
+  'tz-09': [2.767014, 0.6225, 0.0],
+  'p-int-01': [1.661225, 0.222418, 0.2355],
+  'p-int-02': [2.283064, 0.222418, 0.2355],
 
   // --- vent ----------------------------------------------------------------
   'vent-pressure': [2.5566, 0.8220, 0.0],
@@ -341,8 +391,10 @@ export const TWIN_SCREW_ANCHORS_3D: Readonly<Record<string, readonly [number, nu
 
   // --- discharge -----------------------------------------------------------
   'melt-temp': [2.8211, 0.6269, 0.0],
-  'p-screw-in': [2.8726, 0.1900, 0.0],
-  'p-screw-out': [2.9916, 0.1900, 0.0],
+  // Screen pressure ports sit on the nearest visible hardware surfaces. The
+  // authored sensor centres are behind the cylindrical housings in elevation.
+  'p-screw-in': [2.874280, 0.286605, 0.158639],
+  'p-screw-out': [2.983084, 0.183559, 0.018836],
 };
 
 /** The asset the machine canvas renders for this template. */

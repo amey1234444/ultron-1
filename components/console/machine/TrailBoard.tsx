@@ -31,7 +31,8 @@ import {
 } from './machineConnectors';
 import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { DEFAULT_STAGE_BOUNDS, type StageBounds } from './StageGrid';
-import { createTemplateDefaultLayout, hasDefaultLayout } from './templateDefaultLayouts';
+import { createTemplateDefaultLayout, hasDefaultLayout, migrateTemplateLayout } from './templateDefaultLayouts';
+import { connectorStagePoint, rerouteBend, withResolvedConnectors } from './trailRouting';
 
 export type Anchor = { rx: number; ry: number };
 
@@ -56,19 +57,6 @@ export type Trail = {
   // shape instead of going stale at its authored position.
   autoRoute?: boolean;
 };
-
-// Recompute the derived bend of an auto-routed 3-point trail from its current
-// endpoints: bend sits at the box end's height, offset from the machine end by
-// exactly |Δy| so the machine-side segment is 45° and the box-side segment is
-// horizontal.
-function rerouteBend(trail: Trail, points: Point[]): Point[] {
-  if (!trail.autoRoute || points.length !== 3) return points;
-  const machineEnd = trail.startMachineAnchor ? points[0] : points[2];
-  const boxEnd = trail.startMachineAnchor ? points[2] : points[0];
-  const direction = boxEnd.x >= machineEnd.x ? 1 : -1;
-  const bend = { x: machineEnd.x + direction * Math.abs(machineEnd.y - boxEnd.y), y: boxEnd.y };
-  return [points[0], bend, points[2]];
-}
 
 export type Box = {
   id: string;
@@ -234,10 +222,6 @@ function worseStatus(a: TrailStatus, b: TrailStatus): TrailStatus {
 // confused for each other.
 const CONNECTOR_SNAP_RADIUS = 26;
 
-function connectorStagePoint(connector: MachineConnector, rect: Rect): Point {
-  return { x: rect.x + connector.rx * rect.width, y: rect.y + connector.ry * rect.height };
-}
-
 /**
  * The pad a dropped endpoint should lock onto.
  *
@@ -257,6 +241,7 @@ function nearestConnector(
   let any: { connector: MachineConnector; point: Point; distance: number; fit: ConnectorFit } | null = null;
 
   for (const connector of connectors) {
+    if (connector.projectionVisible === false) continue;
     const padPoint = connectorStagePoint(connector, rect);
     const distance = Math.hypot(point.x - padPoint.x, point.y - padPoint.y);
     if (distance > CONNECTOR_SNAP_RADIUS) continue;
@@ -272,85 +257,6 @@ function nearestConnector(
 
 function channelLocationLabel(channel: ChannelRef): string {
   return `S${String(channel.slot).padStart(2, '0')}.CH${channelNumberFor(channel)}`;
-}
-
-// Anchors are fractions of the machine rect; both artworks are drawn on the
-// same 1200×760 viewBox, so comparing them in artwork units gives one tolerance
-// that means the same thing at every zoom and screen size.
-const ARTWORK_WIDTH = 1200;
-const ARTWORK_HEIGHT = 760;
-const ANCHOR_MATCH_TOLERANCE = 14;
-
-function connectorForAnchor(anchor: Anchor | undefined, connectors: MachineConnector[]): MachineConnector | undefined {
-  if (!anchor) return undefined;
-  let best: { connector: MachineConnector; distance: number } | undefined;
-  for (const connector of connectors) {
-    const distance = Math.hypot((anchor.rx - connector.rx) * ARTWORK_WIDTH, (anchor.ry - connector.ry) * ARTWORK_HEIGHT);
-    if (distance <= ANCHOR_MATCH_TOLERANCE && (!best || distance < best.distance)) best = { connector, distance };
-  }
-  return best?.connector;
-}
-
-/**
- * Give saved trails their pad identity back, and put them on the pad.
- *
- * Layouts saved before instrument pads were identified — including every trail
- * the template generator produced — carry a machine anchor but no pad code. The
- * identity is recoverable three ways, in descending order of authority: the
- * trail's own code, the point code on the card at the other end, and finally the
- * pad the anchor is already sitting on.
- *
- * Once a trail declares an instrument, its endpoint is re-anchored to that
- * instrument's current position. That is what keeps the drawing and the wiring
- * from drifting apart when a pad is moved to a more accurate spot on the
- * artwork: the connection follows the instrument instead of being left behind
- * at an old coordinate.
- */
-function withResolvedConnectors(
-  trails: Trail[],
-  boxes: Box[],
-  connectors: MachineConnector[],
-  machineRect: Rect | null,
-): Trail[] {
-  if (connectors.length === 0) return trails;
-  const byCode = new Map(connectors.map((connector) => [connector.code, connector]));
-  let changed = false;
-
-  const next = trails.map((trail) => {
-    let patched = trail;
-
-    for (const which of ['start', 'end'] as const) {
-      const codeKey = which === 'start' ? 'startMachinePointCode' : 'endMachinePointCode';
-      const anchorKey = which === 'start' ? 'startMachineAnchor' : 'endMachineAnchor';
-      const anchor = patched[anchorKey];
-      if (!anchor) continue;
-
-      const cardId = which === 'start' ? patched.endBoxId : patched.startBoxId;
-      const cardCode = cardId ? boxes.find((box) => box.id === cardId)?.templatePointCode : undefined;
-      const connector =
-        byCode.get(patched[codeKey] ?? '') ?? byCode.get(cardCode ?? '') ?? connectorForAnchor(anchor, connectors);
-      if (!connector) continue;
-
-      const codeStale = patched[codeKey] !== connector.code;
-      const anchorStale = Math.abs(anchor.rx - connector.rx) > 1e-4 || Math.abs(anchor.ry - connector.ry) > 1e-4;
-      if (!codeStale && !anchorStale) continue;
-
-      changed = true;
-      const index = which === 'start' ? 0 : patched.points.length - 1;
-      patched = {
-        ...patched,
-        [codeKey]: connector.code,
-        [anchorKey]: { rx: connector.rx, ry: connector.ry },
-        points: machineRect
-          ? patched.points.map((point, i) => (i === index ? connectorStagePoint(connector, machineRect) : point))
-          : patched.points,
-      };
-    }
-
-    return patched;
-  });
-
-  return changed ? next : trails;
 }
 
 /** A transient confirmation raised by a connection the operator just made. */
@@ -406,7 +312,11 @@ export function TrailBoard({
   const initialLayoutRef = useRef<SavedLayout | null>(null);
   if (initialLayoutRef.current === null) {
     const saved = initialLayout ?? loadLocal<SavedLayout>(storageKey);
-    initialLayoutRef.current = saved ?? templateLayout ?? { trails: [], boxes: [] };
+    initialLayoutRef.current = migrateTemplateLayout(
+      machineTemplate,
+      saved ?? templateLayout ?? { trails: [], boxes: [] },
+      machineRect,
+    );
   }
 
   const [trails, setTrails] = useState<Trail[]>(initialLayoutRef.current.trails);
@@ -651,13 +561,14 @@ export function TrailBoard({
   useEffect(() => {
     if (!initialLayout || initialLayout === appliedRemoteLayout.current) return;
     appliedRemoteLayout.current = initialLayout;
+    const incoming = migrateTemplateLayout(machineTemplate, initialLayout, machineRect);
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-    trailsRef.current = initialLayout.trails;
-    boxesRef.current = initialLayout.boxes;
-    setTrails(initialLayout.trails);
-    setBoxes(initialLayout.boxes);
+    trailsRef.current = incoming.trails;
+    boxesRef.current = incoming.boxes;
+    setTrails(incoming.trails);
+    setBoxes(incoming.boxes);
     setSelectedId(null);
-  }, [initialLayout]);
+  }, [initialLayout, machineRect, machineTemplate]);
 
   const applyTemplateLayout = () => {
     // A saved template carries the size it was arranged at, so take that first:
@@ -670,7 +581,11 @@ export function TrailBoard({
     // the machine's *current* rect (it shrinks and grows with zoom) — endpoints
     // and bends land exactly on the artwork as rendered right now, not where it
     // would sit at 100%.
-    const layout = templateLayout ?? createTemplateDefaultLayout(machineTemplate, pickableChannels, machineRect);
+    const layout = migrateTemplateLayout(
+      machineTemplate,
+      templateLayout ?? createTemplateDefaultLayout(machineTemplate, pickableChannels, machineRect),
+      machineRect,
+    );
     trailsRef.current = layout.trails;
     boxesRef.current = layout.boxes;
     setTrails(layout.trails);
@@ -726,11 +641,30 @@ export function TrailBoard({
 
   useEffect(() => {
     if (initialLayout || !templateLayout || trailsRef.current.length > 0 || boxesRef.current.length > 0) return;
-    trailsRef.current = templateLayout.trails;
-    boxesRef.current = templateLayout.boxes;
-    setTrails(templateLayout.trails);
-    setBoxes(templateLayout.boxes);
-  }, [initialLayout, templateLayout]);
+    const incoming = migrateTemplateLayout(machineTemplate, templateLayout, machineRect);
+    trailsRef.current = incoming.trails;
+    boxesRef.current = incoming.boxes;
+    setTrails(incoming.trails);
+    setBoxes(incoming.boxes);
+  }, [initialLayout, machineRect, machineTemplate, templateLayout]);
+
+  // The 3D machine rect is measured after the board first mounts. Re-run the
+  // saved-layout upgrade then so a complete pre-TZ09 layout can place its one
+  // restored card/trail against the real full-bleed stage, without disturbing
+  // any operator-positioned card already in the layout.
+  useEffect(() => {
+    const current: SavedLayout = {
+      trails: trailsRef.current,
+      boxes: boxesRef.current,
+      machineZoom: machineZoomRef.current,
+    };
+    const migrated = migrateTemplateLayout(machineTemplate, current, machineRect);
+    if (migrated === current) return;
+    trailsRef.current = migrated.trails;
+    boxesRef.current = migrated.boxes;
+    setTrails(migrated.trails);
+    setBoxes(migrated.boxes);
+  }, [machineRect, machineTemplate]);
 
   // Entering Actual View drops any active selection so no editing chrome
   // (highlight ring, bend toolbar) leaks into the clean monitor rendering.
@@ -781,7 +715,7 @@ export function TrailBoard({
 
   const updateTrailPoints = (id: string, points: Point[]) => {
     const next = magnetised(id, points);
-    replaceTrails((prev) => prev.map((t) => (t.id === id ? { ...t, points: next } : t)));
+    replaceTrails((prev) => prev.map((t) => (t.id === id ? { ...t, points: next, autoRoute: false } : t)));
   };
 
   const removeTrail = (id: string) => {
@@ -800,7 +734,14 @@ export function TrailBoard({
     replaceTrails((prev) =>
       prev.map((t) =>
         t.id === trailId
-          ? { ...t, [boxIdKey]: undefined, [boxAnchorKey]: undefined, [machineAnchorKey]: undefined, [pointCodeKey]: undefined }
+          ? {
+              ...t,
+              autoRoute: false,
+              [boxIdKey]: undefined,
+              [boxAnchorKey]: undefined,
+              [machineAnchorKey]: undefined,
+              [pointCodeKey]: undefined,
+            }
           : t,
       ),
     );
@@ -962,14 +903,18 @@ export function TrailBoard({
         const previous = t.points[insertIndex - 1];
         const end = t.points[insertIndex];
         const bend = { x: (previous.x + end.x) / 2, y: (previous.y + end.y) / 2 };
-        return { ...t, points: [...t.points.slice(0, insertIndex), bend, ...t.points.slice(insertIndex)] };
+        return { ...t, autoRoute: false, points: [...t.points.slice(0, insertIndex), bend, ...t.points.slice(insertIndex)] };
       }),
     );
   };
 
   const removeBendFromSelected = () => {
     replaceTrails((prev) =>
-      prev.map((t) => (t.id === selectedId && t.points.length > 2 ? { ...t, points: t.points.filter((_, i) => i !== t.points.length - 2) } : t)),
+      prev.map((t) =>
+        t.id === selectedId && t.points.length > 2
+          ? { ...t, autoRoute: false, points: t.points.filter((_, i) => i !== t.points.length - 2) }
+          : t,
+      ),
     );
   };
 
@@ -1222,6 +1167,7 @@ export function TrailBoard({
         {!readOnly && machineRect && connectors.length > 0 && (wiring || flashedConnector) && (
           <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
             {connectors.map((connector) => {
+              if (connector.projectionVisible === false) return null;
               const flashed = flashedConnector === connector.code;
               if (!wiring && !flashed) return null;
               const padPoint = connectorStagePoint(connector, machineRect);
