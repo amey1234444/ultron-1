@@ -123,9 +123,14 @@ export async function onMessage(topic, buf) {
   // to any other app instance so its SSE clients see it too.
   const frame = buildLiveFrame(parsed.kind, msg);
   if (frame) {
-    if (PERSISTENCE_ENABLED) void publishLiveFrame(frame);
+    // Sockets first, deliberately. pg_notify is a database round trip; even
+    // un-awaited it does synchronous work (serialising the frame, building the
+    // statement) before yielding, and that work would sit between the message
+    // arriving and the browser seeing it. Presentation is the priority, so
+    // nothing database-shaped runs ahead of it.
     publishToSubscribers(topic, { type: 'frame', kind: parsed.kind, topic, frame, serverNowMs: Date.now() });
     recordPublishLatency(frame);
+    if (PERSISTENCE_ENABLED) void publishLiveFrame(frame);
   }
 
   bumpMetric(`messages_schema_${msg.schema.replaceAll('.', '_')}`);

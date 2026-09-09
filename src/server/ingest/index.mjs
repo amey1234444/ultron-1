@@ -25,7 +25,7 @@ import {
   startSocketHeartbeat,
 } from './liveSocket.mjs';
 import { brokerStatus, connectBroker, disconnectBroker } from './mqttClient.mjs';
-import { coalescedCount, queueDepth } from './persistQueue.mjs';
+import { coalescedCount, droppedCount, failureCount, queueDepth } from './persistQueue.mjs';
 import { MAX_PAYLOAD_BYTES, PERSISTENCE_ENABLED, onMessage } from './pipeline.mjs';
 import { sendCommand } from './commands.mjs';
 
@@ -44,10 +44,11 @@ export function ingestHealth() {
   return {
     ok: true,
     transport: INGEST_TRANSPORT,
-    persistence: PERSISTENCE_ENABLED,
+    // `enabled` is the intent; `ready` is whether the database is actually
+    // answering. enabled && !ready means live data is flowing but not stored.
+    persistence: { enabled: PERSISTENCE_ENABLED, ready: schemaReady, queueDepth: queueDepth(), dropped: droppedCount(), failed: failureCount() },
     broker: brokerStatus(),
     sockets: liveSocketStats(),
-    persistQueueDepth: queueDepth(),
     serverNowMs: Date.now(),
   };
 }
@@ -60,22 +61,47 @@ export function handleIngestHealth(req, res) {
 }
 
 let runtimeStarted = false;
+// Storage readiness, tracked separately from storage being *wanted*. Presenting
+// data matters more than storing it, so an unreachable database degrades this to
+// false and the live path carries on without it.
+let schemaReady = false;
+const SCHEMA_RETRY_MS = Number(process.env.DB_SCHEMA_RETRY_MS ?? 15_000);
+
+// Never throws. A database that is down at boot must not stop the broker
+// subscription or the browser sockets from coming up — that would let a storage
+// outage take out presentation, which is exactly backwards. Persistence jobs
+// already fail individually and are dropped, so the app runs live-only until the
+// database answers, then starts writing without a restart.
+async function prepareSchema() {
+  try {
+    await ensureSchema();
+    if (!schemaReady) console.log('[db] schema ready');
+    schemaReady = true;
+  } catch (err) {
+    schemaReady = false;
+    console.error(`[db] schema not ready (${err.message}); serving live frames and retrying in ${SCHEMA_RETRY_MS}ms`);
+    setTimeout(() => void prepareSchema(), SCHEMA_RETRY_MS).unref?.();
+  }
+}
 
 export async function startIngestRuntime() {
   if (runtimeStarted) return;
   runtimeStarted = true;
 
   if (PERSISTENCE_ENABLED) {
-    await ensureSchema();
-    console.log('[db] schema ready');
+    // Not awaited. Waiting here would hold the broker subscription and the
+    // browser sockets behind a database round trip — up to the connect timeout
+    // when the database is unreachable — which is presentation waiting on
+    // storage. Schema prep runs alongside; writes that land before it finishes
+    // fail individually and are dropped.
+    void prepareSchema();
   } else {
     console.log('[db] persistence disabled; live frames are published but not stored');
   }
 
   startSocketHeartbeat();
 
-  if (GATEWAY_DOOR_ENABLED) {
-    enableGatewaySocketDoor(onMessage, MAX_PAYLOAD_BYTES);
+  if (GATEWAY_DOOR_ENABLED && enableGatewaySocketDoor(onMessage, MAX_PAYLOAD_BYTES)) {
     console.warn(`[ingest] direct gateway door open at ${GATEWAY_WS_PATH} (INGEST_TRANSPORT=${INGEST_TRANSPORT})`);
   }
 
@@ -94,6 +120,7 @@ export async function startIngestRuntime() {
     setInterval(() => {
       setMetric('persist_queue_depth', queueDepth());
       setMetric('persist_coalesced_total', coalescedCount());
+      setMetric('persist_dropped_total', droppedCount());
       flushMetrics().catch((err) => console.error('[metrics]', err.message));
     }, METRICS_FLUSH_INTERVAL_MS).unref?.();
   }

@@ -84,7 +84,10 @@ export function attachIngestWebSockets(server) {
 
     if (url.pathname === GATEWAY_WS_PATH) {
       if (!gatewayIngest) return reject(socket, 404, 'Not Found');
-      if (GATEWAY_WS_SECRET && bearerToken(req, url) !== GATEWAY_WS_SECRET) return reject(socket, 401, 'Unauthorized');
+      // An empty secret used to mean "no check", which turns the fallback door
+      // into an unauthenticated write path into the pipeline. Enabling the door
+      // without a secret is a misconfiguration, not permission to skip auth.
+      if (!GATEWAY_WS_SECRET || bearerToken(req, url) !== GATEWAY_WS_SECRET) return reject(socket, 401, 'Unauthorized');
       gatewayWss.handleUpgrade(req, socket, head, (ws) => gatewayWss.emit('connection', ws, req));
       return;
     }
@@ -145,6 +148,10 @@ function normalizeGatewayPacket(raw) {
 }
 
 export function enableGatewaySocketDoor(onMessage, maxPayloadBytes) {
+  if (!GATEWAY_WS_SECRET) {
+    console.error(`[ws:gateway] ${GATEWAY_WS_PATH} NOT opened: DIRECT_WS_GATEWAY_SECRET is unset`);
+    return false;
+  }
   gatewayIngest = onMessage;
   gatewayWss.on('connection', (ws, req) => {
     heartbeat(ws);
@@ -170,6 +177,7 @@ export function enableGatewaySocketDoor(onMessage, maxPayloadBytes) {
     });
     ws.on('close', () => console.log(`[ws:gateway] disconnected ${peer}`));
   });
+  return true;
 }
 
 export function startSocketHeartbeat() {

@@ -149,10 +149,8 @@ function withDirectRealtime(snapshot: LiveState, previous: LiveState): LiveState
   };
 }
 
-function publishDirectFrameMeasurements(frame: LiveFrame, blockedGatewayIds: Set<string>) {
-  const measurements = frame.measurements?.filter((measurement) => !blockedGatewayIds.has(measurement.gatewayId));
-  publishLiveMeasurements(measurements);
-  recordChannelHistorySamples(measurements);
+function displayableMeasurements(frame: LiveFrame, blockedGatewayIds: Set<string>) {
+  return frame.measurements?.filter((measurement) => !blockedGatewayIds.has(measurement.gatewayId));
 }
 
 export function useLiveTelemetry(): LiveState {
@@ -217,8 +215,15 @@ export function useLiveTelemetry(): LiveState {
       liveLatency.lastFrameAt = now;
       if (frames.some((frame) => (frame.measurements?.length ?? 0) > 0)) liveLatency.lastMeasurementFrameAt = now;
       for (const frame of frames) recordLatency(frame.sourceCreatedAtMs, 0);
-      frames.forEach((frame) => publishDirectFrameMeasurements(frame, blockedGatewayIds));
+
+      // Present, then store. The live bus feeds the channel readouts and the
+      // state merge repaints the canvas; only once both have the values does
+      // this frame's history go to IndexedDB. Recording is cheap and deferred,
+      // but it is storage, and storage never goes first.
+      const batches = frames.map((frame) => displayableMeasurements(frame, blockedGatewayIds));
+      batches.forEach(publishLiveMeasurements);
       setState((current) => frames.reduce((state, frame) => mergeLiveFrame(state, frame, 0), current));
+      batches.forEach(recordChannelHistorySamples);
     };
 
     const queueFrame = (frame: LiveFrame) => {

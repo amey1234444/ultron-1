@@ -198,6 +198,33 @@ parse it. Binding, deduplication, quarantine and the database writes all happen
 in the second branch, where a slow database costs history resolution rather than
 liveness.
 
+**Presentation before storage, everywhere.** The ordering is deliberate at each
+point the two paths meet:
+
+- Browser sockets are written *before* `pg_notify`, because a database round
+  trip does synchronous work before it yields and that work would sit between
+  the message arriving and the reading appearing.
+- Schema preparation is **not awaited at startup**. A database that is
+  unreachable at boot used to throw out of `startIngestRuntime` and take the
+  whole process with it — a storage outage killing presentation. It now logs,
+  retries every `DB_SCHEMA_RETRY_MS`, and the broker subscription and sockets
+  come up regardless.
+- The persistence queue is **capped** (`PERSIST_QUEUE_MAX`, default 10 000).
+  Current-state jobs coalesce and are self-limiting, but append-only work
+  (events, quarantine) has a unique key per message, so a database that stopped
+  answering would grow the queue until the process died. Past the cap the oldest
+  queued write is dropped and counted in `persist_dropped_total`.
+- Failed writes log at most once every 10 s with a running count, so a storage
+  outage cannot bury the log the live path also writes to.
+- In the browser, the live bus and the state merge run before the frame's
+  samples are handed to IndexedDB.
+
+The net effect: with the database completely unreachable, the app still starts,
+subscribes, and paints live readings. `/health` reports it honestly as
+`persistence: { enabled: true, ready: false }` — storage is wanted but not
+happening — and writing resumes on its own when the database answers, without a
+restart.
+
 Because a frame ships before binding has run, **a frame carries no
 authorization**. The browser applies frames only for gateways its persisted
 snapshot already shows as commissioned, which is what keeps an unknown or
@@ -330,22 +357,54 @@ GATEWAY_STATE_DIR=/var/lib/ultron-gateway
 | `MQTT_MAX_PAYLOAD_BYTES` | `262144` | larger messages are quarantined |
 | `LIVE_WS_REQUIRE_SESSION` | on in production | requires a login on `/ws/live` |
 | `PERSISTENCE_ENABLED` | `true` | false = publish frames, write nothing |
+| `PERSIST_QUEUE_MAX` | `10000` | queued writes before the oldest are shed |
+| `DB_SCHEMA_RETRY_MS` | `15000` | retry cadence when the database is unreachable |
 | `STALE_AFTER_S` | `15` | silent gateways are marked OFFLINE after this |
 | `DATABASE_URL` | Supabase URI | |
 | `LIVE_NOTIFY_DATABASE_URL` | **session-mode** URI (port 5432) | the transaction pooler silently drops `NOTIFY` |
 
 ### Broker ACLs
 
-Two users, because the two roles want different permissions:
+The two roles are not symmetric, and that shapes the rules.
 
-| | publish | subscribe |
-| --- | --- | --- |
-| **gateway** (`ultron-gw-{gateway_id}`) | `ultron/v1/gateways/{gateway_id}/#` | `ultron/v1/gateways/{gateway_id}/racks/+/commands/request` |
-| **application** (`ultron-app-ingest-*`) | `ultron/v1/gateways/+/racks/+/commands/request` | `ultron/v1/gateways/#` |
+The **application** is one actor that legitimately speaks to the whole fleet, so
+its rules are wildcards and never change as gateways come and go:
 
-A gateway must not be able to publish as another gateway, and the application
-must not be able to publish telemetry. Sharing one credential between them
-throws that away.
+| | topic filter |
+| --- | --- |
+| subscribe | `ultron/v1/gateways/#` |
+| publish | `ultron/v1/gateways/+/racks/+/commands/request` |
+
+A **gateway** is one actor that may only speak about *itself*. Writing that as a
+literal id (`ultron/v1/gateways/gw-3ml32wam/#`) means editing the broker every
+time a gateway is commissioned, which does not scale. Writing it as a bare
+wildcard (`ultron/v1/gateways/+/#`) scales but lets any gateway publish as any
+other.
+
+Neither is necessary: EMQX interpolates `${username}` as a topic segment, so one
+rule covers every gateway and still confines each to its own subtree.
+
+| | topic filter |
+| --- | --- |
+| publish | `ultron/v1/gateways/${username}/#` |
+| subscribe | `ultron/v1/gateways/${username}/racks/+/commands/request` |
+
+The condition is **one broker user per gateway, with the username equal to that
+gateway's `GATEWAY_ID`** — so `MQTT_USERNAME=gw-3ml32wam` alongside
+`GATEWAY_ID=gw-3ml32wam`. Adding a gateway is then adding a broker user; the ACL
+is written once. (The interpolated value may not contain `/`, `+` or `#`, which
+is another reason gateway ids should stay in the `gw-xxxxxxxx` shape.)
+
+`${clientid}` will *not* work here: the gateway's client id is
+`ultron-gw-{gateway_id}`, and the topic segment is the bare gateway id — EMQX
+substitutes whole values and cannot strip the prefix.
+
+Why bother, when the pipeline already rejects a topic/payload identity mismatch?
+Because that check only catches a *misconfigured* gateway. A gateway that sets
+both the topic and the envelope to another gateway's id passes validation
+cleanly; the broker ACL is the only layer that can refuse it. Per-gateway
+credentials also mean a compromised site is revoked on its own, instead of
+rotating a shared secret across every Pi in the fleet.
 
 ### Deployment order
 
@@ -431,7 +490,8 @@ Written to the ingest metrics table every `METRICS_FLUSH_INTERVAL_MS` (2 s):
 `messages_total`, `messages_schema_*`, `qos_duplicates`, `schema_failures`,
 `identity_mismatches`, `quarantine_messages`, `parse_failures`,
 `payload_too_large`, `persist_queue_depth`, `persist_coalesced_total`,
-`gateway_to_publish_latency_ms`, `last_message_unix_seconds`.
+`gateway_to_publish_latency_ms`, `last_message_unix_seconds`,
+`persist_dropped_total`.
 
 `gateway_to_publish_latency_ms` is gateway sample → frame published, the part of
 end-to-end latency this application owns. Over `LATENCY_BUDGET_MS` (1 s) it logs
@@ -455,6 +515,7 @@ measurement and the live socket's connection state.
 | Frames arrive, values do not paint | `measurement_valid`, `channel_status`, and a non-empty `value_display` are all required before a reading reaches the canvas |
 | SSE works, WebSocket does not | a proxy not forwarding `Upgrade`, or an expired session cookie (`/ws/live` is session-gated) |
 | Values stale after a reconnect | check `persist_queue_depth`; if it is climbing the database is the bottleneck |
+| `persistence.ready: false` in `/health` | the database is unreachable; live frames are unaffected, writes are being dropped — check `DATABASE_URL` |
 
 ---
 
@@ -464,11 +525,12 @@ measurement and the live socket's connection state.
 npm run test:ingest
 ```
 
-17 tests: the v2 contract (topic parsing, envelope and payload validation,
+19 tests: the v2 contract (topic parsing, envelope and payload validation,
 percent-encoded segments, spool replays), live frame construction and queue
 coalescing, and the pub/sub path itself — topic filter matching, per-subscriber
 filtering on `/ws/live`, refusal of unknown upgrade paths, command
-request/response correlation, and command timeout.
+request/response correlation, command timeout, and the persistence queue's
+load-shedding and coalescing under a stalled database.
 
 The full chain was also verified against a real broker: a gateway publishing a
 71.5 °C reading arrives at a browser socket as a measurement, and a `PING`
