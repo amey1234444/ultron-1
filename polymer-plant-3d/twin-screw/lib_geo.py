@@ -261,6 +261,31 @@ def frustum(name, r0, r1, length, axis='X', center=(0, 0, 0), seg=48,
                  bev=bev, closed=True)
 
 
+def torus(name, ring_r, tube_r, axis='Z', center=(0, 0, 0), seg=24, side=10,
+          mat=None, target=None):
+    """A closed ring lying in the plane normal to `axis`.
+
+    Lifting eyes and coupling guard rings are the only round-section parts on
+    the machine, and both were previously open-coded a vertex at a time. `axis`
+    names the ring's *normal*, so a lifting eye standing up in the XZ plane is
+    `axis='Y'` and a guard ring around the drive shaft is `axis='X'`.
+    """
+    verts, faces = [], []
+    for j in range(seg):
+        aj = TAU * j / seg
+        for i in range(side):
+            ai = TAU * i / side
+            r = ring_r + tube_r * cos(ai)
+            p = _axis_pt(axis, r * cos(aj), r * sin(aj), tube_r * sin(ai))
+            verts.append((p[0] + center[0], p[1] + center[1], p[2] + center[2]))
+    for j in range(seg):
+        j2 = (j + 1) % seg
+        for i in range(side):
+            i2 = (i + 1) % side
+            faces.append((j * side + i, j * side + i2, j2 * side + i2, j2 * side + i))
+    return mk(name, verts, faces, mat, target, smooth_angle=radians(50))
+
+
 def ring_of(fn, count, radius, axis='Z', center=(0, 0, 0), start=0.0,
             arc=TAU, plane=None):
     """Call fn(i, (x, y, z)) `count` times around a circle. Returns the objects."""

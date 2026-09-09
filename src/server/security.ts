@@ -27,7 +27,7 @@ function hostFromUrl(value: string | undefined): string | null {
 }
 
 function requestHost(req: NextApiRequest): string | null {
-  // Prefer the proxy-forwarded host (Vercel) then the raw Host header.
+  // Prefer the proxy-forwarded host (Render's edge sets it) then raw Host.
   const xfHost = req.headers['x-forwarded-host'];
   const forwarded = Array.isArray(xfHost) ? xfHost[0] : xfHost;
   const host = forwarded || req.headers.host;

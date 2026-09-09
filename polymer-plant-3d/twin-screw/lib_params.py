@@ -223,9 +223,15 @@ P_INT_FACE_Z = 0.212                       # tapping height on the barrel front 
 # ----------------------------------------------------------------------------
 MOTOR_BODY_R    = 0.207
 MOTOR_BODY_L    = 0.290
-MOTOR_FIN_N     = 26
-MOTOR_FIN_D     = 0.038   # radial fin depth
-MOTOR_FIN_T     = 0.0105  # fin thickness
+# Fin pitch is the whole point of a fin. At the old 26 fins x 10.5 mm on a
+# 290 mm stack the gap between neighbours was 0.65 mm -- narrower than the
+# shading could resolve at any sane render size, so the "finned" motor drew as
+# a smooth drum with a faint stripe pattern. 17 fins at 8.5 mm leaves an 8.6 mm
+# air gap: about 1:1 fin to gap, which is what a real TEFC frame looks like and
+# what makes the stack read as fins from across a dashboard.
+MOTOR_FIN_N     = 17
+MOTOR_FIN_D     = 0.040   # radial fin depth
+MOTOR_FIN_T     = 0.0085  # fin thickness
 MOTOR_SHROUD_R  = 0.176
 MOTOR_SHROUD_L  = 0.098
 MOTOR_ENDBELL_R = 0.150
@@ -329,14 +335,31 @@ SF_X    = slot_center("SIDE_FEED_PORT")
 VENT_X  = slot_center("VENT_PORT")
 
 # ----------------------------------------------------------------------------
-# Tessellation quality (master prompt V2 section 6A.1)
-#   64-96 radial segments on the hopper, motor body, large flanges, screw
-#   cores and large round housings; 40-64 on medium pipes; 24-40 on small
-#   instanced fasteners.
+# Tessellation quality
+#
+# This asset is not rendered in Blender. It is streamed to a browser and drawn
+# on a dashboard where the whole 3.2 m machine is about 1600 px wide -- roughly
+# 500 px per metre. The budget is therefore set from what survives at that
+# scale, not from what a studio render would want.
+#
+# The two screws used to be 460 832 of the machine's 603 744 triangles: 76% of
+# the asset, and by far the largest part of both the download and every frame's
+# vertex work, spent on a helix whose flight crest is eighty pixels across. The
+# numbers below halve the sampling in each direction, which is a quarter of the
+# faces per element, and at 500 px/m the flight silhouette is unchanged.
+#
+# Radial resolution is deliberately cut less than axial. A screw section is read
+# across the flight -- the crest arc and the valley either side of it are the
+# geometry -- while along the shaft the eye only checks that the helix is
+# continuous. 64 samples around the profile hold the crest; 24 slices per turn
+# is one slice every 2.8 mm on the finest (0.068 m) metering pitch.
+#
+#   Q_PROFILE_SEG x 4 = samples around one screw section
+#   Q_SLICES_TURN     = axial slices per full turn of the helix
 # ----------------------------------------------------------------------------
-Q_PROFILE_SEG = 24      # samples per Erdmenger profile segment (x4 segments)
-Q_SLICES_TURN = 48      # axial slices per full screw turn
-Q_LARGE       = 80      # hopper, motor body, big flanges
-Q_CYL         = 64      # default radial segments
-Q_MED         = 48      # medium pipes, couplings
-Q_CYL_LOW     = 32      # small fasteners
+Q_PROFILE_SEG = 16      # samples per Erdmenger profile segment (x4 segments)
+Q_SLICES_TURN = 24      # axial slices per full screw turn
+Q_LARGE       = 48      # hopper, motor body, big flanges
+Q_CYL         = 40      # default radial segments
+Q_MED         = 30      # medium pipes, couplings
+Q_CYL_LOW     = 18      # small fasteners

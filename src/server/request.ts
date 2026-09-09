@@ -2,7 +2,7 @@ import crypto from 'crypto';
 
 import type { NextApiRequest } from 'next';
 
-// Best-effort client IP. Behind Vercel / proxies the real client is the first
+// Best-effort client IP. Behind a proxy the real client is the first
 // entry of x-forwarded-for; fall back to the socket address for direct hits.
 export function clientIp(req: NextApiRequest): string {
   const xff = req.headers['x-forwarded-for'];

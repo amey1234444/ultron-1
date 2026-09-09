@@ -59,6 +59,9 @@ import {
   TWIN_SCREW_INSPECTION_VIEW,
   resolveMachineFinishKey,
 } from './modelSemantics';
+import { MachineGround } from './MachineGround';
+import { SensorHardPoints, type HardPointFaces } from './SensorHardPoints';
+import type { HardPointState } from './hardPointTypes';
 import {
   clampProjectionFraction,
   projectionIsOnScreen,
@@ -69,6 +72,28 @@ import {
 export type { MachineScene3DCanvasProps, ProjectedPoint } from './types';
 
 const OCCLUSION_EVERY = 6; // frames
+
+/**
+ * Smallest feature allowed to cast, in metres of world size.
+ *
+ * The shadow map is a second full geometry pass, and it is only worth its cost
+ * for parts big enough to throw a shadow the map can actually resolve. At the
+ * frustum fitted below one texel is a few millimetres on the machine, so an M8
+ * bolt head or a single screw flight contributes noise and a draw. Anything
+ * bigger than this casts; everything still *receives*, which is the half of
+ * the effect that reads.
+ *
+ * Measured in world space, which on this asset is not optional. The GLB ships
+ * `KHR_mesh_quantization`: positions are int16 on a 0.0977 mm grid and the
+ * metre scale lives on a wrapper node, so a mesh's *geometry* bounding sphere
+ * is in units of about a ten-thousandth of a metre. Comparing that radius
+ * against 0.06 asks whether the part is bigger than six micrometres, which
+ * every part is -- the test would pass universally and quietly buy nothing.
+ */
+const SHADOW_CASTER_MIN_SIZE = 0.06; // metres
+
+/** Shadow map resolution. One pass, fitted tightly, at a size worth sampling. */
+const SHADOW_MAP_SIZE = 1024;
 
 /**
  * Tone-map exposure per theme.
@@ -137,7 +162,8 @@ function Machine({
     root.traverse((object) => {
       const mesh = object as THREE.Mesh;
       if (!mesh.isMesh) return;
-      mesh.castShadow = true;
+      // Receiving is universal; casting is decided in world space once the
+      // matrices are known, below.
       mesh.receiveShadow = true;
       mesh.material = Array.isArray(mesh.material)
         ? mesh.material.map((entry) => cloneMaterial(mesh, entry))
@@ -170,6 +196,18 @@ function Machine({
     }
 
     prepared.root.updateWorldMatrix(true, true);
+
+    // Now that world matrices exist, decide which parts cast. One Box3 per
+    // mesh at load, never per frame. See SHADOW_CASTER_MIN_SIZE for why this
+    // cannot be read off the geometry.
+    const bounds = new THREE.Box3();
+    const size = new THREE.Vector3();
+    for (const mesh of prepared.meshes) {
+      bounds.setFromObject(mesh);
+      bounds.getSize(size);
+      mesh.castShadow = Math.max(size.x, size.y, size.z) >= SHADOW_CASTER_MIN_SIZE;
+    }
+
     const box = new THREE.Box3().setFromObject(prepared.root);
     onLoaded({ root: prepared.root, box, meshes: prepared.meshes });
   }, [prepared, closed, onLoaded]);
@@ -245,14 +283,26 @@ function Framing({
 /* the projector                                                               */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Turns each instrument's *physical port* into a screen position every frame.
+ *
+ * The world position comes from the port's connection face -- the same piece of
+ * geometry the operator can see bolted to the machine -- so the pad, the trail
+ * endpoint and the snap target are all derived from one 3D object rather than
+ * from a coordinate that merely resembles where it is. `anchors` remains the
+ * authoritative list of point codes, and its coordinates are the fallback for
+ * the handful of frames before the ports have mounted.
+ */
 function PointProjector({
   anchors,
+  faces,
   root,
   meshes,
   onProjectPoints,
   onReady,
 }: {
   anchors: Readonly<Record<string, readonly [number, number, number]>>;
+  faces: React.RefObject<HardPointFaces | null>;
   root: THREE.Object3D;
   meshes: THREE.Mesh[];
   onProjectPoints?: (points: ProjectedPoint[]) => void;
@@ -278,9 +328,12 @@ function PointProjector({
     const doOcclusion = meshes.length > 0 && tick.current % OCCLUSION_EVERY === 0;
     camera.getWorldPosition(camPos);
 
+    const ports = faces.current;
     const out: ProjectedPoint[] = [];
     for (const [code, a] of entries) {
-      world.set(a[0], a[1], a[2]).applyMatrix4(root.matrixWorld);
+      if (!ports?.read(code, world)) {
+        world.set(a[0], a[1], a[2]).applyMatrix4(root.matrixWorld);
+      }
       ndc.copy(world).project(camera);
 
       view.copy(world).applyMatrix4(camera.matrixWorldInverse);
@@ -382,7 +435,52 @@ function RendererSettings({ dark }: { dark: boolean }) {
  * two short-throw fills reach into the open barrel so the screws are lit by
  * something other than bounce.
  */
-function Lights({ dark }: { dark: boolean }) {
+function Lights({ dark, box }: { dark: boolean; box: THREE.Box3 | null }) {
+  const key = useRef<THREE.DirectionalLight>(null);
+
+  /**
+   * Aim the key at the machine and bracket it with the shadow camera.
+   *
+   * A directional light targets the world origin by default, and its shadow
+   * camera is a fixed 10 m box around that origin. This machine's centre is
+   * 1.6 m down the +X axis and it is 3.2 m long, so the default arrangement
+   * spent a 512 px map on a volume mostly containing nothing and resolved the
+   * machine itself at about two centimetres per texel -- coarser than the fins,
+   * the flights, the barrel seams and every fastener it was supposed to be
+   * shading. Fitted to the real box at 1024 px it lands near three millimetres,
+   * which is the scale the geometry is actually built at.
+   */
+  useEffect(() => {
+    const light = key.current;
+    if (!light || !box || box.isEmpty()) return;
+    const centre = box.getCenter(new THREE.Vector3());
+    // Bounding-sphere radius, so the machine fits inside this half-extent no
+    // matter which way the light looks at it. The margin is for the shadow
+    // itself: the key is oblique, so what it throws onto the floor reaches
+    // further than the machine does, and a frustum sized to the machine alone
+    // would slice the far end of its own shadow off in a straight line.
+    const radius = (box.getSize(new THREE.Vector3()).length() / 2) * 1.5;
+
+    light.target.position.copy(centre);
+    light.target.updateMatrixWorld();
+
+    const camera = light.shadow.camera;
+    camera.left = -radius;
+    camera.right = radius;
+    camera.top = radius;
+    camera.bottom = -radius;
+    camera.near = 0.05;
+    camera.far = radius * 6;
+    camera.updateProjectionMatrix();
+    light.shadow.mapSize.set(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
+    // Normal bias rather than depth bias: it offsets along the surface normal,
+    // so it removes acne on the fins and the flights without the peter-panning
+    // that a flat depth bias large enough to do the same job would cause.
+    light.shadow.normalBias = 0.012;
+    light.shadow.bias = -0.0004;
+    light.shadow.needsUpdate = true;
+  }, [box]);
+
   return (
     <>
       {/* Very low, and neutral. This sets the floor of the image, not its level. */}
@@ -393,6 +491,7 @@ function Lights({ dark }: { dark: boolean }) {
       />
       {/* Key: upper front-left, the only light that casts. */}
       <directionalLight
+        ref={key}
         position={[-2.4, 4.6, 5.2]}
         color="#FFFDF9"
         intensity={dark ? 1.55 : 1.75}
@@ -436,6 +535,8 @@ function Lights({ dark }: { dark: boolean }) {
 export default function MachineScene3DCanvas({
   modelUrl,
   anchors,
+  labels,
+  connectorState,
   dark,
   closed = false,
   cameraMode = 'free',
@@ -443,9 +544,21 @@ export default function MachineScene3DCanvas({
   onProjectPoints,
   onReady,
   onSelectPart,
+  onSelectHardPoint,
   onContextLost,
 }: MachineScene3DCanvasProps) {
   const controls = useRef<OrbitControlsImpl | null>(null);
+  // The ports publish themselves here rather than through state: the projector
+  // reads them inside `useFrame`, so a re-render would buy nothing and cost a
+  // reconciliation of the whole stage every time one mounts.
+  const faces = useRef<HardPointFaces | null>(null);
+  const handleFaces = useCallback((next: HardPointFaces) => {
+    faces.current = next;
+  }, []);
+  const hardPointStates = useMemo(
+    () => (connectorState ?? {}) as Readonly<Record<string, HardPointState>>,
+    [connectorState],
+  );
   // State, not a ref: the projector needs to re-read the mesh list when it
   // arrives, and a ref mutation does not re-render.
   const [loaded, setLoaded] = useState<Loaded | null>(null);
@@ -494,7 +607,7 @@ export default function MachineScene3DCanvas({
     >
       <RendererSettings dark={dark} />
       <LocalEnvironment dark={dark} />
-      <Lights dark={dark} />
+      <Lights dark={dark} box={loaded?.box ?? null} />
 
       <Suspense fallback={null}>
         <Machine
@@ -506,11 +619,33 @@ export default function MachineScene3DCanvas({
         />
       </Suspense>
 
+      {/* The floor, ported from the Blender studio the asset is authored in.
+          Sized from the machine's own box, so it follows a re-export. */}
+      {loaded ? <MachineGround box={loaded.box} dark={dark} /> : null}
+
+      {/* Physical instrumentation ports, parented into the components they are
+          bolted to. `loaded.meshes` was captured before these mounted, so a
+          port is never raycast against itself when the projector tests
+          occlusion -- but it is depth tested against the machine like any other
+          piece of metal, which is what makes it disappear behind the barrel
+          instead of floating in front of it. */}
+      {loaded ? (
+        <SensorHardPoints
+          root={loaded.root}
+          states={hardPointStates}
+          labels={labels}
+          dark={dark}
+          onFaces={handleFaces}
+          onSelect={onSelectHardPoint}
+        />
+      ) : null}
+
       {/* Only projects once the machine is actually there, so pads can never
           again be drawn over an empty stage. */}
       {loaded ? (
         <PointProjector
           anchors={anchors}
+          faces={faces}
           root={loaded.root}
           meshes={loaded.meshes}
           onProjectPoints={onProjectPoints}

@@ -199,6 +199,43 @@ export function machineFinishColor(key: MachineFinishKey, dark: boolean): string
 export const MACHINE_ENV_INTENSITY = { light: 0.34, dark: 0.30 } as const;
 
 /**
+ * Specular effects the asset ships that this console does not want.
+ *
+ * The export carries `KHR_materials_anisotropy`, and it carries it on exactly
+ * the four materials that were blowing out: the hopper shells at 0.55 and 0.72,
+ * the screws at 0.40 and the barrel at 0.25. three.js honours the extension by
+ * upgrading those materials to `MeshPhysicalMaterial` and stretching their
+ * specular lobe along one axis -- which on a brushed hopper in a studio is
+ * exactly right, and on a near-black dashboard is a white streak that swallows
+ * the geometry underneath it. Measured on the stage, the hopper's cylindrical
+ * shell rendered at #B3BBC1 against a base colour of #747D86, and screw flights
+ * at #BEC0C1 against #929AA2 with the valleys beside them at #121212: the
+ * "white-and-black noise instead of a screw" in one number.
+ *
+ * Re-grading colour, metalness and roughness could never fix that, because the
+ * value it was showing was not coming from any of the three. So the anisotropy
+ * is cleared here, along with the other physical lobes an export could add,
+ * and the finish below is what decides the highlight.
+ */
+function clearPhysicalSpecular(material: MeshStandardMaterial): void {
+  const physical = material as MeshStandardMaterial & {
+    anisotropy?: number;
+    anisotropyRotation?: number;
+    clearcoat?: number;
+    iridescence?: number;
+    sheen?: number;
+    specularIntensity?: number;
+  };
+  if (physical.anisotropy !== undefined) {
+    physical.anisotropy = 0;
+    physical.anisotropyRotation = 0;
+  }
+  if (physical.clearcoat !== undefined) physical.clearcoat = 0;
+  if (physical.iridescence !== undefined) physical.iridescence = 0;
+  if (physical.sheen !== undefined) physical.sheen = 0;
+}
+
+/**
  * Write a finish onto a cloned standard material.
  *
  * Maps, transparency and normal data are left exactly as loaded: this asset
@@ -216,6 +253,23 @@ export function applyMachineFinish(
   material.metalness = finish.metalness;
   material.roughness = finish.roughness;
   material.envMapIntensity = MACHINE_ENV_INTENSITY[dark ? 'dark' : 'light'];
+  clearPhysicalSpecular(material);
   material.needsUpdate = true;
   return true;
+}
+
+/** True when a material still carries a specular lobe the finish does not own. */
+export function machineFinishHasStraySpecular(material: MeshStandardMaterial): boolean {
+  const physical = material as MeshStandardMaterial & {
+    anisotropy?: number;
+    clearcoat?: number;
+    iridescence?: number;
+    sheen?: number;
+  };
+  return Boolean(
+    (physical.anisotropy ?? 0) > 0 ||
+      (physical.clearcoat ?? 0) > 0 ||
+      (physical.iridescence ?? 0) > 0 ||
+      (physical.sheen ?? 0) > 0,
+  );
 }

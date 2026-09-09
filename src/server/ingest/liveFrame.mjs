@@ -4,7 +4,7 @@
 // snapshot it already holds, so a reading reaches the canvas as soon as the
 // broker delivers it and long before the row lands in PostgreSQL.
 //
-// Mirrored in src/server/liveFrame.ts for the Vercel webhook ingest path; keep
+// Mirrored in src/server/liveFrame.ts for the webhook ingest path; keep
 // both in sync.
 
 const CONTROLLER_SLOT = 13;

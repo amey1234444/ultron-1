@@ -103,6 +103,15 @@ export type MachineCameraCommand = {
   kind: 'fit' | 'reset';
 };
 
+/**
+ * Wiring state per point code, as the console already models it.
+ *
+ * Passed straight through to the hard points so a port's ring brightens when
+ * its instrument is linked or live. The mapping between a `code` and a channel
+ * is not this module's business and is never rewritten here.
+ */
+export type HardPointStateMap = Readonly<Record<string, 'idle' | 'linked' | 'live'>>;
+
 export type MachineScene3DCanvasProps = {
   /** The asset to render, served from `public/`. */
   modelUrl: string;
@@ -111,6 +120,10 @@ export type MachineScene3DCanvasProps = {
    * frame and published through `onProjectPoints`.
    */
   anchors: Readonly<Record<string, readonly [number, number, number]>>;
+  /** Spoken name per point code, for the port's accessible description. */
+  labels?: Readonly<Record<string, string>>;
+  /** Wiring state per point code, which decides each port's ring brightness. */
+  connectorState?: HardPointStateMap;
   dark: boolean;
   /** Draw the barrel closed instead of cut away. */
   closed?: boolean;
@@ -123,6 +136,8 @@ export type MachineScene3DCanvasProps = {
   onReady?: () => void;
   /** Pointer went down on the model rather than on empty space. */
   onSelectPart?: (partId: string) => void;
+  /** Pointer went down on an instrumentation port, by point code. */
+  onSelectHardPoint?: (code: string) => void;
   /** The GPU dropped the drawing buffer; the stage shows a notice, not a hole. */
   onContextLost?: () => void;
 };

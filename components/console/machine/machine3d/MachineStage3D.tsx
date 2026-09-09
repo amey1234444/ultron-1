@@ -14,14 +14,42 @@
  * on the feature it measures while the operator orbits the machine.
  */
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Text, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 
 import { consolePalette } from '../../../ui';
 import { padStateLabel, type MeasurementPadState } from '../MeasurementPad';
+import { MachineLoadingRing } from './MachineLoadingRing';
+import { markMachineReady, warmMachineAsset } from './machineAssetProgress';
 import type { MachineCameraCommand, MachineCameraMode, ProjectedPoint } from './types';
 
-const LazyCanvas = lazy(() => import('./MachineScene3DCanvas'));
+const loadCanvas = () => import('./MachineScene3DCanvas');
+const LazyCanvas = lazy(loadCanvas);
+
+/**
+ * Start the two downloads the stage needs, together.
+ *
+ * They used to run in series, and it was the single largest part of the wait.
+ * `lazy` cannot ask for the asset until its chunk has arrived, because
+ * `useGLTF.preload` lives *inside* that chunk -- so the browser fetched ~600 kB
+ * of three.js, executed it, and only then discovered it wanted 3.6 MB of
+ * machine. Kicking the asset off here overlaps the two, and with the model
+ * route's cache header the loader's own request is then served from cache
+ * rather than fetched twice.
+ *
+ * Deliberately fire-and-forget: this is a cache warm, not a data dependency.
+ * If it fails, `useGLTF` still fetches the asset exactly as it did before.
+ */
+const warmed = new Set<string>();
+
+function warmStage(modelUrl: string) {
+  if (typeof window === 'undefined' || warmed.has(modelUrl)) return;
+  warmed.add(modelUrl);
+  void loadCanvas().catch(() => {});
+  // Same single request as before; `warmMachineAsset` streams the body so the
+  // loading ring can show real progress instead of an unlabelled wait.
+  warmMachineAsset(modelUrl);
+}
 
 /** Absolute fill. Written out rather than `inset`, which RN styles do not take. */
 const FILL = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const;
@@ -39,7 +67,18 @@ function markerAria(label: string | undefined): Record<string, string> {
   return label ? { 'aria-label': label, role: 'img' } : { 'aria-hidden': 'true' };
 }
 
-/** A depth-safe marker whose idle centre leaves the machine surface visible. */
+/**
+ * The wiring state of one instrument, drawn over its physical port.
+ *
+ * The port itself is 3D -- a socket, a stem and a green ring bolted to the
+ * component -- and it is what the operator reads as "there is an instrument
+ * here". This layer only says what the console knows about that instrument:
+ * whether it is unmapped, linked, or carrying live data. It is therefore
+ * deliberately slight. The old marker was a 12 px halo around a 6 px filled
+ * disc, which is what made the set look like map pins scattered over a render;
+ * at this weight the machine keeps its own hardware and the overlay adds a
+ * state, not a second marker.
+ */
 function InstrumentMarker3D({
   x,
   y,
@@ -57,23 +96,25 @@ function InstrumentMarker3D({
 }) {
   const wired = state !== 'idle';
   const live = state === 'live';
-  const under = dark ? 'rgba(250,252,252,0.78)' : 'rgba(7,12,16,0.72)';
+  // A hairline of the opposite value, so the ring survives both a bright hopper
+  // and a near-black cavity without needing a heavy halo to do it.
+  const under = dark ? 'rgba(6,10,13,0.55)' : 'rgba(248,250,251,0.60)';
+  const radius = wired ? 5.4 : 4.8;
 
   return (
     <G {...markerAria(label)}>
-      {live ? <Circle cx={x} cy={y} r={12} fill={accent} opacity={0.18} /> : null}
-      {wired ? <Circle cx={x} cy={y} r={8.5} fill={accent} opacity={0.2} /> : null}
-      <Circle cx={x} cy={y} r={6.4} fill="none" stroke={under} strokeWidth={3.4} opacity={0.72} />
+      {live ? <Circle cx={x} cy={y} r={8.2} fill={accent} opacity={0.13} /> : null}
+      <Circle cx={x} cy={y} r={radius} fill="none" stroke={under} strokeWidth={2.2} opacity={0.7} />
       <Circle
         cx={x}
         cy={y}
-        r={6.1}
-        fill={wired ? accent : 'none'}
-        fillOpacity={wired ? 0.9 : 0}
+        r={radius}
+        fill="none"
         stroke={accent}
-        strokeWidth={wired ? 1.4 : 1.8}
+        strokeWidth={wired ? 1.5 : 1.0}
+        opacity={wired ? 1 : 0.62}
       />
-      {wired ? <Circle cx={x} cy={y} r={1.8} fill="#FFFFFF" opacity={0.9} /> : null}
+      {wired ? <Circle cx={x} cy={y} r={1.7} fill={accent} opacity={0.95} /> : null}
     </G>
   );
 }
@@ -101,10 +142,17 @@ export type MachineStage3DProps = {
   style?: StyleProp<ViewStyle>;
 };
 
-function Notice({ dark, message, spinner = false }: { dark: boolean; message: string; spinner?: boolean }) {
+/**
+ * A terminal message: not-web, context lost, or a stage that threw.
+ *
+ * No spinner any more. Every state that is genuinely *waiting* now renders
+ * `MachineLoadingRing` instead, so a `Notice` always means "this is as far as
+ * it goes", and it no longer positions itself -- the status layer that mounts
+ * it owns the centring for both.
+ */
+function Notice({ dark, message }: { dark: boolean; message: string }) {
   return (
-    <View style={{ ...FILL, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      {spinner ? <ActivityIndicator size="small" color={dark ? '#F5F5F5' : '#111827'} /> : null}
+    <View style={{ alignItems: 'center', justifyContent: 'center', gap: 8 }}>
       <Text
         style={{
           fontSize: 11.5,
@@ -119,7 +167,19 @@ function Notice({ dark, message, spinner = false }: { dark: boolean; message: st
   );
 }
 
-class CanvasBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
+/**
+ * Catches a stage that throws, and tells the stage about it.
+ *
+ * `onFailed` is the important half. The boundary used to render its own
+ * fallback in place of the canvas -- inside the layer the stage keeps at
+ * `opacity: 0` until the first projection, which for a stage that never
+ * projects is forever. The message existed and was invisible. Now the failure
+ * is lifted into the stage, which draws it in a layer that is actually shown.
+ */
+class CanvasBoundary extends Component<
+  { onFailed: () => void; children: ReactNode },
+  { failed: boolean }
+> {
   state = { failed: false };
 
   static getDerivedStateFromError() {
@@ -128,10 +188,11 @@ class CanvasBoundary extends Component<{ fallback: ReactNode; children: ReactNod
 
   componentDidCatch(error: unknown) {
     console.error('[machine-3d] stage failed to render', error);
+    this.props.onFailed();
   }
 
   render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
+    return this.state.failed ? null : this.props.children;
   }
 }
 
@@ -154,14 +215,20 @@ export function MachineStage3D({
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [points, setPoints] = useState<ProjectedPoint[]>([]);
   const [contextLost, setContextLost] = useState(false);
+  const [failed, setFailed] = useState(false);
 
-  useEffect(() => setMounted(true), []);
+  useEffect(() => {
+    warmStage(modelUrl);
+    setMounted(true);
+  }, [modelUrl]);
   useEffect(() => {
     setPoints([]);
     setContextLost(false);
+    setFailed(false);
   }, [anchors, modelUrl]);
 
   const handleContextLost = useCallback(() => setContextLost(true), []);
+  const handleFailed = useCallback(() => setFailed(true), []);
 
   // The canvas projects every frame; this coalesces to PUBLISH_MS.
   const latest = useRef<ProjectedPoint[] | null>(null);
@@ -179,22 +246,46 @@ export function MachineStage3D({
     [onProjectConnectors],
   );
 
-  const canvas = () => {
+  // The first projection is the first frame in which the machine is provably
+  // drawn, which is also the moment the loading ring has nothing left to say.
+  const shown = points.length > 0;
+  useEffect(() => {
+    if (shown) markMachineReady(modelUrl);
+  }, [shown, modelUrl]);
+
+  /**
+   * What the overlay layer has to say, or `null` when it should say nothing.
+   *
+   * Exactly one of these is true at a time, and none of them are the canvas --
+   * which is why they are drawn in their own full-opacity layer rather than
+   * inside the one that fades the machine in.
+   */
+  const overlay = (): ReactNode => {
     if (Platform.OS !== 'web') {
       return <Notice dark={dark} message="The 3D machine is available in the web console." />;
-    }
-    if (!mounted) {
-      return <Notice dark={dark} message="Preparing machine…" spinner />;
     }
     if (contextLost) {
       return <Notice dark={dark} message="The 3D view lost its graphics context. Reload to restore it." />;
     }
+    if (failed) {
+      return <Notice dark={dark} message="The 3D machine could not be displayed on this device." />;
+    }
+    if (!shown) {
+      return <MachineLoadingRing dark={dark} modelUrl={modelUrl} />;
+    }
+    return null;
+  };
+
+  const canvas = () => {
+    if (Platform.OS !== 'web' || !mounted || contextLost) return null;
     return (
-      <CanvasBoundary fallback={<Notice dark={dark} message="The 3D machine could not be displayed on this device." />}>
-        <Suspense fallback={<Notice dark={dark} message="Loading machine…" spinner />}>
+      <CanvasBoundary onFailed={handleFailed}>
+        <Suspense fallback={null}>
           <LazyCanvas
             modelUrl={modelUrl}
             anchors={anchors}
+            labels={labels}
+            connectorState={connectorState}
             dark={dark}
             closed={closed}
             cameraMode={cameraMode}
@@ -224,17 +315,35 @@ export function MachineStage3D({
         style={[
           FILL,
           Platform.OS === 'web'
-            ? ({ opacity: points.length > 0 ? 1 : 0, transition: 'opacity 320ms ease-out' } as object)
+            ? ({ opacity: shown ? 1 : 0, transition: 'opacity 320ms ease-out' } as object)
             : null,
         ]}
       >
         {canvas()}
       </View>
 
+      {/* Status layer. Deliberately a sibling of the fade above and never a
+          child of it: everything here exists precisely for the window in which
+          the machine is not yet drawn, so anything drawn inside that layer
+          would be held at zero opacity for exactly as long as it had something
+          to say. Pointer events are off so it never blocks the orbit controls
+          during the fade-in. */}
+      {(() => {
+        const status = overlay();
+        return status ? (
+          <View
+            style={[FILL, { alignItems: 'center', justifyContent: 'center' }]}
+            pointerEvents="none"
+          >
+            {status}
+          </View>
+        ) : null;
+      })()}
+
       {/* Instrument pads, placed from the live projection. Pointer events stay
           off: the trail board above this layer owns hit-testing and wiring, the
           same way it does for the flat drawings. */}
-      {size && points.length > 0 ? (
+      {size && shown ? (
         <Svg
           width="100%"
           height="100%"

@@ -1,5 +1,5 @@
 // Shared Babel config for BOTH the Expo/Metro build (mobile + expo web) and the
-// Next.js build (Vercel web). We branch on the Babel caller so each toolchain gets
+// Next.js build (web). We branch on the Babel caller so each toolchain gets
 // the preset it needs while the repo keeps a single babel.config.js.
 module.exports = function (api) {
   const callerName = api.caller((caller) => (caller ? caller.name : ''));

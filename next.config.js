@@ -57,7 +57,21 @@ const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false, // don't advertise the framework/version
   async headers() {
-    return [{ source: '/:path*', headers: securityHeaders }];
+    return [
+      // The machine asset is 3.6 MB of geometry that changes only when the
+      // model is rebuilt. Next serves `public/` with `max-age=0`, so every
+      // visit to the machine page re-validated it before a single triangle
+      // could be drawn. A week of hard caching with a month of background
+      // revalidation makes the second visit instant and keeps a rebuilt asset
+      // arriving on its own.
+      {
+        source: '/models/:path*',
+        headers: [
+          { key: 'Cache-Control', value: 'public, max-age=604800, stale-while-revalidate=2592000' },
+        ],
+      },
+      { source: '/:path*', headers: securityHeaders },
+    ];
   },
   // Keep the Expo tsconfig untouched — Next uses its own. Type-checking is skipped
   // during the build because the shared React Native component tree legitimately

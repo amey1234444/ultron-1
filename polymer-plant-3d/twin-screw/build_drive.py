@@ -14,6 +14,21 @@ import lib_mat as M
 # ---------------------------------------------------------------------------
 
 def build_motor(root):
+    """A heavy-duty TEFC frame, built as one.
+
+    The old motor was a finned cylinder with a box on top: correct in outline,
+    and readable as nothing in particular. What a real machine of this size has,
+    and what the eye actually uses to recognise one, is the hardware *between*
+    the primitives -- a bearing housing centring each end, cast bands closing
+    the fin stack, webs tying the frame to its feet, a conduit leaving the
+    terminal box, an eye to lift it by, and a stepped output shaft that visibly
+    seats into the coupling instead of ending near it.
+
+    All of that is authored here rather than added at render time. It is part of
+    the motor: it carries the motor's `partId`, moves with it when the assembly
+    is exploded, is selectable as it, and takes the same finish grade as the
+    casting it grows out of.
+    """
     c = G.coll("MOTOR", root)
     body = M.get("MAT_motor_body")
     fin = M.get("MAT_motor_fin")
@@ -33,17 +48,33 @@ def build_motor(root):
             (P.MOTOR_SHROUD_R * 0.86, 0.016), (P.MOTOR_SHROUD_R, 0.040),
             (P.MOTOR_SHROUD_R, sh - 0.012), (P.MOTOR_SHROUD_R * 0.99, sh),
             (0.0, sh)]
-    shroud = G.lathe("MOTOR_fan_shroud", prof, P.Q_CYL, 'X', (sx0, 0, zc),
-                     mat=cast, target=c)
+    shroud = [G.lathe("MOTOR_fan_shroud", prof, P.Q_CYL, 'X', (sx0, 0, zc),
+                      mat=cast, target=c)]
     # cooling slots in the shroud face
-    slots = []
     for i in range(12):
         a = 2 * pi * i / 12
-        slots.append(G.box("slot%d" % i,
-                           (sx0 + 0.004, P.MOTOR_SHROUD_R * .62 * cos(a),
-                            zc + P.MOTOR_SHROUD_R * .62 * sin(a)),
-                           (0.010, 0.020, 0.048), dark, c, bev=0.002))
-    out["MOTOR_fan_shroud"] = G.join([shroud] + slots, "MOTOR_fan_shroud", None, c)
+        shroud.append(G.box("slot%d" % i,
+                            (sx0 + 0.004, P.MOTOR_SHROUD_R * .62 * cos(a),
+                             zc + P.MOTOR_SHROUD_R * .62 * sin(a)),
+                            (0.010, 0.020, 0.048), dark, c, bev=0.002))
+    # Non-drive-end bearing housing. Without it the back of the motor is a flat
+    # disc, and a flat disc on the end of a cylinder reads as a capped pipe.
+    shroud.append(G.lathe("MOTOR_ndbearing",
+                          [(0.0, 0.0), (0.058, 0.0), (0.058, -0.014),
+                           (0.040, -0.021), (0.040, -0.031), (0.0, -0.031)],
+                          P.Q_MED, 'X', (sx0 + 0.002, 0, zc), mat=cast, target=c))
+    shroud.append(G.cyl("MOTOR_ndcap", 0.022, 0.010, 'X',
+                        (sx0 - 0.034, 0, zc), P.Q_CYL_LOW, steel, c,
+                        chamfer=0.003))
+    # Cast ribs breaking up the shroud barrel, on the same clock as the slots.
+    for i in range(6):
+        a = 2 * pi * i / 6 + radians(30)
+        shroud.append(G.box("MOTOR_shroud_rib",
+                            (sx0 + sh * .55,
+                             (P.MOTOR_SHROUD_R - 0.004) * cos(a),
+                             zc + (P.MOTOR_SHROUD_R - 0.004) * sin(a)),
+                            (sh * .62, 0.014, 0.014), cast, c, bev=0.003))
+    out["MOTOR_fan_shroud"] = G.join(shroud, "MOTOR_fan_shroud", None, c)
 
     # ---- finned stator body ------------------------------------------------
     bx0 = sx0 + sh
@@ -55,6 +86,12 @@ def build_motor(root):
         fx = bx0 + pitchf * (i + 0.5)
         parts.append(G.tube("MOTOR_fin%02d" % i, P.MOTOR_BODY_R, core_r - 0.004,
                             P.MOTOR_FIN_T, 'X', (fx, 0, zc), P.Q_CYL, fin, c))
+    # Heavier cast bands closing the fin stack at each end. A row of identical
+    # rings with nothing terminating it reads as a texture; with a band at each
+    # end it reads as a stack of fins on a frame, which is what it is.
+    for bx in (bx0 + 0.008, bx0 + P.MOTOR_BODY_L - 0.008):
+        parts.append(G.tube("MOTOR_band", P.MOTOR_BODY_R + 0.0035, core_r - 0.004,
+                            0.019, 'X', (bx, 0, zc), P.Q_CYL, body, c))
     # cast ribs the fins are broken by, top and bottom
     for s in (1, -1):
         parts.append(G.box("MOTOR_rib%d" % s,
@@ -62,6 +99,11 @@ def build_motor(root):
                             zc + s * (P.MOTOR_BODY_R - P.MOTOR_FIN_D * .35)),
                            (P.MOTOR_BODY_L, 0.052, P.MOTOR_FIN_D * .8),
                            body, c, bev=0.004))
+    # Rating plate, on the face the console frames the machine from (-Y).
+    parts.append(G.box("MOTOR_nameplate",
+                       (bx0 + P.MOTOR_BODY_L * .70,
+                        -(P.MOTOR_BODY_R - 0.010), zc - 0.030),
+                       (0.088, 0.016, 0.052), steel, c, bev=0.003))
     out["MOTOR_body"] = G.join(parts, "MOTOR_body", None, c)
 
     # ---- terminal box ------------------------------------------------------
@@ -77,46 +119,103 @@ def build_motor(root):
                 "MOTOR_tbolt", 0.0075, 0.006, 'Z',
                 (tx + sx * tl * .38, sy * tw * .38, tz + th * .5 + 0.020),
                 bolt, c, dark))
-    # gland plate on the side
-    tparts.append(G.cyl("MOTOR_gland", 0.020, 0.030, 'Y',
-                        (tx, -tw * .5 - 0.012, tz), 24, cast, c, chamfer=0.004))
+    # gland plate on the side, and the conduit leaving it
+    gy = -tw * .5 - 0.012
+    tparts.append(G.cyl("MOTOR_gland", 0.020, 0.030, 'Y', (tx, gy, tz), 24,
+                        cast, c, chamfer=0.004))
+    tparts.append(G.cyl("MOTOR_conduit_a", 0.0155, 0.040, 'Y',
+                        (tx, gy - 0.026, tz), P.Q_CYL_LOW, cast, c))
+    tparts.append(G.lathe("MOTOR_conduit_elbow",
+                          [(0, 0), (0.020, 0), (0.020, 0.030), (0, 0.030)],
+                          P.Q_CYL_LOW, 'Z', (tx, gy - 0.046, tz - 0.015),
+                          mat=cast, target=c))
+    tparts.append(G.cyl("MOTOR_conduit_b", 0.0155, 0.130, 'Z',
+                        (tx, gy - 0.046, tz - 0.078), P.Q_CYL_LOW, dark, c))
     out["MOTOR_terminal_box"] = G.join(tparts, "MOTOR_terminal_box", None, c)
 
-    # ---- drive end bell + shaft -------------------------------------------
+    # ---- lifting eye -------------------------------------------------------
+    # Clear of the terminal box, which occupies the top of the frame from
+    # tx - tl/2 to tx + tl/2.
+    ex = tx + tl * .5 + 0.048
+    ez = zc + P.MOTOR_BODY_R
+    lparts = [G.box("MOTOR_eye_pad", (ex, 0, ez + 0.008),
+                    (0.058, 0.050, 0.018), body, c, bev=0.005),
+              G.lathe("MOTOR_eye_boss",
+                      [(0, 0), (0.020, 0), (0.017, 0.022), (0, 0.022)],
+                      P.Q_CYL_LOW, 'Z', (ex, 0, ez + 0.016), mat=cast, target=c),
+              G.torus("MOTOR_eye_ring", 0.0215, 0.0072, 'Y',
+                      (ex, 0, ez + 0.058), P.Q_CYL_LOW, 8, steel, c)]
+    out["MOTOR_lifting_eye"] = G.join(lparts, "MOTOR_lifting_eye", None, c)
+
+    # ---- drive end bell + bearing cap + shaft ------------------------------
     ex0 = bx0 + P.MOTOR_BODY_L
     eprof = [(0.0, 0.0), (P.MOTOR_BODY_R * .97, 0.0), (P.MOTOR_ENDBELL_R, 0.030),
              (P.MOTOR_ENDBELL_R, 0.052), (P.MOTOR_ENDBELL_R * .72, 0.068),
              (P.MOTOR_ENDBELL_R * .60, 0.070), (0.0, 0.070)]
     eparts = [G.lathe("MOTOR_endbell", eprof, P.Q_CYL, 'X', (ex0, 0, zc),
                       mat=cast, target=c)]
-    eparts.append(G.cyl("MOTOR_shaft_boss", P.MOTOR_SHAFT_R * 1.9, 0.034, 'X',
-                        (ex0 + 0.084, 0, zc), 36, cast, c, chamfer=0.004))
     for i in range(6):
         a = 2 * pi * i / 6 + radians(30)
         eparts.append(G.socket_screw(
             "MOTOR_ebolt", 0.008, 0.007, 'X',
             (ex0 + 0.002, P.MOTOR_ENDBELL_R * .78 * cos(a),
              zc + P.MOTOR_ENDBELL_R * .78 * sin(a)), bolt, c, dark))
+    # Drive-end bearing housing, stepped down to the shaft seal. This is what
+    # makes the output end read as carrying a load rather than as a rod poking
+    # out of a lid.
+    bcx = ex0 + 0.066
+    eparts.append(G.lathe("MOTOR_de_bearing",
+                          [(P.MOTOR_SHAFT_R, 0.0), (0.084, 0.0), (0.084, 0.020),
+                           (0.062, 0.028), (0.062, 0.040),
+                           (P.MOTOR_SHAFT_R * 1.22, 0.040)],
+                          P.Q_MED, 'X', (bcx, 0, zc), mat=cast, target=c))
+    for i in range(6):
+        a = 2 * pi * i / 6
+        eparts.append(G.socket_screw(
+            "MOTOR_bcbolt", 0.0068, 0.006, 'X',
+            (bcx + 0.001, 0.070 * cos(a), zc + 0.070 * sin(a)), bolt, c, dark))
     out["MOTOR_end_bell"] = G.join(eparts, "MOTOR_end_bell", None, c)
 
-    shaft_x0 = ex0 + 0.100
-    out["MOTOR_shaft"] = G.cyl("MOTOR_shaft", P.MOTOR_SHAFT_R,
-                               (x1 - shaft_x0) + 0.02, 'X',
-                               (shaft_x0 + (x1 - shaft_x0) * .5, 0, zc),
-                               36, steel, c, chamfer=0.004)
+    # ---- stepped output shaft ---------------------------------------------
+    # Three diameters: the seal journal, the collar bearing against the housing,
+    # and the reduced nose that seats inside the coupling hub bore. The old
+    # shaft was one cylinder that stopped short of the hub, which is most of why
+    # the drive train looked like parts parked in a row.
+    shaft_x0 = bcx + 0.036
+    nose = P.X_COUPLING[0] + 0.030 - shaft_x0
+    out["MOTOR_shaft"] = G.lathe(
+        "MOTOR_shaft",
+        [(0.0, 0.0), (P.MOTOR_SHAFT_R * 1.30, 0.0), (P.MOTOR_SHAFT_R * 1.30, 0.016),
+         (P.MOTOR_SHAFT_R, 0.022), (P.MOTOR_SHAFT_R, nose - 0.016),
+         (P.MOTOR_SHAFT_R * 0.88, nose - 0.010), (P.MOTOR_SHAFT_R * 0.88, nose),
+         (0.0, nose)],
+        P.Q_MED, 'X', (shaft_x0, 0, zc), mat=steel, target=c)
     G.set_origin(out["MOTOR_shaft"], (shaft_x0, 0, zc))
 
-    # ---- feet, base plates, anchors ---------------------------------------
+    # ---- feet, webs, base plate, anchors ----------------------------------
     foot_z0 = 0.100
+    foot_top = zc - P.MOTOR_BODY_R * .55
     fparts = []
     for fx in (bx0 + 0.030, ex0 - 0.030):
         for sy in (-1, 1):
             fparts.append(G.box("MOTOR_foot",
-                                (fx, sy * 0.140, (foot_z0 + zc - P.MOTOR_BODY_R * .55) * .5),
-                                (0.070, 0.048, zc - P.MOTOR_BODY_R * .55 - foot_z0 + 0.10),
+                                (fx, sy * 0.140, (foot_z0 + foot_top) * .5),
+                                (0.070, 0.048, foot_top - foot_z0 + 0.10),
                                 body, c, bev=0.005))
             fparts.append(G.box("MOTOR_footpad", (fx, sy * 0.140, foot_z0 + 0.012),
                                 (0.096, 0.078, 0.026), body, c, bev=0.005))
+            # Cast web from the foot back up into the frame. Four small wedges
+            # are what stop the motor from looking like a cylinder resting on
+            # four unattached posts.
+            fparts.append(G.box("MOTOR_web",
+                                (fx, sy * 0.106, (foot_z0 + foot_top) * .5 + 0.020),
+                                (0.052, 0.014, foot_top - foot_z0 + 0.04),
+                                body, c, bev=0.003))
+    # Longitudinal rail tying the two feet on each side into one frame.
+    for sy in (-1, 1):
+        fparts.append(G.box("MOTOR_rail",
+                            ((bx0 + ex0) * .5, sy * 0.140, foot_z0 + 0.030),
+                            (ex0 - bx0 - 0.040, 0.036, 0.026), body, c, bev=0.004))
     out["MOTOR_feet"] = G.join(fparts, "MOTOR_feet", None, c)
 
     bl, bw, bh = P.MOTOR_BASE
@@ -129,6 +228,11 @@ def build_motor(root):
             bparts.append(G.hex_head("MOTOR_anchor", 0.016, 0.014, 'Z',
                                      (bxc + sx * bl * .40, sy * bw * .40, bh),
                                      bolt, c))
+    # Hold-down bolts through the foot pads onto the bedplate.
+    for fx in (bx0 + 0.030, ex0 - 0.030):
+        for sy in (-1, 1):
+            bparts.append(G.hex_head("MOTOR_holddown", 0.014, 0.013, 'Z',
+                                     (fx, sy * 0.140, foot_z0 + 0.025), bolt, c))
     out["MOTOR_base"] = G.join(bparts, "MOTOR_base", None, c)
     return out
 
@@ -161,6 +265,18 @@ def build_coupling(root):
                                 zc + hub_r * .66 * sin(a)), 16, dark, c))
     parts.append(G.cyl("CPL_spacer", hub_r * .78, (x1 - x0) - 0.096, 'X',
                        ((x0 + x1) * .5, 0, zc), 36, cast, c, chamfer=0.004))
+    # Guard rings on the outboard face of each hub, plus the bolt circle that
+    # closes them. Two hubs floating between a shaft and a casting read as three
+    # unrelated cylinders; ringed and bolted they read as one drive.
+    for hx in (x0 + 0.022, x1 - 0.022):
+        parts.append(G.torus("CPL_guard", hub_r + 0.006, 0.0075, 'X',
+                             (hx, 0, zc), P.Q_MED, 8, cast, c))
+    for k in range(4):
+        a = 2 * pi * k / 4 + radians(45)
+        parts.append(G.socket_screw("CPL_bolt", 0.0065, 0.006, 'X',
+                                    (x0 + 0.048, (hub_r + 0.006) * cos(a),
+                                     zc + (hub_r + 0.006) * sin(a)),
+                                    bolt, c, dark))
     out["COUPLING"] = G.join(parts, "COUPLING", None, c)
     G.set_origin(out["COUPLING"], ((x0 + x1) * .5, 0, zc))
     return out
@@ -212,7 +328,49 @@ def build_gearbox(root):
     # cast seam between the two housing halves
     parts.append(G.box("GB_seam", (bxc, 0, body_zc + body_h * .16),
                        (bl * 1.004, P.GB_BODY_W * 1.004, 0.006), dark, c, bev=0))
+    # Vertical cast cooling ribs down the drive-side end wall. A reduction case
+    # this size is ribbed, and the ribs are also what give a large flat casting
+    # a direction under a soft key light -- without them the gearbox is a slab
+    # of one value next to a barrel of another.
+    for i in range(5):
+        ry = -P.GB_BODY_W * .34 + P.GB_BODY_W * .68 * i / 4.0
+        parts.append(G.box("GB_endrib", (P.GB_X0 + 0.008, ry, body_zc - 0.020),
+                           (0.018, 0.030, body_h * .66), cast, c, bev=0.004))
+    # Transverse ribs across the raised upper section.
+    for i in range(4):
+        rx = bxc - bl * .28 + bl * .44 * i / 3.0
+        parts.append(G.box("GB_toprib", (rx, 0, P.GB_TOP_Z + 0.058),
+                           (0.020, P.GB_BODY_W * .70, 0.026), cast, c, bev=0.004))
     out["GEARBOX_housing"] = G.join(parts, "GEARBOX_housing", None, c)
+
+    # ---- oil sight glass, filler / breather, drain plug -------------------
+    # Three small fittings, and between them they say "gearbox" faster than any
+    # amount of extra casting does: oil goes in at the top, is read on the
+    # front, and comes out at the bottom.
+    sparts = []
+    for sy in (-1, 1):
+        yy = sy * (P.GB_BODY_W * .5 + 0.020)
+        sparts.append(G.lathe("GB_sight_ring",
+                              [(0.020, 0), (0.036, 0), (0.036, 0.014),
+                               (0.020, 0.014)],
+                              P.Q_MED, 'Y', (bxc - bl * .13, yy,
+                                             body_zc - body_h * .30),
+                              mat=light, target=c))
+        sparts.append(G.lathe("GB_sight_glass",
+                              [(0, 0), (0.021, 0), (0.021, 0.010), (0, 0.010)],
+                              P.Q_MED, 'Y', (bxc - bl * .13, yy,
+                                             body_zc - body_h * .30),
+                              mat=dark, target=c))
+    sparts.append(G.lathe("GB_breather",
+                          [(0, 0), (0.022, 0), (0.022, 0.018), (0.014, 0.026),
+                           (0.014, 0.040), (0, 0.040)],
+                          P.Q_MED, 'Z', (bxc + bl * .22, P.GB_BODY_W * .22,
+                                         P.GB_TOP_Z + 0.008),
+                          mat=steel, target=c))
+    sparts.append(G.hex_head("GB_drain", 0.017, 0.014, 'Y',
+                             (bxc - bl * .30, -(P.GB_BODY_W * .5 + 0.006),
+                              body_z0 + 0.040), bolt, c))
+    out["GEARBOX_fittings"] = G.join(sparts, "GEARBOX_fittings", None, c)
 
     # ---- inspection plugs / caps on the visible face ----------------------
     pparts = []
@@ -291,6 +449,19 @@ def build_gearbox(root):
         iparts.append(G.socket_screw("GB_ibolt", 0.008, 0.006, 'X',
                                      (ix0 + 0.001, P.GB_INPUT_R * .74 * cos(a),
                                       P.Z_MOTOR + P.GB_INPUT_R * .74 * sin(a)),
+                                     bolt, c, dark))
+    # Input bearing retainer: a machined ring the coupling guard runs up to.
+    iparts.append(G.lathe("GB_in_retainer",
+                          [(P.MOTOR_SHAFT_R * 1.06, 0.0), (P.GB_INPUT_R * 1.04, 0.0),
+                           (P.GB_INPUT_R * 1.04, -0.016),
+                           (P.MOTOR_SHAFT_R * 1.06, -0.016)],
+                          P.Q_MED, 'X', (ix0 - 0.004, 0, P.Z_MOTOR),
+                          mat=light, target=c))
+    for k in range(8):
+        a = 2 * pi * k / 8
+        iparts.append(G.socket_screw("GB_irbolt", 0.0062, 0.005, 'X',
+                                     (ix0 - 0.019, P.GB_INPUT_R * .88 * cos(a),
+                                      P.Z_MOTOR + P.GB_INPUT_R * .88 * sin(a)),
                                      bolt, c, dark))
     out["GEARBOX_input"] = G.join(iparts, "GEARBOX_input", None, c)
 

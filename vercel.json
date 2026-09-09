@@ -1,5 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs",
-  "buildCommand": "next build"
+  "git": {
+    "deploymentEnabled": {
+      "main": false,
+      "master": false,
+      "1783405085-nextjs-vercel-auth": false
+    }
+  }
 }

@@ -11,7 +11,7 @@ function headerValue(req: NextApiRequest, name: string): string | undefined {
 }
 
 // Drains the reputation queue at <= 1 request/second. Intended to be triggered
-// either by a super admin (session) or a scheduler (Vercel Cron / external),
+// either by a super admin (session) or a scheduler (Render cron / external),
 // authenticating with `Authorization: Bearer $CRON_SECRET`. Safe to call often:
 // the single-flight advisory lock means overlapping calls are no-ops.
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {

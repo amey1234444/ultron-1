@@ -193,14 +193,34 @@ const ASSET = join(process.cwd(), 'public', ...TWIN_SCREW_MODEL_URL.split('/').f
 check('the machine asset is present', existsSync(ASSET), ASSET);
 
 /**
- * The asset carries no required glTF extension.
+ * The asset requires no glTF extension that needs a decoder.
  *
  * It was Draco-compressed once, and never rendered: Draco decodes through a
  * WebAssembly worker, no other model in this app uses it, and the production
  * CSP is `script-src 'self'`, which does not permit WebAssembly. The loader
  * never resolved and a suspended loader says nothing. Anything that puts a
- * required extension back needs to answer the CSP question first.
+ * required extension back has to answer the CSP question first.
+ *
+ * `KHR_mesh_quantization` answers it. It is a storage format, not a codec:
+ * three.js reads int16 positions and int8 normals through the same
+ * `BufferAttribute` path it uses for floats, with no worker, no WebAssembly and
+ * no second script to load. That is what makes it usable here where Draco and
+ * meshopt are not, and it is what takes the asset from 6.0 MB to 3.6 MB with no
+ * change to a single triangle.
+ *
+ * The allowance is a fixed list rather than a relaxed assertion, so adding a
+ * genuinely undecodable extension still fails here.
  */
+const DECODER_FREE_EXTENSIONS = new Set(['KHR_mesh_quantization']);
+
+/**
+ * What the shipped asset is allowed to cost.
+ *
+ * `meshes` counts glTF primitives, which is what three.js actually draws and
+ * therefore the number that decides draw calls. `triangles` is a ceiling; the
+ * check that reads it says why it is not an equality.
+ */
+const TWIN_SCREW_ASSET_BUDGET = { meshes: 280, triangles: 300_000 } as const;
 const assetJson = (() => {
   const buf = readFileSync(ASSET);
   const len = buf.readUInt32LE(12);
@@ -214,10 +234,13 @@ const assetJson = (() => {
     materials?: { name?: string; pbrMetallicRoughness?: { roughnessFactor?: number } }[];
   };
 })();
+const undecodable = (assetJson.extensionsRequired ?? []).filter(
+  (name) => !DECODER_FREE_EXTENSIONS.has(name),
+);
 check(
   'the asset needs no glTF extension the browser must decode',
-  (assetJson.extensionsRequired ?? []).length === 0,
-  (assetJson.extensionsRequired ?? []).join(', ') || undefined,
+  undecodable.length === 0,
+  undecodable.join(', ') || undefined,
 );
 
 // The pivots are what a screw speed will drive. They are produced by the
@@ -811,8 +834,31 @@ async function checkRuntimeAsset() {
     meshes.push(mesh);
     triangles += (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3;
   });
-  check('the production GLB loads all 265 render meshes', meshes.length === 265, String(meshes.length));
-  check('the production GLB retains its complete 603744-triangle machine', triangles === 603744, String(triangles));
+  check(
+    'the production GLB loads every render mesh in the machine',
+    meshes.length === TWIN_SCREW_ASSET_BUDGET.meshes,
+    String(meshes.length),
+  );
+  // A ceiling, not an equality: the point of this number is the frame, not the
+  // asset. The two screws were 460 832 of an old 603 744 -- three quarters of
+  // the machine spent on a helix eighty pixels across -- and both the download
+  // and every vertex shader invocation were paying for it. Re-tessellated they
+  // are a third of that. What must never happen again is a detail pass quietly
+  // buying its way back over the budget, so the assertion is a limit with the
+  // current figure printed beside it.
+  check(
+    `the production GLB stays inside its ${TWIN_SCREW_ASSET_BUDGET.triangles}-triangle frame budget`,
+    triangles <= TWIN_SCREW_ASSET_BUDGET.triangles,
+    String(triangles),
+  );
+  // And a floor, because the cheapest way to pass a triangle budget is to lose
+  // the machine. A silently truncated export is exactly the failure this pairs
+  // with: it would sail through the ceiling above and render a partial model.
+  check(
+    'the production GLB still carries the whole machine, not a truncated export',
+    triangles >= TWIN_SCREW_ASSET_BUDGET.triangles * 0.7,
+    String(triangles),
+  );
 
   const hiddenCount = setPartGroupVisibility(root, TWIN_SCREW_CUTAWAY_GROUP, false);
   check(

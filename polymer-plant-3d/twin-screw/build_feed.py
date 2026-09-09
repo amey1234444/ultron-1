@@ -59,6 +59,44 @@ def build_main_feed(root):
     out["MAIN_HOPPER_BODY"] = G.lathe("MAIN_HOPPER_BODY", prof, P.Q_LARGE, 'Z',
                                       (x, 0, 0), mat=bright, target=c)
 
+    # ---- cone stiffeners, lifting lugs, sight port ------------------------
+    # The hopper is the largest single curved surface on the machine, and a
+    # bare cone under a soft key light is a value gradient with no landmarks in
+    # it: it is the part that reads as a white blob first. Eight pressed
+    # stiffeners give the cone a rhythm that survives rotation, three lugs give
+    # the rim a scale reference, and the sight port says which face is the
+    # front. All of it is hardware a real vessel this size carries.
+    # 6 mm proud over a 3.4 degree arc. The first pass stood them 13 mm off the
+    # cone over 5 degrees, and at that size they stopped being stiffeners: each
+    # one turned its own dark side to the key light and the cone read as a
+    # funnel with eight blades bolted to it. A pressed rib is a crease, and its
+    # whole job here is to give the specular somewhere to break.
+    sr = []
+    z_rib0, z_rib1 = Z_NECK_T + 0.055, Z_CONE_T - 0.030
+    slope = (R - r) / P.HOP_CONE_H
+    r_rib0 = r + (z_rib0 - Z_NECK_T) * slope
+    r_rib1 = r + (z_rib1 - Z_NECK_T) * slope
+    for k in range(8):
+        sr.append(G.lathe("MHS_rib", [(r_rib0, z_rib0), (r_rib0 + 0.006, z_rib0),
+                                      (r_rib1 + 0.006, z_rib1), (r_rib1, z_rib1)],
+                          2, 'Z', (x, 0, 0), arc=radians(3.4), mat=bright,
+                          target=c, phase=2 * pi * k / 8 + radians(22.5)))
+    for k in range(3):
+        a = 2 * pi * k / 3 + radians(90)
+        sr.append(G.box("MHS_lug", (x + (R + 0.014) * cos(a), (R + 0.014) * sin(a),
+                                    Z_CYL_T - 0.030),
+                        (0.034, 0.034, 0.042), steel, c, bev=0.004))
+    # sight port on the face the console frames the machine from (-Y)
+    sr.append(G.lathe("MHS_port_ring",
+                      [(0.026, 0.0), (0.042, 0.0), (0.042, -0.014), (0.026, -0.014)],
+                      P.Q_MED, 'Y', (x, -(R - 0.004), (Z_CONE_T + Z_CYL_T) * .5),
+                      mat=steel, target=c))
+    sr.append(G.lathe("MHS_port_glass",
+                      [(0.0, 0.0), (0.027, 0.0), (0.027, -0.009), (0.0, -0.009)],
+                      P.Q_MED, 'Y', (x, -(R - 0.004), (Z_CONE_T + Z_CYL_T) * .5),
+                      mat=dark, target=c))
+    out["MAIN_HOPPER_STIFFENERS"] = G.join(sr, "MAIN_HOPPER_STIFFENERS", None, c)
+
     # ---- lid + centred capped fitting -------------------------------------
     lp = [G.lathe("MHL_plate",
                   [(0, Z_CYL_T + 0.020), (R - 0.004, Z_CYL_T + 0.020),
@@ -136,7 +174,20 @@ def build_main_feed(root):
     out["MAIN_FEEDER_DRIVE"] = G.join(dp, "MAIN_FEEDER_DRIVE", None, c)
 
     # ---- pellet bed, revealed by the translucent / cutaway hopper mode -----
-    fill = G.frustum("MAIN_HOPPER_LEVEL", P.HOP_R * 0.982, P.HOP_NECK_R * 1.2,
+    # `frustum` puts its first radius at the *bottom* of the sweep. Passing the
+    # vessel radius first therefore built the bed upside down: its 0.226 m end
+    # sat at z = 0.763, where the cone wall is only 0.074 m across, so a 15 cm
+    # skirt of pellet-coloured cone burst straight out through the hopper and
+    # read on the console as a second flared shell below the funnel. That is
+    # most of what "the hopper loses its geometry" was actually describing --
+    # the cone was not blowing out, it was being interrupted by a solid that
+    # should never have been visible at all.
+    #
+    # Right way up, and inset inside the *inner* wall so it stays enclosed by
+    # an opaque hopper and only appears when the cutaway asks for it.
+    fill = G.frustum("MAIN_HOPPER_LEVEL",
+                     (P.HOP_NECK_R - P.HOP_WALL) * 0.94,
+                     (P.HOP_R - P.HOP_WALL) * 0.985,
                      P.HOP_CONE_H, 'Z', (x, 0, Z_NECK_T + P.HOP_CONE_H * .5),
                      P.Q_CYL, M.get("MAT_pellet_cool"), c)
     fill.hide_render = True
