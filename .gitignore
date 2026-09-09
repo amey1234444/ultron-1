@@ -48,3 +48,7 @@ yarn-error.*
 .next/
 next-env.d.ts
 /build
+
+# Blender/Python bytecode from the twin-screw build pipeline
+__pycache__/
+*.pyc

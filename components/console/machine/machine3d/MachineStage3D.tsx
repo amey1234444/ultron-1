@@ -153,9 +153,15 @@ export function MachineStage3D({
   const [mounted, setMounted] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [points, setPoints] = useState<ProjectedPoint[]>([]);
+  const [contextLost, setContextLost] = useState(false);
 
   useEffect(() => setMounted(true), []);
-  useEffect(() => setPoints([]), [anchors, modelUrl]);
+  useEffect(() => {
+    setPoints([]);
+    setContextLost(false);
+  }, [anchors, modelUrl]);
+
+  const handleContextLost = useCallback(() => setContextLost(true), []);
 
   // The canvas projects every frame; this coalesces to PUBLISH_MS.
   const latest = useRef<ProjectedPoint[] | null>(null);
@@ -180,6 +186,9 @@ export function MachineStage3D({
     if (!mounted) {
       return <Notice dark={dark} message="Preparing machine…" spinner />;
     }
+    if (contextLost) {
+      return <Notice dark={dark} message="The 3D view lost its graphics context. Reload to restore it." />;
+    }
     return (
       <CanvasBoundary fallback={<Notice dark={dark} message="The 3D machine could not be displayed on this device." />}>
         <Suspense fallback={<Notice dark={dark} message="Loading machine…" spinner />}>
@@ -192,6 +201,7 @@ export function MachineStage3D({
             cameraCommand={cameraCommand}
             onProjectPoints={handleProject}
             onSelectPart={onSelectPart}
+            onContextLost={handleContextLost}
           />
         </Suspense>
       </CanvasBoundary>
@@ -207,7 +217,19 @@ export function MachineStage3D({
         setSize({ width, height });
       }}
     >
-      <View style={FILL}>{canvas()}</View>
+      {/* Faded in on the first real projection rather than on mount: that is
+          the first moment the machine is known to be drawn, so the operator
+          never sees an empty stage resolve into a populated one. */}
+      <View
+        style={[
+          FILL,
+          Platform.OS === 'web'
+            ? ({ opacity: points.length > 0 ? 1 : 0, transition: 'opacity 320ms ease-out' } as object)
+            : null,
+        ]}
+      >
+        {canvas()}
+      </View>
 
       {/* Instrument pads, placed from the live projection. Pointer events stay
           off: the trail board above this layer owns hit-testing and wiring, the

@@ -55,6 +55,8 @@ import {
   setPartGroupVisibility,
   TWIN_SCREW_CUTAWAY_GROUP,
   TWIN_SCREW_CUTAWAY_PART_COUNT,
+  MACHINE_FINISHES,
+  resolveMachineFinishKey,
   TWIN_SCREW_ENV_INTENSITY,
   TWIN_SCREW_INSPECTION_VIEW,
   twinScrewGradedSpec,
@@ -384,13 +386,47 @@ check(
 const lightScrewSpec = twinScrewGradedSpec('MAT_screw_steel', false)!;
 check(
   'the screw is graded lighter for the dark stage than the light one',
-  darkScrewSpec.color !== lightScrewSpec.color &&
-    darkScrewSpec.color === '#79828A' &&
-    lightScrewSpec.color === '#5F686E',
+  darkScrewSpec.color === MACHINE_FINISHES.brightMetal.color &&
+    lightScrewSpec.color === MACHINE_FINISHES.brightMetal.lightColor,
 );
 check(
-  'an ungraded material falls through to its authored value on both themes',
-  twinScrewGradedSpec('MAT_bolt', true)?.color === twinScrewGradedSpec('MAT_bolt', false)?.color,
+  'an ungraded material keeps one value across both themes',
+  twinScrewGradedSpec('MAT_cast_gray', true)?.color === twinScrewGradedSpec('MAT_cast_gray', false)?.color,
+);
+
+// The console is a near-black dashboard. A large surface at paper-white is the
+// single thing that made the machine read as a pasted-on CAD model, so no
+// finish may exceed the palette's one deliberate highlight step.
+const tooBright = Object.entries(MACHINE_FINISHES).filter(([, finish]) => {
+  const channel = (hex: string) => parseInt(hex.slice(1, 3), 16);
+  return channel(finish.color) > channel(MACHINE_FINISHES.trim.color);
+});
+check(
+  'no finish is brighter than the reserved highlight step',
+  tooBright.length === 0,
+  tooBright.map(([name]) => name).join(', ') || undefined,
+);
+
+// Part group decides the tone step for the shared body materials. If this
+// collapses, the motor, gearbox, barrel and hopper all render the same grey --
+// which is exactly the flattening this classification exists to prevent.
+const bodyGroups = ['motor', 'gearbox', 'barrel', 'main_feed', 'frame'] as const;
+const bodyFinishes = bodyGroups.map((group) =>
+  resolveMachineFinishKey(group, undefined, 'MAT_cast_gray'),
+);
+check(
+  'shared body material resolves to a distinct finish per part group',
+  new Set(bodyFinishes).size === bodyGroups.length,
+  bodyFinishes.join(', '),
+);
+check(
+  'barrel zone covers alternate between two graphite steps',
+  resolveMachineFinishKey('barrel_top', 'BARREL_TZ_01_top', 'MAT_cast_gray') !==
+    resolveMachineFinishKey('barrel_top', 'BARREL_TZ_02_top', 'MAT_cast_gray'),
+);
+check(
+  'the screws stay lighter than the barrel they sit inside',
+  MACHINE_FINISHES.brightMetal.color > MACHINE_FINISHES.bodyDark.color,
 );
 recoveredMaterial.dispose();
 

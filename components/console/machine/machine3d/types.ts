@@ -123,4 +123,6 @@ export type MachineScene3DCanvasProps = {
   onReady?: () => void;
   /** Pointer went down on the model rather than on empty space. */
   onSelectPart?: (partId: string) => void;
+  /** The GPU dropped the drawing buffer; the stage shows a notice, not a hole. */
+  onContextLost?: () => void;
 };

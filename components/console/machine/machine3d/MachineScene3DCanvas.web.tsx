@@ -49,13 +49,15 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 
 import {
-  applyTwinScrewMaterialSpec,
+  applyMachineFinish,
   inheritedString,
   isEffectivelyVisible,
   setPartGroupVisibility,
   TWIN_SCREW_CUTAWAY_GROUP,
   TWIN_SCREW_CUTAWAY_PART_COUNT,
+  TWIN_SCREW_ENV_INTENSITY as MACHINE_ENV_INTENSITY,
   TWIN_SCREW_INSPECTION_VIEW,
+  resolveMachineFinishKey,
 } from './modelSemantics';
 import {
   clampProjectionFraction,
@@ -67,6 +69,16 @@ import {
 export type { MachineScene3DCanvasProps, ProjectedPoint } from './types';
 
 const OCCLUSION_EVERY = 6; // frames
+
+/**
+ * Tone-map exposure per theme.
+ *
+ * ACES filmic rolls highlights off rather than clipping them, but it cannot
+ * rescue an image that is over-lit going in. With the environment down and the
+ * palette re-graded, this sits below 1: the point is controlled midtones, not
+ * brightness.
+ */
+const MACHINE_EXPOSURE = { light: 0.92, dark: 0.86 } as const;
 
 /** A near-elevation inspection view: enough lift for top fittings, no 3/4 distortion. */
 const VIEW_DIR = new THREE.Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction).normalize();
@@ -91,18 +103,34 @@ function Machine({
   onSelectPart?: (partId: string) => void;
 }) {
   const { scene } = useGLTF(modelUrl);
+
+  // Normalization runs once per (asset, theme), never per frame. The clone
+  // cache is keyed by source material *and* resolved finish: `MAT_cast_gray`
+  // alone covers the motor, the gearbox, the frame, the die and every barrel
+  // cap, so keying on the source material would collapse them onto one value
+  // and flatten the machine into a single grey mass.
   const prepared = useMemo(() => {
     const root = scene.clone(true);
     const meshes: THREE.Mesh[] = [];
-    const materialClones = new Map<THREE.Material, THREE.Material>();
+    const materialClones = new Map<string, THREE.Material>();
 
-    const cloneMaterial = (source: THREE.Material) => {
-      const cached = materialClones.get(source);
+    const finishFor = (mesh: THREE.Mesh, source: THREE.Material) =>
+      resolveMachineFinishKey(
+        inheritedString(mesh, 'partGroup'),
+        inheritedString(mesh, 'partId'),
+        source.name,
+      );
+
+    const cloneMaterial = (mesh: THREE.Mesh, source: THREE.Material) => {
+      const key = finishFor(mesh, source);
+      const cacheKey = `${source.uuid}|${key}`;
+      const cached = materialClones.get(cacheKey);
       if (cached) return cached;
+      // Cloning keeps whatever the export carried -- maps, transparency,
+      // normals -- and the finish only writes the four PBR values it owns.
       const clone = source.clone();
-      const standard = clone as THREE.MeshStandardMaterial;
-      applyTwinScrewMaterialSpec(standard, dark);
-      materialClones.set(source, clone);
+      applyMachineFinish(clone as THREE.MeshStandardMaterial, key, dark);
+      materialClones.set(cacheKey, clone);
       return clone;
     };
 
@@ -112,8 +140,8 @@ function Machine({
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       mesh.material = Array.isArray(mesh.material)
-        ? mesh.material.map(cloneMaterial)
-        : cloneMaterial(mesh.material);
+        ? mesh.material.map((entry) => cloneMaterial(mesh, entry))
+        : cloneMaterial(mesh, mesh.material);
       meshes.push(mesh);
     });
 
@@ -307,7 +335,12 @@ function LocalEnvironment({ dark }: { dark: boolean }) {
     const target = pmrem.fromScene(room, 0.04);
     room.dispose();
     scene.environment = target.texture;
-    scene.environmentIntensity = dark ? 0.76 : 0.92;
+    // Low, on purpose. Most of this palette is metallic, and a metal takes its
+    // value from what it reflects: at the old 0.76/0.92 the housings were lit
+    // almost entirely by the room and clipped to white whatever base colour
+    // they were given. Here the base colour is what you see and the
+    // environment only softens the terminator.
+    scene.environmentIntensity = MACHINE_ENV_INTENSITY[dark ? 'dark' : 'light'];
 
     return () => {
       scene.environment = previous;
@@ -325,53 +358,72 @@ function RendererSettings({ dark }: { dark: boolean }) {
   const gl = useThree((state) => state.gl);
 
   useEffect(() => {
+    // three r180 enables ColorManagement and defaults the output space to sRGB,
+    // and R3F v9 does not override either; both are asserted rather than set so
+    // a future upgrade that changes the default fails loudly in the checks
+    // instead of silently shifting every colour on the stage.
+    gl.outputColorSpace = THREE.SRGBColorSpace;
     gl.toneMapping = THREE.ACESFilmicToneMapping;
-    gl.toneMappingExposure = dark ? 1.12 : 1.02;
+    gl.toneMappingExposure = MACHINE_EXPOSURE[dark ? 'dark' : 'light'];
     gl.shadowMap.type = THREE.PCFSoftShadowMap;
   }, [dark, gl]);
 
   return null;
 }
 
+/**
+ * Restrained neutral studio rig.
+ *
+ * Four lights and an ambient floor, all neutral: the previous rig ran a bright
+ * hemisphere plus three strong directionals tinted `#dcecf5`/`#9fc4d8`, which
+ * both over-lit the machine and pulled it blue against a neutral dashboard.
+ * Key does the modelling, fill opens the shadow side just enough to keep the
+ * casting readable, rim separates the silhouette from a near-black page, and
+ * two short-throw fills reach into the open barrel so the screws are lit by
+ * something other than bounce.
+ */
 function Lights({ dark }: { dark: boolean }) {
   return (
     <>
+      {/* Very low, and neutral. This sets the floor of the image, not its level. */}
       <hemisphereLight
-        intensity={dark ? 0.72 : 0.82}
-        color={dark ? '#d5e2e8' : '#ffffff'}
-        groundColor={dark ? '#202a31' : '#b9bec1'}
+        intensity={dark ? 0.20 : 0.28}
+        color="#EEF0F2"
+        groundColor={dark ? '#0D1013' : '#9A9EA3'}
       />
+      {/* Key: upper front-left, the only light that casts. */}
       <directionalLight
         position={[-2.4, 4.6, 5.2]}
-        color={dark ? '#f4f0e8' : '#fffaf2'}
-        intensity={dark ? 2.35 : 1.95}
+        color="#FFFDF9"
+        intensity={dark ? 1.55 : 1.75}
         castShadow
       />
-      <directionalLight position={[5.6, 2.0, 3.2]} color="#dcecf5" intensity={dark ? 0.92 : 0.68} />
-      <directionalLight position={[1.6, 3.2, -4.4]} color="#eef4f6" intensity={dark ? 1.2 : 0.9} />
-      {/* Rim from behind and below. On the dark console the machine's lower
-          edge otherwise runs straight into the page; this re-draws the
-          silhouette without lifting the whole body. */}
+      {/* Fill: opposite side, well under the key so the form still turns. */}
+      <directionalLight position={[5.6, 2.0, 3.2]} color="#F2F4F5" intensity={dark ? 0.42 : 0.5} />
+      {/* Rim: behind and above, enough to draw the top edge off the page. */}
+      <directionalLight position={[1.6, 3.2, -4.4]} color="#E8EBED" intensity={dark ? 0.6 : 0.4} />
+      {/* Lower back rim. On the dark console the machine's underside otherwise
+          runs straight into the background with no silhouette at all. */}
       <directionalLight
         position={[-1.2, -2.6, -3.4]}
-        color={dark ? '#9fc4d8' : '#c9d6de'}
-        intensity={dark ? 0.85 : 0.28}
+        color="#DDE2E5"
+        intensity={dark ? 0.34 : 0.16}
       />
-      {/* Two narrow fills into the open barrel so the screws read as machined
-          steel along the whole train rather than sitting in the shadow of
-          their own bore. One light with `decay={2}` cannot reach both ends of
-          a 1.5 m barrel, so the feed end and the metering end get their own. */}
+      {/* Two short-throw fills into the open barrel. One light with `decay={2}`
+          cannot reach both ends of a 1.5 m barrel, so the feed end and the
+          metering end get their own; without them the screws sit in the shadow
+          of their own bore and crush to black. */}
       <pointLight
         position={[1.62, 0.48, 1.05]}
-        color="#f7f3e8"
-        intensity={dark ? 2.7 : 2.1}
+        color="#FBF9F4"
+        intensity={dark ? 1.5 : 1.2}
         distance={2.4}
         decay={2}
       />
       <pointLight
         position={[2.42, 0.48, 1.05]}
-        color="#f7f3e8"
-        intensity={dark ? 2.7 : 2.1}
+        color="#FBF9F4"
+        intensity={dark ? 1.5 : 1.2}
         distance={2.4}
         decay={2}
       />
@@ -391,6 +443,7 @@ export default function MachineScene3DCanvas({
   onProjectPoints,
   onReady,
   onSelectPart,
+  onContextLost,
 }: MachineScene3DCanvasProps) {
   const controls = useRef<OrbitControlsImpl | null>(null);
   // State, not a ref: the projector needs to re-read the mesh list when it
@@ -419,14 +472,23 @@ export default function MachineScene3DCanvas({
 
   return (
     <Canvas
-      dpr={[1, 2]}
+      dpr={[1, 1.5]}
       shadows
       gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
       camera={{ fov: TWIN_SCREW_INSPECTION_VIEW.fov, near: 0.05, far: 200, position: [2.4, 1.6, 4.6] }}
       onCreated={({ gl }) => {
+        gl.outputColorSpace = THREE.SRGBColorSpace;
         gl.toneMapping = THREE.ACESFilmicToneMapping;
-        gl.toneMappingExposure = dark ? 1.12 : 1.02;
+        gl.toneMappingExposure = MACHINE_EXPOSURE[dark ? 'dark' : 'light'];
         gl.shadowMap.type = THREE.PCFSoftShadowMap;
+        // A lost context is not a React error, so the boundary above never
+        // sees it: the canvas simply goes blank and stays blank. Preventing
+        // the default lets the browser hand back a restored context, and the
+        // callback lets the stage tell the operator instead of showing a hole.
+        gl.domElement.addEventListener('webglcontextlost', (event) => {
+          event.preventDefault();
+          onContextLost?.();
+        });
       }}
       style={{ width: '100%', height: '100%' }}
     >
