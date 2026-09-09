@@ -52,7 +52,8 @@ type PortAssets = {
   stemMaterial: THREE.MeshStandardMaterial;
   faceMaterial: THREE.MeshStandardMaterial;
   ringIdle: THREE.MeshStandardMaterial;
-  ringActive: THREE.MeshStandardMaterial;
+  ringLinked: THREE.MeshStandardMaterial;
+  ringLive: THREE.MeshStandardMaterial;
   dispose: () => void;
 };
 
@@ -89,10 +90,10 @@ function createPortAssets(dark: boolean): PortAssets {
     HARD_POINT.faceHeight,
     18,
   );
-  const ring = new THREE.TorusGeometry(HARD_POINT.ringRadius, HARD_POINT.ringTube, 8, 22);
+  const ringGeometry = new THREE.TorusGeometry(HARD_POINT.ringRadius, HARD_POINT.ringTube, 8, 22);
   // Tori are authored in the XY plane; rotate once here so a port is a plain
   // stack along +Y and no per-instance rotation is needed.
-  ring.rotateX(Math.PI / 2);
+  ringGeometry.rotateX(Math.PI / 2);
 
   // Graphite mounting hardware, one step darker than anything it sits on so the
   // port always reads as an added fitting rather than as part of the casting.
@@ -114,36 +115,44 @@ function createPortAssets(dark: boolean): PortAssets {
   // The only saturated colour on the machine, and the only emissive surface.
   // Kept low on purpose: enough to identify a live connection point, nowhere
   // near enough to bloom or to compete with the screws for attention.
-  const ringIdle = new THREE.MeshStandardMaterial({
-    color: '#55D98B',
-    emissive: '#55D98B',
-    emissiveIntensity: 0.15,
-    metalness: 0.28,
-    roughness: 0.38,
-  });
-  const ringActive = new THREE.MeshStandardMaterial({
-    color: '#55D98B',
-    emissive: '#55D98B',
-    emissiveIntensity: 0.34,
-    metalness: 0.28,
-    roughness: 0.34,
-  });
+  //
+  // Three steps, not two. The console distinguishes an unwired port from a
+  // wired one from one actually carrying data, and until now that distinction
+  // lived only in a flat SVG ring drawn over the canvas -- a second marker for
+  // every port, in a different visual language, sitting on top of the hardware
+  // that already represented it. The port is the marker, so the port carries
+  // the state: same green throughout, brightness alone separating the three.
+  const ring = (emissiveIntensity: number, roughness: number) =>
+    new THREE.MeshStandardMaterial({
+      color: '#55D98B',
+      emissive: '#55D98B',
+      emissiveIntensity,
+      metalness: 0.28,
+      roughness,
+    });
+  /** Unwired: present, and visibly not connected to anything. */
+  const ringIdle = ring(0.10, 0.40);
+  /** Wired to a channel, but no data has arrived on it. */
+  const ringLinked = ring(0.22, 0.38);
+  /** Carrying live data, and the brightest thing on the machine. */
+  const ringLive = ring(0.34, 0.34);
 
   return {
     pad,
     boss,
     stem,
     face,
-    ring,
+    ring: ringGeometry,
     socketMaterial,
     stemMaterial,
     faceMaterial,
     ringIdle,
-    ringActive,
+    ringLinked,
+    ringLive,
     dispose() {
-      [pad, boss, stem, face, ring].forEach((geometry) => geometry.dispose());
-      [socketMaterial, stemMaterial, faceMaterial, ringIdle, ringActive].forEach((material) =>
-        material.dispose(),
+      [pad, boss, stem, face, ringGeometry].forEach((geometry) => geometry.dispose());
+      [socketMaterial, stemMaterial, faceMaterial, ringIdle, ringLinked, ringLive].forEach(
+        (material) => material.dispose(),
       );
     },
   };
@@ -228,7 +237,12 @@ function SensorHardPoint({
     if (typeof document !== 'undefined') document.body.style.cursor = '';
   };
 
-  const active = state === 'live' || state === 'linked' || state === 'selected';
+  const ringMaterial =
+    state === 'live' || state === 'selected'
+      ? assets.ringLive
+      : state === 'linked'
+        ? assets.ringLinked
+        : assets.ringIdle;
 
   return (
     <group
@@ -261,7 +275,7 @@ function SensorHardPoint({
       <mesh
         ref={ringMesh}
         geometry={assets.ring}
-        material={active ? assets.ringActive : assets.ringIdle}
+        material={ringMaterial}
         position={[0, FACE_Y, 0]}
       />
     </group>

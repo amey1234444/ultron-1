@@ -15,10 +15,7 @@
  */
 import { Component, lazy, Suspense, useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Circle, G } from 'react-native-svg';
 
-import { consolePalette } from '../../../ui';
-import { padStateLabel, type MeasurementPadState } from '../MeasurementPad';
 import { MachineLoadingRing } from './MachineLoadingRing';
 import { markMachineReady, warmMachineAsset } from './machineAssetProgress';
 import type { MachineCameraCommand, MachineCameraMode, ProjectedPoint } from './types';
@@ -63,68 +60,36 @@ const FILL = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as c
  */
 const PUBLISH_MS = 33;
 
-function markerAria(label: string | undefined): Record<string, string> {
-  return label ? { 'aria-label': label, role: 'img' } : { 'aria-hidden': 'true' };
-}
-
 /**
- * The wiring state of one instrument, drawn over its physical port.
+ * Why there is no flat marker layer here any more
+ * ------------------------------------------------
+ * There used to be one: an SVG ring per instrument, drawn over the canvas at
+ * the projected coordinate, in three wiring states. It was the last piece of
+ * the old flat-drawing console left on a stage that had since grown real
+ * instrumentation ports -- so every instrument was being drawn twice, once as
+ * a machined socket standing on the casting and once as a 2D circle floating
+ * above it in a different visual language. On a 3D machine that reads exactly
+ * as what it was: a drawing pasted over a render.
  *
- * The port itself is 3D -- a socket, a stem and a green ring bolted to the
- * component -- and it is what the operator reads as "there is an instrument
- * here". This layer only says what the console knows about that instrument:
- * whether it is unmapped, linked, or carrying live data. It is therefore
- * deliberately slight. The old marker was a 12 px halo around a 6 px filled
- * disc, which is what made the set look like map pins scattered over a render;
- * at this weight the machine keeps its own hardware and the overlay adds a
- * state, not a second marker.
+ * The port carries the state now (`SensorHardPoints` grades its ring across
+ * idle / linked / live), so nothing was lost by deleting the overlay -- the
+ * information moved onto the hardware it describes, where it also inherits
+ * depth testing, occlusion and the camera, none of which a screen-space circle
+ * can have.
+ *
+ * The projection itself is untouched and still published through
+ * `onProjectConnectors`: the trail board needs screen positions for its
+ * endpoints and snap targets, and those still derive from the port's own world
+ * position. What ended was drawing a second marker at that position.
  */
-function InstrumentMarker3D({
-  x,
-  y,
-  state,
-  accent,
-  dark,
-  label,
-}: {
-  x: number;
-  y: number;
-  state: MeasurementPadState;
-  accent: string;
-  dark: boolean;
-  label?: string;
-}) {
-  const wired = state !== 'idle';
-  const live = state === 'live';
-  // A hairline of the opposite value, so the ring survives both a bright hopper
-  // and a near-black cavity without needing a heavy halo to do it.
-  const under = dark ? 'rgba(6,10,13,0.55)' : 'rgba(248,250,251,0.60)';
-  const radius = wired ? 5.4 : 4.8;
-
-  return (
-    <G {...markerAria(label)}>
-      {live ? <Circle cx={x} cy={y} r={8.2} fill={accent} opacity={0.13} /> : null}
-      <Circle cx={x} cy={y} r={radius} fill="none" stroke={under} strokeWidth={2.2} opacity={0.7} />
-      <Circle
-        cx={x}
-        cy={y}
-        r={radius}
-        fill="none"
-        stroke={accent}
-        strokeWidth={wired ? 1.5 : 1.0}
-        opacity={wired ? 1 : 0.62}
-      />
-      {wired ? <Circle cx={x} cy={y} r={1.7} fill={accent} opacity={0.95} /> : null}
-    </G>
-  );
-}
 
 export type MachineStage3DProps = {
   modelUrl: string;
   anchors: Readonly<Record<string, readonly [number, number, number]>>;
   /** Spoken name per point code, for the pad's accessible label. */
   labels?: Readonly<Record<string, string>>;
-  connectorState?: Record<string, MeasurementPadState>;
+  /** Wiring state per point code, forwarded to each 3D instrumentation port. */
+  connectorState?: Record<string, 'idle' | 'linked' | 'live'>;
   dark: boolean;
   closed?: boolean;
   cameraMode?: MachineCameraMode;
@@ -210,7 +175,6 @@ export function MachineStage3D({
   className,
   style,
 }: MachineStage3DProps) {
-  const palette = consolePalette(dark);
   const [mounted, setMounted] = useState(false);
   const [size, setSize] = useState<{ width: number; height: number } | null>(null);
   const [points, setPoints] = useState<ProjectedPoint[]>([]);
@@ -277,11 +241,19 @@ export function MachineStage3D({
   };
 
   const canvas = () => {
-    if (Platform.OS !== 'web' || !mounted || contextLost) return null;
+    // `size` is a hard requirement, not a nicety: the canvas is given explicit
+    // pixels so React Three Fiber cannot settle on a collapsed box. Until the
+    // stage has been laid out there is no honest number to hand it, and
+    // rendering with a guess is what produced a small machine in the corner of
+    // an overlay that spanned the whole container.
+    if (Platform.OS !== 'web' || !mounted || contextLost || !size) return null;
+    if (size.width < 1 || size.height < 1) return null;
     return (
       <CanvasBoundary onFailed={handleFailed}>
         <Suspense fallback={null}>
           <LazyCanvas
+            width={size.width}
+            height={size.height}
             modelUrl={modelUrl}
             anchors={anchors}
             labels={labels}
@@ -340,38 +312,6 @@ export function MachineStage3D({
         ) : null;
       })()}
 
-      {/* Instrument pads, placed from the live projection. Pointer events stay
-          off: the trail board above this layer owns hit-testing and wiring, the
-          same way it does for the flat drawings. */}
-      {size && shown ? (
-        <Svg
-          width="100%"
-          height="100%"
-          viewBox={`0 0 ${Math.max(size.width, 1)} ${Math.max(size.height, 1)}`}
-          style={FILL}
-          pointerEvents="none"
-        >
-          <G>
-            {points.map((point) => {
-              const state = connectorState?.[point.code] ?? 'idle';
-              const name = labels?.[point.code] ?? point.code;
-              const visible = point.onScreen && !point.occluded;
-              return (
-                <G key={point.code} opacity={visible ? 1 : 0}>
-                  <InstrumentMarker3D
-                    x={point.rx * size.width}
-                    y={point.ry * size.height}
-                    state={state}
-                    accent={palette.accent}
-                    dark={dark}
-                    label={visible ? `${name} — ${padStateLabel(state)}` : undefined}
-                  />
-                </G>
-              );
-            })}
-          </G>
-        </Svg>
-      ) : null}
     </View>
   );
 }

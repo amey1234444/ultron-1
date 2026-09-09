@@ -140,4 +140,25 @@ export type MachineScene3DCanvasProps = {
   onSelectHardPoint?: (code: string) => void;
   /** The GPU dropped the drawing buffer; the stage shows a notice, not a hole. */
   onContextLost?: () => void;
+  /**
+   * The drawing surface, in CSS pixels, measured by the stage.
+   *
+   * Passed explicitly rather than left to `width: 100%`. React Three Fiber sizes
+   * its canvas from a `ResizeObserver` on the wrapper it renders, and a wrapper
+   * whose height is a percentage of a percentage of a flex child does not always
+   * resolve to a usable box before that observer first fires. When it does not,
+   * the canvas settles at some smaller size and -- because the default alignment
+   * is flex-start -- sits in the top-left corner of the space it was supposed to
+   * fill. The machine then renders small and off-centre, its ground plane is
+   * clipped at the canvas edge rather than fading, and every overlay that spans
+   * the *container* (the pad markers, the trail board's machine rect) addresses a
+   * box roughly twice the size of the one the projection fractions belong to --
+   * which is the whole "flat markers scattered over a 3D scene" failure.
+   *
+   * A measured pixel size removes the ambiguity: the canvas is exactly the box
+   * the stage measured, so the projection basis and every overlay share one rect
+   * by construction.
+   */
+  width: number;
+  height: number;
 };

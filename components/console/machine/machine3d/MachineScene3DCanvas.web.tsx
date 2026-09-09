@@ -546,6 +546,8 @@ export default function MachineScene3DCanvas({
   onSelectPart,
   onSelectHardPoint,
   onContextLost,
+  width,
+  height,
 }: MachineScene3DCanvasProps) {
   const controls = useRef<OrbitControlsImpl | null>(null);
   // The ports publish themselves here rather than through state: the projector
@@ -603,7 +605,9 @@ export default function MachineScene3DCanvas({
           onContextLost?.();
         });
       }}
-      style={{ width: '100%', height: '100%' }}
+      // Explicit pixels, not percentages. See `width`/`height` in
+      // `MachineScene3DCanvasProps` for what a percentage chain does here.
+      style={{ width, height, display: 'block' }}
     >
       <RendererSettings dark={dark} />
       <LocalEnvironment dark={dark} />
