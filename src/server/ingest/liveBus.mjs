@@ -8,7 +8,7 @@
 // NOTIFY limit degrade to an `invalidate` marker, which makes subscribers pull a
 // snapshot instead of dropping the update.
 
-import { query } from './db.js';
+import { query } from './db.mjs';
 
 export const LIVE_CHANNEL = 'ultron_live';
 const MAX_NOTIFY_BYTES = 7000;

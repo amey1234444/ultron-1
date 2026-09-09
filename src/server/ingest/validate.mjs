@@ -18,7 +18,11 @@ export function validateEnvelope(msg) {
   if (!Number.isInteger(msg.gateway_sequence)) errors.push('gateway_sequence must be an integer');
   if (typeof msg.created_at !== 'string' || Number.isNaN(Date.parse(msg.created_at))) errors.push('created_at invalid');
   if (typeof msg.created_at_us !== 'string' || !/^\d+$/.test(msg.created_at_us)) errors.push('created_at_us must be a decimal string');
-  if (msg.replayed !== false) errors.push('replayed must be false');
+  // Boolean, not `false`: the gateway's offline spool republishes buffered
+  // messages with replayed=true after a broker outage, and those carry the
+  // original timestamps and sequence so dedup handles them normally. Rejecting
+  // them here would quarantine exactly the data the spool exists to save.
+  if (typeof msg.replayed !== 'boolean') errors.push('replayed must be a boolean');
   if (!msg.payload || typeof msg.payload !== 'object') errors.push('payload missing');
   return errors;
 }

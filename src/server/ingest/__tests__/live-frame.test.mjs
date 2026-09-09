@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildLiveFrame } from '../liveFrame.js';
-import { enqueue, flushQueue, queueDepth } from '../persistQueue.js';
+import { buildLiveFrame } from '../liveFrame.mjs';
+import { enqueue, flushQueue, queueDepth } from '../persistQueue.mjs';
 
 function telemetry(slots, dataCurrent = true) {
   return {

@@ -48,7 +48,7 @@ export async function query(text, params) {
 // fresh database without waiting for the Next.js app to cold-start.
 export async function ensureSchema() {
   const here = dirname(fileURLToPath(import.meta.url));
-  const migrations = join(here, '..', '..', 'supabase', 'migrations');
+  const migrations = join(here, '..', '..', '..', 'supabase', 'migrations');
   for (const file of readdirSync(migrations).filter((name) => name.endsWith('.sql')).sort()) {
     await query(readFileSync(join(migrations, file), 'utf8'));
   }

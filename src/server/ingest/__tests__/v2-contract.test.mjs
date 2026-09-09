@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { encodeSegment, parseTopic } from '../topics.js';
-import { SCHEMA_FOR_KIND, validateEnvelope, validatePayload } from '../validate.js';
+import { encodeSegment, parseTopic } from '../topics.mjs';
+import { SCHEMA_FOR_KIND, validateEnvelope, validatePayload } from '../validate.mjs';
 
 function envelope(schema, rackId, payload = {}) {
   return {
@@ -60,4 +60,13 @@ test('old schema version and integer rack IDs are rejected', () => {
   msg.rack_id = 1;
   assert.match(validateEnvelope(msg).join('; '), /schema_version/);
   assert.match(validateEnvelope(msg).join('; '), /rack_id/);
+});
+
+test('spool replays are accepted; a non-boolean replayed flag is not', () => {
+  // A gateway that buffered through a broker outage republishes with
+  // replayed=true and the original message_id, so dedup — not validation — is
+  // what keeps the replay from being counted twice.
+  const replayed = { ...envelope('ultron.gateway.status', null, { state: 'ONLINE' }), replayed: true };
+  assert.deepEqual(validateEnvelope(replayed), []);
+  assert.deepEqual(validateEnvelope({ ...replayed, replayed: 'true' }), ['replayed must be a boolean']);
 });

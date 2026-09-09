@@ -1,10 +1,14 @@
 # Single-service Render Blueprint for BlackGATE.
 #
-# This one web service serves the Next.js app and terminates gateway/live
-# WebSockets on the same public Render URL:
-# - https://<service>.onrender.com/       -> app
-# - wss://<service>.onrender.com/ws/gateway -> gateway ingest
-# - wss://<service>.onrender.com/ws/live    -> frontend live frames
+# One web service runs the Next.js app and the MQTT ingest runtime in the same
+# process. The live data path is pub/sub end to end:
+#
+#   gateway --MQTT publish--> EMQX --MQTT subscribe--> this service
+#           --WebSocket publish--> browser (wss://<service>.onrender.com/ws/live)
+#   this service --MQTT publish--> EMQX --MQTT subscribe--> gateway (commands)
+#
+# The service therefore dials out to the broker; the broker never calls in, and
+# there is no ingest webhook to expose. Health: https://<service>.onrender.com/health
 #
 # Fill sync:false values in the Render dashboard during Blueprint setup.
 
@@ -31,16 +35,31 @@ services:
         sync: false
       - key: LIVE_NOTIFY_DATABASE_URL
         sync: false
+      # mqtt = broker subscription only. `both` additionally opens the direct
+      # gateway WebSocket door at /ws/gateway as a broker-outage fallback.
       - key: INGEST_TRANSPORT
-        value: websocket
-      - key: GATEWAY_WS_PATH
-        value: /ws/gateway
+        value: mqtt
       - key: LIVE_WS_PATH
         value: /ws/live
-      - key: DIRECT_WS_GATEWAY_SECRET
+      # EMQX connection for this service's subscription and command publishes.
+      - key: MQTT_HOST
         sync: false
-      - key: DIRECT_WS_MAX_PAYLOAD_BYTES
+      - key: MQTT_PORT
+        value: 8883
+      - key: MQTT_USE_TLS
+        value: true
+      - key: MQTT_USERNAME
+        sync: false
+      - key: MQTT_PASSWORD
+        sync: false
+      - key: MQTT_BACKEND_CLIENT_ID
+        value: ultron-app-ingest
+      - key: MQTT_SUBSCRIBE_QOS
+        value: 1
+      - key: MQTT_MAX_PAYLOAD_BYTES
         value: 262144
+      - key: MQTT_COMMAND_TIMEOUT_MS
+        value: 10000
       - key: PERSISTENCE_ENABLED
         value: true
       - key: STALE_AFTER_S

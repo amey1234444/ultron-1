@@ -167,23 +167,25 @@ Settings → Database → Connection string → URI** into Vercel's `DATABASE_UR
 environment variable. Use the transaction pooler URI for serverless deployments
 and keep `sslmode=require`. See `.env.example` for the expected format.
 
-### MQTT ingestion in the Vercel app
+### MQTT ingestion, inside this app
 
-Production MQTT ingestion is handled by the Next.js app through
-`POST /api/mqtt/ingest`. Configure EMQX with an HTTP Action/Webhook that forwards
-`ultron/v1/gateways/#` messages to:
+The application subscribes to EMQX itself. Ingest lives in `src/server/ingest/`
+and is started by `server.mjs`, in the same process that serves Next.js — there
+is no separate worker and no broker webhook to configure.
 
 ```text
-https://YOUR-VERCEL-DOMAIN/api/mqtt/ingest
+gateway --MQTT publish--> EMQX --MQTT subscribe--> this app --WebSocket--> browser
+this app --MQTT publish--> EMQX --MQTT subscribe--> gateway  (commands)
 ```
 
-Set `MQTT_INGEST_SECRET` in Vercel and send it as the
-`x-ultron-ingest-secret` header from EMQX. This replaces the standalone
-`services/mqtt-ingest` worker for Vercel deployments; do not run both long-term.
-The full EMQX webhook event is stored in `mqtt_messages.source_event`, while the
-gateway payload is normalized into the live telemetry tables. See
-`docs/vercel-mqtt-ingest.md` for the EMQX rule/action body and validation
-queries.
+Set `MQTT_HOST`/`MQTT_USERNAME`/`MQTT_PASSWORD` and leave `INGEST_TRANSPORT=mqtt`.
+The browser subscribes to `/ws/live` with its session cookie; `POST
+/api/live/command` publishes a command and waits for the gateway's response on the
+same broker. `GET /health` reports the broker connection.
+
+This needs a host that keeps a process alive (Render, `npm run start:render`).
+A Vercel deployment serves the UI but cannot hold a broker subscription, so it
+has no ingest. See `docs/mqtt-pubsub-ingest.md`.
 
 ## Deployment (Vercel)
 

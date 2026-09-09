@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { query } from './db.js';
+import { query } from './db.mjs';
 
 const textOrNull = (value) => (typeof value === 'string' && value.length > 0 ? value : null);
 const bool = (value) => value === true;

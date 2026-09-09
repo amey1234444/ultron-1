@@ -7,11 +7,11 @@ gateway:
   rack_ids: [1, 2, 3, 4]           # match Rack Script IDs shown inside the gateway
   gateway_ip: 192.168.10.10        # or primary_interface: eth0
 transport:
-  mode: websocket
-  direct_ws_url: wss://YOUR-RENDER-INGEST.onrender.com/ws/gateway
+  mode: mqtt                       # publish to the broker; the app subscribes to it
+  direct_ws_url: wss://YOUR-RENDER-APP.onrender.com/ws/gateway  # fallback door only
   # DIRECT_WS_TOKEN is supplied from the environment, not this file.
 mqtt:
-  host: your-emqx-host # fallback only when GATEWAY_TRANSPORT=mqtt
+  host: your-emqx-host
   port: 8883
   tls: true
   client_id: ultron-gw-ultron-gw-demo-01 # derived: ultron-gw-{gateway_id}

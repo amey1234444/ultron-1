@@ -34,7 +34,9 @@ def validate_envelope(message: dict[str, Any]) -> None:
         raise ValueError(f"invalid gateway_ip: {message['gateway_ip']!r}")
     if "rack_id" in message and (not isinstance(message["rack_id"], str) or not message["rack_id"]):
         raise ValueError("rack_id must be a non-empty string")
-    if message["replayed"] is not False:
-        raise ValueError("replayed must be false")
+    # Spool replays set replayed=True, which the contract allows; only a
+    # non-boolean is a gateway bug.
+    if not isinstance(message["replayed"], bool):
+        raise ValueError("replayed must be a boolean")
     if not isinstance(message["payload"], dict):
         raise ValueError("payload must be an object")

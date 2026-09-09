@@ -65,4 +65,4 @@ For real gateway values to appear:
 - API: `src/pages/api/analysis/machine/[id].ts`
 - Database schema: `src/server/db.ts`
 - Supabase migration: `supabase/migrations/20260803000000_in_app_analysis_layer.sql`
-- Per-channel gateway persistence: `src/server/mqttIngest.ts`, `services/mqtt-ingest/handlers.js`
+- Per-channel gateway persistence: `src/server/ingest/handlers.mjs`

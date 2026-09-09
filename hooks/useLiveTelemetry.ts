@@ -5,15 +5,16 @@ import { recordChannelHistorySamples } from '../lib/channelHistoryDb';
 import { pruneLiveMeasurements, publishLiveMeasurements } from '../lib/liveMeasurementBus';
 import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, type LiveFrame, type LiveMeasurement, type LiveState } from '../lib/liveTelemetry';
 import { apiFetch } from '../src/lib/apiClient';
-import { directWsConfig, subscribeDirectWsFrames, type DirectWsSubscription } from '../src/lib/directWsFrames';
+import { liveSocketConfig, subscribeLiveFrames, type LiveSocketSubscription } from '../src/lib/liveSocket';
 
 // Live state has three transports, in order of latency:
 //
-//   1. Direct WebSocket frames from the Render ingest service (when configured):
-//      one backend hop from the gateway, at the gateway's own publish rate. This
-//      is the only transport allowed to paint channel telemetry/measurements.
+//   1. The live socket (/ws/live): this app's own broker subscription, fanned
+//      out to the browser as each message arrives, at the gateway's own publish
+//      rate. This is the only transport allowed to paint channel
+//      telemetry/measurements.
 //   2. SSE (/api/live/stream): backend structure snapshots and non-measurement
-//      frames, used only until direct WebSocket takes over.
+//      frames, used only until the live socket takes over.
 //   3. Polling /api/live/state: backend structure reconciliation.
 //
 // Backend snapshots still decide which gateways may be shown at all and carry
@@ -21,26 +22,26 @@ import { directWsConfig, subscribeDirectWsFrames, type DirectWsSubscription } fr
 // telemetry rows are deliberately ignored so channels reflect direct data only.
 const VISIBLE_POLL_INTERVAL_MS = 500;
 const HIDDEN_POLL_INTERVAL_MS = 5000;
-// Reconciliation cadence while the direct WebSocket feeds the values.
-const DIRECT_WS_SNAPSHOT_INTERVAL_MS = 5000;
+// Reconciliation cadence while the live socket feeds the values.
+const LIVE_SOCKET_SNAPSHOT_INTERVAL_MS = 5000;
 const REQUEST_TIMEOUT_MS = 4000;
 // Consecutive stream failures before giving up on push for this page view.
 const MAX_STREAM_FAILURES = 3;
 // End-to-end budget: gateway sample → applied to state.
 const LATENCY_BUDGET_MS = 1000;
-const DIRECT_WS_STATE_TTL_MS = 30_000;
+const LIVE_SOCKET_STATE_TTL_MS = 30_000;
 
 // Measured gateway→browser latency of the most recent frames, so the budget can
 // be checked from the console (`__ultronLiveLatency`) instead of eyeballed.
 export const liveLatency: {
-  directWsConnected: boolean;
+  liveSocketConnected: boolean;
   lastFrameAt: string | null;
   lastMeasurementFrameAt: string | null;
   lastMs: number | null;
   maxMs: number | null;
   overBudgetCount: number;
 } = {
-  directWsConnected: false,
+  liveSocketConnected: false,
   lastFrameAt: null,
   lastMeasurementFrameAt: null,
   lastMs: null,
@@ -62,7 +63,7 @@ function recordLatency(sourceCreatedAtMs: number | null | undefined, clockOffset
 
 function isRecent(iso: string | null | undefined) {
   const parsed = Date.parse(iso ?? '');
-  return Number.isFinite(parsed) && Date.now() - parsed <= DIRECT_WS_STATE_TTL_MS;
+  return Number.isFinite(parsed) && Date.now() - parsed <= LIVE_SOCKET_STATE_TTL_MS;
 }
 
 function isNewer(candidateIso: string | null | undefined, currentIso: string | null | undefined) {
@@ -165,8 +166,8 @@ export function useLiveTelemetry(): LiveState {
     let lastPayload = '';
     let inFlight: AbortController | null = null;
     let source: EventSource | null = null;
-    let directWs: DirectWsSubscription | null = null;
-    let directWsConnected = false;
+    let liveSocket: LiveSocketSubscription | null = null;
+    let liveSocketConnected = false;
     let streamFailures = 0;
     let clockOffsetMs = 0;
     let blockedGatewayIds = new Set<string>();
@@ -187,7 +188,7 @@ export function useLiveTelemetry(): LiveState {
     // Polling is structure-only reconciliation. It never carries channel
     // telemetry; if direct frames stop, channel readings age out naturally.
     const nextDelay = () => {
-      if (directWs && directWsConnected) return DIRECT_WS_SNAPSHOT_INTERVAL_MS;
+      if (liveSocket && liveSocketConnected) return LIVE_SOCKET_SNAPSHOT_INTERVAL_MS;
       return document.visibilityState === 'visible' ? VISIBLE_POLL_INTERVAL_MS : HIDDEN_POLL_INTERVAL_MS;
     };
 
@@ -305,18 +306,18 @@ export function useLiveTelemetry(): LiveState {
       return true;
     };
 
-    // --- Direct live WebSocket ----------------------------------------------
-    // Frames delivered by the ingest service already carry server timestamps
-    // for freshness, and are batched per paint.
-    const openDirectWs = () => {
-      const config = directWsConfig();
+    // --- Live socket subscription -------------------------------------------
+    // Frames published by this app's ingest runtime already carry server
+    // timestamps for freshness, and are batched per paint.
+    const openLiveSocket = () => {
+      const config = liveSocketConfig();
       if (cancelled || !config.enabled) return false;
-      const subscription = subscribeDirectWsFrames(
+      const subscription = subscribeLiveFrames(
         config,
         (frame) => { if (!cancelled) queueFrame(frame); },
         (connected) => {
-          directWsConnected = connected;
-          liveLatency.directWsConnected = connected;
+          liveSocketConnected = connected;
+          liveLatency.liveSocketConnected = connected;
         },
       );
       if (!subscription) return false;
@@ -324,8 +325,8 @@ export function useLiveTelemetry(): LiveState {
         subscription.close();
         return false;
       }
-      directWs = subscription;
-      // Values now come from direct WebSocket; the snapshot only reconciles.
+      liveSocket = subscription;
+      // Values now come from the live socket; the snapshot only reconciles.
       closeStream();
       if (timer) clearTimeout(timer);
       schedule(0);
@@ -342,14 +343,14 @@ export function useLiveTelemetry(): LiveState {
     (window as unknown as { __ultronLiveLatency?: typeof liveLatency }).__ultronLiveLatency = liveLatency;
     document.addEventListener('visibilitychange', onVisibilityChange);
     if (!openStream()) void poll();
-    // Direct WebSocket takes over from the stream once configured; until then
-    // the stream (or polling) is already serving state.
-    openDirectWs();
+    // The live socket takes over from the stream once connected; until then the
+    // stream (or polling) is already serving state.
+    openLiveSocket();
 
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', onVisibilityChange);
-      directWs?.close();
+      liveSocket?.close();
       if (flushHandle !== null) cancelFlush(flushHandle);
       closeStream();
       inFlight?.abort();

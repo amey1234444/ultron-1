@@ -1,3 +1,9 @@
+// Application server: Next.js and the MQTT ingest runtime in one process.
+//
+// The ingest runtime is not a sidecar — it holds this process's broker
+// subscription, fans frames out to the browsers connected to this instance, and
+// exposes its command publisher to the API routes running alongside it.
+
 import { createServer } from 'node:http';
 
 import next from 'next';
@@ -6,7 +12,8 @@ import {
   attachIngestWebSockets,
   handleIngestHealth,
   startIngestRuntime,
-} from './services/mqtt-ingest/index.js';
+  stopIngestRuntime,
+} from './src/server/ingest/index.mjs';
 
 const port = Number(process.env.PORT ?? 3000);
 const dev = process.env.NODE_ENV !== 'production';
@@ -24,5 +31,12 @@ const server = createServer((req, res) => {
 attachIngestWebSockets(server);
 
 server.listen(port, () => {
-  console.log(`[ultron] Next app + gateway WebSockets listening on :${port}`);
+  console.log(`[ultron] Next app + MQTT ingest listening on :${port}`);
 });
+
+for (const signal of ['SIGINT', 'SIGTERM']) {
+  process.on(signal, () => {
+    server.close();
+    void stopIngestRuntime().finally(() => process.exit(0));
+  });
+}
