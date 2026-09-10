@@ -17,6 +17,10 @@ class MqttClient:
     def __init__(self, config: Config, will_topic: str, will_payload: dict[str, Any]) -> None:
         self._config = config
         self._connected = threading.Event()
+        # Separate from _connected: the broker answering "no" is also a resolved
+        # connect attempt, and connect() must be able to tell the two apart.
+        self._connect_resolved = threading.Event()
+        self._connect_error: str | None = None
         self._on_command: Callable[[str, dict[str, Any]], None] | None = None
         self._command_filter: str | None = None
 
@@ -52,7 +56,24 @@ class MqttClient:
         self._client.on_message = self._handle_message
 
     def _handle_connect(self, client, userdata, flags, reason_code, properties) -> None:  # noqa: ANN001
+        # paho calls this for refusals too, carrying the broker's verdict in
+        # reason_code. Treating every callback as success is how a rejected
+        # login turns into a gateway that spools every message forever while
+        # printing healthy-looking publish logs.
+        failure = getattr(reason_code, "is_failure", None)
+        if failure is None:
+            try:
+                failure = int(reason_code) != 0
+            except (TypeError, ValueError):
+                failure = False
+        if failure:
+            self._connect_error = str(reason_code)
+            self._connected.clear()
+            self._connect_resolved.set()
+            return
+        self._connect_error = None
         self._connected.set()
+        self._connect_resolved.set()
         if self._command_filter:
             client.subscribe(self._command_filter, qos=1)
 
@@ -77,8 +98,23 @@ class MqttClient:
     def connect(self, timeout_s: float = 30.0) -> None:
         self._client.connect(self._config.mqtt_host, self._config.mqtt_port, keepalive=30)
         self._client.loop_start()
-        if not self._connected.wait(timeout_s):
-            raise RuntimeError(f"MQTT connect timeout ({self._config.mqtt_host}:{self._config.mqtt_port})")
+        if not self._connect_resolved.wait(timeout_s):
+            raise RuntimeError(
+                f"MQTT connect timeout ({self._config.mqtt_host}:{self._config.mqtt_port}) - "
+                "host unreachable, wrong port, or TLS blocked"
+            )
+        if self._connect_error:
+            raise RuntimeError(
+                f"MQTT broker refused the connection: {self._connect_error} "
+                f"(host={self._config.mqtt_host}:{self._config.mqtt_port} "
+                f"username={self._config.mqtt_username!r} client_id={self._config.mqtt_client_id!r}) - "
+                "check the user exists in EMQX Authentication and its password matches"
+            )
+        print(
+            f"[mqtt] connected to {self._config.mqtt_host}:{self._config.mqtt_port} "
+            f"as {self._config.mqtt_client_id}",
+            flush=True,
+        )
 
     @property
     def connected(self) -> bool:
