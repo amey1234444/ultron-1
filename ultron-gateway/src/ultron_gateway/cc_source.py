@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import random
 import socket
 from pathlib import Path
 from typing import Any, Protocol
@@ -54,7 +56,27 @@ class FileSnapshotReader:
 
 
 class LoopingFixtureSnapshotReader:
-    """Returns the same tested CC v3 fixture on every poll."""
+    """Replays the tested CC v3 fixture, with each channel's value moving.
+
+    The fixture is one frozen instant of a real rack. Replayed verbatim it
+    produces a technically valid feed in which nothing ever changes, so a
+    dashboard reading it cannot be told apart from a dashboard that is stuck.
+    Every numeric channel therefore random-walks around its recorded value, and
+    the alert/danger flags are recomputed from the thresholds already in the
+    fixture, so alarm states genuinely come and go.
+
+    Only the value fields move. Card type, sensor, unit and channel identity
+    stay exactly as recorded, so rack inventory keeps its revision and the
+    workspace mapping does not churn.
+
+    CC_FIXTURE_JITTER is the walk step as a fraction of the seed value per poll
+    (0 disables movement entirely and restores verbatim replay).
+    """
+
+    # How far a channel may wander from its recorded value.
+    _DRIFT_LIMIT = 0.30
+    # Discrete channels flip state occasionally rather than drifting.
+    _DISCRETE_FLIP_CHANCE = 0.03
 
     def __init__(self, path: str) -> None:
         fixture_path = Path(path)
@@ -66,9 +88,96 @@ class LoopingFixtureSnapshotReader:
             fixture_path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
         self._path = fixture_path
         self._frame = json.loads(self._path.read_text(encoding="utf-8"))
+        self._jitter = float(os.environ.get("CC_FIXTURE_JITTER", "0.02"))
+        # Seeded from the fixture, then walked. Keyed by channel number.
+        self._values: dict[int, float] = {}
+        for channel in self._frame.get("channels", []) or []:
+            number = channel.get("channel")
+            raw = channel.get("value_raw")
+            if isinstance(number, int) and isinstance(raw, (int, float)):
+                self._values[number] = float(raw)
+
+    @staticmethod
+    def _is_discrete(channel: dict[str, Any]) -> bool:
+        return str(channel.get("unit", "")).lower() == "state" or str(channel.get("card_type", "")).lower() in {
+            "digital_input",
+            "proximity",
+        }
+
+    def _next_raw(self, channel: dict[str, Any], seed: float, current: float) -> float:
+        if self._is_discrete(channel):
+            if random.random() < self._DISCRETE_FLIP_CHANCE:
+                return 0.0 if current >= 0.5 else 1.0
+            return current
+        magnitude = abs(seed) if seed else 1.0
+        step = magnitude * self._jitter
+        walked = current + random.uniform(-step, step)
+        low = seed - magnitude * self._DRIFT_LIMIT
+        high = seed + magnitude * self._DRIFT_LIMIT
+        return max(low, min(high, walked))
+
+    @staticmethod
+    def _threshold_states(value: float, alert: Any, danger: Any) -> tuple[str, str]:
+        """Alarm direction comes from the two thresholds, not from the reading.
+
+        Danger is always further into the fault than alert, so their order says
+        which way the alarm points: rising for an RTD (alert 80, danger 90) and
+        falling for the pressure channel (alert 3.00, danger 1.50). Reading the
+        direction off the current value instead would invert every channel that
+        happens to start out already in alarm.
+        """
+        usable_alert = isinstance(alert, (int, float)) and alert != 0
+        usable_danger = isinstance(danger, (int, float)) and danger != 0
+        if not usable_alert and not usable_danger:
+            return "inactive", "inactive"
+        rising = True
+        if usable_alert and usable_danger:
+            rising = danger >= alert
+
+        def state(threshold: Any, usable: bool) -> str:
+            if not usable:
+                return "inactive"
+            crossed = value >= threshold if rising else value <= threshold
+            return "active" if crossed else "inactive"
+
+        return state(alert, usable_alert), state(danger, usable_danger)
 
     def read(self) -> dict[str, Any] | None:
-        return json.loads(json.dumps(self._frame))
+        frame = json.loads(json.dumps(self._frame))
+        if self._jitter <= 0:
+            return frame
+        for channel in frame.get("channels", []) or []:
+            number = channel.get("channel")
+            if number not in self._values:
+                continue
+            seed = float(self._frame_seed(number))
+            raw = self._next_raw(channel, seed, self._values[number])
+            self._values[number] = raw
+
+            places = channel.get("decimal_places")
+            places = places if isinstance(places, int) and places >= 0 else 0
+            rounded = int(round(raw))
+            channel["value_raw"] = rounded
+            scaled = rounded / (10 ** places)
+            channel["value_formatted"] = f"{scaled:.{places}f}"
+            unit = channel.get("unit")
+            if unit:
+                channel["value_with_unit"] = f"{channel['value_formatted']} {unit}"
+
+            alert, danger = self._threshold_states(
+                rounded, channel.get("alert_value_raw"), channel.get("danger_value_raw")
+            )
+            channel["alert_status"] = alert
+            channel["alert_status_code"] = 1 if alert == "active" else 0
+            channel["danger_status"] = danger
+            channel["danger_status_code"] = 1 if danger == "active" else 0
+        return frame
+
+    def _frame_seed(self, number: int) -> float:
+        for channel in self._frame.get("channels", []) or []:
+            if channel.get("channel") == number:
+                return float(channel.get("value_raw") or 0.0)
+        return 0.0
 
     def close(self) -> None:
         return None
