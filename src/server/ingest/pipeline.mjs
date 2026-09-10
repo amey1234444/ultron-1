@@ -27,7 +27,6 @@ import {
   quarantine,
   setMetric,
 } from './handlers.mjs';
-import { maybeLogPayload, recordGatewayToApp, recordPipeline } from './latency.mjs';
 import { resolveCommandResponse } from './mqttClient.mjs';
 import { publishToSubscribers } from './liveSocket.mjs';
 import { parseTopic } from './topics.mjs';
@@ -39,10 +38,6 @@ export const PERSISTENCE_ENABLED = !['0', 'false', 'no'].includes(
 export const MAX_PAYLOAD_BYTES = Number(
   process.env.MQTT_MAX_PAYLOAD_BYTES ?? process.env.DIRECT_WS_MAX_PAYLOAD_BYTES ?? 262_144,
 );
-// Budget for gateway sample → frame published. Exceeding it means the broker,
-// the network or the gateway clock is the bottleneck, not this application.
-const LATENCY_BUDGET_MS = Number(process.env.LATENCY_BUDGET_MS ?? 1000);
-const LATENCY_WARN_INTERVAL_MS = 5000;
 // Kinds whose handler writes the full rack row, so binding must not write it too.
 const KINDS_UPSERTING_RACK = new Set(['telemetry', 'rack_health', 'topology']);
 
@@ -54,10 +49,6 @@ async function rejectMessage(topic, reason, msg) {
 }
 
 export async function onMessage(topic, buf) {
-  // Started before any parsing so the pipeline figure covers everything this
-  // process does to a payload, not just the interesting part.
-  const startedAt = performance.now();
-  const arrivedAtMs = Date.now();
   const parsed = parseTopic(topic);
   if (!parsed) return rejectMessage(topic, 'unknown topic', null);
   if (parsed.kind === 'command_request') return; // backend-originated; not ingested
@@ -134,14 +125,6 @@ export async function onMessage(topic, buf) {
     // arriving and the browser seeing it. Presentation is the priority, so
     // nothing database-shaped runs ahead of it.
     publishToSubscribers(topic, { type: 'frame', kind: parsed.kind, topic, frame, serverNowMs: Date.now() });
-    // Measured at the moment the frame is on the wire to the browser, which is
-    // the point the reading is actually visible. Anything after this (pg_notify,
-    // persistence) is storage and must not count against it.
-    const pipelineMs = performance.now() - startedAt;
-    recordPipeline(pipelineMs);
-    const gatewayToAppMs = recordGatewayToApp(msg.gateway_id, frame.sourceCreatedAtMs, arrivedAtMs);
-    maybeLogPayload(topic, gatewayToAppMs, pipelineMs);
-    warnIfOverBudget(gatewayToAppMs);
     if (PERSISTENCE_ENABLED) void publishLiveFrame(frame);
   }
 
@@ -158,21 +141,11 @@ export async function onMessage(topic, buf) {
   enqueue(persistKey, () => persist(topic, parsed, msg));
 }
 
-// Latency is kept in memory only (see latency.mjs) and served from /health.
-// It is diagnostic, it is high frequency, and writing it would put a database
-// round trip on the path whose speed it exists to measure. The one thing worth
-// escalating is a sustained breach of the budget, and that goes to the log.
-let lastLatencyWarnAt = 0;
-
-function warnIfOverBudget(gatewayToAppMs) {
-  if (gatewayToAppMs === null || gatewayToAppMs <= LATENCY_BUDGET_MS) return;
-  if (Date.now() - lastLatencyWarnAt <= LATENCY_WARN_INTERVAL_MS) return;
-  lastLatencyWarnAt = Date.now();
-  console.warn(
-    `[latency] gateway→publish ${Math.round(gatewayToAppMs)}ms over ${LATENCY_BUDGET_MS}ms budget ` +
-    '(broker backlog, network, or gateway clock skew — check /health latency.clocks)',
-  );
-}
+// Latency is deliberately not measured here. Every frame carries the gateway's
+// own created_at_us, so anyone who wants the number subscribes to the broker and
+// computes it against their own clock — see scripts/Watch-MqttLatency.ps1. Doing
+// it in this process would only report this hop, would cost work on the path it
+// claims to measure, and would still be at the mercy of the gateway's clock.
 
 async function persist(topic, parsed, msg) {
   const binding = await bind(msg, { ensureRackRow: !KINDS_UPSERTING_RACK.has(parsed.kind) });

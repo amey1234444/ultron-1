@@ -16,7 +16,6 @@
 
 import { ensureSchema } from './db.mjs';
 import { flushMetrics, markStaleGateways, setMetric } from './handlers.mjs';
-import { latencySnapshot } from './latency.mjs';
 import {
   GATEWAY_WS_PATH,
   LIVE_WS_PATH,
@@ -50,7 +49,6 @@ export function ingestHealth() {
     persistence: { enabled: PERSISTENCE_ENABLED, ready: schemaReady, queueDepth: queueDepth(), dropped: droppedCount(), failed: failureCount() },
     broker: brokerStatus(),
     sockets: liveSocketStats(),
-    latency: latencySnapshot(),
     serverNowMs: Date.now(),
   };
 }
@@ -130,7 +128,7 @@ export async function startIngestRuntime() {
   // Next.js API routes are bundled separately from this module, so they cannot
   // reach this instance by import. The runtime publishes itself here instead,
   // which is how /api/live/command reaches the live broker connection.
-  globalThis.__ultronIngest = { sendCommand, ingestHealth, brokerStatus, latencySnapshot };
+  globalThis.__ultronIngest = { sendCommand, ingestHealth, brokerStatus };
 }
 
 export async function stopIngestRuntime() {
