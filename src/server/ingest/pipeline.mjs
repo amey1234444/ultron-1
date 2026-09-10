@@ -27,6 +27,7 @@ import {
   quarantine,
   setMetric,
 } from './handlers.mjs';
+import { maybeLogPayload, recordGatewayToApp, recordPipeline } from './latency.mjs';
 import { resolveCommandResponse } from './mqttClient.mjs';
 import { publishToSubscribers } from './liveSocket.mjs';
 import { parseTopic } from './topics.mjs';
@@ -53,6 +54,10 @@ async function rejectMessage(topic, reason, msg) {
 }
 
 export async function onMessage(topic, buf) {
+  // Started before any parsing so the pipeline figure covers everything this
+  // process does to a payload, not just the interesting part.
+  const startedAt = performance.now();
+  const arrivedAtMs = Date.now();
   const parsed = parseTopic(topic);
   if (!parsed) return rejectMessage(topic, 'unknown topic', null);
   if (parsed.kind === 'command_request') return; // backend-originated; not ingested
@@ -129,6 +134,13 @@ export async function onMessage(topic, buf) {
     // arriving and the browser seeing it. Presentation is the priority, so
     // nothing database-shaped runs ahead of it.
     publishToSubscribers(topic, { type: 'frame', kind: parsed.kind, topic, frame, serverNowMs: Date.now() });
+    // Measured at the moment the frame is on the wire to the browser, which is
+    // the point the reading is actually visible. Anything after this (pg_notify,
+    // persistence) is storage and must not count against it.
+    const pipelineMs = performance.now() - startedAt;
+    recordPipeline(pipelineMs);
+    const gatewayToAppMs = recordGatewayToApp(msg.gateway_id, frame.sourceCreatedAtMs, arrivedAtMs);
+    maybeLogPayload(topic, gatewayToAppMs, pipelineMs);
     recordPublishLatency(frame);
     if (PERSISTENCE_ENABLED) void publishLiveFrame(frame);
   }
