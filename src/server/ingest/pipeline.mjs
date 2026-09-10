@@ -141,7 +141,7 @@ export async function onMessage(topic, buf) {
     recordPipeline(pipelineMs);
     const gatewayToAppMs = recordGatewayToApp(msg.gateway_id, frame.sourceCreatedAtMs, arrivedAtMs);
     maybeLogPayload(topic, gatewayToAppMs, pipelineMs);
-    recordPublishLatency(frame);
+    warnIfOverBudget(gatewayToAppMs);
     if (PERSISTENCE_ENABLED) void publishLiveFrame(frame);
   }
 
@@ -158,19 +158,20 @@ export async function onMessage(topic, buf) {
   enqueue(persistKey, () => persist(topic, parsed, msg));
 }
 
-// Gateway sample → frame published, the part of end-to-end latency this
-// application owns. Exported as a metric so the budget is observable rather
-// than assumed.
+// Latency is kept in memory only (see latency.mjs) and served from /health.
+// It is diagnostic, it is high frequency, and writing it would put a database
+// round trip on the path whose speed it exists to measure. The one thing worth
+// escalating is a sustained breach of the budget, and that goes to the log.
 let lastLatencyWarnAt = 0;
 
-function recordPublishLatency(frame) {
-  if (typeof frame.sourceCreatedAtMs !== 'number') return;
-  const latencyMs = frame.serverNowMs - frame.sourceCreatedAtMs;
-  setMetric('gateway_to_publish_latency_ms', Math.max(0, Math.round(latencyMs)));
-  if (latencyMs > LATENCY_BUDGET_MS && Date.now() - lastLatencyWarnAt > LATENCY_WARN_INTERVAL_MS) {
-    lastLatencyWarnAt = Date.now();
-    console.warn(`[latency] gateway→publish ${Math.round(latencyMs)}ms over ${LATENCY_BUDGET_MS}ms budget (broker backlog or gateway clock skew)`);
-  }
+function warnIfOverBudget(gatewayToAppMs) {
+  if (gatewayToAppMs === null || gatewayToAppMs <= LATENCY_BUDGET_MS) return;
+  if (Date.now() - lastLatencyWarnAt <= LATENCY_WARN_INTERVAL_MS) return;
+  lastLatencyWarnAt = Date.now();
+  console.warn(
+    `[latency] gateway→publish ${Math.round(gatewayToAppMs)}ms over ${LATENCY_BUDGET_MS}ms budget ` +
+    '(broker backlog, network, or gateway clock skew — check /health latency.clocks)',
+  );
 }
 
 async function persist(topic, parsed, msg) {
