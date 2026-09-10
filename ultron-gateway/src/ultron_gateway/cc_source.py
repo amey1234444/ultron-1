@@ -70,11 +70,17 @@ class LoopingFixtureSnapshotReader:
     workspace mapping does not churn.
 
     CC_FIXTURE_JITTER is the walk step as a fraction of the seed value per poll
-    (0 disables movement entirely and restores verbatim replay).
+    (default 0.05, so a 72.57 degC channel moves by up to ~3.6 degC a sample and
+    the swing is obvious on a trend; 0 restores verbatim replay).
     """
 
     # How far a channel may wander from its recorded value.
     _DRIFT_LIMIT = 0.30
+    # Pull back towards the recorded reading each poll. A pure random walk with
+    # a visible step size reaches the drift limit quickly and then hugs it,
+    # which reads as another kind of stuck; reverting keeps the movement
+    # centred on the real value and continuously visible.
+    _REVERSION = 0.12
     # Discrete channels flip state occasionally rather than drifting.
     _DISCRETE_FLIP_CHANCE = 0.03
 
@@ -88,7 +94,7 @@ class LoopingFixtureSnapshotReader:
             fixture_path = next((candidate for candidate in candidates if candidate.exists()), candidates[0])
         self._path = fixture_path
         self._frame = json.loads(self._path.read_text(encoding="utf-8"))
-        self._jitter = float(os.environ.get("CC_FIXTURE_JITTER", "0.02"))
+        self._jitter = float(os.environ.get("CC_FIXTURE_JITTER", "0.05"))
         # Seeded from the fixture, then walked. Keyed by channel number.
         self._values: dict[int, float] = {}
         for channel in self._frame.get("channels", []) or []:
@@ -111,7 +117,7 @@ class LoopingFixtureSnapshotReader:
             return current
         magnitude = abs(seed) if seed else 1.0
         step = magnitude * self._jitter
-        walked = current + random.uniform(-step, step)
+        walked = current + random.uniform(-step, step) + (seed - current) * self._REVERSION
         low = seed - magnitude * self._DRIFT_LIMIT
         high = seed + magnitude * self._DRIFT_LIMIT
         return max(low, min(high, walked))
