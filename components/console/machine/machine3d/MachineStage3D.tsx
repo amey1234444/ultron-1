@@ -94,6 +94,8 @@ export type MachineStage3DProps = {
   closed?: boolean;
   cameraMode?: MachineCameraMode;
   cameraCommand?: MachineCameraCommand | null;
+  zoom?: number;
+  onZoomChange?: (zoom: number) => void;
   /**
    * Live instrument positions as fractions of this stage.
    *
@@ -170,6 +172,8 @@ export function MachineStage3D({
   closed = false,
   cameraMode = 'free',
   cameraCommand = null,
+  zoom = 1,
+  onZoomChange,
   onProjectConnectors,
   onSelectPart,
   className,
@@ -262,6 +266,8 @@ export function MachineStage3D({
             closed={closed}
             cameraMode={cameraMode}
             cameraCommand={cameraCommand}
+            zoom={zoom}
+            onZoomChange={onZoomChange}
             onProjectPoints={handleProject}
             onSelectPart={onSelectPart}
             onContextLost={handleContextLost}
@@ -274,10 +280,11 @@ export function MachineStage3D({
   return (
     <View
       className={className}
-      style={[{ flex: 1 }, style]}
+      testID="machine-stage-3d"
+      style={[{ flex: 1, minWidth: 0, minHeight: 0, position: 'relative', overflow: 'hidden' }, style]}
       onLayout={(e) => {
         const { width, height } = e.nativeEvent.layout;
-        setSize({ width, height });
+        setSize((previous) => previous?.width === width && previous.height === height ? previous : { width, height });
       }}
     >
       {/* Faded in on the first real projection rather than on mount: that is

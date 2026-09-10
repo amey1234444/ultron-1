@@ -14,7 +14,7 @@ export const TWIN_SCREW_CUTAWAY_PART_COUNT = 11;
 export const TWIN_SCREW_INSPECTION_VIEW = {
   direction: [0, 0.06, 1] as const,
   fov: 32,
-  fillMargin: 1.07,
+  fillMargin: 1.12,
   occlusionClearance: 0.012,
 } as const;
 

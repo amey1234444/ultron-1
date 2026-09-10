@@ -33,6 +33,8 @@ import { SingleScrewExtruder } from './SingleScrewExtruder';
 import { MachineStage3D } from './machine3d/MachineStage3D';
 import {
   mergeProjectedConnectorPositions,
+  viewportMachineRect,
+  type MachineCameraCommand,
   type ProjectedConnectorMap,
   type ProjectedPoint,
 } from './machine3d/types';
@@ -133,13 +135,13 @@ function ZoomControls({ zoom, onZoomOut, onReset, onZoomIn }: { zoom: number; on
   return (
     <View pointerEvents="box-none" className="absolute bottom-4 right-4 items-end">
       <View className={cn('flex-row items-center gap-1 rounded-full border px-1 py-1', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}>
-        <Pressable onPress={onZoomOut} disabled={zoom <= MIN_ZOOM} className="h-7 w-7 items-center justify-center rounded-full">
+        <Pressable accessibilityRole="button" accessibilityLabel="Zoom out" onPress={onZoomOut} disabled={zoom <= MIN_ZOOM} className="h-7 w-7 items-center justify-center rounded-full">
           <Text className={cn('font-body-bold text-sm', zoom <= MIN_ZOOM ? mutedClass : inkClass)}>−</Text>
         </Pressable>
-        <Pressable onPress={onReset} className="px-2">
+        <Pressable accessibilityRole="button" accessibilityLabel="Reset zoom" onPress={onReset} className="px-2">
           <Text className={cn('font-body-medium text-[12.5px] tabular-nums', mutedClass)}>{Math.round(zoom * 100)}%</Text>
         </Pressable>
-        <Pressable onPress={onZoomIn} disabled={zoom >= MAX_ZOOM} className="h-7 w-7 items-center justify-center rounded-full">
+        <Pressable accessibilityRole="button" accessibilityLabel="Zoom in" onPress={onZoomIn} disabled={zoom >= MAX_ZOOM} className="h-7 w-7 items-center justify-center rounded-full">
           <Text className={cn('font-body-bold text-sm', zoom >= MAX_ZOOM ? mutedClass : inkClass)}>+</Text>
         </Pressable>
       </View>
@@ -184,13 +186,21 @@ export function MachineWorkspace({
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
+  const has3DStage = STAGE_3D_TEMPLATES.has(machine.template);
+  const [cameraCommand, setCameraCommand] = useState<MachineCameraCommand | null>(null);
+  const [closedBarrel, setClosedBarrel] = useState(false);
 
   const [actualTab, setActualTab] = useState<ActualTab>('machine');
   const [configuratorMode, setConfiguratorMode] = useState<WorkspaceMode>('design');
   const mode: WorkspaceMode = canConfigure ? configuratorMode : 'actual';
+  // A view command is transient, unlike the saved magnification. Do not
+  // replay an old Fit/Side command when the canvas mounts after another tab.
+  useEffect(() => setCameraCommand(null), [actualTab, mode]);
   useEffect(() => {
     setConfiguratorMode('design');
     setActualTab('machine');
+    setCameraCommand(null);
+    setClosedBarrel(false);
   }, [machine.id]);
   useEffect(() => {
     onModeChange?.(mode);
@@ -245,7 +255,11 @@ export function MachineWorkspace({
   const roundZoom = (value: number) => Math.round(value * 100) / 100;
   const zoomIn = () => setZoom((z) => Math.min(MAX_ZOOM, roundZoom(z + ZOOM_STEP)));
   const zoomOut = () => setZoom((z) => Math.max(MIN_ZOOM, roundZoom(z - ZOOM_STEP)));
-  const resetZoom = () => setZoom(DEFAULT_MACHINE_ZOOM);
+  const requestCamera = (kind: MachineCameraCommand['kind']) => {
+    setZoom(DEFAULT_MACHINE_ZOOM);
+    setCameraCommand((previous) => ({ id: (previous?.id ?? 0) + 1, kind }));
+  };
+  const resetZoom = () => has3DStage ? requestCamera('fit') : setZoom(DEFAULT_MACHINE_ZOOM);
   // Anything outside the canvas that asks for a size goes through the same
   // bounds the zoom control enforces.
   const setZoomClamped = useCallback((value: number) => setZoom(clampMachineZoom(value) ?? DEFAULT_MACHINE_ZOOM), []);
@@ -319,8 +333,13 @@ export function MachineWorkspace({
   // (post-scale) box is the unscaled layout box re-centred at the same point.
   // All in stage units.
   const hasTemplateArtwork = ARTWORK_TEMPLATES.has(machine.template);
+  const viewportRect = useMemo(() => canvasSize ? viewportMachineRect(stageBounds) : null, [canvasSize, stageBounds]);
 
   const machineRect = useMemo(() => {
+    // The WebGL stage fills the real viewport. Convert that rect back into
+    // the board's logical units so projected ports and saved trails agree,
+    // including the extra space beyond the 16:9 reference stage.
+    if (has3DStage) return viewportRect;
     if (!machineLayout) return null;
     const pad = ARTWORK_TEMPLATES.has(machine.template) ? ARTWORK_PADDING : 0;
     const contentX = machineLayout.x + pad;
@@ -332,7 +351,7 @@ export function MachineWorkspace({
     const width = contentWidth * zoom;
     const height = contentHeight * zoom;
     return { x: centerX - width / 2, y: centerY - height / 2, width, height };
-  }, [machineLayout, zoom, machine.template]);
+  }, [machineLayout, zoom, machine.template, has3DStage, viewportRect]);
 
   useEffect(() => {
     if (!isActual || actualTab === 'machine') return;
@@ -374,7 +393,9 @@ export function MachineWorkspace({
   }, []);
 
   const connectors = useMemo(() => {
-    if (!projected) return staticConnectors;
+    if (!projected) return has3DStage
+      ? staticConnectors.map((connector) => ({ ...connector, projectionVisible: false }))
+      : staticConnectors;
     // A pad the camera cannot currently see keeps its last valid 3D position,
     // but is not offered as a snap target while hidden. Missing entries after
     // the first frame are disabled rather than silently presented as 2D pads.
@@ -384,7 +405,7 @@ export function MachineWorkspace({
         ? { ...connector, rx: at.rx, ry: at.ry, projectionVisible: at.visible }
         : { ...connector, projectionVisible: false };
     });
-  }, [staticConnectors, projected]);
+  }, [staticConnectors, projected, has3DStage]);
 
   const twinScrewLabels = useMemo(
     () => Object.fromEntries(TWIN_SCREW_POINT_REGISTRY.map((point) => [point.code, point.label])),
@@ -466,47 +487,69 @@ export function MachineWorkspace({
   // gets the entire remaining area on every screen.
   const canvasRegion = (board: ReactNode) => (
     <View
+      testID="machine-workspace-viewport"
       className="relative flex-1 overflow-hidden"
       onLayout={(e) => setCanvasSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
     >
       {/* Grid first, in container coordinates, so the work surface runs to all
           four edges instead of stopping at the letterboxed stage. */}
-      {canvasSize ? <CanvasGrid width={canvasSize.width} height={canvasSize.height} scale={stageScale} /> : null}
+      {canvasSize && !has3DStage ? <CanvasGrid width={canvasSize.width} height={canvasSize.height} scale={stageScale} /> : null}
 
       {stageStyle && (
         <>
-          <View pointerEvents="box-none" style={stageStyle} className="items-center justify-center">
-            <View
-              onLayout={(e) => {
-                const { x, y, width, height } = e.nativeEvent.layout;
-                setMachineLayout({ x, y, width, height });
-              }}
-              style={{ transform: [{ scale: zoom }] }}
-              className={hasTemplateArtwork ? 'w-full max-w-5xl p-6' : 'h-full w-full'}
-              // The 3D stage needs a real height; the artwork branch gets one
-              // from its aspect ratio.
-            >
-              {machine.template === 'Twin Screw Extruder' ? (
-                <MachineStage3D
-                  modelUrl={TWIN_SCREW_MODEL_URL}
-                  anchors={TWIN_SCREW_ANCHORS_3D}
-                  labels={twinScrewLabels}
-                  connectorState={connectorState}
-                  dark={isDark}
-                  onProjectConnectors={handleProjectConnectors}
-                />
-              ) : machine.template === 'Rotary Airlock Valve' ? (
-                <RotaryAirlockValve />
-              ) : machine.template === 'Single Screw Extruder' ? (
-                <SingleScrewExtruder connectorState={connectorState} />
-              ) : (
-                <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
-              )}
+          {has3DStage ? (
+            <MachineStage3D
+              key={machine.id}
+              style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 }}
+              modelUrl={TWIN_SCREW_MODEL_URL}
+              anchors={TWIN_SCREW_ANCHORS_3D}
+              labels={twinScrewLabels}
+              connectorState={connectorState}
+              dark={isDark}
+              closed={closedBarrel}
+              cameraCommand={cameraCommand}
+              zoom={zoom}
+              onZoomChange={setZoomClamped}
+              onProjectConnectors={handleProjectConnectors}
+            />
+          ) : (
+            <View pointerEvents="box-none" style={stageStyle} className="items-center justify-center">
+              <View
+                onLayout={(e) => {
+                  const { x, y, width, height } = e.nativeEvent.layout;
+                  setMachineLayout({ x, y, width, height });
+                }}
+                style={{ transform: [{ scale: zoom }] }}
+                className={hasTemplateArtwork ? 'w-full max-w-5xl p-6' : 'h-full w-full'}
+              >
+                {machine.template === 'Rotary Airlock Valve' ? (
+                  <RotaryAirlockValve />
+                ) : machine.template === 'Single Screw Extruder' ? (
+                  <SingleScrewExtruder connectorState={connectorState} />
+                ) : (
+                  <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
+                )}
+              </View>
             </View>
-          </View>
+          )}
 
           {board}
 
+          {has3DStage && (
+            <View style={{ position: 'absolute', left: 16, right: (canvasSize?.width ?? 0) < 640 ? 16 : undefined, bottom: (canvasSize?.width ?? 0) < 640 ? 74 : 18, maxWidth: (canvasSize?.width ?? 0) < 640 ? undefined : '65%', gap: 8 }}>
+              <Text style={{ color: palette.inkMuted, fontSize: 11 }}>Drag to rotate · Scroll or pinch to zoom</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4, padding: 4, borderRadius: 16, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.panel }}>
+                {(['side', 'fit', 'reset'] as const).map((kind) => (
+                  <Pressable key={kind} accessibilityRole="button" accessibilityLabel={`${kind === 'side' ? 'Side view of' : kind === 'fit' ? 'Fit' : 'Reset view of'} 3D machine`} onPress={() => requestCamera(kind)} style={{ paddingHorizontal: 10, paddingVertical: 7 }}>
+                    <Text style={{ color: palette.ink, fontSize: 12 }}>{kind === 'side' ? 'Side view' : kind === 'fit' ? 'Fit' : 'Reset'}</Text>
+                  </Pressable>
+                ))}
+                <Pressable accessibilityRole="button" accessibilityLabel="Show barrel cutaway" accessibilityState={{ selected: !closedBarrel }} onPress={() => setClosedBarrel((value) => !value)} style={{ paddingHorizontal: 10, paddingVertical: 7 }}>
+                  <Text style={{ color: palette.ink, fontSize: 12 }}>{closedBarrel ? 'Open cutaway' : 'Close barrel'}</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
           <ZoomControls zoom={zoom} onZoomOut={zoomOut} onReset={resetZoom} onZoomIn={zoomIn} />
         </>
       )}

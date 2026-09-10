@@ -34,6 +34,8 @@ import {
   type Mesh,
 } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { fitMachineCamera } from '../machine3d/cameraFit';
+import { stageBoundsForCanvas, STAGE_WIDTH, STAGE_HEIGHT } from '../StageGrid';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
   TWIN_SCREW_ANCHORS_3D,
@@ -66,6 +68,7 @@ import {
   clampProjectionFraction,
   mergeProjectedConnectorPositions,
   projectionIsOnScreen,
+  viewportMachineRect,
 } from '../machine3d/types';
 import {
   analyseTwinScrew,
@@ -930,14 +933,12 @@ async function checkRuntimeAsset() {
     anchorOutsideModel.map(([code]) => code).join(', ') || undefined,
   );
 
-  const centre = modelBox.getCenter(new Vector3());
   const extent = modelBox.getSize(new Vector3());
   const aspect = 1600 / 900;
-  const vFov = (TWIN_SCREW_INSPECTION_VIEW.fov * Math.PI) / 180;
-  const fitHeight = extent.y / 2 / Math.tan(vFov / 2);
-  const fitWidth = extent.x / 2 / Math.tan(vFov / 2) / aspect;
-  const distance =
-    Math.max(fitHeight, fitWidth, 0.2) * TWIN_SCREW_INSPECTION_VIEW.fillMargin + extent.z / 2;
+  const { centre, distance } = fitMachineCamera(
+    modelBox, new Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction),
+    TWIN_SCREW_INSPECTION_VIEW.fov, aspect, TWIN_SCREW_INSPECTION_VIEW.fillMargin,
+  );
   const camera = new PerspectiveCamera(
     TWIN_SCREW_INSPECTION_VIEW.fov,
     aspect,
@@ -949,6 +950,42 @@ async function checkRuntimeAsset() {
     .addScaledVector(new Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction).normalize(), distance);
   camera.lookAt(centre);
   camera.updateMatrixWorld(true);
+
+  // Regression: the entire model must fit at desktop/tablet/phone sizes,
+  // including the screenshot's saved 80% magnification. Test the shipped
+  // camera helper against the actual GLB, not a second copy of the formula.
+  for (const [width, height] of [[1920, 774], [1366, 700], [768, 900], [390, 650]]) {
+    const scale = Math.min(width / STAGE_WIDTH, height / STAGE_HEIGHT);
+    const rect = viewportMachineRect(stageBoundsForCanvas(width, height, scale));
+    const originX = (width - STAGE_WIDTH * scale) / 2;
+    const originY = (height - STAGE_HEIGHT * scale) / 2;
+    for (const direction of [new Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction), new Vector3(0, 0, 1), new Vector3(1, 0.6, 1).normalize()]) {
+      for (const zoom of [0.8, 1]) {
+        const fit = fitMachineCamera(modelBox, direction, camera.fov, width / height);
+        const viewCamera = new PerspectiveCamera(camera.fov, width / height, 0.01, fit.distance * 10);
+        viewCamera.position.copy(fit.centre).addScaledVector(direction, fit.distance / zoom);
+        viewCamera.lookAt(fit.centre);
+        viewCamera.updateMatrixWorld(true);
+        let fits = true;
+        let aligned = true;
+        for (const x of [modelBox.min.x, modelBox.max.x]) {
+          for (const y of [modelBox.min.y, modelBox.max.y]) {
+            for (const z of [modelBox.min.z, modelBox.max.z]) {
+              const ndc = new Vector3(x, y, z).project(viewCamera);
+              fits &&= Number.isFinite(ndc.x) && Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1 && Math.abs(ndc.z) < 1;
+              const rx = (ndc.x + 1) / 2;
+              const ry = (1 - ndc.y) / 2;
+              aligned &&= Math.abs(originX + (rect.x + rx * rect.width) * scale - rx * width) < 1e-6;
+              aligned &&= Math.abs(originY + (rect.y + ry * rect.height) * scale - ry * height) < 1e-6;
+            }
+          }
+        }
+        const label = `${width}×${height}, ${zoom * 100}%, direction ${direction.toArray()}`;
+        check(`full GLB stays inside camera frame: ${label}`, fits);
+        check(`trail coordinates match the full viewport: ${label}`, aligned);
+      }
+    }
+  }
 
   const ray = new Raycaster();
   const visibleCodes: string[] = [];

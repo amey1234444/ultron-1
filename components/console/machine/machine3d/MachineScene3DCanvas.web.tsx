@@ -47,6 +47,8 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'rea
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
+import { clampMachineZoom, MAX_MACHINE_ZOOM, MIN_MACHINE_ZOOM } from '../../../../lib/machineZoom';
+import { fitMachineCamera } from './cameraFit';
 
 import {
   applyMachineFinish,
@@ -66,6 +68,7 @@ import {
   clampProjectionFraction,
   projectionIsOnScreen,
   type MachineScene3DCanvasProps,
+  type MachineCameraCommand,
   type ProjectedPoint,
 } from './types';
 
@@ -239,42 +242,80 @@ function Machine({
 function Framing({
   loaded,
   controls,
-  resetKey,
+  command,
+  zoom,
+  onZoomChange,
 }: {
   loaded: Loaded | null;
   controls: React.RefObject<OrbitControlsImpl | null>;
-  resetKey: number;
+  command: MachineCameraCommand | null;
+  zoom: number;
+  onZoomChange?: (zoom: number) => void;
 }) {
   const camera = useThree((s) => s.camera) as THREE.PerspectiveCamera;
   const size = useThree((s) => s.size);
+  const baseDistance = useRef<number | null>(null);
+  const lastCommand = useRef<number | null>(null);
+  const current = useRef({ zoom, onZoomChange });
+  current.current = { zoom, onZoomChange };
 
   useEffect(() => {
-    if (!loaded || loaded.box.isEmpty()) return;
-
-    const centre = loaded.box.getCenter(new THREE.Vector3());
+    const c = controls.current;
+    if (!loaded || loaded.box.isEmpty() || !c || size.width < 1 || size.height < 1) return;
+    const first = baseDistance.current === null;
+    const requested = command && command.id !== lastCommand.current ? command.kind : null;
+    lastCommand.current = command?.id ?? null;
+    const direction = requested === 'side'
+      ? new THREE.Vector3(0, 0, 1)
+      : first || requested === 'reset'
+        ? VIEW_DIR.clone()
+        : camera.position.clone().sub(c.target).normalize();
+    const { centre, distance } = fitMachineCamera(
+      loaded.box, direction, camera.fov, size.width / size.height,
+      TWIN_SCREW_INSPECTION_VIEW.fillMargin,
+    );
+    // Resizing preserves the chosen angle and pan. Explicit view commands
+    // recenter the entire machine; neither path scales the canvas element.
+    const target = first || requested ? centre : c.target.clone();
+    const magnification = requested ? 1 : (clampMachineZoom(current.current.zoom) ?? 1);
+    baseDistance.current = distance;
     const extent = loaded.box.getSize(new THREE.Vector3());
-    const aspect = Math.max(size.width, 1) / Math.max(size.height, 1);
-
-    // Distance that fits the box on whichever axis is the binding constraint.
-    const vFov = THREE.MathUtils.degToRad(camera.fov);
-    const fitHeight = extent.y / 2 / Math.tan(vFov / 2);
-    const fitWidth = extent.x / 2 / Math.tan(vFov / 2) / aspect;
-    const distance = Math.max(fitHeight, fitWidth, 0.2) * TWIN_SCREW_INSPECTION_VIEW.fillMargin + extent.z / 2;
-
-    camera.position.copy(centre).addScaledVector(VIEW_DIR, distance);
+    camera.aspect = size.width / size.height;
+    camera.position.copy(target).addScaledVector(direction, distance / magnification);
     camera.near = Math.max(distance / 200, 0.01);
     camera.far = distance * 8 + extent.length();
     camera.updateProjectionMatrix();
-    camera.lookAt(centre);
+    camera.lookAt(target);
+    c.target.copy(target);
+    c.minDistance = distance / MAX_MACHINE_ZOOM;
+    c.maxDistance = distance / MIN_MACHINE_ZOOM;
+    c.update();
+    camera.updateMatrixWorld();
+    if (requested) current.current.onZoomChange?.(1);
+  }, [loaded, camera, size.width, size.height, controls, command]);
 
+  // Buttons and saved template sizes use the same dolly as wheel/pinch zoom.
+  // Changing magnification does not reframe or discard an operator's orbit.
+  useEffect(() => {
     const c = controls.current;
-    if (c) {
-      c.target.copy(centre);
-      c.minDistance = distance * 0.2;
-      c.maxDistance = distance * 4;
-      c.update();
-    }
-  }, [loaded, camera, size.width, size.height, controls, resetKey]);
+    if (!c || baseDistance.current === null) return;
+    const direction = camera.position.clone().sub(c.target).normalize();
+    camera.position.copy(c.target).addScaledVector(direction, baseDistance.current / (clampMachineZoom(zoom) ?? 1));
+    c.update();
+    camera.updateMatrixWorld();
+  }, [camera, controls, zoom]);
+
+  useEffect(() => {
+    const c = controls.current;
+    if (!c) return;
+    const publishZoom = () => {
+      if (baseDistance.current === null) return;
+      const next = clampMachineZoom(baseDistance.current / camera.position.distanceTo(c.target));
+      if (next !== null && next !== current.current.zoom) current.current.onZoomChange?.(next);
+    };
+    c.addEventListener('end', publishZoom);
+    return () => c.removeEventListener('end', publishZoom);
+  }, [camera, controls, loaded]);
 
   return null;
 }
@@ -541,6 +582,8 @@ export default function MachineScene3DCanvas({
   closed = false,
   cameraMode = 'free',
   cameraCommand = null,
+  zoom = 1,
+  onZoomChange,
   onProjectPoints,
   onReady,
   onSelectPart,
@@ -581,12 +624,11 @@ export default function MachineScene3DCanvas({
     );
   }, []);
 
-  const resetKey = cameraCommand?.kind === 'reset' || cameraCommand?.kind === 'fit'
-    ? (cameraCommand?.id ?? 0)
-    : 0;
-
   return (
     <Canvas
+      // Measure layout pixels, not getBoundingClientRect's transformed size.
+      // The workspace is unscaled, and this also protects embedded previews.
+      resize={{ offsetSize: true }}
       dpr={[1, 1.5]}
       shadows
       gl={{ antialias: true, alpha: true, preserveDrawingBuffer: true }}
@@ -668,7 +710,7 @@ export default function MachineScene3DCanvas({
         zoomSpeed={0.8}
         panSpeed={0.7}
       />
-      <Framing loaded={loaded} controls={controls} resetKey={resetKey} />
+      <Framing loaded={loaded} controls={controls} command={cameraCommand} zoom={zoom} onZoomChange={onZoomChange} />
     </Canvas>
   );
 }

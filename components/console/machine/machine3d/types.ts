@@ -42,6 +42,11 @@ export type ProjectedConnectorPosition = {
 
 export type ProjectedConnectorMap = Record<string, ProjectedConnectorPosition>;
 
+/** Full viewport expressed in the saved 1600×900 trail coordinate system. */
+export function viewportMachineRect(bounds: { minX: number; minY: number; maxX: number; maxY: number }) {
+  return { x: bounds.minX, y: bounds.minY, width: bounds.maxX - bounds.minX, height: bounds.maxY - bounds.minY };
+}
+
 export function clampProjectionFraction(value: number): number {
   if (!Number.isFinite(value)) return 0.5;
   return Math.min(1, Math.max(0, value));
@@ -100,7 +105,7 @@ export type MachineCameraMode = 'elevation' | 'free';
 /** Imperative camera command, applied once per `id`. */
 export type MachineCameraCommand = {
   id: number;
-  kind: 'fit' | 'reset';
+  kind: 'fit' | 'reset' | 'side';
 };
 
 /**
@@ -130,6 +135,10 @@ export type MachineScene3DCanvasProps = {
   /** Free orbit, or locked to the reference elevation. */
   cameraMode?: MachineCameraMode;
   cameraCommand?: MachineCameraCommand | null;
+  /** Magnification relative to the fitted view; never a CSS canvas transform. */
+  zoom?: number;
+  /** Publishes wheel/pinch zoom when an orbit gesture ends. */
+  onZoomChange?: (zoom: number) => void;
   /** Per-frame screen geometry for the pad overlay and the trail board. */
   onProjectPoints?: (points: ProjectedPoint[]) => void;
   /** Fired once the asset has loaded and the first frame has been projected. */
