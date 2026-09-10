@@ -159,6 +159,70 @@ def test_feed_only_emits_alarm_edges(tmp_path):
     assert [(a.slot_number, a.severity, a.state) for a in transitions] == [(3, "CRITICAL", "CLEARED")]
 
 
+class _ListReader:
+    """Yields a fixed list of frames, one per poll, then None."""
+
+    def __init__(self, frames):
+        self._frames = list(frames)
+
+    def read(self):
+        return self._frames.pop(0) if self._frames else None
+
+    def close(self):
+        return None
+
+
+def _frame_with_rack(rack_number: str) -> dict:
+    raw = frame()
+    raw["rack_number"] = rack_number
+    return raw
+
+
+def test_rack_ids_pool_assigns_cc_racks_in_first_seen_order():
+    # RACK_IDS=2,3 with no RACK_NUMBER_MAP: first CC rack -> "2", second -> "3".
+    feed = CcV3Feed(
+        _ListReader([_frame_with_rack("CC_Card_UID1"), _frame_with_rack("CC_Card_UID2")]),
+        rack_id_pool=("2", "3"),
+    )
+    first = feed.poll()
+    second = feed.poll()
+    assert first is not None and first.rack_id == "2" and first.rack_number == "CC_Card_UID1"
+    assert second is not None and second.rack_id == "3" and second.rack_number == "CC_Card_UID2"
+
+
+def test_rack_id_assignment_is_stable_per_rack_name():
+    feed = CcV3Feed(
+        _ListReader([_frame_with_rack("CC_Card_UID1"), _frame_with_rack("CC_Card_UID2"), _frame_with_rack("CC_Card_UID1")]),
+        rack_id_pool=("2", "3"),
+    )
+    assert feed.poll().rack_id == "2"
+    assert feed.poll().rack_id == "3"
+    assert feed.poll().rack_id == "2"  # the first rack keeps its assignment
+
+
+def test_explicit_rack_number_map_disables_pool_assignment():
+    feed = CcV3Feed(
+        _ListReader([_frame_with_rack("CC_Card_UID1")]),
+        rack_number_map={"CC_Card_UID1": "Rack-A7"},
+        rack_id_pool=("2", "3"),
+    )
+    assert feed.poll().rack_id == "Rack-A7"
+
+
+def test_exhausted_pool_keeps_the_exact_cc_rack_name():
+    feed = CcV3Feed(
+        _ListReader([_frame_with_rack("CC_Card_UID1"), _frame_with_rack("CC_Card_UID2")]),
+        rack_id_pool=("2",),
+    )
+    assert feed.poll().rack_id == "2"
+    assert feed.poll().rack_id == "CC_Card_UID2"  # no id left; name preserved, never invented
+
+
+def test_no_pool_preserves_cc_rack_name():
+    feed = CcV3Feed(_ListReader([_frame_with_rack("CC_Card_UID1")]))
+    assert feed.poll().rack_id == "CC_Card_UID1"
+
+
 def test_file_reader_skips_unchanged_and_broken_frames(tmp_path):
     path = tmp_path / "latest_telemetry.json"
     reader = FileSnapshotReader(str(path))
