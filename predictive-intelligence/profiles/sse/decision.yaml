@@ -1,0 +1,7 @@
+version: "sse-decision-1.0.0"
+persistence_n: 3
+persistence_m: 5
+cooldown_seconds: 300
+min_history_seconds: 120
+thresholds:
+  - {fault: "*", horizon: "*", on_threshold: 0.60, off_threshold: 0.45}

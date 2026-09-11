@@ -1,0 +1,49 @@
+# Operating-state gating (brief: OPERATING STATE GATING). Shared vocabulary for all profiles.
+version: "states-1.0.0"
+stabilisation_seconds: 120
+rules:
+  - state: "OFF"
+    rules: false
+    diagnosis: false
+    prognosis: false
+    description: "No normal production diagnosis."
+  - state: STARTING
+    rules: true
+    diagnosis: false
+    prognosis: false
+    persistence_reset: true
+    description: "Startup rules only; steady-state fault logic suppressed."
+  - state: WARMING
+    rules: true
+    diagnosis: true
+    prognosis: false
+    thermal_only: true
+    description: "Thermal analysis only; pressure/load prognosis ineligible."
+  - state: STEADY_PRODUCTION
+    rules: true
+    diagnosis: true
+    prognosis: true
+    train_eligible: true
+    description: "Full detection + diagnosis + prognosis."
+  - state: RECIPE_CHANGE
+    rules: true
+    diagnosis: false
+    prognosis: false
+    persistence_reset: true
+    description: "Transitional context; suppress persistent alerts until stabilised."
+  - state: PURGING
+    rules: true
+    diagnosis: false
+    prognosis: false
+    persistence_reset: true
+    description: "Transient-specific handling."
+  - state: SHUTDOWN
+    rules: true
+    diagnosis: false
+    prognosis: false
+    description: "No production fault prognosis."
+  - state: MAINTENANCE
+    rules: false
+    diagnosis: false
+    prognosis: false
+    description: "Excluded from training and production inference."

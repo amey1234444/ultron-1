@@ -1,0 +1,19 @@
+# SSE recipe reference (Doc B §6 row 11 and §11 header): PA6 grade 6201, nominal feed 50 kg/h,
+# melt 210 C, melt pressure 4 MPa; barrel profile Z1/Z2/Z3 = 180/210/220 C (Doc B §5, §7).
+version: "sse-recipes-1.0.0"
+recipes:
+  - recipe_id: SSE-PA6-6201
+    product_id: PA6-6201
+    grade: "PA6 grade 6201"
+    feed_setpoint: 50.0
+    motor_speed_setpoint: 2000.0
+    screw_speed_setpoint: 100.0
+    zone_setpoints: {Z1: 180.0, Z2: 210.0, Z3: 220.0}
+    expected_melt_temperature: 210.0
+    expected_pressure: {low: 3.5, high: 4.5}
+    expected_ranges:
+      I: {low: 8.0, high: 12.0}
+      SRPM: {low: 97.5, high: 102.5}
+      MT: {low: 200.0, high: 220.0}
+    machine_profile: sse
+    config_version: "docB-1.0-reference"
