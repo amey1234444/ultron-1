@@ -1,0 +1,12 @@
+# Decision layer defaults (brief: DECISION ENGINE). Tunable via Optuna after baseline.
+version: "tse-decision-0.1.0"
+persistence_n: 3
+persistence_m: 5
+cooldown_seconds: 300
+min_history_seconds: 120
+horizons: ["5m", "15m", "30m"]
+thresholds:
+  - {fault: "*", horizon: "*", on_threshold: 0.60, off_threshold: 0.45}
+  - {fault: "*", horizon: "5m", on_threshold: 0.50, off_threshold: 0.35}
+  - {fault: DOWNSTREAM_FLOW_RESTRICTION, horizon: "*", on_threshold: 0.55, off_threshold: 0.40}
+  - {fault: MOTOR_OVERLOAD, horizon: "*", on_threshold: 0.55, off_threshold: 0.40}

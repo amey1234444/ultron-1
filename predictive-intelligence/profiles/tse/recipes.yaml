@@ -1,0 +1,37 @@
+# TSE recipe / context model (Doc A §9.2: FR is recipe-dependent; setpoints for feed, motor/screw
+# speed, zone temperatures and expected process ranges must accompany telemetry).
+# RCP-42 mirrors the HLD example telemetry packet (Doc A §16.1) and the HLD nominal column (§3).
+# RCP-77 is a second recipe used to exercise cross-recipe validation; its values are engineering
+# assumptions for validation only and must be commissioned per machine.
+version: "tse-recipes-1.0.0"
+recipes:
+  - recipe_id: RCP-42
+    product_id: PP-H-300
+    grade: reference-nominal
+    feed_setpoint: 50.0
+    motor_speed_setpoint: 2000.0
+    screw_speed_setpoint: 100.0
+    zone_setpoints: {Z1: 180.0, Z2: 210.0, Z3: 220.0}
+    expected_melt_temperature: 210.0
+    expected_pressure: {low: 3.5, high: 4.5}
+    expected_ranges:
+      I: {low: 8.0, high: 12.0}
+      SRPM: {low: 97.5, high: 102.5}
+      MT: {low: 200.0, high: 220.0}
+    machine_profile: tse
+    config_version: "hld-1.0-nominal"
+  - recipe_id: RCP-77
+    product_id: PE-LD-120
+    grade: validation-only
+    feed_setpoint: 40.0
+    motor_speed_setpoint: 1800.0
+    screw_speed_setpoint: 90.0
+    zone_setpoints: {Z1: 172.0, Z2: 200.0, Z3: 212.0}
+    expected_melt_temperature: 202.0
+    expected_pressure: {low: 3.2, high: 4.2}
+    expected_ranges:
+      I: {low: 7.5, high: 11.0}
+      SRPM: {low: 87.5, high: 92.5}
+      MT: {low: 192.0, high: 212.0}
+    machine_profile: tse
+    config_version: "validation-assumption"
