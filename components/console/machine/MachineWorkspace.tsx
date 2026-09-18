@@ -30,6 +30,7 @@ import { MachineAnalysisWorkspace } from './MachineAnalysisWorkspace';
 import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
+import { TwinScrewDiagnosisView } from './TwinScrewDiagnosisView';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
 import { MachineStage3D } from './machine3d/MachineStage3D';
@@ -640,7 +641,22 @@ export function MachineWorkspace({
         />
       )}
 
-      {isActual && actualTab === 'analysis' && (
+      {/*
+        The twin screw is the only template with a DOC-01..DOC-04 knowledge
+        pack, so it is the only one whose Analysis tab runs that chain. Every
+        other template falls through to the generic workspace exactly as before.
+      */}
+      {isActual && actualTab === 'analysis' && machine.template === 'Twin Screw Extruder' && (
+        <TwinScrewDiagnosisView
+          machine={machine}
+          mappedChannels={mappedChannels}
+          devices={devices}
+          cards={cards}
+          live={live}
+        />
+      )}
+
+      {isActual && actualTab === 'analysis' && machine.template !== 'Twin Screw Extruder' && (
         <MachineAnalysisWorkspace
           machine={machine}
           mappedChannels={mappedChannels}

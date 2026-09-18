@@ -371,6 +371,32 @@ export function diagnose(input: DiagnoseInput): DiagnosisObject {
     };
   }
 
+  const anomalousEarly = input.anomalies.filter(
+    (result) =>
+      result.verdict !== 'NOT_ANOMALOUS' &&
+      result.verdict !== 'NOT_EVALUATED' &&
+      result.verdict !== 'EXPECTED_PROCESS_RESPONSE',
+  );
+
+  // Nothing is wrong. Asked before the evidence gate, because a healthy machine
+  // has no evidence for the simple reason that there is nothing to evidence —
+  // reporting that as INSUFFICIENT_EVIDENCE would tell an operator data was
+  // missing when in fact the machine is fine.
+  if (anomalousEarly.length === 0) {
+    return {
+      ...base,
+      primaryDiagnosis: 'NO_FAULT',
+      diagnosisState: 'NOT_DETECTED',
+      what: 'No abnormal condition is present.',
+      where: 'Not applicable.',
+      why: input.anomalies.some((result) => result.verdict === 'EXPECTED_PROCESS_RESPONSE')
+        ? 'Signals moved, but as the expected physical response to a commanded change.'
+        : 'All evaluated signals sit inside their contextual healthy envelopes.',
+      faultCandidates: [],
+      sendToDoc05: false,
+    };
+  }
+
   // §18 — required evidence missing or BAD.
   if (!assessment.requiredSatisfied) {
     return {
@@ -400,21 +426,6 @@ export function diagnose(input: DiagnoseInput): DiagnosisObject {
       why: 'The anomaly is real but matches no rule in the fault library. Forcing it into the nearest fault would be a guess.',
       faultCandidates: [],
       sendToDoc05: true,
-    };
-  }
-
-  if (anomalous.length === 0) {
-    return {
-      ...base,
-      primaryDiagnosis: 'NO_FAULT',
-      diagnosisState: 'NOT_DETECTED',
-      what: 'No abnormal condition is present.',
-      where: 'Not applicable.',
-      why: input.anomalies.some((result) => result.verdict === 'EXPECTED_PROCESS_RESPONSE')
-        ? 'Signals moved, but as the expected physical response to a commanded change.'
-        : 'All evaluated signals sit inside their contextual healthy envelopes.',
-      faultCandidates: [],
-      sendToDoc05: false,
     };
   }
 

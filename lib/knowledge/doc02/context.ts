@@ -88,6 +88,31 @@ export function composeContextId(input: ContextInput): string | null {
   return parts.join('|');
 }
 
+/**
+ * A context id built from the dimensions that are known, skipping recipe.
+ *
+ * DOC-02 §27 permits an approved fallback when the recipe is missing, and
+ * DOC-03 §12 gives it a level — BROADER_CONTEXT, at reduced confidence. This
+ * composes that fallback so a machine with no MES integration can still be
+ * compared against something, while the caller records the weaker level rather
+ * than passing it off as an exact-context match.
+ *
+ * Null when a dimension other than recipe is also missing: at that point too
+ * little is known for even a broad comparison to mean anything.
+ */
+export function fallbackContextId(input: ContextInput): string | null {
+  const parts = [
+    input.machineId,
+    input.machineVariant,
+    input.configurationVersion,
+    input.operatingState,
+    input.screwRpm === null ? null : String(input.screwRpm),
+    input.mainFeedRate === null ? null : String(input.mainFeedRate),
+  ];
+  if (parts.some((part) => part === null || part === '')) return null;
+  return `${parts.join('|')}|RECIPE_UNKNOWN`;
+}
+
 /** Mandatory context fields that are absent. */
 export function missingMandatoryContext(input: ContextInput): string[] {
   const present: Record<string, unknown> = {
