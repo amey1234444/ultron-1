@@ -72,7 +72,8 @@
     "check:machine-zoom": "npx --yes esbuild components/console/machine/__checks__/machineZoomChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/machineZoomChecks.cjs && node node_modules/.cache/machineZoomChecks.cjs",
     "check:tse-knowledge": "npx --yes esbuild lib/knowledge/tse/__checks__/tseKnowledgeChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/tseKnowledgeChecks.cjs && node node_modules/.cache/tseKnowledgeChecks.cjs",
     "check:doc02": "npx --yes esbuild lib/knowledge/doc02/__checks__/doc02Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc02Checks.cjs && node node_modules/.cache/doc02Checks.cjs",
-    "check:doc03": "npx --yes esbuild lib/knowledge/doc03/__checks__/doc03Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc03Checks.cjs && node node_modules/.cache/doc03Checks.cjs"
+    "check:doc03": "npx --yes esbuild lib/knowledge/doc03/__checks__/doc03Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc03Checks.cjs && node node_modules/.cache/doc03Checks.cjs",
+    "check:doc04": "npx --yes esbuild lib/knowledge/doc04/__checks__/doc04Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc04Checks.cjs && node node_modules/.cache/doc04Checks.cjs"
   },
   "private": true
 }
