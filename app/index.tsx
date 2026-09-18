@@ -588,7 +588,15 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     const components = componentsForTemplate(newMachine.template, makeId);
     setMachines((prev) => [
       ...prev,
-      { id, projectId: createMachineTarget.projectId, folderId: createMachineTarget.folderId, name: newMachine.name, template: newMachine.template, components },
+      {
+        id,
+        projectId: createMachineTarget.projectId,
+        folderId: createMachineTarget.folderId,
+        name: newMachine.name,
+        template: newMachine.template,
+        components,
+        variantId: newMachine.variantId,
+      },
     ]);
     setSelected({ kind: 'machine', id });
     setCreateMachineTarget(null);

@@ -17,6 +17,7 @@ import {
 } from '../../lib/deviceUniqueness';
 import type { FolderNode, ProjectNode } from '../../lib/hierarchy';
 import type { MachineNode } from '../../lib/machines';
+import { normaliseVariantId } from '../../lib/machineVariants';
 import { clampMachineZoom } from '../../lib/machineZoom';
 import type { CardNode } from '../../lib/rack';
 import { createSeedData } from '../../lib/seedData';
@@ -181,9 +182,12 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
   for (const m of data.machines) {
     await q(
       client,
-      `INSERT INTO studio_machines (id, project_id, folder_id, name, template, components, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7)`,
-      [m.id, m.projectId, m.folderId, m.name ?? '', m.template, JSON.stringify(m.components ?? []), order++],
+      `INSERT INTO studio_machines (id, project_id, folder_id, name, template, components, variant_id, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`,
+      // The variant is normalised against the template on the way in, so an id
+      // that does not belong to this template — or no longer exists at all — is
+      // stored as NULL rather than as a variant the machine is not.
+      [m.id, m.projectId, m.folderId, m.name ?? '', m.template, JSON.stringify(m.components ?? []), normaliseVariantId(m.template, m.variantId), order++],
     );
   }
   order = 0;
@@ -263,7 +267,7 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
 
 type ProjectRow = { id: string; name: string; code: string; description: string };
 type FolderRow = { id: string; project_id: string; parent_id: string | null; name: string; type: string; code: string; description: string };
-type MachineRow = { id: string; project_id: string; folder_id: string; name: string; template: string; components: unknown };
+type MachineRow = { id: string; project_id: string; folder_id: string; name: string; template: string; components: unknown; variant_id: string | null };
 type DeviceRow = {
   id: string; name: string; type: string; model: string; ip: string; port: string; protocol: string;
   description: string; status: string; project_id: string | null; gateway_id: string | null; real_gateway_id: string | null; real_rack_id: string | null; archived: boolean;
@@ -315,6 +319,7 @@ export async function getWorkspace(): Promise<Workspace | null> {
       id: r.id, projectId: r.project_id, folderId: r.folder_id, name: r.name,
       template: r.template as MachineNode['template'],
       components: (Array.isArray(r.components) ? r.components : []) as MachineNode['components'],
+      variantId: normaliseVariantId(r.template as MachineNode['template'], r.variant_id),
     })),
     devices: devices.rows.map((r: DeviceRow) => ({
       id: r.id, name: r.name, type: r.type as DeviceNode['type'], model: r.model, ip: r.ip, port: r.port,

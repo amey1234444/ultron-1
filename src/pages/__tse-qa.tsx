@@ -29,6 +29,8 @@ import {
   TWIN_SCREW_POINT_REGISTRY,
 } from '../../lib/twinScrewExtruderPoints';
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
+import { factsForMachine } from '../../lib/knowledge/registry';
+import { TSE_TEMPLATE } from '../../lib/knowledge/tse/template';
 
 const REFERENCE_IMAGE = '/references/twin-screw-extruder-reference.png';
 
@@ -95,7 +97,13 @@ export default function TwinScrewQaPage() {
   const states = useMemo(() => padStates(mode), [mode]);
   const connectors = useMemo(() => connectorsForTemplate('Twin Screw Extruder'), []);
   const layout = useMemo(() => createTemplateDefaultLayout('Twin Screw Extruder', [], null), []);
-  const analysis = useMemo(() => analyseTwinScrew(SAMPLES), []);
+  // The harness exercises a machine whose variant IS declared, so the fact
+  // register resolves and the pending rules report their real DOC-01 gaps
+  // rather than "no variant declared".
+  const analysis = useMemo(
+    () => analyseTwinScrew(SAMPLES, factsForMachine({ template: 'Twin Screw Extruder', variantId: TSE_TEMPLATE.templateId })),
+    [],
+  );
   const labels = useMemo(
     () => Object.fromEntries(TWIN_SCREW_POINT_REGISTRY.map((point) => [point.code, point.label])),
     [],

@@ -8,6 +8,9 @@ import { deviceWithGatewayConnectionState, type DeviceNode } from '../../../lib/
 import { CHANNEL_LIVE_GRACE_MS, latestMeasurementForChannel, type LiveMeasurement, type LiveState } from '../../../lib/liveTelemetry';
 import type { CardNode } from '../../../lib/rack';
 import { analyseTwinScrew, type RuleResult, type TagSample, type TwinScrewAnalysis } from '../../../lib/analysis/twinScrew';
+import { knowledgeForMachine } from '../../../lib/knowledge/registry';
+import { unresolvedReason } from '../../../lib/knowledge/machineKnowledge';
+import type { MachineNode } from '../../../lib/machines';
 import { twinScrewPointByCode } from '../../../lib/twinScrewExtruderPoints';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -32,6 +35,14 @@ import type { MappedChannel } from './RackOccupancyView';
  */
 
 type TwinScrewAnalysisViewProps = {
+  /**
+   * The machine, for its declared variant.
+   *
+   * Passed whole rather than as a template string because the engineering-fact
+   * register this page reports against is a property of the machine's variant
+   * (DOC-01 §21), not of the console template it is drawn with.
+   */
+  machine: Pick<MachineNode, 'template' | 'variantId'>;
   mappedChannels: MappedChannel[];
   devices: DeviceNode[];
   cards: CardNode[];
@@ -115,11 +126,19 @@ function FindingCard({ finding }: { finding: RuleResult }) {
   );
 }
 
-export function TwinScrewAnalysisView({ mappedChannels, devices, cards, live }: TwinScrewAnalysisViewProps) {
+export function TwinScrewAnalysisView({ machine, mappedChannels, devices, cards, live }: TwinScrewAnalysisViewProps) {
   const { isDark } = useAppTheme();
+
+  // Which process knowledge applies, resolved from the declared variant and
+  // from nothing else. An undeclared variant yields no register, and the page
+  // says so rather than reporting against the reference variant's facts.
+  const resolution = useMemo(() => knowledgeForMachine(machine), [machine]);
+  const facts = resolution.kind === 'resolved' ? resolution.knowledge.requiredFacts : [];
+  const knowledgeGap = unresolvedReason(resolution);
+
   const analysis: TwinScrewAnalysis = useMemo(
-    () => analyseTwinScrew(samplesFromChannels(mappedChannels, devices, cards, live)),
-    [mappedChannels, devices, cards, live],
+    () => analyseTwinScrew(samplesFromChannels(mappedChannels, devices, cards, live), facts),
+    [mappedChannels, devices, cards, live, facts],
   );
 
   const faults = analysis.findings.filter((f) => f.severity === 'fault' || f.severity === 'alarm');
@@ -190,6 +209,23 @@ export function TwinScrewAnalysisView({ mappedChannels, devices, cards, live }: 
           </Card>
         ))}
       </View>
+
+      {/*
+        Shown when no process knowledge could be resolved. It sits above the
+        commissioning checklist because it is upstream of every item on it: with
+        no variant declared there is no fact register for any of those rules to
+        be waiting on, and saying "declare EF-MOTOR-RATED-CURRENT" to someone
+        whose machine has no template identity is the wrong next step.
+      */}
+      {knowledgeGap ? (
+        <Card className="gap-2">
+          <View className="flex-row items-center gap-2">
+            <Badge variant="muted">KNOWLEDGE</Badge>
+            <Text className="font-body-bold">No process knowledge applies to this machine</Text>
+          </View>
+          <Body muted>{knowledgeGap}</Body>
+        </Card>
+      ) : null}
 
       {/* The commissioning gap, as a checklist rather than a silence. */}
       <View className="gap-3">

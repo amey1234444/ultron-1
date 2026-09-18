@@ -1,0 +1,27 @@
+-- Which variant of its template a machine actually is.
+--
+-- A template says what kind of machine this is; a variant says which build of
+-- that kind. For a twin-screw extruder that distinction carries most of the
+-- engineering: a co-rotating fully intermeshing machine and a counter-rotating
+-- non-intermeshing one share a drive train and a name, melt and pressurise
+-- differently, and a baseline learned on one does not transfer to the other.
+--
+-- Nullable on purpose, and the null is meaningful. NULL means nobody has
+-- declared the variant — which is a different answer from "it is the reference
+-- variant", exactly as a NULL machine_zoom is a different answer from 100%.
+-- Every machine created before this column existed therefore reads as
+-- undeclared, and the console shows it as undeclared rather than assuming the
+-- reference. That mirrors the rule ULTRON-TSE-DOC-01 §7 applies to zone
+-- function: a reference is a starting point for a person to confirm, never a
+-- default the software fills in on their behalf.
+--
+-- Deliberately not backfilled. Setting every existing 'Twin Screw Extruder' to
+-- TSE-7Z-CR-INT-PAR-COMP would assert a machine-specific fact that nobody has
+-- validated, and it would be indistinguishable afterwards from one somebody
+-- did validate.
+--
+-- Stored as free TEXT rather than a FK or an enum because the variant registry
+-- lives in application code (lib/machineVariants.ts), which is also where an
+-- id that no longer resolves is normalised back to NULL on write.
+
+ALTER TABLE studio_machines ADD COLUMN IF NOT EXISTS variant_id TEXT;

@@ -118,6 +118,13 @@ export type AnalysisViewProps = {
   live?: LiveState;
   machineId?: string;
   machineTemplate?: string;
+  /**
+   * The machine's declared variant, which selects its process knowledge.
+   *
+   * Separate from `machineTemplate` on purpose: DOC-01 §21 makes the knowledge a
+   * property of the variant, and the template alone cannot choose it.
+   */
+  machineVariantId?: string | null;
   expectedPoints?: number;
 };
 
@@ -305,6 +312,7 @@ export function AnalysisView(props: AnalysisViewProps) {
   if (analyzer === 'twin-screw') {
     return (
       <TwinScrewAnalysisView
+        machine={{ template: 'Twin Screw Extruder', variantId: props.machineVariantId ?? null }}
         mappedChannels={props.mappedChannels}
         devices={props.devices}
         cards={props.cards}

@@ -19,6 +19,7 @@ import {
   type MachineComponent,
   type MachineNode,
 } from '../../../lib/machines';
+import { variantForMachine, variantIsUndeclared } from '../../../lib/machineVariants';
 import { listChannels, type CardNode } from '../../../lib/rack';
 import { consolePalette } from '../../ui';
 import { BackButton } from '../BackButton';
@@ -298,6 +299,14 @@ export function MachineWorkspace({
   // shown across the Overview/Alarm/Trend/Rack sub-tabs.
   const expectedPoints = useMemo(() => Math.max(expectedPointsForTemplate(machine.template), machine.components.reduce((sum, c) => sum + c.points.length, 0)), [machine.components, machine.template]);
 
+  // The variant line under the machine name. Null for templates that declare no
+  // variants, so those headers are byte-identical to what they were.
+  const variantLine = useMemo(() => {
+    const variant = variantForMachine(machine);
+    if (variant) return variant.variantId;
+    return variantIsUndeclared(machine) ? 'Variant not declared' : null;
+  }, [machine]);
+
   // The whole design lives on a fixed 1600×900 logical stage that gets
   // uniformly scaled to fit the available canvas. All trail/box/machine
   // geometry is stored in stage units, so the layout is identical on every
@@ -437,6 +446,18 @@ export function MachineWorkspace({
       <Text numberOfLines={1} className={cn('font-mono text-[10.5px] uppercase leading-tight tracking-[0.18em]', mutedClass)}>
         {machine.template}
       </Text>
+      {/*
+        The variant sits under the template because it qualifies it rather than
+        replaces it. Machines on a template with no variants show nothing here,
+        so no existing header gains a line. A twin screw whose variant predates
+        the field shows that it is undeclared rather than silently reading as
+        the reference variant.
+      */}
+      {variantLine ? (
+        <Text numberOfLines={1} className={cn('font-mono text-[10.5px] uppercase leading-tight tracking-[0.18em]', mutedClass)}>
+          {variantLine}
+        </Text>
+      ) : null}
     </View>
   );
 

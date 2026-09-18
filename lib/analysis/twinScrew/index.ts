@@ -9,6 +9,7 @@
 
 export {
   analyseTwinScrew,
+  commissioningGaps,
   hasCommissionedModel,
   THRESHOLD_RULES,
   type RuleResult,

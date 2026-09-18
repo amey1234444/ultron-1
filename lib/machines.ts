@@ -54,6 +54,19 @@ export type MachineNode = {
   name: string;
   template: MachineTemplate;
   components: MachineComponent[];
+  /**
+   * Which declared variant of the template this machine is.
+   *
+   * Optional and nullable, and the two states are the same answer: nobody has
+   * declared it. That is different from "it is the reference variant", and the
+   * difference matters for the same reason it does on a barrel zone — a
+   * template offers a starting point, and only a person can say which build is
+   * actually installed. Machines created before the field existed read as null
+   * and are shown as undeclared rather than assumed.
+   *
+   * See `lib/machineVariants.ts` for the registry and the resolution rules.
+   */
+  variantId?: string | null;
 };
 
 type TemplateComponentDef = { type: ComponentType; label?: string };
