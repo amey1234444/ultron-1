@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Modal, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
 import { useAppTheme } from '../../hooks/useAppTheme';
@@ -10,6 +10,15 @@ type DialogProps = {
   onRequestClose: () => void;
   children: ReactNode;
   footer: ReactNode;
+  /**
+   * Change this to scroll the body to the bottom.
+   *
+   * A scrolling body can hide a field that a choice higher up has just made
+   * required, and a required field nobody can see reads as a dialog that will
+   * not let you continue. Any dialog that reveals a control below the fold
+   * passes a value here that changes when it does.
+   */
+  revealBottomOn?: string | number | null;
 };
 
 /**
@@ -27,9 +36,22 @@ const DIALOG_CHROME_HEIGHT = 260;
 /** Never squeeze the body below this, even on a very short viewport. */
 const MIN_BODY_HEIGHT = 180;
 
-export function Dialog({ visible, title, onRequestClose, children, footer }: DialogProps) {
+export function Dialog({ visible, title, onRequestClose, children, footer, revealBottomOn }: DialogProps) {
   const { isDark } = useAppTheme();
   const { height } = useWindowDimensions();
+  const bodyRef = useRef<ScrollView | null>(null);
+
+  // Bring a newly revealed control into view.
+  //
+  // Deferred a frame because the child that triggered this mounts in the same
+  // commit: scrolling before layout has run measures the old content height and
+  // lands short of the bottom. `null` means nothing to reveal, so an ordinary
+  // dialog never scrolls itself.
+  useEffect(() => {
+    if (revealBottomOn === null || revealBottomOn === undefined) return;
+    const frame = requestAnimationFrame(() => bodyRef.current?.scrollToEnd({ animated: true }));
+    return () => cancelAnimationFrame(frame);
+  }, [revealBottomOn]);
 
   // The body scrolls; the title and the footer do not.
   //
@@ -58,6 +80,7 @@ export function Dialog({ visible, title, onRequestClose, children, footer }: Dia
         >
           <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>{title}</Text>
           <ScrollView
+            ref={bodyRef}
             style={{ maxHeight: maxBodyHeight }}
             contentContainerStyle={{ gap: 16 }}
             showsVerticalScrollIndicator={false}

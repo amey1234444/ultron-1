@@ -94,6 +94,10 @@ export function AddMachineDialog({ visible, parentLabel, onCancel, onCreate }: A
       visible={visible}
       title="Add Machine"
       onRequestClose={onCancel}
+      // Choosing a template with variants adds a required field below eleven
+      // template cards, well under the fold of a scrolling body. Without this
+      // the dialog looks like it simply refuses to enable Create.
+      revealBottomOn={needsVariant ? template : null}
       footer={
         <>
           <ActionButton label="Cancel" variant="secondary" onPress={onCancel} />
@@ -124,22 +128,36 @@ export function AddMachineDialog({ visible, parentLabel, onCancel, onCreate }: A
       {/*
         Shown only for templates that declare variants, so every other template
         keeps the dialog it had. Today that is the twin-screw extruder alone.
+
+        Boxed and tinted rather than dropped in as a bare field: it appears only
+        after a template is chosen, so it has to read as a new step rather than
+        as something that was always there and already dealt with.
       */}
       {needsVariant ? (
-        <SelectField
-          label="Variant"
-          required
-          placeholder="Select the variant this machine is"
-          value={variantId}
-          onChange={setVariantId}
-          options={variants.map((variant) => ({
-            value: variant.variantId,
-            label: variant.name,
-            description: variant.summary,
-            tag: variant.variantId,
-          }))}
-          hint="The variant decides which process knowledge applies. It is not inferred from the template, so it has to be chosen."
-        />
+        <View
+          className={cn(
+            'gap-1.5 rounded-xl border p-3',
+            isDark ? 'border-line-dark bg-surface-dark' : 'border-line-light bg-surface-light',
+          )}
+        >
+          <Text className={cn('font-mono text-[10px] uppercase tracking-[0.16em]', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+            Step 2 — {template}
+          </Text>
+          <SelectField
+            label="Variant"
+            required
+            placeholder="Select the variant this machine is"
+            value={variantId}
+            onChange={setVariantId}
+            options={variants.map((variant) => ({
+              value: variant.variantId,
+              label: variant.name,
+              description: variant.summary,
+              tag: variant.variantId,
+            }))}
+            hint="The variant decides which process knowledge applies. It is not inferred from the template, so it has to be chosen."
+          />
+        </View>
       ) : null}
     </Dialog>
   );
