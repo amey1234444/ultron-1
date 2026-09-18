@@ -86,7 +86,16 @@ export type MachineKnowledge = {
  * pick a variant, fix a stale record, or wait for a pack to be written.
  */
 export type KnowledgeResolution =
-  | { kind: 'resolved'; knowledge: MachineKnowledge }
+  /**
+   * Knowledge applies.
+   *
+   * `defaulted` says how it was chosen. False means a person picked this
+   * variant. True means the template offers exactly one, nobody picked it, and
+   * the single option was applied so the machine is usable — a convenience, not
+   * a confirmation. A commissioning view should still ask someone to confirm
+   * it, and the flag is what lets it tell the two apart.
+   */
+  | { kind: 'resolved'; knowledge: MachineKnowledge; defaulted: boolean }
   /** The template offers variants and this machine has not been given one. */
   | { kind: 'variant-undeclared'; consoleTemplate: MachineTemplate; available: MachineKnowledge[] }
   /** A variant id is stored that no pack claims, or that belongs to another template. */

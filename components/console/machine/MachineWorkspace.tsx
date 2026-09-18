@@ -19,7 +19,8 @@ import {
   type MachineComponent,
   type MachineNode,
 } from '../../../lib/machines';
-import { variantForMachine, variantIsUndeclared } from '../../../lib/machineVariants';
+import { variantIsUndeclared } from '../../../lib/machineVariants';
+import { knowledgeForMachine } from '../../../lib/knowledge/registry';
 import { listChannels, type CardNode } from '../../../lib/rack';
 import { consolePalette } from '../../ui';
 import { BackButton } from '../BackButton';
@@ -302,8 +303,13 @@ export function MachineWorkspace({
   // The variant line under the machine name. Null for templates that declare no
   // variants, so those headers are byte-identical to what they were.
   const variantLine = useMemo(() => {
-    const variant = variantForMachine(machine);
-    if (variant) return variant.variantId;
+    const resolution = knowledgeForMachine(machine);
+    if (resolution.kind === 'resolved') {
+      // A defaulted variant is shown, because the machine really is running on
+      // that knowledge — but marked, so nobody reads it as confirmed.
+      const id = resolution.knowledge.template.templateId;
+      return resolution.defaulted ? `${id} (default)` : id;
+    }
     return variantIsUndeclared(machine) ? 'Variant not declared' : null;
   }, [machine]);
 

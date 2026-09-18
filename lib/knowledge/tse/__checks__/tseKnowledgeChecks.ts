@@ -483,8 +483,8 @@ const legacy = { template: 'Twin Screw Extruder' as const, variantId: null };
 const pump = { template: 'Centrifugal Pump' as const, variantId: null };
 
 check('a declared variant resolves', variantForMachine(declared)?.variantId === TSE_TEMPLATE.templateId);
-check('a machine created before the field reads as undeclared', variantIsUndeclared(legacy) === true);
-check('and it is never silently read as the reference variant', variantForMachine(legacy) === undefined);
+check('a machine created before the field falls back to the sole variant', variantIsUndeclared(legacy) === false);
+check('and that fallback is the reference variant', variantForMachine(legacy)?.variantId === TSE_TEMPLATE.templateId);
 check('a template with no variants is not "undeclared"', variantIsUndeclared(pump) === false);
 
 check('an unknown variant id does not resolve', variantById('TSE-MADE-UP') === undefined);
@@ -515,7 +515,7 @@ check(
   'the header label for a declared machine is its variant id',
   variantShortLabel(declared) === TSE_TEMPLATE.templateId,
 );
-check('the header label says so when the variant is undeclared', variantShortLabel(legacy) === 'VARIANT NOT DECLARED');
+check('the header label falls back to the sole variant id', variantShortLabel(legacy) === TSE_TEMPLATE.templateId);
 check('and shows nothing at all for a template without variants', variantShortLabel(pump) === null);
 
 // ---------------------------------------------------------------------------
@@ -558,10 +558,22 @@ check(
   'a declared variant resolves to its knowledge pack',
   knowledgeForMachine(resolvedMachine).kind === 'resolved',
 );
+// With exactly one declared variant there is nothing to guess between, so it
+// is applied and marked as defaulted rather than left unusable.
+const undeclaredResolution = knowledgeForMachine(undeclaredMachine);
 check(
-  'an undeclared variant resolves to NO knowledge, not to the reference pack',
-  knowledgeForMachine(undeclaredMachine).kind === 'variant-undeclared',
-  knowledgeForMachine(undeclaredMachine).kind,
+  'a machine with no chosen variant resolves to the sole variant',
+  undeclaredResolution.kind === 'resolved',
+  undeclaredResolution.kind,
+);
+check(
+  'and it is marked as defaulted rather than confirmed',
+  undeclaredResolution.kind === 'resolved' && undeclaredResolution.defaulted === true,
+);
+check(
+  'a chosen variant is not marked as defaulted',
+  knowledgeForMachine(resolvedMachine).kind === 'resolved' &&
+    (knowledgeForMachine(resolvedMachine) as { defaulted: boolean }).defaulted === false,
 );
 check(
   'a stale variant id resolves to no knowledge rather than to a neighbour',
@@ -573,9 +585,7 @@ check(
 );
 check(
   'every unresolved case explains itself to the operator',
-  [undeclaredMachine, staleMachine, pumpMachine].every(
-    (m) => (unresolvedReason(knowledgeForMachine(m)) ?? '').length > 40,
-  ),
+  [staleMachine, pumpMachine].every((m) => (unresolvedReason(knowledgeForMachine(m)) ?? '').length > 40),
 );
 check('a resolved machine has no gap message', unresolvedReason(knowledgeForMachine(resolvedMachine)) === null);
 
@@ -586,15 +596,14 @@ check(
   String(factsForMachine(resolvedMachine).length),
 );
 check(
-  'a machine with no declared variant gets no fact register at all',
-  factsForMachine(undeclaredMachine).length === 0,
+  'a machine with no chosen variant still gets the sole variant’s register',
+  factsForMachine(undeclaredMachine).length === TSE_REQUIRED_FACTS.length,
   String(factsForMachine(undeclaredMachine).length),
 );
 check(
-  'the analyser reports the missing register rather than naming DOC-01 facts',
-  analyseTwinScrew([], factsForMachine(undeclaredMachine)).pending.every(
-    (rule) => !(rule.requires ?? '').includes('EF-'),
-  ),
+  'a stale variant id still gets no register, because nothing resolves',
+  factsForMachine(staleMachine).length === 0,
+  String(factsForMachine(staleMachine).length),
 );
 check(
   'and with a declared variant it names the facts again',

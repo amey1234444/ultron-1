@@ -60,6 +60,13 @@ export function knowledgeForMachine(machine: {
   }
 
   if (!machine.variantId) {
+    // Exactly one variant means there is nothing to get wrong by applying it:
+    // the machine is usable immediately, and `defaulted` keeps the fact that
+    // nobody confirmed it. With two or more, applying one would be a guess
+    // between genuinely different machines, so it stays undeclared.
+    if (available.length === 1) {
+      return { kind: 'resolved', knowledge: available[0], defaulted: true };
+    }
     return { kind: 'variant-undeclared', consoleTemplate: machine.template, available };
   }
 
@@ -72,7 +79,7 @@ export function knowledgeForMachine(machine: {
     return { kind: 'variant-unknown', variantId: machine.variantId };
   }
 
-  return { kind: 'resolved', knowledge: pack };
+  return { kind: 'resolved', knowledge: pack, defaulted: false };
 }
 
 /**
