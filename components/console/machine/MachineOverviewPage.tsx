@@ -55,6 +55,7 @@ import {
 import { SENSOR_TILE_MIN_WIDTH, SensorGaugeTile } from './overview/SensorGaugeTile';
 import type { PointCondition } from './overview/usePointCondition';
 import type { MappedChannel } from './RackOccupancyView';
+import { TwinScrewDocSummary } from './TwinScrewDocSummary';
 import { deriveAnalysis } from './deriveAnalysis';
 
 const ZONE_ORDER: Record<IsoZone, number> = { A: 0, B: 1, C: 2, D: 3 };
@@ -367,6 +368,21 @@ export function MachineOverviewPage({
         onSelectMachine={onSelectMachine}
         onRefresh={onRefresh}
       />
+
+      {/*
+        The DOC-01..04 conclusion, for the one template that has a knowledge
+        pack. It sits beside the generic assessment rather than replacing it —
+        two readings of the same machine, each saying which it is.
+      */}
+      {machine.template === 'Twin Screw Extruder' && (
+        <TwinScrewDocSummary
+          machine={machine}
+          mappedChannels={mappedChannels}
+          devices={devices}
+          cards={cards}
+          live={live}
+        />
+      )}
 
       {/* Data-quality strip: what the assessment above is based on. */}
       <View className="flex-row flex-wrap items-center gap-x-5 gap-y-2">
