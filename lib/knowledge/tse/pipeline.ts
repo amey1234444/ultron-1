@@ -45,7 +45,7 @@ import {
   evaluateAnomaly,
   type InconsistencyCheck,
 } from '../doc04/engine';
-import type { AnomalyResult, DiagnosisObject, EvidenceItem } from '../doc04/types';
+import type { AnomalyResult, AnomalyVerdict, DiagnosisObject, EvidenceItem } from '../doc04/types';
 import {
   COMMISSIONING_NOTICE,
   FEATURE_BANDS,
@@ -55,6 +55,7 @@ import {
   STATE_THRESHOLDS,
 } from './commissioning';
 import { signalForTag, unboundMandatorySignals } from './signalBinding';
+import { anomalyIdFor } from '../doc07/anomalies';
 
 /** One channel as the console already holds it. */
 export type PipelineChannel = {
@@ -74,6 +75,17 @@ export type PipelineInput = {
   nowMs?: number;
   /** Recent values per tag, when the caller keeps history. Enables trend. */
   history?: Partial<Record<TwinScrewTag, number[]>>;
+  /**
+   * A commanded change whose process response is physically expected.
+   *
+   * DOC-04 §3 gate 8: a feed, RPM, recipe or setpoint change that the machine
+   * answers exactly as physics predicts is not an anomaly. The gate has always
+   * been implemented; nothing could reach it because this machine publishes no
+   * setpoint or command signals — D015 feed setpoint and D006 RPM setpoint are
+   * both unbound. A caller that knows a change was commanded passes it here,
+   * and the gate does the rest.
+   */
+  commandedChange?: string | null;
 };
 
 export type PipelineResult = {
@@ -87,6 +99,15 @@ export type PipelineResult = {
   features: FeatureObject[];
   /** DOC-04 §3 — an anomaly verdict per signal. */
   anomalies: AnomalyResult[];
+  /**
+   * DOC-07 — the library identity of each anomaly that fired.
+   *
+   * A verdict says "this pressure is high"; the library id says *which named
+   * anomaly* that is, and DOC-07 §9 and DOC-06 §32 both key their ML labels on
+   * it. Signals whose verdict matches no library entry are simply absent rather
+   * than labelled with the nearest fit.
+   */
+  labelledAnomalies: { signalId: string; anomalyId: string; verdict: AnomalyVerdict }[];
   /** DOC-04 §21 — the diagnosis, or a NO_FAULT one. */
   diagnosis: DiagnosisObject;
   /** Signals reporting values right now. */
@@ -346,7 +367,7 @@ export function runTwinScrewPipeline(input: PipelineInput): PipelineResult {
  * so the chain can be exercised on known values without a rack behind it.
  */
 export function analyseReadings(
-  input: Pick<PipelineInput, 'machineId' | 'variantId' | 'configurationVersion' | 'history'>,
+  input: Pick<PipelineInput, 'machineId' | 'variantId' | 'configurationVersion' | 'history' | 'commandedChange'>,
   readings: readonly TagReading[],
   nowMs: number,
 ): PipelineResult {
@@ -445,7 +466,7 @@ export function analyseReadings(
       // history should pass it and get the stricter answer.
       persistenceSatisfied: true,
       rocAbnormal: false,
-      expectedContextChange: null,
+      expectedContextChange: input.commandedChange ?? null,
       limitStatus: reading?.measurement?.dangerState === 'ACTIVE'
         ? 'DANGER'
         : reading?.measurement?.alertState === 'ACTIVE'
@@ -506,12 +527,20 @@ export function analyseReadings(
     },
   });
 
+  const labelledAnomalies = anomalies
+    .map((entry) => {
+      const anomalyId = anomalyIdFor(entry.signalId, entry.verdict);
+      return anomalyId ? { signalId: entry.signalId, anomalyId, verdict: entry.verdict } : null;
+    })
+    .filter((entry): entry is { signalId: string; anomalyId: string; verdict: AnomalyVerdict } => entry !== null);
+
   return {
     quality,
     state,
     context,
     features,
     anomalies,
+    labelledAnomalies,
     diagnosis,
     reportingCount: readings.filter((reading) => reading.value !== null).length,
     unboundMandatory: unboundMandatorySignals().map((signal) => `${signal.signalId} ${signal.parameter}`),

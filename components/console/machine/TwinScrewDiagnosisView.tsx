@@ -166,9 +166,15 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
         ) : (
           firedAnomalies.map((entry) => (
             <Card key={entry.signalId} className="gap-1">
-              <View className="flex-row items-center gap-2">
+              <View className="flex-row flex-wrap items-center gap-2">
                 <Badge variant={anomalyVariant(entry.verdict)}>{entry.verdict.replace(/_/g, ' ')}</Badge>
                 <Text className="font-body-bold">{entry.signalId}</Text>
+                {/* The DOC-07 catalogue id, where the verdict maps onto one. */}
+                {result.labelledAnomalies.find((labelled) => labelled.signalId === entry.signalId) ? (
+                  <Badge variant="muted">
+                    {result.labelledAnomalies.find((labelled) => labelled.signalId === entry.signalId)?.anomalyId}
+                  </Badge>
+                ) : null}
                 {entry.limitStatus !== 'NONE' ? <Badge variant="destructive">{entry.limitStatus}</Badge> : null}
               </View>
               <Body muted>{entry.reason}</Body>
