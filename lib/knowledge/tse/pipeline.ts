@@ -56,6 +56,8 @@ import {
 } from './commissioning';
 import { signalForTag, unboundMandatorySignals } from './signalBinding';
 import { anomalyIdFor } from '../doc07/anomalies';
+import { decide } from '../doc05/engine';
+import type { DecisionObject } from '../doc05/types';
 
 /** One channel as the console already holds it. */
 export type PipelineChannel = {
@@ -114,6 +116,13 @@ export type PipelineResult = {
   reportingCount: number;
   /** DOC-02 mandatory signals this machine cannot supply. */
   unboundMandatory: string[];
+  /**
+   * DOC-05 §40 — severity, confidence, impact, priority and action.
+   *
+   * Present even when the diagnosis is NO_FAULT, because "NORMAL, P4, monitor"
+   * is a decision an operator needs as much as an alarm is.
+   */
+  decision: DecisionObject;
   /** Always true here — nothing in the commissioning set is field calibrated. */
   usesUncalibratedLimits: boolean;
   commissioningNotice: string;
@@ -534,6 +543,55 @@ export function analyseReadings(
     })
     .filter((entry): entry is { signalId: string; anomalyId: string; verdict: AnomalyVerdict } => entry !== null);
 
+  // --- DOC-05 §40: the decision ---------------------------------------------
+  const alertReached = anomalies.some((entry) => entry.limitStatus === 'ALERT');
+  const dangerReached = anomalies.some((entry) => entry.limitStatus === 'DANGER');
+  const tripActive = anomalies.some((entry) => entry.limitStatus === 'TRIP');
+  const strongAnomalies = anomalies.filter(
+    (entry) => entry.verdict === 'HIGH_ANOMALY' || entry.verdict === 'LOW_ANOMALY',
+  ).length;
+  const assessment = assessEvidence(evidenceItems);
+  const instrumentationSuspect = diagnosis.primaryDiagnosis === 'INSTRUMENTATION_SUSPECT';
+
+  const decision = decide({
+    decisionId: `DEC-${input.machineId}-${nowMs}`,
+    timestamp: new Date(nowMs).toISOString(),
+    diagnosis: diagnosis.primaryDiagnosis,
+    location: diagnosis.where,
+    faultFamily: instrumentationSuspect ? 'INSTRUMENTATION' : matched ? 'DOWNSTREAM' : null,
+    severity: {
+      tripActive,
+      customerDangerReached: dangerReached,
+      customerAlertReached: alertReached,
+      // No OEM limit is declared for this machine, so none can be reached.
+      oemLimitReached: false,
+      anomalyStrength: strongAnomalies >= 3 ? 'HIGH' : strongAnomalies === 0 ? 'NONE' : strongAnomalies === 1 ? 'LOW' : 'MEDIUM',
+      faultSeverityFloor: null,
+      requiredMeasurementUnusable: quality.some((entry) => entry.suppressesPhysicalDiagnosis),
+    },
+    confidence: {
+      // Data quality as a fraction of signals that are GOOD.
+      dataQuality: quality.length === 0 ? 0 : quality.filter((entry) => entry.verdict === 'GOOD').length / quality.length,
+      // Cold-start baselines are LOW by declaration, which is the honest input.
+      baselineConfidence: 0.3,
+      contextConfidence: context.confidence,
+      requiredEvidenceSatisfied: assessment.requiredSatisfied,
+      supportingEvidenceCount: assessment.supporting.length,
+      contradictingEvidenceCount: assessment.contradicting.length,
+      missingEvidenceCount: assessment.missing.length,
+      locationResolvable: valueOf(readings, 'TS-P3') !== null && valueOf(readings, 'TS-P4') !== null,
+      rootCauseProposed: diagnosis.rootCauseCandidates.length > 0,
+    },
+    trend: 'UNKNOWN',
+    abnormalFeatureCount: strongAnomalies,
+    assetCritical: true,
+    redundancyAvailable: false,
+    safetyRelevant: false,
+    throughputAffected: strongAnomalies > 0,
+    qualityRelevant: strongAnomalies > 0,
+    instrumentationSuspect,
+  });
+
   return {
     quality,
     state,
@@ -541,6 +599,7 @@ export function analyseReadings(
     features,
     anomalies,
     labelledAnomalies,
+    decision,
     diagnosis,
     reportingCount: readings.filter((reading) => reading.value !== null).length,
     unboundMandatory: unboundMandatorySignals().map((signal) => `${signal.signalId} ${signal.parameter}`),

@@ -9,6 +9,7 @@ import type { MachineNode } from '../../../lib/machines';
 import type { CardNode } from '../../../lib/rack';
 import { operatingStateDefinition } from '../../../lib/knowledge/doc02/operatingState';
 import { runTwinScrewPipeline } from '../../../lib/knowledge/tse/pipeline';
+import { PRIORITY_MEANING } from '../../../lib/knowledge/doc05/types';
 import { Badge, Body, Card } from '../../ui';
 import type { MappedChannel } from './RackOccupancyView';
 
@@ -69,23 +70,29 @@ export function TwinScrewDocSummary({ machine, mappedChannels, devices, cards, l
     (entry) => entry.verdict === 'HIGH_ANOMALY' || entry.verdict === 'LOW_ANOMALY',
   ).length;
 
-  const headlineVariant = diagnosis.sendToDoc05
-    ? 'destructive'
-    : diagnosis.primaryDiagnosis === 'INSTRUMENTATION_SUSPECT'
-      ? 'warning'
-      : 'muted';
+  const decision = result.decision;
+  const severityVariant =
+    decision.severity === 'DANGER' ? 'destructive' : decision.severity === 'ALERT' ? 'warning' : 'success';
+  const priorityVariant =
+    decision.priority === 'P1' ? 'destructive' : decision.priority === 'P2' ? 'warning' : 'muted';
 
   return (
     <Card className="gap-2">
       <View className="flex-row flex-wrap items-center gap-2">
         <Text className={cn('font-mono text-[10px] uppercase tracking-[0.18em]', muted)}>Knowledge model</Text>
         <Badge variant="muted">{stateDef?.name ?? result.state.operatingState}</Badge>
-        <Badge variant={headlineVariant}>{diagnosis.primaryDiagnosis.replace(/_/g, ' ')}</Badge>
+        <Badge variant={severityVariant}>{decision.severity}</Badge>
+        <Badge variant={priorityVariant}>
+          {decision.priority} · {PRIORITY_MEANING[decision.priority].name}
+        </Badge>
+        <Badge variant="muted">{diagnosis.primaryDiagnosis.replace(/_/g, ' ')}</Badge>
         {diagnosis.patternId ? <Badge variant="muted">{diagnosis.patternId}</Badge> : null}
         <Badge variant="warning">NOT FIELD CALIBRATED</Badge>
       </View>
 
       <Body muted>{diagnosis.what}</Body>
+      {/* DOC-05 §27 — what to actually do, not just what is wrong. */}
+      <Body>{decision.recommendation.text}</Body>
 
       <View className="flex-row flex-wrap items-center gap-x-5 gap-y-1">
         <Text className={cn('font-body text-[12.5px]', muted)}>
