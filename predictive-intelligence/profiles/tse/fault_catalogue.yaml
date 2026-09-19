@@ -1,0 +1,371 @@
+# TSE fault taxonomy. The 12 diagnostic hypotheses are Document A §10.1 "Initial diagnosis
+# taxonomy (SME validation required)"; D1/D2/D3 detectability and ambiguity follow Doc A §10.1
+# evidence notes and the brief's FAULT AMBIGUITY rules. Numeric magnitudes reference the channel
+# bands in channels.yaml (Doc A §3) instead of repeating numbers. SSE catalogue records are NOT
+# reused here (Doc B is SSE-specific).
+version: "tse-taxonomy-1.0.0"
+machine_profile: tse
+document: "Document A - TSE Predictive Diagnosis & Prognosis System HLD v1.0 (03 Sep 2026)"
+sections: [drive, gearbox, feed, barrel_thermal, melt, downstream, process_stability, sensing]
+families:
+  - {family_id: FEED_STARVATION, name: Feed starvation, machine_part: feed, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Feed starvation'"}
+  - {family_id: OVERFEED_HIGH_LOAD, name: Overfeed / high process load, machine_part: feed, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Overfeed/high process load'"}
+  - {family_id: DOWNSTREAM_FLOW_RESTRICTION, name: Downstream flow restriction, machine_part: downstream, source_document_reference: "brief: FAULT AMBIGUITY example; OUTPUT CONTRACT example"}
+  - {family_id: MOTOR_OVERLOAD, name: Motor overload, machine_part: drive, source_document_reference: "brief: MULTI-LABEL PROGNOSIS example"}
+  - {family_id: MOTOR_VIBRATION, name: Motor vibration increase, machine_part: drive, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Motor vibration increase'"}
+  - {family_id: GEARBOX_VIBRATION, name: Gearbox vibration increase, machine_part: gearbox, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Gearbox vibration increase'"}
+  - {family_id: THERMAL_CONTROL, name: Barrel thermal-control issue, machine_part: barrel_thermal, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Thermal-control issue'"}
+  - {family_id: MELT_THERMAL, name: Melt thermal issue, machine_part: melt, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Melt thermal issue'"}
+  - {family_id: SPEED_ANOMALY, name: Speed anomaly, machine_part: drive, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Speed anomaly'; SPEED RELATION"}
+  - {family_id: COOLING_DEGRADATION, name: Cooling degradation, machine_part: drive, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Cooling degradation'"}
+  - {family_id: PROCESS_INSTABILITY, name: General process instability, machine_part: process_stability, predictive: false, source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'General process instability'"}
+faults:
+  # ---- D1: specific diagnosis allowed ------------------------------------------------
+  - fault_id: TSE_FEED_STARVATION
+    machine_profile: tse
+    machine_part: feed
+    subcomponent: hopper/feeder
+    fault_name: Feed starvation (hopper empty or feeder under-delivering)
+    fault_family: FEED_STARVATION
+    occurrence_class: FREQUENT
+    detectability: D1
+    primary_sensors: [L, FR, P, I]
+    supporting_sensors: [MT, RPM]
+    developing_pattern:
+      - {channel: L, direction: DOWN}
+      - {channel: P, direction: DOWN}
+      - {channel: I, direction: DOWN}
+    warning_pattern:
+      - {channel: L, direction: DOWN, magnitude: "below normal.low"}
+      - {channel: P, direction: DOWN, magnitude: "> 10% below recipe expected"}
+    severe_pattern:
+      - {channel: P, direction: DOWN, magnitude: "below severe.low"}
+    temporal_evidence: "L trending down over minutes before P and I fall; FR may remain at setpoint (feeder reading) or fall."
+    derived_features: [L_slope_5m, P_slope_2m, I_slope_2m, P_over_FR, P_error_expected]
+    maintenance_confirmation: "Check hopper level / feeder throat; refill and verify recovery."
+    related_scenarios: [SC_FEED_STARVATION]
+    propagation_paths: [TSE_FEED_STARVATION]
+    predictive: true
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Feed starvation'; Doc A §10.1 taxonomy row"
+  - fault_id: TSE_OVERFEED
+    machine_profile: tse
+    machine_part: feed
+    subcomponent: feeder
+    fault_name: Overfeed / high process load
+    fault_family: OVERFEED_HIGH_LOAD
+    occurrence_class: SOMETIMES
+    detectability: D1
+    primary_sensors: [FR, I, P]
+    supporting_sensors: [RPM, TMOT, TGB]
+    developing_pattern:
+      - {channel: FR, direction: UP}
+      - {channel: I, direction: UP}
+      - {channel: P, direction: UP}
+    warning_pattern:
+      - {channel: FR, direction: UP, magnitude: "above setpoint"}
+      - {channel: I, direction: UP}
+    severe_pattern:
+      - {channel: I, direction: UP, magnitude: "above severe.high"}
+    temporal_evidence: "FR rises above setpoint first, then I and P follow within tens of seconds."
+    derived_features: [FR_error, I_slope_2m, P_slope_2m, load_proxy]
+    maintenance_confirmation: "Verify feeder calibration / setpoint."
+    related_scenarios: [SC_OVERFEED]
+    predictive: true
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Overfeed/high process load'; Doc A §10.1 taxonomy row"
+  - fault_id: TSE_MOTOR_OVERLOAD
+    machine_profile: tse
+    machine_part: drive
+    subcomponent: main motor
+    fault_name: Motor overload
+    fault_family: MOTOR_OVERLOAD
+    occurrence_class: SOMETIMES
+    detectability: D1
+    primary_sensors: [I, RPM, TMOT]
+    supporting_sensors: [P, FR, VM]
+    developing_pattern:
+      - {channel: I, direction: UP}
+      - {channel: TMOT, direction: UP}
+    warning_pattern:
+      - {channel: I, direction: UP, magnitude: "above normal.high"}
+      - {channel: RPM, direction: DOWN, magnitude: "droop"}
+    severe_pattern:
+      - {channel: I, direction: UP, magnitude: "above severe.high"}
+    temporal_evidence: "Sustained I above normal with TMOT rising over 5-30 min; RPM droop."
+    derived_features: [I_slope_2m, load_proxy, TMOT_slope_10m, I_over_RPM]
+    maintenance_confirmation: "Check drive load, VFD alarms, motor thermal state."
+    related_scenarios: [SC_RESTRICTION_CASCADE]
+    predictive: true
+    source_document_reference: "brief: MULTI-LABEL PROGNOSIS example; SIMULATOR 'Motor overload'"
+  - fault_id: TSE_MOTOR_VIBRATION
+    machine_profile: tse
+    machine_part: drive
+    subcomponent: motor bearings/mount
+    fault_name: Motor vibration increase (RMS)
+    fault_family: MOTOR_VIBRATION
+    occurrence_class: SOMETIMES
+    detectability: D1
+    primary_sensors: [VM]
+    supporting_sensors: [RPM, I, TMOT]
+    developing_pattern: [{channel: VM, direction: UP}]
+    warning_pattern: [{channel: VM, direction: UP, magnitude: "above normal.high"}]
+    severe_pattern: [{channel: VM, direction: UP, magnitude: "above severe.high"}]
+    temporal_evidence: "VM RMS rising over hours/days at constant RPM."
+    derived_features: [VM_mean_10m, VM_slope_10m, VM_over_RPM]
+    ambiguity_group: VIBRATION_RMS
+    alternative_causes: [bearing wear, misalignment, imbalance, loose mount]
+    additional_evidence_required: ["EXT:vibration_waveform", "EXT:bearing_geometry"]
+    maintenance_confirmation: "RMS increase is detectable; root cause (bearing vs alignment) requires spectral analysis."
+    predictive: true
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Motor vibration increase'; HIGH-FREQUENCY VIBRATION"
+  - fault_id: TSE_GEARBOX_VIBRATION
+    machine_profile: tse
+    machine_part: gearbox
+    subcomponent: gears/bearings
+    fault_name: Gearbox vibration increase (RMS)
+    fault_family: GEARBOX_VIBRATION
+    occurrence_class: SOMETIMES
+    detectability: D1
+    primary_sensors: [VG]
+    supporting_sensors: [TGB, RPM, I]
+    developing_pattern: [{channel: VG, direction: UP}]
+    warning_pattern: [{channel: VG, direction: UP, magnitude: "above normal.high"}]
+    severe_pattern: [{channel: VG, direction: UP, magnitude: "above severe.high"}]
+    temporal_evidence: "VG RMS rising, TGB may rise later."
+    derived_features: [VG_mean_10m, VG_slope_10m, TGB_slope_10m]
+    ambiguity_group: VIBRATION_RMS
+    alternative_causes: [gear mesh wear, bearing wear, lubrication]
+    additional_evidence_required: ["EXT:vibration_waveform", "EXT:gear_tooth_counts"]
+    maintenance_confirmation: "Requires gear-mesh spectral analysis for localisation."
+    predictive: true
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Gearbox vibration increase'; HIGH-FREQUENCY VIBRATION"
+  - fault_id: TSE_ZONE_THERMAL_CONTROL
+    machine_profile: tse
+    machine_part: barrel_thermal
+    subcomponent: zone heater/controller
+    fault_name: Barrel zone thermal-control deviation
+    fault_family: THERMAL_CONTROL
+    occurrence_class: FREQUENT
+    detectability: D1
+    primary_sensors: [Z1, Z2, Z3]
+    supporting_sensors: [MT]
+    developing_pattern: [{channel: Z2, direction: ANY, magnitude: "|Z_error| growing"}]
+    warning_pattern: [{channel: Z2, direction: ANY, magnitude: "outside normal"}]
+    severe_pattern: [{channel: Z2, direction: ANY, magnitude: "outside warning"}]
+    temporal_evidence: "Zone error grows or oscillates over minutes; other zones stable."
+    derived_features: [Z1_error, Z2_error, Z3_error, Z2_minus_Z1, Z3_minus_Z2, Z2_std_5m]
+    maintenance_confirmation: "Check heater band, thermocouple, controller tuning."
+    predictive: true
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Thermal-control issue'; THERMAL features"
+  - fault_id: TSE_SPEED_ANOMALY
+    machine_profile: tse
+    machine_part: drive
+    subcomponent: motor/gearbox coupling
+    fault_name: Speed relation anomaly (SRPM != RPM / gear_ratio)
+    fault_family: SPEED_ANOMALY
+    occurrence_class: RARE
+    detectability: D1
+    primary_sensors: [RPM, SRPM]
+    supporting_sensors: [I, VG]
+    developing_pattern: [{channel: SRPM, direction: ANY, magnitude: "srpm_error growing"}]
+    warning_pattern: [{channel: SRPM, direction: ANY, magnitude: "|srpm_error| > 2%"}]
+    severe_pattern: [{channel: SRPM, direction: ANY, magnitude: "|srpm_error| > 5%"}]
+    temporal_evidence: "Persistent srpm_error at steady RPM."
+    derived_features: [srpm_error, srpm_error_30s]
+    ambiguity_group: SPEED_SENSING
+    alternative_causes: [coupling slip, encoder/pulse fault, gear damage]
+    maintenance_confirmation: "Compare encoder readings; inspect coupling."
+    predictive: false
+    source_document_reference: "brief: SPEED RELATION; SIMULATOR 'Speed anomaly'"
+  # ---- D2: family-level only ----------------------------------------------------------
+  - fault_id: TSE_DOWNSTREAM_RESTRICTION
+    machine_profile: tse
+    machine_part: downstream
+    subcomponent: screen pack / die
+    fault_name: Downstream flow restriction (family)
+    fault_family: DOWNSTREAM_FLOW_RESTRICTION
+    occurrence_class: FREQUENT
+    detectability: D2
+    primary_sensors: [P, I]
+    supporting_sensors: [FR, RPM, MT, TMOT, TGB]
+    developing_pattern:
+      - {channel: P, direction: UP}
+      - {channel: I, direction: UP}
+      - {channel: FR, direction: FLAT}
+    warning_pattern:
+      - {channel: P, direction: UP, magnitude: "above normal.high"}
+      - {channel: I, direction: UP}
+      - {channel: RPM, direction: DOWN, magnitude: "softening"}
+    severe_pattern:
+      - {channel: P, direction: UP, magnitude: "above severe.high"}
+    temporal_evidence: "P 4.00->4.10->4.25->4.50->4.80->5.10->5.40 with I 10->15+ while FR stable (brief example)."
+    derived_features: [P_slope_2m, I_slope_2m, P_over_FR, P_over_I, P_error_expected, lstm_P_residual]
+    ambiguity_group: DOWNSTREAM_RESTRICTION
+    alternative_causes: [SCREEN_RESTRICTION, DIE_RESTRICTION, MATERIAL_VISCOSITY]
+    additional_evidence_required: ["EXT:downstream_pressure", "EXT:die_temperature", "EXT:product_quality"]
+    maintenance_confirmation: "Inspect screen pack differential pressure; check die; check material lot."
+    related_scenarios: [SC_RESTRICTION_CASCADE]
+    propagation_paths: [SC_RESTRICTION_CASCADE]
+    predictive: true
+    source_document_reference: "brief: FAULT AMBIGUITY example; SIMULATOR progressive restriction"
+  - fault_id: TSE_MELT_THERMAL
+    machine_profile: tse
+    machine_part: melt
+    subcomponent: melt/die zone
+    fault_name: Melt thermal issue (family)
+    fault_family: MELT_THERMAL
+    occurrence_class: SOMETIMES
+    detectability: D2
+    primary_sensors: [MT]
+    supporting_sensors: [Z3, P, I, RPM]
+    developing_pattern: [{channel: MT, direction: ANY, magnitude: "MT_minus_Z3 drifting"}]
+    warning_pattern: [{channel: MT, direction: ANY, magnitude: "outside normal"}]
+    severe_pattern: [{channel: MT, direction: ANY, magnitude: "outside warning"}]
+    temporal_evidence: "MT deviates from recipe expected while zones hold setpoint."
+    derived_features: [MT_minus_Z3, MT_error, MT_slope_5m]
+    ambiguity_group: MELT_THERMAL
+    alternative_causes: [shear heating from overload, die heater fault, material change, MT sensor fault]
+    additional_evidence_required: ["EXT:die_temperature", "EXT:material_lot"]
+    maintenance_confirmation: "Check die heater and material lot; verify MT probe."
+    predictive: true
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Melt thermal issue'"
+  - fault_id: TSE_COOLING_DEGRADATION
+    machine_profile: tse
+    machine_part: drive
+    subcomponent: motor/gearbox cooling
+    fault_name: Cooling degradation (family)
+    fault_family: COOLING_DEGRADATION
+    occurrence_class: SOMETIMES
+    detectability: D2
+    primary_sensors: [TMOT, TGB]
+    supporting_sensors: [I, RPM]
+    developing_pattern:
+      - {channel: TMOT, direction: UP}
+      - {channel: TGB, direction: UP}
+      - {channel: I, direction: FLAT}
+    warning_pattern: [{channel: TMOT, direction: UP, magnitude: "above normal.high at constant load"}]
+    severe_pattern: [{channel: TMOT, direction: UP, magnitude: "above severe.high"}]
+    temporal_evidence: "Slow temperature rise (10-60 min) without load increase."
+    derived_features: [TMOT_slope_10m, TGB_slope_10m, load_proxy, I_mean_10m]
+    ambiguity_group: THERMAL_DRIVE
+    alternative_causes: [blocked cooling fan/filter, ambient rise, lubricant degradation]
+    additional_evidence_required: ["EXT:ambient_temperature", "EXT:coolant_flow"]
+    maintenance_confirmation: "Inspect fans/filters, ambient, coolant."
+    predictive: true
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'Cooling degradation'"
+  - fault_id: TSE_PROCESS_INSTABILITY
+    machine_profile: tse
+    machine_part: process_stability
+    fault_name: General process instability (family)
+    fault_family: PROCESS_INSTABILITY
+    occurrence_class: SOMETIMES
+    detectability: D2
+    primary_sensors: [P, I, MT]
+    supporting_sensors: [FR, RPM]
+    developing_pattern:
+      - {channel: P, direction: OSCILLATING}
+      - {channel: I, direction: OSCILLATING}
+    warning_pattern: [{channel: P, direction: OSCILLATING, magnitude: "P_cv_2m elevated"}]
+    severe_pattern: [{channel: P, direction: OSCILLATING, magnitude: "P outside warning band"}]
+    temporal_evidence: "Elevated dispersion (std/CV) in P and I over 2-5 min windows."
+    derived_features: [P_cv_2m, I_cv_2m, P_std_5m, MT_std_5m]
+    ambiguity_group: INSTABILITY
+    alternative_causes: [feed inconsistency, material moisture, surging, thermal oscillation]
+    additional_evidence_required: ["EXT:material_moisture", "EXT:product_quality"]
+    maintenance_confirmation: "Check feed consistency and material moisture."
+    predictive: false
+    source_document_reference: "Doc A §10.1 taxonomy; brief SIMULATOR 'General process instability'"
+  # ---- D3: requires additional evidence ----------------------------------------------
+  - fault_id: TSE_SCREEN_RESTRICTION
+    machine_profile: tse
+    machine_part: downstream
+    subcomponent: screen pack
+    fault_name: Screen pack blockage (specific cause)
+    fault_family: DOWNSTREAM_FLOW_RESTRICTION
+    occurrence_class: FREQUENT
+    detectability: D3
+    primary_sensors: [P, I]
+    supporting_sensors: [FR, RPM]
+    developing_pattern: [{channel: P, direction: UP}]
+    ambiguity_group: DOWNSTREAM_RESTRICTION
+    alternative_causes: [TSE_DIE_RESTRICTION, TSE_MATERIAL_VISCOSITY]
+    additional_evidence_required: ["EXT:downstream_pressure"]
+    maintenance_confirmation: "Screen changer differential pressure or inspection."
+    related_scenarios: [SC_RESTRICTION_CASCADE]
+    source_document_reference: "brief: FAULT AMBIGUITY (screen vs die vs viscosity); COMMISSIONING GAPS"
+  - fault_id: TSE_DIE_RESTRICTION
+    machine_profile: tse
+    machine_part: downstream
+    subcomponent: die
+    fault_name: Die blockage / die restriction (specific cause)
+    fault_family: DOWNSTREAM_FLOW_RESTRICTION
+    occurrence_class: SOMETIMES
+    detectability: D3
+    primary_sensors: [P, I]
+    supporting_sensors: [MT]
+    developing_pattern: [{channel: P, direction: UP}]
+    ambiguity_group: DOWNSTREAM_RESTRICTION
+    alternative_causes: [TSE_SCREEN_RESTRICTION, TSE_MATERIAL_VISCOSITY]
+    additional_evidence_required: ["EXT:downstream_pressure", "EXT:die_temperature"]
+    maintenance_confirmation: "Die inspection."
+    related_scenarios: [SC_RESTRICTION_CASCADE]
+    source_document_reference: "brief: FAULT AMBIGUITY; COMMISSIONING GAPS (die temperature)"
+  - fault_id: TSE_MATERIAL_VISCOSITY
+    machine_profile: tse
+    machine_part: melt
+    subcomponent: material
+    fault_name: Material viscosity change (specific cause)
+    fault_family: DOWNSTREAM_FLOW_RESTRICTION
+    occurrence_class: SOMETIMES
+    detectability: D3
+    primary_sensors: [P, MT]
+    supporting_sensors: [I]
+    developing_pattern: [{channel: P, direction: UP}, {channel: MT, direction: ANY}]
+    ambiguity_group: DOWNSTREAM_RESTRICTION
+    alternative_causes: [TSE_SCREEN_RESTRICTION, TSE_DIE_RESTRICTION]
+    additional_evidence_required: ["EXT:material_moisture", "EXT:product_quality", "EXT:material_lot"]
+    maintenance_confirmation: "Material lot / MFI check."
+    source_document_reference: "brief: FAULT AMBIGUITY; COMMISSIONING GAPS (material moisture/quality)"
+  - fault_id: TSE_MOTOR_BEARING_DEFECT
+    machine_profile: tse
+    machine_part: drive
+    subcomponent: motor bearing
+    fault_name: Motor bearing defect (BPFO/BPFI localisation)
+    fault_family: MOTOR_VIBRATION
+    occurrence_class: RARE
+    detectability: D3
+    primary_sensors: [VM]
+    supporting_sensors: [TMOT]
+    ambiguity_group: VIBRATION_RMS
+    alternative_causes: [TSE_MOTOR_VIBRATION]
+    additional_evidence_required: ["EXT:vibration_waveform", "EXT:bearing_geometry"]
+    maintenance_confirmation: "Envelope / bearing-frequency analysis."
+    source_document_reference: "brief: HIGH-FREQUENCY VIBRATION; COMMISSIONING GAPS (bearing geometry)"
+  - fault_id: TSE_GEAR_MESH_DEFECT
+    machine_profile: tse
+    machine_part: gearbox
+    subcomponent: gear teeth
+    fault_name: Gear mesh defect (specific tooth/gear)
+    fault_family: GEARBOX_VIBRATION
+    occurrence_class: RARE
+    detectability: D3
+    primary_sensors: [VG]
+    supporting_sensors: [TGB]
+    ambiguity_group: VIBRATION_RMS
+    alternative_causes: [TSE_GEARBOX_VIBRATION]
+    additional_evidence_required: ["EXT:vibration_waveform", "EXT:gear_tooth_counts"]
+    maintenance_confirmation: "Gear-mesh frequency analysis."
+    source_document_reference: "brief: COMMISSIONING GAPS (gear tooth counts)"
+  - fault_id: TSE_ELECTRICAL_SUPPLY
+    machine_profile: tse
+    machine_part: drive
+    subcomponent: VFD / supply
+    fault_name: Electrical supply / VFD issue
+    fault_family: MOTOR_OVERLOAD
+    occurrence_class: RARE
+    detectability: D3
+    primary_sensors: [I, RPM]
+    ambiguity_group: ELECTRICAL
+    alternative_causes: [TSE_MOTOR_OVERLOAD]
+    additional_evidence_required: ["EXT:phase_voltage", "EXT:phase_current", "EXT:vfd_diagnostics"]
+    maintenance_confirmation: "VFD diagnostic log; phase measurements."
+    source_document_reference: "brief: COMMISSIONING GAPS (phase voltage/current)"

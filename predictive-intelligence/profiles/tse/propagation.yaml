@@ -1,0 +1,58 @@
+# Fault propagation / cascade graph for TSE (brief: FAULT PROPAGATION / CASCADE MODEL).
+# Symptom node ids are prefixed SYM_. Causal language is constrained to the catalogue.
+version: "tse-propagation-1.0.0"
+machine_profile: tse
+edges:
+  # Restriction cascade (brief conceptual graph)
+  - {source: TSE_SCREEN_RESTRICTION, target: SYM_P_UP, relation: causes_symptom, mechanism: "flow restriction raises head pressure", typical_delay_s: 0, source_document_reference: "brief: propagation example"}
+  - {source: TSE_DIE_RESTRICTION, target: SYM_P_UP, relation: causes_symptom, mechanism: "flow restriction raises head pressure", typical_delay_s: 0}
+  - {source: TSE_MATERIAL_VISCOSITY, target: SYM_P_UP, relation: causes_symptom, mechanism: "higher viscosity raises pressure at same throughput", typical_delay_s: 0}
+  - {source: TSE_DOWNSTREAM_RESTRICTION, target: SYM_P_UP, relation: causes_symptom, typical_delay_s: 0}
+  - {source: SYM_P_UP, target: SYM_TORQUE_UP, relation: causes_symptom, mechanism: "screw torque/load increases", typical_delay_s: 10}
+  - {source: SYM_TORQUE_UP, target: SYM_I_UP, relation: causes_symptom, mechanism: "motor current increases", typical_delay_s: 5}
+  - {source: SYM_I_UP, target: SYM_TMOT_UP, relation: causes_symptom, mechanism: "motor/gearbox temperature increases", typical_delay_s: 300}
+  - {source: SYM_I_UP, target: SYM_TGB_UP, relation: causes_symptom, typical_delay_s: 300}
+  - {source: SYM_TORQUE_UP, target: SYM_RPM_DROOP, relation: causes_symptom, mechanism: "RPM can droop", typical_delay_s: 60}
+  - {source: TSE_DOWNSTREAM_RESTRICTION, target: TSE_MOTOR_OVERLOAD, relation: may_propagate_to, mechanism: "sustained load increase", typical_delay_s: 600}
+  - {source: TSE_OVERFEED, target: SYM_I_UP, relation: causes_symptom, typical_delay_s: 10}
+  - {source: TSE_OVERFEED, target: SYM_P_UP, relation: causes_symptom, typical_delay_s: 10}
+  - {source: TSE_OVERFEED, target: TSE_MOTOR_OVERLOAD, relation: may_propagate_to, typical_delay_s: 300}
+  - {source: TSE_MOTOR_OVERLOAD, target: SYM_TMOT_UP, relation: causes_symptom, typical_delay_s: 120}
+  - {source: TSE_MOTOR_OVERLOAD, target: SYM_RPM_DROOP, relation: causes_symptom, typical_delay_s: 30}
+  - {source: TSE_COOLING_DEGRADATION, target: SYM_TMOT_UP, relation: causes_symptom, typical_delay_s: 600}
+  - {source: TSE_COOLING_DEGRADATION, target: SYM_TGB_UP, relation: causes_symptom, typical_delay_s: 600}
+  - {source: TSE_FEED_STARVATION, target: SYM_P_DOWN, relation: causes_symptom, typical_delay_s: 30}
+  - {source: TSE_FEED_STARVATION, target: SYM_I_DOWN, relation: causes_symptom, typical_delay_s: 30}
+  - {source: TSE_FEED_STARVATION, target: TSE_MELT_THERMAL, relation: may_propagate_to, mechanism: "residence time / shear change alters MT", typical_delay_s: 120}
+  - {source: TSE_GEARBOX_VIBRATION, target: SYM_TGB_UP, relation: causes_symptom, typical_delay_s: 1800}
+  # confusion relations
+  - {source: TSE_DOWNSTREAM_RESTRICTION, target: TSE_OVERFEED, relation: may_be_confused_with, mechanism: "both raise P and I; FR distinguishes"}
+  - {source: TSE_MOTOR_OVERLOAD, target: TSE_COOLING_DEGRADATION, relation: may_be_confused_with, mechanism: "both raise TMOT; I distinguishes"}
+  - {source: TSE_SCREEN_RESTRICTION, target: TSE_DIE_RESTRICTION, relation: may_be_confused_with}
+  - {source: TSE_SCREEN_RESTRICTION, target: TSE_MATERIAL_VISCOSITY, relation: may_be_confused_with}
+  - {source: TSE_DIE_RESTRICTION, target: TSE_MATERIAL_VISCOSITY, relation: may_be_confused_with}
+  - {source: TSE_MOTOR_VIBRATION, target: TSE_MOTOR_BEARING_DEFECT, relation: may_be_confused_with}
+  # confirmation requirements
+  - {source: TSE_SCREEN_RESTRICTION, target: "EXT:downstream_pressure", relation: requires_confirmation_by}
+  - {source: TSE_DIE_RESTRICTION, target: "EXT:die_temperature", relation: requires_confirmation_by}
+  - {source: TSE_MATERIAL_VISCOSITY, target: "EXT:material_lot", relation: requires_confirmation_by}
+  - {source: TSE_MOTOR_BEARING_DEFECT, target: "EXT:vibration_waveform", relation: requires_confirmation_by}
+  - {source: TSE_GEAR_MESH_DEFECT, target: "EXT:vibration_waveform", relation: requires_confirmation_by}
+  - {source: TSE_ELECTRICAL_SUPPLY, target: "EXT:vfd_diagnostics", relation: requires_confirmation_by}
+scenarios:
+  - scenario_id: SC_RESTRICTION_CASCADE
+    name: Screen restriction cascade
+    root_fault: TSE_DOWNSTREAM_RESTRICTION
+    chain: [SYM_P_UP, SYM_TORQUE_UP, SYM_I_UP, SYM_TMOT_UP, SYM_RPM_DROOP]
+    description: "SCREEN RESTRICTION -> P increases -> torque/load increases -> I increases -> motor/gearbox temperature increases -> RPM can droop."
+    source_document_reference: "brief: FAULT PROPAGATION conceptual graph"
+  - scenario_id: SC_OVERFEED
+    name: Overfeed load cascade
+    root_fault: TSE_OVERFEED
+    chain: [SYM_I_UP, SYM_P_UP, SYM_TMOT_UP]
+    source_document_reference: "brief: SIMULATOR 'Overfeed/high process load'"
+  - scenario_id: SC_FEED_STARVATION
+    name: Feed starvation
+    root_fault: TSE_FEED_STARVATION
+    chain: [SYM_P_DOWN, SYM_I_DOWN]
+    source_document_reference: "brief: SIMULATOR 'Feed starvation'"
