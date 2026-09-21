@@ -266,17 +266,23 @@
   );
 }
 
-/* The travelling highlight. A conic wedge on the same ring mask, rotated — so
-   the bright spot runs along the limb the way light does on a real one. */
+/* The travelling highlight. Two restrained specular wedges sit opposite each
+   other on the same ring mask. One crosses the visible limb every half-turn,
+   keeping the calibrated scan present without reading as a racing light. */
 .shine {
   background: conic-gradient(
     from 0deg,
     transparent 0deg,
-    transparent 46deg,
-    rgba(111, 168, 255, 0.78) 68deg,
-    #dbeaff 76deg,
-    rgba(111, 168, 255, 0.78) 84deg,
-    transparent 108deg,
+    transparent 48deg,
+    rgba(111, 168, 255, 0.78) 58deg,
+    #dbeaff 66deg,
+    rgba(111, 168, 255, 0.78) 74deg,
+    transparent 86deg,
+    transparent 228deg,
+    rgba(111, 168, 255, 0.78) 238deg,
+    #dbeaff 246deg,
+    rgba(111, 168, 255, 0.78) 254deg,
+    transparent 266deg,
     transparent 360deg
   );
   -webkit-mask-image: radial-gradient(
@@ -291,7 +297,7 @@
     #000 calc(100% - 1px),
     transparent 100%
   );
-  animation: shine 9s linear infinite 1.6s;
+  animation: shine 5.4s linear infinite;
 }
 
 @keyframes shine {
