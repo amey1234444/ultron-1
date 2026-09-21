@@ -1,0 +1,66 @@
+# Decision thresholds and the persistence filter, per fault and per horizon.
+#
+# There is no single right threshold. The cost of a missed screen restriction
+# and the cost of a missed motor overload are different costs, and the rate at
+# which a plant tolerates false alarms depends on who gets paged. So this file
+# is configuration, and the values below are a documented starting point rather
+# than a tuned result — nothing here has been fitted against measured
+# operational performance, because there is none yet.
+#
+# raise_threshold / clear_threshold
+#   Separate on purpose. A single threshold produces chatter around itself, and
+#   an alert that flickers trains people to ignore it.
+#
+# persistence_n / persistence_m
+#   N of the last M eligible cycles, not N consecutive. A genuine signal that
+#   dips for one sample on a noisy channel is still a genuine signal.
+#
+# cooldown_seconds
+#   How long after clearing before the same fault may alert again. Stops a
+#   condition sitting on the boundary generating an incident every few minutes.
+#
+# hard_limit_bypass
+#   DOC-02 §25. An approved Danger or Trip skips the filter entirely. A
+#   protection condition does not wait three cycles for confirmation.
+
+default:
+  raise_threshold: 0.80
+  clear_threshold: 0.60
+  persistence_n: 3
+  persistence_m: 5
+  cooldown_seconds: 900
+  duplicate_suppression_seconds: 300
+  hard_limit_bypass: true
+
+overrides:
+  # A restriction develops over minutes and is expensive to miss, so it may
+  # raise a little earlier and is given longer to confirm.
+  TSE-DOWN-001:
+    raise_threshold: 0.75
+    clear_threshold: 0.55
+    persistence_n: 4
+    persistence_m: 7
+    cooldown_seconds: 1800
+
+  # Mechanical damage accumulates and does not reverse. Raising early is cheap
+  # relative to a gearbox.
+  TSE-MECH-001:
+    raise_threshold: 0.70
+    clear_threshold: 0.50
+    persistence_n: 5
+    persistence_m: 9
+    cooldown_seconds: 3600
+
+  # Feed oscillation is inherently noisy, so it needs more confirmation before
+  # anybody is told about it.
+  TSE-FEED-002:
+    raise_threshold: 0.85
+    clear_threshold: 0.65
+    persistence_n: 5
+    persistence_m: 7
+
+  # A five-minute horizon on a thermal fault is nearly a detection rather than
+  # a prognosis, so it is held to a higher bar.
+  "TSE-THERM-012@5":
+    raise_threshold: 0.90
+    clear_threshold: 0.70

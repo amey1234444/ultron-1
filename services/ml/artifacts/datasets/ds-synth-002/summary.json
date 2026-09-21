@@ -1,0 +1,56 @@
+{
+  "dataset_id": "ds-synth-002",
+  "built_at": "2026-09-21T07:07:06.324Z",
+  "rows": 3600,
+  "features": 1652,
+  "outputs": 12,
+  "horizons": [
+    5,
+    15,
+    30
+  ],
+  "split_counts": {
+    "train": 2520,
+    "valid": 500,
+    "test": 480,
+    "excluded": 100
+  },
+  "positives": {
+    "TSE-DOWN-001@15": 240,
+    "TSE-DOWN-001@30": 240,
+    "TSE-DOWN-001@5": 120,
+    "TSE-DOWN-003@15": 240,
+    "TSE-DOWN-003@30": 240,
+    "TSE-DOWN-003@5": 120,
+    "TSE-FEED-002@15": 240,
+    "TSE-FEED-002@30": 240,
+    "TSE-FEED-002@5": 120,
+    "TSE-THERM-012@15": 240,
+    "TSE-THERM-012@30": 240,
+    "TSE-THERM-012@5": 120
+  },
+  "events": {
+    "TSE-DOWN-001@5": 0,
+    "TSE-DOWN-001@15": 0,
+    "TSE-DOWN-001@30": 0,
+    "TSE-DOWN-003@5": 0,
+    "TSE-DOWN-003@15": 0,
+    "TSE-DOWN-003@30": 0,
+    "TSE-FEED-002@5": 0,
+    "TSE-FEED-002@15": 0,
+    "TSE-FEED-002@30": 0,
+    "TSE-THERM-012@5": 0,
+    "TSE-THERM-012@15": 0,
+    "TSE-THERM-012@30": 0
+  },
+  "label_quality": {
+    "BRONZE": 24
+  },
+  "contains_real_data": false,
+  "feature_set_version": "1.0.0",
+  "rule_set_version": "1.0.0",
+  "knowledge_digest": "acf703ebc12ed47a",
+  "notes": [
+    "Every row in this dataset is SYNTHETIC. A model fitted from it exercises the pipeline and carries no evidence about a real machine."
+  ]
+}

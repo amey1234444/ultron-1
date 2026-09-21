@@ -1,0 +1,889 @@
+{
+  "documentRef": "BLACKGATE-TSE-DOC-04 v1.0",
+  "faults": [
+    {
+      "faultId": "TSE-FEED-001",
+      "name": "Feed Starvation",
+      "family": "FEEDING",
+      "primaryLocation": "Main feeder / feed throat",
+      "applicableStates": "STARTUP, RAMP_UP, STEADY",
+      "minimumRequiredEvidence": "Feed actual, feed SP, RPM",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-002",
+      "name": "Feed Surging / Oscillation",
+      "family": "FEEDING",
+      "primaryLocation": "Feeder / feed throat",
+      "applicableStates": "RAMP_UP, STEADY",
+      "minimumRequiredEvidence": "Feed actual trend/variability, RPM",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-003",
+      "name": "Hopper Bridging / Poor Flow",
+      "family": "FEEDING",
+      "primaryLocation": "Hopper outlet / feeder inlet",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Feed actual, feed SP, hopper level or operator evidence",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-004",
+      "name": "Feeder Blockage / Mechanical Jam",
+      "family": "FEEDING",
+      "primaryLocation": "Feeder screw / discharge",
+      "applicableStates": "STARTUP, STEADY",
+      "minimumRequiredEvidence": "Feed command/actual, feeder motor load/status",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-005",
+      "name": "Feeder Command-Actual Mismatch",
+      "family": "FEEDING",
+      "primaryLocation": "Feeder control loop",
+      "applicableStates": "ALL producing states",
+      "minimumRequiredEvidence": "Feed SP, feed actual",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-006",
+      "name": "Feeder Refill Disturbance",
+      "family": "FEEDING",
+      "primaryLocation": "Loss-in-weight hopper / refill system",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Refill status, feed actual",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-007",
+      "name": "Side Feeder Starvation",
+      "family": "FEEDING",
+      "primaryLocation": "Side feeder",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Side-feed SP/actual",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-008",
+      "name": "Side Feeder Overfeed",
+      "family": "FEEDING",
+      "primaryLocation": "Side feeder / downstream feed zone",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Side-feed actual/SP",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-FEED-009",
+      "name": "Feed-Throat Thermal / Intake Problem",
+      "family": "FEEDING",
+      "primaryLocation": "Feed throat / Zone 1",
+      "applicableStates": "WARM_UP, STARTUP, STEADY",
+      "minimumRequiredEvidence": "Feed behavior, Z1/feed-throat temperature",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-001",
+      "name": "General Process Restriction",
+      "family": "PROCESS",
+      "primaryLocation": "Melt path, location not yet resolved",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Pressure, torque, feed, RPM, recipe",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-002",
+      "name": "Poor / Incomplete Melting",
+      "family": "PROCESS",
+      "primaryLocation": "Melting section",
+      "applicableStates": "RAMP_UP, STEADY",
+      "minimumRequiredEvidence": "Melt temp or indirect process indicators, zone temps, torque",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-003",
+      "name": "Excessive Shear / Process Overheating",
+      "family": "PROCESS",
+      "primaryLocation": "High-shear mixing/kneading zones",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Melt temp, RPM, torque/specific energy",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-004",
+      "name": "Excessive Specific Energy",
+      "family": "PROCESS",
+      "primaryLocation": "Whole process / mixing section",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Specific energy, recipe/context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-005",
+      "name": "Abnormally Low Specific Energy",
+      "family": "PROCESS",
+      "primaryLocation": "Whole process",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Specific energy, recipe/context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-006",
+      "name": "Material Viscosity Increase",
+      "family": "PROCESS",
+      "primaryLocation": "Melt / formulation",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Torque, pressure, melt temp, recipe",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-007",
+      "name": "Material Viscosity Decrease",
+      "family": "PROCESS",
+      "primaryLocation": "Melt / formulation",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Torque, pressure, melt temp, recipe",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-008",
+      "name": "Throughput Loss",
+      "family": "PROCESS",
+      "primaryLocation": "Line output",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Throughput expected/actual, feed, RPM",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-009",
+      "name": "Throughput Instability / Surging",
+      "family": "PROCESS",
+      "primaryLocation": "Whole extrusion line",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Throughput variability, feed variability",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-010",
+      "name": "Process Load Too High",
+      "family": "PROCESS",
+      "primaryLocation": "Whole process",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Torque/current/power vs context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-011",
+      "name": "Process Load Too Low",
+      "family": "PROCESS",
+      "primaryLocation": "Whole process",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Torque/current/power vs context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-012",
+      "name": "Abnormal Residence / Hold-Up Suspicion",
+      "family": "PROCESS",
+      "primaryLocation": "Processing section",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Throughput, RPM, pressure/torque trend, process history",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-PROC-013",
+      "name": "Material Degradation Suspicion",
+      "family": "PROCESS",
+      "primaryLocation": "Melt/process",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "Melt temp, residence indicators, quality evidence",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-008",
+      "name": "Zone Temperature Low",
+      "family": "THERMAL",
+      "primaryLocation": "Any barrel zone",
+      "applicableStates": "WARM_UP, READY, STEADY",
+      "minimumRequiredEvidence": "Zone actual/SP",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-009",
+      "name": "Zone Temperature Oscillation / Hunting",
+      "family": "THERMAL",
+      "primaryLocation": "Any barrel zone",
+      "applicableStates": "WARM_UP, READY, STEADY",
+      "minimumRequiredEvidence": "Zone actual/SP variability",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-010",
+      "name": "Slow Heating / Warm-Up Failure",
+      "family": "THERMAL",
+      "primaryLocation": "Any barrel zone",
+      "applicableStates": "WARM_UP",
+      "minimumRequiredEvidence": "Temperature ROC vs warm-up profile, heater output",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-011",
+      "name": "Heater Non-Response",
+      "family": "THERMAL",
+      "primaryLocation": "Heater / barrel zone",
+      "applicableStates": "WARM_UP, STEADY",
+      "minimumRequiredEvidence": "heater command/output, zone temp ROC",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-012",
+      "name": "Cooling Ineffective / Cooling Loss",
+      "family": "THERMAL",
+      "primaryLocation": "Cooling system / affected zone",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "cooling command, zone temp trend",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-013",
+      "name": "Excessive Cooling / Overcooling",
+      "family": "THERMAL",
+      "primaryLocation": "Cooling system / affected zone",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "zone actual/SP, cooling output",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-014",
+      "name": "Melt Temperature High",
+      "family": "THERMAL",
+      "primaryLocation": "Melt downstream",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "melt temp baseline, recipe/RPM/feed",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-015",
+      "name": "Melt Temperature Low",
+      "family": "THERMAL",
+      "primaryLocation": "Melt downstream",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "melt temp baseline",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-THERM-016",
+      "name": "Abnormal Zone-to-Zone Thermal Gradient",
+      "family": "THERMAL",
+      "primaryLocation": "Barrel thermal profile",
+      "applicableStates": "READY, STEADY",
+      "minimumRequiredEvidence": "zone profile/gradients vs expected",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-VENT-001",
+      "name": "Vacuum Level Too Low / Cannot Reach Setpoint",
+      "family": "VENTING",
+      "primaryLocation": "Vacuum vent / pump",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "vacuum actual/SP",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-VENT-002",
+      "name": "Vacuum Unstable",
+      "family": "VENTING",
+      "primaryLocation": "Vacuum system",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "vacuum variability",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-VENT-003",
+      "name": "Vacuum Lost",
+      "family": "VENTING",
+      "primaryLocation": "Vacuum system",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "vacuum actual, pump status",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-VENT-004",
+      "name": "Vacuum Vent Blockage / Material Build-Up",
+      "family": "VENTING",
+      "primaryLocation": "Vent port / insert",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "vacuum behavior, pressure/load, operator/visual evidence",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-VENT-005",
+      "name": "Vent Flooding / Melt Carryover",
+      "family": "VENTING",
+      "primaryLocation": "Atmospheric/vacuum vent",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "vent event/operator sensor, vacuum, feed/RPM",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-VENT-006",
+      "name": "Excess Volatile / Moisture Load Suspicion",
+      "family": "VENTING",
+      "primaryLocation": "Devolatilization section",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "vacuum load/instability, quality/moisture evidence",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-VENT-007",
+      "name": "Vacuum Pump / Control Problem",
+      "family": "VENTING",
+      "primaryLocation": "Vacuum pump/valves",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "pump status, vacuum actual/SP",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-001",
+      "name": "Screen Restriction / Blockage",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Screen pack / screen changer",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "pre/post pressure or pre pressure, torque, feed/RPM",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-002",
+      "name": "Die Restriction / Blockage",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Die",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "die/upstream pressure, feed/RPM",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-003",
+      "name": "Adapter / Transfer Restriction",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Adapter / transfer channel",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "pressure topology if available",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-004",
+      "name": "High Melt Pressure - Cause Unresolved",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Pressure path",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "melt pressure, context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-005",
+      "name": "Low Melt Pressure",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Discharge path",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "melt pressure, feed/RPM",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-006",
+      "name": "Pressure Pulsation / Surging",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Discharge path",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "pressure variability/oscillation",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-007",
+      "name": "Screen ΔP Rising Trend",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Screen pack",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "ΔP trend",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-DOWN-008",
+      "name": "Pressure Loss / Leak / Open Flow Suspicion",
+      "family": "DOWNSTREAM",
+      "primaryLocation": "Downstream path",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "pressure LOW and throughput/context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-001",
+      "name": "High Torque",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "Screw drive",
+      "applicableStates": "STARTUP, RAMP_UP, STEADY",
+      "minimumRequiredEvidence": "torque anomaly, context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-002",
+      "name": "Torque Instability / Spikes",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "Screw drive",
+      "applicableStates": "STARTUP, STEADY",
+      "minimumRequiredEvidence": "torque variability/spikes",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-003",
+      "name": "High Motor Current",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "Main motor/VFD",
+      "applicableStates": "RAMP_UP, STEADY",
+      "minimumRequiredEvidence": "current anomaly, rated current",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-004",
+      "name": "High Active Power",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "Main drive",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "power anomaly",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-005",
+      "name": "Speed Command-Actual Mismatch",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "VFD / screws",
+      "applicableStates": "STARTUP, RAMP_UP, STEADY",
+      "minimumRequiredEvidence": "speed SP/actual",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-006",
+      "name": "Drive Trip / Overload Event",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "VFD/motor",
+      "applicableStates": "ANY running state",
+      "minimumRequiredEvidence": "VFD trip code/status",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-007",
+      "name": "Torque-Current Relationship Abnormal",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "Motor/VFD measurement chain",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "torque-current residual",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-LOAD-008",
+      "name": "Electrical Load Imbalance / Phase Issue (if available)",
+      "family": "DRIVE_LOAD",
+      "primaryLocation": "Motor supply",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "phase current/voltage",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-001",
+      "name": "Motor Bearing Temperature High",
+      "family": "MECHANICAL",
+      "primaryLocation": "Motor DE/NDE bearing",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "bearing temp baseline",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-002",
+      "name": "Gearbox Oil Temperature High",
+      "family": "MECHANICAL",
+      "primaryLocation": "Gearbox oil",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "oil temp baseline",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-003",
+      "name": "Gearbox Bearing Temperature High",
+      "family": "MECHANICAL",
+      "primaryLocation": "Gearbox bearing",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "bearing temp baseline",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-004",
+      "name": "General Motor Vibration High",
+      "family": "MECHANICAL",
+      "primaryLocation": "Motor bearing housing",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "overall vibration",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-005",
+      "name": "General Gearbox Vibration High",
+      "family": "MECHANICAL",
+      "primaryLocation": "Gearbox housing",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "overall vibration",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-006",
+      "name": "Mechanical Drag / Resistance Suspicion",
+      "family": "MECHANICAL",
+      "primaryLocation": "Drive train / screws",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "torque/current high with weak pressure relationship",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-007",
+      "name": "Lubrication Abnormality Suspicion",
+      "family": "MECHANICAL",
+      "primaryLocation": "Gearbox/bearings",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "oil/bearing temp, vibration trend",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-MECH-008",
+      "name": "Coupling / Transmission Abnormality Suspicion",
+      "family": "MECHANICAL",
+      "primaryLocation": "Motor-coupling-gearbox",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "speed/load/vibration/temp",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-001",
+      "name": "Sensor Communication Loss",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Any source/tag",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "update/timeout",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-002",
+      "name": "Stale / Frozen Signal",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Any analog/process signal",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "flatline + context changes",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-003",
+      "name": "Sensor Spike / Impulsive Outlier",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Any analog sensor",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "spike detector/ROC",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-004",
+      "name": "Sensor Drift Suspicion",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Any sensor",
+      "applicableStates": "STEADY/long term",
+      "minimumRequiredEvidence": "slow residual vs independent evidence",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-005",
+      "name": "Sensor Offset / Calibration Error",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Any sensor",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "persistent bias vs reference",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-006",
+      "name": "Scaling / Engineering Unit Error",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Analog/tag mapping",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "range/plausibility/cross-sensor",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-007",
+      "name": "Tag Mapping / Channel Mismatch",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "PLC/BLACKGATE mapping",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "cross-location contradiction",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-008",
+      "name": "RTD / Temperature Sensor Open-Short",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Temperature channel",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "instrument diagnostics/out-of-range",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-009",
+      "name": "Pressure Transmitter / Port Problem",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Pressure sensor/tap",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "pressure plausibility/flatline/drift",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-010",
+      "name": "RPM Pulse Dropout / Speed Sensor Fault",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Speed sensor",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "pulse integrity vs VFD/run",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-011",
+      "name": "Vibration Sensor Disconnected / Saturated",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Vibration channel",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "sensor health/saturation",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-012",
+      "name": "Timestamp / Time Synchronization Error",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Data pipeline",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "timestamp monotonicity/offset",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-013",
+      "name": "Data Dropout / Excess Missing Samples",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Data pipeline",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "missing %",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-INST-014",
+      "name": "Data Quality Conflict / Contradictory Measurements",
+      "family": "INSTRUMENTATION",
+      "primaryLocation": "Any correlated measurement set",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "cross-sensor residual",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-001",
+      "name": "Temperature Loop Oscillation",
+      "family": "CONTROL",
+      "primaryLocation": "Zone temperature loop",
+      "applicableStates": "WARM_UP, STEADY",
+      "minimumRequiredEvidence": "actual/SP/output oscillation",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-002",
+      "name": "Temperature Setpoint Tracking Failure",
+      "family": "CONTROL",
+      "primaryLocation": "Zone loop",
+      "applicableStates": "READY, STEADY",
+      "minimumRequiredEvidence": "actual-SP error",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-003",
+      "name": "Heater Command Without Response",
+      "family": "CONTROL",
+      "primaryLocation": "Heater output",
+      "applicableStates": "WARM_UP, STEADY",
+      "minimumRequiredEvidence": "command + temp ROC",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-004",
+      "name": "Cooling Command Without Response",
+      "family": "CONTROL",
+      "primaryLocation": "Cooling output",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "command + temp trend",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-005",
+      "name": "Control Output Saturated",
+      "family": "CONTROL",
+      "primaryLocation": "Any loop",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "output near 0/100% persistently",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-006",
+      "name": "Feeder Control Hunting",
+      "family": "CONTROL",
+      "primaryLocation": "Feeder loop",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "feed SP/actual/output oscillation",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-007",
+      "name": "Speed Control Tracking Failure",
+      "family": "CONTROL",
+      "primaryLocation": "VFD speed loop",
+      "applicableStates": "RUNNING",
+      "minimumRequiredEvidence": "speed SP/actual",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-CTRL-008",
+      "name": "Mode / Configuration Mismatch",
+      "family": "CONTROL",
+      "primaryLocation": "PLC/BLACKGATE configuration",
+      "applicableStates": "ALL",
+      "minimumRequiredEvidence": "mode/config vs actual signals",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-QUAL-001",
+      "name": "Poor Dispersion / Mixing Suspicion",
+      "family": "QUALITY",
+      "primaryLocation": "Mixing section / product",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "quality result + process features",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-QUAL-002",
+      "name": "Bubbles / Off-Gassing / Residual Volatiles",
+      "family": "QUALITY",
+      "primaryLocation": "Product / venting",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "quality/visual + vacuum/moisture",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-QUAL-003",
+      "name": "Gels / Contamination Suspicion",
+      "family": "QUALITY",
+      "primaryLocation": "Product / process",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "quality inspection",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-QUAL-004",
+      "name": "Color / Degradation Shift Suspicion",
+      "family": "QUALITY",
+      "primaryLocation": "Product",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "color/lab + melt temp/residence",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-QUAL-005",
+      "name": "Product Property Deviation",
+      "family": "QUALITY",
+      "primaryLocation": "Product/QMS",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "lab/QMS result + context",
+      "ruleVersion": "1.0"
+    },
+    {
+      "faultId": "TSE-QUAL-006",
+      "name": "Output Geometry / Strand Instability",
+      "family": "QUALITY",
+      "primaryLocation": "Die/downstream",
+      "applicableStates": "STEADY",
+      "minimumRequiredEvidence": "output/vision/operator + pressure/throughput",
+      "ruleVersion": "1.0"
+    }
+  ],
+  "patterns": [
+    {
+      "patternId": "P-001",
+      "name": "Increased Process Resistance",
+      "typicalEvidence": "Pressure HIGH + Torque HIGH + Feed STABLE + RPM STABLE",
+      "faultCandidateDirection": "Restriction / high viscosity / low melt temp candidates"
+    },
+    {
+      "patternId": "P-002",
+      "name": "Localized Screen Restriction",
+      "typicalEvidence": "Pre-screen pressure/ΔP HIGH + context stable",
+      "faultCandidateDirection": "Screen restriction candidate"
+    },
+    {
+      "patternId": "P-003",
+      "name": "Downstream / Die Restriction",
+      "typicalEvidence": "Both upstream/downstream pressure high; screen ΔP not dominant",
+      "faultCandidateDirection": "Die/adapter/downstream candidate"
+    },
+    {
+      "patternId": "P-004",
+      "name": "Feed-Driven Instability",
+      "typicalEvidence": "Feed OSCILLATING; torque/pressure follow with lag; RPM stable",
+      "faultCandidateDirection": "Feeder/control/material-flow candidates"
+    },
+    {
+      "patternId": "P-005",
+      "name": "Feed Starvation",
+      "typicalEvidence": "Feed actual LOW vs SP + torque/current/throughput fall",
+      "faultCandidateDirection": "Hopper/feeder/feed-throat candidates"
+    },
+    {
+      "patternId": "P-006",
+      "name": "High-Viscosity Behaviour",
+      "typicalEvidence": "Torque/pressure HIGH + melt temp LOW or recipe/material changed",
+      "faultCandidateDirection": "Viscosity/material/thermal candidate"
+    },
+    {
+      "patternId": "P-007",
+      "name": "Thermal Control Instability",
+      "typicalEvidence": "Zone temp oscillates at unchanged SP; output oscillates/saturates",
+      "faultCandidateDirection": "Heater/cooling/control/sensor candidate"
+    },
+    {
+      "patternId": "P-008",
+      "name": "Cooling Ineffective",
+      "typicalEvidence": "Temp rising + cooling demand high + stable feed/RPM",
+      "faultCandidateDirection": "Cooling utility/valve/flow candidate"
+    },
+    {
+      "patternId": "P-009",
+      "name": "Vacuum / Degassing Problem",
+      "typicalEvidence": "Vacuum poor + process context valid",
+      "faultCandidateDirection": "Leak/pump/blockage/flooding/volatile load candidate"
+    },
+    {
+      "patternId": "P-010",
+      "name": "Mechanical Drag",
+      "typicalEvidence": "Torque/current high + weak pressure evidence + gearbox/motor thermal/vibration evidence",
+      "faultCandidateDirection": "Drive-train/mechanical candidate"
+    },
+    {
+      "patternId": "P-011",
+      "name": "Instrumentation Suspicion",
+      "typicalEvidence": "One signal abnormal + related signals physically unchanged/contradictory",
+      "faultCandidateDirection": "Sensor/scaling/tag/port issue"
+    },
+    {
+      "patternId": "P-012",
+      "name": "Unknown Abnormal Pattern",
+      "typicalEvidence": "Strong multi-signal anomaly but no known pattern fits",
+      "faultCandidateDirection": "FAULT_UNKNOWN; engineering review"
+    }
+  ]
+}

@@ -4,7 +4,7 @@
  * This file exists to enforce one rule, which DOC-01 marks as an IMPLEMENTATION
  * RULE rather than as guidance:
  *
- *   "ULTRON must store Zone_Function as configuration data. The ML/diagnosis
+ *   "BLACKGATE must store Zone_Function as configuration data. The ML/diagnosis
  *    layer should not infer that 'Zone 4 = mixing' merely from zone number.
  *    Actual zone function comes from the validated screw/barrel layout."
  *

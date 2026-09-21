@@ -1,5 +1,5 @@
 /**
- * ULTRON DOC-05 — the decision engine.
+ * BLACKGATE DOC-05 — the decision engine.
  *
  * DOC-04 says what is wrong. DOC-05 says how serious it is, how sure we are,
  * what it affects, how urgently to respond, and what to do — five answers that
@@ -21,7 +21,7 @@ export * from './types';
 export * from './engine';
 export * from './validation';
 
-export const DOC05_DOCUMENT_REF = 'ULTRON-TSE-DOC-05';
+export const DOC05_DOCUMENT_REF = 'BLACKGATE-TSE-DOC-05';
 
 /** DOC-05 §44, the modules this layer produces. */
 export const DOC05_MODULES: readonly { module: string; responsibility: string }[] = [

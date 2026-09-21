@@ -1,0 +1,226 @@
+{
+  "documentRef": "BLACKGATE-TSE-DOC-02 v1.0",
+  "states": [
+    {
+      "stateId": "ST-00",
+      "name": "UNKNOWN",
+      "physicalMeaning": "Insufficient or contradictory context.",
+      "analyticsUse": "Do not force a diagnosis.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Whatever the candidate state required and did not get"
+      ],
+      "referenceLogic": "Returned whenever mandatory evidence is missing, unusable, or points at two states at once.",
+      "expectedBehaviour": "No claim is made about the machine.",
+      "implementationNote": "Unknown is safer than falsely applying a steady-production baseline."
+    },
+    {
+      "stateId": "ST-01",
+      "name": "STOPPED",
+      "physicalMeaning": "No intended rotation or production. The barrel may still be hot immediately after shutdown.",
+      "analyticsUse": "Static and data-quality checks.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Motor run/status",
+        "Screw RPM",
+        "Feed rate",
+        "Machine mode",
+        "Trip/interlock"
+      ],
+      "referenceLogic": "Run OFF plus screw RPM near zero plus feed zero, unless a maintenance, purge or manual state overrides.",
+      "expectedBehaviour": "RPM near zero; feed zero; torque and current off or no-load; pressure decays after process stop; temperatures may remain elevated.",
+      "implementationNote": "Do not classify hot barrel temperatures after shutdown as a process fault simply because the machine is stopped."
+    },
+    {
+      "stateId": "ST-02",
+      "name": "WARM_UP",
+      "physicalMeaning": "Barrel zones are heating toward the recipe or setpoint profile before production.",
+      "analyticsUse": "Thermal trajectory and control checks.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Zone actual temperatures",
+        "Zone setpoints",
+        "Heater outputs",
+        "Cooling outputs if active",
+        "Screw RPM",
+        "Feed"
+      ],
+      "referenceLogic": "RPM near zero plus no material feed plus one or more heating zones actively approaching setpoint.",
+      "expectedBehaviour": "Temperature rises over time; heater output active; setpoint error reduces; different zones may heat at different normal rates.",
+      "implementationNote": "DOC-03 uses a trajectory or profile baseline here, not a steady-production baseline."
+    },
+    {
+      "stateId": "ST-03",
+      "name": "READY",
+      "physicalMeaning": "Thermal and permissive conditions are satisfied but production has not started.",
+      "analyticsUse": "Readiness checks.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Zone actual and setpoint",
+        "Run permissive",
+        "Trip status",
+        "Screw RPM",
+        "Feed"
+      ],
+      "referenceLogic": "Required zones inside the configured ready band, no active trip, screw RPM near zero and feed zero.",
+      "expectedBehaviour": "Temperatures near setpoints; low temperature rate of change; no process pressure or throughput.",
+      "implementationNote": "Ready criteria are machine and recipe specific configuration fields, not universal numbers."
+    },
+    {
+      "stateId": "ST-04",
+      "name": "STARTUP",
+      "physicalMeaning": "Rotation and feed are introduced; transients are expected.",
+      "analyticsUse": "Startup envelope only.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Screw RPM",
+        "RPM setpoint",
+        "Feed rate and setpoint",
+        "Torque",
+        "Current/power",
+        "Melt pressure",
+        "Temperatures",
+        "Recipe"
+      ],
+      "referenceLogic": "Transition from READY or STOPPED into nonzero RPM and/or feed. Remains STARTUP until the defined ramp criteria are met.",
+      "expectedBehaviour": "RPM rises; feed begins; torque and current rise; pressure develops; short transients may be normal.",
+      "implementationNote": "Steady-production fault rules must not be blindly applied here."
+    },
+    {
+      "stateId": "ST-05",
+      "name": "RAMP_UP",
+      "physicalMeaning": "Producing, but feed, RPM, load and process variables are still moving toward target.",
+      "analyticsUse": "Transition and stability logic.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "RPM",
+        "Feed",
+        "Torque",
+        "Pressure",
+        "Throughput",
+        "Temperatures",
+        "Recipe/setpoints"
+      ],
+      "referenceLogic": "Production present plus context still changing, or stability criteria not yet satisfied.",
+      "expectedBehaviour": "Trend toward targets; decreasing variability as stable production is approached.",
+      "implementationNote": "The primary output is \"stable enough?\" rather than aggressive fault diagnosis."
+    },
+    {
+      "stateId": "ST-06",
+      "name": "STEADY_PRODUCTION",
+      "physicalMeaning": "Stable production under a defined machine, recipe, speed and load context.",
+      "analyticsUse": "Full analytics.",
+      "baselineLearning": true,
+      "requiredInputs": [
+        "Run state",
+        "Screw RPM",
+        "Feed",
+        "Torque",
+        "Pressure",
+        "Zone profile",
+        "Recipe/material",
+        "Throughput",
+        "Mode"
+      ],
+      "referenceLogic": "Run ON plus feed above minimum plus recipe and configuration unchanged plus RPM, feed and key process variables stable for the validated persistence window.",
+      "expectedBehaviour": "Context stable; full process relationships applicable; eligible for baseline learning only when data quality is GOOD and no anomaly, fault or limit event is active.",
+      "implementationNote": "The primary state for contextual baselines and most Part-1 diagnostics."
+    },
+    {
+      "stateId": "ST-07",
+      "name": "RECIPE_CHANGE",
+      "physicalMeaning": "Recipe, material, product or the commanded thermal/feed profile is intentionally changing.",
+      "analyticsUse": "Transition logic.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Recipe ID/material",
+        "Feed and side feed",
+        "Temperature setpoints",
+        "Product/batch",
+        "RPM target"
+      ],
+      "referenceLogic": "A change in recipe, material or product, or an explicit transition flag. Freeze old baseline learning until the new context stabilises.",
+      "expectedBehaviour": "Torque, pressure and energy can legitimately change; a new steady context must be selected or learned.",
+      "implementationNote": "A context change is not a fault."
+    },
+    {
+      "stateId": "ST-08",
+      "name": "SHUTDOWN",
+      "physicalMeaning": "Production is intentionally reduced toward zero feed and RPM.",
+      "analyticsUse": "Shutdown envelope.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Feed",
+        "RPM",
+        "Pressure",
+        "Torque/current",
+        "Shutdown command",
+        "Purge status"
+      ],
+      "referenceLogic": "Feed reduction or stop plus RPM reduction, or an explicit shutdown command.",
+      "expectedBehaviour": "Throughput, pressure and torque reduce; temperatures can remain high.",
+      "implementationNote": "Use the shutdown envelope; avoid steady-state false alarms."
+    },
+    {
+      "stateId": "ST-09",
+      "name": "FAULT_TRIP",
+      "physicalMeaning": "A protection or interlock is active.",
+      "analyticsUse": "Event capture and diagnosis.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Trip/interlock",
+        "Mode",
+        "Core state signals"
+      ],
+      "referenceLogic": "Explicit high-authority state bit. Overrides any inferred state.",
+      "expectedBehaviour": "Analytics restricted to state-appropriate checks.",
+      "implementationNote": "Prevents inappropriate baseline learning and false process diagnosis."
+    },
+    {
+      "stateId": "ST-10",
+      "name": "MAINTENANCE",
+      "physicalMeaning": "Service or manual maintenance state.",
+      "analyticsUse": "Service and data-quality checks only.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Maintenance flag",
+        "Mode",
+        "Core state signals"
+      ],
+      "referenceLogic": "Explicit high-authority state bit. Overrides any inferred state.",
+      "expectedBehaviour": "Analytics restricted to state-appropriate checks.",
+      "implementationNote": "Prevents inappropriate baseline learning and false process diagnosis."
+    },
+    {
+      "stateId": "ST-11",
+      "name": "PURGE_CLEANING",
+      "physicalMeaning": "Intentional purge or cleaning behaviour.",
+      "analyticsUse": "Dedicated rules if configured.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Purge/cleaning flag",
+        "Mode",
+        "Feed",
+        "RPM"
+      ],
+      "referenceLogic": "Explicit purge or cleaning flag.",
+      "expectedBehaviour": "Process variables follow the purge procedure rather than a production envelope.",
+      "implementationNote": "Prevents inappropriate baseline learning and false process diagnosis."
+    },
+    {
+      "stateId": "ST-12",
+      "name": "MANUAL",
+      "physicalMeaning": "Operator or manual control, which may violate automatic relationships.",
+      "analyticsUse": "Limited and context-aware.",
+      "baselineLearning": false,
+      "requiredInputs": [
+        "Operator mode",
+        "Mode",
+        "Core state signals"
+      ],
+      "referenceLogic": "Explicit manual-mode bit.",
+      "expectedBehaviour": "Automatic process relationships may not hold.",
+      "implementationNote": "Usually not eligible for baseline learning."
+    }
+  ]
+}

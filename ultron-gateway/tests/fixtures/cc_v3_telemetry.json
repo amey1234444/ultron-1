@@ -19,7 +19,7 @@
     "last_error": null
   },
   "gateway": {
-    "application": "Ultron Gateway v3",
+    "application": "BlackGATE Gateway v3",
     "listen_endpoint": "0.0.0.0:5000",
     "allowed_client_ip": "192.168.30.10",
     "expected_rack_number": "CC_Card_UID1",

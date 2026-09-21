@@ -1,0 +1,366 @@
+{
+  "documentRefs": [
+    "BLACKGATE-TSE-DOC-04 v1.0",
+    "BLACKGATE-TSE-DOC-05"
+  ],
+  "enums": {
+    "qualityVerdict": [
+      "GOOD",
+      "UNCERTAIN",
+      "BAD",
+      "MISSING"
+    ],
+    "qualityRank": {
+      "GOOD": 0,
+      "UNCERTAIN": 1,
+      "BAD": 2,
+      "MISSING": 3
+    },
+    "operatingState": [
+      "ST-00",
+      "ST-01",
+      "ST-02",
+      "ST-03",
+      "ST-04",
+      "ST-05",
+      "ST-06",
+      "ST-07",
+      "ST-08",
+      "ST-09",
+      "ST-10",
+      "ST-11",
+      "ST-12"
+    ],
+    "limitConcept": [
+      "BASELINE",
+      "ANOMALY_THRESHOLD",
+      "ALERT",
+      "DANGER",
+      "TRIP_PROTECTION"
+    ],
+    "limitConceptMeaning": {
+      "BASELINE": {
+        "meaning": "Expected healthy behaviour in a defined context.",
+        "definedBy": "DOC-03, using customer, OEM, commissioning and historical data.",
+        "interpretation": "The normal distribution for this recipe at this RPM and feed."
+      },
+      "ANOMALY_THRESHOLD": {
+        "meaning": "An analytics boundary indicating unusual behaviour.",
+        "definedBy": "BLACKGATE and DOC-03 contextual analytics.",
+        "interpretation": "Unusual against normal, but possibly still below the plant Alert."
+      },
+      "ALERT": {
+        "meaning": "An approved condition requiring attention.",
+        "definedBy": "Customer, OEM or engineering policy.",
+        "interpretation": "Investigate and plan a response."
+      },
+      "DANGER": {
+        "meaning": "An approved serious-condition threshold.",
+        "definedBy": "Customer, OEM or engineering policy.",
+        "interpretation": "Urgent response."
+      },
+      "TRIP_PROTECTION": {
+        "meaning": "A control or protection action threshold or state.",
+        "definedBy": "PLC, SIS, protection design or OEM.",
+        "interpretation": "A machine protection action. BLACKGATE recognises it and does not replace it."
+      }
+    },
+    "baselineLevel": [
+      "EXACT_CONTEXT",
+      "CONTEXT_BAND",
+      "BROADER_CONTEXT",
+      "TEMPLATE_REFERENCE",
+      "CUSTOMER_OEM_REFERENCE"
+    ],
+    "baselineLevelMeaning": {
+      "EXACT_CONTEXT": {
+        "whenUsed": "Enough healthy history exists for this exact validated context.",
+        "confidence": "Highest"
+      },
+      "CONTEXT_BAND": {
+        "whenUsed": "Exact match is sparse but a comparable context band is available.",
+        "confidence": "High / medium"
+      },
+      "BROADER_CONTEXT": {
+        "whenUsed": "Limited history; a broader recipe or configuration context is used.",
+        "confidence": "Medium"
+      },
+      "TEMPLATE_REFERENCE": {
+        "whenUsed": "Commissioning or cold start, from the machine template or variant.",
+        "confidence": "Low / medium"
+      },
+      "CUSTOMER_OEM_REFERENCE": {
+        "whenUsed": "No healthy history yet; a customer or OEM reference is used.",
+        "confidence": "Declared by the source"
+      }
+    },
+    "baselineStatusUse": {
+      "NOT_AVAILABLE": "No suitable reference exists. Use an approved fallback and report low confidence.",
+      "LEARNING": "Collecting eligible data. Not to be treated as a mature baseline.",
+      "PROVISIONAL": "Enough data for limited use but not fully validated. Analytics allowed at reduced confidence.",
+      "VALID": "Approved, mature contextual baseline. Normal use.",
+      "FROZEN": "No learning updates permitted. Use the current baseline for comparison if still applicable.",
+      "REVIEW_REQUIRED": "Drift or a configuration change demands review. Use according to policy, with a warning.",
+      "SUPERSEDED": "Replaced by a newer version but preserved. Historical replay only.",
+      "RETIRED": "No longer active or applicable. Historical only."
+    },
+    "featureFailureRule": {
+      "DENOMINATOR_ZERO": "NOT_APPLICABLE or an alternate formula. Never divide silently.",
+      "MANDATORY_INPUT_MISSING": "INSUFFICIENT_DATA.",
+      "MANDATORY_INPUT_BAD": "BAD or INSUFFICIENT_DATA according to the feature policy.",
+      "OPTIONAL_INPUT_MISSING": "Calculate only if a degraded mode is defined, and lower the output quality.",
+      "CONTEXT_UNKNOWN": "Use an approved fallback only and reduce confidence; otherwise INSUFFICIENT_CONTEXT.",
+      "BASELINE_NOT_AVAILABLE": "Use the approved fallback hierarchy and disclose the level and confidence.",
+      "TIMESTAMP_INVALID_FOR_ROC": "Rate of change is invalid. Never fabricate a time delta."
+    },
+    "faultFamily": [
+      "FEEDING",
+      "PROCESS",
+      "THERMAL",
+      "VENTING",
+      "DOWNSTREAM",
+      "DRIVE_LOAD",
+      "MECHANICAL",
+      "INSTRUMENTATION",
+      "CONTROL",
+      "QUALITY"
+    ],
+    "faultFamilyScope": {
+      "FEEDING": "Main feeder, side feeder, hopper, feed throat.",
+      "PROCESS": "Melting, mixing, viscosity, shear, residence, throughput.",
+      "THERMAL": "Zones, heaters, cooling, melt temperature.",
+      "VENTING": "Vents, vacuum pump, devolatilisation.",
+      "DOWNSTREAM": "Screen, adapter, die, pressure path.",
+      "DRIVE_LOAD": "Motor, VFD, torque, current, power, speed.",
+      "MECHANICAL": "Motor, gearbox, coupling, basic vibration, lubrication.",
+      "INSTRUMENTATION": "Sensors, wiring, scaling, tags, communication, timestamps.",
+      "CONTROL": "Temperature, feed and speed loops and their actuators.",
+      "QUALITY": "Dispersion, bubbles, contamination, degradation, product property."
+    },
+    "anomalyGate": [
+      "DATA_QUALITY",
+      "OPERATING_STATE",
+      "CONTEXT",
+      "EXPECTED_RANGE",
+      "MAGNITUDE",
+      "RATE_OF_CHANGE",
+      "PERSISTENCE",
+      "CONTEXT_CHANGE",
+      "LIMIT_STATUS"
+    ],
+    "anomalyGateRule": {
+      "DATA_QUALITY": {
+        "question": "Is the measurement trustworthy?",
+        "behaviour": "BAD or MISSING — do not declare a physical anomaly; evaluate the instrumentation or data issue instead."
+      },
+      "OPERATING_STATE": {
+        "question": "Is this comparison valid in the present state?",
+        "behaviour": "Do not apply a steady-production baseline during startup, shutdown or warm-up."
+      },
+      "CONTEXT": {
+        "question": "Are recipe, RPM, feed and relevant configuration known?",
+        "behaviour": "Select the matching baseline; otherwise use an approved fallback at lower confidence."
+      },
+      "EXPECTED_RANGE": {
+        "question": "Is the value outside healthy contextual behaviour?",
+        "behaviour": "Use the baseline envelope — percentiles, model residual or the configured anomaly boundary."
+      },
+      "MAGNITUDE": {
+        "question": "How far from expected?",
+        "behaviour": "Store absolute and percent deviation. Do not rely on absolute value alone."
+      },
+      "RATE_OF_CHANGE": {
+        "question": "Is the value changing faster than normal?",
+        "behaviour": "A fast rate of change can be anomalous before the level reaches any high limit."
+      },
+      "PERSISTENCE": {
+        "question": "Does the deviation last long enough to be meaningful?",
+        "behaviour": "A sustained condition is stronger evidence than a single noisy sample."
+      },
+      "CONTEXT_CHANGE": {
+        "question": "Did feed, RPM, recipe or setpoint intentionally change?",
+        "behaviour": "If the response is physically expected, classify as EXPECTED_PROCESS_RESPONSE rather than an anomaly."
+      },
+      "LIMIT_STATUS": {
+        "question": "Has an Alert, Danger or Trip been reached?",
+        "behaviour": "Keep this separate from anomaly status and pass it to DOC-05."
+      }
+    },
+    "evidenceClass": [
+      "REQUIRED",
+      "SUPPORTING",
+      "CONTRADICTORY",
+      "MISSING",
+      "NOT_APPLICABLE"
+    ],
+    "evidenceBehaviour": {
+      "REQUIRED": "Minimum evidence for the standard rule. Missing or BAD yields INSUFFICIENT_EVIDENCE unless a validated degraded mode exists.",
+      "SUPPORTING": "Strengthens the hypothesis. Used by DOC-05 for confidence.",
+      "CONTRADICTORY": "Supports another explanation. Alternatives are kept; the contradiction is never hidden.",
+      "MISSING": "Useful evidence is unavailable. Returned explicitly in the diagnosis.",
+      "NOT_APPLICABLE": "The equipment or sensor is not fitted. Disable the rule or use the relevant variant."
+    },
+    "diagnosisLevel": [
+      "L1_ANOMALY",
+      "L2_PATTERN",
+      "L3_PROBLEM",
+      "L4_LOCATION",
+      "L5_FAULT",
+      "L6_ROOT_CAUSE"
+    ],
+    "diagnosisState": [
+      "NOT_EVALUATED",
+      "NOT_DETECTED",
+      "POSSIBLE",
+      "SUSPECTED",
+      "PROBABLE",
+      "INSUFFICIENT_EVIDENCE",
+      "FAULT_UNKNOWN"
+    ],
+    "diagnosisStateMeaning": {
+      "NOT_EVALUATED": "The rule does not apply in the current state or configuration.",
+      "NOT_DETECTED": "Valid evidence was evaluated and the pattern is absent.",
+      "POSSIBLE": "Some evidence is present but incomplete or ambiguous.",
+      "SUSPECTED": "Meaningful multi-signal evidence supports the candidate.",
+      "PROBABLE": "Strong consistent evidence. The numeric confidence still belongs to DOC-05.",
+      "INSUFFICIENT_EVIDENCE": "Required data is missing or BAD.",
+      "FAULT_UNKNOWN": "An anomaly is confirmed but no known fault fits safely."
+    },
+    "severity": [
+      "NORMAL",
+      "ALERT",
+      "DANGER"
+    ],
+    "severityMeaning": {
+      "NORMAL": "No approved Alert or Danger condition, and nothing requiring elevated physical severity. An anomaly may still exist as an early advisory.",
+      "ALERT": "Requires attention, investigation, trending, or planned or current-shift intervention.",
+      "DANGER": "Serious condition requiring urgent verification, intervention or escalation under approved procedure."
+    },
+    "limitAuthority": [
+      "SAFETY_TRIP",
+      "CUSTOMER_DANGER",
+      "CUSTOMER_ALERT",
+      "OEM_ENGINEERING",
+      "ULTRON_LEARNED"
+    ],
+    "authoritySeverityFloor": {
+      "SAFETY_TRIP": "DANGER",
+      "CUSTOMER_DANGER": "DANGER",
+      "CUSTOMER_ALERT": "ALERT",
+      "OEM_ENGINEERING": "ALERT",
+      "ULTRON_LEARNED": "NORMAL"
+    },
+    "progression": [
+      "EARLY",
+      "DEVELOPING",
+      "ADVANCED",
+      "SEVERE"
+    ],
+    "progressionMeaning": {
+      "EARLY": "Small but persistent abnormal departure; near the anomaly boundary, no approved Alert.",
+      "DEVELOPING": "Clear sustained deterioration; deviation and persistence increasing.",
+      "ADVANCED": "Large deviation or strong fault pattern; multiple related features abnormal.",
+      "SEVERE": "Near or at serious engineering or approved limits; rapid deterioration or high consequence."
+    },
+    "confidenceLevel": [
+      "LOW",
+      "MEDIUM",
+      "HIGH",
+      "INSUFFICIENT_EVIDENCE"
+    ],
+    "confidenceMeaning": {
+      "LOW": "Some evidence but major uncertainty, or missing or contradictory inputs.",
+      "MEDIUM": "Reasonable evidence, but not all key evidence or localisation is available.",
+      "HIGH": "Strong required evidence, good data and context, and multi-sensor agreement.",
+      "INSUFFICIENT_EVIDENCE": "A required measurement is BAD or MISSING and no documented degraded rule exists."
+    },
+    "priority": [
+      "P1",
+      "P2",
+      "P3",
+      "P4"
+    ],
+    "priorityMeaning": {
+      "P1": {
+        "name": "IMMEDIATE",
+        "window": "Now, according to plant emergency or operating procedure."
+      },
+      "P2": {
+        "name": "URGENT",
+        "window": "Current shift or very near term, according to plant procedure."
+      },
+      "P3": {
+        "name": "PLANNED",
+        "window": "Scheduled intervention in a planned maintenance or operation window."
+      },
+      "P4": {
+        "name": "MONITOR",
+        "window": "No immediate intervention; continue trending and verify on routine basis."
+      }
+    },
+    "actionLevel": [
+      "MONITOR",
+      "VERIFY",
+      "INSPECT",
+      "PLAN_MAINTENANCE",
+      "URGENT_INTERVENTION",
+      "IMMEDIATE_ESCALATION"
+    ],
+    "actionLevelUse": {
+      "MONITOR": "Early anomaly, low impact, stable trend. Continue trend monitoring.",
+      "VERIFY": "High consequence but uncertain evidence. Check independent measurements and related process values.",
+      "INSPECT": "Fault evidence is credible and the component is accessible.",
+      "PLAN_MAINTENANCE": "Condition is stable but requires corrective work. Schedule it.",
+      "URGENT_INTERVENTION": "Alert or Danger, or a worsening high-impact fault. Act in the current shift or per plant procedure.",
+      "IMMEDIATE_ESCALATION": "Danger, protection or safety-relevant. Follow the approved emergency procedure immediately."
+    },
+    "actionStep": [
+      "CONFIRM",
+      "INSPECT",
+      "CORRECT",
+      "VERIFY",
+      "ESCALATE"
+    ],
+    "actionStepPurpose": {
+      "CONFIRM": "Verify the diagnosis and the measurement before unnecessary maintenance.",
+      "INSPECT": "Tell the team where and what to inspect.",
+      "CORRECT": "Apply the approved corrective action.",
+      "VERIFY": "Prove the condition actually improved.",
+      "ESCALATE": "Escalate when unresolved, severe, or outside local authority."
+    },
+    "mlLabelFields": [
+      {
+        "field": "Anomaly",
+        "example": "A-PRES-H"
+      },
+      {
+        "field": "Pattern",
+        "example": "P-002 LOCALIZED_SCREEN_RESTRICTION"
+      },
+      {
+        "field": "Fault ID",
+        "example": "TSE-DOWN-001"
+      },
+      {
+        "field": "Fault Label",
+        "example": "SCREEN_RESTRICTION"
+      },
+      {
+        "field": "Location",
+        "example": "DOWNSTREAM.SCREEN"
+      },
+      {
+        "field": "Root Cause",
+        "example": "SCREEN_CONTAMINATION"
+      },
+      {
+        "field": "Confirmation",
+        "example": "YES / NO / UNKNOWN"
+      },
+      {
+        "field": "Case Type",
+        "example": "REAL / SYNTHETIC / GOLDEN_TEST"
+      }
+    ]
+  }
+}

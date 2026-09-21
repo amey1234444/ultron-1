@@ -1,4 +1,4 @@
-# Ultron MQTT v1 topic tree.
+# BlackGATE MQTT v1 topic tree.
 # Identity lives in {gateway_id}/{rack_id} path segments + the payload envelope.
 # Never put the gateway IP in a topic — it belongs in the payload (gateway_ip).
 version: 1

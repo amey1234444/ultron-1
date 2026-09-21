@@ -4,12 +4,12 @@
  * This is the file that makes DOC-01's NON-OVERRIDE RULE enforceable instead of
  * aspirational:
  *
- *   "ULTRON may calculate baselines, anomalies and suggested limits, but it
+ *   "BLACKGATE may calculate baselines, anomalies and suggested limits, but it
  *    must not silently replace an approved customer, OEM, safety or protection
  *    limit. Suggested values remain separate until explicitly reviewed and
  *    approved."
  *
- * It is enforced structurally rather than by convention. An ULTRON-calculated
+ * It is enforced structurally rather than by convention. An BLACKGATE-calculated
  * number cannot enter the fact registry at all: `proposeSuggestion` returns a
  * `SuggestedLimit`, which is a different type, and the only route from a
  * suggestion to a fact is `approveSuggestion`, which demands a human approver,
@@ -255,7 +255,7 @@ function appliesIn(fact: EngineeringFact, context: FactContext): boolean {
  *
  * The authority ladder decides, not recency and not specificity: a safety or
  * protection limit outranks an approved customer limit, which outranks an OEM
- * rating, which outranks approved engineering, which outranks anything ULTRON
+ * rating, which outranks approved engineering, which outranks anything BLACKGATE
  * calculated. `outranked` is returned rather than discarded so a UI can show an
  * engineer that a lower-authority value exists and is being deferred — the rule
  * is that a learned value may not *replace* an approved one, not that it must
@@ -297,7 +297,7 @@ export function resolveGoverningFact(
 /* The non-override boundary -------------------------------------------------- */
 
 /**
- * A value ULTRON worked out for itself.
+ * A value BLACKGATE worked out for itself.
  *
  * Deliberately not an `EngineeringFact`. The type difference is the enforcement
  * mechanism: no function accepts a `SuggestedLimit` where a fact is expected,
@@ -361,7 +361,7 @@ export class ApprovalError extends Error {}
  * construction. It demands a named approver, a document reference and an
  * authority other than ULTRON_ANALYTICS, because "explicitly reviewed and
  * approved" in DOC-01 §17 means a person took responsibility for the number.
- * Approving a suggestion back into ULTRON's own authority would be a no-op
+ * Approving a suggestion back into BLACKGATE's own authority would be a no-op
  * dressed as governance, so it is refused.
  */
 export function approveSuggestion(
@@ -410,7 +410,7 @@ export function approveSuggestion(
     version: approval.version,
     effectiveFrom: approval.effectiveFrom ?? approval.approvedOn,
     authoritativeSource: approval.source,
-    whyCaptured: `Approved from ULTRON suggestion ${suggestion.suggestionId}: ${suggestion.method}`,
+    whyCaptured: `Approved from BLACKGATE suggestion ${suggestion.suggestionId}: ${suggestion.method}`,
     knowledgeClass: MACHINE,
   };
 }

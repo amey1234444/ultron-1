@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0.0",
+  "generator": "scripts/exportKnowledge.ts",
+  "documents": {
+    "DOC-02": "BLACKGATE-TSE-DOC-02 v1.0",
+    "DOC-03": "BLACKGATE-TSE-DOC-03 v1.0",
+    "DOC-04": "BLACKGATE-TSE-DOC-04 v1.0",
+    "DOC-05": "BLACKGATE-TSE-DOC-05",
+    "DOC-07": "BLACKGATE-TSE-DOC-07"
+  },
+  "counts": {
+    "signals": 60,
+    "operatingStates": 13,
+    "formulas": 49,
+    "faults": 90,
+    "patterns": 12,
+    "anomalies": 40,
+    "tags": 36
+  },
+  "files": {
+    "signals.json": "42ef86ba5f5a779b986ac4ccea407eb403b7a09f212546872c6b32f617cc7e81",
+    "operating_states.json": "659b0b86590b0df659dafb11f4ed5676196b7fca65011c287d7a5012bc02920e",
+    "formulas.json": "652fe9153894a213946f6fe7409567a4c11b7a3c6400cb049bcc57c7a1ec8fc7",
+    "faults.json": "7849210ccdd77927aaf43b693c1cf943a74807dd62a232f331d810934d26a246",
+    "anomalies.json": "e3e49250b6c2ee5af289041aee4bb5fa857749ba3cb4df9c3e3f8763337d8283",
+    "tags.json": "470713e372d132a0f5614a727fa738405b526dd8b9469ca8c06cb2062315ea15",
+    "enums.json": "4e88417bc4002b7e8ea2a39d560d3aad77b74bc4874290027f1c6c2aad009cad",
+    "commissioning.json": "f22c1d828eed344a469a0ed96cacc5754c90e21b9288f3b214962ce915a859a6"
+  }
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "ultron.common.envelope/1.1",
-  "title": "Ultron common message envelope v1.1",
+  "title": "BlackGATE common message envelope v1.1",
   "type": "object",
   "required": [
     "schema",

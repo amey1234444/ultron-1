@@ -1,0 +1,230 @@
+{
+  "library": "xgboost",
+  "outputs": {
+    "TSE-DOWN-003@15": {
+      "file": "TSE-DOWN-003_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9955360952052345,
+        "intercept": -2.2532623146589237,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.25040082781373013,
+          "brier_after": 0.08616780045351474
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 160,
+      "metrics": {
+        "aucpr": 0.09523809523809523,
+        "logloss": 0.6939488252003988,
+        "best_iteration": 74.0
+      }
+    },
+    "TSE-DOWN-003@30": {
+      "file": "TSE-DOWN-003_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9955360952052345,
+        "intercept": -2.2532623146589237,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.25040082781373013,
+          "brier_after": 0.08616780045351474
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 160,
+      "metrics": {
+        "aucpr": 0.09523809523809523,
+        "logloss": 0.6939488252003988,
+        "best_iteration": 74.0
+      }
+    },
+    "TSE-DOWN-003@5": {
+      "file": "TSE-DOWN-003_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9687849483838709,
+        "intercept": -3.005769670776249,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 20,
+        "metrics": {
+          "brier_before": 0.25235020471639774,
+          "brier_after": 0.045351473922902494
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 80,
+      "metrics": {
+        "aucpr": 0.04761904761904762,
+        "logloss": 0.6978476388113839,
+        "best_iteration": 69.0
+      }
+    },
+    "TSE-FEED-002@15": {
+      "file": "TSE-FEED-002_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.997883239269699,
+        "intercept": -2.252225848661856,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.2501894896740289,
+          "brier_after": 0.08616780045351474
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 160,
+      "metrics": {
+        "aucpr": 0.09523809523809523,
+        "logloss": 0.6935261715026129,
+        "best_iteration": 3.0
+      }
+    },
+    "TSE-FEED-002@30": {
+      "file": "TSE-FEED-002_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.997883239269699,
+        "intercept": -2.252225848661856,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.2501894896740289,
+          "brier_after": 0.08616780045351474
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 160,
+      "metrics": {
+        "aucpr": 0.09523809523809523,
+        "logloss": 0.6935261715026129,
+        "best_iteration": 3.0
+      }
+    },
+    "TSE-FEED-002@5": {
+      "file": "TSE-FEED-002_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.0196909686020235,
+        "intercept": -2.9890201349952084,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 20,
+        "metrics": {
+          "brier_before": 0.2485138095988064,
+          "brier_after": 0.045351473922902494
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 80,
+      "metrics": {
+        "aucpr": 0.04761904761904762,
+        "logloss": 0.6901748095239911,
+        "best_iteration": 107.0
+      }
+    },
+    "TSE-THERM-012@15": {
+      "file": "TSE-THERM-012_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9964002857887897,
+        "intercept": -2.2528839283463,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.2503235403192982,
+          "brier_after": 0.08616780045351474
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 160,
+      "metrics": {
+        "aucpr": 0.09523809523809523,
+        "logloss": 0.693794241973332,
+        "best_iteration": 33.0
+      }
+    },
+    "TSE-THERM-012@30": {
+      "file": "TSE-THERM-012_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9964002857887897,
+        "intercept": -2.2528839283463,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.2503235403192982,
+          "brier_after": 0.08616780045351474
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 160,
+      "metrics": {
+        "aucpr": 0.09523809523809523,
+        "logloss": 0.693794241973332,
+        "best_iteration": 33.0
+      }
+    },
+    "TSE-THERM-012@5": {
+      "file": "TSE-THERM-012_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.002116248594409,
+        "intercept": -2.995025777823149,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 420,
+        "positive_count": 20,
+        "metrics": {
+          "brier_before": 0.24984056593308643,
+          "brier_after": 0.045351473922902494
+        }
+      },
+      "positive_events": 6,
+      "positive_samples": 80,
+      "metrics": {
+        "aucpr": 0.04761904761904762,
+        "logloss": 0.6928283118066334,
+        "best_iteration": 33.0
+      }
+    }
+  }
+}

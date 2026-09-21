@@ -2,7 +2,7 @@
  * The DOC-02 §23–§25 limit and authority registry.
  *
  * §23 and §24 restate DOC-01 §17 — the authority ladder, the value types, the
- * rule that ULTRON analytics never displaces an approved plant value — and that
+ * rule that BLACKGATE analytics never displaces an approved plant value — and that
  * part is already implemented in `lib/knowledge/tse/engineeringFacts.ts`. This
  * file adds what DOC-02 brings that DOC-01 did not: §24's explicit separation
  * of the five concepts, and §25's persistence and hysteresis fields.
@@ -37,7 +37,7 @@ export const LIMIT_CONCEPT: Record<
   },
   ANOMALY_THRESHOLD: {
     meaning: 'An analytics boundary indicating unusual behaviour.',
-    definedBy: 'ULTRON and DOC-03 contextual analytics.',
+    definedBy: 'BLACKGATE and DOC-03 contextual analytics.',
     interpretation: 'Unusual against normal, but possibly still below the plant Alert.',
   },
   ALERT: {
@@ -53,7 +53,7 @@ export const LIMIT_CONCEPT: Record<
   TRIP_PROTECTION: {
     meaning: 'A control or protection action threshold or state.',
     definedBy: 'PLC, SIS, protection design or OEM.',
-    interpretation: 'A machine protection action. ULTRON recognises it and does not replace it.',
+    interpretation: 'A machine protection action. BLACKGATE recognises it and does not replace it.',
   },
 };
 

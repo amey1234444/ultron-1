@@ -199,10 +199,10 @@ check(
 console.log('\n--- §29/§32: actions and their authority ---');
 const tripped = recommend({ severity: 'DANGER', confidence: 'HIGH', priority: 'P1', tripActive: true, instrumentationSuspect: false, location: 'Z' });
 check('a trip directs to the approved procedure', tripped.level === 'IMMEDIATE_ESCALATION');
-check('and is marked as an approved procedure, not an ULTRON suggestion', tripped.authority === 'APPROVED_PROCEDURE');
-check('and says ULTRON does not replace protection', tripped.text.includes('does not replace'));
+check('and is marked as an approved procedure, not an BLACKGATE suggestion', tripped.authority === 'APPROVED_PROCEDURE');
+check('and says BLACKGATE does not replace protection', tripped.text.includes('does not replace'));
 check(
-  'an ordinary recommendation is marked as ULTRON advice',
+  'an ordinary recommendation is marked as BLACKGATE advice',
   recommend({ severity: 'ALERT', confidence: 'HIGH', priority: 'P2', tripActive: false, instrumentationSuspect: false, location: 'Z' })
     .authority === 'ULTRON_RECOMMENDATION',
 );

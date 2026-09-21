@@ -1,4 +1,4 @@
-"""Ultron Gateway v3 CC-card telemetry -> canonical rack model.
+"""BlackGATE Gateway v3 CC-card telemetry -> canonical rack model.
 
 v3 emits one normalized JSON snapshot per DAQ frame: a `cc_gateway_communication`
 block describing the CC link, a `rack_number`, and a flat `channels` list holding

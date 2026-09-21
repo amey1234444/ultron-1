@@ -1,0 +1,28 @@
+{
+  "strategy": "chronological",
+  "boundaries": {
+    "train_end": "2026-01-01T02:09:57.000Z",
+    "valid_start": "2026-01-01T02:49:57.000Z",
+    "valid_end": "2026-01-01T03:09:56.000Z",
+    "test_start": "2026-01-01T03:49:56.000Z",
+    "gap_seconds": 2400.0
+  },
+  "event_assignment": {
+    "EV-SC-SCREEN-RESTRICTION-1": "train",
+    "EV-SC-DIE-RESTRICTION-2": "excluded",
+    "EV-SC-FEED-INSTABILITY-3": "excluded"
+  },
+  "holdout_machines": [],
+  "holdout_recipes": [],
+  "counts": {
+    "train": 420,
+    "valid": 60,
+    "test": 0,
+    "excluded": 240
+  },
+  "excluded_count": 240,
+  "notes": [
+    "The train/valid boundary fell inside event EV-SC-DIE-RESTRICTION-2 (TSE-DOWN-003); moved to before its onset at 2026-01-01T02:09:58.000Z.",
+    "The valid/test boundary fell inside event EV-SC-FEED-INSTABILITY-3 (TSE-FEED-002); moved to before its onset at 2026-01-01T03:09:57.000Z."
+  ]
+}

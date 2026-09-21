@@ -76,6 +76,8 @@
     "check:doc04": "npx --yes esbuild lib/knowledge/doc04/__checks__/doc04Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc04Checks.cjs && node node_modules/.cache/doc04Checks.cjs",
     "check:tse-pipeline": "npx --yes esbuild lib/knowledge/tse/__checks__/pipelineChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/tsePipelineChecks.cjs && node node_modules/.cache/tsePipelineChecks.cjs",
     "check:doc06": "npx --yes esbuild lib/knowledge/doc06/__checks__/doc06Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc06Checks.cjs && node node_modules/.cache/doc06Checks.cjs",
+    "export:knowledge": "npx --yes esbuild scripts/exportKnowledge.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/exportKnowledge.cjs && node node_modules/.cache/exportKnowledge.cjs write",
+    "check:knowledge-export": "npx --yes esbuild scripts/exportKnowledge.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/exportKnowledge.cjs && node node_modules/.cache/exportKnowledge.cjs check",
     "check:doc05": "npx --yes esbuild lib/knowledge/doc05/__checks__/doc05Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc05Checks.cjs && node node_modules/.cache/doc05Checks.cjs"
   },
   "private": true

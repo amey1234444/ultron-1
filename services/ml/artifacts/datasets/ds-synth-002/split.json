@@ -1,0 +1,46 @@
+{
+  "strategy": "chronological",
+  "boundaries": {
+    "train_end": "2026-01-01T20:29:25.000Z",
+    "valid_start": "2026-01-01T21:09:25.000Z",
+    "valid_end": "2026-01-02T01:14:20.000Z",
+    "test_start": "2026-01-02T01:54:20.000Z",
+    "gap_seconds": 2400.0
+  },
+  "event_assignment": {
+    "EV-SC-SCREEN-RESTRICTION-1": "train",
+    "EV-SC-DIE-RESTRICTION-2": "train",
+    "EV-SC-FEED-INSTABILITY-3": "train",
+    "EV-SC-COOLING-FAILURE-4": "train",
+    "EV-SC-SCREEN-RESTRICTION-6": "train",
+    "EV-SC-DIE-RESTRICTION-7": "train",
+    "EV-SC-FEED-INSTABILITY-8": "train",
+    "EV-SC-COOLING-FAILURE-9": "train",
+    "EV-SC-SCREEN-RESTRICTION-11": "train",
+    "EV-SC-DIE-RESTRICTION-12": "train",
+    "EV-SC-FEED-INSTABILITY-13": "train",
+    "EV-SC-COOLING-FAILURE-14": "train",
+    "EV-SC-SCREEN-RESTRICTION-16": "train",
+    "EV-SC-DIE-RESTRICTION-17": "train",
+    "EV-SC-FEED-INSTABILITY-18": "train",
+    "EV-SC-COOLING-FAILURE-19": "train",
+    "EV-SC-SCREEN-RESTRICTION-21": "valid",
+    "EV-SC-DIE-RESTRICTION-22": "valid",
+    "EV-SC-FEED-INSTABILITY-23": "valid",
+    "EV-SC-COOLING-FAILURE-24": "valid",
+    "EV-SC-SCREEN-RESTRICTION-26": "test",
+    "EV-SC-DIE-RESTRICTION-27": "test",
+    "EV-SC-FEED-INSTABILITY-28": "test",
+    "EV-SC-COOLING-FAILURE-29": "test"
+  },
+  "holdout_machines": [],
+  "holdout_recipes": [],
+  "counts": {
+    "train": 2520,
+    "valid": 500,
+    "test": 480,
+    "excluded": 100
+  },
+  "excluded_count": 100,
+  "notes": []
+}

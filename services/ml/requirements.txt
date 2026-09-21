@@ -1,0 +1,54 @@
+# Pinned to compatible ranges rather than exact versions.
+#
+# Exact pins on a stack this size produce an install nobody can resolve within
+# a year; ranges with an upper bound on the major version keep it installable
+# while refusing the breaking change. The lock for a given deployment belongs
+# in that deployment, not here.
+#
+# Install profiles:
+#
+#   pip install -e .                 the deterministic chain, Golden suite and
+#                                    dataset builder. No heavy dependencies.
+#   pip install -e ".[api]"          adds the HTTP surface.
+#   pip install -e ".[all]"          adds models, explanations, data and cache.
+#
+# This file is the "everything" profile, for a training host.
+
+# -- core, always required --------------------------------------------------
+pydantic>=2.8,<3
+numpy>=1.26,<3
+pyyaml>=6.0,<7
+
+# -- HTTP surface -----------------------------------------------------------
+fastapi>=0.111,<1
+uvicorn[standard]>=0.30,<1
+httpx>=0.27,<1
+
+# -- models -----------------------------------------------------------------
+# TensorFlow is the single largest dependency here and the one most likely to
+# fail to install on a given platform. Every import of it in this service is
+# lazy and guarded, so a deployment that cannot install it still serves the
+# deterministic chain — see app/core/capability.py.
+tensorflow>=2.16,<3
+lightgbm>=4.3,<5
+xgboost>=2.0,<3
+scikit-learn>=1.4,<2
+scipy>=1.11,<2
+joblib>=1.3,<2
+
+# -- explanations -----------------------------------------------------------
+# The serving path uses each booster's own exact tree SHAP, which needs no
+# extra package. This is for offline analysis and the ablation report.
+shap>=0.45,<1
+
+# -- data -------------------------------------------------------------------
+pandas>=2.2,<3
+pyarrow>=15,<22
+
+# -- optional infrastructure ------------------------------------------------
+redis>=5.0,<6
+
+# -- development ------------------------------------------------------------
+pytest>=7.4,<9
+pytest-cov>=4.1,<6
+ruff>=0.4,<1

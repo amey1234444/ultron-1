@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "ultron.event.fault/1.1",
-  "title": "Ultron fault event v1.1",
+  "title": "BlackGATE fault event v1.1",
   "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
   "properties": {
     "schema": { "const": "ultron.event.fault" },

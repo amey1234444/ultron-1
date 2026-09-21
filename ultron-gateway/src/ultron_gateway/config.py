@@ -104,7 +104,7 @@ class Config:
         default_factory=lambda: os.environ.get("MQTT_PUBLISH_LATEST_TELEMETRY", "1") != "0"
     )
 
-    # Data source: the simulator (Colab/dev) or Ultron Gateway v3 CC telemetry
+    # Data source: the simulator (Colab/dev) or BlackGATE Gateway v3 CC telemetry
     # (Raspberry Pi). v3 writes latest_telemetry.json and can stream frames over
     # TCP; CC_V3_TCP_HOST/PORT selects the stream, otherwise the file is polled.
     data_source: str = field(default_factory=lambda: os.environ.get("DATA_SOURCE", "simulator").strip().lower())

@@ -1,5 +1,5 @@
 /**
- * ULTRON DOC-06 — verification and ML dataset architecture.
+ * BLACKGATE DOC-06 — verification and ML dataset architecture.
  *
  * DOC-06 is a test specification, so it is implemented in two halves. The
  * specification itself is `testSpec.ts`; the cases that actually execute
@@ -20,7 +20,7 @@
 
 export * from './testSpec';
 
-export const DOC06_DOCUMENT_REF = 'ULTRON-TSE-DOC-06';
+export const DOC06_DOCUMENT_REF = 'BLACKGATE-TSE-DOC-06';
 
 /** Parts of DOC-06 that cannot be implemented yet, and why. */
 export const DOC06_UNIMPLEMENTED: readonly { section: string; reason: string }[] = [

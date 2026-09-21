@@ -207,7 +207,7 @@ export function runDoc02Validation(input: Doc02ValidationInput = {}): Doc02Check
   add(
     'D2-12',
     'Canonical tags',
-    'Stable ULTRON tags assigned and source lineage preserved.',
+    'Stable BLACKGATE tags assigned and source lineage preserved.',
     taggedSignals === DOC02_SIGNAL_MASTER.length ? 'PASS' : 'FAIL',
     `${taggedSignals} of ${DOC02_SIGNAL_MASTER.length} master signals carry a composed §29 canonical tag. Lineage back to a source tag requires the mappings in D2-04.`,
   );

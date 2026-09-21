@@ -1,5 +1,5 @@
 /**
- * ULTRON DOC-04 — anomaly, pattern and fault diagnosis, as code.
+ * BLACKGATE DOC-04 — anomaly, pattern and fault diagnosis, as code.
  *
  * DOC-04 §22 names the modules this layer produces. They are:
  *
@@ -12,7 +12,7 @@
  *   Causal / Multi-Fault      engine.ts   §19
  *   Diagnosis Object          engine.ts   §21
  *
- * DOC-04 is complete, in its own words, "when ULTRON can explain why a
+ * DOC-04 is complete, in its own words, "when BLACKGATE can explain why a
  * parameter is considered anomalous, can distinguish an expected operating
  * response from a real abnormal pattern, can compare competing fault
  * explanations, and can return a structured WHAT/WHERE/WHY diagnosis without
@@ -31,7 +31,7 @@ export * from './faults';
 export * from './engine';
 export * from './validation';
 
-export const DOC04_DOCUMENT_REF = 'ULTRON-TSE-DOC-04 v1.0';
+export const DOC04_DOCUMENT_REF = 'BLACKGATE-TSE-DOC-04 v1.0';
 
 /** DOC-04 §23, the ML label set this layer emits. */
 export const ML_LABEL_FIELDS: readonly { field: string; example: string }[] = [

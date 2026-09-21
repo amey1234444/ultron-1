@@ -1,5 +1,5 @@
 /**
- * ULTRON DOC-02 types — operations, sensors and data requirements.
+ * BLACKGATE DOC-02 types — operations, sensors and data requirements.
  *
  * DOC-02 answers the second question in the chain: "How is the machine
  * operating right now, what data is required to understand that operation,
@@ -58,7 +58,7 @@ export const DATA_CLASS_RULE: Record<DataClass, string> = {
 /**
  * Where a signal should preferably come from, best first (DOC-02 §17).
  *
- * The ordering is the policy: "reuse trustworthy data first". ULTRON should not
+ * The ordering is the policy: "reuse trustworthy data first". BLACKGATE should not
  * duplicate an existing reliable measurement simply because a new sensor could
  * be installed, so an independent sensor ranks *below* the plant's own
  * controller rather than above it.
@@ -85,7 +85,7 @@ export const SOURCE_USE: Record<SourceKind, string> = {
     'VFD, feeder or dedicated controller. Preferred for drive current, power and torque, feeder actual rate, and controller diagnostics.',
   MES_QMS_LAB: 'Recipe, batch, production and quality context. Not always real-time.',
   ULTRON_SENSOR:
-    'Use when data is unavailable, unreliable or too slow, when independent verification is needed, or when the measurement is core to ULTRON.',
+    'Use when data is unavailable, unreliable or too slow, when independent verification is needed, or when the measurement is core to BLACKGATE.',
   OPERATOR_ENTRY: 'Only for context that cannot be obtained automatically. Manual-entry quality is tracked.',
 };
 
@@ -124,7 +124,7 @@ export const ACQUISITION_CHARACTER: Record<AcquisitionClass, string> = {
  *
  * DOC-02 attaches a rule to this table that the type is built around: "A
  * pressure value without its physical tap location is not enough for reliable
- * diagnosis. ULTRON should store location as structured metadata, not only in
+ * diagnosis. BLACKGATE should store location as structured metadata, not only in
  * the tag name." So location is its own field on every signal, and the tag is
  * composed from it rather than being the only place it lives.
  */

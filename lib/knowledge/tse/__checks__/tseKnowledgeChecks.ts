@@ -14,7 +14,7 @@
  *
  *   §7   a zone function is never inferred from a zone number
  *   §13  a directional prior never loses its conditions
- *   §17  an ULTRON-calculated value never becomes an approved limit
+ *   §17  an BLACKGATE-calculated value never becomes an approved limit
  *   §18  a rule never believes it has a measurement the machine lacks
  *
  * Nothing is re-implemented. Every assertion imports the shipped module.
@@ -198,10 +198,10 @@ check(
 );
 
 // ---------------------------------------------------------------------------
-console.log('\n--- §17: an ULTRON value never becomes an approved limit ---');
+console.log('\n--- §17: an BLACKGATE value never becomes an approved limit ---');
 
 check(
-  'the authority ladder runs safety first and ULTRON last',
+  'the authority ladder runs safety first and BLACKGATE last',
   AUTHORITY_PRECEDENCE[0] === 'SAFETY_PROTECTION' &&
     AUTHORITY_PRECEDENCE[AUTHORITY_PRECEDENCE.length - 1] === 'ULTRON_ANALYTICS',
 );
@@ -228,7 +228,7 @@ const suggestion = proposeSuggestion({
   computedOn: '2026-09-18',
   facts: TSE_REQUIRED_FACTS,
 });
-check('a calculated value comes back under ULTRON authority', suggestion.authority === 'ULTRON_ANALYTICS');
+check('a calculated value comes back under BLACKGATE authority', suggestion.authority === 'ULTRON_ANALYTICS');
 
 // The type system is the real guard here — a SuggestedLimit is not an
 // EngineeringFact and cannot be passed where one is expected. What this check
@@ -255,7 +255,7 @@ try {
 } catch (error) {
   ultronDeclarationRejected = error instanceof ApprovalError;
 }
-check('a fact cannot be declared under ULTRON authority', ultronDeclarationRejected);
+check('a fact cannot be declared under BLACKGATE authority', ultronDeclarationRejected);
 
 let incompleteRejected = false;
 try {
@@ -293,7 +293,7 @@ const approved = approveSuggestion(suggestion, {
   version: '1.0',
 });
 check('an approved suggestion becomes a fully declared fact', isDeclared(approved));
-check('and it no longer carries ULTRON authority', approved.authority === 'APPROVED_CUSTOMER');
+check('and it no longer carries BLACKGATE authority', approved.authority === 'APPROVED_CUSTOMER');
 
 // ---------------------------------------------------------------------------
 console.log('\n--- §17: the authority ladder decides which limit governs ---');

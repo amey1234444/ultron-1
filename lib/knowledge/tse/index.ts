@@ -1,8 +1,8 @@
 /**
  * The TSE machine-knowledge layer — DOC-01 as code.
  *
- * `ULTRON-TSE-DOC-01` §21 says its knowledge "maps to explicit entities and
- * relationships in the ULTRON software model" and names ten of them. All ten
+ * `BLACKGATE-TSE-DOC-01` §21 says its knowledge "maps to explicit entities and
+ * relationships in the BLACKGATE software model" and names ten of them. All ten
  * are declared in this directory:
  *
  *   MachineTemplate         template.ts
@@ -108,7 +108,7 @@ export const TSE_TERMINOLOGY: Readonly<Record<string, string>> = {
   'Configuration version':
     'A traceable identifier for a physical or process configuration whose change may invalidate prior baselines.',
   Authority:
-    'The source priority that determines whether a value is safety, customer, OEM, engineering or ULTRON-calculated.',
+    'The source priority that determines whether a value is safety, customer, OEM, engineering or BLACKGATE-calculated.',
 };
 
 /* Handover to DOC-02 — §24 ---------------------------------------------------- */
@@ -131,6 +131,6 @@ export const DOC02_HANDOVER: readonly { doc01Output: string; doc02Builds: string
   { doc01Output: 'Configuration version', doc02Builds: 'Baseline and configuration lineage.' },
   {
     doc01Output: 'Measurement-location philosophy',
-    doc02Builds: 'The PLC/DCS reuse versus ULTRON sensor decision.',
+    doc02Builds: 'The PLC/DCS reuse versus BLACKGATE sensor decision.',
   },
 ] as const;

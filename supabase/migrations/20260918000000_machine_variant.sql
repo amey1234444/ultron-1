@@ -11,7 +11,7 @@
 -- variant", exactly as a NULL machine_zoom is a different answer from 100%.
 -- Every machine created before this column existed therefore reads as
 -- undeclared, and the console shows it as undeclared rather than assuming the
--- reference. That mirrors the rule ULTRON-TSE-DOC-01 §7 applies to zone
+-- reference. That mirrors the rule BLACKGATE-TSE-DOC-01 §7 applies to zone
 -- function: a reference is a starting point for a person to confirm, never a
 -- default the software fills in on their behalf.
 --

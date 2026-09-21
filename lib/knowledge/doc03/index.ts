@@ -1,5 +1,5 @@
 /**
- * ULTRON DOC-03 — formulas, baselines and features, as code.
+ * BLACKGATE DOC-03 — formulas, baselines and features, as code.
  *
  * DOC-03 §41 names the modules this layer produces. They are:
  *
@@ -30,7 +30,7 @@ export * from './baseline';
 export * from './feature';
 export * from './validation';
 
-export const DOC03_DOCUMENT_REF = 'ULTRON-TSE-DOC-03 v1.0';
+export const DOC03_DOCUMENT_REF = 'BLACKGATE-TSE-DOC-03 v1.0';
 
 /** DOC-03 §4, the concepts that must stay separate and who owns each. */
 export const CORE_CONCEPTS: readonly {
@@ -52,7 +52,7 @@ export const CORE_CONCEPTS: readonly {
     note: 'No silent overwrite.',
   },
   {
-    concept: 'ULTRON Baseline',
+    concept: 'BLACKGATE Baseline',
     owner: 'Commissioning, history or a validated model',
     ultronCanLearn: true,
     note: 'Learned only under the §14 eligibility rules.',

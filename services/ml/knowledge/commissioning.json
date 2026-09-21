@@ -1,0 +1,94 @@
+{
+  "fieldCalibrated": false,
+  "source": "ENGINEERING_DEVELOPMENT",
+  "notice": "Limits and baselines below are engineering-development values for a machine of this class, not measurements from this machine. No value here is field calibrated, so every finding carries reduced confidence until a site commissions its own.",
+  "stateThresholds": {
+    "zeroRpm": 5,
+    "zeroFeed": 1,
+    "minProductionFeed": 10,
+    "readyBandDegC": 8,
+    "warmUpSlopeDegCPerMin": 0.5
+  },
+  "featureBands": {
+    "deviationBand": 2,
+    "anomalyBand": 3,
+    "flatBand": 0.5
+  },
+  "templateId": "TSE-7Z-CR-INT-PAR-COMP",
+  "unboundTags": [
+    "TS-TZ8",
+    "TS-TZ9"
+  ],
+  "unboundMandatorySignals": [
+    {
+      "signalId": "D001",
+      "parameter": "Motor Run / Drive Enable",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D007",
+      "parameter": "Screw Torque",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D022",
+      "parameter": "Material / Recipe ID",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D031",
+      "parameter": "Zone 1 Temperature Setpoint",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D032",
+      "parameter": "Zone 2 Temperature Setpoint",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D033",
+      "parameter": "Zone 3 Temperature Setpoint",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D034",
+      "parameter": "Zone 4 Temperature Setpoint",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D035",
+      "parameter": "Zone 5 Temperature Setpoint",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D036",
+      "parameter": "Zone 6 Temperature Setpoint",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D037",
+      "parameter": "Zone 7 Temperature Setpoint",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D053",
+      "parameter": "Throughput / Production Rate",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D054",
+      "parameter": "Machine Mode",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D055",
+      "parameter": "Trip / Interlock Status",
+      "priority": "MANDATORY"
+    },
+    {
+      "signalId": "D060",
+      "parameter": "Machine Configuration Version",
+      "priority": "MANDATORY"
+    }
+  ]
+}

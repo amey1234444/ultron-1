@@ -1,4 +1,4 @@
-# Ultron Gateway
+# BlackGATE Gateway
 
 Python MQTT 5 gateway (Phase C of the handover). Runs identically in Google
 Colab (simulated CC/RCC input) and on the Raspberry Pi (real CC/RCC input) —
@@ -9,7 +9,7 @@ Simulator / CC v3 telemetry  →  canonical RackModel  →  Publisher  →  MQTT
 ```
 
 `DATA_SOURCE` selects the input: `simulator` (default, synthetic rack) or
-`cc_v3` (Ultron Gateway v3 CC-card telemetry, see below).
+`cc_v3` (BlackGATE Gateway v3 CC-card telemetry, see below).
 
 - Identity: permanent `gateway_id + rack_id`; `gateway_ip` is the mandatory
   network-binding field in every envelope (`envelope.py` adds it automatically).
@@ -56,7 +56,7 @@ For dashboard smoke tests, set `DATA_SOURCE=cc_v3_test_loop`. The gateway will
 publish `CC_V3_TEST_FIXTURE_PATH` repeatedly, using the checked-in tested fixture
 by default.
 
-Ultron Gateway v3 normalizes each CC/DAQ frame and rewrites
+BlackGATE Gateway v3 normalizes each CC/DAQ frame and rewrites
 `latest_telemetry.json` (or streams newline-delimited frames over TCP —
 `CC_V3_TCP_HOST`/`CC_V3_TCP_PORT`). `cc_v3.py` translates a frame into the
 canonical model:

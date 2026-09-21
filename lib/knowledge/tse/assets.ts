@@ -13,7 +13,7 @@
  * writing the hierarchy out:
  *
  *   - `DRV.VFD` — DOC-01 §9.2 calls the drive "an important existing data
- *     source" and says ULTRON should prefer trustworthy VFD values over
+ *     source" and says BLACKGATE should prefer trustworthy VFD values over
  *     duplicate sensors. No VFD data is currently mapped on this machine.
  *   - `THERM` — heater and cooling output are observables DOC-01 §9.10/§9.11
  *     name, and no heater-duty channel exists, which is why the heater-response

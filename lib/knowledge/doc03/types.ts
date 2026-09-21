@@ -1,5 +1,5 @@
 /**
- * ULTRON DOC-03 types — formulas, baselines and features.
+ * BLACKGATE DOC-03 types — formulas, baselines and features.
  *
  * DOC-03 answers the third question: "What is normal, mathematically?" It takes
  * DOC-02's validated data, state and context, computes features from them,

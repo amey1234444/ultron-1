@@ -1,4 +1,4 @@
--- Ultron MQTT ingestion schema (gateways, racks, binding, dedup, telemetry).
+-- BlackGATE MQTT ingestion schema (gateways, racks, binding, dedup, telemetry).
 -- Idempotent: safe for existing deployments; never drops or truncates data.
 
 -- Permanent gateway identity is gateway_id; current_ip is the mandatory

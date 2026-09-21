@@ -418,7 +418,7 @@ export function analyseReadings(
     machineVariant: input.variantId,
     configurationVersion: input.configurationVersion,
     operatingState: state.operatingState,
-    // No recipe reaches ULTRON on this machine; §27 says that lowers confidence
+    // No recipe reaches BLACKGATE on this machine; §27 says that lowers confidence
     // rather than being papered over.
     recipeId: null,
     screwRpm: screwSpeed,
@@ -429,7 +429,7 @@ export function analyseReadings(
   };
   const context = buildContext(contextInput);
 
-  // No recipe reaches ULTRON on this machine, so the exact-context id is null.
+  // No recipe reaches BLACKGATE on this machine, so the exact-context id is null.
   // §27 permits an approved fallback, and §12 calls it BROADER_CONTEXT — a real
   // comparison at lower confidence, rather than no comparison at all.
   const comparisonContextId = context.contextId ?? fallbackContextId(contextInput);

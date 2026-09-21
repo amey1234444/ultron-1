@@ -29,7 +29,7 @@
 import type { ChangeDirection, ExpectationStrength, Predicate, RelationshipDefinition } from './types';
 import { PREDICATE_KIND } from './types';
 
-const DOC = 'ULTRON-TSE-DOC-01 v1.0';
+const DOC = 'BLACKGATE-TSE-DOC-01 v1.0';
 const TSE = 'TSE_SPECIFIC' as const;
 const COMMON = 'COMMON' as const;
 

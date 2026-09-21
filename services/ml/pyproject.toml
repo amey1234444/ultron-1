@@ -1,0 +1,112 @@
+[project]
+name = "ultron-ml"
+version = "1.0.0"
+description = "BLACKGATE predictive diagnosis and prognosis for the twin-screw extruder"
+requires-python = ">=3.11"
+
+# The base install runs the whole deterministic chain — quality, state,
+# context, features, baselines, rules, DOC-04 resolution, DOC-05 decision — the
+# Golden suite and the dataset builder. It deliberately does not pull
+# TensorFlow, LightGBM or SHAP, because the chain must keep working in a
+# deployment where those will not install, and because a 600 MB image for a
+# service that mostly evaluates rules is a poor trade.
+dependencies = [
+    "pydantic>=2.8,<3",
+    "numpy>=1.26,<3",
+    "pyyaml>=6.0,<7",
+]
+
+[project.optional-dependencies]
+# The HTTP surface. Separated so the training commands can run on a host with
+# no web server installed.
+api = [
+    "fastapi>=0.111,<1",
+    "uvicorn[standard]>=0.30,<1",
+    "httpx>=0.27,<1",
+]
+
+# Everything needed to fit and serve models.
+models = [
+    "lightgbm>=4.3,<5",
+    "xgboost>=2.0,<3",
+    "tensorflow>=2.16,<3",
+    "scikit-learn>=1.4,<2",
+    "scipy>=1.11,<2",
+    "joblib>=1.3,<2",
+]
+
+# Explanations. Split from `models` because the booster's own exact tree SHAP
+# is what the serving path uses; the `shap` package is for offline analysis.
+explain = [
+    "shap>=0.45,<1",
+]
+
+# Dataset storage and offline analysis.
+data = [
+    "pandas>=2.2,<3",
+    "pyarrow>=15,<22",
+]
+
+# Cross-worker rolling windows and decision state.
+cache = [
+    "redis>=5.0,<6",
+]
+
+# Experiment tracking and hyperparameter search, both genuinely optional: the
+# file-backed registry covers the same ground for a single deployment.
+tracking = [
+    "mlflow>=2.12,<3",
+    "optuna>=3.6,<5",
+]
+
+dev = [
+    "pytest>=7.4,<9",
+    "pytest-cov>=4.1,<6",
+    "ruff>=0.4,<1",
+]
+
+all = [
+    "ultron-ml[api,models,explain,data,cache]",
+]
+
+[project.scripts]
+ultron-ml-api = "app.api.app:build"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+app = ["../knowledge/*.json", "../configs/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers"
+markers = [
+    "slow: replays a full scenario; minutes rather than seconds",
+    "needs_models: requires LightGBM, XGBoost or TensorFlow",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B", "C4", "SIM", "RUF"]
+ignore = [
+    # The pipeline's assembly functions genuinely have many arguments; naming
+    # them all is clearer than bundling them into an options object nobody can
+    # see the shape of.
+    "C901",
+    # Broad excepts are deliberate at every model and library boundary: a
+    # failure there must degrade the response, not raise into a request. Each
+    # one carries a noqa with its reason.
+    "BLE001",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101"]

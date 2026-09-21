@@ -37,6 +37,9 @@ import {
   type Variant,
 } from '../../ui';
 import { StatusBand, type StatusCount } from './analyzer/StatusBand';
+import { ExplanationPanel } from './ml/ExplanationPanel';
+import { PrognosisPanel } from './ml/PrognosisPanel';
+import { useMlDiagnosis } from './ml/useMlDiagnosis';
 import type { MappedChannel } from './RackOccupancyView';
 
 /**
@@ -66,7 +69,7 @@ type Props = {
   live?: LiveState;
 };
 
-type TabKey = 'diagnosis' | 'evidence' | 'signals';
+type TabKey = 'diagnosis' | 'evidence' | 'signals' | 'prognosis';
 
 function severityVariant(severity: string): Variant {
   if (severity === 'DANGER') return 'destructive';
@@ -177,6 +180,12 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
   const palette = consolePalette(isDark);
   const [tab, setTab] = useState<TabKey>('diagnosis');
 
+  // The learned layer, fetched separately and allowed to be absent. The three
+  // deterministic tabs below never wait on it and never fail because of it —
+  // which is the whole arrangement: DOC-02..DOC-05 are authoritative and
+  // compute in the browser, and the ML service is advisory and remote.
+  const ml = useMlDiagnosis(machine.id, { intervalMs: 15_000 });
+
   const result: PipelineResult = useMemo(
     () =>
       runTwinScrewPipeline({
@@ -264,6 +273,13 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
     },
   ];
 
+  // Risks that have actually crossed their decision threshold. A probability
+  // above a line with persistence unmet is not something to badge a tab with.
+  const mlRiskCount = (ml.response?.diagnoses ?? []).reduce(
+    (total, entry) => total + entry.risk.filter((horizon) => horizon.crossed).length,
+    0,
+  );
+
   const tabs: TabItem<TabKey>[] = [
     { value: 'diagnosis', label: 'Diagnosis', icon: 'stethoscope' },
     {
@@ -279,6 +295,16 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
       icon: 'access-point',
       count: badQuality.length + uncertainQuality.length || undefined,
       countVariant: badQuality.length > 0 ? 'destructive' : 'warning',
+    },
+    {
+      // A fourth tab rather than a panel inside Diagnosis. Predictive risk is
+      // a different claim from a present condition, and putting the two on one
+      // page is how an operator comes to read them as the same thing.
+      value: 'prognosis',
+      label: 'Prognosis',
+      icon: 'chart-timeline-variant',
+      count: mlRiskCount || undefined,
+      countVariant: 'info',
     },
   ];
 
@@ -480,7 +506,7 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
               <Body muted>
                 {decision.recommendation.authority === 'APPROVED_PROCEDURE'
                   ? 'This follows an approved plant procedure.'
-                  : 'This is an ULTRON recommendation. An approved plant SOP outranks it.'}
+                  : 'This is an BLACKGATE recommendation. An approved plant SOP outranks it.'}
               </Body>
             </Card>
 
@@ -819,6 +845,26 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
                 </View>
               </View>
             </Collapsible>
+          </View>
+        ) : null}
+
+        {tab === 'prognosis' ? (
+          <View className="gap-3 px-3 pb-6">
+            <PrognosisPanel response={ml.response} unavailable={ml.unavailable} />
+
+            {ml.response?.diagnoses
+              .filter((entry) => entry.risk.length > 0 || entry.shapAvailable)
+              .map((entry) => (
+                <Collapsible
+                  key={`explain-${entry.faultId}`}
+                  title={`Why — ${entry.diagnosis}`}
+                  summary={`${entry.diagnosisState} · ${entry.faultConfidence.level} fault confidence`}
+                  icon="help-circle-outline"
+                  variant="info"
+                >
+                  <ExplanationPanel diagnosis={entry} />
+                </Collapsible>
+              ))}
           </View>
         ) : null}
       </ScrollView>
