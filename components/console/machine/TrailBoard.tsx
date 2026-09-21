@@ -648,10 +648,9 @@ export function TrailBoard({
     setBoxes(incoming.boxes);
   }, [initialLayout, machineRect, machineTemplate, templateLayout]);
 
-  // The 3D machine rect is measured after the board first mounts. Re-run the
-  // saved-layout upgrade then so a complete pre-TZ09 layout can place its one
-  // restored card/trail against the real full-bleed stage, without disturbing
-  // any operator-positioned card already in the layout.
+  // The machine rect is measured after the board first mounts. Re-run the saved
+  // layout upgrade then so legacy aliases and retired template points are
+  // reconciled against the real stage without disturbing operator positioning.
   useEffect(() => {
     const current: SavedLayout = {
       trails: trailsRef.current,

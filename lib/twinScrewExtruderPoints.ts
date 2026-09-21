@@ -1,10 +1,10 @@
 /**
  * Twin-screw extruder connection points — the single source of truth.
  *
- * Coordinates are SVG user units inside the artwork's own `0 0 1648 928`
- * viewBox, never percentages or viewport units. The drawing is rendered with
- * `preserveAspectRatio="xMidYMid meet"`, so machine and points scale as one
- * object: resizing or zooming can never slide a pad off the feature it measures.
+ * Coordinates are image units inside the supplied artwork's native
+ * `0 0 1700 670` frame, never percentages or viewport units. The image and its
+ * overlay share that frame, so resizing or zooming cannot slide a pad off the
+ * feature it measures.
  *
  * Geometry and instrument metadata are kept apart on purpose. This file is the
  * only place a point's position is declared. The artwork renders one pad per
@@ -69,7 +69,7 @@ export type TwinScrewTag =
   | 'TS-TZ6'
   | 'TS-TZ7'
   | 'TS-TZ8'
-  | 'TS-TZ9'
+  | 'TS-TZ9' // legacy channel compatibility; the supplied 35-point image ends at zone 8
   | 'TS-P1' // intermediate melt pressure 1
   | 'TS-P2' // intermediate melt pressure 2
   // Devolatilisation and discharge
@@ -105,9 +105,11 @@ export type TwinScrewComponent =
 export type TwinScrewPointDefinition = {
   /** Stable id used for channel mapping. Never rendered on the drawing. */
   code: string;
+  /** Sensor id from the supplied 1700x670 reference template. */
+  referenceSensorId: TwinScrewReferenceSensorId;
   label: string;
   kind: TwinScrewPointKind;
-  /** Position in the artwork's own SVG coordinate space (1648 x 928). */
+  /** Position in the supplied artwork's native image coordinate space. */
   x: number;
   y: number;
   /** Which card column this point's trail runs out to. */
@@ -123,9 +125,60 @@ export type TwinScrewPointDefinition = {
   derivedFrom?: readonly TwinScrewTag[];
 };
 
-/** The artwork's viewBox. Anything mapping a point onto the canvas reads these. */
-export const TWIN_SCREW_ARTWORK_WIDTH = 1648;
-export const TWIN_SCREW_ARTWORK_HEIGHT = 928;
+/**
+ * Native frame and measured sensor centers from the supplied exact template.
+ *
+ * These values intentionally mirror `twin_screw_exact/TwinScrewExtruder.tsx`
+ * from `twin_screw_exact_typescript.zip`. Keeping the source ids here gives the
+ * app's semantic point codes a one-to-one, auditable mapping to every visible
+ * green marker in the reference PNG.
+ */
+export const TWIN_SCREW_ARTWORK_WIDTH = 1700;
+export const TWIN_SCREW_ARTWORK_HEIGHT = 670;
+
+export const TWIN_SCREW_REFERENCE_SENSORS = {
+  S01: { x: 821.4, y: 89.3 },
+  S02: { x: 807.5, y: 183.4 },
+  S03: { x: 796.5, y: 209.4 },
+  S04: { x: 497.5, y: 213.4 },
+  S05: { x: 1083.2, y: 215.4 },
+  S06: { x: 1335.4, y: 233.5 },
+  S07: { x: 785.8, y: 235.5 },
+  S08: { x: 1075.3, y: 241.3 },
+  S09: { x: 1067.4, y: 261.2 },
+  S10: { x: 1355.4, y: 291.3 },
+  S11: { x: 777.4, y: 307.3 },
+  S12: { x: 801.5, y: 347.4 },
+  S13: { x: 861.5, y: 347.4 },
+  S14: { x: 921.5, y: 347.4 },
+  S15: { x: 981.5, y: 347.4 },
+  S16: { x: 1107.5, y: 347.4 },
+  S17: { x: 1179.5, y: 347.4 },
+  S18: { x: 1251.5, y: 347.4 },
+  S19: { x: 1391.5, y: 347.4 },
+  S20: { x: 209.5, y: 367.3 },
+  S21: { x: 603.5, y: 369.4 },
+  S22: { x: 263.4, y: 371.1 },
+  S23: { x: 413.6, y: 375.3 },
+  S24: { x: 1429.5, y: 397.4 },
+  S25: { x: 655.4, y: 407.3 },
+  S26: { x: 357.5, y: 439.2 },
+  S27: { x: 115.6, y: 455.4 },
+  S28: { x: 655.4, y: 455.3 },
+  S29: { x: 321.6, y: 485.3 },
+  S30: { x: 915.5, y: 521.3 },
+  S31: { x: 1179.7, y: 521.1 },
+  S32: { x: 1407.5, y: 521.3 },
+  S33: { x: 1489.5, y: 521.3 },
+  S34: { x: 495.5, y: 541.4 },
+  S35: { x: 577.5, y: 575.4 },
+} as const;
+
+export type TwinScrewReferenceSensorId = keyof typeof TWIN_SCREW_REFERENCE_SENSORS;
+
+function referenceSensor(referenceSensorId: TwinScrewReferenceSensorId) {
+  return { referenceSensorId, ...TWIN_SCREW_REFERENCE_SENSORS[referenceSensorId] };
+}
 
 
 /**
@@ -158,60 +211,59 @@ const NEEDS_COMMISSIONING = {
  */
 export const TWIN_SCREW_POINT_REGISTRY: readonly TwinScrewPointDefinition[] = [
   // ---- Motor: terminal box for electrical, bearing brackets for vibration ----
-  { code: 'motor-nde-vib', label: 'Motor Non-Drive-End Vibration', kind: 'Vibration', x: 30, y: 556, side: 'left', component: 'Main Motor', analyzerTag: 'TS-V2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'motor-current-power', label: 'Motor Current / Power', kind: 'Power', x: 128, y: 449, side: 'left', component: 'Main Motor', analyzerTag: 'TS-PM1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'motor-temp', label: 'Motor Temperature', kind: 'Temperature', x: 181, y: 449, side: 'left', component: 'Main Motor', analyzerTag: 'TS-T1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'motor-de-vib', label: 'Motor Drive-End Vibration', kind: 'Vibration', x: 239, y: 520, side: 'left', component: 'Main Motor', analyzerTag: 'TS-V1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'motor-rpm', label: 'Motor Speed', kind: 'Speed', x: 258, y: 558, side: 'left', component: 'Main Motor', analyzerTag: 'TS-E1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'motor-nde-vib', ...referenceSensor('S27'), label: 'Motor Non-Drive-End Vibration', kind: 'Vibration', side: 'left', component: 'Main Motor', analyzerTag: 'TS-V2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'motor-current-power', ...referenceSensor('S20'), label: 'Motor Current / Power', kind: 'Power', side: 'left', component: 'Main Motor', analyzerTag: 'TS-PM1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'motor-temp', ...referenceSensor('S22'), label: 'Motor Temperature', kind: 'Temperature', side: 'left', component: 'Main Motor', analyzerTag: 'TS-T1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'motor-de-vib', ...referenceSensor('S29'), label: 'Motor Drive-End Vibration', kind: 'Vibration', side: 'left', component: 'Main Motor', analyzerTag: 'TS-V1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'motor-rpm', ...referenceSensor('S26'), label: 'Motor Speed', kind: 'Speed', side: 'left', component: 'Main Motor', analyzerTag: 'TS-E1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
 
   // ---- Gearbox: input and output housings stay separate measurements ----
-  { code: 'gearbox-in-vib', label: 'Gearbox Input-Side Vibration', kind: 'Vibration', x: 350, y: 468, side: 'left', component: 'Gearbox', analyzerTag: 'TS-V3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'gearbox-temp', label: 'Gearbox Temperature', kind: 'Temperature', x: 458, y: 376, side: 'left', component: 'Gearbox', analyzerTag: 'TS-T2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'gearbox-out-1-vib', label: 'Gearbox Output-1 Vibration', kind: 'Vibration', x: 532, y: 486, side: 'left', component: 'Gearbox', analyzerTag: 'TS-V4', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'gearbox-out-2-vib', label: 'Gearbox Output-2 Vibration', kind: 'Vibration', x: 532, y: 620, side: 'left', component: 'Gearbox', analyzerTag: 'TS-V5', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'thrust-bearing-temp', label: 'Thrust Bearing Temperature', kind: 'Temperature', x: 436, y: 670, side: 'left', component: 'Gearbox', analyzerTag: 'TS-T3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'gearbox-in-vib', ...referenceSensor('S23'), label: 'Gearbox Input-Side Vibration', kind: 'Vibration', side: 'left', component: 'Gearbox', analyzerTag: 'TS-V3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'gearbox-temp', ...referenceSensor('S04'), label: 'Gearbox Temperature', kind: 'Temperature', side: 'left', component: 'Gearbox', analyzerTag: 'TS-T2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'gearbox-out-1-vib', ...referenceSensor('S21'), label: 'Gearbox Output-1 Vibration', kind: 'Vibration', side: 'left', component: 'Gearbox', analyzerTag: 'TS-V4', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'gearbox-out-2-vib', ...referenceSensor('S35'), label: 'Gearbox Output-2 Vibration', kind: 'Vibration', side: 'left', component: 'Gearbox', analyzerTag: 'TS-V5', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'thrust-bearing-temp', ...referenceSensor('S34'), label: 'Thrust Bearing Temperature', kind: 'Temperature', side: 'left', component: 'Gearbox', analyzerTag: 'TS-T3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
 
   // ---- Screw speeds: two shafts, two measurements, never averaged ----
-  { code: 'screw-1-rpm', label: 'Screw A Speed', kind: 'Speed', x: 616, y: 527, side: 'left', component: 'Screw A', analyzerTag: 'TS-S1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
-  { code: 'screw-2-rpm', label: 'Screw B Speed', kind: 'Speed', x: 616, y: 578, side: 'left', component: 'Screw B', analyzerTag: 'TS-S2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'screw-1-rpm', ...referenceSensor('S25'), label: 'Screw A Speed', kind: 'Speed', side: 'left', component: 'Screw A', analyzerTag: 'TS-S1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
+  { code: 'screw-2-rpm', ...referenceSensor('S28'), label: 'Screw B Speed', kind: 'Speed', side: 'left', component: 'Screw B', analyzerTag: 'TS-S2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.drive },
 
   // ---- Feed throat and the upstream barrel zones ----
-  { code: 'feed-throat-temp', label: 'Feed Throat Temperature', kind: 'Temperature', x: 700, y: 448, side: 'left', component: 'Main Feeder', analyzerTag: 'TS-TT0', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-01', label: 'Barrel Temperature Zone 1', kind: 'Temperature', x: 768, y: 460, side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-02', label: 'Barrel Temperature Zone 2', kind: 'Temperature', x: 833, y: 460, side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-03', label: 'Barrel Temperature Zone 3', kind: 'Temperature', x: 898, y: 460, side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-04', label: 'Barrel Temperature Zone 4', kind: 'Temperature', x: 963, y: 460, side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ4', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'feed-throat-temp', ...referenceSensor('S11'), label: 'Feed Throat Temperature', kind: 'Temperature', side: 'left', component: 'Main Feeder', analyzerTag: 'TS-TT0', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-01', ...referenceSensor('S12'), label: 'Barrel Temperature Zone 1', kind: 'Temperature', side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-02', ...referenceSensor('S13'), label: 'Barrel Temperature Zone 2', kind: 'Temperature', side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-03', ...referenceSensor('S14'), label: 'Barrel Temperature Zone 3', kind: 'Temperature', side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-04', ...referenceSensor('S15'), label: 'Barrel Temperature Zone 4', kind: 'Temperature', side: 'left', component: 'Barrel Zones', analyzerTag: 'TS-TZ4', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
 
   // ---- Main hopper and its gravimetric feeder ----
-  { code: 'hopper-level', label: 'Main Hopper Level', kind: 'Level', x: 754, y: 170, side: 'right', component: 'Main Feeder', analyzerTag: 'TS-L1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
-  { code: 'main-feed-rate', label: 'Main Feeder Rate', kind: 'Flow', x: 748, y: 218, side: 'right', component: 'Main Feeder', analyzerTag: 'TS-F1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
-  { code: 'main-feed-rpm', label: 'Main Feeder Speed', kind: 'Speed', x: 741, y: 244, side: 'right', component: 'Main Feeder', analyzerTag: 'TS-N1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
-  { code: 'main-feed-current', label: 'Main Feeder Motor Current', kind: 'Current', x: 731, y: 270, side: 'right', component: 'Main Feeder', analyzerTag: 'TS-I1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
+  { code: 'hopper-level', ...referenceSensor('S01'), label: 'Main Hopper Level', kind: 'Level', side: 'right', component: 'Main Feeder', analyzerTag: 'TS-L1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
+  { code: 'main-feed-rate', ...referenceSensor('S02'), label: 'Main Feeder Rate', kind: 'Flow', side: 'right', component: 'Main Feeder', analyzerTag: 'TS-F1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
+  { code: 'main-feed-rpm', ...referenceSensor('S03'), label: 'Main Feeder Speed', kind: 'Speed', side: 'right', component: 'Main Feeder', analyzerTag: 'TS-N1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
+  { code: 'main-feed-current', ...referenceSensor('S07'), label: 'Main Feeder Motor Current', kind: 'Current', side: 'right', component: 'Main Feeder', analyzerTag: 'TS-I1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
 
   // ---- Side feeder ----
-  { code: 'side-feed-rate', label: 'Side Feeder Rate', kind: 'Flow', x: 1064, y: 338, side: 'right', component: 'Side Feeder', analyzerTag: 'TS-F2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
-  { code: 'side-feed-rpm', label: 'Side Feeder Speed', kind: 'Speed', x: 1056, y: 366, side: 'right', component: 'Side Feeder', analyzerTag: 'TS-N2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
-  { code: 'side-feed-current', label: 'Side Feeder Motor Current', kind: 'Current', x: 1068, y: 386, side: 'right', component: 'Side Feeder', analyzerTag: 'TS-I2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
+  { code: 'side-feed-rate', ...referenceSensor('S05'), label: 'Side Feeder Rate', kind: 'Flow', side: 'right', component: 'Side Feeder', analyzerTag: 'TS-F2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
+  { code: 'side-feed-rpm', ...referenceSensor('S08'), label: 'Side Feeder Speed', kind: 'Speed', side: 'right', component: 'Side Feeder', analyzerTag: 'TS-N2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
+  { code: 'side-feed-current', ...referenceSensor('S09'), label: 'Side Feeder Motor Current', kind: 'Current', side: 'right', component: 'Side Feeder', analyzerTag: 'TS-I2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.feed },
 
   // ---- Intermediate process pressure, on the barrel underside ----
-  { code: 'p-int-01', label: 'Intermediate Melt Pressure 1', kind: 'Pressure', x: 890, y: 638, side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-P1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
-  { code: 'p-int-02', label: 'Intermediate Melt Pressure 2', kind: 'Pressure', x: 1180, y: 638, side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-P2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
+  { code: 'p-int-01', ...referenceSensor('S30'), label: 'Intermediate Melt Pressure 1', kind: 'Pressure', side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-P1', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
+  { code: 'p-int-02', ...referenceSensor('S31'), label: 'Intermediate Melt Pressure 2', kind: 'Pressure', side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-P2', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
 
   // ---- Downstream barrel zones ----
-  { code: 'tz-05', label: 'Barrel Temperature Zone 5', kind: 'Temperature', x: 1102, y: 460, side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ5', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-06', label: 'Barrel Temperature Zone 6', kind: 'Temperature', x: 1163, y: 460, side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ6', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-07', label: 'Barrel Temperature Zone 7', kind: 'Temperature', x: 1224, y: 460, side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ7', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-08', label: 'Barrel Temperature Zone 8', kind: 'Temperature', x: 1285, y: 460, side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ8', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
-  { code: 'tz-09', label: 'Barrel Temperature Zone 9', kind: 'Temperature', x: 1408, y: 460, side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ9', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-05', ...referenceSensor('S16'), label: 'Barrel Temperature Zone 5', kind: 'Temperature', side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ5', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-06', ...referenceSensor('S17'), label: 'Barrel Temperature Zone 6', kind: 'Temperature', side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ6', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-07', ...referenceSensor('S18'), label: 'Barrel Temperature Zone 7', kind: 'Temperature', side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ7', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
+  { code: 'tz-08', ...referenceSensor('S19'), label: 'Barrel Temperature Zone 8', kind: 'Temperature', side: 'right', component: 'Barrel Zones', analyzerTag: 'TS-TZ8', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.barrel },
 
   // ---- Vent / devolatilisation ----
-  { code: 'vent-pressure', label: 'Vent / Vacuum Pressure', kind: 'Pressure', x: 1348, y: 338, side: 'right', component: 'Vent Section', analyzerTag: 'TS-PV', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
-  { code: 'vent-temp', label: 'Vent Zone Temperature', kind: 'Temperature', x: 1388, y: 421, side: 'right', component: 'Vent Section', analyzerTag: 'TS-TV', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
+  { code: 'vent-pressure', ...referenceSensor('S06'), label: 'Vent / Vacuum Pressure', kind: 'Pressure', side: 'right', component: 'Vent Section', analyzerTag: 'TS-PV', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
+  { code: 'vent-temp', ...referenceSensor('S10'), label: 'Vent Zone Temperature', kind: 'Temperature', side: 'right', component: 'Vent Section', analyzerTag: 'TS-TV', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
 
   // ---- Final melt and screen section ----
-  { code: 'melt-temp', label: 'Melt Temperature', kind: 'Temperature', x: 1462, y: 486, side: 'right', component: 'Die and Discharge', analyzerTag: 'TS-TM', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
-  { code: 'p-screw-in', label: 'Screen Inlet Melt Pressure', kind: 'Pressure', x: 1415, y: 638, side: 'right', component: 'Die and Discharge', analyzerTag: 'TS-P3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
-  { code: 'p-screw-out', label: 'Screen Outlet Melt Pressure', kind: 'Pressure', x: 1460, y: 638, side: 'right', component: 'Die and Discharge', analyzerTag: 'TS-P4', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
+  { code: 'melt-temp', ...referenceSensor('S24'), label: 'Melt Temperature', kind: 'Temperature', side: 'right', component: 'Die and Discharge', analyzerTag: 'TS-TM', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
+  { code: 'p-screw-in', ...referenceSensor('S32'), label: 'Screen Inlet Melt Pressure', kind: 'Pressure', side: 'right', component: 'Die and Discharge', analyzerTag: 'TS-P3', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
+  { code: 'p-screw-out', ...referenceSensor('S33'), label: 'Screen Outlet Melt Pressure', kind: 'Pressure', side: 'right', component: 'Die and Discharge', analyzerTag: 'TS-P4', modelStatus: 'integrity-only', analyzerNote: NEEDS_COMMISSIONING.process },
 ] as const;
 
 /**

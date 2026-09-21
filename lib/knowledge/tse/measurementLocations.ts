@@ -86,7 +86,6 @@ export const TSE_MEASUREMENT_LOCATIONS: readonly MeasurementLocation[] = [
       'TS-TZ6',
       'TS-TZ7',
       'TS-TZ8',
-      'TS-TZ9',
       'TS-P1',
       'TS-P2',
     ],

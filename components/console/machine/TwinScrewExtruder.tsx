@@ -1,8 +1,6 @@
-import { useMemo } from 'react';
-import { View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { G, parse } from 'react-native-svg';
+import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { G } from 'react-native-svg';
 
-import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
@@ -10,7 +8,9 @@ import {
   TWIN_SCREW_POINT_REGISTRY,
 } from '../../../lib/twinScrewExtruderPoints';
 import { MeasurementPad, padStateLabel, type MeasurementPadState } from './MeasurementPad';
-import { buildTwinScrewExtruderArtwork } from './twinScrewArtwork';
+
+/** Untouched source artwork from `twin_screw_exact_typescript.zip`. */
+const TWIN_SCREW_IMAGE = require('../../../assets/machines/twin-screw-extruder.png');
 
 type TwinScrewExtruderProps = {
   className?: string;
@@ -26,11 +26,8 @@ type TwinScrewExtruderProps = {
   connectorState?: Record<string, MeasurementPadState>;
 
   /**
-   * Draw the drawing sheet and its engineering grid.
-   *
-   * Left false on the machine canvas: the workspace already paints its own grid
-   * behind the stage, and a second grid inside the artwork would beat against
-   * it. Set true when the drawing is shown on its own.
+   * Retained for call-site compatibility. The supplied exact artwork includes
+   * its own dark sheet and engineering grid, so its background is always shown.
    */
   showBackground?: boolean;
 };
@@ -48,27 +45,15 @@ const VIEWBOX_HEIGHT = TWIN_SCREW_VIEWBOX_HEIGHT;
  *
  * The canvas snaps trail endpoints to this list and the default trail layout
  * places its cards from it, so a card can never attach to a place the artwork
- * does not actually have an instrument. The drawing renders one pad per entry
- * and never a circle of its own: the reference calls itself a marker-only
- * drawing and leaves the markers to the application for exactly this reason.
+ * does not actually have an instrument. Each entry is mapped to exactly one of
+ * the 35 marker centers supplied with the reference image.
  */
 export type TwinScrewConnector = (typeof TWIN_SCREW_POINT_REGISTRY)[number];
 
 export const TWIN_SCREW_CONNECTORS: readonly TwinScrewConnector[] = TWIN_SCREW_POINT_REGISTRY;
 
-/**
- * The sheet the machine is drawn on, per theme.
- *
- * The drawing itself is re-toned by `buildTwinScrewExtruderArtwork({ dark })`,
- * the same way the single-screw drawing swaps its palette — a light machine on
- * a dark console is a slab, whatever the artwork was drawn as.
- *
- * These two also stand in for the ground behind a pad: an idle pad is a hole
- * cut in the machine, so its centre has to be the colour the machine sits on,
- * not the colour of the console around it.
- */
-const SHEET_LIGHT = '#fbfbfa';
-const SHEET_DARK = '#0d0e10';
+/** Exact background colour of the supplied raster artwork. */
+const REFERENCE_BACKGROUND = '#080b0d';
 
 /**
  * The pad's status colour, and the ground its hollow centre is cut out of.
@@ -85,49 +70,38 @@ export function TwinScrewExtruder({
   showBackground = false,
   connectorState,
 }: TwinScrewExtruderProps) {
-  const { isDark } = useAppTheme();
-  const sheet = isDark ? SHEET_DARK : SHEET_LIGHT;
-  /**
-   * The machine, parsed once per appearance.
-   *
-   * The artwork is emitted as SVG source and turned into react-native-svg nodes
-   * here rather than being hand-transcribed into JSX. That is what keeps this
-   * template honest about being the reference drawing: there is no second copy
-   * of the geometry to drift, and the parse is exact — every gradient, pattern,
-   * clip path and lighting filter in the source comes out the other side.
-   *
-   * Two inputs can change the source — the sheet and the theme — so this is at
-   * most a handful of parses in a session, and none on a re-render that changed
-   * neither.
-   */
-  const artwork = useMemo(
-    () => parse(buildTwinScrewExtruderArtwork({ showBackground, sheet, dark: isDark })),
-    [showBackground, sheet, isDark],
-  );
-
   return (
     <View
       className={cn('w-full overflow-hidden', showBackground && 'rounded-2xl', className)}
       style={[
         {
           aspectRatio: VIEWBOX_WIDTH / VIEWBOX_HEIGHT,
-          backgroundColor: showBackground ? sheet : 'transparent',
+          backgroundColor: REFERENCE_BACKGROUND,
         },
         style,
       ]}
     >
-      <Svg width="100%" height="100%" viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}>
-        {/* The machine. Its own <svg> wrapper is discarded and its children are
-            mounted here instead, so the pads below share one coordinate space
-            with it — a pad and the feature it measures scale together at every
-            zoom, which is the whole reason the anchors are stored as fractions
-            of this viewBox. */}
-        {artwork?.children}
+      <Image
+        source={TWIN_SCREW_IMAGE}
+        resizeMode="stretch"
+        accessible
+        accessibilityLabel="Twin screw extruder machine visualization with sensor points"
+        style={StyleSheet.absoluteFill}
+      />
 
-        {/* Instrument pads. One per registry entry, and nothing else. */}
+      <Svg
+        pointerEvents="none"
+        width="100%"
+        height="100%"
+        viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}
+        preserveAspectRatio="none"
+        style={StyleSheet.absoluteFill}
+      >
+        {/* The PNG owns idle rings. Only active states are over-painted. */}
         <G>
           {TWIN_SCREW_CONNECTORS.map((point) => {
             const state = connectorState?.[point.code] ?? 'idle';
+            if (state === 'idle') return null;
             return (
               <MeasurementPad
                 key={point.code}
@@ -135,7 +109,7 @@ export function TwinScrewExtruder({
                 y={point.y}
                 state={state}
                 accent={PAD_ACCENT}
-                panel={sheet}
+                panel={REFERENCE_BACKGROUND}
                 label={`${point.label} — ${padStateLabel(state)}`}
               />
             );

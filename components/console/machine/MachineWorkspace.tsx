@@ -95,15 +95,15 @@ const ARTWORK_TEMPLATES = new Set<string>([
 /**
  * Templates whose stage is a 3D scene rather than the 2D drawing.
  *
- * Empty. The twin screw was the only entry, and it is drawn again as the
- * vendored SVG elevation in `twinScrewArtwork/` — a fixed sheet the point
- * registry places instruments on by construction, which is what
+ * Empty. The twin screw was the only entry, and it now uses the supplied exact
+ * raster template — a fixed sheet the point registry maps to by construction,
+ * which is what
  * `machineConnectors` and every saved `TrailBoard` layout address. The set is
  * kept rather than deleted so a template that genuinely needs a 3D stage has
  * somewhere to declare it.
  */
 const STAGE_3D_TEMPLATES = new Set<string>();
-// That wrapper has a `p-6` (24px) pad between it and the actual SVG artwork;
+// That wrapper has a `p-6` (24px) pad between it and the actual artwork;
 // subtract it so trail anchors line up with the drawing itself rather than the
 // padded box around it.
 const ARTWORK_PADDING = 24;

@@ -22,11 +22,11 @@
  * fallback from one to the other, because a fallback is how the rule gets
  * broken quietly.
  *
- * A second, machine-specific fact this file records: the installed machine
- * model carries nine heated barrel zones (`TS-TZ1`…`TS-TZ9`), while the DOC-01
+ * A second, machine-specific fact this file records: the supplied exact machine
+ * template carries eight heated barrel zones (`TS-TZ1`…`TS-TZ8`), while the DOC-01
  * reference variant is a seven-zone template. That mismatch is not an error —
  * it is exactly the situation §7 is written for — but it does mean the seven
- * reference roles cannot be laid onto the nine installed positions by number
+ * reference roles cannot be laid onto the eight installed positions by number
  * even informally.
  */
 

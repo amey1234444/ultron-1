@@ -14,10 +14,9 @@
  *
  *  - `TS-TT0` (feed throat) binds to D021, not to D024. They are different
  *    places on the machine and the feed throat is normally cooled.
- *  - `TS-TZ8` and `TS-TZ9` bind to nothing. DOC-02's master stops at seven
- *    zones and this machine has nine; inventing D061 and D062 would be putting
- *    words in the document's mouth. They remain available to the machine's own
- *    analyser, which does read all nine.
+ *  - `TS-TZ8` binds to nothing. DOC-02's master stops at seven zones and this
+ *    template has eight; inventing D061 would be putting words in the
+ *    document's mouth. It remains available to the machine's own analyser.
  *
  * `UNBOUND_MANDATORY` is the other half of the answer: the DOC-02 mandatory
  * signals this machine has no instrument for. That list is what §37's "all
@@ -53,7 +52,7 @@ export const TAG_TO_SIGNAL: Readonly<Partial<Record<TwinScrewTag, string>>> = {
   'TS-I2': 'D020',
   'TS-TT0': 'D021', // feed-throat temperature — NOT zone 1
 
-  // Barrel zones one to seven. Eight and nine have no DOC-02 counterpart.
+  // Barrel zones one to seven. Eight has no DOC-02 counterpart.
   'TS-TZ1': 'D024',
   'TS-TZ2': 'D025',
   'TS-TZ3': 'D026',
@@ -80,7 +79,7 @@ export function signalForTag(tag: TwinScrewTag): SignalDefinition | undefined {
 }
 
 /** Tags this machine carries that DOC-02's master has no entry for. */
-export const UNBOUND_TAGS: readonly TwinScrewTag[] = ['TS-TZ8', 'TS-TZ9'] as const;
+export const UNBOUND_TAGS: readonly TwinScrewTag[] = ['TS-TZ8'] as const;
 
 /** Whether this machine supplies a given DOC-02 signal at all. */
 export function machineSupplies(signal: SignalDefinition): boolean {

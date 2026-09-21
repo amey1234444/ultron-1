@@ -6,12 +6,8 @@
 //
 //   /__tse-qa?theme=dark|light&state=idle|linked|live|mixed&width=<px>&codes=1
 //
-// The reference-image overlay is a development alignment aid only. It draws a
-// PNG *behind* the drawing at adjustable opacity so the elevation can be checked
-// against the source photograph. The production machine is always the vendored
-// SVG elevation; the raster is never the rendered machine. Drop a file at
-// `public/references/twin-screw-extruder-reference.png` to use it — the control
-// is inert when the file is absent.
+// The production component renders the supplied reference PNG directly and
+// layers live connector state in the same native 1700x670 coordinate space.
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, View } from 'react-native';
 
@@ -30,8 +26,6 @@ import {
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
 import { factsForMachine } from '../../lib/knowledge/registry';
 import { TSE_TEMPLATE } from '../../lib/knowledge/tse/template';
-
-const REFERENCE_IMAGE = '/references/twin-screw-extruder-reference.png';
 
 type PadMode = 'idle' | 'linked' | 'live' | 'mixed';
 
@@ -72,7 +66,6 @@ export default function TwinScrewQaPage() {
   const { colorScheme, setColorScheme } = useColorScheme();
   const [mode, setMode] = useState<PadMode>('mixed');
   const [width, setWidth] = useState(1440);
-  const [overlay, setOverlay] = useState(0);
   const [showCodes, setShowCodes] = useState(false);
 
   useEffect(() => {
@@ -134,7 +127,7 @@ export default function TwinScrewQaPage() {
     <ScrollView style={{ backgroundColor: bg }} contentContainerStyle={{ padding: 24 }}>
       <Text style={{ ...mono, fontSize: 16, marginBottom: 4 }}>Twin Screw Extruder — template QA</Text>
       <Text style={{ ...mono, opacity: 0.6, marginBottom: 16 }}>
-        vendored SVG elevation · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
+        exact supplied raster · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
         {TWIN_SCREW_ARTWORK_WIDTH}×{TWIN_SCREW_ARTWORK_HEIGHT} sheet
       </Text>
 
@@ -157,21 +150,11 @@ export default function TwinScrewQaPage() {
         </View>
       </Section>
 
-      <Section title="Reference overlay (development alignment aid only)">
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-          {[0, 0.25, 0.5, 0.75].map((o) => button(`${Math.round(o * 100)}%`, overlay === o, () => setOverlay(o)))}
-        </View>
-        <Text style={{ ...mono, opacity: 0.55 }}>
-          Draws {REFERENCE_IMAGE} behind the render. The production machine is always the 3D asset; the raster is never
-          shipped as the rendered machine.
-        </Text>
-      </Section>
-
       <View
         style={{
           width,
           maxWidth: '100%',
-          aspectRatio: 16 / 9,
+          aspectRatio: TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_ARTWORK_HEIGHT,
           borderWidth: 1,
           borderColor: dark ? '#222' : '#DDD',
           backgroundColor: dark ? '#0B0D10' : '#F7F8F8',
@@ -179,14 +162,6 @@ export default function TwinScrewQaPage() {
         }}
       >
         <View style={{ position: 'relative', flex: 1 }}>
-          {overlay > 0 && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={REFERENCE_IMAGE}
-              alt=""
-              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: overlay, objectFit: 'contain' }}
-            />
-          )}
           <TwinScrewExtruder connectorState={states} />
           {showCodes && (
             <View style={{ position: 'absolute', inset: 0 }} pointerEvents="none">
@@ -231,13 +206,13 @@ export default function TwinScrewQaPage() {
       </Section>
 
       <Section title="Artwork">
-        <Text style={mono}>components/console/machine/twinScrewArtwork/</Text>
+        <Text style={mono}>assets/machines/twin-screw-extruder.png</Text>
         <Text style={{ ...mono, opacity: 0.55, marginTop: 4 }}>
-          MachineWorkspace → TwinScrewExtruder → buildTwinScrewExtruderArtwork
+          MachineWorkspace → TwinScrewExtruder → exact supplied image
         </Text>
         <Text style={{ ...mono, opacity: 0.55 }}>
-          SVG source, parsed once into react-native-svg nodes. Pads are drawn by the
-          application in the same {TWIN_SCREW_ARTWORK_WIDTH}×{TWIN_SCREW_ARTWORK_HEIGHT} space.
+          Active pad states are drawn by the application in the same{' '}
+          {TWIN_SCREW_ARTWORK_WIDTH}×{TWIN_SCREW_ARTWORK_HEIGHT} space.
         </Text>
       </Section>
 

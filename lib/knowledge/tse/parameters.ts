@@ -96,7 +96,7 @@ export const TSE_PARAMETERS: readonly ParameterDefinition[] = [
     mainInfluences: ['Setpoint', 'Heater and cooling', 'Process heat'],
     whyUltronUsesIt: 'Thermal state and control behaviour.',
     knowledgeClass: TSE,
-    tags: ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8', 'TS-TZ9'],
+    tags: ['TS-TZ1', 'TS-TZ2', 'TS-TZ3', 'TS-TZ4', 'TS-TZ5', 'TS-TZ6', 'TS-TZ7', 'TS-TZ8'],
   },
   {
     parameterId: 'PAR-ZONE-SETPOINT',

@@ -16,8 +16,7 @@
   },
   "templateId": "TSE-7Z-CR-INT-PAR-COMP",
   "unboundTags": [
-    "TS-TZ8",
-    "TS-TZ9"
+    "TS-TZ8"
   ],
   "unboundMandatorySignals": [
     {

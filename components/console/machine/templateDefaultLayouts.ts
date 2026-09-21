@@ -242,11 +242,13 @@ export function createTemplateDefaultLayout(
 /**
  * Upgrade saved twin-screw layouts without replacing operator positioning.
  *
- * Legacy uppercase identities are exact aliases. A layout that contains every
- * one of the former 35 points is the pre-TZ09 template, so it receives only the
- * missing TZ09 card/trail at its default position. Partial/custom layouts are
- * never padded. Complete template-shaped layouts also recover dynamic routing
- * for their single authored bend.
+ * Legacy uppercase identities are exact aliases. The exact supplied template
+ * has 35 visible instruments and ends at barrel zone 8. Layouts saved against
+ * the superseded generated drawing may still contain a `tz-09` card: its data
+ * card is preserved but detached, and the obsolete machine trail is removed so
+ * no connection lands on a sensor that is absent from the reference image.
+ * Complete template-shaped layouts also recover dynamic routing for their
+ * single authored bend.
  */
 export function migrateTemplateLayout(
   machineTemplate: string,
@@ -256,9 +258,18 @@ export function migrateTemplateLayout(
   if (machineTemplate !== 'Twin Screw Extruder') return layout;
 
   const knownCodes = new Set(TWIN_SCREW_POINT_REGISTRY.map((point) => point.code));
+  const retiredBoxIds = new Set(
+    layout.boxes
+      .filter((box) => normalizeTwinScrewPointCode(box.templatePointCode) === 'tz-09')
+      .map((box) => box.id),
+  );
   let changed = false;
   const boxes = layout.boxes.map((box) => {
     const code = normalizeTwinScrewPointCode(box.templatePointCode);
+    if (code === 'tz-09') {
+      changed = true;
+      return { ...box, templatePointCode: undefined };
+    }
     if (code === box.templatePointCode) return box;
     changed = true;
     return { ...box, templatePointCode: code };
@@ -269,10 +280,6 @@ export function migrateTemplateLayout(
       .map((box) => box.templatePointCode)
       .filter((code): code is string => Boolean(code && knownCodes.has(code))),
   );
-  const completeLegacy =
-    boxes.length === TWIN_SCREW_POINT_REGISTRY.length - 1 &&
-    boxCodes.size === TWIN_SCREW_POINT_REGISTRY.length - 1 &&
-    !boxCodes.has('tz-09');
   const completeCurrent =
     boxes.length === TWIN_SCREW_POINT_REGISTRY.length &&
     boxCodes.size === TWIN_SCREW_POINT_REGISTRY.length;
@@ -283,9 +290,21 @@ export function migrateTemplateLayout(
       .map((trail) => [trail.startMachinePointCode as string, trail.points[1]]),
   );
 
-  let trails = layout.trails.map((trail) => {
+  const trails = layout.trails.flatMap((trail) => {
     const startCode = normalizeTwinScrewPointCode(trail.startMachinePointCode);
     const endCode = normalizeTwinScrewPointCode(trail.endMachinePointCode);
+    const retiredMachineConnection =
+      startCode === 'tz-09' ||
+      endCode === 'tz-09' ||
+      ((trail.startMachineAnchor || trail.endMachineAnchor) &&
+        Boolean(
+          (trail.startBoxId && retiredBoxIds.has(trail.startBoxId)) ||
+            (trail.endBoxId && retiredBoxIds.has(trail.endBoxId)),
+        ));
+    if (retiredMachineConnection) {
+      changed = true;
+      return [];
+    }
     const routeCode =
       startCode ??
       endCode ??
@@ -293,7 +312,7 @@ export function migrateTemplateLayout(
       (trail.startBoxId ? boxCodeById.get(trail.startBoxId) : undefined);
     const authoredBend = routeCode ? authoredRoutes.get(routeCode) : undefined;
     const templateRouted =
-      (completeLegacy || completeCurrent) &&
+      completeCurrent &&
       trail.autoRoute === undefined &&
       trail.points.length === 3 &&
       Boolean(trail.startMachineAnchor) !== Boolean(trail.endMachineAnchor) &&
@@ -308,28 +327,16 @@ export function migrateTemplateLayout(
       endCode === trail.endMachinePointCode &&
       !templateRouted
     ) {
-      return trail;
+      return [trail];
     }
     changed = true;
-    return {
+    return [{
       ...trail,
       startMachinePointCode: startCode,
       endMachinePointCode: endCode,
       autoRoute: templateRouted ? true : trail.autoRoute,
-    };
+    }];
   });
 
-  let nextBoxes = boxes;
-  if (completeLegacy && machineRect) {
-    const generated = createTemplateDefaultLayout(machineTemplate, [], machineRect);
-    const missingBox = generated.boxes.find((box) => box.templatePointCode === 'tz-09');
-    const missingTrail = generated.trails.find((trail) => trail.startMachinePointCode === 'tz-09');
-    if (missingBox && missingTrail) {
-      nextBoxes = [...boxes, missingBox];
-      trails = [...trails, missingTrail];
-      changed = true;
-    }
-  }
-
-  return changed ? { ...layout, trails, boxes: nextBoxes } : layout;
+  return changed ? { ...layout, trails, boxes } : layout;
 }

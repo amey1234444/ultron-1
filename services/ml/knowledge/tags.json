@@ -1169,48 +1169,6 @@
       }
     },
     {
-      "tag": "TS-TZ9",
-      "code": "tz-09",
-      "label": "Barrel Temperature Zone 9",
-      "kind": "Temperature",
-      "canonicalUnit": "degC",
-      "doc02SignalId": null,
-      "doc02Priority": null,
-      "doc02AcquisitionClass": null,
-      "doc02CanonicalLocation": null,
-      "doc07ParameterFamily": "ZT",
-      "qualityConfig": {
-        "rangeMin": -20,
-        "rangeMax": 400,
-        "freshnessMs": 60000,
-        "flatlineSamples": 10,
-        "maxRateOfChangePerSecond": 3
-      },
-      "templateBaseline": {
-        "baselineId": "BL-TEMPLATE-TS-TZ9",
-        "version": "1",
-        "status": "PROVISIONAL",
-        "level": "TEMPLATE_REFERENCE",
-        "source": "OEM_ENGINEERING",
-        "contextId": null,
-        "configurationVersion": null,
-        "featureId": "TS-TZ9",
-        "unit": "degC",
-        "mean": 205,
-        "median": 205,
-        "stdDev": 6,
-        "p05": 195.16,
-        "p50": 205,
-        "p95": 214.84,
-        "iqr": 8.100000000000001,
-        "mad": 4.0200000000000005,
-        "sampleCount": 0,
-        "learnedFrom": null,
-        "learnedTo": null,
-        "confidence": "LOW"
-      }
-    },
-    {
       "tag": "TS-PV",
       "code": "vent-pressure",
       "label": "Vent / Vacuum Pressure",
