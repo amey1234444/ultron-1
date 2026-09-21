@@ -6,10 +6,10 @@
 // also why the ranges are ranges and not point estimates — a single figure
 // would be the more confident-looking thing to print and the less honest one.
 //
-// The band is bronze rather than lime, and spends that colour twice: on the
+// The band is optical blue rather than lime, and spends that colour twice: on the
 // oversized word set behind the grid, and on the figure in whichever card the
 // cursor is on. The hover colour is deliberately not decoration — at any moment
-// exactly one number on the band is warm, and it is the one being read.
+// exactly one number on the band is blue, and it is the one being read.
 //
 // That highlight is pure CSS. The design it comes from tracks the hovered card
 // in component state; a `:hover` rule gets the same result without a re-render
@@ -23,7 +23,7 @@ import { Arrow, useInView } from './primitives';
 type Metric = {
   /** What was measured. */
   label: string;
-  /** The observed range after cutover — bronze under the cursor, white at rest. */
+  /** The observed range after cutover — blue under the cursor, white at rest. */
   value: string;
   unit: string;
   /** The twelve-month baseline the range is measured against. */
@@ -47,7 +47,7 @@ export default function Cutover() {
 
   return (
     <section id="condition" className={styles.section}>
-      {/* Decorative: the warm cast the band sits in, and the section signing
+      {/* Decorative: the navy cast the band sits in, and the section signing
           itself behind the figures. */}
       <div className={styles.glow} aria-hidden="true" />
       <span className={styles.ghost} aria-hidden="true">
