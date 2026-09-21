@@ -35,7 +35,7 @@ def create_app(service: MLService | None = None) -> Any:
     from fastapi.responses import JSONResponse
 
     app = FastAPI(
-        title="BLACKGATE ML service",
+        title="ULTRON ML service",
         version="1.0.0",
         description=(
             "Predictive diagnosis and prognosis for the twin-screw extruder. "

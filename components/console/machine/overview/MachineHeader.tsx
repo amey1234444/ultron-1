@@ -92,7 +92,7 @@ export function MachineHeader({
   return (
     <View className="flex-row flex-wrap items-start justify-between gap-5">
       <View style={{ flexGrow: 1, flexBasis: 430, minWidth: 260 }} className="gap-1">
-        <Text className={cn('font-mono text-[11px] tracking-[0.22em]', mutedClass)}>BLACKGATE / {section}</Text>
+        <Text className={cn('font-mono text-[11px] tracking-[0.22em]', mutedClass)}>ULTRON / {section}</Text>
 
         <View className="flex-row flex-wrap items-center gap-x-3 gap-y-1">
           <Text className={cn('font-heading-medium text-[26px] leading-[32px]', inkClass)}>{machineName}</Text>

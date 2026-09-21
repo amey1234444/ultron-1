@@ -2,11 +2,11 @@
   "schemaVersion": "1.0.0",
   "generator": "scripts/exportKnowledge.ts",
   "documents": {
-    "DOC-02": "BLACKGATE-TSE-DOC-02 v1.0",
-    "DOC-03": "BLACKGATE-TSE-DOC-03 v1.0",
-    "DOC-04": "BLACKGATE-TSE-DOC-04 v1.0",
-    "DOC-05": "BLACKGATE-TSE-DOC-05",
-    "DOC-07": "BLACKGATE-TSE-DOC-07"
+    "DOC-02": "ULTRON-TSE-DOC-02 v1.0",
+    "DOC-03": "ULTRON-TSE-DOC-03 v1.0",
+    "DOC-04": "ULTRON-TSE-DOC-04 v1.0",
+    "DOC-05": "ULTRON-TSE-DOC-05",
+    "DOC-07": "ULTRON-TSE-DOC-07"
   },
   "counts": {
     "signals": 60,

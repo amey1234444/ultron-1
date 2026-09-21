@@ -13,10 +13,10 @@
  * data underneath stays the same in both places.
  */
 
-export const COMPANY_NAME = 'BlackGATE';
+export const COMPANY_NAME = 'ULTRON';
 
 /** The name used where a legal entity is meant — the address block, the copyright line. */
-export const COMPANY_LEGAL_NAME = 'BlackGATE Technologies';
+export const COMPANY_LEGAL_NAME = 'ULTRON Technologies';
 
 /** The registered office, one line per line. */
 export const COMPANY_ADDRESS_LINES = [

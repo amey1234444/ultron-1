@@ -1,4 +1,4 @@
-// BlackGATE ingest runtime — part of the web application, not a service beside it.
+// ULTRON ingest runtime — part of the web application, not a service beside it.
 //
 //   gateway ──MQTT publish──▶ EMQX ──MQTT subscribe──▶ this Node process
 //                                                       ├─ WebSocket publish ─▶ browsers

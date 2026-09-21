@@ -18,7 +18,7 @@ import {
 } from '../../../ui';
 
 /**
- * Why BLACKGATE produced this finding — in two panels that must not be merged.
+ * Why ULTRON produced this finding — in two panels that must not be merged.
  *
  * **Physical evidence** comes from the DOC-04 evidence model and the DOC-07
  * fault library: measured signals, required and contradicting evidence, the

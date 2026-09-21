@@ -1,4 +1,4 @@
-# Single-service Render Blueprint for BlackGATE.
+# Single-service Render Blueprint for ULTRON.
 #
 # One web service runs the Next.js app and the MQTT ingest runtime in the same
 # process. The live data path is pub/sub end to end:

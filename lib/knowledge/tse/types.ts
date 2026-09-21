@@ -1,7 +1,7 @@
 /**
- * BLACKGATE DOC-01 machine-knowledge types.
+ * ULTRON DOC-01 machine-knowledge types.
  *
- * DOC-01 (`BLACKGATE-TSE-DOC-01`, template `TSE-7Z-CR-INT-PAR-COMP`) is explicit
+ * DOC-01 (`ULTRON-TSE-DOC-01`, template `TSE-7Z-CR-INT-PAR-COMP`) is explicit
  * that it "should not end as a PDF/Word reference only" — its section 21 names
  * ten software entities the knowledge has to become. This file declares those
  * ten, plus the two cross-cutting classifications every entity carries:
@@ -43,7 +43,7 @@ export const KNOWLEDGE_CLASS_REUSE: Record<KnowledgeClass, string> = {
  *
  * Order matters and is relied on by `AUTHORITY_PRECEDENCE`: the ladder is
  * SAFETY / TRIP / PROTECTION > APPROVED CUSTOMER > OEM > APPROVED ENGINEERING >
- * BLACKGATE LEARNED. A value lower on the ladder never displaces one above it.
+ * ULTRON LEARNED. A value lower on the ladder never displaces one above it.
  */
 export type Authority =
   | 'SAFETY_PROTECTION'
@@ -66,7 +66,7 @@ export const AUTHORITY_LABEL: Record<Authority, string> = {
   APPROVED_CUSTOMER: 'Approved customer limit',
   OEM: 'OEM limit or rating',
   APPROVED_ENGINEERING: 'Approved engineering limit',
-  ULTRON_ANALYTICS: 'BLACKGATE learned baseline or anomaly threshold',
+  ULTRON_ANALYTICS: 'ULTRON learned baseline or anomaly threshold',
 };
 
 /** Rank of an authority on the ladder. Lower number wins. */
@@ -78,7 +78,7 @@ export function authorityRank(authority: Authority): number {
  * What kind of number a value is (DOC-01 §17 value-type table).
  *
  * Kept separate from `Authority` because the two are independent: a baseline
- * can be commissioning-approved or BLACKGATE-learned, and an Alert can come from
+ * can be commissioning-approved or ULTRON-learned, and an Alert can come from
  * the customer or from plant engineering.
  */
 export type ValueType =
@@ -393,7 +393,7 @@ export type MeasurementLocation = {
   installedTags: string[];
   /**
    * Whether an existing PLC/DCS/VFD value should be reused rather than a new
-   * BLACKGATE sensor added (DOC-01 §18). Null where the site has not decided.
+   * ULTRON sensor added (DOC-01 §18). Null where the site has not decided.
    */
   preferExistingSource: boolean | null;
   knowledgeClass: KnowledgeClass;

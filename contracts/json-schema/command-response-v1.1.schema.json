@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "ultron.command.response/1.1",
-  "title": "BlackGATE command response v1.1 (Gateway -> Backend)",
+  "title": "ULTRON command response v1.1 (Gateway -> Backend)",
   "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
   "properties": {
     "schema": { "const": "ultron.command.response" },

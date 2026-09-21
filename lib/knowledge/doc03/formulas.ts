@@ -660,7 +660,7 @@ export function formulasWithoutGuardrail(): FormulaDefinition[] {
  * implemented here. The rest stay as definitions: several TSE features depend
  * on a site-declared reference — a clean-screen differential, a commissioned
  * throughput — and computing them without one would be inventing the number
- * DOC-03 §4 says BLACKGATE may not invent.
+ * DOC-03 §4 says ULTRON may not invent.
  *
  * Every function takes already-validated samples. Gating on quality is the
  * caller's job and is done once, in `computeFeature`, rather than repeated in

@@ -75,7 +75,7 @@ export function AppLoader({ overlay = false }: { overlay?: boolean }) {
           source={LOGO_DARK}
           style={{ height: LOGO_HEIGHT, width: LOGO_HEIGHT * LOGO_ASPECT }}
           resizeMode="contain"
-          accessibilityLabel="BlackGATE"
+          accessibilityLabel="ULTRON"
         />
 
         <View

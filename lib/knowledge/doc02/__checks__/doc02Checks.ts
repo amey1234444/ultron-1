@@ -83,7 +83,7 @@ check(
   DOC02_SIGNAL_MASTER.find((s) => s.signalId === 'D001')?.acquisitionClass,
 );
 check(
-  'motor current prefers the drive, not an BLACKGATE sensor',
+  'motor current prefers the drive, not an ULTRON sensor',
   DOC02_SIGNAL_MASTER.find((s) => s.signalId === 'D002')?.preferredSource === 'DRIVE_OR_DEDICATED_CONTROLLER',
   DOC02_SIGNAL_MASTER.find((s) => s.signalId === 'D002')?.preferredSource,
 );

@@ -1,5 +1,5 @@
 /**
- * BLACKGATE DOC-07 — the complete anomaly and fault knowledge library.
+ * ULTRON DOC-07 — the complete anomaly and fault knowledge library.
  *
  * DOC-07 is the reference companion to DOC-04. Where DOC-04 defines the engine
  * — the gates, the evidence model, the diagnosis object — DOC-07 supplies the
@@ -21,7 +21,7 @@
 
 export * from './anomalies';
 
-export const DOC07_DOCUMENT_REF = 'BLACKGATE-TSE-DOC-07';
+export const DOC07_DOCUMENT_REF = 'ULTRON-TSE-DOC-07';
 
 /** DOC-07 §6, the instrumentation-first rule, restated where the library lives. */
 export const INSTRUMENTATION_FIRST_RULE =

@@ -92,7 +92,7 @@ export function machineSupplies(signal: SignalDefinition): boolean {
  *
  * Ten of these are control-system values — run status, machine mode, trip
  * bits, the seven zone setpoints, recipe id — that a PLC almost certainly
- * already holds and that nobody has wired to BLACKGATE. They are an integration
+ * already holds and that nobody has wired to ULTRON. They are an integration
  * gap, not an instrumentation one, and the distinction changes who has to fix
  * it.
  */

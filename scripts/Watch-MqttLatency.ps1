@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Subscribe to the BlackGATE MQTT tree and show each payload with the latency it
+  Subscribe to the ULTRON MQTT tree and show each payload with the latency it
   took to reach this machine.
 
 .DESCRIPTION

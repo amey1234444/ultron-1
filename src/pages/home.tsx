@@ -16,10 +16,10 @@ export default function HomePage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>BlackGATE — Condition monitoring for rotating equipment</title>
+        <title>ULTRON — Condition monitoring for rotating equipment</title>
         <meta
           name="description"
-          content="Stop finding out after it breaks. BlackGATE turns plant telemetry into a named component, an evidence trail and a window to take the machine out in."
+          content="Stop finding out after it breaks. ULTRON turns plant telemetry into a named component, an evidence trail and a window to take the machine out in."
         />
         <meta name="theme-color" content="#070707" />
       </Head>

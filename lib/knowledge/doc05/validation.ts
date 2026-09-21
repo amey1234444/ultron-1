@@ -74,7 +74,7 @@ export const DOC05_VALIDATION_TESTS: readonly Doc05TestExpectation[] = [
   {
     testId: 'D05-T09',
     scenario: 'An approved customer SOP is mapped to the fault',
-    expected: 'The recommendation references the SOP; a generic BLACKGATE action does not override it.',
+    expected: 'The recommendation references the SOP; a generic ULTRON action does not override it.',
     executable: false,
     notExecutableReason:
       'Needs a customer SOP library. The engine already marks its own output ULTRON_RECOMMENDATION so an approved procedure can outrank it, but there is no procedure to map.',

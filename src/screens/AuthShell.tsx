@@ -100,7 +100,7 @@ export function AuthShell({
         <Column paddingHorizontal={compact ? 18 : 28}>
           <View style={{ width: '100%', maxWidth: 432, alignSelf: 'center' }}>
             <View style={{ alignItems: 'center', gap: 6 }}>
-              <Image source={LOGO_DARK} style={{ height: 30, width: 30 * LOGO_ASPECT }} resizeMode="contain" accessibilityLabel="BlackGATE" />
+              <Image source={LOGO_DARK} style={{ height: 30, width: 30 * LOGO_ASPECT }} resizeMode="contain" accessibilityLabel="ULTRON" />
               <Text style={{ fontFamily: AUTH_FONT_MONO, fontSize: 10, letterSpacing: 3.4, color: MUTED }}>
                 ASSET MONITORING
               </Text>
@@ -174,7 +174,7 @@ export function AuthShell({
           }}
         >
           <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>
-            (c) {new Date().getFullYear()} BlackGATE. All rights reserved.
+            (c) {new Date().getFullYear()} ULTRON. All rights reserved.
           </Text>
           <Text style={{ fontFamily: AUTH_FONT_BODY, fontSize: 12, color: FAINT }}>Legal</Text>
         </View>

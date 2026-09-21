@@ -7,7 +7,7 @@
  * So there are no sensor part numbers or sample rates below.
  *
  * `preferExistingSource` carries §18's reuse policy: "Existing trustworthy
- * PLC/VFD/controller measurements should be reused where practical; BLACKGATE
+ * PLC/VFD/controller measurements should be reused where practical; ULTRON
  * sensors are added where data are absent, inadequate or require independent
  * measurement." It is true where the controller is the natural owner of the
  * value, and null where the site has to decide.

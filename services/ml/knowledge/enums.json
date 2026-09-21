@@ -1,7 +1,7 @@
 {
   "documentRefs": [
-    "BLACKGATE-TSE-DOC-04 v1.0",
-    "BLACKGATE-TSE-DOC-05"
+    "ULTRON-TSE-DOC-04 v1.0",
+    "ULTRON-TSE-DOC-05"
   ],
   "enums": {
     "qualityVerdict": [
@@ -46,7 +46,7 @@
       },
       "ANOMALY_THRESHOLD": {
         "meaning": "An analytics boundary indicating unusual behaviour.",
-        "definedBy": "BLACKGATE and DOC-03 contextual analytics.",
+        "definedBy": "ULTRON and DOC-03 contextual analytics.",
         "interpretation": "Unusual against normal, but possibly still below the plant Alert."
       },
       "ALERT": {
@@ -62,7 +62,7 @@
       "TRIP_PROTECTION": {
         "meaning": "A control or protection action threshold or state.",
         "definedBy": "PLC, SIS, protection design or OEM.",
-        "interpretation": "A machine protection action. BLACKGATE recognises it and does not replace it."
+        "interpretation": "A machine protection action. ULTRON recognises it and does not replace it."
       }
     },
     "baselineLevel": [

@@ -29,7 +29,7 @@ export default function OutcomesPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>Outcomes — BlackGATE</title>
+        <title>Outcomes — ULTRON</title>
         <meta
           name="description"
           content="Four outcome ranges drawn against the baselines they moved off, across sixty-two monitored assets. The Northfield case in its own dates, the study method, and what the people on the floor said."

@@ -338,7 +338,7 @@ export function recommend(input: {
     return {
       level: 'IMMEDIATE_ESCALATION',
       steps: ['ESCALATE', 'CONFIRM'],
-      text: 'A protection state is active. Follow the approved trip and recovery procedure. BLACKGATE does not replace the protection system.',
+      text: 'A protection state is active. Follow the approved trip and recovery procedure. ULTRON does not replace the protection system.',
       authority: 'APPROVED_PROCEDURE',
     };
   }

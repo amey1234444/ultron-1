@@ -145,5 +145,5 @@ export const MISSING_DATA_BEHAVIOUR: Record<MissingDataSituation, string> = {
   SIGNAL_BAD: 'Do not use as GOOD evidence. The instrumentation or data event must be visible.',
   CONTEXT_MISSING: 'Use an approved fallback hierarchy only, and carry the context uncertainty forward.',
   CUSTOMER_LIMIT_MISSING:
-    'Do not invent a plant Alert or Danger. BLACKGATE anomaly analytics may still operate if a baseline exists.',
+    'Do not invent a plant Alert or Danger. ULTRON anomaly analytics may still operate if a baseline exists.',
 };

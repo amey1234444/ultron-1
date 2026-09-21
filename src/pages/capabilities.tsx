@@ -26,7 +26,7 @@ export default function CapabilitiesPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>Capabilities — BlackGATE</title>
+        <title>Capabilities — ULTRON</title>
         <meta
           name="description"
           content="Adaptive baselines, explainable findings, forecasts drawn as ranges and instructions the plant can act on — with the artefact behind each claim, the pipeline that joins them, and the four claims the system declines to make."

@@ -50,7 +50,7 @@ export type SourceMapping = {
   pollClass: AcquisitionClass | null;
   /** Monitoring mappings are read-only unless a write path was separately engineered. */
   access: 'READ_ONLY' | 'READ_WRITE';
-  /** How the source's own quality bits map onto BLACKGATE quality. */
+  /** How the source's own quality bits map onto ULTRON quality. */
   qualityMapping: Record<string, QualityVerdict> | null;
   /** Which clock the timestamp comes from. Defined per project. */
   timestampSource: 'SOURCE' | 'GATEWAY' | 'BACKEND' | null;
@@ -123,7 +123,7 @@ export const LINEAGE_CHAIN: readonly string[] = [
   'Raw source tag / sensor channel',
   'Scaling / engineering unit',
   'Timestamp + source quality',
-  'BLACKGATE data quality',
+  'ULTRON data quality',
   'Canonical tag',
   'Operating state + context',
   'DOC-03 formula / feature',

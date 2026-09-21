@@ -82,7 +82,7 @@ export const TSE_SITE_INPUTS: readonly SiteInputItem[] = [
   },
   {
     group: 'Materials and recipes',
-    whatMustBeCollected: 'Recipe IDs, and the material, filler and additive context available to BLACKGATE.',
+    whatMustBeCollected: 'Recipe IDs, and the material, filler and additive context available to ULTRON.',
     typicalOwner: 'MES / process engineer',
   },
   {
@@ -234,8 +234,8 @@ export function runValidation(input: ValidationInput = {}): CheckResult[] {
     'At least a usable recipe or material identifier can be supplied.',
     recipeAvailable ? 'PASS' : 'FAIL',
     recipeAvailable
-      ? 'A recipe identifier is available to BLACKGATE.'
-      : 'No recipe or material identifier reaches BLACKGATE. Contextual baselines cannot be selected, and a legitimate formulation change will look like a process deviation.',
+      ? 'A recipe identifier is available to ULTRON.'
+      : 'No recipe or material identifier reaches ULTRON. Contextual baselines cannot be selected, and a legitimate formulation change will look like a process deviation.',
   );
 
   // 10. Engineering limits sourced.

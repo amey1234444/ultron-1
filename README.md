@@ -1,4 +1,4 @@
-# BlackGATE
+# ULTRON
 
 Industrial HMI / asset-hierarchy console. The UI is built with React Native components
 and runs on **two targets from one codebase**:

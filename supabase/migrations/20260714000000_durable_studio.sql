@@ -1,4 +1,4 @@
--- BlackGATE durable Supabase/PostgreSQL schema.
+-- ULTRON durable Supabase/PostgreSQL schema.
 -- Idempotent: safe for existing deployments; never drops or truncates data.
 
 CREATE TABLE IF NOT EXISTS users (

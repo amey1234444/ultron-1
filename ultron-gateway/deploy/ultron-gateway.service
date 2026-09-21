@@ -1,5 +1,5 @@
 [Unit]
-Description=BlackGATE Gateway (CC/RCC -> MQTT)
+Description=ULTRON Gateway (CC/RCC -> MQTT)
 After=network-online.target
 Wants=network-online.target
 

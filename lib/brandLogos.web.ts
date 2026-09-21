@@ -25,7 +25,7 @@ export const LOGO_LIGHT = toUri(logoLight);
  * Next's static import already carries the real dimensions, so they are read off
  * it here rather than restated; the constants are the fallback for the plain
  * string case (a bundler configured to emit URLs instead of metadata) and match
- * what `scripts/make-brand.py` writes.
+ * the original ULTRON wordmark artwork restored in `assets/brand`.
  */
 function dimension(img: unknown, key: 'width' | 'height', fallback: number): number {
   if (img && typeof img === 'object' && key in img) {
@@ -35,6 +35,6 @@ function dimension(img: unknown, key: 'width' | 'height', fallback: number): num
   return fallback;
 }
 
-export const LOGO_WIDTH = dimension(logoDark, 'width', 1098);
-export const LOGO_HEIGHT = dimension(logoDark, 'height', 171);
+export const LOGO_WIDTH = dimension(logoDark, 'width', 284);
+export const LOGO_HEIGHT = dimension(logoDark, 'height', 77);
 export const LOGO_ASPECT = LOGO_WIDTH / LOGO_HEIGHT;

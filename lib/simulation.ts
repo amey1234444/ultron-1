@@ -1,4 +1,4 @@
-// Simulation Mode — a virtual BlackGATE gateway.
+// Simulation Mode — a virtual ULTRON gateway.
 //
 // A simulated gateway/rack/channel is stored in the ordinary workspace
 // hierarchy (DeviceNode / CardNode), and the generator publishes the same

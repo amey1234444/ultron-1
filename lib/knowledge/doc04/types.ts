@@ -1,5 +1,5 @@
 /**
- * BLACKGATE DOC-04 types — anomaly, pattern and fault diagnosis.
+ * ULTRON DOC-04 types — anomaly, pattern and fault diagnosis.
  *
  * DOC-04 answers "what does the abnormal pattern mean?" It takes DOC-03's
  * feature objects and produces a structured WHAT / WHERE / WHY diagnosis with

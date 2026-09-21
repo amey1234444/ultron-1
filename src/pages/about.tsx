@@ -63,8 +63,8 @@ const JOURNEY = [
   },
   {
     when: 'Now',
-    title: 'BlackGATE',
-    body: `Registered as BlackGATE Technologies at ${COMPANY_ADDRESS_INLINE}. A small team of controls, reliability and software engineers, most of whom have been on the floor at 3am.`,
+    title: 'ULTRON',
+    body: `Registered as ULTRON Technologies at ${COMPANY_ADDRESS_INLINE}. A small team of controls, reliability and software engineers, most of whom have been on the floor at 3am.`,
   },
 ];
 
@@ -78,10 +78,10 @@ export default function AboutPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>About — BlackGATE</title>
+        <title>About — ULTRON</title>
         <meta
           name="description"
-          content="Why BlackGATE is built the way it is: one number per asset and the instruction that follows from it. The principles, the numbers, the journey, and how we work with a plant."
+          content="Why ULTRON is built the way it is: one number per asset and the instruction that follows from it. The principles, the numbers, the journey, and how we work with a plant."
         />
         <meta name="theme-color" content="#0A0A0A" />
       </Head>

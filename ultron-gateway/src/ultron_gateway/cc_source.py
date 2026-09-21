@@ -1,4 +1,4 @@
-"""Reading BlackGATE Gateway v3 telemetry frames on the Raspberry Pi.
+"""Reading ULTRON Gateway v3 telemetry frames on the Raspberry Pi.
 
 v3 writes every normalized frame to `latest_telemetry.json` and can also stream
 newline-delimited frames over TCP, so both intakes are supported. The feed keeps

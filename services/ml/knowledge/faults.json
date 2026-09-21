@@ -1,5 +1,5 @@
 {
-  "documentRef": "BLACKGATE-TSE-DOC-04 v1.0",
+  "documentRef": "ULTRON-TSE-DOC-04 v1.0",
   "faults": [
     {
       "faultId": "TSE-FEED-001",
@@ -617,7 +617,7 @@
       "faultId": "TSE-INST-007",
       "name": "Tag Mapping / Channel Mismatch",
       "family": "INSTRUMENTATION",
-      "primaryLocation": "PLC/BLACKGATE mapping",
+      "primaryLocation": "PLC/ULTRON mapping",
       "applicableStates": "ALL",
       "minimumRequiredEvidence": "cross-location contradiction",
       "ruleVersion": "1.0"
@@ -752,7 +752,7 @@
       "faultId": "TSE-CTRL-008",
       "name": "Mode / Configuration Mismatch",
       "family": "CONTROL",
-      "primaryLocation": "PLC/BLACKGATE configuration",
+      "primaryLocation": "PLC/ULTRON configuration",
       "applicableStates": "ALL",
       "minimumRequiredEvidence": "mode/config vs actual signals",
       "ruleVersion": "1.0"

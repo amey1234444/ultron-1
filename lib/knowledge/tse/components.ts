@@ -3,7 +3,7 @@
  *
  * Every component is described with the same six fields DOC-01 uses: purpose,
  * physical inputs, physical outputs, useful observables, main influences and
- * why it matters to BLACKGATE. Fault signatures are absent on purpose — DOC-01 §9
+ * why it matters to ULTRON. Fault signatures are absent on purpose — DOC-01 §9
  * defers those to DOC-04, and inventing them here would put failure modes in
  * front of an operator that no document has approved.
  *
@@ -43,7 +43,7 @@ export const TSE_COMPONENT_LIBRARY: readonly ComponentDefinition[] = [
     usefulObservables: ['Actual speed', 'Actual current', 'Active power where available', 'Torque estimate', 'Drive status and trip codes'],
     mainInfluences: ['Control strategy', 'Motor data configuration', 'DC-bus and supply condition', 'Mechanical and process load'],
     whyItMatters:
-      'An important existing data source. BLACKGATE should prefer trustworthy VFD values rather than duplicating sensors unnecessarily.',
+      'An important existing data source. ULTRON should prefer trustworthy VFD values rather than duplicating sensors unnecessarily.',
     measurementLocationIds: ['ML-MOTOR'],
     knowledgeClass: COMMON,
     alwaysPresent: true,

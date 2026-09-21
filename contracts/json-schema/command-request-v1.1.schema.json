@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "ultron.command.request/1.1",
-  "title": "BlackGATE command request v1.1 (Backend -> Gateway)",
+  "title": "ULTRON command request v1.1 (Backend -> Gateway)",
   "type": "object",
   "required": ["schema", "schema_version", "request_id", "gateway_id", "rack_id", "command", "created_at"],
   "properties": {

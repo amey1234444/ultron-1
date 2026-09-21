@@ -1,5 +1,5 @@
 /**
- * BLACKGATE DOC-05 types — severity, confidence, impact, priority and action.
+ * ULTRON DOC-05 types — severity, confidence, impact, priority and action.
  *
  * DOC-05 answers the question DOC-04 deliberately refuses: how serious is this,
  * how sure are we, what does it affect, how urgently must someone respond, and
@@ -167,9 +167,9 @@ export type Recommendation = {
   /** One sentence an operator can act on. */
   text: string;
   /**
-   * Whether this is an BLACKGATE suggestion or an approved plant procedure.
+   * Whether this is an ULTRON suggestion or an approved plant procedure.
    *
-   * §32's authority hierarchy: BLACKGATE recommends, the plant's approved SOP
+   * §32's authority hierarchy: ULTRON recommends, the plant's approved SOP
    * decides. Nothing here ever presents itself as the procedure.
    */
   authority: 'ULTRON_RECOMMENDATION' | 'APPROVED_PROCEDURE';

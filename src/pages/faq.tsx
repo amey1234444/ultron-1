@@ -201,10 +201,10 @@ export default function FaqPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>FAQ — BlackGATE</title>
+        <title>FAQ — ULTRON</title>
         <meta
           name="description"
-          content="Every question engineering teams ask us before deploying BlackGATE, grouped by who is asking: getting started, the model, deployment and data, people and access."
+          content="Every question engineering teams ask us before deploying ULTRON, grouped by who is asking: getting started, the model, deployment and data, people and access."
         />
         <meta name="theme-color" content="#0A0A0A" />
       </Head>

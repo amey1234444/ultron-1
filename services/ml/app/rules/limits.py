@@ -561,7 +561,7 @@ class RuleEngine:
         """Limit status from the plant's own flags first, then the registry.
 
         The plant's flags win because they come from the system that owns the
-        limit. The registry covers limits a site declared to BLACKGATE but has not
+        limit. The registry covers limits a site declared to ULTRON but has not
         wired as a flag, and never contradicts a flag that is set.
         """
         if plant.get("trip"):

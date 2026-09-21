@@ -1,4 +1,4 @@
--- BlackGATE MQTT v2 current-state model.
+-- ULTRON MQTT v2 current-state model.
 -- Idempotent migration: preserves legacy tables while moving live identity to
 -- exact string rack IDs and adding current-only v2 state surfaces.
 

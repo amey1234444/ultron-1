@@ -97,13 +97,13 @@ export default function SiteFooter() {
         </a>
 
         <p className={styles.legal}>
-          © {new Date().getFullYear()} BlackGATE Technologies. All rights reserved.
+          © {new Date().getFullYear()} ULTRON Technologies. All rights reserved.
         </p>
       </div>
 
       {/* The page signs its name on the way out. Decorative only. */}
       <div className={styles.wordmark} aria-hidden="true">
-        BlackGATE
+        ULTRON
       </div>
     </footer>
   );

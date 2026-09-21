@@ -1,5 +1,5 @@
 /**
- * BLACKGATE DOC-02 — operations, sensors and data requirements, as code.
+ * ULTRON DOC-02 — operations, sensors and data requirements, as code.
  *
  * DOC-02 §36 names eight software modules. All eight are declared here:
  *
@@ -36,7 +36,7 @@ export * from './limits';
 export * from './validation';
 
 /** The document this module implements. */
-export const DOC02_DOCUMENT_REF = 'BLACKGATE-TSE-DOC-02 v1.0';
+export const DOC02_DOCUMENT_REF = 'ULTRON-TSE-DOC-02 v1.0';
 
 /** DOC-02 §36, the modules and what each is responsible for. */
 export const DOC02_MODULES: readonly { module: string; responsibilities: string; primaryOutputs: string }[] = [
@@ -47,7 +47,7 @@ export const DOC02_MODULES: readonly { module: string; responsibilities: string;
   },
   {
     module: 'Source / Tag Mapping',
-    responsibilities: 'PLC, DCS, controller and BLACKGATE channels onto canonical tags.',
+    responsibilities: 'PLC, DCS, controller and ULTRON channels onto canonical tags.',
     primaryOutputs: 'Validated mapping.',
   },
   {

@@ -356,7 +356,7 @@ def match_patterns(verdicts: Mapping[str, SignalVerdict]) -> list[PatternMatch]:
 def unevaluable_patterns(verdicts: Mapping[str, SignalVerdict]) -> list[tuple[str, tuple[str, ...]]]:
     """Patterns this machine cannot evaluate, and the signals they need.
 
-    Surfaced in the UI as coverage. "BLACKGATE cannot distinguish a die
+    Surfaced in the UI as coverage. "ULTRON cannot distinguish a die
     restriction from a screen restriction on this machine because there is no
     post-screen pressure tap" is a sentence that gets an instrument installed;
     silence is not.

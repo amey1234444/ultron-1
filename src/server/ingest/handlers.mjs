@@ -355,7 +355,7 @@ async function ensureWorkspaceRackAndSlots(msg, slots = []) {
         rackDeviceId,
         msg.rack_id,
         currentIp,
-        'Auto-discovered from BlackGATE MQTT live state',
+        'Auto-discovered from ULTRON MQTT live state',
         gatewayDevice.project_id ?? null,
         gatewayDevice.id,
         msg.gateway_id,

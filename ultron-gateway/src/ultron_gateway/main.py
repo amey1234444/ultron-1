@@ -5,7 +5,7 @@ boot id -> gateway_id -> gateway_ip -> sequence -> TLS + Last Will -> connect
 inventory -> telemetry loop.
 
 Two data sources feed the same canonical rack model: the simulator (Colab/dev)
-and BlackGATE Gateway v3 CC telemetry (Raspberry Pi), selected with DATA_SOURCE.
+and ULTRON Gateway v3 CC telemetry (Raspberry Pi), selected with DATA_SOURCE.
 """
 
 from __future__ import annotations

@@ -85,7 +85,7 @@ export default function ContactPage() {
   return (
     <div className={styles.page}>
       <Head>
-        <title>Contact — BlackGATE</title>
+        <title>Contact — ULTRON</title>
         <meta
           name="description"
           content="Talk to an engineer about a walkthrough on your asset, a pilot on one line, or a technical question. Replies within one business day, from the people who built it."

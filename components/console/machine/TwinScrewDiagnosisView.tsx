@@ -506,7 +506,7 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
               <Body muted>
                 {decision.recommendation.authority === 'APPROVED_PROCEDURE'
                   ? 'This follows an approved plant procedure.'
-                  : 'This is an BLACKGATE recommendation. An approved plant SOP outranks it.'}
+                  : 'This is an ULTRON recommendation. An approved plant SOP outranks it.'}
               </Body>
             </Card>
 

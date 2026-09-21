@@ -1,4 +1,4 @@
-# BLACKGATE ML service
+# ULTRON ML service
 
 Predictive diagnosis and prognosis for the twin-screw extruder.
 
@@ -21,7 +21,7 @@ about a real machine.
 ## Where this sits
 
 ```
-BLACKGATE WEB (Next.js)                     this service (Python + FastAPI)
+ULTRON WEB (Next.js)                     this service (Python + FastAPI)
   lib/knowledge/doc0*  DOC-01..07  ──┐
   lib/knowledge/tse/pipeline.ts      │   npm run export:knowledge
     single-frame DOC-02→05 chain,    ├──────────────────────────────▶ knowledge/*.json
@@ -51,7 +51,7 @@ Four different questions, four different mechanisms:
 | **Detection** — what is abnormal right now? | Contextual baselines and the DOC-04 §3 gates |
 | **Diagnosis** — which fault explains the evidence? | DOC-04 patterns, the fault library, the evidence model |
 | **Prognosis** — what may develop in the next few minutes? | LightGBM per fault per horizon, over the feature union |
-| **Explanation** — why does BLACKGATE think this? | DOC-07 knowledge for the physics, SHAP for the model |
+| **Explanation** — why does ULTRON think this? | DOC-07 knowledge for the physics, SHAP for the model |
 | **Decision** — how serious, how sure, how urgent, what to do? | DOC-05, five outputs kept separate |
 
 A single network cannot answer these. It would have no access to approved

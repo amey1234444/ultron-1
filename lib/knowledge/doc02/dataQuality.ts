@@ -6,7 +6,7 @@
  * attaches to it.
  *
  * The rule the whole module exists to serve is §22's INSTRUMENTATION-FIRST
- * RULE: "If a mandatory sensor is BAD, BLACKGATE should first report the
+ * RULE: "If a mandatory sensor is BAD, ULTRON should first report the
  * data/instrument problem and suppress or degrade dependent physical diagnoses.
  * BAD pressure data must not become 'process restriction.'" So the engine
  * returns `suppressesPhysicalDiagnosis`, and a diagnosis layer that ignores it

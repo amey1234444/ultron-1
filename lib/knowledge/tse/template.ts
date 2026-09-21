@@ -18,7 +18,7 @@ import type {
 } from './types';
 import { AUTHORITY_PRECEDENCE } from './types';
 
-export const TSE_DOCUMENT_REF = 'BLACKGATE-TSE-DOC-01 v1.0';
+export const TSE_DOCUMENT_REF = 'ULTRON-TSE-DOC-01 v1.0';
 
 const ROTATION_LABEL: Record<ScrewRotation, string> = {
   CO_ROTATING: 'Co-Rotating',
@@ -139,7 +139,7 @@ export const TSE_CLASSIFICATION: readonly {
   {
     term: '7-zone reference',
     engineeringMeaning:
-      'Seven controlled barrel zones are the reference BLACKGATE template. The actual functional role of each zone is configuration-specific.',
+      'Seven controlled barrel zones are the reference ULTRON template. The actual functional role of each zone is configuration-specific.',
     knowledgeClass: 'MACHINE_SPECIFIC',
   },
   {
@@ -154,7 +154,7 @@ export const TSE_CLASSIFICATION: readonly {
  * The configuration-version record for the reference machine.
  *
  * Every field is null or empty on purpose. DOC-01 §8.1 lists exactly these as
- * metadata BLACKGATE *needs*, and §22 lists them as items to collect from the OEM
+ * metadata ULTRON *needs*, and §22 lists them as items to collect from the OEM
  * — not as things the template may assume. What this record therefore does
  * today is state the shape of the gap, which `validation.ts` turns into a
  * commissioning checklist.

@@ -1,7 +1,7 @@
 [project]
 name = "ultron-ml"
 version = "1.0.0"
-description = "BLACKGATE predictive diagnosis and prognosis for the twin-screw extruder"
+description = "ULTRON predictive diagnosis and prognosis for the twin-screw extruder"
 requires-python = ">=3.11"
 
 # The base install runs the whole deterministic chain — quality, state,

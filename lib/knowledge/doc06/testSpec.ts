@@ -1,5 +1,5 @@
 /**
- * BLACKGATE DOC-06 — the verification specification.
+ * ULTRON DOC-06 — the verification specification.
  *
  * DOC-06 is unlike the documents before it. DOC-01 to DOC-04 describe what the
  * system should know and conclude; DOC-06 describes how you prove it does. So

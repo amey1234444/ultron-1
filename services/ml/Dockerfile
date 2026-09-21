@@ -1,4 +1,4 @@
-# BLACKGATE ML service.
+# ULTRON ML service.
 #
 # Two stages, and the split is about more than image size: the builder installs
 # a compiler toolchain that has no business being in a running container, and

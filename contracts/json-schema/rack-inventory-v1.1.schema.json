@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "ultron.rack.inventory/1.1",
-  "title": "BlackGATE rack inventory v1.1",
+  "title": "ULTRON rack inventory v1.1",
   "allOf": [{ "$ref": "ultron.common.envelope/1.1" }],
   "properties": {
     "schema": { "const": "ultron.rack.inventory" },

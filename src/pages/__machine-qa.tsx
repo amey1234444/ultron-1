@@ -52,7 +52,7 @@ const GATEWAY: DeviceNode = {
   id: 'qa-sim-gateway',
   name: 'QA Simulated Gateway',
   type: 'Gateway',
-  model: 'BlackGATE-GW',
+  model: 'ULTRON-GW',
   ip: '10.99.1.1',
   port: '1883',
   protocol: 'Modbus TCP',

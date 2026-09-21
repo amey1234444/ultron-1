@@ -4,7 +4,7 @@
  * The signal map in `lib/analysis/twinScrew/signalMap.ts` already answers "what
  * unit is this tag in, and what may it be converted from". This dictionary
  * answers the questions that layer deliberately does not: what the quantity
- * *means*, what moves it, why BLACKGATE keeps it, and how far that knowledge
+ * *means*, what moves it, why ULTRON keeps it, and how far that knowledge
  * travels.
  *
  * The two are linked by `tags`, and `parametersWithoutTags` reports the
