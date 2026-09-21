@@ -33,7 +33,6 @@ from typing import Iterable, Mapping
 from ..baseline.engine import BaselineSelection
 from ..core.config import settings
 from ..core.versions import RULE_SET_VERSION
-from ..features import families
 from ..features.engine import FeatureFrame
 from ..knowledge.enums import AUTHORITY_SEVERITY_FLOOR, LimitAuthority, LimitStatus, Severity
 from ..knowledge.loader import knowledge

@@ -180,6 +180,15 @@ python -m app.training.promote_model --model lgbm-... --check
 python -m app.training.promote_model --model lgbm-... --approved-by "A. Engineer"
 ```
 
+The whole sequence, on synthetic data, in one command:
+
+```bash
+bash scripts/lifecycle_demo.sh
+```
+
+It ends by attempting a promotion and **expecting the refusal**, then prints
+the measured frozen-test metrics so nobody has to take the result on trust.
+
 ### Promotion is gated
 
 Four conditions, all of which must hold:

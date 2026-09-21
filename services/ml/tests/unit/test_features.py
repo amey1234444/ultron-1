@@ -65,8 +65,10 @@ def test_union_always_includes_temporal_columns(isolated_settings) -> None:
 def test_features_compute_over_a_run(isolated_settings, steady_run) -> None:
     frame = _run(steady_run(400), isolated_settings)
     assert frame is not None
-    assert frame.value_of("TS-P3.value") == pytest.approx(8.0, abs=0.001)
-    assert frame.value_of("TS-P3.mean_300s") == pytest.approx(8.0, abs=0.01)
+    # The fixture carries 0.2% noise, because a fixture that repeats a value
+    # byte for byte is a frozen sensor as far as DQ-005 is concerned.
+    assert frame.value_of("TS-P3.value") == pytest.approx(8.0, rel=0.01)
+    assert frame.value_of("TS-P3.mean_300s") == pytest.approx(8.0, rel=0.01)
     assert frame.value_of("TS-P3.std_300s") is not None
 
 
@@ -157,7 +159,10 @@ def test_persistence_seconds_is_the_trailing_run() -> None:
     """A condition that fired an hour ago and is quiet now has not persisted."""
     origin = datetime(2026, 1, 1, tzinfo=UTC)
     stamps = [origin + timedelta(seconds=index) for index in range(6)]
-    assert families.persistence_seconds([True, True, False, True, True, True], stamps) == 3.0
+    # Three trailing samples one second apart span two seconds, not three. The
+    # elapsed time is the conservative reading: the condition is known to have
+    # held from t=3 to t=5, and when it actually started is somewhere in (2, 3].
+    assert families.persistence_seconds([True, True, False, True, True, True], stamps) == 2.0
     assert families.persistence_seconds([True, True, True, False], stamps[:4]) == 0.0
 
 

@@ -12,7 +12,7 @@ module, because the properties are what the system promises:
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import timezone
 
 import pytest
 

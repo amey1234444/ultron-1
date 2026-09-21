@@ -25,8 +25,15 @@ from app.synthetic.scenarios import GOLDEN_CASES, SCENARIOS, SCENARIOS_BY_ID
 from app.training.run_golden_tests import run_case
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def pipeline(isolated_settings) -> InferencePipeline:  # type: ignore[no-untyped-def]
+    """A fresh pipeline per case.
+
+    Function-scoped because `isolated_settings` is: each case needs its own
+    artifacts directory, and a module-scoped pipeline would carry one case's
+    baselines and filter state into the next. `run_case` resets the pipeline
+    anyway; this makes the isolation structural rather than dependent on that.
+    """
     return InferencePipeline()
 
 

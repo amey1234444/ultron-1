@@ -89,9 +89,57 @@ services:
         sync: false
       - key: SMTP_FROM
         sync: false
+      # --- ULTRON ML service ------------------------------------------------
+      # Advisory and optional. Unset means the Analyzer runs the deterministic
+      # DOC-02..DOC-05 chain exactly as before; nothing here is on the critical
+      # path and nothing waits on it.
+      - key: ML_SERVICE_URL
+        sync: false
+      - key: ML_INTERNAL_TOKEN
+        sync: false
+      - key: ML_TIMEOUT_MS
+        value: 4000
       - key: SUPER_ADMIN_PASSWORD
         sync: false
       - key: ADMIN_PASSWORD
         sync: false
       - key: USER_PASSWORD
         sync: false
+
+  # The ML service. Commented out rather than deleted: it is a real deployment
+  # target and the settings below are the ones that matter, but nothing should
+  # start paying for a service that currently has no promoted model to serve.
+  # Uncomment when there is one, and set ML_SERVICE_URL on the web service to
+  # this service's internal address.
+  #
+  # - type: web
+  #   name: ultron-ml
+  #   runtime: docker
+  #   dockerfilePath: ./services/ml/Dockerfile
+  #   dockerContext: ./services/ml
+  #   healthCheckPath: /health
+  #   # One instance. The pipeline holds rolling windows and decision-filter
+  #   # state in memory per machine; several instances would each see a fraction
+  #   # of the telemetry and none would hold a full window. Scaling out needs
+  #   # ML_REDIS_URL, which moves that state somewhere every instance can reach.
+  #   numInstances: 1
+  #   envVars:
+  #     # shadow: models run and predictions persist, but nobody is alerted.
+  #     # The mode to live in until engineering has compared predictions against
+  #     # confirmed outcomes. Rolling back is a change to this one variable.
+  #     - key: ML_MODE
+  #       value: shadow
+  #     - key: ML_INTERNAL_TOKEN
+  #       sync: false
+  #     - key: ML_DATABASE_URL
+  #       sync: false
+  #     - key: ML_REDIS_URL
+  #       sync: false
+  #     - key: ML_INFERENCE_INTERVAL_SECONDS
+  #       value: 2
+  #     - key: ML_LOG_LEVEL
+  #       value: INFO
+  #     # Leave false. The guard that stops a model fitted on synthetic
+  #     # fixtures becoming champion.
+  #     - key: ML_ALLOW_UNTRAINED_CHAMPION
+  #       value: false

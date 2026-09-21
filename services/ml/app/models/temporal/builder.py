@@ -104,9 +104,10 @@ def build_model(architecture: TemporalArchitecture) -> Any:
 
     first_units, second_units = architecture.lstm_units
 
-    inputs = keras.Input(
-        shape=(architecture.lookback_steps, architecture.feature_count), name="sequence"
-    )
+    # Deliberately unnamed. A named single input makes Keras expect a mapping
+    # on every call and warn when handed a plain array, which the serving path
+    # does on every inference. The layer names that matter are below.
+    inputs = keras.Input(shape=(architecture.lookback_steps, architecture.feature_count))
     hidden = layers.LSTM(first_units, return_sequences=True, name="lstm_1")(inputs)
     hidden = layers.Dropout(architecture.dropout, name="dropout_1")(hidden)
     hidden = layers.LSTM(second_units, return_sequences=False, name="lstm_2")(hidden)

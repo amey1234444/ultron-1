@@ -78,7 +78,12 @@
     "check:doc06": "npx --yes esbuild lib/knowledge/doc06/__checks__/doc06Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc06Checks.cjs && node node_modules/.cache/doc06Checks.cjs",
     "export:knowledge": "npx --yes esbuild scripts/exportKnowledge.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/exportKnowledge.cjs && node node_modules/.cache/exportKnowledge.cjs write",
     "check:knowledge-export": "npx --yes esbuild scripts/exportKnowledge.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/exportKnowledge.cjs && node node_modules/.cache/exportKnowledge.cjs check",
-    "check:doc05": "npx --yes esbuild lib/knowledge/doc05/__checks__/doc05Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc05Checks.cjs && node node_modules/.cache/doc05Checks.cjs"
+    "check:doc05": "npx --yes esbuild lib/knowledge/doc05/__checks__/doc05Checks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/doc05Checks.cjs && node node_modules/.cache/doc05Checks.cjs",
+    "ml:test": "cd services/ml && python -m pytest tests -q",
+    "ml:test:fast": "cd services/ml && python -m pytest tests -q -m \"not slow\"",
+    "ml:golden": "cd services/ml && python -m app.training.run_golden_tests",
+    "ml:serve": "cd services/ml && uvicorn app.api.app:build --factory --host 0.0.0.0 --port 8080",
+    "check:ml": "npm run check:knowledge-export && npm run ml:test:fast"
   },
   "private": true
 }

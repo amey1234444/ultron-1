@@ -1,0 +1,84 @@
+# ULTRON ML service CI.
+#
+# Two jobs, split by what they prove and what they cost.
+#
+# `knowledge` is the cheap one and the one that catches the subtlest failure:
+# the TypeScript knowledge layer moving without the Python snapshot being
+# re-exported. It runs on every change to either side.
+#
+# `ml` installs only the base profile — three dependencies — because the
+# deterministic chain, the leakage guards and the Golden suite need nothing
+# else, and pulling TensorFlow into CI to run tests that do not use it costs
+# ten minutes a run for nothing. The model adapters are exercised by their own
+# capability probes, which is what those probes are for.
+
+name: ML service
+
+on:
+  push:
+    paths:
+      - "services/ml/**"
+      - "lib/knowledge/**"
+      - "lib/twinScrewExtruderPoints.ts"
+      - "scripts/exportKnowledge.ts"
+      - ".github/workflows/ml.yml"
+  pull_request:
+    paths:
+      - "services/ml/**"
+      - "lib/knowledge/**"
+      - "scripts/exportKnowledge.ts"
+
+jobs:
+  knowledge:
+    name: Knowledge snapshot is current
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --include=dev
+      # Fails when the committed snapshot no longer matches the knowledge
+      # layer. A fault definition edited in TypeScript and not re-exported
+      # would otherwise leave Python reasoning over a stale library.
+      - run: npm run check:knowledge-export
+
+  ml:
+    name: Python tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install (base profile only)
+        working-directory: services/ml
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+      # Importing the package must not require TensorFlow, LightGBM or SHAP.
+      # This is the property that keeps the deterministic chain serving when a
+      # heavy library will not install, and it is cheap to assert directly.
+      - name: The service imports without the heavy libraries
+        working-directory: services/ml
+        run: python -c "import app.inference.pipeline; print('ok')"
+      - name: Unit tests
+        working-directory: services/ml
+        run: python -m pytest tests/unit -q
+      - name: Integration and Golden suites
+        working-directory: services/ml
+        run: python -m pytest tests/integration tests/golden -q
+      # The report promotion reads. Uploaded so a failed run can be read
+      # without reproducing it locally.
+      - name: Golden report
+        if: always()
+        working-directory: services/ml
+        run: python -m app.training.run_golden_tests || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: golden-report
+          path: services/ml/artifacts/golden/
+          if-no-files-found: ignore

@@ -16,7 +16,7 @@ import pytest
 
 from app.diagnosis.resolver import DiagnosisResolver
 from app.persistence.filters import DecisionFilter, FilterConfig, FilterConfigSet, FilterVerdict
-from app.quality.engine import FrameQuality, QualityFinding, SignalQuality
+from app.quality.engine import FrameQuality, SignalQuality
 from app.rules.limits import RuleResult, SignalVerdict
 
 UTC = timezone.utc

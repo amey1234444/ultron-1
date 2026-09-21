@@ -10,8 +10,6 @@ from __future__ import annotations
 
 import inspect
 
-import pytest
-
 from app.decision.engine import DecisionEngine
 from app.diagnosis.resolver import EvidenceItem, ResolvedDiagnosis
 from app.rules.limits import RuleResult, SignalVerdict, max_severity, severity_at_least
