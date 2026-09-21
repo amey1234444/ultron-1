@@ -1,6 +1,6 @@
-import { Component, lazy, Suspense, useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, Platform, Text, View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { G } from 'react-native-svg';
+import { useMemo } from 'react';
+import { View, type StyleProp, type ViewStyle } from 'react-native';
+import Svg, { G, parse } from 'react-native-svg';
 
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
@@ -10,16 +10,7 @@ import {
   TWIN_SCREW_POINT_REGISTRY,
 } from '../../../lib/twinScrewExtruderPoints';
 import { MeasurementPad, padStateLabel, type MeasurementPadState } from './MeasurementPad';
-
-/**
- * The canvas is loaded lazily, after mount, and only on web.
- *
- * Importing it statically runs three.js through Next's SSR pass, where there is
- * no WebGL context — the canvas mounts to nothing and the stage renders empty
- * with no error to point at. Same reasoning and same shape as
- * `plant3d/PlantScene3D`, which is the precedent this follows.
- */
-const LazyCanvas = lazy(() => import('./TwinScrewExtruder3D'));
+import { buildTwinScrewExtruderArtwork } from './twinScrewArtwork';
 
 type TwinScrewExtruderProps = {
   className?: string;
@@ -35,15 +26,13 @@ type TwinScrewExtruderProps = {
   connectorState?: Record<string, MeasurementPadState>;
 
   /**
-   * Draw the drawing sheet behind the machine.
+   * Draw the drawing sheet and its engineering grid.
    *
    * Left false on the machine canvas: the workspace already paints its own grid
-   * behind the stage. Set true when the drawing is shown on its own.
+   * behind the stage, and a second grid inside the artwork would beat against
+   * it. Set true when the drawing is shown on its own.
    */
   showBackground?: boolean;
-
-  /** Draw the barrel closed instead of cut away. */
-  closed?: boolean;
 };
 
 /* Stage -------------------------------------------------------------------- */
@@ -53,117 +42,68 @@ export const TWIN_SCREW_VIEWBOX_HEIGHT = TWIN_SCREW_ARTWORK_HEIGHT;
 const VIEWBOX_WIDTH = TWIN_SCREW_VIEWBOX_WIDTH;
 const VIEWBOX_HEIGHT = TWIN_SCREW_VIEWBOX_HEIGHT;
 
-/** Absolute fill. Written out rather than `inset`, which RN styles do not take. */
-const FILL = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 } as const;
-
 /**
- * Every point this machine can report, at the spot on the machine where the
+ * Every point this machine can report, at the spot on the drawing where the
  * instrument physically sits.
  *
  * The canvas snaps trail endpoints to this list and the default trail layout
- * places its cards from it, so a card can never attach to a place the machine
- * does not actually have an instrument.
+ * places its cards from it, so a card can never attach to a place the artwork
+ * does not actually have an instrument. The drawing renders one pad per entry
+ * and never a circle of its own: the reference calls itself a marker-only
+ * drawing and leaves the markers to the application for exactly this reason.
  */
 export type TwinScrewConnector = (typeof TWIN_SCREW_POINT_REGISTRY)[number];
 
 export const TWIN_SCREW_CONNECTORS: readonly TwinScrewConnector[] = TWIN_SCREW_POINT_REGISTRY;
 
 /**
- * The sheet the machine sits on, per theme.
+ * The sheet the machine is drawn on, per theme.
  *
- * These also stand in for the ground behind a pad: an idle pad is a hole cut in
- * the machine, so its centre has to be the colour the machine sits on.
+ * The drawing itself is re-toned by `buildTwinScrewExtruderArtwork({ dark })`,
+ * the same way the single-screw drawing swaps its palette — a light machine on
+ * a dark console is a slab, whatever the artwork was drawn as.
+ *
+ * These two also stand in for the ground behind a pad: an idle pad is a hole
+ * cut in the machine, so its centre has to be the colour the machine sits on,
+ * not the colour of the console around it.
  */
 const SHEET_LIGHT = '#fbfbfa';
 const SHEET_DARK = '#0d0e10';
 
-/** The pad's status colour. */
+/**
+ * The pad's status colour, and the ground its hollow centre is cut out of.
+ *
+ * The ground is the sheet rather than the console surface because that is what
+ * a pad is drawn on top of — an idle pad has to read as a hole in the machine,
+ * not as a disc of console colour floating over it.
+ */
 const PAD_ACCENT = '#16c84a';
 
-function Notice({ dark, message, spinner = false }: { dark: boolean; message: string; spinner?: boolean }) {
-  return (
-    <View style={{ ...FILL, alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-      {spinner ? <ActivityIndicator size="small" color={dark ? '#F5F5F5' : '#111827'} /> : null}
-      <Text
-        style={{
-          fontSize: 11.5,
-          textAlign: 'center',
-          paddingHorizontal: 24,
-          color: dark ? 'rgba(245,245,245,0.62)' : 'rgba(17,24,39,0.55)',
-        }}
-      >
-        {message}
-      </Text>
-    </View>
-  );
-}
-
-/**
- * A WebGL failure or a missing/corrupt GLB degrades to a readable message
- * rather than an empty stage that looks like a layout bug.
- */
-class CanvasBoundary extends Component<{ fallback: ReactNode; children: ReactNode }, { failed: boolean }> {
-  state = { failed: false };
-
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-
-  componentDidCatch(error: unknown) {
-    console.error('[twin-screw-3d] machine failed to render', error);
-  }
-
-  render() {
-    return this.state.failed ? this.props.fallback : this.props.children;
-  }
-}
-
-/**
- * The twin-screw extruder.
- *
- * The machine is the 3D asset at `public/models/machines/twin-screw-extruder.glb`
- * — a modular barrel, a two-path feeding system, a devolatilisation vent, a
- * screen-pack/die discharge train, and two complete Erdmenger screw shafts that
- * genuinely self-wipe. It is rendered through a locked orthographic elevation
- * framed so the machine lands on this component's own 1648 x 928 sheet exactly
- * where the point registry expects it.
- *
- * The pads are unchanged and still drawn here, in sheet coordinates, on top of
- * the render. That is what keeps `machineConnectors`, `TrailBoard` and every
- * saved card layout working across the swap: they all address instruments by
- * `rx`/`ry` fractions of this sheet, and those fractions did not move.
- */
 export function TwinScrewExtruder({
   className,
   style,
   showBackground = false,
-  closed = false,
   connectorState,
 }: TwinScrewExtruderProps) {
   const { isDark } = useAppTheme();
   const sheet = isDark ? SHEET_DARK : SHEET_LIGHT;
-
-  // Nothing three.js touches may run during SSR, so the canvas waits for mount.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  const machine = () => {
-    if (Platform.OS !== 'web') {
-      return <Notice dark={isDark} message="The 3D machine is available in the web console." />;
-    }
-    if (!mounted) {
-      return <Notice dark={isDark} message="Preparing machine…" spinner />;
-    }
-    return (
-      <CanvasBoundary
-        fallback={<Notice dark={isDark} message="The 3D machine could not be displayed on this device." />}
-      >
-        <Suspense fallback={<Notice dark={isDark} message="Loading machine…" spinner />}>
-          <LazyCanvas closed={closed} dark={isDark} />
-        </Suspense>
-      </CanvasBoundary>
-    );
-  };
+  /**
+   * The machine, parsed once per appearance.
+   *
+   * The artwork is emitted as SVG source and turned into react-native-svg nodes
+   * here rather than being hand-transcribed into JSX. That is what keeps this
+   * template honest about being the reference drawing: there is no second copy
+   * of the geometry to drift, and the parse is exact — every gradient, pattern,
+   * clip path and lighting filter in the source comes out the other side.
+   *
+   * Two inputs can change the source — the sheet and the theme — so this is at
+   * most a handful of parses in a session, and none on a re-render that changed
+   * neither.
+   */
+  const artwork = useMemo(
+    () => parse(buildTwinScrewExtruderArtwork({ showBackground, sheet, dark: isDark })),
+    [showBackground, sheet, isDark],
+  );
 
   return (
     <View
@@ -176,14 +116,15 @@ export function TwinScrewExtruder({
         style,
       ]}
     >
-      {/* The machine. Fills the stage exactly, so a pad at sheet (x, y) lands on
-          the feature at that spot in the render. */}
-      <View style={FILL} pointerEvents="none">
-        {machine()}
-      </View>
+      <Svg width="100%" height="100%" viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`}>
+        {/* The machine. Its own <svg> wrapper is discarded and its children are
+            mounted here instead, so the pads below share one coordinate space
+            with it — a pad and the feature it measures scale together at every
+            zoom, which is the whole reason the anchors are stored as fractions
+            of this viewBox. */}
+        {artwork?.children}
 
-      {/* Instrument pads. One per registry entry, and nothing else. */}
-      <Svg width="100%" height="100%" viewBox={`0 0 ${VIEWBOX_WIDTH} ${VIEWBOX_HEIGHT}`} style={FILL}>
+        {/* Instrument pads. One per registry entry, and nothing else. */}
         <G>
           {TWIN_SCREW_CONNECTORS.map((point) => {
             const state = connectorState?.[point.code] ?? 'idle';

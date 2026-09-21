@@ -4,12 +4,12 @@
 // a mock. The pads, the connectors, the default layout and the analysis all come
 // from the shipped modules, so what this page shows is what the console does.
 //
-//   /__tse-qa?theme=dark|light&state=idle|linked|live|mixed&width=<px>&codes=1&closed=1
+//   /__tse-qa?theme=dark|light&state=idle|linked|live|mixed&width=<px>&codes=1
 //
 // The reference-image overlay is a development alignment aid only. It draws a
-// PNG *behind* the render at adjustable opacity so the initial inspection view
-// can be checked against the source photograph. The production machine is always the
-// 3D asset; the raster is never the rendered machine. Drop a file at
+// PNG *behind* the drawing at adjustable opacity so the elevation can be checked
+// against the source photograph. The production machine is always the vendored
+// SVG elevation; the raster is never the rendered machine. Drop a file at
 // `public/references/twin-screw-extruder-reference.png` to use it — the control
 // is inert when the file is absent.
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -18,14 +18,13 @@ import { ScrollView, Text, View } from 'react-native';
 import { useColorScheme } from 'nativewind';
 
 import { connectorsForTemplate } from '../../components/console/machine/machineConnectors';
-import { MachineStage3D } from '../../components/console/machine/machine3d/MachineStage3D';
-import type { ProjectedPoint } from '../../components/console/machine/machine3d/types';
+import { TwinScrewExtruder } from '../../components/console/machine/TwinScrewExtruder';
 import { createTemplateDefaultLayout } from '../../components/console/machine/templateDefaultLayouts';
 import type { MeasurementPadState } from '../../components/console/machine/MeasurementPad';
 import { consolePalette } from '../../components/ui';
 import {
-  TWIN_SCREW_ANCHORS_3D,
-  TWIN_SCREW_MODEL_URL,
+  TWIN_SCREW_ARTWORK_HEIGHT,
+  TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_POINT_REGISTRY,
 } from '../../lib/twinScrewExtruderPoints';
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
@@ -75,8 +74,6 @@ export default function TwinScrewQaPage() {
   const [width, setWidth] = useState(1440);
   const [overlay, setOverlay] = useState(0);
   const [showCodes, setShowCodes] = useState(false);
-  const [closed, setClosed] = useState(false);
-  const [projected, setProjected] = useState<ProjectedPoint[]>([]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -91,7 +88,6 @@ export default function TwinScrewQaPage() {
     const requestedWidth = Number(params.get('width'));
     if (Number.isFinite(requestedWidth) && requestedWidth >= 320) setWidth(Math.min(requestedWidth, 1440));
     setShowCodes(params.get('codes') === '1');
-    setClosed(params.get('closed') === '1');
   }, [setColorScheme]);
 
   const states = useMemo(() => padStates(mode), [mode]);
@@ -108,7 +104,6 @@ export default function TwinScrewQaPage() {
     () => Object.fromEntries(TWIN_SCREW_POINT_REGISTRY.map((point) => [point.code, point.label])),
     [],
   );
-  const handleProjection = useCallback((points: ProjectedPoint[]) => setProjected(points), []);
 
   const dark = colorScheme === 'dark';
   const palette = consolePalette(dark);
@@ -139,8 +134,8 @@ export default function TwinScrewQaPage() {
     <ScrollView style={{ backgroundColor: bg }} contentContainerStyle={{ padding: 24 }}>
       <Text style={{ ...mono, fontSize: 16, marginBottom: 4 }}>Twin Screw Extruder — template QA</Text>
       <Text style={{ ...mono, opacity: 0.6, marginBottom: 16 }}>
-        production 3D stage · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
-        {Object.keys(TWIN_SCREW_ANCHORS_3D).length} model-space anchors
+        vendored SVG elevation · {TWIN_SCREW_POINT_REGISTRY.length} registry points ·{' '}
+        {TWIN_SCREW_ARTWORK_WIDTH}×{TWIN_SCREW_ARTWORK_HEIGHT} sheet
       </Text>
 
       <Section title="Pad state">
@@ -152,7 +147,6 @@ export default function TwinScrewQaPage() {
       <Section title="Display">
         <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
           {button(dark ? 'dark' : 'light', dark, () => setColorScheme(dark ? 'light' : 'dark'))}
-          {button(closed ? 'barrel closed' : 'cutaway open', !closed, () => setClosed((value) => !value))}
           {button(showCodes ? 'codes on' : 'codes off', showCodes, () => setShowCodes((v) => !v))}
         </View>
       </Section>
@@ -193,35 +187,25 @@ export default function TwinScrewQaPage() {
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: overlay, objectFit: 'contain' }}
             />
           )}
-          <MachineStage3D
-            modelUrl={TWIN_SCREW_MODEL_URL}
-            anchors={TWIN_SCREW_ANCHORS_3D}
-            labels={labels}
-            connectorState={states}
-            dark={dark}
-            closed={closed}
-            onProjectConnectors={handleProjection}
-          />
+          <TwinScrewExtruder connectorState={states} />
           {showCodes && (
             <View style={{ position: 'absolute', inset: 0 }} pointerEvents="none">
-              {projected.map((point) =>
-                point.onScreen && !point.occluded ? (
-                  <Text
-                    key={point.code}
-                    style={{
-                      position: 'absolute',
-                      left: `${point.rx * 100}%`,
-                      top: `${point.ry * 100}%`,
-                      fontFamily: 'monospace',
-                      fontSize: 8,
-                      color: palette.accent,
-                      transform: [{ translateX: 8 }, { translateY: -4 }],
-                    }}
-                  >
-                    {point.code}
-                  </Text>
-                ) : null,
-              )}
+              {TWIN_SCREW_POINT_REGISTRY.map((point) => (
+                <Text
+                  key={point.code}
+                  style={{
+                    position: 'absolute',
+                    left: `${(point.x / TWIN_SCREW_ARTWORK_WIDTH) * 100}%`,
+                    top: `${(point.y / TWIN_SCREW_ARTWORK_HEIGHT) * 100}%`,
+                    fontFamily: 'monospace',
+                    fontSize: 9,
+                    color: dark ? '#9ca3af' : '#4b5563',
+                    transform: [{ translateX: 6 }, { translateY: -6 }],
+                  }}
+                >
+                  {point.code}
+                </Text>
+              ))}
             </View>
           )}
         </View>
@@ -246,13 +230,14 @@ export default function TwinScrewQaPage() {
         })}
       </Section>
 
-      <Section title="3D asset">
-        <Text style={mono}>{TWIN_SCREW_MODEL_URL}</Text>
+      <Section title="Artwork">
+        <Text style={mono}>components/console/machine/twinScrewArtwork/</Text>
         <Text style={{ ...mono, opacity: 0.55, marginTop: 4 }}>
-          MachineWorkspace → MachineStage3D → MachineScene3DCanvas.web
+          MachineWorkspace → TwinScrewExtruder → buildTwinScrewExtruderArtwork
         </Text>
         <Text style={{ ...mono, opacity: 0.55 }}>
-          {closed ? '11 front barrel groups shown' : '11 front barrel groups hidden; twin screws exposed'}
+          SVG source, parsed once into react-native-svg nodes. Pads are drawn by the
+          application in the same {TWIN_SCREW_ARTWORK_WIDTH}×{TWIN_SCREW_ARTWORK_HEIGHT} space.
         </Text>
       </Section>
 

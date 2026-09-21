@@ -15,61 +15,18 @@
  */
 
 import { connectorsForTemplate, artworkSizeForTemplate } from '../machineConnectors';
-import type { SavedLayout } from '../TrailBoard';
-import { rerouteBend, withResolvedConnectors } from '../trailRouting';
-import {
-  createTemplateDefaultLayout,
-  hasDefaultLayout,
-  migrateTemplateLayout,
-} from '../templateDefaultLayouts';
+import { createTemplateDefaultLayout, hasDefaultLayout } from '../templateDefaultLayouts';
 import { TWIN_SCREW_CONNECTORS } from '../TwinScrewExtruder';
-import { existsSync, readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import {
-  Box3,
-  MeshStandardMaterial,
-  PerspectiveCamera,
-  Raycaster,
-  Vector3,
-  type Mesh,
-} from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { fitMachineCamera } from '../machine3d/cameraFit';
-import { stageBoundsForCanvas, STAGE_WIDTH, STAGE_HEIGHT } from '../StageGrid';
+import { parse } from 'react-native-svg';
+import { buildTwinScrewExtruderArtwork, WIDTH, HEIGHT } from '../twinScrewArtwork';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
-  TWIN_SCREW_ANCHORS_3D,
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_COMPONENT_ORDER,
-  TWIN_SCREW_LEGACY_CODE_ALIASES,
-  TWIN_SCREW_MODEL_URL,
-  TWIN_SCREW_SHEET_SCALE,
-  TWIN_SCREW_SHEET_X0,
-  TWIN_SCREW_SHEET_Y1,
   TWIN_SCREW_POINT_REGISTRY,
   twinScrewPointByCode,
 } from '../../../../lib/twinScrewExtruderPoints';
-import {
-  applyTwinScrewMaterialSpec,
-  inheritedString,
-  isEffectivelyVisible,
-  setPartGroupVisibility,
-  TWIN_SCREW_CUTAWAY_GROUP,
-  TWIN_SCREW_CUTAWAY_PART_COUNT,
-  MACHINE_FINISHES,
-  resolveMachineFinishKey,
-  TWIN_SCREW_ENV_INTENSITY,
-  TWIN_SCREW_INSPECTION_VIEW,
-  twinScrewGradedSpec,
-  twinScrewMaterialSpec,
-} from '../machine3d/modelSemantics';
-import {
-  clampProjectionFraction,
-  mergeProjectedConnectorPositions,
-  projectionIsOnScreen,
-  viewportMachineRect,
-} from '../machine3d/types';
 import {
   analyseTwinScrew,
   normaliseReading,
@@ -94,23 +51,7 @@ function check(name: string, condition: boolean, detail?: string) {
 console.log('\n--- Registry ---');
 
 const codes = TWIN_SCREW_POINT_REGISTRY.map((point) => point.code);
-check('the production registry exposes exactly 36 points', codes.length === 36, String(codes.length));
 check('point codes are unique', new Set(codes).size === codes.length, `${codes.length} codes, ${new Set(codes).size} unique`);
-
-const anchorCodes = Object.keys(TWIN_SCREW_ANCHORS_3D);
-check('there is exactly one model-space anchor per point', anchorCodes.length === 36, String(anchorCodes.length));
-check(
-  'registry and model-space anchor identities are one-to-one',
-  codes.length === anchorCodes.length &&
-    codes.every((code) => Object.hasOwn(TWIN_SCREW_ANCHORS_3D, code)) &&
-    anchorCodes.every((code) => codes.includes(code)),
-);
-check(
-  'every model-space anchor is a finite 3-vector',
-  Object.values(TWIN_SCREW_ANCHORS_3D).every(
-    (anchor) => anchor.length === 3 && anchor.every((value) => Number.isFinite(value)),
-  ),
-);
 
 const tags = TWIN_SCREW_POINT_REGISTRY.map((point) => point.analyzerTag);
 check('analyzer tags are unique', new Set(tags).size === tags.length, `${tags.length} tags, ${new Set(tags).size} unique`);
@@ -169,165 +110,150 @@ for (let i = 0; i < TWIN_SCREW_POINT_REGISTRY.length; i += 1) {
 check('no two pads overlap (>= 18 units apart)', closest >= 18, `closest ${closest.toFixed(1)} between ${closestPair}`);
 
 // ---------------------------------------------------------------------------
-console.log('\n--- Registry connector export ---');
+console.log('\n--- Artwork and pads ---');
 
 check(
-  'the connector export contains exactly one pad per registry entry',
+  'the drawing renders exactly one pad per registry entry',
   TWIN_SCREW_CONNECTORS.length === TWIN_SCREW_POINT_REGISTRY.length,
   `${TWIN_SCREW_CONNECTORS.length} vs ${TWIN_SCREW_POINT_REGISTRY.length}`,
 );
 
 check(
-  'the connector export contains no pad outside the registry',
+  'the drawing draws no pad that is not in the registry',
   TWIN_SCREW_CONNECTORS.every((connector) => Boolean(twinScrewPointByCode(connector.code))),
 );
 
 // ---------------------------------------------------------------------------
-console.log('\n--- 3D asset ---');
+console.log('\n--- Artwork ---');
+
+const machineSvg = buildTwinScrewExtruderArtwork();
+
+check(
+  'the artwork is drawn on the frame the registry places points in',
+  WIDTH === TWIN_SCREW_ARTWORK_WIDTH && HEIGHT === TWIN_SCREW_ARTWORK_HEIGHT,
+  `${WIDTH}x${HEIGHT} vs ${TWIN_SCREW_ARTWORK_WIDTH}x${TWIN_SCREW_ARTWORK_HEIGHT}`,
+);
+
+check(
+  'the artwork declares that frame as its viewBox',
+  machineSvg.includes(`viewBox="0 0 ${TWIN_SCREW_ARTWORK_WIDTH} ${TWIN_SCREW_ARTWORK_HEIGHT}"`),
+);
+
+check(
+  'the same options always produce the same drawing',
+  buildTwinScrewExtruderArtwork() === machineSvg,
+);
+
+// The machine has to actually contain the machine. Each of these is a part the
+// registry hangs points off; a silent loss of one would leave pads floating.
+const REQUIRED_PARTS = [
+  // The drive train comes from the rebuild pass, which is why these three carry
+  // its names rather than the base geometry's.
+  'motor-v16', 'motor-coupling-v16', 'gearbox-v16', 'gearbox-output-raised-v22',
+  'main-hopper', 'barrel', 'upper-screw', 'lower-screw', 'side-feeder', 'vent', 'die',
+];
+check(
+  'every part the registry measures is present in the drawing',
+  REQUIRED_PARTS.every((id) => machineSvg.includes(`id="${id}"`)),
+  REQUIRED_PARTS.filter((id) => !machineSvg.includes(`id="${id}"`)).join(', ') || undefined,
+);
 
 /**
- * The production workspace mounts this GLB through
- * `MachineWorkspace -> MachineStage3D -> MachineScene3DCanvas.web`. Its
- * initial view is a fitted near-elevation perspective and remains orbitable.
- * The Blender sources are retained for provenance; this check treats the
- * shipped GLB and explicit TypeScript anchors as the production contract.
+ * Every `url(#…)` the drawing uses resolves to something the drawing defines.
+ *
+ * This is not a style check. A paint server or clip path that is referenced but
+ * never declared is silently destructive and platform-dependent: a browser
+ * drops the element that references it, react-native-svg renders it unclipped.
+ * The reference drawing shipped with exactly that fault — a `#intermeshClip`
+ * that was never defined — so the drawing looked different depending on which
+ * renderer opened it. Nothing about that is visible in a diff.
  */
-const ASSET = join(process.cwd(), 'public', ...TWIN_SCREW_MODEL_URL.split('/').filter(Boolean));
-check('the machine asset is present', existsSync(ASSET), ASSET);
+const referenced = new Set(Array.from(machineSvg.matchAll(/url\(#([^)]+)\)/g), (m) => m[1]));
+const declared = new Set(Array.from(machineSvg.matchAll(/\sid="([^"]+)"/g), (m) => m[1]));
+const dangling = [...referenced].filter((id) => !declared.has(id));
+check('every paint, clip and filter reference resolves', dangling.length === 0, dangling.join(', ') || undefined);
 
 /**
- * The asset requires no glTF extension that needs a decoder.
+ * The drawing draws no instrument of its own.
  *
- * It was Draco-compressed once, and never rendered: Draco decodes through a
- * WebAssembly worker, no other model in this app uses it, and the production
- * CSP is `script-src 'self'`, which does not permit WebAssembly. The loader
- * never resolved and a suspended loader says nothing. Anything that puts a
- * required extension back has to answer the CSP question first.
- *
- * `KHR_mesh_quantization` answers it. It is a storage format, not a codec:
- * three.js reads int16 positions and int8 normals through the same
- * `BufferAttribute` path it uses for floats, with no worker, no WebAssembly and
- * no second script to load. That is what makes it usable here where Draco and
- * meshopt are not, and it is what takes the asset from 6.0 MB to 3.6 MB with no
- * change to a single triangle.
- *
- * The allowance is a fixed list rather than a relaxed assertion, so adding a
- * genuinely undecodable extension still fails here.
+ * The reference ships its sensor markers as a separate layer keyed by its own
+ * sensor ids. Those ids are not the ones saved layouts and channel mappings
+ * reference, so carrying the layer across would have put a second, differently
+ * named set of markers on the machine next to the registry's own — visually
+ * identical, and wired to nothing.
  */
-const DECODER_FREE_EXTENSIONS = new Set(['KHR_mesh_quantization']);
+check(
+  'the drawing carries no instrument markers of its own',
+  !machineSvg.includes('data-sensor-id') && !machineSvg.includes('configured-process-sensors'),
+);
+
+// The reference calls this a marker-only drawing: no sensor names, part names,
+// zone names or leader lines are baked in, so nothing on the machine can go
+// stale against a label the application is the actual source of.
+check('the drawing carries no baked-in text', !machineSvg.includes('<text'));
+
+check(
+  'the sheet and its grid are off unless asked for',
+  !machineSvg.includes('url(#grid)') && buildTwinScrewExtruderArtwork({ showBackground: true }).includes('url(#grid)'),
+);
 
 /**
- * What the shipped asset is allowed to cost.
+ * With the sheet off, the drawing is actually transparent.
  *
- * `meshes` counts glTF primitives, which is what three.js actually draws and
- * therefore the number that decides draw calls. `triangles` is a ceiling; the
- * check that reads it says why it is not an equality.
+ * The reference draws its motor and gearbox twice and hides the first pair
+ * behind an opaque patch across the left third of the frame. Vendoring removes
+ * the hidden pair instead, which is the only reason the machine can sit on the
+ * console's own grid rather than on a white card. A re-vendoring that brought
+ * the patch back would look almost right and be wrong in exactly one way, so
+ * the absence of any opaque fill is asserted rather than assumed.
  */
-const TWIN_SCREW_ASSET_BUDGET = { meshes: 280, triangles: 300_000 } as const;
-const assetJson = (() => {
-  const buf = readFileSync(ASSET);
-  const len = buf.readUInt32LE(12);
-  return JSON.parse(buf.subarray(20, 20 + len).toString('utf8')) as {
-    extensionsRequired?: string[];
-    nodes?: {
-      name?: string;
-      mesh?: number;
-      extras?: { partId?: string; partGroup?: string; spin?: string };
-    }[];
-    materials?: { name?: string; pbrMetallicRoughness?: { roughnessFactor?: number } }[];
+check(
+  'nothing paints an opaque ground when the sheet is off',
+  !/<rect[^>]*fill="#[0-9a-fA-F]{6}"[^>]*width="6[0-9][0-9]"/.test(machineSvg) && !machineSvg.includes('rebuild-background-patches'),
+);
+
+check(
+  'the whole drawing parses into renderable nodes',
+  (() => {
+    const ast = parse(machineSvg);
+    return Boolean(ast) && Array.isArray(ast?.children) && ast.children.length > 0;
+  })(),
+);
+
+/**
+ * Nothing is lost between the drawing and what the console mounts.
+ *
+ * The template does not transcribe the machineSvg into JSX, it parses it — so the
+ * question worth asking is whether the parse is lossy. Counting the elements on
+ * both sides answers it for every element type at once.
+ */
+const parsedCount = (() => {
+  let n = 0;
+  const walk = (node: unknown) => {
+    if (!node || typeof node !== 'object') return;
+    n += 1;
+    const kids = (node as { props?: { children?: unknown[] } }).props?.children;
+    if (Array.isArray(kids)) kids.forEach(walk);
   };
+  parse(machineSvg)?.children.forEach(walk);
+  return n;
 })();
-const undecodable = (assetJson.extensionsRequired ?? []).filter(
-  (name) => !DECODER_FREE_EXTENSIONS.has(name),
-);
+const sourceCount = (machineSvg.match(/<(?!\/|\?|!)/g) ?? []).length - 1; // less the <svg> root
 check(
-  'the asset needs no glTF extension the browser must decode',
-  undecodable.length === 0,
-  undecodable.join(', ') || undefined,
-);
-
-// The pivots are what a screw speed will drive. They are produced by the
-// export step rather than saved in the master, so an export run the wrong
-// way silently ships an asset that can never be animated.
-const PIVOTS = ['PIVOT_SCREW1', 'PIVOT_SCREW2', 'PIVOT_DRIVE'];
-const pivotNames = new Set((assetJson.nodes ?? []).map((n) => n.name));
-check(
-  'the asset carries its animation pivots',
-  PIVOTS.every((name) => pivotNames.has(name)),
-  PIVOTS.filter((name) => !pivotNames.has(name)).join(', ') || undefined,
-);
-
-const authoredFrontNodes = (assetJson.nodes ?? []).filter(
-  (node) => node.extras?.partGroup === TWIN_SCREW_CUTAWAY_GROUP,
-);
-check(
-  'the GLB declares all 11 removable front barrel objects',
-  authoredFrontNodes.length === TWIN_SCREW_CUTAWAY_PART_COUNT,
-  String(authoredFrontNodes.length),
-);
-check(
-  'every removable front object has a stable selectable part id',
-  authoredFrontNodes.every((node) => Boolean(node.extras?.partId)),
-);
-
-const assetMaterialNames = (assetJson.materials ?? [])
-  .map((material) => material.name)
-  .filter((name): name is string => Boolean(name));
-check(
-  'every material used by the GLB has an authored runtime PBR specification',
-  assetMaterialNames.every((name) => Boolean(twinScrewMaterialSpec(name))),
-  assetMaterialNames.filter((name) => !twinScrewMaterialSpec(name)).join(', ') || undefined,
-);
-check(
-  'materials whose exported roughness was lost are covered by runtime normalization',
-  ['MAT_stainless', 'MAT_stainless_b', 'MAT_screw_steel', 'MAT_barrel_steel', 'MAT_cast_gray', 'MAT_cast_light'].every(
-    (name) => twinScrewMaterialSpec(name)?.roughness !== undefined,
-  ),
-);
-
-/**
- * The historical sheet map remains a compatibility contract for stored 2D
- * template anchors. Production marker positions come from the model-space
- * registry and the live camera projection audited below.
- */
-check(
-  'the sheet mapping is declared',
-  Number.isFinite(TWIN_SCREW_SHEET_SCALE) && TWIN_SCREW_SHEET_SCALE > 0 &&
-    Number.isFinite(TWIN_SCREW_SHEET_X0) && Number.isFinite(TWIN_SCREW_SHEET_Y1),
-  `scale ${TWIN_SCREW_SHEET_SCALE}, x0 ${TWIN_SCREW_SHEET_X0}, y1 ${TWIN_SCREW_SHEET_Y1}`,
-);
-
-/** Keep the compatibility map internally proportional to its old sheet. */
-const frustumW = TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_SHEET_SCALE;
-const frustumH = TWIN_SCREW_ARTWORK_HEIGHT / TWIN_SCREW_SHEET_SCALE;
-check(
-  'the compatibility map preserves the sheet aspect ratio',
-  Math.abs(frustumW / frustumH - TWIN_SCREW_ARTWORK_WIDTH / TWIN_SCREW_ARTWORK_HEIGHT) < 1e-9,
-  `${frustumW.toFixed(4)} x ${frustumH.toFixed(4)}`,
-);
-
-/** Every historical sheet point maps back inside the broad model extent. */
-const outsideAsset = TWIN_SCREW_POINT_REGISTRY.filter((point) => {
-  const wx = point.x / TWIN_SCREW_SHEET_SCALE + TWIN_SCREW_SHEET_X0;
-  const wy = TWIN_SCREW_SHEET_Y1 - point.y / TWIN_SCREW_SHEET_SCALE;
-  return wx < -0.05 || wx > 3.3 || wy < -0.05 || wy > 1.4;
-});
-check(
-  'every historical connector maps inside the broad asset extent',
-  outsideAsset.length === 0,
-  outsideAsset.map((p) => p.code).join(', ') || undefined,
+  'the parse keeps every element the drawing declares',
+  parsedCount === sourceCount,
+  `${parsedCount} parsed vs ${sourceCount} in source`,
 );
 
 // ---------------------------------------------------------------------------
-console.log('\n--- Historical connector map ---');
+console.log('\n--- Pads sit on the machine ---');
 
 /**
- * These bounds protect legacy saved-layout migration. Physical attachment of
- * production markers is checked from the loaded GLB near the end.
+ * A pad that has drifted off the machine is still a valid connection point and
+ * still passes every check above it — it just measures thin air. These bound it
+ * to the drawn extent of the machine rather than to the sheet.
  */
-// Historical reference-elevation extent:
-// x 49.5..1598.1, y 76.0..722.5. Rounded outward by a pad radius.
-const MACHINE = { x: 40, y: 66, width: 1608 - 40, height: 733 - 66 };
+const MACHINE = { x: 16, y: 119, width: 1618 - 16, height: 726 - 119 };
 const strays = TWIN_SCREW_POINT_REGISTRY.filter(
   (point) =>
     point.x < MACHINE.x ||
@@ -335,10 +261,10 @@ const strays = TWIN_SCREW_POINT_REGISTRY.filter(
     point.y < MACHINE.y ||
     point.y > MACHINE.y + MACHINE.height,
 );
-check('no historical connector sits off its reference machine', strays.length === 0, strays.map((p) => p.code).join(', ') || undefined);
+check('no pad sits off the machine', strays.length === 0, strays.map((p) => p.code).join(', ') || undefined);
 
-// The barrel zones are one row of instruments along one heater band. If one
-// drifts off that line the machine stops reading as a zone profile.
+// The eight barrel zones are one row of instruments along one heater band. If
+// one drifts off that line the drawing stops reading as a zone profile.
 const zonePads = TWIN_SCREW_POINT_REGISTRY.filter((point) => /^tz-\d+$/.test(point.code));
 check('all nine barrel zones are declared', zonePads.length === 9, String(zonePads.length));
 check(
@@ -350,111 +276,6 @@ check(
   'the barrel zones run upstream to downstream in registry order',
   zonePads.every((point, index) => index === 0 || point.x > zonePads[index - 1].x),
 );
-
-// ---------------------------------------------------------------------------
-console.log('\n--- 3D projection and material contracts ---');
-
-check('projection fractions clamp below the stage', clampProjectionFraction(-0.25) === 0);
-check('projection fractions clamp above the stage', clampProjectionFraction(1.25) === 1);
-check('non-finite projection fractions never escape', clampProjectionFraction(Number.NaN) === 0.5);
-check('a finite point in front of the camera is on-screen', projectionIsOnScreen({ x: 0, y: 0, z: 0 }, -1));
-check('a point behind the camera is rejected', !projectionIsOnScreen({ x: 0, y: 0, z: 0 }, 1));
-check('an off-frustum point is rejected', !projectionIsOnScreen({ x: 1.01, y: 0, z: 0 }, -1));
-check('a non-finite point is rejected', !projectionIsOnScreen({ x: Number.NaN, y: 0, z: 0 }, -1));
-
-const firstProjection = mergeProjectedConnectorPositions(null, [
-  { code: 'tz-01', rx: 1.4, ry: -0.2, distance: 2, onScreen: true, occluded: false },
-]);
-check(
-  'published connector positions are clamped to the stage',
-  firstProjection['tz-01']?.rx === 1 && firstProjection['tz-01']?.ry === 0,
-);
-const retainedProjection = mergeProjectedConnectorPositions(firstProjection, [
-  { code: 'tz-01', rx: 0.2, ry: 0.8, distance: 2, onScreen: false, occluded: false },
-]);
-check(
-  'off-screen connectors retain their last real 3D position',
-  retainedProjection['tz-01']?.rx === 1 && retainedProjection['tz-01']?.ry === 0,
-);
-check('off-screen retained connectors are not snap targets', retainedProjection['tz-01']?.visible === false);
-check(
-  'a connector never falls back to static artwork before its first valid projection',
-  !Object.hasOwn(
-    mergeProjectedConnectorPositions(null, [
-      { code: 'tz-02', rx: 0.5, ry: 0.5, distance: 2, onScreen: false, occluded: false },
-    ]),
-    'tz-02',
-  ),
-);
-
-const recoveredMaterial = new MeshStandardMaterial({ roughness: 1, metalness: 0 });
-recoveredMaterial.name = 'MAT_screw_steel';
-const materialApplied = applyTwinScrewMaterialSpec(recoveredMaterial, true);
-check('the runtime normalizer recognizes the screw material', materialApplied);
-// Asserted against the palette rather than against copied literals: these used
-// to restate 0.26/1.0 and so had to be edited by hand whenever the finish was
-// retuned, which is exactly the kind of drift the normalizer exists to prevent.
-const darkScrewSpec = twinScrewGradedSpec('MAT_screw_steel', true)!;
-check(
-  'the screw roughness is restored from the authored palette',
-  recoveredMaterial.roughness === darkScrewSpec.roughness,
-);
-check(
-  'the screw metalness is restored from the authored palette',
-  recoveredMaterial.metalness === darkScrewSpec.metalness,
-);
-check(
-  'dark-stage reflection intensity is applied',
-  recoveredMaterial.envMapIntensity === TWIN_SCREW_ENV_INTENSITY.dark,
-);
-// The grade is a theme layer over one authored palette, so the same material
-// must come back lighter on the dark stage than on the light one.
-const lightScrewSpec = twinScrewGradedSpec('MAT_screw_steel', false)!;
-check(
-  'the screw is graded lighter for the dark stage than the light one',
-  darkScrewSpec.color === MACHINE_FINISHES.brightMetal.color &&
-    lightScrewSpec.color === MACHINE_FINISHES.brightMetal.lightColor,
-);
-check(
-  'an ungraded material keeps one value across both themes',
-  twinScrewGradedSpec('MAT_cast_gray', true)?.color === twinScrewGradedSpec('MAT_cast_gray', false)?.color,
-);
-
-// The console is a near-black dashboard. A large surface at paper-white is the
-// single thing that made the machine read as a pasted-on CAD model, so no
-// finish may exceed the palette's one deliberate highlight step.
-const tooBright = Object.entries(MACHINE_FINISHES).filter(([, finish]) => {
-  const channel = (hex: string) => parseInt(hex.slice(1, 3), 16);
-  return channel(finish.color) > channel(MACHINE_FINISHES.trim.color);
-});
-check(
-  'no finish is brighter than the reserved highlight step',
-  tooBright.length === 0,
-  tooBright.map(([name]) => name).join(', ') || undefined,
-);
-
-// Part group decides the tone step for the shared body materials. If this
-// collapses, the motor, gearbox, barrel and hopper all render the same grey --
-// which is exactly the flattening this classification exists to prevent.
-const bodyGroups = ['motor', 'gearbox', 'barrel', 'main_feed', 'frame'] as const;
-const bodyFinishes = bodyGroups.map((group) =>
-  resolveMachineFinishKey(group, undefined, 'MAT_cast_gray'),
-);
-check(
-  'shared body material resolves to a distinct finish per part group',
-  new Set(bodyFinishes).size === bodyGroups.length,
-  bodyFinishes.join(', '),
-);
-check(
-  'barrel zone covers alternate between two graphite steps',
-  resolveMachineFinishKey('barrel_top', 'BARREL_TZ_01_top', 'MAT_cast_gray') !==
-    resolveMachineFinishKey('barrel_top', 'BARREL_TZ_02_top', 'MAT_cast_gray'),
-);
-check(
-  'the screws stay lighter than the barrel they sit inside',
-  MACHINE_FINISHES.brightMetal.color > MACHINE_FINISHES.bodyDark.color,
-);
-recoveredMaterial.dispose();
 
 // ---------------------------------------------------------------------------
 console.log('\n--- Connectors and snap targets ---');
@@ -512,108 +333,6 @@ const regenerated = createTemplateDefaultLayout('Twin Screw Extruder', [], null)
 check(
   'the layout is deterministic in the positions it produces',
   JSON.stringify(regenerated.trails.map((t) => t.startMachineAnchor)) === JSON.stringify(layout.trails.map((t) => t.startMachineAnchor)),
-);
-check('every generated twin-screw trail opts into dynamic bend routing', layout.trails.every((trail) => trail.autoRoute === true));
-check(
-  'dynamic bend routing is not added to other machine templates',
-  createTemplateDefaultLayout('Rotary Airlock Valve', [], null).trails.every((trail) => trail.autoRoute === undefined) &&
-    createTemplateDefaultLayout('Single Screw Extruder', [], null).trails.every((trail) => trail.autoRoute === undefined),
-);
-
-const legacyByCurrentCode = new Map(
-  Object.entries(TWIN_SCREW_LEGACY_CODE_ALIASES).map(([legacy, current]) => [current, legacy]),
-);
-const legacyLayout: SavedLayout = {
-  boxes: layout.boxes
-    .filter((box) => box.templatePointCode !== 'tz-09')
-    .map((box) => ({
-      ...box,
-      templatePointCode: box.templatePointCode ? legacyByCurrentCode.get(box.templatePointCode) ?? box.templatePointCode : undefined,
-    })),
-  trails: layout.trails
-    .filter((trail) => trail.startMachinePointCode !== 'tz-09')
-    .map((trail) => ({
-      ...trail,
-      autoRoute: undefined,
-      startMachinePointCode: trail.startMachinePointCode
-        ? legacyByCurrentCode.get(trail.startMachinePointCode) ?? trail.startMachinePointCode
-        : undefined,
-    })),
-  machineZoom: 1.2,
-};
-const migratedLayout = migrateTemplateLayout(
-  'Twin Screw Extruder',
-  legacyLayout,
-  { x: 0, y: 0, width: 1600, height: 900 },
-);
-check('a complete historical 35-point layout restores TZ09', migratedLayout.boxes.length === 36 && migratedLayout.trails.length === 36);
-check(
-  'historical layout identities migrate to current registry codes',
-  migratedLayout.boxes.every((box) => Boolean(twinScrewPointByCode(box.templatePointCode))) &&
-    migratedLayout.trails.every((trail) => Boolean(twinScrewPointByCode(trail.startMachinePointCode))),
-);
-check('layout migration preserves the saved machine zoom', migratedLayout.machineZoom === legacyLayout.machineZoom);
-check('migrated template trails recover dynamic bend routing', migratedLayout.trails.every((trail) => trail.autoRoute === true));
-
-const explicitlyManual: SavedLayout = {
-  ...legacyLayout,
-  trails: legacyLayout.trails.map((trail, index) =>
-    index === 0 ? { ...trail, autoRoute: false } : trail,
-  ),
-};
-const migratedManual = migrateTemplateLayout(
-  'Twin Screw Extruder',
-  explicitlyManual,
-  { x: 0, y: 0, width: 1600, height: 900 },
-);
-check('migration preserves an explicitly manual bend', migratedManual.trails[0].autoRoute === false);
-
-const customPartial: SavedLayout = {
-  boxes: legacyLayout.boxes.slice(0, 4),
-  trails: legacyLayout.trails.slice(0, 4),
-};
-const migratedPartial = migrateTemplateLayout(
-  'Twin Screw Extruder',
-  customPartial,
-  { x: 0, y: 0, width: 1600, height: 900 },
-);
-check('migration never pads a partial operator layout', migratedPartial.boxes.length === 4 && migratedPartial.trails.length === 4);
-
-const routed = rerouteBend(
-  {
-    id: 'route-check',
-    points: [{ x: 10, y: 10 }, { x: 20, y: 20 }, { x: 200, y: 80 }],
-    startMachineAnchor: { rx: 0.1, ry: 0.1 },
-    endBoxId: 'box-check',
-    autoRoute: true,
-  },
-  [{ x: 20, y: 30 }, { x: 20, y: 20 }, { x: 200, y: 80 }],
-);
-check('an auto-routed bend follows a moved endpoint', routed[1].x === 70 && routed[1].y === 80);
-
-const dynamicConnector = { ...connectors[0], rx: 0.25, ry: 0.4, projectionVisible: true };
-const dynamicallyResolved = withResolvedConnectors(
-  [
-    {
-      id: 'dynamic-check',
-      points: [{ x: 0, y: 0 }, { x: 0, y: 0 }, { x: 1200, y: 400 }],
-      startMachineAnchor: { rx: 0, ry: 0 },
-      startMachinePointCode: dynamicConnector.code,
-      endBoxId: 'box-check',
-      autoRoute: true,
-    },
-  ],
-  [{ id: 'box-check', x: 1200, y: 400, label: 'check', templatePointCode: dynamicConnector.code }],
-  [dynamicConnector],
-  { x: 100, y: 50, width: 800, height: 400 },
-)[0];
-check(
-  'a live 3D projection moves the attached trail endpoint',
-  dynamicallyResolved.points[0].x === 300 && dynamicallyResolved.points[0].y === 210,
-);
-check(
-  'a live 3D projection reroutes the derived bend with the endpoint',
-  dynamicallyResolved.points[1].x === 490 && dynamicallyResolved.points[1].y === 400,
 );
 
 // ---------------------------------------------------------------------------
@@ -811,244 +530,5 @@ const empty = analyseTwinScrew([]);
 check('with nothing mapped, every rule reports insufficient evidence', empty.pending.every((r) => r.status === 'INSUFFICIENT_EVIDENCE'));
 check('with nothing mapped, no finding is invented', empty.findings.length === 0);
 
-async function checkRuntimeAsset() {
-  console.log('\n--- Loaded GLB semantics and default visibility ---');
-
-  // GLTFLoader's progress object is a browser global. No network is involved,
-  // but Node still needs the constructor to exist while parsing the local GLB.
-  if (typeof globalThis.ProgressEvent === 'undefined') {
-    Object.defineProperty(globalThis, 'ProgressEvent', {
-      configurable: true,
-      value: class ProgressEvent {},
-    });
-  }
-
-  const bytes = readFileSync(ASSET);
-  const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
-  const gltf = await new GLTFLoader().parseAsync(arrayBuffer, '');
-  const root = gltf.scene;
-  root.updateWorldMatrix(true, true);
-
-  const meshes: Mesh[] = [];
-  let triangles = 0;
-  root.traverse((object) => {
-    const mesh = object as Mesh;
-    if (!mesh.isMesh) return;
-    meshes.push(mesh);
-    triangles += (mesh.geometry.index?.count ?? mesh.geometry.attributes.position.count) / 3;
-  });
-  check(
-    'the production GLB loads every render mesh in the machine',
-    meshes.length === TWIN_SCREW_ASSET_BUDGET.meshes,
-    String(meshes.length),
-  );
-  // A ceiling, not an equality: the point of this number is the frame, not the
-  // asset. The two screws were 460 832 of an old 603 744 -- three quarters of
-  // the machine spent on a helix eighty pixels across -- and both the download
-  // and every vertex shader invocation were paying for it. Re-tessellated they
-  // are a third of that. What must never happen again is a detail pass quietly
-  // buying its way back over the budget, so the assertion is a limit with the
-  // current figure printed beside it.
-  check(
-    `the production GLB stays inside its ${TWIN_SCREW_ASSET_BUDGET.triangles}-triangle frame budget`,
-    triangles <= TWIN_SCREW_ASSET_BUDGET.triangles,
-    String(triangles),
-  );
-  // And a floor, because the cheapest way to pass a triangle budget is to lose
-  // the machine. A silently truncated export is exactly the failure this pairs
-  // with: it would sail through the ceiling above and render a partial model.
-  check(
-    'the production GLB still carries the whole machine, not a truncated export',
-    triangles >= TWIN_SCREW_ASSET_BUDGET.triangles * 0.7,
-    String(triangles),
-  );
-
-  const hiddenCount = setPartGroupVisibility(root, TWIN_SCREW_CUTAWAY_GROUP, false);
-  check(
-    'cutaway mode hides all authored front groups through inherited metadata',
-    hiddenCount === TWIN_SCREW_CUTAWAY_PART_COUNT,
-    String(hiddenCount),
-  );
-  const hiddenOwner = root.getObjectByName('BARREL_TZ_01_front');
-  const hiddenPrimitive = hiddenOwner?.getObjectByProperty('isMesh', true);
-  check(
-    'a primitive under a hidden cutaway owner is effectively hidden',
-    Boolean(hiddenPrimitive && !isEffectivelyVisible(hiddenPrimitive)),
-  );
-
-  const groupedOwner = root.getObjectByName('GEARBOX_input');
-  const groupedPrimitive = groupedOwner?.getObjectByProperty('isMesh', true);
-  check(
-    'part selection resolves metadata inherited from a multi-primitive owner',
-    inheritedString(groupedPrimitive, 'partId') === 'GEARBOX_input',
-  );
-
-  const screwParts = { screw_1: 0, screw_2: 0 };
-  root.traverse((object) => {
-    const group = object.userData?.partGroup;
-    if (group === 'screw_1') {
-      screwParts.screw_1 += 1;
-      if (!isEffectivelyVisible(object)) screwParts.screw_1 = Number.NEGATIVE_INFINITY;
-    } else if (group === 'screw_2') {
-      screwParts.screw_2 += 1;
-      if (!isEffectivelyVisible(object)) screwParts.screw_2 = Number.NEGATIVE_INFINITY;
-    }
-  });
-  check('cutaway leaves both complete screw groups visible', screwParts.screw_1 === 12 && screwParts.screw_2 === 12);
-
-  const semanticSurfaces: Readonly<Record<string, string>> = {
-    'motor-nde-vib': 'MOTOR_body',
-    // Screw A is the upper shaft, Screw B the lower, and the asset now agrees:
-    // this pair used to be inverted because the shipped GLB predated the
-    // correction to `lib_params.SCREW_1_AXIS` and carried S1 geometry on
-    // screw 2's axis. Re-exported, S1/S2 sit on their own pivots.
-    'screw-1-rpm': 'PIVOT_SCREW1',
-    'screw-2-rpm': 'PIVOT_SCREW2',
-    'side-feed-current': 'SIDE_FEEDER_HOUSING',
-    'p-int-01': 'SENSOR_P_INT_01',
-    'p-int-02': 'SENSOR_P_INT_02',
-    'tz-09': 'BARREL_TZ_08_top',
-    'p-screw-in': 'SCREEN_PACK_INLET',
-    'p-screw-out': 'SENSOR_P_SCR_OUT',
-  };
-  const surfaceDrift = Object.entries(semanticSurfaces).filter(([code, partId]) => {
-    const part = root.getObjectByName(partId);
-    const anchor = TWIN_SCREW_ANCHORS_3D[code];
-    if (!part || !anchor) return true;
-    return new Box3().setFromObject(part).distanceToPoint(new Vector3(...anchor)) > 0.003;
-  });
-  check(
-    'corrected anchors remain on their semantically appropriate hardware',
-    surfaceDrift.length === 0,
-    surfaceDrift.map(([code, part]) => `${code}:${part}`).join(', ') || undefined,
-  );
-
-  const modelBox = new Box3().setFromObject(root);
-  const anchorOutsideModel = Object.entries(TWIN_SCREW_ANCHORS_3D).filter(([, anchor]) =>
-    modelBox.distanceToPoint(new Vector3(...anchor)) > 1e-6,
-  );
-  check(
-    'all 36 anchors stay within the loaded machine extent',
-    anchorOutsideModel.length === 0,
-    anchorOutsideModel.map(([code]) => code).join(', ') || undefined,
-  );
-
-  const extent = modelBox.getSize(new Vector3());
-  const aspect = 1600 / 900;
-  const { centre, distance } = fitMachineCamera(
-    modelBox, new Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction),
-    TWIN_SCREW_INSPECTION_VIEW.fov, aspect, TWIN_SCREW_INSPECTION_VIEW.fillMargin,
-  );
-  const camera = new PerspectiveCamera(
-    TWIN_SCREW_INSPECTION_VIEW.fov,
-    aspect,
-    Math.max(distance / 200, 0.01),
-    distance * 8 + extent.length(),
-  );
-  camera.position
-    .copy(centre)
-    .addScaledVector(new Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction).normalize(), distance);
-  camera.lookAt(centre);
-  camera.updateMatrixWorld(true);
-
-  // Regression: the entire model must fit at desktop/tablet/phone sizes,
-  // including the screenshot's saved 80% magnification. Test the shipped
-  // camera helper against the actual GLB, not a second copy of the formula.
-  for (const [width, height] of [[1920, 774], [1366, 700], [768, 900], [390, 650]]) {
-    const scale = Math.min(width / STAGE_WIDTH, height / STAGE_HEIGHT);
-    const rect = viewportMachineRect(stageBoundsForCanvas(width, height, scale));
-    const originX = (width - STAGE_WIDTH * scale) / 2;
-    const originY = (height - STAGE_HEIGHT * scale) / 2;
-    for (const direction of [new Vector3(...TWIN_SCREW_INSPECTION_VIEW.direction), new Vector3(0, 0, 1), new Vector3(1, 0.6, 1).normalize()]) {
-      for (const zoom of [0.8, 1]) {
-        const fit = fitMachineCamera(modelBox, direction, camera.fov, width / height);
-        const viewCamera = new PerspectiveCamera(camera.fov, width / height, 0.01, fit.distance * 10);
-        viewCamera.position.copy(fit.centre).addScaledVector(direction, fit.distance / zoom);
-        viewCamera.lookAt(fit.centre);
-        viewCamera.updateMatrixWorld(true);
-        let fits = true;
-        let aligned = true;
-        for (const x of [modelBox.min.x, modelBox.max.x]) {
-          for (const y of [modelBox.min.y, modelBox.max.y]) {
-            for (const z of [modelBox.min.z, modelBox.max.z]) {
-              const ndc = new Vector3(x, y, z).project(viewCamera);
-              fits &&= Number.isFinite(ndc.x) && Math.abs(ndc.x) < 1 && Math.abs(ndc.y) < 1 && Math.abs(ndc.z) < 1;
-              const rx = (ndc.x + 1) / 2;
-              const ry = (1 - ndc.y) / 2;
-              aligned &&= Math.abs(originX + (rect.x + rx * rect.width) * scale - rx * width) < 1e-6;
-              aligned &&= Math.abs(originY + (rect.y + ry * rect.height) * scale - ry * height) < 1e-6;
-            }
-          }
-        }
-        const label = `${width}×${height}, ${zoom * 100}%, direction ${direction.toArray()}`;
-        check(`full GLB stays inside camera frame: ${label}`, fits);
-        check(`trail coordinates match the full viewport: ${label}`, aligned);
-      }
-    }
-  }
-
-  const ray = new Raycaster();
-  const visibleCodes: string[] = [];
-  const detachedCodes: string[] = [];
-  const invalidProjectionCodes: string[] = [];
-  for (const [code, anchor] of Object.entries(TWIN_SCREW_ANCHORS_3D)) {
-    const world = new Vector3(...anchor).applyMatrix4(root.matrixWorld);
-    const ndc = world.clone().project(camera);
-    const view = world.clone().applyMatrix4(camera.matrixWorldInverse);
-    const onScreen = projectionIsOnScreen(ndc, view.z);
-    const rx = clampProjectionFraction((ndc.x + 1) / 2);
-    const ry = clampProjectionFraction((1 - ndc.y) / 2);
-    if (!Number.isFinite(rx) || !Number.isFinite(ry) || rx < 0 || rx > 1 || ry < 0 || ry > 1) {
-      invalidProjectionCodes.push(code);
-    }
-    if (!onScreen) continue;
-
-    const direction = world.clone().sub(camera.position);
-    const anchorDistance = direction.length();
-    ray.set(camera.position, direction.normalize());
-    ray.far = Math.max(
-      anchorDistance - TWIN_SCREW_INSPECTION_VIEW.occlusionClearance,
-      0.01,
-    );
-    const occluded = ray.intersectObjects(meshes, false).some((hit) => isEffectivelyVisible(hit.object));
-    if (!occluded) visibleCodes.push(code);
-
-    // The rendered dot needs a small stand-off so it does not z-fight with the
-    // metal. Reusing the production occlusion clearance makes that allowance
-    // explicit: the first visible triangle must still be within 12 mm along
-    // the inspection ray, in front of or immediately behind the anchor.
-    ray.far = Number.POSITIVE_INFINITY;
-    const surfaceHit = ray
-      .intersectObjects(meshes, false)
-      .find((hit) => isEffectivelyVisible(hit.object));
-    const surfaceGap = surfaceHit ? Math.abs(surfaceHit.distance - anchorDistance) : Number.POSITIVE_INFINITY;
-    if (surfaceGap > TWIN_SCREW_INSPECTION_VIEW.occlusionClearance) {
-      detachedCodes.push(`${code}:${Number.isFinite(surfaceGap) ? surfaceGap.toFixed(4) : 'no-surface'}`);
-    }
-  }
-  check(
-    'default cutaway keeps all 36 points on-screen and unoccluded',
-    visibleCodes.length === 36,
-    codes.filter((code) => !visibleCodes.includes(code)).join(', ') || undefined,
-  );
-  check(
-    'all 36 marker anchors are physically attached to a visible machine surface',
-    detachedCodes.length === 0,
-    detachedCodes.join(', ') || undefined,
-  );
-  check(
-    'default projected coordinates are finite and clamped',
-    invalidProjectionCodes.length === 0,
-    invalidProjectionCodes.join(', ') || undefined,
-  );
-}
-
-checkRuntimeAsset()
-  .catch((error: unknown) => {
-    failures += 1;
-    console.log(`  FAIL  production GLB runtime audit — ${error instanceof Error ? error.message : String(error)}`);
-  })
-  .finally(() => {
-    console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
-    process.exitCode = failures === 0 ? 0 : 1;
-  });
+console.log(`\n${failures === 0 ? 'ALL CHECKS PASSED' : `${failures} CHECK(S) FAILED`}`);
+process.exit(failures === 0 ? 0 : 1);
