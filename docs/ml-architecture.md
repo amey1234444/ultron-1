@@ -70,6 +70,39 @@ components/console/machine/ml/
                          Wired as a fourth tab on the twin-screw Analyzer.
 ```
 
+### How telemetry actually reaches the service
+
+This was the missing link, and it is worth being explicit about because the
+service is useless without it:
+
+```
+MQTT → ingest → measurement_latest          (already existed)
+                      │
+  src/instrumentation.ts  register()        starts the feeder once, per process
+                      ▼
+  src/server/mlFeeder.ts   every ML_FEED_INTERVAL_MS (default 5s)
+      getWorkspace() + getLiveState()
+        → for each Twin Screw Extruder machine
+          → lib/knowledge/ml/telemetryFrame.ts  buildTelemetryFrame()
+               mapped channels → analyser tags, normalised to canonical units
+          → skip if nothing is reporting
+          → POST /inference
+          → persistMlDiagnosis()  →  ml_predictions, ml_fault_risks, ...
+```
+
+It runs **on the server, on a timer**, not in the browser. Shadow mode only
+produces data if frames arrive whether or not anyone is looking, and a
+developing fault runs through exactly the period when nobody has a tab open.
+
+`POST /api/ml/feed` drives one pass by hand, for a deployment that prefers an
+external scheduler or an engineer who wants to see one tick's outcome.
+
+The frame shape is contract-tested: `services/ml/tests/fixtures/console_frame.json`
+was produced by running the TypeScript adapter, and
+`tests/unit/test_console_contract.py` validates it against the Python schema and
+runs the whole chain on it. A hand-written fixture would keep passing while the
+adapter drifted.
+
 ### The knowledge bridge
 
 Ninety faults, forty anomalies, sixty signals, thirteen operating states and

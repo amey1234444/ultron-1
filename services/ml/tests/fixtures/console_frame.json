@@ -1,0 +1,111 @@
+{
+  "machine_id": "TSE-01",
+  "timestamp": "2026-01-01T00:00:00.000Z",
+  "machine_type": "TWIN_SCREW_EXTRUDER",
+  "template_id": "TSE-7Z-CR-INT-PAR-COMP",
+  "configuration_version": null,
+  "context": {
+    "recipe_id": "PP-GF30",
+    "material_id": null,
+    "commanded_change": null
+  },
+  "channels": {
+    "TS-PM1": {
+      "value": null,
+      "unit": "kW",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    },
+    "TS-S1": {
+      "value": null,
+      "unit": "rpm",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    },
+    "TS-S2": {
+      "value": null,
+      "unit": "rpm",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    },
+    "TS-TZ1": {
+      "value": null,
+      "unit": "degC",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    },
+    "TS-F1": {
+      "value": null,
+      "unit": "kg/h",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    },
+    "TS-TM": {
+      "value": null,
+      "unit": "degC",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    },
+    "TS-P3": {
+      "value": null,
+      "unit": "MPa",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    },
+    "TS-P4": {
+      "value": null,
+      "unit": "MPa",
+      "source_timestamp": null,
+      "received_at": null,
+      "source_quality": null,
+      "source": null,
+      "alert_active": false,
+      "danger_active": false,
+      "trip_active": false
+    }
+  },
+  "setpoints": {},
+  "data_source": "REAL",
+  "sequence": 1,
+  "ingest_metadata": {
+    "mapped_channels": 8,
+    "reporting": 0,
+    "unknown_points": [],
+    "unit_problems": []
+  }
+}

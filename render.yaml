@@ -99,6 +99,8 @@ services:
         sync: false
       - key: ML_TIMEOUT_MS
         value: 4000
+      - key: ML_FEED_INTERVAL_MS
+        value: 5000
       - key: SUPER_ADMIN_PASSWORD
         sync: false
       - key: ADMIN_PASSWORD
