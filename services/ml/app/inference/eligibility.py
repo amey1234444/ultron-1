@@ -58,6 +58,7 @@ def evaluate_eligibility(
     required_lookback_steps: int,
     model_available: bool,
     model_reason: str | None = None,
+    model_schema_error: str | None = None,
     configuration_version: str | None = None,
     model_configuration: str | None = None,
 ) -> EligibilityResult:
@@ -175,6 +176,20 @@ def evaluate_eligibility(
     if not knowledge().field_calibrated:
         warnings.append(
             "Baselines and limits are engineering-development values, not field calibrated."
+        )
+
+    # A model that is loaded but cannot be fed is a different answer from no
+    # model at all, and the difference matters to whoever is paged: NO_MODEL is
+    # a deployment that has not adopted the ML layer, FEATURE_SCHEMA_MISMATCH is
+    # an artifact and a pipeline that have drifted apart and needs a retrain.
+    # Checked before NO_MODEL because a mismatched model is reported as
+    # unavailable, and the more specific reason must win.
+    if model_schema_error:
+        return EligibilityResult(
+            eligible=False,
+            reason=MLIneligibleReason.FEATURE_SCHEMA_MISMATCH,
+            detail=model_schema_error,
+            warnings=warnings,
         )
 
     # Last: the observation would have been eligible, and there is no model.

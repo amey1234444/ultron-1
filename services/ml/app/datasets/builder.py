@@ -208,15 +208,43 @@ class Dataset:
             for row in self.rows
         ]
 
+        # Parquet in row-group batches rather than one table.
+        #
+        # `Table.from_pylist` over the whole dataset builds every column in
+        # memory at once, which for a few thousand rows of a 1,644-column
+        # union is enough to fail on an ordinary machine. It did: the first
+        # rebuild silently fell back and wrote a 332 MB JSONL for 4,980 rows,
+        # where the parquet is a fraction of that. Batching keeps the peak flat
+        # and the schema is taken from the first batch so every batch agrees.
+        batch_size = 256
+        written = False
         try:
             from ..core.capability import module
 
             pyarrow = module("pyarrow")
             import pyarrow.parquet as parquet  # noqa: PLC0415
 
-            table = pyarrow.Table.from_pylist(records)
-            parquet.write_table(table, base / "rows.parquet")
-        except Exception:  # noqa: BLE001 - JSONL is a complete fallback
+            first = pyarrow.Table.from_pylist(records[:batch_size])
+            with parquet.ParquetWriter(base / "rows.parquet", first.schema) as writer:
+                writer.write_table(first)
+                for start in range(batch_size, len(records), batch_size):
+                    writer.write_table(
+                        pyarrow.Table.from_pylist(
+                            records[start : start + batch_size], schema=first.schema
+                        )
+                    )
+            written = True
+        except Exception as error:  # noqa: BLE001 - JSONL is a complete fallback
+            # Recorded rather than swallowed. A silent fallback is how a
+            # 332 MB JSONL appears where a parquet was expected, and nothing
+            # downstream can tell the difference until it runs out of memory.
+            self.notes.append(
+                f"Parquet could not be written ({type(error).__name__}: {error}); "
+                "fell back to JSONL, which is larger and slower to read."
+            )
+            (base / "rows.parquet").unlink(missing_ok=True)
+
+        if not written:
             with (base / "rows.jsonl").open("w", encoding="utf-8") as handle:
                 for record in records:
                     handle.write(json.dumps(record) + "\n")
@@ -320,6 +348,41 @@ class DatasetBuilder:
 
         if not rows:
             raise DatasetError("No rows were produced. Check the frame source.")
+
+        # A dataset whose feature block is empty is not a dataset, and it is
+        # indistinguishable from a good one until a model trained on it turns
+        # out to be a constant predictor. That is not hypothetical: ds-synth-002
+        # was written with all 1,652 columns null, and the resulting boosters
+        # contained 44-148 trees and zero splits. Nothing between the builder
+        # and the frozen-test metrics noticed.
+        #
+        # Residual and embedding columns are legitimately null on a first pass
+        # (the temporal model is trained from this same data and does not exist
+        # yet), so the check is on the engineered block only.
+        engineered_ids = set(
+            union_feature_ids(include_residuals=False, include_embedding=False)
+        )
+        engineered = [
+            index for index, fid in enumerate(feature_ids) if fid in engineered_ids
+        ]
+        populated = sum(
+            1
+            for index in engineered
+            if any(row.features[index] is not None for row in rows)
+        )
+        if engineered and populated == 0:
+            raise DatasetError(
+                f"Every one of the {len(engineered)} engineered feature columns is null "
+                f"across all {len(rows)} rows. A model trained on this cannot split on "
+                "anything and will be a constant predictor. See "
+                "docs/ml/WHY_THE_MODEL_WAS_CONSTANT.md."
+            )
+        if engineered and populated < 0.5 * len(engineered):
+            notes.append(
+                f"Only {populated} of {len(engineered)} engineered feature columns carry "
+                "any value. Check the feature engine before reading anything into a model "
+                "trained from this dataset."
+            )
 
         split = chronological_split(
             [row.timestamp for row in rows],

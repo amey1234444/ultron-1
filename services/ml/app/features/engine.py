@@ -624,3 +624,51 @@ def describe_vector(feature_ids: Sequence[str]) -> list[dict[str, Any]]:
             }
         )
     return out
+
+
+def feature_schema_fingerprint(feature_ids: Sequence[str] | None = None) -> str:
+    """A deterministic hash of the feature schema a model is fitted against.
+
+    ``FEATURE_SET_VERSION`` is a promise a human has to remember to keep. This
+    is the same promise the machine can check, and it exists because the
+    promise was broken: ``TS-TZ9`` was removed from the knowledge, 48 columns
+    disappeared, and the version string stayed ``1.0.0`` on both sides. A model
+    trained before that change and a pipeline running after it agreed on the
+    version and disagreed on 48 columns.
+
+    The hash covers everything that changes what a column *means* to a trained
+    model — id, order, family, unit and window — so a renamed unit or a
+    widened window invalidates the artifact even though the column count is
+    unchanged. It deliberately does not cover descriptions or display names,
+    which a model never sees.
+    """
+    from hashlib import sha256
+
+    ids = tuple(feature_ids) if feature_ids is not None else union_feature_ids()
+    index = definition_index()
+    digest = sha256()
+    for position, feature_id in enumerate(ids):
+        definition = index.get(feature_id)
+        digest.update(
+            "|".join(
+                (
+                    str(position),
+                    feature_id,
+                    definition.family if definition else "UNKNOWN",
+                    str(definition.unit) if definition else "",
+                    str(definition.window_seconds) if definition else "",
+                )
+            ).encode("utf-8")
+        )
+        digest.update(b"\x1e")
+    return digest.hexdigest()[:32]
+
+
+def feature_schema_block(feature_ids: Sequence[str] | None = None) -> dict[str, Any]:
+    """The schema identity to stamp on an artifact and compare at load."""
+    ids = tuple(feature_ids) if feature_ids is not None else union_feature_ids()
+    return {
+        "feature_set_version": FEATURE_SET_VERSION,
+        "feature_schema_hash": feature_schema_fingerprint(ids),
+        "feature_count": len(ids),
+    }

@@ -204,14 +204,30 @@ class EventOutcome:
 
 def event_level_recall(
     outcomes: Sequence[EventOutcome],
-) -> dict[str, float | int]:
-    """How many *events* were caught, not how many samples."""
+) -> dict[str, float | int | str | None]:
+    """How many *events* were caught, not how many samples.
+
+    With no events in the split the recall is **undefined**, and it is reported
+    as ``None`` with a reason rather than as ``0.0``. The difference is not
+    cosmetic: ``0.0`` reads as "the model missed everything" and would fail a
+    promotion gate on evidence that does not exist, when the truth is that the
+    split contained nothing to detect. The frozen test split of ds-synth-002
+    reported exactly this — `event_recall: 0.0` over zero events — and it was
+    read as a model failure for longer than it should have been.
+    """
     total = len(outcomes)
     detected = sum(1 for outcome in outcomes if outcome.detected)
+    if total == 0:
+        return {
+            "events": 0,
+            "detected": 0,
+            "event_recall": None,
+            "undefined_reason": "No physical events of this fault occur in this split.",
+        }
     return {
         "events": total,
         "detected": detected,
-        "event_recall": round(detected / total, 4) if total else 0.0,
+        "event_recall": round(detected / total, 4),
     }
 
 
@@ -505,3 +521,119 @@ def classify_false_alarm(record: FalseAlarmRecord) -> str:
             "anomaly rather than a model error."
         )
     return "No obvious contextual cause. Candidate for engineering review or a label gap."
+
+
+# ---------------------------------------------------------------------------
+# Sanity gates.
+#
+# These exist because ds-synth-002 produced nine outputs whose every metric was
+# computed correctly, reported honestly, and described a model that had learned
+# nothing at all. The trees contained zero splits, every prediction was the
+# base score, ROC-AUC was exactly 0.50, and nothing in the pipeline objected.
+#
+# A metric describes a model. A gate refuses one. The difference is what these
+# add. See docs/ml/WHY_THE_MODEL_WAS_CONSTANT.md.
+
+
+@dataclass(frozen=True)
+class SanityVerdict:
+    """The outcome of one gate, with the numbers that decided it."""
+
+    check: str
+    passed: bool
+    detail: str
+    observed: dict[str, float | int | None] = field(default_factory=dict)
+
+    def to_json(self) -> dict[str, object]:
+        return {
+            "check": self.check,
+            "passed": self.passed,
+            "detail": self.detail,
+            "observed": self.observed,
+        }
+
+
+#: Below this spread a score column carries no ranking information at all.
+#: Deliberately tiny — this catches a degenerate model, not a cautious one.
+CONSTANT_PREDICTION_STD = 1e-6
+
+#: A ranking this close to chance on data built to be separable means something
+#: upstream is broken. It is not a quality bar; a genuinely weak model scores
+#: well clear of it.
+RANDOM_RANKING_MARGIN = 0.02
+
+
+def constant_predictor_check(probabilities: Sequence[float]) -> SanityVerdict:
+    """Fail when a model returns effectively one number for every input."""
+    values = [float(p) for p in probabilities if p is not None]
+    if len(values) < 2:
+        return SanityVerdict(
+            check="CONSTANT_PREDICTOR_CHECK",
+            passed=False,
+            detail="Fewer than two predictions were produced; nothing can be concluded.",
+            observed={"count": len(values)},
+        )
+    mean = sum(values) / len(values)
+    variance = sum((value - mean) ** 2 for value in values) / len(values)
+    std = variance**0.5
+    distinct = len(set(round(value, 9) for value in values))
+    passed = std > CONSTANT_PREDICTION_STD and distinct > 1
+    return SanityVerdict(
+        check="CONSTANT_PREDICTOR_CHECK",
+        passed=passed,
+        detail=(
+            "Predictions vary across inputs."
+            if passed
+            else (
+                f"Every prediction is effectively the same value (std={std:.3e}, "
+                f"{distinct} distinct). The model cannot rank anything. Check that the "
+                "feature matrix reaching the trainer is populated."
+            )
+        ),
+        observed={
+            "std": std,
+            "mean": mean,
+            "min": min(values),
+            "max": max(values),
+            "distinct": distinct,
+            "count": len(values),
+        },
+    )
+
+
+def ranking_sanity_check(observed_roc_auc: float, *, positives: int, negatives: int) -> SanityVerdict:
+    """Fail when ranking is indistinguishable from chance on separable data.
+
+    Reported as undecidable rather than failed when either class is empty,
+    because ROC-AUC is undefined there and a gate that fails on an undefined
+    metric teaches people to ignore gates.
+    """
+    if positives == 0 or negatives == 0:
+        return SanityVerdict(
+            check="RANKING_SANITY_CHECK",
+            passed=True,
+            detail=(
+                "Undecidable: ROC-AUC needs both classes present "
+                f"({positives} positive, {negatives} negative)."
+            ),
+            observed={"roc_auc": None, "positives": positives, "negatives": negatives},
+        )
+    passed = abs(observed_roc_auc - 0.5) > RANDOM_RANKING_MARGIN
+    return SanityVerdict(
+        check="RANKING_SANITY_CHECK",
+        passed=passed,
+        detail=(
+            f"ROC-AUC {observed_roc_auc:.4f} is distinguishable from chance."
+            if passed
+            else (
+                f"ROC-AUC {observed_roc_auc:.4f} is within {RANDOM_RANKING_MARGIN} of 0.50. "
+                "On data built to be separable this indicates a broken pipeline, not a weak "
+                "model — check the feature matrix, the label alignment and the column order."
+            )
+        ),
+        observed={
+            "roc_auc": observed_roc_auc,
+            "positives": positives,
+            "negatives": negatives,
+        },
+    )

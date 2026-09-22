@@ -42,6 +42,22 @@ class ModelContract:
 
     feature_set_version: str = FEATURE_SET_VERSION
 
+    feature_schema_hash: str | None = None
+    """Fingerprint of the exact schema this artifact was fitted against.
+
+    The version string is a promise a human has to remember to keep; this is
+    the one the machine checks. It exists because the promise was broken once
+    already — 48 columns were removed from the registry and
+    ``feature_set_version`` stayed ``1.0.0`` on both sides, so a model and a
+    pipeline agreed on the version and disagreed on the columns.
+
+    ``None`` means the artifact predates fingerprinting, which is itself a
+    reason to refuse it rather than a reason to skip the check.
+    """
+
+    feature_count: int | None = None
+    """Column count, checked before the hash so the error can say what changed."""
+
     outputs: tuple[str, ...] = ()
     """For a classifier: ``fault_id@horizon_minutes`` per output. For the
     temporal model: the forecast channels."""
@@ -81,17 +97,69 @@ class ModelContract:
         case: a feature-set bump invalidates every model, and reporting "column
         x missing" for four hundred columns would bury the actual cause.
         """
-        if self.feature_set_version != FEATURE_SET_VERSION:
+        from ..features.engine import feature_schema_fingerprint
+
+        running_hash = feature_schema_fingerprint(available)
+
+        def refuse(message: str, **extra: Any) -> None:
+            # Every refusal carries both sides of every identifier, because the
+            # first question anyone asks is "trained against what, running
+            # what?" and an error that omits it sends them to the registry.
             raise ModelContractError(
-                f"Model {self.model_id} was trained against feature set "
-                f"{self.feature_set_version}; this service computes {FEATURE_SET_VERSION}.",
-                detail={"model": self.model_id, "trained": self.feature_set_version, "running": FEATURE_SET_VERSION},
+                message,
+                detail={
+                    "model": self.model_id,
+                    "expected_feature_set_version": self.feature_set_version,
+                    "actual_feature_set_version": FEATURE_SET_VERSION,
+                    "expected_feature_count": self.feature_count
+                    if self.feature_count is not None
+                    else len(self.feature_ids),
+                    "actual_feature_count": len(available),
+                    "expected_feature_schema_hash": self.feature_schema_hash,
+                    "actual_feature_schema_hash": running_hash,
+                    **extra,
+                },
             )
+
+        if self.feature_set_version != FEATURE_SET_VERSION:
+            refuse(
+                f"Model {self.model_id} was trained against feature set "
+                f"{self.feature_set_version}; this service computes {FEATURE_SET_VERSION}."
+            )
+
+        expected_count = (
+            self.feature_count if self.feature_count is not None else len(self.feature_ids)
+        )
+        if expected_count != len(available):
+            refuse(
+                f"Model {self.model_id} was trained on {expected_count} features; this "
+                f"pipeline produces {len(available)}."
+            )
+
         missing = [feature_id for feature_id in self.feature_ids if feature_id not in set(available)]
         if missing:
-            raise ModelContractError(
-                f"Model {self.model_id} expects {len(missing)} feature(s) this pipeline does not produce.",
-                detail={"model": self.model_id, "missing": missing[:20], "missing_count": len(missing)},
+            refuse(
+                f"Model {self.model_id} expects {len(missing)} feature(s) this pipeline "
+                "does not produce.",
+                missing=missing[:20],
+                missing_count=len(missing),
+            )
+
+        # Last, because it is the check that catches what the others cannot: a
+        # column that kept its name and position but changed its unit, its
+        # window or the family that computes it. The count matches, no name is
+        # missing, and the trained tree's thresholds are silently wrong.
+        if self.feature_schema_hash is None:
+            refuse(
+                f"Model {self.model_id} carries no feature schema fingerprint. It predates "
+                "schema verification and cannot be shown to match this pipeline."
+            )
+        if self.feature_schema_hash != running_hash:
+            refuse(
+                f"Model {self.model_id} was fitted against feature schema "
+                f"{self.feature_schema_hash}; this pipeline computes {running_hash}. The "
+                "column count and names agree, so something a model reads — a unit, a "
+                "window, or the family computing a column — changed underneath it."
             )
 
     def to_json(self) -> dict[str, Any]:

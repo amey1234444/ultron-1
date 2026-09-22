@@ -96,3 +96,27 @@ def test_commissioning_is_not_field_calibrated(isolated_settings) -> None:
     book = knowledge()
     assert book.field_calibrated is False
     assert "No value here is field calibrated" in book.commissioning_notice
+
+
+def test_the_generator_never_publishes_an_undeclared_tag(isolated_settings) -> None:
+    """The synthetic generator's tag list must be a subset of the knowledge.
+
+    This is the regression guard for a defect that cost a whole training run.
+    ``tags.json`` lost ``TS-TZ9`` when the twin-screw artwork was changed, but
+    ``STEADY_LEVELS`` kept publishing it. DQ-008 then flagged every frame as
+    "published but not a declared tag", which dragged the frame verdict to BAD
+    and made healthy synthetic data unusable — while every unit test that did
+    not evaluate data quality carried on passing.
+
+    Asserting the subset relation here means the next tag removed from the
+    knowledge fails loudly, in one place, naming the tag.
+    """
+    from app.synthetic.generator import STEADY_LEVELS
+
+    declared = {entry.tag for entry in knowledge().tags}
+    published = set(STEADY_LEVELS)
+    undeclared = published - declared
+    assert not undeclared, (
+        f"the synthetic generator publishes {sorted(undeclared)}, which the knowledge "
+        f"snapshot does not declare; DQ-008 will mark every frame BAD"
+    )

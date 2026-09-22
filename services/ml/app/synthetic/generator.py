@@ -54,7 +54,6 @@ STEADY_LEVELS: dict[str, float] = {
     "TS-TZ6": 205.0,
     "TS-TZ7": 205.0,
     "TS-TZ8": 205.0,
-    "TS-TZ9": 205.0,
     "TS-TT0": 55.0,
     "TS-TV": 200.0,
     "TS-PV": 0.03,

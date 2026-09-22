@@ -37,7 +37,7 @@ from typing import Any, Sequence
 from ..baseline.engine import BaselineSelector, BaselineStore
 from ..context.engine import ContextEngine, ContextObject, context_changed
 from ..core.config import Settings, settings as global_settings
-from ..core.errors import MLStatus
+from ..core.errors import MLServiceError, MLStatus, ModelContractError, ModelInferenceError
 from ..core.timeutil import iso, seconds_between
 from ..core.versions import version_block
 from ..decision.engine import DecisionEngine, DecisionResult
@@ -47,6 +47,7 @@ from ..features.engine import FeatureEngine, FeatureFrame, union_feature_ids
 from ..features.registry import reset_registry_cache
 from ..knowledge.loader import knowledge
 from ..models.temporal.runtime import TemporalOutput, TemporalRuntime, UNAVAILABLE
+from ..models.base import Prediction
 from ..models.trees.ensemble import TreeEnsemble
 from ..persistence.filters import DecisionFilter, FilterVerdict
 from ..quality.engine import DataQualityEngine, FrameQuality
@@ -132,8 +133,28 @@ class InferencePipeline:
         )
         self._machines: dict[str, MachineState] = {}
         self._feature_ids = union_feature_ids()
+        self._schema_error = self._verify_model_contract()
 
     # -- public -------------------------------------------------------------
+
+    def _verify_model_contract(self) -> str | None:
+        """Check the loaded artifact against the schema this pipeline serves.
+
+        ``ModelContract.check_against`` has always existed and was never
+        called, which is how a model trained on 1,652 columns reached
+        ``predict()`` in a pipeline computing 1,604 and raised a bare
+        ``ValueError`` out of an API handler that catches only
+        ``MLServiceError``. The verification belongs here, once, at load —
+        not per frame, and never inside the try block that serves a request.
+        """
+        contract = self.ensemble.contract
+        if contract is None:
+            return None
+        try:
+            contract.check_against(self._feature_ids)
+        except ModelContractError as error:
+            return str(error)
+        return None
 
     def process(
         self, frame: TelemetryFrame, *, explain: bool = False, force: bool = False
@@ -208,6 +229,7 @@ class InferencePipeline:
             required_lookback_steps=self.temporal.lookback_steps,
             model_available=self.ensemble.available,
             model_reason=self.ensemble.reason,
+            model_schema_error=self._schema_error,
             configuration_version=frame.configuration_version,
             model_configuration=None,
         )
@@ -218,20 +240,34 @@ class InferencePipeline:
         vector: list[float | None] = []
         risks: dict[str, FilterVerdict] = {}
 
-        if eligibility.eligible:
-            temporal_output = self._run_temporal(frame, quality, sequence)
-            # A temporal model that was never configured is absent, not
-            # degraded. DEGRADED means something that should work does not, and
-            # applying it to an optional component nobody installed would make
-            # every healthy deployment report itself unwell.
-            if (
-                not temporal_output.available
-                and temporal_output.reason
-                and self.temporal.contract is not None
-            ):
-                degraded.append(f"temporal: {temporal_output.reason}")
+        # The feature union is computed for every processed frame, eligible or
+        # not. Eligibility answers "may this observation drive an
+        # operator-facing prediction?", which is a different question from
+        # "what did the feature engine compute?" — deterministic, and with no
+        # dependency on a model existing.
+        #
+        # Conflating the two was silently fatal. `build_dataset` records the
+        # vector the pipeline served, and a dataset is built precisely when no
+        # model exists yet, so the last gate in `evaluate_eligibility` —
+        # NO_MODEL — fired on every frame and every training row was written
+        # with 1,652 nulls. The trees then had nothing to split on and every
+        # model trained this way was a constant predictor. See
+        # docs/ml/WHY_THE_MODEL_WAS_CONSTANT.md.
+        temporal_output = self._run_temporal(frame, quality, sequence)
+        # A temporal model that was never configured is absent, not degraded.
+        # DEGRADED means something that should work does not, and applying it
+        # to an optional component nobody installed would make every healthy
+        # deployment report itself unwell.
+        if (
+            not temporal_output.available
+            and temporal_output.reason
+            and self.temporal.contract is not None
+        ):
+            degraded.append(f"temporal: {temporal_output.reason}")
 
-            vector = self._build_vector(features, temporal_output)
+        vector = self._build_vector(features, temporal_output)
+
+        if eligibility.eligible:
             risks = self._run_classifier(frame, vector, rules, eligible=True)
             if not self.ensemble.available and self.ensemble.reason:
                 degraded.append(f"classifier: {self.ensemble.reason}")
@@ -444,7 +480,30 @@ class InferencePipeline:
         eligible: bool,
     ) -> dict[str, FilterVerdict]:
         hard_limit = rules.danger_reached or rules.trip_active
-        predictions = self.ensemble.predict(vector) if (eligible and vector) else []
+        predictions: list[Prediction] = []
+        if eligible and vector:
+            try:
+                predictions = self.ensemble.predict(vector)
+            except MLServiceError:
+                # Already structured — the caller's degraded path knows what to
+                # do with it.
+                raise
+            except Exception as error:
+                # A booster, a calibrator or a numeric library failing mid-frame
+                # must not become an HTTP 500 that takes the deterministic
+                # verdict down with it. The contract is verified at load, so
+                # anything arriving here is genuinely unexpected and is
+                # re-raised as a structured failure the API can render — with
+                # the original attached, because a swallowed traceback is how a
+                # silent model defect survives a release.
+                raise ModelInferenceError(
+                    f"The classifier failed on this frame: {type(error).__name__}: {error}",
+                    detail={
+                        "model": self.ensemble.model_id,
+                        "library": self.ensemble.library,
+                        "exception": type(error).__name__,
+                    },
+                ) from error
 
         verdicts: dict[str, FilterVerdict] = {}
         for prediction in predictions:

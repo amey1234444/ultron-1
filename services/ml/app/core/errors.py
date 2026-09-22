@@ -74,6 +74,23 @@ class ModelContractError(MLServiceError):
     code = "MODEL_CONTRACT_MISMATCH"
 
 
+class ModelInferenceError(MLServiceError):
+    """A loaded model failed while scoring a frame.
+
+    Distinct from ``ModelContractError``, which is a mismatch caught before any
+    prediction is attempted. This one means the contract checked out and the
+    model still failed — a corrupt booster, a calibrator disagreeing with its
+    ensemble, a numeric library raising on a value it does not like.
+
+    It exists so that such a failure degrades the response instead of escaping
+    as a bare ``ValueError`` through an API layer that catches only
+    ``MLServiceError``. The deterministic verdict must survive it.
+    """
+
+    status_code = 503
+    code = "MODEL_INFERENCE_FAILED"
+
+
 class PromotionRefused(MLServiceError):
     """A model was not promoted. The reasons are the point of the exception."""
 
