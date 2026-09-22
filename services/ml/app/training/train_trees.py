@@ -22,6 +22,7 @@ from typing import Any, Sequence
 from ..core.capability import probe
 from ..core.timeutil import iso, now as utc_now, parse_timestamp
 from ..core.versions import FEATURE_SET_VERSION
+from ..features.engine import feature_schema_fingerprint
 from ..labels.events import FaultEvent, label_quality_mix
 from ..models.base import ModelContract
 from ..models.trees.common import TreeTrainingConfig
@@ -135,6 +136,12 @@ def train(library: str, argv: Sequence[str] | None = None) -> int:
         version="1",
         feature_ids=tuple(selected),
         feature_set_version=FEATURE_SET_VERSION,
+        # Stamped at training time so the artifact can be checked against the
+        # pipeline that loads it. Without these the contract verification has
+        # nothing to compare and refuses the model -- which is the correct
+        # behaviour for an artifact that cannot prove what it was fitted on.
+        feature_schema_hash=feature_schema_fingerprint(tuple(selected)),
+        feature_count=len(selected),
         trained_on_dataset=args.dataset,
         trained_on_real_data=bool(summary.get("contains_real_data", False)),
         label_quality_mix=label_quality_mix(events),
