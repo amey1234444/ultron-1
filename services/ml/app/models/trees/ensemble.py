@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from ...core.capability import CapabilityUnavailable, module, probe
+from ...core.errors import ComponentCapability, ModelContractError
 from ..base import ModelContract, Prediction
 from ..calibration.calibrators import Calibrator
 from .common import TreeTrainingConfig, to_matrix
@@ -64,6 +65,32 @@ class TreeEnsemble:
     @property
     def available(self) -> bool:
         return bool(self.outputs) and self.contract is not None
+
+    def capability(self, feature_ids: Sequence[str] | None = None) -> ComponentCapability:
+        """Which state this ensemble is in, not merely whether it is usable.
+
+        ``available`` collapses "nobody has trained one", "an artifact exists
+        but did not load" and "it loaded and its contract no longer matches the
+        pipeline" into a single False. Those need different responses: the
+        first is an expected state, the last needs a retrain, and only the last
+        two are anyone's fault.
+
+        ``feature_ids`` is the schema the caller would serve it against. Pass it
+        to distinguish INCOMPATIBLE from AVAILABLE; without it the contract is
+        taken at face value, which is all a describe() call needs.
+        """
+        if self.contract is None:
+            return ComponentCapability.NOT_TRAINED
+        if not self.outputs:
+            return ComponentCapability.NOT_LOADED
+        if feature_ids is not None:
+            try:
+                self.contract.check_against(feature_ids)
+            except ModelContractError:
+                return ComponentCapability.INCOMPATIBLE
+            except Exception:  # noqa: BLE001 - a contract that cannot be read is broken
+                return ComponentCapability.FAILED
+        return ComponentCapability.AVAILABLE
 
     @property
     def model_id(self) -> str | None:
@@ -378,6 +405,7 @@ class TreeEnsemble:
         return {
             "library": self.library,
             "available": self.available,
+            "capability": self.capability().value,
             "reason": self.reason,
             "model_id": self.model_id,
             "output_count": len(self.outputs),

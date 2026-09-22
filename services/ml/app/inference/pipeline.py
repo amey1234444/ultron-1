@@ -37,7 +37,13 @@ from typing import Any, Sequence
 from ..baseline.engine import BaselineSelector, BaselineStore
 from ..context.engine import ContextEngine, ContextObject, context_changed
 from ..core.config import Settings, settings as global_settings
-from ..core.errors import MLServiceError, MLStatus, ModelContractError, ModelInferenceError
+from ..core.errors import (
+    ComponentCapability,
+    MLServiceError,
+    MLStatus,
+    ModelContractError,
+    ModelInferenceError,
+)
 from ..core.timeutil import iso, seconds_between
 from ..core.versions import version_block
 from ..decision.engine import DecisionEngine, DecisionResult
@@ -136,6 +142,33 @@ class InferencePipeline:
         self._schema_error = self._verify_model_contract()
 
     # -- public -------------------------------------------------------------
+
+    def component_capabilities(self) -> dict[str, str]:
+        """The state of each learned component, as a state not a boolean.
+
+        ``DISABLED`` is decided here rather than by the components themselves:
+        a model is not disabled, a deployment is, and the component has no way
+        to know the difference between "switched off" and "never installed".
+        """
+        if self.settings.ml_mode == "disabled":
+            return {
+                "classifier": ComponentCapability.DISABLED.value,
+                "temporal": ComponentCapability.DISABLED.value,
+                "explanation": ComponentCapability.DISABLED.value,
+            }
+        from ..core.capability import probe
+
+        return {
+            # Checked against the schema this pipeline actually serves, so a
+            # loaded-but-stale artifact reads INCOMPATIBLE, not AVAILABLE.
+            "classifier": self.ensemble.capability(self._feature_ids).value,
+            "temporal": self.temporal.capability.value,
+            "explanation": (
+                ComponentCapability.AVAILABLE
+                if probe("shap").available
+                else ComponentCapability.NOT_LOADED
+            ).value,
+        }
 
     def _verify_model_contract(self) -> str | None:
         """Check the loaded artifact against the schema this pipeline serves.
@@ -381,7 +414,10 @@ class InferencePipeline:
             "mode": self.settings.ml_mode,
             "feature_count": len(self._feature_ids),
             "temporal": self.temporal.describe(),
-            "classifier": self.ensemble.describe(),
+            "classifier": self.ensemble.describe() | {
+                "capability": self.component_capabilities()["classifier"]
+            },
+            "capabilities": self.component_capabilities(),
             "machines_tracked": len(self._machines),
             "knowledge": knowledge().describe(),
             "versions": version_block(),
