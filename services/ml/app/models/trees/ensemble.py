@@ -232,6 +232,14 @@ class TreeEnsemble:
                 if values.ndim == 3:
                     values = values[..., 1] if values.shape[-1] == 2 else values[0]
                 row = list(values[0])[: len(self.contract.feature_ids)]
+                if len(row) != len(self.contract.feature_ids):
+                    # zip would silently truncate to the shorter sequence and
+                    # hand back a vector that looks complete. Fall through to
+                    # the native path instead of returning a short one.
+                    raise ValueError(
+                        f"shap returned {len(row)} contributions for "
+                        f"{len(self.contract.feature_ids)} features"
+                    )
                 return (
                     list(zip(self.contract.feature_ids, (float(v) for v in row))),
                     "shap_treeexplainer",
@@ -240,6 +248,13 @@ class TreeEnsemble:
                 pass
 
         pairs = self.explain(vector, output)
+        if not pairs:
+            # `explain` swallows its errors by design -- an explanation is never
+            # worth a 500 -- so an empty result is a legitimate outcome, not an
+            # exception. Reporting a method name beside no numbers would claim a
+            # provenance for values that do not exist, which is worse than
+            # saying nothing.
+            return [], "unavailable"
         method = (
             "native_pred_contrib_shap_equivalent"
             if self.library in self.NATIVE_SHAP_EQUIVALENT

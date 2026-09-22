@@ -52,12 +52,25 @@ def test_the_method_is_reported_with_the_numbers(library: str, path: Path) -> No
         [0.0] * len(ensemble.contract.feature_ids), output
     )
 
-    assert len(pairs) == len(ensemble.contract.feature_ids)
     assert method in {
         "shap_treeexplainer",
         "native_pred_contrib_shap_equivalent",
         "native_tree_contributions_unverified",
+        "unavailable",
     }
+
+    # The invariant that matters, and the one this test previously got wrong:
+    # the method describes the numbers that came back. `explain` swallows its
+    # errors by design, so no contributions is a legitimate outcome — but then
+    # the method must say so rather than name a path.
+    if method == "unavailable":
+        assert pairs == []
+    else:
+        assert len(pairs) == len(ensemble.contract.feature_ids), (
+            "a named method must come with a full-width vector; a short one "
+            "would look complete to every consumer"
+        )
+
     if method == "native_tree_contributions_unverified":
         assert library not in TreeEnsemble.NATIVE_SHAP_EQUIVALENT, (
             "a library on the verified list should not report itself unverified"
