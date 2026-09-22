@@ -112,7 +112,25 @@ const nextConfig = {
     '@expo-google-fonts/space-grotesk',
     '@expo-google-fonts/ibm-plex-mono',
   ],
-  webpack: (config, { isServer, webpack }) => {
+  webpack: (config, { isServer, nextRuntime, webpack }) => {
+    // `src/instrumentation.ts` is compiled once for every server runtime — Node
+    // and edge alike — and webpack resolves its `await import('./server/mlFeeder')`
+    // even though the `NEXT_RUNTIME` guard around it means the edge build can
+    // never reach that line. The feeder imports `pg`, `pg` requires `fs` and
+    // `pg-native`, and the edge compilation has neither.
+    //
+    // The consequence is out of all proportion to the cause: the compilation
+    // fails, and *every* page 500s, not just the ones that touch the database.
+    // `serverExternalPackages` above does not cover this, because it applies to
+    // the Node server compilation only.
+    //
+    // If this path ever moves, the edge build fails with that same
+    // `Can't resolve 'fs'` — loudly, and pointing back here.
+    if (nextRuntime === 'edge') {
+      config.plugins.push(
+        new webpack.IgnorePlugin({ resourceRegExp: /^\.\/server\/mlFeeder$/ }),
+      );
+    }
     config.resolve.alias = {
       ...(config.resolve.alias || {}),
       // react-native -> react-native-web for the browser build.
