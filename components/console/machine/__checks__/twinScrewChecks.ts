@@ -31,6 +31,11 @@ import {
   twinScrewPointByCode,
 } from '../../../../lib/twinScrewExtruderPoints';
 import {
+  TWIN_SCREW_ARTWORK_PIXEL_HEIGHT,
+  TWIN_SCREW_ARTWORK_PIXEL_WIDTH,
+  TWIN_SCREW_ARTWORK_SOURCE,
+} from '../../../../lib/machineArtwork';
+import {
   analyseTwinScrew,
   normaliseReading,
   resolveSignal,
@@ -151,6 +156,34 @@ check(
   'the shipped PNG is byte-identical to the supplied template asset',
   imageHash === 'c0478204b57944a5745c5e0de9bf217ce94ea519e80d59cb38fb5e35120021ee',
   imageHash,
+);
+
+// The drawing is loaded through a platform split — `machineArtwork.ts` for
+// Metro, `machineArtwork.web.ts` for Next — because the two bundlers hand back
+// different things for the same import. Getting that wrong fails *silently*:
+// react-native-web's Image accepts a string or a `{ uri }` and renders nothing
+// at all for any other shape, with no error and no warning, so the container's
+// own background shows through and the machine reads as a solid dark slab.
+//
+// Nothing else in the suite would notice, which is exactly why these are here.
+const artworkSource = TWIN_SCREW_ARTWORK_SOURCE as { uri?: unknown };
+check(
+  'the artwork resolves to something Image can load',
+  typeof artworkSource === 'object' &&
+    artworkSource !== null &&
+    typeof artworkSource.uri === 'string' &&
+    (artworkSource.uri as string).length > 0,
+  JSON.stringify(TWIN_SCREW_ARTWORK_SOURCE).slice(0, 120),
+);
+check(
+  'the artwork source is not a bundler object left unreduced',
+  !JSON.stringify(TWIN_SCREW_ARTWORK_SOURCE).includes('"src"'),
+  JSON.stringify(TWIN_SCREW_ARTWORK_SOURCE).slice(0, 120),
+);
+check(
+  'the artwork module reports the size the PNG actually is',
+  TWIN_SCREW_ARTWORK_PIXEL_WIDTH === imageWidth && TWIN_SCREW_ARTWORK_PIXEL_HEIGHT === imageHeight,
+  `${TWIN_SCREW_ARTWORK_PIXEL_WIDTH}x${TWIN_SCREW_ARTWORK_PIXEL_HEIGHT} vs ${imageWidth}x${imageHeight}`,
 );
 
 const referenceSensorIds = Object.keys(TWIN_SCREW_REFERENCE_SENSORS);

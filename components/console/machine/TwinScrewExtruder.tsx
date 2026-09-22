@@ -7,10 +7,8 @@ import {
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_POINT_REGISTRY,
 } from '../../../lib/twinScrewExtruderPoints';
+import { TWIN_SCREW_ARTWORK_SOURCE } from '../../../lib/machineArtwork';
 import { MeasurementPad, padStateLabel, type MeasurementPadState } from './MeasurementPad';
-
-/** Untouched source artwork from `twin_screw_exact_typescript.zip`. */
-const TWIN_SCREW_IMAGE = require('../../../assets/machines/twin-screw-extruder.png');
 
 type TwinScrewExtruderProps = {
   className?: string;
@@ -82,7 +80,7 @@ export function TwinScrewExtruder({
       ]}
     >
       <Image
-        source={TWIN_SCREW_IMAGE}
+        source={TWIN_SCREW_ARTWORK_SOURCE}
         resizeMode="stretch"
         accessible
         accessibilityLabel="Twin screw extruder machine visualization with sensor points"
