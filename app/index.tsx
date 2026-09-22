@@ -44,6 +44,7 @@ import {
 import { ensureSseSimulationWorkspace } from '../lib/sseSimulationProfile';
 import { archiveDuplicateConfiguredDeviceIps, archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
 import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
+import { SapIntegrationPage } from '../components/console/sap/SapIntegrationPage';
 import {
   duplicateFolderSubtree,
   duplicateProject,
@@ -78,6 +79,8 @@ function selectedToHash(selected: SelectedNode): string {
       return '#devices';
     case 'simulation':
       return '#simulation';
+    case 'sap':
+      return '#sap';
     case 'project':
     case 'folder':
     case 'machine':
@@ -91,6 +94,7 @@ function selectedFromHash(hash: string): SelectedNode {
   if (!normalized || normalized === 'home') return { kind: 'none' };
   if (normalized === 'devices') return { kind: 'devices' };
   if (normalized === 'simulation') return { kind: 'simulation' };
+  if (normalized === 'sap') return { kind: 'sap' };
   const [kind, encodedId = ''] = normalized.split('=');
   const id = decodeURIComponent(encodedId);
   if (!id) return { kind: 'none' };
@@ -900,10 +904,12 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const detailTopClearance =
     leftCollapsed && !workspaceCollapsesSidebar && (selected.kind === 'device' || selected.kind === 'simulation') ? 44 : 0;
 
-  // The top-bar switcher owns the three top-level destinations; the selection
+  // The top-bar switcher owns the four top-level destinations; the selection
   // is still the single source of truth, so the control reads back out of it.
   const consoleView: ConsoleView =
-    selected.kind === 'devices' || selected.kind === 'device' || selected.kind === 'simulation'
+    selected.kind === 'sap'
+      ? 'sap'
+      : selected.kind === 'devices' || selected.kind === 'device' || selected.kind === 'simulation'
       ? 'devices'
       : selected.kind === 'none'
         ? 'overview'
@@ -918,6 +924,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       setSelected({ kind: 'devices' });
       return;
     }
+    if (view === 'sap') {
+      setSelected({ kind: 'sap' });
+      return;
+    }
     const firstProjectId = projects[0]?.id;
     setSelected(firstProjectId ? { kind: 'project', id: firstProjectId } : { kind: 'none' });
     setLeftCollapsed(false);
@@ -925,7 +935,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
   // The overview is plant-wide and has no tree to browse, so the sidebar would
   // only be a column of dead space next to it.
-  const showSidebar = consoleView !== 'overview' && !workspaceCollapsesSidebar;
+  const showSidebar = consoleView !== 'overview' && consoleView !== 'sap' && !workspaceCollapsesSidebar;
 
   // Which plant the overview reports on. Defaults to the first project and
   // falls back to it if that project disappears.
@@ -1081,7 +1091,9 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         )}
 
         <View className="relative flex-1" style={detailTopClearance ? { paddingTop: detailTopClearance } : undefined}>
-          {selected.kind === 'machine' && selectedMachine ? (
+          {selected.kind === 'sap' ? (
+            <SapIntegrationPage plantId={overviewPlantId} plantName={overviewProjects[0]?.name ?? null} />
+          ) : selected.kind === 'machine' && selectedMachine ? (
             <MachineWorkspace
               key={selectedMachine.id}
               machine={selectedMachine}

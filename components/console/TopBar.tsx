@@ -10,13 +10,14 @@ import { deviceWithGatewayConnectionState, racksForGateway, type DeviceNode } fr
 
 const LOGO_HEIGHT = 19;
 
-/** The three top-level destinations the console opens onto. */
-export type ConsoleView = 'overview' | 'hierarchy' | 'devices';
+/** The four top-level destinations the console opens onto. */
+export type ConsoleView = 'overview' | 'hierarchy' | 'devices' | 'sap';
 
 const VIEWS: { id: ConsoleView; label: string; hint: string }[] = [
   { id: 'overview', label: 'Plant Overview', hint: 'Operations, performance and history' },
   { id: 'hierarchy', label: 'Asset Hierarchy', hint: 'Projects, areas and machines' },
   { id: 'devices', label: 'Devices', hint: 'Gateways, racks and channels' },
+  { id: 'sap', label: 'SAP Integration', hint: 'Equipment, maintenance and materials' },
 ];
 
 type TopBarProps = {
