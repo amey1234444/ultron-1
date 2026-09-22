@@ -43,6 +43,15 @@ DECISION_RULES_VERSION: Final = "1.0.0"
 #: Persistence / hysteresis / cooldown filter.
 DECISION_FILTER_VERSION: Final = "1.0.0"
 
+#: The label schema: what 0, 1 and EXCLUDED mean, and how onset windows are
+#: derived. A model trained under different label semantics is not comparable
+#: with one trained under these, however similar its metrics look.
+LABEL_SCHEMA_VERSION: Final = "1.0.0"
+
+#: The fault taxonomy the outputs are named from. A renumbered fault library
+#: silently repoints every output key, so it is recorded per artifact.
+FAULT_TAXONOMY_VERSION: Final = "1.0.0"
+
 #: The knowledge snapshot shape this code understands. Checked at load.
 KNOWLEDGE_SCHEMA_VERSION: Final = "1.0.0"
 
@@ -61,4 +70,6 @@ def version_block() -> dict[str, str]:
         "decision_rules": DECISION_RULES_VERSION,
         "decision_filter": DECISION_FILTER_VERSION,
         "knowledge_schema": KNOWLEDGE_SCHEMA_VERSION,
+        "label_schema": LABEL_SCHEMA_VERSION,
+        "fault_taxonomy": FAULT_TAXONOMY_VERSION,
     }

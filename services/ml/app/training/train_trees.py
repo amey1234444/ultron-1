@@ -21,7 +21,7 @@ from typing import Any, Sequence
 
 from ..core.capability import probe
 from ..core.timeutil import iso, now as utc_now, parse_timestamp
-from ..core.versions import FEATURE_SET_VERSION
+from ..core.versions import FAULT_TAXONOMY_VERSION, FEATURE_SET_VERSION, LABEL_SCHEMA_VERSION
 from ..features.engine import feature_schema_fingerprint
 from ..labels.events import FaultEvent, label_quality_mix
 from ..models.base import ModelContract
@@ -31,6 +31,7 @@ from ..registry.registry import ModelRegistry, artifact_dir, timestamp_id
 from .common import (
     RunRecord,
     base_parser,
+    code_revision,
     configure_logging,
     environment,
     print_summary,
@@ -146,6 +147,12 @@ def train(library: str, argv: Sequence[str] | None = None) -> int:
         trained_on_real_data=bool(summary.get("contains_real_data", False)),
         label_quality_mix=label_quality_mix(events),
         knowledge_digest=str(summary.get("knowledge_digest", "")),
+        label_schema_version=LABEL_SCHEMA_VERSION,
+        fault_taxonomy_version=FAULT_TAXONOMY_VERSION,
+        # The commit the artifact was produced from. Without it a model cannot
+        # be rebuilt, and "which code made this" is the first question asked of
+        # any surfaced prediction.
+        code_revision=code_revision(),
         random_seed=args.seed,
         trained_at=iso(utc_now()),
         training_window=_window(records),

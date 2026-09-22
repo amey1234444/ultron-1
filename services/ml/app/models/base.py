@@ -72,6 +72,20 @@ class ModelContract:
     trained entirely on BRONZE is a pipeline test, and this is where that is
     written down rather than remembered."""
 
+    label_schema_version: str | None = None
+    """What 0, 1 and EXCLUDED meant when this was fitted."""
+
+    fault_taxonomy_version: str | None = None
+    """Which fault library the output keys are named from."""
+
+    temporal_model: str | None = None
+    """The temporal artifact whose residuals and embedding this model consumed.
+
+    ``None`` means it was fitted on engineered features alone. Recorded because
+    a tree trained on residuals from one LSTM cannot be served alongside a
+    different one -- the columns keep their names and change their meaning.
+    """
+
     knowledge_digest: str | None = None
     code_revision: str | None = None
     random_seed: int | None = None

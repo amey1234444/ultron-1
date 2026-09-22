@@ -18,6 +18,9 @@ on:
   push:
     paths:
       - "services/ml/**"
+      - "src/**"
+      - "components/**"
+      - "next.config.js"
       - "lib/knowledge/**"
       - "lib/twinScrewExtruderPoints.ts"
       - "scripts/exportKnowledge.ts"
@@ -82,3 +85,96 @@ jobs:
           name: golden-report
           path: services/ml/artifacts/golden/
           if-no-files-found: ignore
+
+  smoke:
+    name: Training smoke (models actually learn)
+    runs-on: ubuntu-latest
+    # The expensive job, and the one that would have caught a pipeline
+    # producing 44-148 trees with zero splits in every one of them. It builds
+    # a small dataset, trains both libraries and asserts the result is not a
+    # constant predictor. Deliberately not a quality bar -- it fails only on
+    # catastrophic breakage, which is the failure mode that went unnoticed for
+    # an entire release.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install with the tree libraries
+        working-directory: services/ml
+        run: |
+          python -m pip install --upgrade pip
+          # Pinned: 4.7.0 segfaults in LGBM_DatasetSetField on some platforms.
+          pip install -e ".[dev]" "lightgbm==4.5.0" "xgboost>=2,<3" scikit-learn
+      - name: Build a small dataset
+        working-directory: services/ml
+        run: |
+          python -m app.training.build_dataset             --dataset-id ci-smoke --repeats 1 --emit-every 60 --allow-unverified
+      # The check that matters: a dataset whose feature block is empty is not a
+      # dataset, and the builder refuses to write one. Asserted here so a
+      # regression in the feature path fails CI rather than a release.
+      - name: Audit the dataset
+        working-directory: services/ml
+        run: |
+          python -m app.training.audit_dataset --dataset ci-smoke
+          python - <<'PY'
+          import json, sys
+          audit = json.load(open("artifacts/audit/dataset_audit.json"))
+          assert audit["usable_for_training"], "the feature matrix is empty"
+          assert audit["features_populated"] > 0, audit
+          print("populated columns:", audit["features_populated"])
+          PY
+      - name: Baselines must beat chance
+        working-directory: services/ml
+        run: |
+          python -m app.training.run_baselines --dataset ci-smoke --split valid
+          python - <<'PY'
+          import json
+          result = json.load(open("artifacts/metrics/baselines.json"))
+          assert result["any_arm_learned"], result["verdict"]
+          print(result["verdict"])
+          PY
+      - name: Model serialises and round-trips
+        working-directory: services/ml
+        run: |
+          python -m app.training.train_lightgbm             --dataset ci-smoke --model-id ci-lgbm --min-events 1
+          python - <<'PY'
+          from pathlib import Path
+          from app.inference.pipeline import InferencePipeline
+          from app.models.trees.ensemble import TreeEnsemble
+          ensemble = TreeEnsemble.load(Path("artifacts/models/lightgbm/ci-lgbm-1"))
+          pipeline = InferencePipeline(ensemble=ensemble)
+          assert pipeline._schema_error is None, pipeline._schema_error
+          print("contract verified on load")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-artifacts
+          path: |
+            services/ml/artifacts/audit/
+            services/ml/artifacts/metrics/
+          if-no-files-found: ignore
+
+  web:
+    name: Typecheck and production build
+    runs-on: ubuntu-latest
+    # The acceptance gate that has never been proven. A dev-server 200 is not a
+    # production build: the edge compilation, which is where instrumentation.ts
+    # dragged pg and fs into a runtime that has neither, only runs here.
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --include=dev
+      - run: npm run check:knowledge-export
+      - run: npx tsc --noEmit -p tsconfig.next.json
+      - run: npm run check:twin-screw
+      - run: npm run check:machine-zoom
+      - name: Production build
+        run: npx next build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
