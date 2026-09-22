@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Sequence
 
-from ...core.capability import CapabilityUnavailable, module
+from ...core.capability import CapabilityUnavailable, module, probe
 from ..base import ModelContract, Prediction
 from ..calibration.calibrators import Calibrator
 from .common import TreeTrainingConfig, to_matrix
@@ -192,12 +192,66 @@ class TreeEnsemble:
             )
         return predictions
 
-    def explain(self, vector: Sequence[float | None], output: str) -> list[tuple[str, float]]:
-        """SHAP contributions for one output, paired with feature ids.
+    #: Libraries whose native contribution output has been checked against
+    #: ``shap.TreeExplainer`` on a real artifact and found identical.
+    #:
+    #: LightGBM's ``pred_contrib`` matches to 0.000e+00 -- bit identical -- so
+    #: calling it SHAP is accurate. XGBoost's ``pred_contribs`` does NOT: the
+    #: same artifact and inputs differ by up to 5.7e-01, and it is not a
+    #: feature-name or DMatrix artifact (checked both ways). Until that is
+    #: understood, XGBoost native output is reported as what it is -- native
+    #: tree contributions -- and never as a validated SHAP value.
+    NATIVE_SHAP_EQUIVALENT = frozenset({"lightgbm"})
 
-        Uses the booster's own fast path rather than a generic explainer: both
-        libraries compute exact tree SHAP internally, which is both correct and
-        roughly two orders of magnitude quicker than a sampling explainer on a
+    def explain_with_method(
+        self, vector: Sequence[float | None], output: str
+    ) -> tuple[list[tuple[str, float]], str]:
+        """Contributions plus the name of the method that produced them.
+
+        Prefers ``shap.TreeExplainer`` where it is installed, because it is the
+        reference implementation. Falls back to the booster's native path,
+        which is far quicker on a 1,604-column vector and, for LightGBM, has
+        been verified identical.
+
+        The method travels with the numbers so a consumer is never left
+        guessing whether it holds a SHAP value or something SHAP-like.
+        """
+        fitted = self.outputs.get(output)
+        if fitted is None or self.contract is None:
+            return [], "unavailable"
+
+        if probe("shap").available:
+            try:
+                import numpy  # noqa: PLC0415
+
+                shap = module("shap")
+                matrix = to_matrix([vector])
+                values = numpy.array(
+                    shap.TreeExplainer(fitted.booster).shap_values(matrix)
+                )
+                if values.ndim == 3:
+                    values = values[..., 1] if values.shape[-1] == 2 else values[0]
+                row = list(values[0])[: len(self.contract.feature_ids)]
+                return (
+                    list(zip(self.contract.feature_ids, (float(v) for v in row))),
+                    "shap_treeexplainer",
+                )
+            except Exception:  # noqa: BLE001 - fall through to the native path
+                pass
+
+        pairs = self.explain(vector, output)
+        method = (
+            "native_pred_contrib_shap_equivalent"
+            if self.library in self.NATIVE_SHAP_EQUIVALENT
+            else "native_tree_contributions_unverified"
+        )
+        return pairs, method
+
+    def explain(self, vector: Sequence[float | None], output: str) -> list[tuple[str, float]]:
+        """Native tree contributions for one output, paired with feature ids.
+
+        The booster's own fast path rather than a generic explainer: roughly
+        two orders of magnitude quicker than a sampling explainer on a
         vector this wide.
         """
         fitted = self.outputs.get(output)
