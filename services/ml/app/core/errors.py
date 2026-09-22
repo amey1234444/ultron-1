@@ -38,6 +38,54 @@ class MLStatus(str, Enum):
     DISABLED = "DISABLED"
 
 
+class ComponentCapability(str, Enum):
+    """What state a learned component is actually in.
+
+    ``available: bool`` collapses several situations that call for different
+    responses. A temporal model nobody has trained yet is not the same as one
+    that failed to load, and neither is the same as one whose contract no
+    longer matches the pipeline. Reporting all three as "unavailable" means an
+    operator cannot tell "this deployment has not adopted the feature" from
+    "something is broken", and an engineer cannot tell which to go and fix.
+
+    The specific case this was introduced for: the LSTM has never been trained,
+    so every residual and embedding column is null. That is NOT_TRAINED -- an
+    expected state on the way to a working system -- and reporting it as
+    DEGRADED would make every healthy deployment look unwell.
+    """
+
+    AVAILABLE = "AVAILABLE"
+    """Loaded, contract verified, and usable."""
+
+    NOT_TRAINED = "NOT_TRAINED"
+    """No artifact has ever been produced. Expected before first training."""
+
+    NOT_LOADED = "NOT_LOADED"
+    """An artifact exists but this process has not loaded it."""
+
+    INCOMPATIBLE = "INCOMPATIBLE"
+    """Loaded, but its contract does not match this pipeline. Needs a retrain."""
+
+    FAILED = "FAILED"
+    """Loading or running it raised. Something is broken."""
+
+    DISABLED = "DISABLED"
+    """Switched off by configuration, not by circumstance."""
+
+    @property
+    def is_usable(self) -> bool:
+        return self is ComponentCapability.AVAILABLE
+
+    @property
+    def is_fault(self) -> bool:
+        """Whether this state means something is wrong.
+
+        NOT_TRAINED and DISABLED are not faults. Treating them as faults is how
+        a system that is working correctly reports itself as degraded.
+        """
+        return self in (ComponentCapability.INCOMPATIBLE, ComponentCapability.FAILED)
+
+
 class MLServiceError(Exception):
     """Base for failures that must not take the deterministic path down."""
 

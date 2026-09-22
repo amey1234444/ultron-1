@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
 
-from ...core.errors import ModelLoadError
+from ...core.errors import ComponentCapability, ModelLoadError
 from ..base import ModelContract
 from .builder import EMBEDDING_LAYER_NAME
 from .scaler import SequenceScaler
@@ -74,16 +74,36 @@ class TemporalRuntime:
         contract: ModelContract | None = None,
         scaler: SequenceScaler | None = None,
         reason: str | None = None,
+        capability: "ComponentCapability | None" = None,
     ) -> None:
         self._model = model
         self._embedding_model = embedding_model
         self.contract = contract
         self.scaler = scaler or SequenceScaler()
         self.reason = reason
+        self._capability = capability
 
     @property
     def available(self) -> bool:
         return self._model is not None and self.contract is not None
+
+    @property
+    def capability(self) -> "ComponentCapability":
+        """Which state this runtime is actually in.
+
+        ``available`` is a boolean over several different situations. The one
+        that matters most here is NOT_TRAINED: no LSTM has ever been fitted, so
+        all 48 residual and 32 embedding columns are null. That is an expected
+        state on the way to a working system, not a fault, and reporting it as
+        DEGRADED would make a correctly-working deployment look unwell.
+        """
+        if self._capability is not None:
+            return self._capability
+        if self._model is not None and self.contract is not None:
+            return ComponentCapability.AVAILABLE
+        if self.contract is None:
+            return ComponentCapability.NOT_TRAINED
+        return ComponentCapability.NOT_LOADED
 
     @property
     def model_id(self) -> str | None:
@@ -110,12 +130,18 @@ class TemporalRuntime:
         """Load an artifact directory, degrading with a reason on any failure."""
         contract_path = directory / "contract.json"
         if not contract_path.is_file():
-            return cls(reason=f"No temporal model artifact at {directory}.")
+            return cls(
+                reason=f"No temporal model artifact at {directory}.",
+                capability=ComponentCapability.NOT_TRAINED,
+            )
 
         try:
             contract = ModelContract.read(contract_path)
         except Exception as error:  # noqa: BLE001 - a corrupt contract is a reason
-            return cls(reason=f"Temporal contract unreadable: {error}")
+            return cls(
+                reason=f"Temporal contract unreadable: {error}",
+                capability=ComponentCapability.FAILED,
+            )
 
         scaler_path = directory / "scaler.json"
         scaler = SequenceScaler.read(scaler_path) if scaler_path.is_file() else SequenceScaler()
