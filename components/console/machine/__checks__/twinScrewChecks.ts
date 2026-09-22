@@ -137,6 +137,7 @@ const image = readFileSync(imagePath);
 const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const imageWidth = image.readUInt32BE(16);
 const imageHeight = image.readUInt32BE(20);
+const imageColourType = image[25];
 const imageHash = createHash('sha256').update(image).digest('hex');
 
 check('the shipped artwork is a valid PNG', image.subarray(0, 8).equals(pngSignature));
@@ -151,8 +152,13 @@ check(
   `${TWIN_SCREW_ARTWORK_WIDTH}x${TWIN_SCREW_ARTWORK_HEIGHT} vs ${imageWidth}x${imageHeight}`,
 );
 check(
-  'the shipped PNG is byte-identical to the supplied template asset',
-  imageHash === 'c0478204b57944a5745c5e0de9bf217ce94ea519e80d59cb38fb5e35120021ee',
+  'the machine layer carries an alpha channel instead of a baked canvas',
+  imageColourType === 6,
+  `PNG colour type ${imageColourType}`,
+);
+check(
+  'the transparent machine layer remains byte-stable',
+  imageHash === 'a16474aa5cfaee7a3aa7b30fce9ef7230a113b15a3dcd5145870691835437420',
   imageHash,
 );
 

@@ -24,8 +24,9 @@ type TwinScrewExtruderProps = {
   connectorState?: Record<string, MeasurementPadState>;
 
   /**
-   * Retained for call-site compatibility. The supplied exact artwork includes
-   * its own dark sheet and engineering grid, so its background is always shown.
+   * Retained for call-site compatibility. It controls rounded clipping only;
+   * the machine layer stays transparent so the workspace owns the one visible
+   * background and grid.
    */
   showBackground?: boolean;
 };
@@ -50,15 +51,15 @@ export type TwinScrewConnector = (typeof TWIN_SCREW_POINT_REGISTRY)[number];
 
 export const TWIN_SCREW_CONNECTORS: readonly TwinScrewConnector[] = TWIN_SCREW_POINT_REGISTRY;
 
-/** Exact background colour of the supplied raster artwork. */
-const REFERENCE_BACKGROUND = '#080b0d';
+/** Canvas-toned separator used only inside active measurement pads. */
+const PAD_PANEL = '#080b0d';
 
 /**
  * The pad's status colour, and the ground its hollow centre is cut out of.
  *
- * The ground is the sheet rather than the console surface because that is what
- * a pad is drawn on top of — an idle pad has to read as a hole in the machine,
- * not as a disc of console colour floating over it.
+ * The transparent machine layer exposes the console surface. This small dark
+ * separator is retained inside an active pad so its green state remains legible
+ * over both machine metal and a grid line without painting a background panel.
  */
 const PAD_ACCENT = '#16c84a';
 
@@ -74,7 +75,7 @@ export function TwinScrewExtruder({
       style={[
         {
           aspectRatio: VIEWBOX_WIDTH / VIEWBOX_HEIGHT,
-          backgroundColor: REFERENCE_BACKGROUND,
+          backgroundColor: 'transparent',
         },
         style,
       ]}
@@ -101,7 +102,7 @@ export function TwinScrewExtruder({
                 y={point.y}
                 state={state}
                 accent={PAD_ACCENT}
-                panel={REFERENCE_BACKGROUND}
+                panel={PAD_PANEL}
                 label={`${point.label} — ${padStateLabel(state)}`}
               />
             );
