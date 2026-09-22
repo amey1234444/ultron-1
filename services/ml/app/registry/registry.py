@@ -74,6 +74,14 @@ class RegistryEntry:
         return ModelContract.from_json(self.contract) if self.contract else None
 
 
+#: Physical events per output below which promotion is refused outright.
+#:
+#: An absolute guard, not a sufficiency claim. Eight confirmed events is still
+#: extremely weak evidence; it is the point below which a model is memorising
+#: rather than learning, not the point above which it is trustworthy.
+MINIMUM_EVENTS_FOR_PROMOTION = 8
+
+
 class ModelRegistry:
     """Registered models, on disk, with promotion gates."""
 
@@ -205,6 +213,67 @@ class ModelRegistry:
 
         if not entry.approved_by:
             blockers.append("No approver is recorded. Promotion requires a named engineer.")
+
+        # -- the structural gates ------------------------------------------
+        #
+        # Added after a model with ROC-AUC exactly 0.50 on every output, and
+        # zero splits in every tree, passed every check above and produced a
+        # promotable-looking artifact. Metrics existed, were correct, were
+        # honestly reported, and described a model that had learned nothing.
+        # The gates below refuse rather than describe.
+
+        contract = entry.contract or {}
+
+        if not contract.get("feature_schema_hash"):
+            blockers.append(
+                "The artifact carries no feature schema fingerprint, so it cannot be shown "
+                "to match the pipeline that would serve it."
+            )
+
+        metrics = entry.test_metrics or {}
+        constant_outputs = [
+            key
+            for key, value in metrics.items()
+            if isinstance(value, dict)
+            and value.get("prediction_std") is not None
+            and float(value["prediction_std"]) <= 1e-6
+        ]
+        if constant_outputs:
+            blockers.append(
+                f"Constant predictions on {', '.join(sorted(constant_outputs))}. A model that "
+                "returns one number for every input cannot rank anything."
+            )
+
+        chance_outputs = [
+            key
+            for key, value in metrics.items()
+            if isinstance(value, dict)
+            and value.get("roc_auc") is not None
+            and abs(float(value["roc_auc"]) - 0.5) <= 0.02
+        ]
+        if chance_outputs:
+            blockers.append(
+                f"Ranking indistinguishable from chance on {', '.join(sorted(chance_outputs))} "
+                "(ROC-AUC within 0.02 of 0.50)."
+            )
+
+        # Rows are not events. A fault lasting forty seconds is one event, and
+        # a model fitted on a handful of them memorises rather than learns --
+        # which row counts will not show.
+        thin = {
+            key: value.get("event_recall", {}).get("events")
+            for key, value in metrics.items()
+            if isinstance(value, dict)
+            and isinstance(value.get("event_recall"), dict)
+            and isinstance(value["event_recall"].get("events"), int)
+            and value["event_recall"]["events"] < MINIMUM_EVENTS_FOR_PROMOTION
+        }
+        if thin:
+            blockers.append(
+                "Too few physical events to evaluate: "
+                + ", ".join(f"{key} ({count})" for key, count in sorted(thin.items()))
+                + f". The floor is {MINIMUM_EVENTS_FOR_PROMOTION}, and that floor is generous."
+            )
 
         return blockers
 
