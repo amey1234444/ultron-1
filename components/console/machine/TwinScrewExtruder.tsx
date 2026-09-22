@@ -1,4 +1,4 @@
-import { Image, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import Svg, { G } from 'react-native-svg';
 
 import { cn } from '../../../lib/cn';
@@ -7,8 +7,8 @@ import {
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_POINT_REGISTRY,
 } from '../../../lib/twinScrewExtruderPoints';
-import { TWIN_SCREW_ARTWORK_SOURCE } from '../../../lib/machineArtwork';
 import { MeasurementPad, padStateLabel, type MeasurementPadState } from './MeasurementPad';
+import { TwinScrewArtwork } from './TwinScrewArtwork';
 
 type TwinScrewExtruderProps = {
   className?: string;
@@ -79,13 +79,7 @@ export function TwinScrewExtruder({
         style,
       ]}
     >
-      <Image
-        source={TWIN_SCREW_ARTWORK_SOURCE}
-        resizeMode="stretch"
-        accessible
-        accessibilityLabel="Twin screw extruder machine visualization with sensor points"
-        style={StyleSheet.absoluteFill}
-      />
+      <TwinScrewArtwork />
 
       <Svg
         pointerEvents="none"

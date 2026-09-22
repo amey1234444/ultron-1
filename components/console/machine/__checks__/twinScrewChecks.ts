@@ -17,9 +17,12 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import React from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 
 import { connectorsForTemplate, artworkSizeForTemplate } from '../machineConnectors';
 import { createTemplateDefaultLayout, hasDefaultLayout } from '../templateDefaultLayouts';
+import { TwinScrewArtwork, TWIN_SCREW_ARTWORK_URI } from '../TwinScrewArtwork.web';
 import { TWIN_SCREW_CONNECTORS } from '../TwinScrewExtruder';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
@@ -30,11 +33,6 @@ import {
   TWIN_SCREW_REFERENCE_SENSORS,
   twinScrewPointByCode,
 } from '../../../../lib/twinScrewExtruderPoints';
-import {
-  TWIN_SCREW_ARTWORK_PIXEL_HEIGHT,
-  TWIN_SCREW_ARTWORK_PIXEL_WIDTH,
-  TWIN_SCREW_ARTWORK_SOURCE,
-} from '../../../../lib/machineArtwork';
 import {
   analyseTwinScrew,
   normaliseReading,
@@ -158,32 +156,24 @@ check(
   imageHash,
 );
 
-// The drawing is loaded through a platform split — `machineArtwork.ts` for
-// Metro, `machineArtwork.web.ts` for Next — because the two bundlers hand back
-// different things for the same import. Getting that wrong fails *silently*:
-// react-native-web's Image accepts a string or a `{ uri }` and renders nothing
-// at all for any other shape, with no error and no warning, so the container's
-// own background shows through and the machine reads as a solid dark slab.
-//
-// Nothing else in the suite would notice, which is exactly why these are here.
-const artworkSource = TWIN_SCREW_ARTWORK_SOURCE as { uri?: unknown };
+// Next must emit a real image URL in the server-rendered markup. This protects
+// the exact failure that produced the black slab: a correctly sized container
+// whose image loader never painted its CSS background.
+const artworkMarkup = renderToStaticMarkup(React.createElement(TwinScrewArtwork));
 check(
-  'the artwork resolves to something Image can load',
-  typeof artworkSource === 'object' &&
-    artworkSource !== null &&
-    typeof artworkSource.uri === 'string' &&
-    (artworkSource.uri as string).length > 0,
-  JSON.stringify(TWIN_SCREW_ARTWORK_SOURCE).slice(0, 120),
+  'the web artwork resolves to a browser-loadable URL',
+  typeof TWIN_SCREW_ARTWORK_URI === 'string' && TWIN_SCREW_ARTWORK_URI.length > 0,
+  TWIN_SCREW_ARTWORK_URI.slice(0, 120),
 );
 check(
-  'the artwork source is not a bundler object left unreduced',
-  !JSON.stringify(TWIN_SCREW_ARTWORK_SOURCE).includes('"src"'),
-  JSON.stringify(TWIN_SCREW_ARTWORK_SOURCE).slice(0, 120),
+  'the server markup contains a real img instead of an empty backing rectangle',
+  artworkMarkup.startsWith('<img ') && artworkMarkup.includes('src="') && artworkMarkup.includes('width="1700"') && artworkMarkup.includes('height="670"'),
+  artworkMarkup.slice(0, 160),
 );
 check(
-  'the artwork module reports the size the PNG actually is',
-  TWIN_SCREW_ARTWORK_PIXEL_WIDTH === imageWidth && TWIN_SCREW_ARTWORK_PIXEL_HEIGHT === imageHeight,
-  `${TWIN_SCREW_ARTWORK_PIXEL_WIDTH}x${TWIN_SCREW_ARTWORK_PIXEL_HEIGHT} vs ${imageWidth}x${imageHeight}`,
+  'the browser markup uses the PNG native dimensions',
+  artworkMarkup.includes(`width="${imageWidth}"`) && artworkMarkup.includes(`height="${imageHeight}"`),
+  artworkMarkup.slice(0, 160),
 );
 
 const referenceSensorIds = Object.keys(TWIN_SCREW_REFERENCE_SENSORS);
