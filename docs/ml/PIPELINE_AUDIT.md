@@ -205,14 +205,50 @@ All five trace to the single `TS-TZ9` deletion in §3.
 | 6 | Zero-denominator event recall reported as `0.0` | Undefined read as total failure |
 | 7 | No constant-predictor or ranking gate | A model that learned nothing produced a promotable-looking artifact |
 | 8 | Parquet writer swallowed its exception | Silent fallback to a 332 MB JSONL |
-| 9 | LSTM never trained outside a unit test | 80 of 1,604 columns permanently null; hybrid architecture is nominal |
+| 9 | LSTM never trained outside a unit test | 80 of 1,604 columns permanently null; hybrid architecture is nominal. Trained since — see section 10, which found 24 of them are computed by nothing at all |
 | 10 | Golden suite does not exercise ML | "12/12" misread as ML validation |
 
 Defects 1–8 are fixed. 9 and 10 are outstanding.
 
 ---
 
-## 10. What is preserved
+## 10. Found after the LSTM first ran
+
+The temporal model had never been trained outside a unit test, so all 80
+residual and embedding columns were permanently null and nothing about them
+could be checked. Training one (`lstm-smoke-1`, 8 forecast channels, lookback
+30, 225 train / 5 valid sequences) and running
+`generate_temporal_features` filled 385 of 415 rows — and populated columns
+went 1,378 → 1,434, not the 1,458 expected.
+
+**24 declared features have no code path that computes them.** The registry
+declares six residual features per forecast channel:
+
+```
+residual            abs_residual             norm_residual
+residual_mean_300s  residual_slope_300s      residual_persistence_300s
+```
+
+`TemporalOutput.residual_features` emits the first three. The rolling
+statistics over residual history — 24 columns across 8 channels — travel in the
+1,604-column contract that every model is trained against, and are computed by
+nothing, anywhere. They have been null since the feature set was written.
+
+They are left null rather than zero-filled: a zero residual slope is a real
+measurement meaning "the residual is not trending", and inventing one is worse
+than the gap. Computing them needs residual history per machine — the online
+pipeline could carry it in the window store, and the offline fill pass would
+have to accumulate it.
+
+The smoke run itself is not evidence of learning. `best_epoch: 1` of 7, over
+five validation sequences, is what too little data looks like. It proves the
+training path executes, the best epoch is restored, the scaler is fitted on
+train only, the artifact serialises and reloads, and the residual scale is
+measured — which is all it was for.
+
+---
+
+## 11. What is preserved
 
 `artifacts/models/xgboost/xgb-pipeline-test-1/` is kept **unmodified** as
 regression evidence, along with `artifacts/audit/model_debug.json`. Any future
