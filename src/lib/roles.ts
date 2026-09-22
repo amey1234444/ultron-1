@@ -17,6 +17,12 @@ export const ROLE_LABEL: Record<Role, string> = {
 
 export const USER_PERMISSIONS = {
   SCHEMA_EDIT_DELETE: 'schema.edit_delete',
+  SAP_VIEW: 'sap.view',
+  SAP_MAPPING_MANAGE: 'sap.mapping.manage',
+  SAP_NOTIFICATION_CREATE: 'sap.notification.create',
+  SAP_MEASUREMENT_WRITE: 'sap.measurement.write',
+  SAP_CONNECTION_CONFIGURE: 'sap.connection.configure',
+  SAP_RETRY: 'sap.retry',
 } as const;
 
 export type UserPermission = (typeof USER_PERMISSIONS)[keyof typeof USER_PERMISSIONS];

@@ -4,6 +4,7 @@ import { ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 import { useAppTheme } from "../../../hooks/useAppTheme";
 import { cn } from "../../../lib/cn";
+import type { PublicUser } from "../../../src/lib/roles";
 import { SapConnectionDialog } from "./SapConnectionDialog";
 import { SapButton, StatusPill, useSapPalette } from "./SapUi";
 import { EquipmentMappingTab } from "./tabs/EquipmentMappingTab";
@@ -17,9 +18,11 @@ import { SAP_TABS, type SapTabId } from "./types";
 export function SapIntegrationPage({
   plantId,
   plantName,
+  currentUser,
 }: {
   plantId?: string | null;
   plantName?: string | null;
+  currentUser?: PublicUser | null;
 }) {
   const { isDark } = useAppTheme();
   const palette = useSapPalette();
@@ -28,8 +31,35 @@ export function SapIntegrationPage({
   const [tab, setTab] = useState<SapTabId>("overview");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [syncing, setSyncing] = useState(false);
-  const [lastSyncSeconds, setLastSyncSeconds] = useState(44);
+  const [lastSyncSeconds, setLastSyncSeconds] = useState(0);
   const [notificationCreated, setNotificationCreated] = useState(false);
+  const [dashboard, setDashboard] = useState<SapDashboard | null>(null);
+  const [message, setMessage] = useState("");
+
+  const loadDashboard = async () => {
+    try {
+      const response = await fetch("/api/sap/dashboard", {
+        credentials: "include",
+      });
+      const data = (await response.json()) as SapDashboard & { error?: string };
+      if (!response.ok)
+        throw new Error(data.error ?? "Unable to load SAP data.");
+      setDashboard(data);
+      setMessage("");
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "Unable to load SAP data.",
+      );
+    }
+  };
+
+  useEffect(() => {
+    void loadDashboard();
+    if (typeof EventSource === "undefined") return;
+    const events = new EventSource("/api/sap/stream");
+    events.addEventListener("refresh", () => void loadDashboard());
+    return () => events.close();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(
@@ -47,16 +77,71 @@ export function SapIntegrationPage({
     [lastSyncSeconds],
   );
 
-  const runSync = () => {
+  const runSync = async () => {
     if (syncing) return;
+    if (!dashboard?.connection?.id) {
+      setSettingsOpen(true);
+      return;
+    }
     setSyncing(true);
-    setTimeout(() => {
+    setMessage("");
+    try {
+      const response = await fetch("/api/sap/sync", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ connectionId: dashboard.connection.id }),
+      });
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(data.error ?? "SAP sync failed.");
       setLastSyncSeconds(0);
+      await loadDashboard();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "SAP sync failed.");
+    } finally {
       setSyncing(false);
-    }, 900);
+    }
   };
 
-  const createNotification = () => setNotificationCreated(true);
+  const createNotification = async () => {
+    if (!dashboard?.connection?.id) {
+      setSettingsOpen(true);
+      return;
+    }
+    setMessage("");
+    try {
+      const response = await fetch(
+        `/api/sap/resource/notifications?connectionId=${encodeURIComponent(dashboard.connection.id)}`,
+        {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          credentials: "include",
+          body: JSON.stringify({
+            payload: {
+              NotificationType: "M1",
+              MaintenanceNotificationDesc: `ULTRON predictive alert · ${plantName ?? plantId ?? "Plant"}`,
+            },
+          }),
+        },
+      );
+      const data = (await response.json()) as { error?: string };
+      if (!response.ok)
+        throw new Error(data.error ?? "Notification was not accepted.");
+      setNotificationCreated(true);
+      await loadDashboard();
+    } catch (error) {
+      setMessage(
+        error instanceof Error
+          ? error.message
+          : "Notification was not accepted.",
+      );
+    }
+  };
+
+  const connected =
+    dashboard?.configured &&
+    dashboard.connection?.lastTestStatus === "connected";
+  const latestSync = dashboard?.syncRuns?.[0];
 
   return (
     <View className="flex-1" style={{ backgroundColor: palette.bg }}>
@@ -87,12 +172,31 @@ export function SapIntegrationPage({
               maintenance, materials, measurements and production execution.
             </Text>
             <View className="mt-3 flex-row flex-wrap items-center gap-2">
-              <StatusPill label="UI preview" tone="info" />
+              <StatusPill
+                label={
+                  connected
+                    ? "SAP connected"
+                    : dashboard?.configured
+                      ? "Configured · test required"
+                      : "Not configured"
+                }
+                tone={
+                  connected
+                    ? "success"
+                    : dashboard?.configured
+                      ? "warning"
+                      : "neutral"
+                }
+              />
               <Text
                 className="font-body text-[10.5px]"
                 style={{ color: palette.inkMuted }}
               >
-                S/4HANA Sandbox · {plantName ?? plantId ?? "Plant 1000"}
+                {dashboard?.connection?.name ?? "SAP S/4HANA"} ·{" "}
+                {plantName ??
+                  plantId ??
+                  dashboard?.connection?.defaultPlant ??
+                  "Plant"}
               </Text>
               <Text
                 className="font-body text-[10.5px]"
@@ -104,9 +208,19 @@ export function SapIntegrationPage({
                 className="font-body text-[10.5px]"
                 style={{ color: palette.inkMuted }}
               >
-                Last simulated sync {lastSyncLabel}
+                {latestSync
+                  ? `Last sync ${lastSyncLabel}`
+                  : "No completed sync yet"}
               </Text>
             </View>
+            {message ? (
+              <Text
+                className="mt-2 font-body text-[10px]"
+                style={{ color: palette.criticalValue }}
+              >
+                {message}
+              </Text>
+            ) : null}
           </View>
           <View className="flex-row flex-wrap gap-2">
             <SapButton
@@ -155,6 +269,14 @@ export function SapIntegrationPage({
           <OverviewTab
             notificationCreated={notificationCreated}
             onCreateNotification={createNotification}
+            live={Boolean(connected)}
+            counts={{
+              equipment: dashboard?.resources?.equipment?.length ?? 0,
+              notifications: dashboard?.resources?.notifications?.length ?? 0,
+              maintenanceOrders:
+                dashboard?.resources?.maintenanceOrders?.length ?? 0,
+              materialStock: dashboard?.resources?.materialStock?.length ?? 0,
+            }}
           />
         ) : null}
         {tab === "mapping" ? <EquipmentMappingTab /> : null}
@@ -165,13 +287,56 @@ export function SapIntegrationPage({
           />
         ) : null}
         {tab === "materials" ? <MaterialsTab /> : null}
-        {tab === "production" ? <ProductionTab /> : null}
-        {tab === "audit" ? <SyncAuditTab /> : null}
+        {tab === "production" ? (
+          <ProductionTab
+            orders={dashboard?.resources?.productionOrders ?? []}
+            live={Boolean(connected)}
+          />
+        ) : null}
+        {tab === "audit" ? (
+          <SyncAuditTab
+            live={Boolean(connected)}
+            audit={dashboard?.audit ?? []}
+            outbox={dashboard?.outbox ?? []}
+          />
+        ) : null}
       </ScrollView>
       <SapConnectionDialog
         visible={settingsOpen}
         onClose={() => setSettingsOpen(false)}
+        connection={dashboard?.connection ?? null}
+        canConfigure={
+          currentUser?.role === "super_admin" ||
+          Boolean(currentUser?.permissions.includes("sap.connection.configure"))
+        }
+        onSaved={() => void loadDashboard()}
       />
     </View>
   );
 }
+
+type SapDashboard = {
+  configured: boolean;
+  connection?: {
+    id: string;
+    name: string;
+    edition: string;
+    baseUrl: string;
+    authType: string;
+    tokenUrl: string;
+    defaultPlant: string;
+    lastTestStatus: string;
+    lastTestDetail: string;
+    credentialStatus: string;
+  };
+  resources?: {
+    equipment?: Record<string, unknown>[];
+    notifications?: Record<string, unknown>[];
+    maintenanceOrders?: Record<string, unknown>[];
+    materialStock?: Record<string, unknown>[];
+    productionOrders?: Record<string, unknown>[];
+  };
+  syncRuns?: Array<{ startedAt?: string }>;
+  outbox?: Record<string, unknown>[];
+  audit?: Record<string, unknown>[];
+};

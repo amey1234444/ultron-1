@@ -1,4 +1,10 @@
-import { CalendarClock } from "lucide-react-native";
+import {
+  Activity,
+  CalendarClock,
+  Factory,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react-native";
 import { Text, View } from "react-native";
 
 import {
@@ -12,227 +18,431 @@ import {
   useSapPalette,
 } from "../SapUi";
 
-export function ProductionTab() {
+type Order = Record<string, unknown>;
+const value = (order: Order | undefined, keys: string[], fallback: string) => {
+  for (const key of keys)
+    if (order?.[key] !== undefined && order[key] !== null && order[key] !== "")
+      return String(order[key]);
+  return fallback;
+};
+
+export function ProductionTab({
+  orders = [],
+  live = false,
+}: {
+  orders?: Order[];
+  live?: boolean;
+}) {
   const palette = useSapPalette();
+  const active = orders[0];
+  const orderNumber = value(
+    active,
+    ["ProductionOrder", "ManufacturingOrder"],
+    "10009248",
+  );
+  const material = value(active, ["Product", "Material"], "MAT-445001");
+  const planned = value(
+    active,
+    ["TotalQuantity", "OrderPlannedTotalQty"],
+    "12,000",
+  );
+  const confirmed = value(
+    active,
+    ["MfgOrderConfirmedYieldQty", "ConfirmedYieldQuantity"],
+    "8,160",
+  );
+  const status = value(
+    active,
+    ["OrderIsReleased", "ProductionOrderStatus"],
+    "Released",
+  );
+
   return (
     <View>
-      <View className="mb-3 flex-row flex-wrap items-start justify-between gap-3">
-        <View className="min-w-[260px] flex-1">
-          <Text
-            className="font-body-medium text-[14px]"
-            style={{ color: palette.ink }}
-          >
-            Production risk planner
-          </Text>
-          <Text
-            className="mt-1 font-body text-[11px]"
-            style={{ color: palette.inkMuted }}
-          >
-            Overlay SAP production orders with ULTRON health and
-            remaining-useful-life forecasts.
-          </Text>
+      <View
+        className="mb-3 overflow-hidden rounded-2xl border p-5"
+        style={{ backgroundColor: palette.panel, borderColor: palette.line }}
+      >
+        <View className="flex-row flex-wrap items-start justify-between gap-4">
+          <View className="min-w-[280px] flex-1">
+            <View className="mb-2 flex-row items-center gap-2">
+              <Factory size={18} color={palette.accent} />
+              <Text
+                className="font-body-medium text-[15px]"
+                style={{ color: palette.ink }}
+              >
+                Production command board
+              </Text>
+            </View>
+            <Text
+              className="max-w-[720px] font-body text-[11px] leading-[17px]"
+              style={{ color: palette.inkMuted }}
+            >
+              A decision layer across SAP production orders, ULTRON machine
+              condition, maintenance readiness and output risk. Recommendations
+              remain advisory until a planner approves them.
+            </Text>
+          </View>
+          <View className="items-end gap-2">
+            <StatusPill
+              label={
+                live
+                  ? "Live SAP order feed"
+                  : "Illustrative plan · connect SAP for live orders"
+              }
+              tone={live ? "success" : "info"}
+            />
+            <Text
+              className="font-mono text-[8px]"
+              style={{ color: palette.inkFaint }}
+            >
+              WORK CENTRE · EXT-01
+            </Text>
+          </View>
         </View>
-        <View className="flex-row flex-wrap gap-2">
-          <StatusPill label="Order delta 22 sec ago" tone="success" />
-          <SapButton label="Change work centre" compact />
+        <View className="mt-4 flex-row flex-wrap gap-2">
+          <Signal
+            icon={Activity}
+            label="Machine constraint"
+            value="Bearing DE · elevated"
+            tone="warning"
+          />
+          <Signal
+            icon={ShieldCheck}
+            label="Safe run envelope"
+            value="9 days predicted RUL"
+          />
+          <Signal
+            icon={CalendarClock}
+            label="Planner opportunity"
+            value="19:00–23:30 today"
+            tone="success"
+          />
         </View>
       </View>
+
       <MetricRow>
         <MetricCard
-          label="Active order"
-          value="10009248"
-          detail="HDPE compound · 68% complete"
+          label="Active SAP order"
+          value={orderNumber}
+          detail={`${material} · ${status}`}
         />
         <MetricCard
-          label="Orders at risk"
+          label="Order progress"
+          value="68%"
+          detail={`${confirmed} / ${planned} kg`}
+          tone="success"
+        />
+        <MetricCard
+          label="Orders exposed"
           value="3"
-          detail="Inside the 9-day RUL window"
+          detail="Cross the forecast risk boundary"
           tone="warning"
         />
         <MetricCard
           label="Protected output"
           value="36.4t"
-          detail="If maintenance starts tonight"
+          detail="With the recommended service window"
           tone="success"
-        />
-        <MetricCard
-          label="Best maintenance window"
-          value="19:00"
-          detail="4.5 hours before next order"
         />
       </MetricRow>
 
       <SectionCard style={{ marginBottom: 12 }}>
         <SectionHeader
-          title="Seven-day work-centre timeline · EXT-01"
-          description="Production orders, recommended maintenance and the predicted critical-risk boundary"
-          action={<StatusPill label="RUL 9 days" tone="warning" />}
+          title="Constraint-aware schedule · next 7 days"
+          description="SAP order blocks are overlaid with idle capacity, service duration and ULTRON's predicted risk boundary."
+          action={<StatusPill label="RUL boundary · day 9" tone="warning" />}
         />
         <View className="mb-2 flex-row justify-between">
-          <Text
-            className="font-mono text-[8px]"
-            style={{ color: palette.inkFaint }}
-          >
-            Today 08:00
-          </Text>
-          <Text
-            className="font-mono text-[8px]"
-            style={{ color: palette.inkFaint }}
-          >
-            Tue
-          </Text>
-          <Text
-            className="font-mono text-[8px]"
-            style={{ color: palette.inkFaint }}
-          >
-            Thu
-          </Text>
-          <Text
-            className="font-mono text-[8px]"
-            style={{ color: palette.inkFaint }}
-          >
-            Sat
-          </Text>
-          <Text
-            className="font-mono text-[8px]"
-            style={{ color: palette.inkFaint }}
-          >
-            Mon
-          </Text>
+          {["NOW", "TUE", "THU", "SAT", "MON"].map((day) => (
+            <Text
+              key={day}
+              className="font-mono text-[8px]"
+              style={{ color: palette.inkFaint }}
+            >
+              {day}
+            </Text>
+          ))}
         </View>
         <View
-          className="relative overflow-hidden rounded-lg p-3"
-          style={{ minHeight: 104, backgroundColor: palette.panelRaised }}
+          className="relative overflow-hidden rounded-xl border p-3"
+          style={{
+            minHeight: 142,
+            backgroundColor: palette.panelRaised,
+            borderColor: palette.line,
+          }}
         >
           <View
             className="absolute bottom-0 top-0"
-            style={{ left: "92%", width: 2, backgroundColor: palette.critical }}
+            style={{
+              left: "72%",
+              width: "28%",
+              backgroundColor: palette.criticalSoft,
+              opacity: 0.35,
+            }}
           />
-          <View className="flex-row gap-2">
+          <View
+            className="absolute bottom-0 top-0"
+            style={{ left: "91%", width: 2, backgroundColor: palette.critical }}
+          />
+          <View className="mb-3 flex-row gap-2">
             <TimelineBlock
-              label="10009248 · 12.0t"
-              flex={15}
+              label={`${orderNumber} · ${planned} kg`}
+              flex={18}
               tone="production"
             />
             <TimelineBlock
-              label="Maintenance · 4.5h"
-              flex={9}
+              label="Recommended maintenance · 4.5h"
+              flex={11}
               tone="maintenance"
             />
             <TimelineBlock
               label="10009261 · 18.4t"
-              flex={19}
+              flex={22}
               tone="production"
             />
-            <TimelineBlock label="Idle" flex={6} />
+            <TimelineBlock label="Idle · 6h" flex={8} />
             <TimelineBlock
               label="10009272 · 9.2t"
-              flex={15}
+              flex={18}
               tone="production"
             />
-            <TimelineBlock label="Idle" flex={5} />
-            <TimelineBlock
-              label="10009280 · 21.0t"
-              flex={19}
-              tone="production"
-            />
-            <TimelineBlock label="Risk" flex={7} tone="risk" />
+            <TimelineBlock label="Risk exposure" flex={12} tone="risk" />
           </View>
-          <Text
-            className="mt-5 font-body text-[9px]"
-            style={{ color: palette.inkMuted }}
+          <View
+            className="flex-row flex-wrap items-center justify-between gap-3 border-t pt-3"
+            style={{ borderColor: palette.line }}
           >
-            Recommended window: today 19:00–23:30 · no production order
-            displaced · spare readiness 67%
-          </Text>
+            <View>
+              <Text
+                className="font-body-medium text-[10px]"
+                style={{ color: palette.accentValue }}
+              >
+                Best intervention · today 19:00
+              </Text>
+              <Text
+                className="mt-1 font-body text-[9px]"
+                style={{ color: palette.inkMuted }}
+              >
+                No order displaced · 4.5 h available · next order protected
+              </Text>
+            </View>
+            <View className="flex-row gap-2">
+              <SapButton label="Compare scenarios" compact />
+              <SapButton label="Build planning proposal" primary compact />
+            </View>
+          </View>
         </View>
       </SectionCard>
+
+      <View className="mb-3 flex-row flex-wrap gap-3">
+        <SectionCard style={{ flexGrow: 1, flexBasis: 560, minWidth: 300 }}>
+          <SectionHeader
+            title="Order impact matrix"
+            description="Prioritised by overlap with the machine-risk forecast—not only by due date."
+            action={<Sparkles size={16} color={palette.warning} />}
+          />
+          <OrderRow
+            order="10009248"
+            product="HDPE compound"
+            window="Now → 18:30"
+            exposure="Protected"
+            progress={68}
+            tone="success"
+          />
+          <OrderRow
+            order="10009261"
+            product="LDPE masterbatch"
+            window="Tomorrow 00:30"
+            exposure="Low"
+            progress={12}
+            tone="neutral"
+          />
+          <OrderRow
+            order="10009272"
+            product="PP GF30"
+            window="Thu 08:00"
+            exposure="Elevated"
+            progress={0}
+            tone="warning"
+          />
+          <OrderRow
+            order="10009280"
+            product="Export grade HDPE"
+            window="Sun 06:00"
+            exposure="Critical overlap"
+            progress={0}
+            tone="critical"
+          />
+        </SectionCard>
+        <SectionCard style={{ flexGrow: 1, flexBasis: 360, minWidth: 290 }}>
+          <SectionHeader
+            title="Decision cockpit"
+            description="Side-by-side operational consequences for planner review."
+          />
+          <Scenario
+            label="Continue unchanged"
+            tone="critical"
+            facts={[
+              "3 orders enter risk window",
+              "52.8t output exposed",
+              "Failure margin narrows",
+            ]}
+          />
+          <Scenario
+            label="Service tonight · recommended"
+            tone="success"
+            facts={[
+              "0 orders displaced",
+              "36.4t output protected",
+              "Bearing readiness 67%",
+            ]}
+          />
+          <Text
+            className="mt-3 font-body text-[9px] leading-[14px]"
+            style={{ color: palette.inkFaint }}
+          >
+            ULTRON does not reschedule or release a SAP order automatically. An
+            approved workflow should create the final maintenance order or
+            schedule change in SAP.
+          </Text>
+        </SectionCard>
+      </View>
 
       <View className="flex-row flex-wrap gap-3">
         <SectionCard style={{ flexGrow: 1, flexBasis: 520, minWidth: 290 }}>
           <SectionHeader
-            title="Active production context"
-            description="Associated through explicit machine ↔ SAP work-centre mapping"
-            action={<StatusPill label="In process" tone="success" />}
+            title="Active SAP production context"
+            description={
+              live
+                ? "Values below are sourced from the latest SAP cache."
+                : "Example values remain visible until a SAP connection is synchronized."
+            }
+            action={<StatusPill label={status} tone="success" />}
           />
           <View className="flex-row flex-wrap items-end justify-between gap-3">
             <View>
               <Text
-                className="font-mono text-[20px]"
+                className="font-mono text-[21px]"
                 style={{ color: palette.ink }}
               >
-                10009248
+                {orderNumber}
               </Text>
               <Text
                 className="mt-1 font-body text-[10px]"
                 style={{ color: palette.inkMuted }}
               >
-                HDPE compound · MAT-445001 · Batch B260921-07
+                {material} · work centre EXT-01
               </Text>
             </View>
             <View>
               <Text
-                className="font-mono text-[9px] uppercase"
+                className="font-mono text-[8px] uppercase"
                 style={{ color: palette.inkFaint }}
               >
-                Completed
+                Confirmed / planned
               </Text>
               <Text
                 className="mt-1 font-mono text-[14px]"
                 style={{ color: palette.ink }}
               >
-                8,160 / 12,000 kg
+                {confirmed} / {planned} kg
               </Text>
             </View>
           </View>
           <View
             className="mt-3 overflow-hidden rounded-full"
-            style={{ height: 5, backgroundColor: palette.track }}
+            style={{ height: 6, backgroundColor: palette.track }}
           >
             <View
               style={{
                 width: "68%",
-                height: 5,
+                height: 6,
                 backgroundColor: palette.accent,
               }}
             />
           </View>
-          <View className="mt-3 flex-row flex-wrap gap-3">
+          <View className="mt-4 flex-row flex-wrap gap-3">
             <Fact label="Machine" value="TSE-01" />
             <Fact label="Work centre" value="EXT-01" />
-            <Fact label="Planned finish" value="18:30 today" />
-            <Fact label="Machine risk" value="Elevated" tone="warning" />
+            <Fact label="Finish" value="18:30 today" />
+            <Fact label="Health constraint" value="Elevated" tone="warning" />
           </View>
         </SectionCard>
         <SectionCard style={{ flexGrow: 1, flexBasis: 420, minWidth: 290 }}>
           <SectionHeader
-            title="Maintenance Window Finder"
-            description="Advisory only — it never changes the SAP schedule automatically"
+            title="Maintenance readiness gate"
+            description="The window is only actionable when every gate has an accountable owner."
             action={<CalendarClock size={17} color={palette.warning} />}
           />
-          <View className="flex-row flex-wrap gap-3">
-            <Fact label="Recommended start" value="Today 19:00" />
-            <Fact label="Required duration" value="4.5 hours" />
-            <Fact label="Spare readiness" value="67%" tone="warning" />
-            <Fact label="Orders displaced" value="0" tone="success" />
-          </View>
-          <Text
-            className="mt-3 font-body text-[10px] leading-[16px]"
-            style={{ color: palette.inkMuted }}
-          >
-            This window finishes before the next order, stays inside the RUL
-            safety margin and requires one bearing shortage to be resolved.
-          </Text>
-          <View className="mt-3 flex-row flex-wrap gap-2">
-            <SapButton label="Open planning proposal" primary compact />
-            <SapButton label="Compare another window" compact />
-          </View>
+          <Readiness
+            label="Production clearance"
+            detail="No order displaced"
+            percent={100}
+          />
+          <Readiness
+            label="Technician capacity"
+            detail="Shift B reserved"
+            percent={85}
+          />
+          <Readiness
+            label="Bearing and consumables"
+            detail="One shortage unresolved"
+            percent={67}
+            warning
+          />
+          <Readiness
+            label="Permit and isolation"
+            detail="Draft checklist ready"
+            percent={80}
+          />
         </SectionCard>
       </View>
     </View>
   );
 }
 
+function Signal({
+  icon: Icon,
+  label,
+  value,
+  tone = "neutral",
+}: {
+  icon: typeof Activity;
+  label: string;
+  value: string;
+  tone?: "neutral" | "warning" | "success";
+}) {
+  const palette = useSapPalette();
+  const color =
+    tone === "warning"
+      ? palette.warningValue
+      : tone === "success"
+        ? palette.accentValue
+        : palette.ink;
+  return (
+    <View
+      className="min-w-[220px] flex-1 flex-row items-center gap-3 rounded-xl border p-3"
+      style={{
+        backgroundColor: palette.panelRaised,
+        borderColor: palette.line,
+      }}
+    >
+      <Icon size={17} color={color} />
+      <View>
+        <Text
+          className="font-mono text-[8px] uppercase"
+          style={{ color: palette.inkFaint }}
+        >
+          {label}
+        </Text>
+        <Text className="mt-1 font-body-medium text-[10px]" style={{ color }}>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+}
 function TimelineBlock({
   label,
   flex,
@@ -242,39 +452,165 @@ function TimelineBlock({
   flex: number;
   tone?: "production" | "maintenance" | "risk" | "idle";
 }) {
-  const palette = useSapPalette();
-  const colors =
+  const p = useSapPalette();
+  const c =
     tone === "production"
-      ? {
-          bg: palette.accentSoft,
-          border: palette.accentBorder,
-          text: palette.accent,
-        }
+      ? { bg: p.accentSoft, border: p.accentBorder, text: p.accent }
       : tone === "maintenance"
-        ? {
-            bg: palette.warningSoft,
-            border: palette.warningBorder,
-            text: palette.warningValue,
-          }
+        ? { bg: p.warningSoft, border: p.warningBorder, text: p.warningValue }
         : tone === "risk"
           ? {
-              bg: palette.criticalSoft,
-              border: palette.criticalBorder,
-              text: palette.criticalValue,
+              bg: p.criticalSoft,
+              border: p.criticalBorder,
+              text: p.criticalValue,
             }
-          : { bg: palette.panel, border: palette.line, text: palette.inkFaint };
+          : { bg: p.panel, border: p.line, text: p.inkFaint };
   return (
     <View
-      className="min-w-0 rounded-md border px-2 py-2"
-      style={{ flex, backgroundColor: colors.bg, borderColor: colors.border }}
+      className="min-w-0 rounded-lg border px-2 py-3"
+      style={{ flex, backgroundColor: c.bg, borderColor: c.border }}
     >
       <Text
-        numberOfLines={1}
-        className="font-mono text-[8px]"
-        style={{ color: colors.text }}
+        numberOfLines={2}
+        className="font-mono text-[8px] leading-[12px]"
+        style={{ color: c.text }}
       >
         {label}
       </Text>
+    </View>
+  );
+}
+function OrderRow({
+  order,
+  product,
+  window,
+  exposure,
+  progress,
+  tone,
+}: {
+  order: string;
+  product: string;
+  window: string;
+  exposure: string;
+  progress: number;
+  tone: "success" | "neutral" | "warning" | "critical";
+}) {
+  const p = useSapPalette();
+  return (
+    <View
+      className="mb-2 flex-row flex-wrap items-center gap-3 rounded-lg border px-3 py-2.5"
+      style={{ borderColor: p.line, backgroundColor: p.panelRaised }}
+    >
+      <View style={{ width: 82 }}>
+        <Text className="font-mono text-[10px]" style={{ color: p.ink }}>
+          {order}
+        </Text>
+        <Text
+          className="mt-1 font-body text-[8px]"
+          style={{ color: p.inkFaint }}
+        >
+          {progress}% complete
+        </Text>
+      </View>
+      <View className="min-w-[130px] flex-1">
+        <Text className="font-body-medium text-[10px]" style={{ color: p.ink }}>
+          {product}
+        </Text>
+        <Text
+          className="mt-1 font-body text-[8px]"
+          style={{ color: p.inkMuted }}
+        >
+          {window}
+        </Text>
+      </View>
+      <StatusPill label={exposure} tone={tone} />
+    </View>
+  );
+}
+function Scenario({
+  label,
+  tone,
+  facts,
+}: {
+  label: string;
+  tone: "success" | "critical";
+  facts: string[];
+}) {
+  const p = useSapPalette();
+  return (
+    <View
+      className="mb-2 rounded-xl border p-3"
+      style={{
+        backgroundColor: tone === "success" ? p.accentSoft : p.criticalSoft,
+        borderColor: tone === "success" ? p.accentBorder : p.criticalBorder,
+      }}
+    >
+      <View className="mb-2 flex-row items-center justify-between">
+        <Text
+          className="font-body-medium text-[10.5px]"
+          style={{ color: p.ink }}
+        >
+          {label}
+        </Text>
+        <StatusPill
+          label={tone === "success" ? "Preferred" : "Higher risk"}
+          tone={tone}
+        />
+      </View>
+      {facts.map((fact) => (
+        <Text
+          key={fact}
+          className="mt-1 font-body text-[9px]"
+          style={{ color: p.inkMuted }}
+        >
+          • {fact}
+        </Text>
+      ))}
+    </View>
+  );
+}
+function Readiness({
+  label,
+  detail,
+  percent,
+  warning = false,
+}: {
+  label: string;
+  detail: string;
+  percent: number;
+  warning?: boolean;
+}) {
+  const p = useSapPalette();
+  const color = warning ? p.warning : p.accent;
+  return (
+    <View className="mb-3">
+      <View className="mb-1.5 flex-row justify-between gap-3">
+        <View>
+          <Text
+            className="font-body-medium text-[9.5px]"
+            style={{ color: p.ink }}
+          >
+            {label}
+          </Text>
+          <Text
+            className="mt-0.5 font-body text-[8px]"
+            style={{ color: p.inkMuted }}
+          >
+            {detail}
+          </Text>
+        </View>
+        <Text className="font-mono text-[9px]" style={{ color }}>
+          {percent}%
+        </Text>
+      </View>
+      <View
+        className="overflow-hidden rounded-full"
+        style={{ height: 4, backgroundColor: p.track }}
+      >
+        <View
+          style={{ width: `${percent}%`, height: 4, backgroundColor: color }}
+        />
+      </View>
     </View>
   );
 }

@@ -1092,7 +1092,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
 
         <View className="relative flex-1" style={detailTopClearance ? { paddingTop: detailTopClearance } : undefined}>
           {selected.kind === 'sap' ? (
-            <SapIntegrationPage plantId={overviewPlantId} plantName={overviewProjects[0]?.name ?? null} />
+            <SapIntegrationPage
+              plantId={overviewPlantId}
+              plantName={overviewProjects[0]?.name ?? null}
+              currentUser={currentUser}
+            />
           ) : selected.kind === 'machine' && selectedMachine ? (
             <MachineWorkspace
               key={selectedMachine.id}

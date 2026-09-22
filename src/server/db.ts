@@ -892,4 +892,168 @@ async function migrate(): Promise<void> {
     `CREATE INDEX IF NOT EXISTS analysis_overview_snapshots_machine_recent
        ON analysis_overview_snapshots (machine_id, generated_at DESC);`,
   );
+
+  // --- SAP S/4HANA integration ------------------------------------------
+  // Credentials are encrypted by the application before they reach this
+  // table. Only redacted connection metadata is ever returned to browsers.
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_connections (
+      id                    TEXT PRIMARY KEY,
+      name                  TEXT NOT NULL,
+      edition               TEXT NOT NULL DEFAULT 'cloud_public',
+      base_url              TEXT NOT NULL,
+      auth_type             TEXT NOT NULL,
+      token_url             TEXT NOT NULL DEFAULT '',
+      encrypted_credentials TEXT NOT NULL,
+      default_plant         TEXT NOT NULL DEFAULT '',
+      service_paths         JSONB NOT NULL DEFAULT '{}'::jsonb,
+      enabled               BOOLEAN NOT NULL DEFAULT true,
+      last_tested_at        TIMESTAMPTZ,
+      last_test_status      TEXT NOT NULL DEFAULT 'untested',
+      last_test_detail      TEXT NOT NULL DEFAULT '',
+      created_by            TEXT NOT NULL DEFAULT '',
+      updated_by            TEXT NOT NULL DEFAULT '',
+      created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at            TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS sap_connections_enabled ON sap_connections (enabled, updated_at DESC);`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_project_bindings (
+      project_id      TEXT PRIMARY KEY REFERENCES studio_projects(id) ON DELETE CASCADE,
+      connection_id   TEXT NOT NULL REFERENCES sap_connections(id) ON DELETE CASCADE,
+      sap_plant       TEXT NOT NULL DEFAULT '',
+      planning_plant  TEXT NOT NULL DEFAULT '',
+      updated_by      TEXT NOT NULL DEFAULT '',
+      updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS sap_project_bindings_connection ON sap_project_bindings (connection_id);`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_asset_mappings (
+      id                    BIGSERIAL PRIMARY KEY,
+      connection_id         TEXT NOT NULL REFERENCES sap_connections(id) ON DELETE CASCADE,
+      ultron_machine_id     TEXT NOT NULL REFERENCES studio_machines(id) ON DELETE CASCADE,
+      sap_equipment         TEXT NOT NULL,
+      functional_location   TEXT NOT NULL DEFAULT '',
+      plant                 TEXT NOT NULL DEFAULT '',
+      work_center           TEXT NOT NULL DEFAULT '',
+      measuring_points      JSONB NOT NULL DEFAULT '{}'::jsonb,
+      status                TEXT NOT NULL DEFAULT 'validated',
+      last_validated_at     TIMESTAMPTZ,
+      updated_by            TEXT NOT NULL DEFAULT '',
+      updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (connection_id, ultron_machine_id)
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS sap_asset_mappings_equipment ON sap_asset_mappings (connection_id, sap_equipment);`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_material_mappings (
+      id                    BIGSERIAL PRIMARY KEY,
+      connection_id         TEXT NOT NULL REFERENCES sap_connections(id) ON DELETE CASCADE,
+      ultron_machine_id     TEXT NOT NULL REFERENCES studio_machines(id) ON DELETE CASCADE,
+      component_key         TEXT NOT NULL,
+      sap_material          TEXT NOT NULL,
+      plant                 TEXT NOT NULL DEFAULT '',
+      storage_location      TEXT NOT NULL DEFAULT '',
+      required_quantity     DOUBLE PRECISION,
+      unit                  TEXT NOT NULL DEFAULT '',
+      approved_substitutes  JSONB NOT NULL DEFAULT '[]'::jsonb,
+      updated_by            TEXT NOT NULL DEFAULT '',
+      updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (connection_id, ultron_machine_id, component_key)
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_case_links (
+      id                    BIGSERIAL PRIMARY KEY,
+      connection_id         TEXT NOT NULL REFERENCES sap_connections(id) ON DELETE CASCADE,
+      maintenance_case_id   BIGINT NOT NULL REFERENCES analysis_maintenance_cases(id) ON DELETE CASCADE,
+      notification_number   TEXT NOT NULL DEFAULT '',
+      maintenance_order     TEXT NOT NULL DEFAULT '',
+      status                TEXT NOT NULL DEFAULT 'pending',
+      idempotency_key       TEXT NOT NULL UNIQUE,
+      last_synced_at        TIMESTAMPTZ,
+      created_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at            TIMESTAMPTZ NOT NULL DEFAULT now(),
+      UNIQUE (connection_id, maintenance_case_id)
+    );
+  `);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_object_cache (
+      connection_id    TEXT NOT NULL REFERENCES sap_connections(id) ON DELETE CASCADE,
+      object_type      TEXT NOT NULL,
+      object_key       TEXT NOT NULL,
+      payload          JSONB NOT NULL DEFAULT '{}'::jsonb,
+      etag             TEXT NOT NULL DEFAULT '',
+      source_changed_at TIMESTAMPTZ,
+      synced_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (connection_id, object_type, object_key)
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS sap_object_cache_recent ON sap_object_cache (connection_id, object_type, synced_at DESC);`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_outbox (
+      id                BIGSERIAL PRIMARY KEY,
+      connection_id     TEXT NOT NULL REFERENCES sap_connections(id) ON DELETE CASCADE,
+      operation         TEXT NOT NULL,
+      object_type       TEXT NOT NULL,
+      object_key        TEXT NOT NULL DEFAULT '',
+      payload           JSONB NOT NULL DEFAULT '{}'::jsonb,
+      idempotency_key   TEXT NOT NULL UNIQUE,
+      state             TEXT NOT NULL DEFAULT 'pending',
+      attempts          INT NOT NULL DEFAULT 0,
+      next_attempt_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_error        TEXT NOT NULL DEFAULT '',
+      correlation_id    TEXT NOT NULL,
+      created_by        TEXT NOT NULL DEFAULT '',
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      processed_at      TIMESTAMPTZ
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS sap_outbox_pending ON sap_outbox (state, next_attempt_at, created_at);`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_sync_runs (
+      id                BIGSERIAL PRIMARY KEY,
+      connection_id     TEXT NOT NULL REFERENCES sap_connections(id) ON DELETE CASCADE,
+      scope             TEXT NOT NULL DEFAULT 'all',
+      state             TEXT NOT NULL DEFAULT 'running',
+      objects_read      INT NOT NULL DEFAULT 0,
+      objects_written   INT NOT NULL DEFAULT 0,
+      error_count       INT NOT NULL DEFAULT 0,
+      detail            JSONB NOT NULL DEFAULT '{}'::jsonb,
+      requested_by      TEXT NOT NULL DEFAULT '',
+      started_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+      finished_at       TIMESTAMPTZ
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS sap_sync_runs_recent ON sap_sync_runs (connection_id, started_at DESC);`);
+
+  await query(`
+    CREATE TABLE IF NOT EXISTS sap_audit_log (
+      id                BIGSERIAL PRIMARY KEY,
+      connection_id     TEXT REFERENCES sap_connections(id) ON DELETE SET NULL,
+      user_id           TEXT NOT NULL DEFAULT '',
+      action            TEXT NOT NULL,
+      object_type       TEXT NOT NULL DEFAULT '',
+      object_key        TEXT NOT NULL DEFAULT '',
+      direction         TEXT NOT NULL DEFAULT 'internal',
+      status            TEXT NOT NULL,
+      http_status       INT,
+      duration_ms       INT,
+      correlation_id    TEXT NOT NULL DEFAULT '',
+      detail            JSONB NOT NULL DEFAULT '{}'::jsonb,
+      created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+  `);
+  await query(`CREATE INDEX IF NOT EXISTS sap_audit_log_recent ON sap_audit_log (created_at DESC);`);
+  await query(`CREATE INDEX IF NOT EXISTS sap_audit_log_connection ON sap_audit_log (connection_id, created_at DESC);`);
 }

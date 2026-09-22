@@ -14,8 +14,29 @@ import {
 } from "../SapUi";
 import type { SapTone } from "../types";
 
-export function SyncAuditTab() {
+export function SyncAuditTab({
+  live = false,
+  audit = [],
+  outbox = [],
+}: {
+  live?: boolean;
+  audit?: Record<string, unknown>[];
+  outbox?: Record<string, unknown>[];
+}) {
   const palette = useSapPalette();
+  const successful = audit.filter((entry) => entry.status === "success").length;
+  const latencyValues = audit
+    .map((entry) => Number(entry.durationMs))
+    .filter((entry) => Number.isFinite(entry));
+  const latency = latencyValues.length
+    ? Math.round(
+        latencyValues.reduce((sum, entry) => sum + entry, 0) /
+          latencyValues.length,
+      )
+    : 0;
+  const queueDepth = outbox.filter(
+    (entry) => entry.state !== "completed",
+  ).length;
   return (
     <View>
       <View className="mb-3 flex-row flex-wrap items-start justify-between gap-3">
@@ -35,26 +56,43 @@ export function SyncAuditTab() {
           </Text>
         </View>
         <View className="flex-row flex-wrap gap-2">
-          <StatusPill label="Live event channel ready" tone="success" />
+          <StatusPill
+            label={
+              live ? "Live event channel ready" : "Waiting for SAP connection"
+            }
+            tone={live ? "success" : "neutral"}
+          />
           <SapButton label="Export audit CSV" icon={Download} compact />
         </View>
       </View>
       <MetricRow>
         <MetricCard
           label="Success rate · 24h"
-          value="99.7%"
-          detail="3,842 successful operations"
+          value={
+            live && audit.length
+              ? `${Math.round((successful / audit.length) * 1000) / 10}%`
+              : "99.7%"
+          }
+          detail={
+            live
+              ? `${successful} successful recent operations`
+              : "3,842 successful operations"
+          }
           tone="success"
         />
         <MetricCard
           label="Median SAP latency"
-          value="312ms"
-          detail="P95 1.8 seconds"
+          value={live ? `${latency}ms` : "312ms"}
+          detail={live ? "Recent request average" : "P95 1.8 seconds"}
         />
         <MetricCard
           label="Queue depth"
-          value="2"
-          detail="One retry, one scheduled"
+          value={live ? String(queueDepth) : "2"}
+          detail={
+            live
+              ? "Pending, processing or retrying"
+              : "One retry, one scheduled"
+          }
           tone="warning"
         />
         <MetricCard

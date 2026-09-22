@@ -17,33 +17,48 @@ import {
 export function OverviewTab({
   notificationCreated,
   onCreateNotification,
+  live = false,
+  counts,
 }: {
   notificationCreated: boolean;
   onCreateNotification: () => void;
+  live?: boolean;
+  counts?: {
+    equipment: number;
+    notifications: number;
+    maintenanceOrders: number;
+    materialStock: number;
+  };
 }) {
   const palette = useSapPalette();
   return (
     <View>
       <MetricRow>
         <MetricCard
-          label="Equipment mapped"
-          value="24/26"
-          detail="92% mapping coverage"
+          label={live ? "Equipment synchronized" : "Equipment mapped"}
+          value={live ? String(counts?.equipment ?? 0) : "24/26"}
+          detail={live ? "Latest SAP cache" : "92% mapping coverage"}
         />
         <MetricCard
           label="Open notifications"
-          value="3"
-          detail="One awaiting planner review"
+          value={live ? String(counts?.notifications ?? 0) : "3"}
+          detail={
+            live ? "Latest synchronized set" : "One awaiting planner review"
+          }
         />
         <MetricCard
           label="Maintenance orders"
-          value="2"
-          detail="One scheduled this week"
+          value={live ? String(counts?.maintenanceOrders ?? 0) : "2"}
+          detail={live ? "Latest synchronized set" : "One scheduled this week"}
         />
         <MetricCard
-          label="Spare risks"
-          value="1"
-          detail="Bearing stock below requirement"
+          label={live ? "Stock records" : "Spare risks"}
+          value={live ? String(counts?.materialStock ?? 0) : "1"}
+          detail={
+            live
+              ? "Material stock rows received"
+              : "Bearing stock below requirement"
+          }
           tone="warning"
         />
       </MetricRow>
