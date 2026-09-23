@@ -44,6 +44,7 @@ from ..evaluation.metrics import (
     ranking_sanity_check,
     roc_auc,
 )
+from ..evaluation.plots import write_all
 from ..models.trees.common import to_matrix
 from .common import base_parser, configure_logging, require, resolve_out, set_seed
 
@@ -103,6 +104,10 @@ def _score(name: str, probabilities: list[float], labels: list[int]) -> dict[str
         "prediction_max": constant.observed.get("max"),
         "gates": [constant.to_json(), ranking.to_json()],
         "gates_passed": bool(constant.passed and ranking.passed),
+        # Stripped before the record is written. Kept this far so a chart and a
+        # table can never disagree: regenerating predictions for a figure is
+        # exactly how that happens.
+        "_probabilities": [float(p) for p in probabilities],
     }
 
 
@@ -222,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     results: dict[str, Any] = {}
+    raw_scores: dict[str, Any] = {}
     considered = 0
 
     for key in output_keys:
@@ -262,6 +268,7 @@ def main(argv: list[str] | None = None) -> int:
                 )
                 entry = _score("E3_lightgbm", probabilities, y_eval)
                 entry["splits"] = _tree_splits(booster, "lightgbm")
+                entry["_probabilities"] = probabilities
                 arms.append(entry)
             except Exception as error:  # noqa: BLE001
                 arms.append({"arm": "E3_lightgbm", "error": f"{type(error).__name__}: {error}"})
@@ -277,6 +284,19 @@ def main(argv: list[str] | None = None) -> int:
             except Exception as error:  # noqa: BLE001
                 arms.append({"arm": "E4_xgboost", "error": f"{type(error).__name__}: {error}"})
 
+        # Kept so the plots are drawn from the same run that produced the
+        # numbers. Regenerating predictions for a chart is how a figure and a
+        # table end up disagreeing.
+        for arm in arms:
+            scores = arm.get("_probabilities")
+            if scores:
+                # Per arm, not per output: the interesting comparison is
+                # between architectures on the same target, and a single plot
+                # per output would silently show only whichever ran last.
+                raw_scores[f"{key}__{arm['arm']}"] = {
+                    "probabilities": scores,
+                    "labels": y_eval,
+                }
         results[key] = {
             "train_rows": len(y_train),
             "train_positives": positives,
@@ -313,7 +333,35 @@ def main(argv: list[str] | None = None) -> int:
 
     out = root / "metrics"
     out.mkdir(parents=True, exist_ok=True)
+    # The private probability lists are for the plots, not for the record.
+    for entry in results.values():
+        for arm in entry.get("arms", []) if isinstance(entry, dict) else []:
+            arm.pop("_probabilities", None)
     (out / "baselines.json").write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    # One file per arm, as the brief asks, rather than only the combined view.
+    for arm_name, filename in (
+        ("E1_logistic", "logistic_baseline.json"),
+        ("E3_lightgbm", "lightgbm_engineered.json"),
+        ("E4_xgboost", "xgboost_engineered.json"),
+    ):
+        per_arm = {
+            "arm": arm_name,
+            "dataset": args.dataset,
+            "evaluated_on": args.split,
+            "synthetic_only": payload["synthetic_only"],
+            "outputs": {
+                key: next((a for a in entry.get("arms", []) if a.get("arm") == arm_name), None)
+                for key, entry in results.items()
+                if isinstance(entry, dict) and entry.get("arms")
+            },
+            "warning": payload["warning"],
+        }
+        (out / filename).write_text(json.dumps(per_arm, indent=2), encoding="utf-8")
+
+    plots_root = root / "plots"
+    drawn = write_all(plots_root, {"outputs": raw_scores})
+    log.info("plots: %s", {k: len(v) for k, v in drawn.items() if v})
 
     print(f"\nBASELINES on {args.dataset} ({args.split} split)")
     print("SYNTHETIC PIPELINE VALIDATION ONLY\n")
