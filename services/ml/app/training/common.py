@@ -192,10 +192,12 @@ def load_scenario_frames(
     override, and it is set here rather than by the caller so it cannot be
     forgotten.
     """
+    import random as _random
     from dataclasses import replace
     from datetime import timedelta
 
     from ..labels.events import FaultEvent
+    from ..synthetic.generator import STEADY_LEVELS
     from ..synthetic.scenarios import SCENARIOS_BY_ID
 
     order: list[tuple[int, str]] = []
@@ -212,9 +214,38 @@ def load_scenario_frames(
 
     for index, (repeat, scenario_id) in enumerate(order):
         base = SCENARIOS_BY_ID[scenario_id]
-        # A new seed per repeat, so the noise differs and the model cannot
-        # memorise one realisation of it.
-        scenario = replace(base, seed=base.seed + repeat * 977)
+        # Every replay is a different realisation of the same fault, not the
+        # same trajectory with a different noise seed.
+        #
+        # A new seed alone leaves the onset, the duration and the development
+        # rate byte-for-byte identical, so twelve repeats produced one
+        # restriction seen twelve times rather than twelve restrictions. A model
+        # can memorise that shape without learning the relationship, and nothing
+        # in the metrics would show the difference.
+        #
+        # Drawn from a generator seeded on the scenario and the repeat, so the
+        # variation is exactly as reproducible as the noise it sits beside.
+        jitter = _random.Random(base.seed * 7919 + repeat)
+        onset = base.onset_second
+        if onset is not None:
+            # +/-40% of the declared onset, floored so a fault never begins
+            # before there is enough history to have noticed it.
+            span = max(int(onset * 0.4), 1)
+            onset = max(60, onset + jitter.randint(-span, span))
+        scenario = replace(
+            base,
+            seed=base.seed + repeat * 977,
+            onset_second=onset,
+            duration_seconds=max(
+                300, int(base.duration_seconds * jitter.uniform(0.8, 1.25))
+            ),
+            progression_rate=jitter.uniform(0.6, 1.6),
+            # A small standing offset per tag, within what a healthy transmitter
+            # drifts to. A generator that starts every tag at exactly its
+            # template value teaches a model that the template value is normal,
+            # which no instrument on a real machine agrees with.
+            sensor_bias={tag: jitter.gauss(0.0, 0.004) for tag in STEADY_LEVELS},
+        )
         scenario_frames = list(scenario.frames(machine_id=machine_id, start=cursor))
         if not scenario_frames:
             continue

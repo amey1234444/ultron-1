@@ -138,6 +138,30 @@ class Scenario:
     data_source: str = "SYNTHETIC"
     sample_hz: float = 1.0
 
+    progression_rate: float = 1.0
+    """How fast the injected condition develops, relative to the scenario's own
+    design.
+
+    1.0 is the trajectory the mutator was written for. A replay at 0.6 develops
+    the same fault more slowly and one at 1.5 faster, which is the difference
+    between a dataset of one restriction seen twelve times and a dataset of
+    twelve restrictions. Without it every replay produced a byte-for-byte
+    identical trajectory apart from the noise seed, and a model could memorise
+    the shape rather than learn the relationship.
+
+    Mutators read it through ``scenario.progression_rate``; one that ignores it
+    is simply a condition with no rate to vary, such as a frozen sensor.
+    """
+
+    sensor_bias: dict[str, float] = field(default_factory=dict)
+    """Per-tag offset applied for the whole run, as a fraction of level.
+
+    A real transmitter sits a little high or a little low and stays there. A
+    generator that always starts every tag at exactly its template value
+    teaches a model that the template value *is* normal, which no instrument on
+    a real machine agrees with.
+    """
+
     def frames(self, machine_id: str = "TSE-01", start: datetime | None = None) -> Iterator[TelemetryFrame]:
         """Emit the scenario as canonical telemetry frames."""
         rng = random.Random(self.seed)
@@ -224,7 +248,7 @@ def _recipe_change(values: dict[str, float | None], elapsed: float, scenario: Sc
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 120.0)
+    progress = min(1.0, (elapsed - onset) / (120.0 / scenario.progression_rate))
     values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.22 * progress)
     values["TS-P4"] = (values["TS-P4"] or 0.0) * (1.0 + 0.20 * progress)
     values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.18 * progress)
@@ -236,7 +260,7 @@ def _feed_increase(values: dict[str, float | None], elapsed: float, scenario: Sc
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 90.0)
+    progress = min(1.0, (elapsed - onset) / (90.0 / scenario.progression_rate))
     values["TS-F1"] = (values["TS-F1"] or 0.0) * (1.0 + 0.25 * progress)
     values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.20 * progress)
     values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.22 * progress)
@@ -252,7 +276,7 @@ def _screen_restriction(values: dict[str, float | None], elapsed: float, scenari
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 420.0)
+    progress = min(1.0, (elapsed - onset) / (420.0 / scenario.progression_rate))
     values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.85 * progress)
     values["TS-P4"] = (values["TS-P4"] or 0.0) * (1.0 + 0.05 * progress)
     values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.40 * progress)
@@ -264,7 +288,7 @@ def _die_restriction(values: dict[str, float | None], elapsed: float, scenario: 
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 420.0)
+    progress = min(1.0, (elapsed - onset) / (420.0 / scenario.progression_rate))
     for tag in ("TS-P3", "TS-P4"):
         values[tag] = (values[tag] or 0.0) * (1.0 + 0.7 * progress)
     values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.3 * progress)
@@ -286,7 +310,7 @@ def _cooling_failure(values: dict[str, float | None], elapsed: float, scenario: 
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 600.0)
+    progress = min(1.0, (elapsed - onset) / (600.0 / scenario.progression_rate))
     values["TS-TZ4"] = (values["TS-TZ4"] or 0.0) + 38.0 * progress
     values["TS-TZ5"] = (values["TS-TZ5"] or 0.0) + 14.0 * progress
     values["TS-TM"] = (values["TS-TM"] or 0.0) + 10.0 * progress
@@ -321,7 +345,7 @@ def _pressure_drift(values: dict[str, float | None], elapsed: float, scenario: S
     onset = scenario.onset_second or 120
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 900.0)
+    progress = min(1.0, (elapsed - onset) / (900.0 / scenario.progression_rate))
     values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.55 * progress)
 
 
@@ -351,7 +375,7 @@ def _unknown_anomaly(values: dict[str, float | None], elapsed: float, scenario: 
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 400.0)
+    progress = min(1.0, (elapsed - onset) / (400.0 / scenario.progression_rate))
     values["TS-V1"] = (values["TS-V1"] or 0.0) * (1.0 + 1.6 * progress)
     values["TS-V2"] = (values["TS-V2"] or 0.0) * (1.0 + 1.5 * progress)
     values["TS-L1"] = (values["TS-L1"] or 0.0) * (1.0 - 0.5 * progress)
@@ -366,7 +390,7 @@ def _two_independent_faults(values: dict[str, float | None], elapsed: float, sce
     _screen_restriction(values, elapsed, scenario)
     onset = (scenario.onset_second or 300) + 60
     if elapsed >= onset:
-        progress = min(1.0, (elapsed - onset) / 300.0)
+        progress = min(1.0, (elapsed - onset) / (300.0 / scenario.progression_rate))
         values["TS-PV"] = (values["TS-PV"] or 0.0) * (1.0 + 1.8 * progress)
 
 
@@ -378,7 +402,7 @@ def _causal_chain(values: dict[str, float | None], elapsed: float, scenario: Sce
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 420.0)
+    progress = min(1.0, (elapsed - onset) / (420.0 / scenario.progression_rate))
     values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.9 * progress)
     values["TS-P4"] = (values["TS-P4"] or 0.0) * (1.0 + 0.05 * progress)
     values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.55 * progress)
@@ -390,7 +414,7 @@ def _sensor_drift_gradual(values: dict[str, float | None], elapsed: float, scena
     onset = scenario.onset_second or 120
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 900.0)
+    progress = min(1.0, (elapsed - onset) / (900.0 / scenario.progression_rate))
     values["TS-TZ3"] = (values["TS-TZ3"] or 0.0) + 160.0 * progress
 
 
@@ -399,7 +423,7 @@ def _rpm_change(values: dict[str, float | None], elapsed: float, scenario: Scena
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
-    progress = min(1.0, (elapsed - onset) / 60.0)
+    progress = min(1.0, (elapsed - onset) / (60.0 / scenario.progression_rate))
     for tag in ("TS-S1", "TS-S2", "TS-E1"):
         values[tag] = (values[tag] or 0.0) * (1.0 + 0.2 * progress)
     values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.15 * progress)
