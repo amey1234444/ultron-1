@@ -22,11 +22,19 @@ later can detect.
 from __future__ import annotations
 
 import json
+from collections import defaultdict, deque
+from datetime import datetime, timedelta
 from pathlib import Path
 
 from ..core.capability import probe
+from ..core.timeutil import parse_timestamp
+from ..features import families
+from ..inference.pipeline import RESIDUAL_EXCURSION_SIGMA
 from ..models.temporal.runtime import TemporalRuntime
 from ..registry.registry import ModelRegistry
+#: Must match the window the registry declares for these features.
+RESIDUAL_WINDOW_SECONDS = 300.0
+
 from .common import (
     RunRecord,
     base_parser,
@@ -79,6 +87,8 @@ def main(argv: list[str] | None = None) -> int:
     series = [[record.get(f"x::{column}.value") for column in columns] for record in records]
     filled = 0
     skipped = 0
+    # Residual history per channel, trimmed to the rolling window as it goes.
+    history: defaultdict[str, deque[tuple[datetime, float]]] = defaultdict(deque)
 
     for index, record in enumerate(records):
         if index < lookback:
@@ -96,6 +106,32 @@ def main(argv: list[str] | None = None) -> int:
             record[f"x::{key}"] = value
         for key, value in output.embedding_features().items():
             record[f"x::{key}"] = value
+
+        # The 300s rolling residual statistics, computed from the residuals of
+        # the rows already filled.
+        #
+        # Not optional, and not a nicety: the online pipeline computes these
+        # from its window store, so a dataset built without them trains a model
+        # on 24 null columns that are populated at serving time. That is
+        # train/serve skew, and it is worse than both sides being null -- the
+        # model would have learned "this column is always missing" and then be
+        # fed real numbers.
+        moment = parse_timestamp(str(record.get("timestamp")))
+        for channel, value in output.normalised_residual.items():
+            history[channel].append((moment, value))
+            cutoff = moment - timedelta(seconds=RESIDUAL_WINDOW_SECONDS)
+            while history[channel] and history[channel][0][0] < cutoff:
+                history[channel].popleft()
+            stamps = [entry[0] for entry in history[channel]]
+            values = [entry[1] for entry in history[channel]]
+            excursion = [abs(v) >= RESIDUAL_EXCURSION_SIGMA for v in values]
+            record[f"x::r.{channel}.residual_mean_300s"] = families.mean(values)
+            record[f"x::r.{channel}.residual_slope_300s"] = families.slope_per_minute(
+                values, stamps
+            )
+            record[f"x::r.{channel}.residual_persistence_300s"] = families.persistence_seconds(
+                excursion, stamps
+            )
         filled += 1
 
     _write_rows(dataset_dir, records)

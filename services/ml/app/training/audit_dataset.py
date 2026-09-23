@@ -272,8 +272,67 @@ def audit(directory: Path) -> dict[str, Any]:
         ],
     }
 
+    # -- the features themselves, not the rows they sit in ------------------
+    #
+    # A separate report because the questions differ. The dataset audit asks
+    # "is this trainable?"; this asks "which columns carry anything, and what
+    # do the empty ones have in common?". The second is what turns "226 columns
+    # are null" into "no site has supplied approved limits", which is a
+    # different job for a different person.
+    from ..features.engine import feature_schema_block
+    from ..features.registry import describe as describe_feature
+
+    def family_of(feature_id: str) -> str:
+        definition = describe_feature(feature_id)
+        if definition is not None:
+            return definition.family
+        if feature_id.startswith("r."):
+            return "RESIDUAL"
+        if feature_id.startswith("e."):
+            return "EMBEDDING"
+        return "UNKNOWN"
+
+    by_family: defaultdict[str, Counter] = defaultdict(Counter)
+    null_examples: defaultdict[str, list[str]] = defaultdict(list)
+    for key in feature_keys:
+        feature_id = key[3:]
+        family = family_of(feature_id)
+        has_values = non_null[key] > 0
+        by_family[family]["total"] += 1
+        by_family[family]["populated" if has_values else "null"] += 1
+        if not has_values and len(null_examples[family]) < 5:
+            null_examples[family].append(feature_id)
+        if has_values and len(distinct[key]) <= 1:
+            by_family[family]["constant"] += 1
+
+    feature_audit = {
+        "dataset_id": summary.get("dataset_id"),
+        "schema": feature_schema_block(),
+        "columns": len(feature_keys),
+        "populated": len(populated),
+        "null": len(feature_keys) - len(populated),
+        "constant": len(constant),
+        "by_family": {
+            family: {
+                **dict(counts),
+                "null_examples": null_examples.get(family, []),
+            }
+            for family, counts in sorted(by_family.items())
+        },
+        "non_finite": {k[3:]: v for k, v in non_finite.items() if v},
+        "notes": [
+            "A null column is not necessarily a defect. Threshold-distance "
+            "features are null until a site supplies approved limits; residual "
+            "and embedding features are null until a temporal model is trained; "
+            "setpoint features are null until the PLC publishes setpoints. Each "
+            "is a different job for a different person, which is why they are "
+            "reported by family rather than as one count.",
+        ],
+    }
+
     return {
         "dataset_audit": dataset_audit,
+        "feature_audit": feature_audit,
         "split_audit": split_audit,
         "leakage_audit": leakage_audit,
     }
