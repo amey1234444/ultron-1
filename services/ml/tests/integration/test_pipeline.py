@@ -17,6 +17,7 @@ from datetime import timezone
 import pytest
 
 from app.core.config import Settings, reset_settings
+from app.features.engine import feature_schema_fingerprint, union_feature_ids
 from app.inference.pipeline import InferencePipeline
 from app.models.base import ModelContract, Prediction
 from app.models.trees.ensemble import TreeEnsemble
@@ -45,11 +46,18 @@ class _StubEnsemble(TreeEnsemble):
     """
 
     def __init__(self, probability: float = 0.95) -> None:
+        # The stub declares the real schema rather than a single column. The
+        # pipeline verifies every artifact's contract at load now, and a stub
+        # that skipped that would be exercising a path production never takes --
+        # it would be refused as INCOMPATIBLE before the first frame.
+        feature_ids = union_feature_ids()
         contract = ModelContract(
             model_id="stub",
             model_kind="LIGHTGBM",
             version="0",
-            feature_ids=("TS-P3.value",),
+            feature_ids=feature_ids,
+            feature_count=len(feature_ids),
+            feature_schema_hash=feature_schema_fingerprint(feature_ids),
             outputs=("TSE-DOWN-001@5", "TSE-DOWN-001@15", "TSE-DOWN-001@30"),
             trained_on_real_data=False,
         )

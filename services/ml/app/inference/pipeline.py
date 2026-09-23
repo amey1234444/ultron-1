@@ -78,7 +78,24 @@ from ..schemas.diagnosis import (
 from ..schemas.telemetry import TelemetryFrame
 from ..state.engine import OperatingStateEngine, StateRecord, StateTrends
 from ..windows.store import SequenceWindow, WindowStore, build_window_store
+from ..features import families
 from .eligibility import EligibilityResult, evaluate_eligibility, surfacing_decision
+
+#: Reserved window-store prefix for residual series. Not a tag anything
+#: publishes, and deliberately not a legal tag name, so a residual series can
+#: never collide with a measurement.
+RESIDUAL_TAG_PREFIX = "~residual."
+
+#: How large a normalised residual has to be to count as an excursion. The
+#: residual is already scaled by its own training spread, so this is "three
+#: times the model's usual error", not three of any physical unit.
+RESIDUAL_EXCURSION_SIGMA = 3.0
+
+_ROLLING_RESIDUAL_STATISTICS = {
+    "residual_mean_300s": "mean",
+    "residual_slope_300s": "slope",
+    "residual_persistence_300s": "persistence",
+}
 
 
 @dataclass
@@ -298,7 +315,22 @@ class InferencePipeline:
         ):
             degraded.append(f"temporal: {temporal_output.reason}")
 
-        vector = self._build_vector(features, temporal_output)
+        # Residual history, so the 300s rolling statistics have a series to read.
+        #
+        # The registry declares six residual features per forecast channel; the
+        # temporal runtime produces three, because a single inference knows the
+        # residual *now* and nothing about the ones before it. The other 24
+        # columns were declared, shipped in every model's contract, and computed
+        # by nothing at all -- permanently null since the feature set was
+        # written. They are computed here because this is the only layer that
+        # holds history.
+        #
+        # Stored under a reserved prefix in the same window store the tags use:
+        # a residual is a time series like any other, and giving it a second
+        # store would mean a second set of gap semantics to keep in step.
+        self._record_residuals(frame, temporal_output)
+
+        vector = self._build_vector(features, temporal_output, frame)
 
         if eligibility.eligible:
             risks = self._run_classifier(frame, vector, rules, eligible=True)
@@ -485,8 +517,41 @@ class InferencePipeline:
         }
         return self.temporal.infer(list(sequence.rows), actual=actual)
 
+    def _record_residuals(self, frame: TelemetryFrame, temporal: TemporalOutput) -> None:
+        """Append this frame's normalised residuals to the window store."""
+        if not temporal.available:
+            return
+        for channel, value in temporal.normalised_residual.items():
+            self.windows.append(
+                frame.machine_id, f"{RESIDUAL_TAG_PREFIX}{channel}", frame.timestamp, value
+            )
+
+    def _residual_statistics(
+        self, machine_id: str, channel: str, at: datetime
+    ) -> dict[str, float | None]:
+        """Mean, slope and excursion persistence of one channel's residual.
+
+        Null when there is no history rather than zero. A zero residual slope is
+        a real measurement meaning "the residual is not trending", and a model
+        cannot tell an invented one from a measured one.
+        """
+        window = self.windows.window(
+            machine_id, f"{RESIDUAL_TAG_PREFIX}{channel}", seconds=300, end=at
+        )
+        if window.count == 0:
+            return {"mean": None, "slope": None, "persistence": None}
+        excursion = [abs(value) >= RESIDUAL_EXCURSION_SIGMA for value in window.values]
+        return {
+            "mean": families.mean(window.values),
+            "slope": families.slope_per_minute(window.values, window.timestamps),
+            "persistence": families.persistence_seconds(excursion, window.timestamps),
+        }
+
     def _build_vector(
-        self, features: FeatureFrame, temporal: TemporalOutput
+        self,
+        features: FeatureFrame,
+        temporal: TemporalOutput,
+        frame: TelemetryFrame | None = None,
     ) -> list[float | None]:
         """The feature union, in the fixed registry order.
 
@@ -497,10 +562,26 @@ class InferencePipeline:
         """
         residuals = temporal.residual_features()
         embedding = temporal.embedding_features()
+        rolling: dict[str, dict[str, float | None]] = {}
         out: list[float | None] = []
         for feature_id in self._feature_ids:
             if feature_id.startswith("r."):
-                out.append(residuals.get(feature_id))
+                if feature_id in residuals:
+                    out.append(residuals.get(feature_id))
+                    continue
+                # r.<channel>.<statistic>, where the statistic needs history.
+                parts = feature_id.split(".")
+                statistic = parts[-1]
+                channel = ".".join(parts[1:-1])
+                suffix = _ROLLING_RESIDUAL_STATISTICS.get(statistic)
+                if suffix is None or frame is None:
+                    out.append(None)
+                    continue
+                if channel not in rolling:
+                    rolling[channel] = self._residual_statistics(
+                        frame.machine_id, channel, frame.timestamp
+                    )
+                out.append(rolling[channel][suffix])
             elif feature_id.startswith("e."):
                 out.append(embedding.get(feature_id))
             else:
