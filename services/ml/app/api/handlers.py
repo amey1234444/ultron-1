@@ -26,7 +26,9 @@ from ..core.timeutil import iso, now as utc_now
 from ..core.versions import version_block
 from ..explanation.shap_explainer import SHAP_CAVEAT
 from ..inference.pipeline import InferencePipeline
+from ..features.engine import feature_schema_block
 from ..knowledge.loader import knowledge
+from ..monitoring.metrics import metrics
 from ..labels.events import MaintenanceFeedback
 from ..models.temporal.runtime import TemporalRuntime
 from ..models.trees.ensemble import TreeEnsemble
@@ -143,7 +145,19 @@ class MLService:
             "knowledge": book,
             "models": self.describe_models(),
             "capabilities": capability_report(),
+            # Library availability answers "can this process import shap?".
+            # Component state answers "is the classifier usable *here*?", which
+            # is the question an operator has, and the two disagree exactly when
+            # it matters -- a loaded artifact whose schema no longer matches
+            # reports every library present and is still unusable.
+            "components": self.pipeline.component_capabilities(),
+            # The identity a prediction has to be reproducible against. Without
+            # it, "which schema produced this?" is answered by reading the
+            # registry and hoping the deployment matches.
+            "feature_schema": feature_schema_block(),
+            "temporal_model": self.pipeline.temporal.model_id,
             "versions": version_block(),
+            "operability": metrics().snapshot(),
             "counters": dict(self._counters),
             "latency_ms": self._latency_summary(),
         }

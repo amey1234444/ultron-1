@@ -39,6 +39,7 @@ from ..context.engine import ContextEngine, ContextObject, context_changed
 from ..core.config import Settings, settings as global_settings
 from ..core.errors import (
     ComponentCapability,
+    MLIneligibleReason,
     MLServiceError,
     MLStatus,
     ModelContractError,
@@ -52,6 +53,7 @@ from ..explanation.shap_explainer import Explanation, explain_output, should_exp
 from ..features.engine import FeatureEngine, FeatureFrame, union_feature_ids
 from ..features.registry import reset_registry_cache
 from ..knowledge.loader import knowledge
+from ..monitoring.metrics import metrics
 from ..models.temporal.runtime import TemporalOutput, TemporalRuntime, UNAVAILABLE
 from ..models.base import Prediction
 from ..models.trees.ensemble import TreeEnsemble
@@ -303,7 +305,9 @@ class InferencePipeline:
         # with 1,652 nulls. The trees then had nothing to split on and every
         # model trained this way was a constant predictor. See
         # docs/ml/WHY_THE_MODEL_WAS_CONSTANT.md.
+        temporal_started = time.perf_counter()
         temporal_output = self._run_temporal(frame, quality, sequence)
+        metrics().stage("temporal", (time.perf_counter() - temporal_started) * 1000)
         # A temporal model that was never configured is absent, not degraded.
         # DEGRADED means something that should work does not, and applying it
         # to an optional component nobody installed would make every healthy
@@ -330,13 +334,22 @@ class InferencePipeline:
         # store would mean a second set of gap semantics to keep in step.
         self._record_residuals(frame, temporal_output)
 
+        vector_started = time.perf_counter()
         vector = self._build_vector(features, temporal_output, frame)
+        metrics().stage("features", (time.perf_counter() - vector_started) * 1000)
 
         if eligibility.eligible:
+            tree_started = time.perf_counter()
             risks = self._run_classifier(frame, vector, rules, eligible=True)
+            metrics().stage("trees", (time.perf_counter() - tree_started) * 1000)
             if not self.ensemble.available and self.ensemble.reason:
                 degraded.append(f"classifier: {self.ensemble.reason}")
         else:
+            # The deterministic chain answered alone. The number that says how
+            # much of the time the learned layer contributed nothing.
+            metrics().fallback()
+            if eligibility.reason is MLIneligibleReason.FEATURE_SCHEMA_MISMATCH:
+                metrics().degraded(schema_mismatch=True)
             # An ineligible cycle still passes through the filter so an active
             # alert is held rather than silently dropped by a data gap.
             risks = self._run_classifier(frame, [], rules, eligible=False)

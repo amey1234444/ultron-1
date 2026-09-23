@@ -78,6 +78,36 @@ class ServiceMetrics:
     window_readiness: Counter = field(default_factory=Counter)
     unknown_events: int = 0
 
+    # -- shadow-mode operability -------------------------------------------
+    #
+    # Total inference latency says a frame was slow; it does not say which
+    # stage. These separate it, because the three stages fail for different
+    # reasons and are fixed by different people: the feature engine is CPU on
+    # 1,604 columns, the temporal model is TensorFlow, and the explainer is
+    # SHAP over a wide vector.
+    feature_latency: LatencyWindow = field(default_factory=LatencyWindow)
+    temporal_latency: LatencyWindow = field(default_factory=LatencyWindow)
+    tree_latency: LatencyWindow = field(default_factory=LatencyWindow)
+    explanation_latency: LatencyWindow = field(default_factory=LatencyWindow)
+
+    #: Frames where a component that should have worked did not. Distinct from
+    #: ineligible, which is the gate declining for a declared reason.
+    degraded_inferences: int = 0
+
+    #: Frames refused because the loaded artifact no longer matches the feature
+    #: schema. Its own counter because it means "retrain", not "investigate the
+    #: data", and it is the failure that used to escape as an HTTP 500.
+    schema_mismatches: int = 0
+
+    #: Frames answered by the deterministic chain alone. The number that says
+    #: how much of the time the ML layer contributed nothing at all.
+    fallbacks: int = 0
+
+    #: Prediction distribution, coarsely binned. A run of shadow mode whose
+    #: probabilities all sit in one bin is a constant predictor, which is the
+    #: failure this project already shipped once.
+    prediction_bins: Counter = field(default_factory=Counter)
+
     # -- recording ---------------------------------------------------------
 
     def request(self, route: str) -> None:
@@ -112,6 +142,31 @@ class ServiceMetrics:
             # library is behind the machine, which is a knowledge job rather
             # than a modelling one.
             self.unknown_events += 1
+
+    def stage(self, name: str, milliseconds: float) -> None:
+        """Record one stage's latency. Unknown names are ignored, not raised:
+        a metrics call must never be the thing that fails a frame."""
+        window = {
+            "features": self.feature_latency,
+            "temporal": self.temporal_latency,
+            "trees": self.tree_latency,
+            "explanation": self.explanation_latency,
+        }.get(name)
+        if window is not None:
+            window.observe(milliseconds)
+
+    def degraded(self, *, schema_mismatch: bool = False) -> None:
+        self.degraded_inferences += 1
+        if schema_mismatch:
+            self.schema_mismatches += 1
+
+    def fallback(self) -> None:
+        """The deterministic chain answered alone."""
+        self.fallbacks += 1
+
+    def prediction(self, probability: float) -> None:
+        bucket = min(int(max(probability, 0.0) * 10), 9)
+        self.prediction_bins[f"{bucket / 10:.1f}-{(bucket + 1) / 10:.1f}"] += 1
 
     def alert(self, action: str) -> None:
         """action: raised | cleared | suppressed | bypassed."""
@@ -155,9 +210,35 @@ class ServiceMetrics:
             return None
         return round(positives / (positives + negatives), 4)
 
+    def prediction_spread(self) -> float | None:
+        """How many probability bins the model has actually used.
+
+        One bin over a long run is the signature of a constant predictor. It is
+        reported rather than alerted on, because early in shadow mode one bin is
+        also what a healthy machine looks like.
+        """
+        if not self.prediction_bins:
+            return None
+        return len(self.prediction_bins)
+
     def snapshot(self) -> dict[str, object]:
         return {
             "requests": dict(self.requests),
+            "stage_latency_ms": {
+                "features": self.feature_latency.percentiles(),
+                "temporal": self.temporal_latency.percentiles(),
+                "trees": self.tree_latency.percentiles(),
+                "explanation": self.explanation_latency.percentiles(),
+            },
+            "degraded": {
+                "inferences": self.degraded_inferences,
+                "schema_mismatches": self.schema_mismatches,
+                "fallbacks": self.fallbacks,
+            },
+            "predictions": {
+                "bins": dict(self.prediction_bins),
+                "bins_used": self.prediction_spread(),
+            },
             "inference_latency_ms": self.inference_latency.percentiles(),
             "eligible_rate": self.eligible_rate(),
             "ineligible_reasons": dict(self.ineligible_reasons),
