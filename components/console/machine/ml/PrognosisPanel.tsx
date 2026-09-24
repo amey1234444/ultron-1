@@ -1,5 +1,6 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Text, View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { Pressable, Text, View } from 'react-native';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import type {
@@ -136,7 +137,7 @@ function RiskRow({ horizon }: { horizon: MlRiskHorizon }) {
   );
 }
 
-function FaultRisk({ entry }: { entry: MlDiagnosis }) {
+function FaultRisk({ entry, shown }: { entry: MlDiagnosis; shown: Set<number> }) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
 
@@ -163,9 +164,11 @@ function FaultRisk({ entry }: { entry: MlDiagnosis }) {
         </View>
       </CardHeader>
       <CardContent className="gap-0">
-        {entry.risk.map((horizon) => (
-          <RiskRow key={horizon.horizonMinutes} horizon={horizon} />
-        ))}
+        {entry.risk
+          .filter((horizon) => shown.has(horizon.horizonMinutes))
+          .map((horizon) => (
+            <RiskRow key={horizon.horizonMinutes} horizon={horizon} />
+          ))}
         <Separator className="my-2" />
         <Body className="text-[12px]">{entry.why}</Body>
       </CardContent>
@@ -173,9 +176,113 @@ function FaultRisk({ entry }: { entry: MlDiagnosis }) {
   );
 }
 
+/**
+ * Which forecast horizons to show.
+ *
+ * The options come from the response, never from a constant, because a horizon
+ * is not a display preference — it is a trained output. Each one is a separate
+ * booster keyed `fault_id@horizon_minutes`, so a control offering 45 minutes
+ * against a model trained on 5/15/30 would be asking for a prediction that does
+ * not exist. Reading the options from `diagnoses[].risk[]` makes that
+ * impossible by construction.
+ *
+ * Changing which horizons a model is *trained* on is a different operation:
+ * rebuild the dataset with `--horizons` and retrain. This control cannot do it
+ * and does not imply that it can.
+ */
+function HorizonSelector({
+  available,
+  shown,
+  onToggle,
+}: {
+  available: number[];
+  shown: Set<number>;
+  onToggle: (minutes: number) => void;
+}) {
+  const { isDark } = useAppTheme();
+  const palette = consolePalette(isDark);
+
+  if (available.length <= 1) return null;
+
+  return (
+    <View
+      className="rounded-lg border p-3"
+      style={{
+        borderColor: alpha(palette.inkMuted, 0.3),
+        backgroundColor: alpha(palette.panel, 0.5),
+      }}
+    >
+      <SectionLabel>Forecast horizon — trained outputs</SectionLabel>
+      <View className="mt-2 flex-row flex-wrap items-center gap-2">
+        {available.map((minutes) => {
+          const on = shown.has(minutes);
+          return (
+            <Pressable
+              key={minutes}
+              onPress={() => onToggle(minutes)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: on }}
+              accessibilityLabel={`${minutes} minute horizon`}
+              className="flex-row items-center gap-1 rounded-md border px-2 py-1"
+              style={{
+                borderColor: on ? palette.accent : alpha(palette.inkMuted, 0.4),
+                backgroundColor: on ? alpha(palette.accent, 0.14) : 'transparent',
+              }}
+            >
+              <MaterialCommunityIcons
+                name={on ? 'checkbox-marked-outline' : 'checkbox-blank-outline'}
+                size={13}
+                color={on ? palette.accent : palette.inkMuted}
+              />
+              <Text
+                className="font-mono text-[11px]"
+                style={{ color: on ? palette.ink : palette.inkMuted }}
+              >
+                {minutes} min
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      <Body muted className="mt-2 text-[11px]">
+        These are the horizons this model was trained for. Training different ones needs a dataset
+        rebuild and a retrain — it is not a display setting.
+      </Body>
+    </View>
+  );
+}
+
 export function PrognosisPanel({ response, unavailable }: Props) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
+
+  // Derived from the response so a model with different horizons is followed
+  // automatically. Sorted ascending: a reader scans short to long.
+  const available = useMemo(() => {
+    const seen = new Set<number>();
+    for (const entry of response?.diagnoses ?? []) {
+      for (const horizon of entry.risk) seen.add(horizon.horizonMinutes);
+    }
+    return [...seen].sort((a, b) => a - b);
+  }, [response]);
+
+  // `null` means "not chosen yet", which shows everything. Storing the choice
+  // rather than defaulting to all-selected keeps a newly appearing horizon
+  // visible instead of silently hidden.
+  const [hidden, setHidden] = useState<Set<number>>(() => new Set());
+  const shown = useMemo(
+    () => new Set(available.filter((minutes) => !hidden.has(minutes))),
+    [available, hidden],
+  );
+  const toggle = (minutes: number) =>
+    setHidden((current) => {
+      const next = new Set(current);
+      // The last visible horizon cannot be hidden: an empty panel would read as
+      // "no risk" rather than "nothing selected".
+      if (next.has(minutes)) next.delete(minutes);
+      else if (shown.size > 1) next.add(minutes);
+      return next;
+    });
 
   if (unavailable) {
     return (
@@ -243,6 +350,8 @@ export function PrognosisPanel({ response, unavailable }: Props) {
         ) : null}
       </Alert>
 
+      <HorizonSelector available={available} shown={shown} onToggle={toggle} />
+
       {withRisk.length === 0 ? (
         <Alert variant="muted" title="No fault risk is being modelled" icon="information-outline">
           <Body>
@@ -251,7 +360,9 @@ export function PrognosisPanel({ response, unavailable }: Props) {
           </Body>
         </Alert>
       ) : (
-        withRisk.map((entry) => <FaultRisk key={entry.faultId} entry={entry} />)
+        withRisk.map((entry) => (
+          <FaultRisk key={entry.faultId} entry={entry} shown={shown} />
+        ))
       )}
 
       <View className="flex-row flex-wrap gap-x-6 gap-y-1">
