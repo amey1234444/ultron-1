@@ -52,3 +52,6 @@ next-env.d.ts
 # Blender/Python bytecode from the twin-screw build pipeline
 __pycache__/
 *.pyc
+
+# scratch output (logs, SSR experiments, working notes)
+.tmp/
