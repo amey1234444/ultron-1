@@ -66,11 +66,21 @@ export type MappableBoxProps = {
   bounds?: StageBounds;
   // Current stage scale — converts screen-pixel gesture deltas to stage units.
   stageScale?: number;
+  // How large the machine is currently drawn. The card is drawn at the same
+  // factor so it keeps its proportion to the machine at every size: a board
+  // arranged at 100% reads identically at 60% or 180%, just smaller or larger.
+  // Its offset from the connector point scales with it, so the card stays in
+  // the same place relative to the dot it belongs to.
+  boxScale?: number;
   // Actual View: no dragging, no editing, no delete/unlink — just the label or
   // the live channel readout.
   readOnly?: boolean;
   hideUnlink?: boolean;
   onDrag: (point: Point) => void;
+  // Moves the connector dot itself, independently of the card. Absent (or in
+  // read-only) the dot is not draggable — and in read-only it is not drawn at
+  // all, because a connection marker is configuration chrome, not a reading.
+  onConnectorDrag?: (point: Point) => void;
   onLabelChange: (label: string) => void;
   onPickChannel: (channel: ChannelRef | null) => void;
   onDelete: () => void;
@@ -98,9 +108,11 @@ export function MappableBox({
   devices = [],
   bounds = DEFAULT_STAGE_BOUNDS,
   stageScale = 1,
+  boxScale = 1,
   readOnly = false,
   hideUnlink = false,
   onDrag,
+  onConnectorDrag,
   onLabelChange,
   onPickChannel,
   onDelete,
@@ -185,8 +197,10 @@ export function MappableBox({
   pointRef.current = { x, y };
   const boundsRef = useRef(bounds);
   boundsRef.current = bounds;
-  const renderedWidthRef = useRef(renderedWidth);
-  renderedWidthRef.current = renderedWidth;
+  // The card is drawn scaled, so the room it actually takes on the stage — and
+  // therefore the limit that keeps it on screen — is its scaled width.
+  const renderedWidthRef = useRef(renderedWidth * boxScale);
+  renderedWidthRef.current = renderedWidth * boxScale;
   // Gesture dx/dy arrive in screen pixels; box coordinates live in stage units
   // under a scale transform, so deltas must be divided by the current stage scale.
   const scaleRef = useRef(stageScale);
@@ -224,7 +238,80 @@ export function MappableBox({
     }),
   ).current;
 
+  // The dot is dragged on its own, so it needs its own origin and its own
+  // responder — grabbing it must not also move the card it belongs to.
+  const connectorPointRef = useRef(connectorPoint);
+  connectorPointRef.current = connectorPoint;
+  const onConnectorDragRef = useRef(onConnectorDrag);
+  onConnectorDragRef.current = onConnectorDrag;
+  const connectorDragOrigin = useRef(connectorPoint);
+
+  const connectorResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => !readOnlyRef.current && !!onConnectorDragRef.current,
+      onMoveShouldSetPanResponder: () => !readOnlyRef.current && !!onConnectorDragRef.current,
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        connectorDragOrigin.current = connectorPointRef.current;
+      },
+      onPanResponderMove: (_evt, gesture) => {
+        const { minX, minY, maxX, maxY } = boundsRef.current;
+        const s = scaleRef.current || 1;
+        // The dot goes anywhere on the work surface — it is the point the trail
+        // lands on, and that is not confined to the card's own neighbourhood.
+        onConnectorDragRef.current?.({
+          x: clamp(connectorDragOrigin.current.x + gesture.dx / s, minX + 4, maxX - 4),
+          y: clamp(connectorDragOrigin.current.y + gesture.dy / s, minY + 4, maxY - 4),
+        });
+      },
+    }),
+  ).current;
+
   const connectorColour = attached ? '#3FBF6A' : '#3FBF6A';
+  const connectorDraggable = !readOnly && !!onConnectorDrag;
+
+  /**
+   * The connection marker.
+   *
+   * Configuration chrome: it says where a trail attaches to this card, which is
+   * only a question while the canvas is being wired. In Actual View there is
+   * nothing to attach, so it is not drawn at all rather than drawn inert — a
+   * dashboard should show readings, not the scaffolding they were mapped with.
+   */
+  const connectorDot = readOnly ? null : (
+    <View
+      {...(connectorDraggable ? connectorResponder.panHandlers : {})}
+      pointerEvents={connectorDraggable ? 'auto' : 'none'}
+      accessibilityLabel={connectorDraggable ? `Move the connection point for ${label || 'this point'}` : undefined}
+      // @ts-expect-error web-only: the dot is a drag handle, not selectable text.
+      style={{
+        position: 'absolute',
+        // Grabbing a 14-unit dot is fiddly, so the target is padded out and the
+        // ring is drawn centred inside it.
+        left: connectorPoint.x - 13,
+        top: connectorPoint.y - 13,
+        width: 26,
+        height: 26,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2,
+        cursor: connectorDraggable ? 'grab' : 'default',
+        userSelect: 'none',
+      }}
+    >
+      <View
+        pointerEvents="none"
+        style={{
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          borderWidth: 2,
+          borderColor: connectorColour,
+          backgroundColor: isDark ? '#0A0A0A' : '#FAFAFA',
+        }}
+      />
+    </View>
+  );
 
   if (channel) {
     const decimals = hasReading ? liveDisplayDecimals(channel, displayValue) : LIVE_RANGE_FOR_LETTER[channel.letter].decimals;
@@ -233,24 +320,20 @@ export function MappableBox({
     const status = dataLive && hasReading ? statusFor(channel, displayValue) : 'offline';
     return (
       <>
-        <View
-          pointerEvents="none"
-          style={{
-            position: 'absolute',
-            left: connectorPoint.x - 7,
-            top: connectorPoint.y - 7,
-            width: 14,
-            height: 14,
-            borderRadius: 7,
-            borderWidth: 2,
-            borderColor: connectorColour,
-            backgroundColor: isDark ? '#0A0A0A' : '#FAFAFA',
-          }}
-        />
+        {connectorDot}
 
         <View
           onLayout={(e) => onSizeChange?.({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
-          style={{ position: 'absolute', left: x + 14, top: y - 38 }}
+          style={{
+            position: 'absolute',
+            left: x + 14 * boxScale,
+            top: y - 38 * boxScale,
+            transform: [{ scale: boxScale }],
+            // Scale away from the card's own top-left so its offset from the
+            // connector point stays exactly what it was placed at; the default
+            // centre origin would drift the card sideways at every other size.
+            transformOrigin: 'left top',
+          }}
         >
           <PointCard18
             tag={channel.code}
@@ -272,30 +355,19 @@ export function MappableBox({
 
   return (
     <>
-      <View
-        pointerEvents="none"
-        style={{
-          position: 'absolute',
-          left: connectorPoint.x - 7,
-          top: connectorPoint.y - 7,
-          width: 14,
-          height: 14,
-          borderRadius: 7,
-          borderWidth: 2,
-          borderColor: connectorColour,
-          backgroundColor: isDark ? '#0A0A0A' : '#FAFAFA',
-        }}
-      />
+      {connectorDot}
 
       <View
         onLayout={(e) => onSizeChange?.({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
         className={cn('rounded-xl border border-dashed', lineClass, isDark ? 'bg-surface-darkpanel' : 'bg-surface-lightpanel')}
         style={{
           position: 'absolute',
-          left: x + 12,
-          top: y - 30,
+          left: x + 12 * boxScale,
+          top: y - 30 * boxScale,
           width: UNLINKED_BOX_WIDTH,
           height: MAPPABLE_BOX_HEIGHT,
+          transform: [{ scale: boxScale }],
+          transformOrigin: 'left top',
           zIndex: pickerOpen ? 1000 : 1,
           overflow: 'visible',
         }}

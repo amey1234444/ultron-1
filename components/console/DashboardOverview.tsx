@@ -53,6 +53,15 @@ type DashboardOverviewProps = {
   cards: CardNode[];
   live?: LiveState;
   currentUser?: PublicUser | null;
+  /**
+   * The console-wide configuration toggle.
+   *
+   * Editing the plant map is schema configuration, so it belongs behind the same
+   * switch every other schema edit is behind rather than being permanently on
+   * for whoever happens to be a super admin. Outside configuration mode this
+   * page is a monitor, and a monitor offers nothing to edit.
+   */
+  configureMode?: boolean;
   onOpenDevices: () => void;
   onOpenMachine: (id: string) => void;
 };
@@ -645,6 +654,7 @@ export function DashboardOverview({
   cards,
   live,
   currentUser,
+  configureMode = false,
   onOpenDevices,
   onOpenMachine,
 }: DashboardOverviewProps) {
@@ -661,7 +671,7 @@ export function DashboardOverview({
   // Below this the analytics column would be taking width the plant needs, so
   // it drops out entirely — the plant never shrinks to make room for a panel.
   const isNarrow = width > 0 && width < 1280;
-  const canEditPlant = currentUser?.role === 'super_admin';
+  const canEditPlant = currentUser?.role === 'super_admin' && configureMode;
 
   // --- digital twin view state ---------------------------------------------
   const [plantView, setPlantView] = useState<PlantViewMode>('overview');
@@ -1236,8 +1246,11 @@ export function DashboardOverview({
         {renderSection()}
       </View>
 
-      <Sheet visible={plantEditorOpen} title="Edit plant map" onClose={() => setPlantEditorOpen(false)}>
-        {plantEditorOpen ? (
+      {/* Leaving configuration mode with the editor open would strand an edit
+          surface on a page that no longer offers one, so it closes with the
+          mode rather than waiting to be dismissed. */}
+      <Sheet visible={plantEditorOpen && canEditPlant} title="Edit plant map" onClose={() => setPlantEditorOpen(false)}>
+        {plantEditorOpen && canEditPlant ? (
           <PlantOverviewEditor
             initialConfig={plantConfig}
             componentColors={plantComponentColors}

@@ -68,6 +68,18 @@ export type Box = {
   channelId?: string;
   /** Stable machine-template identity; legacy saved boxes remain label-resolved. */
   templatePointCode?: string;
+  /**
+   * Where this card's connection point sits, as a displacement from the card's
+   * own anchor.
+   *
+   * Stored relative rather than absolute so moving the card carries its dot
+   * along — the two are one object, and a dot left behind when the card moved
+   * would be a connection pointing at nothing. Absent means the dot has never
+   * been placed by hand, and it falls back to whatever the card is wired to.
+   * It rides in the saved layout like every other box field, so "Save Config"
+   * and "Save Template" both keep it.
+   */
+  connectorOffset?: { dx: number; dy: number };
 };
 
 type Rect = { x: number; y: number; width: number; height: number };
@@ -166,13 +178,22 @@ function pointInRect(point: Point, rect: Rect) {
 // Hit area covering the box's connector dot plus its actual rendered card.
 // `size` should be the measured dimensions when known; before that, fall back
 // to the shared card dimensions so linked cards behave the same in both modes.
-function boxHitRect(box: { x: number; y: number }, size: { width: number; height: number } = { width: MAPPABLE_BOX_WIDTH, height: MAPPABLE_BOX_HEIGHT }): Rect {
-  const cardLeft = box.x + 12;
-  const cardTop = box.y - 30;
+//
+// `scale` is how large the machine is drawn. Cards are drawn at that factor, so
+// every rect derived here — hit testing, trail anchoring, the saved centre — is
+// the card's *scaled* footprint. `onLayout` reports the pre-transform box, which
+// is why the scale is applied here rather than trusted from the measurement.
+function boxHitRect(
+  box: { x: number; y: number },
+  size: { width: number; height: number } = { width: MAPPABLE_BOX_WIDTH, height: MAPPABLE_BOX_HEIGHT },
+  scale = 1,
+): Rect {
+  const cardLeft = box.x + 12 * scale;
+  const cardTop = box.y - 30 * scale;
   const left = Math.min(box.x - 10, cardLeft - 10);
   const top = Math.min(box.y - 10, cardTop - 10);
-  const right = Math.max(box.x + 10, cardLeft + size.width + 10);
-  const bottom = cardTop + size.height + 10;
+  const right = Math.max(box.x + 10, cardLeft + size.width * scale + 10);
+  const bottom = cardTop + size.height * scale + 10;
   return { x: left, y: top, width: right - left, height: bottom - top };
 }
 
@@ -180,24 +201,41 @@ function boxVisualRect(
   box: Box,
   channels: ChannelRef[],
   size?: { width: number; height: number },
+  scale = 1,
 ): Rect {
   const linked = !!box.channelId && channels.some((c) => c.id === box.channelId);
-  const width = size?.width ?? (linked ? MAPPABLE_BOX_WIDTH : UNLINKED_BOX_WIDTH);
-  const height = size?.height ?? MAPPABLE_BOX_HEIGHT;
+  const width = (size?.width ?? (linked ? MAPPABLE_BOX_WIDTH : UNLINKED_BOX_WIDTH)) * scale;
+  const height = (size?.height ?? MAPPABLE_BOX_HEIGHT) * scale;
   return {
-    x: box.x + (linked ? 14 : 12),
-    y: box.y + (linked ? -38 : -30),
+    x: box.x + (linked ? 14 : 12) * scale,
+    y: box.y + (linked ? -38 : -30) * scale,
     width,
     height,
   };
+}
+
+/**
+ * Where a card's hand-placed connection dot lands, at the size the machine is
+ * currently drawn.
+ *
+ * The offset is stored in unscaled card units and multiplied back here, for the
+ * same reason the card's own offset from the dot is scaled: the card, its dot
+ * and the trail anchored to it are one assembly, and an offset that ignored the
+ * size would pull the dot off its card at every zoom but the one it was placed
+ * at.
+ */
+function connectorPointFor(box: Box, scale = 1): Point | null {
+  if (!box.connectorOffset) return null;
+  return { x: box.x + box.connectorOffset.dx * scale, y: box.y + box.connectorOffset.dy * scale };
 }
 
 function withBoxCenter(
   box: Box,
   channels: ChannelRef[],
   size?: { width: number; height: number },
+  scale = 1,
 ): Box {
-  const rect = boxVisualRect(box, channels, size);
+  const rect = boxVisualRect(box, channels, size, scale);
   return {
     ...box,
     centerX: Math.round((rect.x + rect.width / 2) * 100) / 100,
@@ -490,7 +528,7 @@ export function TrailBoard({
   const layoutWithCenters = useCallback((nextTrails: Trail[], nextBoxes: Box[]): SavedLayout => {
     return {
       trails: nextTrails,
-      boxes: nextBoxes.map((box) => withBoxCenter(box, channelsRef.current, boxSizesRef.current[box.id])),
+      boxes: nextBoxes.map((box) => withBoxCenter(box, channelsRef.current, boxSizesRef.current[box.id], machineZoomRef.current)),
       // Read through a ref rather than closed over, so a save triggered by a
       // stale callback still records the size on screen at the time it fires.
       machineZoom: machineZoomRef.current,
@@ -770,12 +808,17 @@ export function TrailBoard({
     const candidateBoxes = pad
       ? []
       : boxes
-          .map((box) => ({ box, rect: boxHitRect(box, boxSizes[box.id]) }))
+          .map((box) => ({ box, rect: boxHitRect(box, boxSizes[box.id], machineZoom) }))
           .filter(({ rect }) => pointInRect(point, rect))
           .sort((a, b) => Math.hypot(point.x - a.box.x, point.y - a.box.y) - Math.hypot(point.x - b.box.x, point.y - b.box.y));
 
     const hit = candidateBoxes[0] ?? null;
     const hitMachine = !pad && !hit && machineRect && pointInRect(point, machineRect) ? machineRect : null;
+    // A card whose dot was placed by hand has *declared* where it is connected,
+    // so a trail dropped on it lands on that dot rather than wherever the mouse
+    // happened to be. Without this the line and the marker would sit apart and
+    // the marker would stop meaning anything.
+    const hitConnector = hit ? connectorPointFor(hit.box, machineZoom) : null;
 
     const nextTrails = trailsRef.current.map((t) => {
       if (t.id !== trailId) return t;
@@ -784,7 +827,7 @@ export function TrailBoard({
       const boxAnchorKey = which === 'start' ? 'startBoxAnchor' : 'endBoxAnchor';
       const machineAnchorKey = which === 'start' ? 'startMachineAnchor' : 'endMachineAnchor';
       const pointCodeKey = which === 'start' ? 'startMachinePointCode' : 'endMachinePointCode';
-      const landing = pad ? pad.point : point;
+      const landing = pad ? pad.point : hitConnector ?? point;
       const nextPoints = t.points.map((p, i) => (i === index ? landing : p));
 
       if (pad && machineRect) {
@@ -799,7 +842,7 @@ export function TrailBoard({
       }
 
       if (hit) {
-        const anchor: Anchor = { rx: (point.x - hit.rect.x) / hit.rect.width, ry: (point.y - hit.rect.y) / hit.rect.height };
+        const anchor: Anchor = { rx: (landing.x - hit.rect.x) / hit.rect.width, ry: (landing.y - hit.rect.y) / hit.rect.height };
         return { ...t, points: nextPoints, [boxIdKey]: hit.box.id, [boxAnchorKey]: anchor, [machineAnchorKey]: undefined, [pointCodeKey]: undefined };
       }
 
@@ -846,6 +889,43 @@ export function TrailBoard({
 
   const updateBoxPosition = (id: string, point: Point) => {
     replaceBoxes((prev) => prev.map((b) => (b.id === id ? { ...b, ...point } : b)));
+  };
+
+  /**
+   * Move a card's connection dot.
+   *
+   * The dot is where a trail meets the card, so moving it has to take any
+   * attached trail with it — a dot that walked away from the line it represents
+   * would be showing a connection that is not there. The endpoint is re-anchored
+   * onto the dot's spot on the card's current rect, which is the same anchor
+   * form every other attachment uses, so the endpoint keeps tracking the dot
+   * afterwards through card drags, relinks and zoom.
+   */
+  const updateBoxConnector = (id: string, point: Point) => {
+    const box = boxesRef.current.find((b) => b.id === id);
+    if (!box) return;
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const scale = machineZoomRef.current || 1;
+    const nextBoxes = boxesRef.current.map((b) =>
+      b.id === id
+        ? { ...b, connectorOffset: { dx: round((point.x - b.x) / scale), dy: round((point.y - b.y) / scale) } }
+        : b,
+    );
+
+    const rect = boxHitRect(box, boxSizesRef.current[id], scale);
+    const anchor: Anchor = { rx: (point.x - rect.x) / rect.width, ry: (point.y - rect.y) / rect.height };
+    const nextTrails = trailsRef.current.map((t) => {
+      if (t.startBoxId === id) {
+        return { ...t, startBoxAnchor: anchor, points: t.points.map((p, i) => (i === 0 ? point : p)) };
+      }
+      if (t.endBoxId === id) {
+        return { ...t, endBoxAnchor: anchor, points: t.points.map((p, i) => (i === t.points.length - 1 ? point : p)) };
+      }
+      return t;
+    });
+
+    replaceTrails(nextTrails, false);
+    replaceBoxes(nextBoxes);
   };
 
   const updateBoxLabel = (id: string, label: string) => {
@@ -942,7 +1022,9 @@ export function TrailBoard({
 
   // A box moved, OR its rendered boundary changed — pull every box-anchored
   // endpoint along with it, from its remembered relative spot on that box's
-  // *current* rect.
+  // *current* rect. Resizing the machine changes that rect too, because a card
+  // is drawn at the machine's size, so the zoom belongs in this dependency list
+  // exactly as much as the box's own position does.
   useEffect(() => {
     setTrails((prev) => {
       const next = prev.map((t) => {
@@ -951,13 +1033,21 @@ export function TrailBoard({
           if (t.startBoxAnchor && i === 0) {
             const box = boxes.find((b) => b.id === t.startBoxId);
             if (!box) return p;
-            const rect = boxHitRect(box, boxSizes[box.id]);
+            // A hand-placed dot is the attachment, not an approximation of one,
+            // so the endpoint is put on it exactly. The proportional anchor is
+            // still what carries every other attachment, and it is what this
+            // falls back to when no dot has been placed.
+            const placed = connectorPointFor(box, machineZoom);
+            if (placed) return placed;
+            const rect = boxHitRect(box, boxSizes[box.id], machineZoom);
             return { x: rect.x + t.startBoxAnchor.rx * rect.width, y: rect.y + t.startBoxAnchor.ry * rect.height };
           }
           if (t.endBoxAnchor && i === t.points.length - 1) {
             const box = boxes.find((b) => b.id === t.endBoxId);
             if (!box) return p;
-            const rect = boxHitRect(box, boxSizes[box.id]);
+            const placed = connectorPointFor(box, machineZoom);
+            if (placed) return placed;
+            const rect = boxHitRect(box, boxSizes[box.id], machineZoom);
             return { x: rect.x + t.endBoxAnchor.rx * rect.width, y: rect.y + t.endBoxAnchor.ry * rect.height };
           }
           return p;
@@ -967,11 +1057,19 @@ export function TrailBoard({
       trailsRef.current = next;
       return next;
     });
-  }, [boxes, boxSizes]);
+  }, [boxes, boxSizes, machineZoom]);
 
-  // Wherever a trail is actually attached to this box right now — falls back to
-  // the box's own anchor point when nothing's attached yet.
+  /**
+   * Where this card's connection dot is drawn.
+   *
+   * A dot that was placed by hand wins: it is a decision someone made and saved,
+   * and it must survive the card being moved, rewired or reloaded. Otherwise the
+   * dot follows whatever trail is attached, and with nothing attached it sits on
+   * the card's own anchor — the behaviour every existing saved layout has.
+   */
   const boxConnectorPoint = (box: Box): Point => {
+    const placed = connectorPointFor(box, machineZoom);
+    if (placed) return placed;
     const attachedTrail = trails.find((t) => t.startBoxId === box.id || t.endBoxId === box.id);
     if (!attachedTrail) return { x: box.x, y: box.y };
     return attachedTrail.startBoxId === box.id ? attachedTrail.points[0] : attachedTrail.points[attachedTrail.points.length - 1];
@@ -1275,9 +1373,11 @@ export function TrailBoard({
               devices={devices}
               bounds={stageBounds}
               stageScale={stageScale}
+              boxScale={machineZoom}
               readOnly={readOnly}
               hideUnlink={hideUnlink}
               onDrag={(point) => updateBoxPosition(box.id, point)}
+              onConnectorDrag={(point) => updateBoxConnector(box.id, point)}
               onLabelChange={(label) => updateBoxLabel(box.id, label)}
               onPickChannel={(channel) => pickBoxChannel(box.id, channel)}
               onDelete={() => removeBox(box.id)}

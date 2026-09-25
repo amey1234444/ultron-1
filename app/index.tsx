@@ -1210,6 +1210,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               cards={visibleCards}
               live={plantLive}
               currentUser={currentUser}
+              configureMode={canEditDeleteSchema}
               onOpenDevices={() => setSelected({ kind: 'devices' })}
               onOpenMachine={(id) => setSelected({ kind: 'machine', id })}
             />
