@@ -1,4 +1,6 @@
 import { EXPANDER_POINT_REGISTRY } from '../../../lib/expanderPoints';
+import { CONDITIONER_POINT_REGISTRY } from '../../../lib/conditionerPoints';
+import { CRACKING_MILL_POINT_REGISTRY } from '../../../lib/crackingMillPoints';
 import { FLAKING_MILL_POINT_REGISTRY } from '../../../lib/flakingMillPoints';
 import type { ChannelRef } from '../../../lib/rack';
 import {
@@ -138,6 +140,8 @@ const TWIN_SCREW_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(TWIN_SC
 // does not pull the SVG scene into a module that only needs coordinates.
 const EXPANDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXPANDER_POINT_REGISTRY);
 const FLAKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(FLAKING_MILL_POINT_REGISTRY);
+const CRACKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CRACKING_MILL_POINT_REGISTRY);
+const CONDITIONER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CONDITIONER_POINT_REGISTRY);
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
@@ -145,6 +149,8 @@ const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Twin Screw Extruder': TWIN_SCREW_TEMPLATE_POINTS,
   'Expander X-101': EXPANDER_TEMPLATE_POINTS,
   'Flaking Mill M-102': FLAKING_MILL_TEMPLATE_POINTS,
+  'Cracking Mill M-101': CRACKING_MILL_TEMPLATE_POINTS,
+  'Conditioner E-102': CONDITIONER_TEMPLATE_POINTS,
 };
 
 function makeId(prefix: string) {

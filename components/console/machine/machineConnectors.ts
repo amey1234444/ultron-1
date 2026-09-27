@@ -12,6 +12,16 @@
 // instruments the current model does not read, and they say so.
 
 import {
+  CONDITIONER_ARTWORK_HEIGHT,
+  CONDITIONER_ARTWORK_WIDTH,
+  CONDITIONER_POINT_REGISTRY,
+} from '../../../lib/conditionerPoints';
+import {
+  CRACKING_MILL_ARTWORK_HEIGHT,
+  CRACKING_MILL_ARTWORK_WIDTH,
+  CRACKING_MILL_POINT_REGISTRY,
+} from '../../../lib/crackingMillPoints';
+import {
   EXPANDER_ARTWORK_HEIGHT,
   EXPANDER_ARTWORK_WIDTH,
   EXPANDER_POINT_REGISTRY,
@@ -43,6 +53,8 @@ export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {
   'Expander X-101': { width: EXPANDER_ARTWORK_WIDTH, height: EXPANDER_ARTWORK_HEIGHT },
   // Taller than every other flat artwork; this machine is a vertical stack.
   'Flaking Mill M-102': { width: FLAKING_MILL_ARTWORK_WIDTH, height: FLAKING_MILL_ARTWORK_HEIGHT },
+  'Cracking Mill M-101': { width: CRACKING_MILL_ARTWORK_WIDTH, height: CRACKING_MILL_ARTWORK_HEIGHT },
+  'Conditioner E-102': { width: CONDITIONER_ARTWORK_WIDTH, height: CONDITIONER_ARTWORK_HEIGHT },
 };
 
 const DEFAULT_ARTWORK = { width: 1200, height: 760 };
@@ -149,6 +161,14 @@ const EXPANDER_CONNECTOR_LIST: MachineConnector[] = EXPANDER_POINT_REGISTRY.map(
 const FLAKING_MILL_CONNECTOR_LIST: MachineConnector[] = FLAKING_MILL_POINT_REGISTRY.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Flaking Mill M-102']),
 );
+// Like the flaking mill, both of these templates ship no sensor registry; the
+// positions were written during integration and each lib file records that.
+const CRACKING_MILL_CONNECTOR_LIST: MachineConnector[] = CRACKING_MILL_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Cracking Mill M-101']),
+);
+const CONDITIONER_CONNECTOR_LIST: MachineConnector[] = CONDITIONER_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Conditioner E-102']),
+);
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
 );
@@ -159,6 +179,8 @@ const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Rotary Airlock Valve': RAV_CONNECTOR_LIST,
   'Expander X-101': EXPANDER_CONNECTOR_LIST,
   'Flaking Mill M-102': FLAKING_MILL_CONNECTOR_LIST,
+  'Cracking Mill M-101': CRACKING_MILL_CONNECTOR_LIST,
+  'Conditioner E-102': CONDITIONER_CONNECTOR_LIST,
 };
 
 export function connectorsForTemplate(machineTemplate: string): MachineConnector[] {

@@ -1,4 +1,14 @@
 import {
+  CONDITIONER_COMPONENT_ORDER,
+  conditionerPointsForComponent,
+  type ConditionerComponent,
+} from './conditionerPoints';
+import {
+  CRACKING_MILL_COMPONENT_ORDER,
+  crackingMillPointsForComponent,
+  type CrackingMillComponent,
+} from './crackingMillPoints';
+import {
   EXPANDER_COMPONENT_ORDER,
   expanderPointsForComponent,
   type ExpanderComponent,
@@ -28,6 +38,8 @@ export const MACHINE_TEMPLATES = [
   'Twin Screw Extruder',
   'Expander X-101',
   'Flaking Mill M-102',
+  'Cracking Mill M-101',
+  'Conditioner E-102',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -120,6 +132,20 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
     { type: 'Custom Component', label: 'Rolls' },
     { type: 'Custom Component', label: 'Feed' },
     { type: 'Custom Component', label: 'Hydraulics' },
+  ],
+  'Cracking Mill M-101': [
+    { type: 'Motor', label: 'Top Stage Motor' },
+    { type: 'Motor', label: 'Bottom Stage Motor' },
+    { type: 'Custom Component', label: 'Top Rolls' },
+    { type: 'Custom Component', label: 'Bottom Rolls' },
+    { type: 'Custom Component', label: 'Feed' },
+  ],
+  'Conditioner E-102': [
+    { type: 'Motor', label: 'Agitator Drive' },
+    { type: 'Custom Component', label: 'Decks' },
+    { type: 'Custom Component', label: 'Steam' },
+    { type: 'Custom Component', label: 'Vapour' },
+    { type: 'Custom Component', label: 'Discharge' },
   ],
   'Custom Machine': [],
 };
@@ -264,6 +290,40 @@ const FLAKING_MILL_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = FLAKING_MILL_CO
   points: flakingMillPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
 }));
 
+// Cracking Mill M-101 — two independently driven stages, kept apart in the
+// tree because a fault on one pair is not a fault on the other, and because
+// each pair is set by the difference between its own two roll speeds.
+const CRACKING_MILL_COMPONENT_TYPES: Record<CrackingMillComponent, ComponentType> = {
+  'Top Drive': 'Motor',
+  'Bottom Drive': 'Motor',
+  'Top Rolls': 'Custom Component',
+  'Bottom Rolls': 'Custom Component',
+  Feed: 'Custom Component',
+};
+
+const CRACKING_MILL_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = CRACKING_MILL_COMPONENT_ORDER.map((component) => ({
+  type: CRACKING_MILL_COMPONENT_TYPES[component],
+  label: component,
+  points: crackingMillPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+// Conditioner E-102 — the six decks are one component, not six. They are one
+// product path through one vessel on one shaft, and a deck temperature is only
+// meaningful as part of the profile down the stack.
+const CONDITIONER_COMPONENT_TYPES: Record<ConditionerComponent, ComponentType> = {
+  Agitator: 'Motor',
+  Decks: 'Custom Component',
+  Steam: 'Custom Component',
+  Vapour: 'Custom Component',
+  Discharge: 'Custom Component',
+};
+
+const CONDITIONER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = CONDITIONER_COMPONENT_ORDER.map((component) => ({
+  type: CONDITIONER_COMPONENT_TYPES[component],
+  label: component,
+  points: conditionerPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.
 const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
@@ -272,6 +332,8 @@ const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[
   'Twin Screw Extruder': TWIN_SCREW_ANALYSIS_COMPONENTS,
   'Expander X-101': EXPANDER_ANALYSIS_COMPONENTS,
   'Flaking Mill M-102': FLAKING_MILL_ANALYSIS_COMPONENTS,
+  'Cracking Mill M-101': CRACKING_MILL_ANALYSIS_COMPONENTS,
+  'Conditioner E-102': CONDITIONER_ANALYSIS_COMPONENTS,
 };
 
 /**

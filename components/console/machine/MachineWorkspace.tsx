@@ -31,6 +31,8 @@ import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { TwinScrewDiagnosisView } from './TwinScrewDiagnosisView';
+import { Conditioner } from './Conditioner';
+import { CrackingMill } from './CrackingMill';
 import { Expander } from './Expander';
 import { FlakingMill } from './FlakingMill';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
@@ -85,6 +87,8 @@ const ARTWORK_TEMPLATES = new Set<string>([
   'Twin Screw Extruder',
   'Expander X-101',
   'Flaking Mill M-102',
+  'Cracking Mill M-101',
+  'Conditioner E-102',
 ]);
 
 /**
@@ -553,6 +557,10 @@ export function MachineWorkspace({
                 // so the canvas is the only thing rendering them, as with the
                 // Rotary Airlock Valve.
                 <FlakingMill showBackground={false} showGrid={false} />
+              ) : machine.template === 'Cracking Mill M-101' ? (
+                <CrackingMill showBackground={false} showGrid={false} />
+              ) : machine.template === 'Conditioner E-102' ? (
+                <Conditioner showBackground={false} showGrid={false} />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}
