@@ -11,6 +11,11 @@
 // machine's analysis model actually consumes. Pads without a tag are real
 // instruments the current model does not read, and they say so.
 
+import {
+  EXPANDER_ARTWORK_HEIGHT,
+  EXPANDER_ARTWORK_WIDTH,
+  EXPANDER_POINT_REGISTRY,
+} from '../../../lib/expanderPoints';
 import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
@@ -30,6 +35,7 @@ export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {
   'Rotary Airlock Valve': { width: 1200, height: 760 },
   'Single Screw Extruder': { width: 1200, height: 760 },
   'Twin Screw Extruder': { width: TWIN_SCREW_ARTWORK_WIDTH, height: TWIN_SCREW_ARTWORK_HEIGHT },
+  'Expander X-101': { width: EXPANDER_ARTWORK_WIDTH, height: EXPANDER_ARTWORK_HEIGHT },
 };
 
 const DEFAULT_ARTWORK = { width: 1200, height: 760 };
@@ -115,6 +121,17 @@ const TWIN_SCREW_CONNECTOR_LIST: MachineConnector[] = TWIN_SCREW_POINT_REGISTRY.
   analyzerTag: point.modelStatus === 'modelled' ? point.analyzerTag : undefined,
   analyzerNote: point.analyzerNote,
 }));
+/**
+ * Expander pads, derived from the registry.
+ *
+ * No `analyzerTag` is carried through, and that is the point: every pad on
+ * this machine is a real instrument that no commissioned model reads yet, so
+ * the connection confirmation says exactly that rather than implying a
+ * diagnostic will run.
+ */
+const EXPANDER_CONNECTOR_LIST: MachineConnector[] = EXPANDER_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Expander X-101']),
+);
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
 );
@@ -123,6 +140,7 @@ const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Single Screw Extruder': EXTRUDER_CONNECTOR_LIST,
   'Twin Screw Extruder': TWIN_SCREW_CONNECTOR_LIST,
   'Rotary Airlock Valve': RAV_CONNECTOR_LIST,
+  'Expander X-101': EXPANDER_CONNECTOR_LIST,
 };
 
 export function connectorsForTemplate(machineTemplate: string): MachineConnector[] {

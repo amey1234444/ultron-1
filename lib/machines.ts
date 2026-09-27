@@ -1,3 +1,8 @@
+import {
+  EXPANDER_COMPONENT_ORDER,
+  expanderPointsForComponent,
+  type ExpanderComponent,
+} from './expanderPoints';
 import { EXTRUDER_POINT_REGISTRY } from './extruderPoints';
 import {
   TWIN_SCREW_COMPONENT_ORDER,
@@ -16,6 +21,7 @@ export const MACHINE_TEMPLATES = [
   'Rotary Airlock Valve',
   'Single Screw Extruder',
   'Twin Screw Extruder',
+  'Expander X-101',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -93,6 +99,14 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
     { type: 'Custom Component', label: 'Barrel Zones' },
     { type: 'Custom Component', label: 'Vent Section' },
     { type: 'Custom Component', label: 'Die and Discharge' },
+  ],
+  'Expander X-101': [
+    { type: 'Motor', label: 'Main Motor' },
+    { type: 'Coupling' },
+    { type: 'Gearbox' },
+    { type: 'Custom Component', label: 'Feed' },
+    { type: 'Custom Component', label: 'Barrel' },
+    { type: 'Custom Component', label: 'Discharge' },
   ],
   'Custom Machine': [],
 };
@@ -191,12 +205,37 @@ const TWIN_SCREW_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = TWIN_SCREW_COMPON
   points: twinScrewPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
 }));
 
+// Expander X-101 — the machine tree, derived from its point registry.
+//
+// Same rule as the twin screw: membership is declared on the point, so this
+// cannot list a point twice or lose one. The coupling carries no instrument and
+// so has no component here, which is why this tree is shorter than the
+// TEMPLATE_COMPONENTS list above.
+//
+// No analyzer tags are attached. The extruder and twin-screw models are
+// commissioned on their own machines, and pointing one at expander readings
+// would produce confident output from a model that has never seen this machine.
+const EXPANDER_COMPONENT_TYPES: Record<ExpanderComponent, ComponentType> = {
+  'Main Motor': 'Motor',
+  Gearbox: 'Gearbox',
+  Feed: 'Custom Component',
+  Barrel: 'Custom Component',
+  Discharge: 'Custom Component',
+};
+
+const EXPANDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = EXPANDER_COMPONENT_ORDER.map((component) => ({
+  type: EXPANDER_COMPONENT_TYPES[component],
+  label: component,
+  points: expanderPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.
 const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
   'Rotary Airlock Valve': RAV_ANALYSIS_COMPONENTS,
   'Single Screw Extruder': EXTRUDER_ANALYSIS_COMPONENTS,
   'Twin Screw Extruder': TWIN_SCREW_ANALYSIS_COMPONENTS,
+  'Expander X-101': EXPANDER_ANALYSIS_COMPONENTS,
 };
 
 /**

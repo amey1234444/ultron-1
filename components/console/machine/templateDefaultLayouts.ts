@@ -1,3 +1,4 @@
+import { EXPANDER_POINT_REGISTRY } from '../../../lib/expanderPoints';
 import type { ChannelRef } from '../../../lib/rack';
 import {
   normalizeTwinScrewPointCode,
@@ -132,11 +133,15 @@ function columnTemplatePoints(connectors: readonly ArtworkConnector[]): Template
 
 const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXTRUDER_CONNECTORS);
 const TWIN_SCREW_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(TWIN_SCREW_CONNECTORS);
+// Taken from the registry rather than from the drawing, so the default layout
+// does not pull the SVG scene into a module that only needs coordinates.
+const EXPANDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXPANDER_POINT_REGISTRY);
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
   'Single Screw Extruder': EXTRUDER_TEMPLATE_POINTS,
   'Twin Screw Extruder': TWIN_SCREW_TEMPLATE_POINTS,
+  'Expander X-101': EXPANDER_TEMPLATE_POINTS,
 };
 
 function makeId(prefix: string) {

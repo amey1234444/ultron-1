@@ -31,6 +31,7 @@ import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { TwinScrewDiagnosisView } from './TwinScrewDiagnosisView';
+import { Expander } from './Expander';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
 import { TwinScrewExtruder } from './TwinScrewExtruder';
@@ -81,6 +82,7 @@ const ARTWORK_TEMPLATES = new Set<string>([
   'Rotary Airlock Valve',
   'Single Screw Extruder',
   'Twin Screw Extruder',
+  'Expander X-101',
 ]);
 
 /**
@@ -533,6 +535,17 @@ export function MachineWorkspace({
                 <SingleScrewExtruder connectorState={connectorState} />
               ) : machine.template === 'Twin Screw Extruder' ? (
                 <TwinScrewExtruder connectorState={connectorState} />
+              ) : machine.template === 'Expander X-101' ? (
+                // The workspace already draws one background and one grid, so
+                // the drawing supplies neither. Its own connector overlay stays
+                // off for the same reason the other artworks' does: the canvas
+                // owns pad rendering, and two overlays would double every pad.
+                <Expander
+                  showBackground={false}
+                  showGrid={false}
+                  showConnectors={false}
+                  connectorState={connectorState}
+                />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}

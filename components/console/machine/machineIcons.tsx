@@ -14,6 +14,7 @@ export const MACHINE_TEMPLATE_ICON: Record<MachineTemplate, keyof typeof Materia
   'Rotary Airlock Valve': 'valve',
   'Single Screw Extruder': 'screw-machine-flat-top',
   'Twin Screw Extruder': 'screw-machine-round-top',
+  'Expander X-101': 'screw-machine-flat-top',
   'Custom Machine': 'shape-outline',
 };
 
