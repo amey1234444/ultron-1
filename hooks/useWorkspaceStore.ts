@@ -6,7 +6,7 @@ import type { FolderNode, ProjectNode } from '../lib/hierarchy';
 import type { MachineNode } from '../lib/machines';
 import type { CardNode } from '../lib/rack';
 import { createSeedData } from '../lib/seedData';
-import { apiFetch } from '../src/lib/apiClient';
+import { apiFetch } from '../lib/apiClient';
 import type { SavedLayout } from '../components/console/machine/TrailBoard';
 
 function makeId() {

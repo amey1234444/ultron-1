@@ -58,7 +58,7 @@ import { componentsForTemplate, type MachineNode } from '../lib/machines';
 import { PERMISSIONS } from '../lib/permissions';
 import type { CardConfig, CardNode, CardType } from '../lib/rack';
 import { createSeedData } from '../lib/seedData';
-import { USER_PERMISSIONS, userHasPermission, type PublicUser } from '../src/lib/roles';
+import { USER_PERMISSIONS, userHasPermission, type PublicUser } from '../lib/roles';
 
 const LEFT_PANEL_WIDTH = 256;
 

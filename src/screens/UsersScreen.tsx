@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 
 import { AuthGate } from '../components/web/AuthGate';
 import { useAuth } from '../context/AuthContext';
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 import {
   ONLINE_WINDOW_MS,
   ROLE_LABEL,
@@ -17,7 +17,7 @@ import {
   type ReputationStatus,
   type Role,
   type UserStatus,
-} from '../lib/roles';
+} from '../../lib/roles';
 
 // Human-friendly "time ago" for last-login / last-seen timestamps.
 function timeAgo(iso: string | null, now: number): string {

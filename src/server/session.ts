@@ -3,7 +3,7 @@ import crypto from 'crypto';
 import { serialize, parse } from 'cookie';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import type { Role, PublicUser } from '../lib/roles';
+import type { Role, PublicUser } from '../../lib/roles';
 import { ensureSchema, isDbEnabled, query } from './db';
 import { ApiError, findById, toPublic, type StoredUser } from './users';
 

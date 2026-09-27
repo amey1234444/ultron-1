@@ -2,7 +2,7 @@ import { useRouter } from 'next/router';
 import { useEffect, type ReactNode } from 'react';
 
 import { useAuth } from '../../context/AuthContext';
-import { hasAtLeast, type Role } from '../../lib/roles';
+import { hasAtLeast, type Role } from '../../../lib/roles';
 import { AppLoader } from './AppLoader';
 
 type AuthGateProps = {

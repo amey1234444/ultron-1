@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
-import { apiFetch } from '../lib/apiClient';
-import type { PublicUser } from '../lib/roles';
+import { apiFetch } from '../../lib/apiClient';
+import type { PublicUser } from '../../lib/roles';
 
 type SignupInput = {
   username: string;

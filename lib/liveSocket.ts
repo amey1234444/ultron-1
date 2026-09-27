@@ -12,7 +12,7 @@
 // that silently turns a live dashboard into a stale one — so it retries with
 // backoff until closed explicitly.
 
-import type { LiveFrame } from '../../lib/liveTelemetry';
+import type { LiveFrame } from './liveTelemetry';
 
 declare const process: { env: Record<string, string | undefined> };
 

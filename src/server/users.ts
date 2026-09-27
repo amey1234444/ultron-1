@@ -11,7 +11,7 @@ import {
   type Role,
   type UserPermission,
   type UserStatus,
-} from '../lib/roles';
+} from '../../lib/roles';
 import { ensureSchema, isDbEnabled, query } from './db';
 import { ApiError } from './errors';
 

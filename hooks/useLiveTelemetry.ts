@@ -4,8 +4,8 @@ import { Platform } from 'react-native';
 import { recordChannelHistorySamples } from '../lib/channelHistoryDb';
 import { pruneLiveMeasurements, publishLiveMeasurements } from '../lib/liveMeasurementBus';
 import { EMPTY_LIVE_STATE, mergeLiveFrame, withClockOffset, type LiveFrame, type LiveMeasurement, type LiveState } from '../lib/liveTelemetry';
-import { apiFetch } from '../src/lib/apiClient';
-import { liveSocketConfig, subscribeLiveFrames, type LiveSocketSubscription } from '../src/lib/liveSocket';
+import { apiFetch } from '../lib/apiClient';
+import { liveSocketConfig, subscribeLiveFrames, type LiveSocketSubscription } from '../lib/liveSocket';
 
 // Live state has three transports, in order of latency:
 //

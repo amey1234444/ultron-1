@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import { USER_PERMISSIONS, userHasPermission } from '../../../lib/roles';
+import { USER_PERMISSIONS, userHasPermission } from '../../../../lib/roles';
 import { isDbEnabled } from '../../../server/db';
 import { sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';

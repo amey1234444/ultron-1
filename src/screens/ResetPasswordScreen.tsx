@@ -2,7 +2,7 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { Text } from 'react-native';
 
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 import {
   AUTH_FONT_BODY,
   AuthAltAction,

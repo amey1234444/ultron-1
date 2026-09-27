@@ -4,7 +4,7 @@ import { ScrollView, Text, View, useWindowDimensions } from "react-native";
 
 import { useAppTheme } from "../../../hooks/useAppTheme";
 import { cn } from "../../../lib/cn";
-import type { PublicUser } from "../../../src/lib/roles";
+import type { PublicUser } from "../../../lib/roles";
 import { SapConnectionDialog } from "./SapConnectionDialog";
 import { SapButton, StatusPill, useSapPalette } from "./SapUi";
 import { EquipmentMappingTab } from "./tabs/EquipmentMappingTab";

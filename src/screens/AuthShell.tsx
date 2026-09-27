@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 
 import { LOGO_ASPECT, LOGO_DARK } from '../../lib/brandLogos';
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 
 // Auth pages share the landing page's typography — Inter for everything, with
 // JetBrains Mono for micro-labels, loaded via Google Fonts in _document.tsx.

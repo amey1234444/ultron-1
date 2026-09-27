@@ -2,7 +2,7 @@ import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { Text } from 'react-native';
 
-import { apiFetch } from '../lib/apiClient';
+import { apiFetch } from '../../lib/apiClient';
 import { AUTH_FONT_BODY, AuthAltAction, AuthButton, AuthError, AuthField, AuthShell } from './AuthShell';
 
 export default function ForgotPasswordScreen() {

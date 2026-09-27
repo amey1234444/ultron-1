@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs';
 import type { NextApiRequest, NextApiResponse } from 'next';
 
-import type { PublicUser } from '../../../lib/roles';
+import type { PublicUser } from '../../../../lib/roles';
 import { verifyCaptcha } from '../../../server/captcha';
 import { ApiError, sendApiError } from '../../../server/errors';
 import { enforceRateLimit } from '../../../server/rateLimit';

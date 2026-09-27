@@ -4,7 +4,7 @@ import { Pressable, Text, View } from 'react-native';
 import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import { useAuth } from '../../context/AuthContext';
-import { canManageUsers, ROLE_LABEL } from '../../lib/roles';
+import { canManageUsers, ROLE_LABEL } from '../../../lib/roles';
 
 // Account block pinned to the bottom of the console's left sidebar: who's signed
 // in, their role, and the Manage Users / Sign Out actions. Theme-aware so it

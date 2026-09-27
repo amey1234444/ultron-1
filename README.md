@@ -7,6 +7,33 @@ and runs on **two targets from one codebase**:
 - **Next.js** (web deployment) — renders the same React Native component tree
   via `react-native-web`, adds authentication, and deploys to Render.
 
+## Repository layout
+
+Two targets share one tree, and the split is the thing to understand before
+moving a file:
+
+| Path | Belongs to | Rule |
+| --- | --- | --- |
+| `app/` | Expo Router | Native/Expo entry. Expo resolves this by convention. |
+| `src/pages/` | Next Pages Router | Web routes and `src/pages/api/*`. Next resolves by filename. |
+| `src/screens/`, `src/context/`, `src/server/` | Next only | Web screens, auth context, and everything server-side. |
+| `src/components/` | Next only | Marketing and web-chrome components. |
+| `src/lib/` | Next only | Browser-only helpers (`smoothScroll`, `webFonts`). |
+| `components/`, `lib/`, `hooks/` | **Shared** | React Native code both targets import. |
+
+**The shared tree must not import from `src/`.** It is shared precisely because
+it depends on nothing Next-specific; one import into `src/` means the Expo
+target is pulling in web-only code, and the split has stopped being real.
+
+Nothing in the type system catches that — `tsconfig.json` (Expo) includes the
+whole repo, so such an import typechecks and fails later as a runtime
+resolution error on a device. `npm run check:boundaries` enforces it instead.
+
+Supporting trees: `services/ml` (Python FastAPI), `ultron-gateway` (Python edge
+agent), `polymer-plant-3d` (Blender pipeline), `supabase/migrations` (replayed
+on every ingest start — see `docs/database-schema.md`), `contracts` (MQTT JSON
+schemas), `export` (standalone landing page).
+
 ## Web app (Next.js)
 
 ```bash
@@ -14,7 +41,7 @@ npm install
 npm run dev        # Next.js dev server  -> http://localhost:3000
 npm run build      # production build
 npm run start:next # serve the production build
-npm run typecheck  # tsc against tsconfig.next.json
+npm run typecheck  # tsc --noEmit, against tsconfig.json (whole repo)
 ```
 
 ### Architecture
@@ -22,7 +49,8 @@ npm run typecheck  # tsc against tsconfig.next.json
 - `src/pages/` — Next.js Pages Router (web routes + `src/pages/api/*` auth/user APIs).
 - `src/screens/` — web screens (`LoginScreen`, `ConsoleScreen`, `UsersScreen`), rendered
   client-side (`ssr: false`) since they use `react-native-web`.
-- `app/`, `components/`, `lib/`, `hooks/` — the shared React Native tree, reused as-is.
+- `app/`, `components/`, `lib/`, `hooks/` — the shared React Native tree, reused as-is
+  (see [Repository layout](#repository-layout) for the rule that keeps it shareable).
 - `babel.config.js` branches on the Babel caller so Metro (Expo) and Next each get the
   right preset from a single config.
 - `next.config.js` aliases `react-native` → `react-native-web`, transpiles the RN/Expo

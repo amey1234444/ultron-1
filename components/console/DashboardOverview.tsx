@@ -31,8 +31,8 @@ import {
 import { buildPlantAnalytics, type PlantAssetStatus } from '../../lib/plantAnalytics';
 import { countPartEdits, type PlantScene3DConfig } from '../../lib/plantScene3d';
 import { chromeVisible, isImmersive, PLANT_TRANSITION_MS, type PlantViewMode } from '../../lib/plantViewState';
-import { apiFetch } from '../../src/lib/apiClient';
-import { ROLE_LABEL, type PublicUser } from '../../src/lib/roles';
+import { apiFetch } from '../../lib/apiClient';
+import { ROLE_LABEL, type PublicUser } from '../../lib/roles';
 import type { PlantCalloutFacts } from './plant3d/types';
 import { FadeLayer } from './plant/FadeLayer';
 import {
