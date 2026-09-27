@@ -18,5 +18,17 @@
 -- its template's size. Values are clamped to the range the zoom control offers
 -- (0.5–2) before they are written.
 
+-- studio_machine_templates existed only in src/server/db.ts until
+-- 20260926000000_runtime_only_tables.sql, which sorts after this file. Creating
+-- it here if it is missing is what lets the migrations be replayed against an
+-- empty database at all: ADD COLUMN IF NOT EXISTS tolerates a missing column,
+-- not a missing table, so this file used to abort the replay outright.
+CREATE TABLE IF NOT EXISTS studio_machine_templates (
+  machine_template TEXT PRIMARY KEY,
+  trails           JSONB NOT NULL DEFAULT '[]'::jsonb,
+  boxes            JSONB NOT NULL DEFAULT '[]'::jsonb,
+  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 ALTER TABLE studio_machine_layouts   ADD COLUMN IF NOT EXISTS machine_zoom DOUBLE PRECISION;
 ALTER TABLE studio_machine_templates ADD COLUMN IF NOT EXISTS machine_zoom DOUBLE PRECISION;

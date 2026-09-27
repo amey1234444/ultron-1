@@ -2,16 +2,49 @@
 -- Idempotent migration: preserves legacy tables while moving live identity to
 -- exact string rack IDs and adding current-only v2 state surfaces.
 
-ALTER TABLE studio_devices ALTER COLUMN real_rack_id TYPE TEXT USING real_rack_id::TEXT;
+-- Guarded against the catalog rather than run unconditionally.
+--
+-- src/server/ingest/db.mjs applies every file in this directory, in order, on
+-- every start of the ingest service -- so these are not once-in-history
+-- statements, they are replayed. A bare ALTER COLUMN ... TYPE takes an ACCESS
+-- EXCLUSIVE lock on the table, which stops every reader and writer of
+-- measurement_history until it completes and has to queue behind any in-flight
+-- query. Checking pg_attribute first turns the steady state into a catalog
+-- lookup, and leaves the conversion itself exactly as it was for a database that
+-- has not had it yet.
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN SELECT * FROM (VALUES
+    ('studio_devices', 'real_rack_id'),
+    ('racks', 'rack_id'),
+    ('mqtt_messages', 'rack_id'),
+    ('rack_inventory_slots', 'rack_id'),
+    ('measurement_latest', 'rack_id'),
+    ('measurement_history', 'rack_id'),
+    ('gateway_events', 'rack_id'),
+    ('mqtt_quarantine', 'rack_id')
+  ) AS v(tbl, col) LOOP
+    IF to_regclass(r.tbl) IS NOT NULL AND EXISTS (
+      SELECT 1 FROM pg_attribute a
+      WHERE a.attrelid = to_regclass(r.tbl) AND a.attname = r.col
+        AND a.attnum > 0 AND NOT a.attisdropped AND a.atttypid <> 'text'::regtype
+    ) THEN
+      EXECUTE format('ALTER TABLE %I ALTER COLUMN %I TYPE TEXT USING %I::TEXT', r.tbl, r.col, r.col);
+    END IF;
+  END LOOP;
+END $$;
 
-ALTER TABLE racks ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;
-ALTER TABLE mqtt_messages ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;
-ALTER TABLE rack_inventory_slots ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;
-ALTER TABLE measurement_latest ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;
-ALTER TABLE measurement_history ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;
-ALTER TABLE gateway_events ALTER COLUMN rack_id DROP NOT NULL;
-ALTER TABLE gateway_events ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;
-ALTER TABLE mqtt_quarantine ALTER COLUMN rack_id TYPE TEXT USING rack_id::TEXT;
+-- A gateway-wide event has no rack, so rack_id is nullable. Same guard.
+DO $$
+BEGIN
+  IF to_regclass('gateway_events') IS NOT NULL AND EXISTS (
+    SELECT 1 FROM pg_attribute
+    WHERE attrelid = 'gateway_events'::regclass AND attname = 'rack_id' AND attnotnull
+  ) THEN
+    ALTER TABLE gateway_events ALTER COLUMN rack_id DROP NOT NULL;
+  END IF;
+END $$;
 
 ALTER TABLE gateways ADD COLUMN IF NOT EXISTS mqtt_state TEXT NOT NULL DEFAULT 'UNKNOWN';
 ALTER TABLE gateways ADD COLUMN IF NOT EXISTS last_gateway_sequence BIGINT NOT NULL DEFAULT -1;

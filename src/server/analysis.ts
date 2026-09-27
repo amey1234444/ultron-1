@@ -18,6 +18,24 @@ type LayoutBox = {
 
 type SnapshotRow = { id: string };
 
+// The Overview metrics are calculated in the browser and posted back, so they
+// arrive as whatever the request body says. These columns are percentages and
+// counts and the database now says so, which means an out-of-range number has to
+// be resolved here rather than at the insert: a hand-edited payload should be
+// stored as something the console can draw, not rejected as a 500 and not kept
+// as a readiness of 4000%.
+function percentOrZero(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.min(100, Math.max(0, Math.round(n)));
+}
+
+function countOrZero(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.trunc(n);
+}
+
 const LABEL_TO_SIGNAL: { match: RegExp; code: AnalysisSignalCode }[] = [
   { match: /motor.*current|current/i, code: 'motor_current' },
   { match: /rotor.*speed|speed|rpm/i, code: 'rotor_speed' },
@@ -160,7 +178,7 @@ export async function persistAnalysisSnapshot(machineId: string, machineTemplate
       result.model,
       result.modelVersion,
       result.generatedAt,
-      result.readiness.score,
+      percentOrZero(result.readiness.score),
       result.operatingState.state,
       result.anomaly.state,
       result.anomaly.severity,
@@ -243,15 +261,15 @@ export async function persistOverviewAnalysis(
       machine.id,
       machine.template,
       input.generatedAt,
-      input.readinessPercent,
+      percentOrZero(input.readinessPercent),
       input.readinessLabel,
-      input.conditionScore,
+      percentOrZero(input.conditionScore),
       input.conditionLabel,
       input.operatingState,
-      input.stateConfidence,
-      input.mappedCount,
-      input.expectedPoints,
-      input.liveCount,
+      percentOrZero(input.stateConfidence),
+      countOrZero(input.mappedCount),
+      countOrZero(input.expectedPoints),
+      countOrZero(input.liveCount),
       input.vibrationSpread,
       input.rpmDeviationPercent,
       input.temperatureDelta,
