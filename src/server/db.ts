@@ -492,7 +492,6 @@ async function migrate(): Promise<void> {
       updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
-  await query(`CREATE INDEX IF NOT EXISTS studio_cards_device ON studio_cards (device_id);`);
   // Per-channel simulated signal definition; null for a card in a real rack.
   await query(`ALTER TABLE studio_cards ADD COLUMN IF NOT EXISTS simulation JSONB;`);
   // Clears the duplicates that existed before one-card-per-slot was enforced, so
@@ -1191,6 +1190,18 @@ async function hardenSchema(): Promise<void> {
     `DROP INDEX IF EXISTS rack_inventory_slots_live;`,
     `DROP INDEX IF EXISTS rack_slot_latest_rack;`,
     `DROP INDEX IF EXISTS rate_events_lookup;`,
+  ]);
+
+  // studio_cards_device (device_id) is the fifth of the same kind, missed by the
+  // pass above because it is a prefix rather than an exact duplicate:
+  // studio_cards_device_slot_unique (device_id, slot) already serves every query
+  // the shorter index does, since a btree on (a, b) answers WHERE a = ... too.
+  // It is never read and is maintained on every write, and studio_cards is
+  // rewritten wholesale by each Save Config, so that write cost is on the hot
+  // path. The CREATE that used to sit beside the table definition is gone, so a
+  // fresh database no longer builds it at all.
+  await once('20260927000000_drop_prefix_redundant_studio_cards_index', [
+    `DROP INDEX IF EXISTS studio_cards_device;`,
   ]);
 
   // A foreign key with no index on the referencing side makes the parent's

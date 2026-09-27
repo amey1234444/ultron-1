@@ -120,6 +120,21 @@ Three guards now stand between that and production:
    connections at once is not in fact safe — it can fail on a duplicate
    `pg_class` row — and that was reachable on every deploy.
 
+**A fourth cost, on the write path rather than the boot path.** An index that no
+query needs is still maintained by every `INSERT`, `UPDATE` and `DELETE`.
+`20260926000001_schema_integrity.sql` dropped four that repeated a key
+column-for-column; `20260927000000_drop_prefix_redundant_studio_cards_index.sql`
+drops a fifth that the earlier pass did not match, because it is a *prefix* of a
+key rather than a copy of one. `studio_cards_device` is `(device_id)` and
+`studio_cards_device_slot_unique` is `(device_id, slot)`, and a btree on
+`(a, b)` answers `WHERE a = …` as well as one on `(a)` does — so the shorter
+index could never be the one the planner reached for. Saving the hierarchy
+deletes every row in `studio_cards` and re-inserts the snapshot, so the index was
+maintained twice on every Save Config for no read in return. The `CREATE` was
+removed from `20260714000000_durable_studio.sql` and from `migrate()` in the same
+change, so a fresh database does not build it and a replay of the directory does
+not rebuild it between the two files.
+
 ---
 
 ## 3. Normal form, group by group

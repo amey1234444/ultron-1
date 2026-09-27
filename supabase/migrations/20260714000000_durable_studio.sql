@@ -102,7 +102,10 @@ CREATE TABLE IF NOT EXISTS studio_cards (
   sort_order INT NOT NULL DEFAULT 0,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-CREATE INDEX IF NOT EXISTS studio_cards_device ON studio_cards (device_id);
+-- studio_cards_device (device_id) was dropped in
+-- 20260927000000_drop_prefix_redundant_studio_cards_index.sql: it is a prefix of
+-- studio_cards_device_slot_unique (device_id, slot), which serves the same queries.
+-- Creating it here would have it rebuilt and dropped again on every replay.
 
 -- Canvas geometry is stored in fixed 1600x900 stage units. The JSON arrays
 -- include card/box coordinates, channel mappings, trail points, and anchors.
