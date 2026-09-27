@@ -1,16 +1,16 @@
-import { EXPANDER_POINT_REGISTRY } from '../../../lib/expanderPoints';
-import { CONDITIONER_POINT_REGISTRY } from '../../../lib/conditionerPoints';
-import { CRACKING_MILL_POINT_REGISTRY } from '../../../lib/crackingMillPoints';
-import { FLAKING_MILL_POINT_REGISTRY } from '../../../lib/flakingMillPoints';
+import { EXPANDER_POINT_REGISTRY } from '../../../lib/machinePoints/expanderPoints';
+import { CONDITIONER_POINT_REGISTRY } from '../../../lib/machinePoints/conditionerPoints';
+import { CRACKING_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/crackingMillPoints';
+import { FLAKING_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/flakingMillPoints';
 import type { ChannelRef } from '../../../lib/rack';
 import {
   normalizeTwinScrewPointCode,
   TWIN_SCREW_POINT_REGISTRY,
-} from '../../../lib/twinScrewExtruderPoints';
+} from '../../../lib/machinePoints/twinScrewExtruderPoints';
 import { artworkSizeForTemplate, RAV_CONNECTOR_POINTS } from './machineConnectors';
 import { MAPPABLE_BOX_HEIGHT, UNLINKED_BOX_WIDTH } from './MappableBox';
-import { EXTRUDER_CONNECTORS } from './SingleScrewExtruder';
-import { TWIN_SCREW_CONNECTORS } from './TwinScrewExtruder';
+import { EXTRUDER_CONNECTORS } from './artwork/SingleScrewExtruder';
+import { TWIN_SCREW_CONNECTORS } from './artwork/TwinScrewExtruder';
 import type { Anchor, Box, SavedLayout, Trail } from './TrailBoard';
 
 const STAGE_W = 1600;

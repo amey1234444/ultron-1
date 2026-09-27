@@ -21,6 +21,15 @@ moving a file:
 | `src/lib/` | Next only | Browser-only helpers (`smoothScroll`, `webFonts`). |
 | `components/`, `lib/`, `hooks/` | **Shared** | React Native code both targets import. |
 
+Two groups inside the shared tree are grouped rather than loose, because both
+grow by one file per machine and would otherwise bury the rest:
+
+- `lib/machinePoints/` — one commissioning registry per machine template
+  (artwork frame, part labels, instrument pads). Adding a template adds a file
+  here, not to `lib/`.
+- `components/console/machine/artwork/` — the per-template SVG renderers and
+  their scene geometry. `MachineWorkspace` picks one by `machine.template`.
+
 **The shared tree must not import from `src/`.** It is shared precisely because
 it depends on nothing Next-specific; one import into `src/` means the Expo
 target is pulling in web-only code, and the split has stopped being real.

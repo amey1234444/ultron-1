@@ -19,7 +19,7 @@
  * this model.
  */
 
-import { TWIN_SCREW_POINT_REGISTRY } from '../../twinScrewExtruderPoints';
+import { TWIN_SCREW_POINT_REGISTRY } from '../../machinePoints/twinScrewExtruderPoints';
 import type { MeasurementLocation } from './types';
 
 const COMMON = 'COMMON' as const;

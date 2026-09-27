@@ -26,7 +26,7 @@ import { evaluateQuality } from '../../doc02/dataQuality';
 import { qualityConfigFor } from '../../tse/commissioning';
 import { signalForTag } from '../../tse/signalBinding';
 import { anomalyIdFor, DOC07_ANOMALIES, anomalyById } from '../../doc07/anomalies';
-import type { TwinScrewTag } from '../../../twinScrewExtruderPoints';
+import type { TwinScrewTag } from '../../../machinePoints/twinScrewExtruderPoints';
 import {
   coverageGaps,
   minimumPackGaps,

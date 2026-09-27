@@ -30,7 +30,7 @@
  * even informally.
  */
 
-import { TWIN_SCREW_POINT_REGISTRY, type TwinScrewTag } from '../../twinScrewExtruderPoints';
+import { TWIN_SCREW_POINT_REGISTRY, type TwinScrewTag } from '../../machinePoints/twinScrewExtruderPoints';
 import type { ReferenceZoneEntry, ZoneDefinition } from './types';
 
 /**

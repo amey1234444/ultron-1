@@ -22,8 +22,8 @@ import { renderToStaticMarkup } from 'react-dom/server';
 
 import { connectorsForTemplate, artworkSizeForTemplate } from '../machineConnectors';
 import { createTemplateDefaultLayout, hasDefaultLayout } from '../templateDefaultLayouts';
-import { TwinScrewArtwork, TWIN_SCREW_ARTWORK_URI } from '../TwinScrewArtwork.web';
-import { TWIN_SCREW_CONNECTORS } from '../TwinScrewExtruder';
+import { TwinScrewArtwork, TWIN_SCREW_ARTWORK_URI } from '../artwork/TwinScrewArtwork.web';
+import { TWIN_SCREW_CONNECTORS } from '../artwork/TwinScrewExtruder';
 import { componentsForTemplate } from '../../../../lib/machines';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
@@ -32,7 +32,7 @@ import {
   TWIN_SCREW_POINT_REGISTRY,
   TWIN_SCREW_REFERENCE_SENSORS,
   twinScrewPointByCode,
-} from '../../../../lib/twinScrewExtruderPoints';
+} from '../../../../lib/machinePoints/twinScrewExtruderPoints';
 import {
   analyseTwinScrew,
   normaliseReading,

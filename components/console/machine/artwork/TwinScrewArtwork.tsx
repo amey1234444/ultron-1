@@ -10,7 +10,7 @@ import { Image, StyleSheet } from 'react-native';
 export function TwinScrewArtwork() {
   return (
     <Image
-      source={require('../../../assets/machines/twin-screw-extruder.png')}
+      source={require('../../../../assets/machines/twin-screw-extruder.png')}
       resizeMode="stretch"
       accessible
       accessibilityLabel="Twin screw extruder machine visualization with sensor points"

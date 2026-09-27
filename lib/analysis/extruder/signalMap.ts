@@ -26,7 +26,7 @@
 //     acceleration RMS and is the domain rolling-element and gear-mesh damage
 //     actually lives in. The unit on the channel decides which one a reading is.
 
-import { extruderPointByCode } from '../../extruderPoints';
+import { extruderPointByCode } from '../../machinePoints/extruderPoints';
 
 export type ExtruderTag =
   | 'E1'

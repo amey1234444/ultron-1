@@ -62,7 +62,7 @@ import {
 import { DOC05_DOCUMENT_REF } from '../lib/knowledge/doc05';
 import { DOC07_ANOMALIES, parameterFamily } from '../lib/knowledge/doc07/anomalies';
 import { DOC07_DOCUMENT_REF } from '../lib/knowledge/doc07';
-import { TWIN_SCREW_POINT_REGISTRY } from '../lib/twinScrewExtruderPoints';
+import { TWIN_SCREW_POINT_REGISTRY } from '../lib/machinePoints/twinScrewExtruderPoints';
 import { TAG_TO_SIGNAL, UNBOUND_TAGS, unboundMandatorySignals } from '../lib/knowledge/tse/signalBinding';
 import {
   COMMISSIONING_NOTICE,

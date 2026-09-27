@@ -6,7 +6,7 @@ import {
   EXPANDER_VIEWBOX_HEIGHT, type ExpanderConnector, type PadState,
   type PartId, type SceneNode,
 } from './expanderScene';
-import { useAppTheme } from '../../../hooks/useAppTheme';
+import { useAppTheme } from '../../../../hooks/useAppTheme';
 export * from './expanderScene';
 
 export interface ExpanderProps {

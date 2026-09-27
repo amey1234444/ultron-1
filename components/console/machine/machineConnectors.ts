@@ -15,28 +15,28 @@ import {
   CONDITIONER_ARTWORK_HEIGHT,
   CONDITIONER_ARTWORK_WIDTH,
   CONDITIONER_POINT_REGISTRY,
-} from '../../../lib/conditionerPoints';
+} from '../../../lib/machinePoints/conditionerPoints';
 import {
   CRACKING_MILL_ARTWORK_HEIGHT,
   CRACKING_MILL_ARTWORK_WIDTH,
   CRACKING_MILL_POINT_REGISTRY,
-} from '../../../lib/crackingMillPoints';
+} from '../../../lib/machinePoints/crackingMillPoints';
 import {
   EXPANDER_ARTWORK_HEIGHT,
   EXPANDER_ARTWORK_WIDTH,
   EXPANDER_POINT_REGISTRY,
-} from '../../../lib/expanderPoints';
-import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
+} from '../../../lib/machinePoints/expanderPoints';
+import { EXTRUDER_POINT_REGISTRY } from '../../../lib/machinePoints/extruderPoints';
 import {
   FLAKING_MILL_ARTWORK_HEIGHT,
   FLAKING_MILL_ARTWORK_WIDTH,
   FLAKING_MILL_POINT_REGISTRY,
-} from '../../../lib/flakingMillPoints';
+} from '../../../lib/machinePoints/flakingMillPoints';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_POINT_REGISTRY,
-} from '../../../lib/twinScrewExtruderPoints';
+} from '../../../lib/machinePoints/twinScrewExtruderPoints';
 
 /**
  * The viewBox each artwork is drawn on.

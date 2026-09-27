@@ -24,7 +24,7 @@
  * strength of a limit that was never declared.
  */
 
-import type { TwinScrewTag } from '../../twinScrewExtruderPoints';
+import type { TwinScrewTag } from '../../machinePoints/twinScrewExtruderPoints';
 import { isDeclared } from '../../knowledge/tse/engineeringFacts';
 import type { EngineeringFact } from '../../knowledge/tse/types';
 import {

@@ -13,7 +13,7 @@ import {
   CONDITIONER_PART_LABELS,
   CONDITIONER_POINT_REGISTRY,
   conditionerPointsForComponent,
-} from '../../../../lib/conditionerPoints';
+} from '../../../../lib/machinePoints/conditionerPoints';
 import {
   componentsForTemplate,
   expectedPointLabelsForTemplate,
@@ -21,7 +21,7 @@ import {
   MACHINE_TEMPLATES,
   type MachineTemplate,
 } from '../../../../lib/machines';
-import { buildConditionerScene, type ConditionerNode } from '../conditionerScene';
+import { buildConditionerScene, type ConditionerNode } from '../artwork/conditionerScene';
 import {
   artworkSizeForTemplate,
   connectorFitForUnit,

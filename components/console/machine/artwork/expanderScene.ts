@@ -16,7 +16,7 @@ import {
   EXPANDER_POINT_REGISTRY,
   type ExpanderPartId,
   type ExpanderPointDefinition,
-} from '../../../lib/expanderPoints';
+} from '../../../../lib/machinePoints/expanderPoints';
 
 export const EXPANDER_VIEWBOX_WIDTH = EXPANDER_ARTWORK_WIDTH;
 export const EXPANDER_VIEWBOX_HEIGHT = EXPANDER_ARTWORK_HEIGHT;

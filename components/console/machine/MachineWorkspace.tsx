@@ -31,19 +31,19 @@ import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { TwinScrewDiagnosisView } from './TwinScrewDiagnosisView';
-import { Conditioner } from './Conditioner';
-import { CrackingMill } from './CrackingMill';
-import { Expander } from './Expander';
-import { FlakingMill } from './FlakingMill';
-import { RotaryAirlockValve } from './RotaryAirlockValve';
-import { SingleScrewExtruder } from './SingleScrewExtruder';
-import { TwinScrewExtruder } from './TwinScrewExtruder';
+import { Conditioner } from './artwork/Conditioner';
+import { CrackingMill } from './artwork/CrackingMill';
+import { Expander } from './artwork/Expander';
+import { FlakingMill } from './artwork/FlakingMill';
+import { RotaryAirlockValve } from './artwork/RotaryAirlockValve';
+import { SingleScrewExtruder } from './artwork/SingleScrewExtruder';
+import { TwinScrewExtruder } from './artwork/TwinScrewExtruder';
 import {
   mergeProjectedConnectorPositions,
   viewportMachineRect,
   type ProjectedConnectorMap,
   type ProjectedPoint,
-} from './machine3d/types';
+} from './projection';
 import { CanvasGrid, stageBoundsForCanvas, STAGE_HEIGHT, STAGE_WIDTH } from './StageGrid';
 import { TrailBoard, trailBoardStorageKey, type Box, type SavedLayout } from './TrailBoard';
 import { migrateTemplateLayout } from './templateDefaultLayouts';

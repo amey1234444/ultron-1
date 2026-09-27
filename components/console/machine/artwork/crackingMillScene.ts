@@ -15,7 +15,7 @@ import {
   CRACKING_MILL_ARTWORK_WIDTH,
   CRACKING_MILL_PART_LABELS,
   type CrackingMillPartId,
-} from '../../../lib/crackingMillPoints';
+} from '../../../../lib/machinePoints/crackingMillPoints';
 
 export const CRACKING_MILL_VIEWBOX_WIDTH = CRACKING_MILL_ARTWORK_WIDTH;
 export const CRACKING_MILL_VIEWBOX_HEIGHT = CRACKING_MILL_ARTWORK_HEIGHT;

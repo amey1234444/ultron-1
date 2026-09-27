@@ -1,6 +1,6 @@
 import React, { type CSSProperties } from 'react';
 
-import artwork from '../../../assets/machines/twin-screw-extruder.png';
+import artwork from '../../../../assets/machines/twin-screw-extruder.png';
 
 /**
  * Next represents a static image import as metadata, while other web bundlers

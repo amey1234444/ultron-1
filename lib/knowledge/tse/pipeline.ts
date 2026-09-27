@@ -32,7 +32,7 @@ import {
 } from '../../liveTelemetry';
 import type { CardNode } from '../../rack';
 import { normaliseReading, UnitError } from '../../analysis/twinScrew/signalMap';
-import { twinScrewPointByCode, type TwinScrewTag } from '../../twinScrewExtruderPoints';
+import { twinScrewPointByCode, type TwinScrewTag } from '../../machinePoints/twinScrewExtruderPoints';
 import { evaluateQuality, type QualitySample } from '../doc02/dataQuality';
 import { inferOperatingState, type StateEvidenceInput } from '../doc02/operatingState';
 import { buildContext, fallbackContextId, type ContextInput } from '../doc02/context';

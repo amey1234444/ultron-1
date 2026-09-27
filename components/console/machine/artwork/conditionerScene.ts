@@ -15,7 +15,7 @@ import {
   CONDITIONER_ARTWORK_WIDTH,
   CONDITIONER_PART_LABELS,
   type ConditionerPartIdentifier,
-} from '../../../lib/conditionerPoints';
+} from '../../../../lib/machinePoints/conditionerPoints';
 
 export const CONDITIONER_VIEWBOX_WIDTH = CONDITIONER_ARTWORK_WIDTH;
 export const CONDITIONER_VIEWBOX_HEIGHT = CONDITIONER_ARTWORK_HEIGHT;

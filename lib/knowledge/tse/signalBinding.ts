@@ -23,7 +23,7 @@
  * mandatory signals mapped or gap recorded" actually records.
  */
 
-import type { TwinScrewTag } from '../../twinScrewExtruderPoints';
+import type { TwinScrewTag } from '../../machinePoints/twinScrewExtruderPoints';
 import { DOC02_SIGNAL_MASTER, signalById } from '../doc02/signals';
 import type { SignalDefinition } from '../doc02/types';
 

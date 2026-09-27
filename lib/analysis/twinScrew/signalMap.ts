@@ -29,7 +29,7 @@ import {
   twinScrewPointByCode,
   type TwinScrewModelStatus,
   type TwinScrewTag,
-} from '../../twinScrewExtruderPoints';
+} from '../../machinePoints/twinScrewExtruderPoints';
 
 /** The physical quantity a tag carries, and the unit it is normalised to. */
 export const CANONICAL_UNITS: Record<TwinScrewTag, string> = {

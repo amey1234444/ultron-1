@@ -2,28 +2,28 @@ import {
   CONDITIONER_COMPONENT_ORDER,
   conditionerPointsForComponent,
   type ConditionerComponent,
-} from './conditionerPoints';
+} from './machinePoints/conditionerPoints';
 import {
   CRACKING_MILL_COMPONENT_ORDER,
   crackingMillPointsForComponent,
   type CrackingMillComponent,
-} from './crackingMillPoints';
+} from './machinePoints/crackingMillPoints';
 import {
   EXPANDER_COMPONENT_ORDER,
   expanderPointsForComponent,
   type ExpanderComponent,
-} from './expanderPoints';
-import { EXTRUDER_POINT_REGISTRY } from './extruderPoints';
+} from './machinePoints/expanderPoints';
+import { EXTRUDER_POINT_REGISTRY } from './machinePoints/extruderPoints';
 import {
   FLAKING_MILL_COMPONENT_ORDER,
   flakingMillPointsForComponent,
   type FlakingMillComponent,
-} from './flakingMillPoints';
+} from './machinePoints/flakingMillPoints';
 import {
   TWIN_SCREW_COMPONENT_ORDER,
   twinScrewPointsForComponent,
   type TwinScrewComponent,
-} from './twinScrewExtruderPoints';
+} from './machinePoints/twinScrewExtruderPoints';
 
 export const MACHINE_TEMPLATES = [
   'Centrifugal Pump',

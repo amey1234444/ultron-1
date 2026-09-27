@@ -14,10 +14,10 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 
-import { useAppTheme } from '../../../hooks/useAppTheme';
-import { cn } from '../../../lib/cn';
-import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
-import { MeasurementPad, padStateLabel } from './MeasurementPad';
+import { useAppTheme } from '../../../../hooks/useAppTheme';
+import { cn } from '../../../../lib/cn';
+import { EXTRUDER_POINT_REGISTRY } from '../../../../lib/machinePoints/extruderPoints';
+import { MeasurementPad, padStateLabel } from '../MeasurementPad';
 
 type SingleScrewExtruderProps = {
   className?: string;

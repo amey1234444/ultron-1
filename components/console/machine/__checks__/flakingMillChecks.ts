@@ -14,7 +14,7 @@ import {
   FLAKING_MILL_PART_LABELS,
   FLAKING_MILL_POINT_REGISTRY,
   flakingMillPointsForComponent,
-} from '../../../../lib/flakingMillPoints';
+} from '../../../../lib/machinePoints/flakingMillPoints';
 import {
   componentsForTemplate,
   expectedPointLabelsForTemplate,
@@ -22,7 +22,7 @@ import {
   MACHINE_TEMPLATES,
   type MachineTemplate,
 } from '../../../../lib/machines';
-import { buildFlakingMillScene, type MillNode } from '../flakingMillScene';
+import { buildFlakingMillScene, type MillNode } from '../artwork/flakingMillScene';
 import {
   artworkSizeForTemplate,
   connectorFitForUnit,

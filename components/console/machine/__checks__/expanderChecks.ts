@@ -10,7 +10,7 @@ import {
   EXPANDER_COMPONENT_ORDER,
   EXPANDER_POINT_REGISTRY,
   expanderPointsForComponent,
-} from '../../../../lib/expanderPoints';
+} from '../../../../lib/machinePoints/expanderPoints';
 import {
   componentsForTemplate,
   expectedPointLabelsForTemplate,
@@ -24,8 +24,8 @@ import {
   connectorsForTemplate,
   parameterKindForConnector,
 } from '../machineConnectors';
-import { EXPANDER_PARTS } from '../../../../lib/expanderPoints';
-import { buildExpanderScene, type SceneNode } from '../expanderScene';
+import { EXPANDER_PARTS } from '../../../../lib/machinePoints/expanderPoints';
+import { buildExpanderScene, type SceneNode } from '../artwork/expanderScene';
 import { hasDefaultLayout } from '../templateDefaultLayouts';
 
 let failures = 0;

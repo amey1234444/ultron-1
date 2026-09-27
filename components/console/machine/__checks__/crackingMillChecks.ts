@@ -13,7 +13,7 @@ import {
   CRACKING_MILL_PART_LABELS,
   CRACKING_MILL_POINT_REGISTRY,
   crackingMillPointsForComponent,
-} from '../../../../lib/crackingMillPoints';
+} from '../../../../lib/machinePoints/crackingMillPoints';
 import {
   componentsForTemplate,
   expectedPointLabelsForTemplate,
@@ -21,7 +21,7 @@ import {
   MACHINE_TEMPLATES,
   type MachineTemplate,
 } from '../../../../lib/machines';
-import { buildCrackingMillScene, type CrackingNode } from '../crackingMillScene';
+import { buildCrackingMillScene, type CrackingNode } from '../artwork/crackingMillScene';
 import {
   artworkSizeForTemplate,
   connectorFitForUnit,

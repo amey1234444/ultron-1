@@ -17,7 +17,7 @@ import {
   FLAKING_MILL_ARTWORK_WIDTH,
   FLAKING_MILL_PART_LABELS,
   type FlakingMillPartId,
-} from '../../../lib/flakingMillPoints';
+} from '../../../../lib/machinePoints/flakingMillPoints';
 
 export const FLAKING_MILL_VIEWBOX_WIDTH = FLAKING_MILL_ARTWORK_WIDTH;
 export const FLAKING_MILL_VIEWBOX_HEIGHT = FLAKING_MILL_ARTWORK_HEIGHT;

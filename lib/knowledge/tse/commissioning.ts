@@ -33,7 +33,7 @@ import type { QualityConfig } from '../doc02/dataQuality';
 import type { StateThresholds } from '../doc02/operatingState';
 import type { BaselineRecord } from '../doc03/types';
 import type { FeatureBands } from '../doc03/feature';
-import type { TwinScrewTag } from '../../twinScrewExtruderPoints';
+import type { TwinScrewTag } from '../../machinePoints/twinScrewExtruderPoints';
 
 /** Nothing in this file has been validated against a physical machine. */
 export const FIELD_CALIBRATED = false;

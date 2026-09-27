@@ -14,7 +14,7 @@ import { ScrollView, Text, View } from 'react-native';
 import { useColorScheme } from 'nativewind';
 
 import { connectorsForTemplate } from '../../components/console/machine/machineConnectors';
-import { TwinScrewExtruder } from '../../components/console/machine/TwinScrewExtruder';
+import { TwinScrewExtruder } from '../../components/console/machine/artwork/TwinScrewExtruder';
 import { createTemplateDefaultLayout } from '../../components/console/machine/templateDefaultLayouts';
 import type { MeasurementPadState } from '../../components/console/machine/MeasurementPad';
 import { consolePalette } from '../../components/ui';
@@ -22,7 +22,7 @@ import {
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_POINT_REGISTRY,
-} from '../../lib/twinScrewExtruderPoints';
+} from '../../lib/machinePoints/twinScrewExtruderPoints';
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
 import { factsForMachine } from '../../lib/knowledge/registry';
 import { TSE_TEMPLATE } from '../../lib/knowledge/tse/template';

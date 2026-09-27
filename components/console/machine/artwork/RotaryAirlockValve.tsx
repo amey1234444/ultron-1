@@ -17,8 +17,8 @@ import Svg, {
   Text as SvgText,
 } from 'react-native-svg';
 
-import { useAppTheme } from '../../../hooks/useAppTheme';
-import { cn } from '../../../lib/cn';
+import { useAppTheme } from '../../../../hooks/useAppTheme';
+import { cn } from '../../../../lib/cn';
 
 type RotaryAirlockValveProps = {
   className?: string;

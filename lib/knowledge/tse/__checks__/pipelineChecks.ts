@@ -23,7 +23,7 @@ import { analyseReadings, type TagReading } from '../pipeline';
 import { evaluateQuality } from '../../doc02/dataQuality';
 import { qualityConfigFor } from '../commissioning';
 import { signalForTag } from '../signalBinding';
-import type { TwinScrewTag } from '../../../twinScrewExtruderPoints';
+import type { TwinScrewTag } from '../../../machinePoints/twinScrewExtruderPoints';
 
 let failures = 0;
 function check(name: string, condition: boolean, detail?: string) {

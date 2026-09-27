@@ -42,7 +42,7 @@ import {
 } from '../../liveTelemetry';
 import type { CardNode } from '../../rack';
 import { normaliseReading, UnitError } from '../../analysis/twinScrew/signalMap';
-import { twinScrewPointByCode, type TwinScrewTag } from '../../twinScrewExtruderPoints';
+import { twinScrewPointByCode, type TwinScrewTag } from '../../machinePoints/twinScrewExtruderPoints';
 
 /** One channel as the console already holds it. Same shape the pipeline takes. */
 export type FrameChannel = {

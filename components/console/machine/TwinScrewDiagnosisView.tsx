@@ -7,7 +7,7 @@ import type { DeviceNode } from '../../../lib/devices';
 import type { LiveState } from '../../../lib/liveTelemetry';
 import type { MachineNode } from '../../../lib/machines';
 import type { CardNode } from '../../../lib/rack';
-import { twinScrewPointByTag, type TwinScrewTag } from '../../../lib/twinScrewExtruderPoints';
+import { twinScrewPointByTag, type TwinScrewTag } from '../../../lib/machinePoints/twinScrewExtruderPoints';
 import { operatingStateDefinition } from '../../../lib/knowledge/doc02/operatingState';
 import { PRIORITY_MEANING } from '../../../lib/knowledge/doc05/types';
 import { runTwinScrewPipeline, type PipelineResult } from '../../../lib/knowledge/tse/pipeline';
