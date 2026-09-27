@@ -5,6 +5,11 @@ import {
 } from './expanderPoints';
 import { EXTRUDER_POINT_REGISTRY } from './extruderPoints';
 import {
+  FLAKING_MILL_COMPONENT_ORDER,
+  flakingMillPointsForComponent,
+  type FlakingMillComponent,
+} from './flakingMillPoints';
+import {
   TWIN_SCREW_COMPONENT_ORDER,
   twinScrewPointsForComponent,
   type TwinScrewComponent,
@@ -22,6 +27,7 @@ export const MACHINE_TEMPLATES = [
   'Single Screw Extruder',
   'Twin Screw Extruder',
   'Expander X-101',
+  'Flaking Mill M-102',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -107,6 +113,13 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
     { type: 'Custom Component', label: 'Feed' },
     { type: 'Custom Component', label: 'Barrel' },
     { type: 'Custom Component', label: 'Discharge' },
+  ],
+  'Flaking Mill M-102': [
+    { type: 'Motor', label: 'Upper Roll Motor' },
+    { type: 'Motor', label: 'Lower Roll Motor' },
+    { type: 'Custom Component', label: 'Rolls' },
+    { type: 'Custom Component', label: 'Feed' },
+    { type: 'Custom Component', label: 'Hydraulics' },
   ],
   'Custom Machine': [],
 };
@@ -229,6 +242,28 @@ const EXPANDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = EXPANDER_COMPONENT_
   points: expanderPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
 }));
 
+// Flaking Mill M-102 — the machine tree, derived from its point registry.
+//
+// The two roll drives are separate components because they are two motors on
+// two rolls, and the difference between their speeds is the flaking parameter.
+// Folding them into one Drive would lose the measurement that matters most.
+//
+// As with the expander, no analyzer tags are attached: no model in this repo is
+// commissioned on a flaking mill.
+const FLAKING_MILL_COMPONENT_TYPES: Record<FlakingMillComponent, ComponentType> = {
+  'Upper Drive': 'Motor',
+  'Lower Drive': 'Motor',
+  Rolls: 'Custom Component',
+  Feed: 'Custom Component',
+  Hydraulics: 'Custom Component',
+};
+
+const FLAKING_MILL_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = FLAKING_MILL_COMPONENT_ORDER.map((component) => ({
+  type: FLAKING_MILL_COMPONENT_TYPES[component],
+  label: component,
+  points: flakingMillPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.
 const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
@@ -236,6 +271,7 @@ const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[
   'Single Screw Extruder': EXTRUDER_ANALYSIS_COMPONENTS,
   'Twin Screw Extruder': TWIN_SCREW_ANALYSIS_COMPONENTS,
   'Expander X-101': EXPANDER_ANALYSIS_COMPONENTS,
+  'Flaking Mill M-102': FLAKING_MILL_ANALYSIS_COMPONENTS,
 };
 
 /**

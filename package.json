@@ -84,7 +84,8 @@
     "ml:test:fast": "cd services/ml && python -m pytest tests -q -m \"not slow\"",
     "ml:golden": "cd services/ml && python -m app.training.run_golden_tests",
     "ml:serve": "cd services/ml && uvicorn app.api.app:build --factory --host 0.0.0.0 --port 8080",
-    "check:ml": "npm run check:knowledge-export && npm run ml:test:fast"
+    "check:ml": "npm run check:knowledge-export && npm run ml:test:fast",
+    "check:flaking-mill": "npx --yes esbuild components/console/machine/__checks__/flakingMillChecks.ts --bundle --platform=node --format=cjs --alias:react-native=react-native-web --alias:react-native-svg=./node_modules/react-native-svg/lib/commonjs/ReactNativeSVG.web.js --resolve-extensions=.web.tsx,.web.ts,.web.jsx,.web.js,.tsx,.ts,.jsx,.js,.json --loader:.js=jsx --loader:.png=dataurl --outfile=node_modules/.cache/flakingMillChecks.cjs && node node_modules/.cache/flakingMillChecks.cjs"
   },
   "private": true
 }

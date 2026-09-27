@@ -32,6 +32,7 @@ import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { TwinScrewDiagnosisView } from './TwinScrewDiagnosisView';
 import { Expander } from './Expander';
+import { FlakingMill } from './FlakingMill';
 import { RotaryAirlockValve } from './RotaryAirlockValve';
 import { SingleScrewExtruder } from './SingleScrewExtruder';
 import { TwinScrewExtruder } from './TwinScrewExtruder';
@@ -83,6 +84,7 @@ const ARTWORK_TEMPLATES = new Set<string>([
   'Single Screw Extruder',
   'Twin Screw Extruder',
   'Expander X-101',
+  'Flaking Mill M-102',
 ]);
 
 /**
@@ -546,6 +548,11 @@ export function MachineWorkspace({
                   showConnectors={false}
                   connectorState={connectorState}
                 />
+              ) : machine.template === 'Flaking Mill M-102' ? (
+                // Draws no pads of its own — the template ships no overlay —
+                // so the canvas is the only thing rendering them, as with the
+                // Rotary Airlock Valve.
+                <FlakingMill showBackground={false} showGrid={false} />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}

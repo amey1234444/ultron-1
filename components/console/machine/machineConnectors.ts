@@ -18,6 +18,11 @@ import {
 } from '../../../lib/expanderPoints';
 import { EXTRUDER_POINT_REGISTRY } from '../../../lib/extruderPoints';
 import {
+  FLAKING_MILL_ARTWORK_HEIGHT,
+  FLAKING_MILL_ARTWORK_WIDTH,
+  FLAKING_MILL_POINT_REGISTRY,
+} from '../../../lib/flakingMillPoints';
+import {
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
   TWIN_SCREW_POINT_REGISTRY,
@@ -36,6 +41,8 @@ export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {
   'Single Screw Extruder': { width: 1200, height: 760 },
   'Twin Screw Extruder': { width: TWIN_SCREW_ARTWORK_WIDTH, height: TWIN_SCREW_ARTWORK_HEIGHT },
   'Expander X-101': { width: EXPANDER_ARTWORK_WIDTH, height: EXPANDER_ARTWORK_HEIGHT },
+  // Taller than every other flat artwork; this machine is a vertical stack.
+  'Flaking Mill M-102': { width: FLAKING_MILL_ARTWORK_WIDTH, height: FLAKING_MILL_ARTWORK_HEIGHT },
 };
 
 const DEFAULT_ARTWORK = { width: 1200, height: 760 };
@@ -132,6 +139,16 @@ const TWIN_SCREW_CONNECTOR_LIST: MachineConnector[] = TWIN_SCREW_POINT_REGISTRY.
 const EXPANDER_CONNECTOR_LIST: MachineConnector[] = EXPANDER_POINT_REGISTRY.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Expander X-101']),
 );
+/**
+ * Flaking-mill pads, derived from the registry.
+ *
+ * Unlike every other list here, these positions were written during
+ * integration rather than supplied with the drawing — the template ships no
+ * sensor registry at all. `lib/flakingMillPoints.ts` records that, and why.
+ */
+const FLAKING_MILL_CONNECTOR_LIST: MachineConnector[] = FLAKING_MILL_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Flaking Mill M-102']),
+);
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
 );
@@ -141,6 +158,7 @@ const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Twin Screw Extruder': TWIN_SCREW_CONNECTOR_LIST,
   'Rotary Airlock Valve': RAV_CONNECTOR_LIST,
   'Expander X-101': EXPANDER_CONNECTOR_LIST,
+  'Flaking Mill M-102': FLAKING_MILL_CONNECTOR_LIST,
 };
 
 export function connectorsForTemplate(machineTemplate: string): MachineConnector[] {

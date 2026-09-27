@@ -15,6 +15,7 @@ export const MACHINE_TEMPLATE_ICON: Record<MachineTemplate, keyof typeof Materia
   'Single Screw Extruder': 'screw-machine-flat-top',
   'Twin Screw Extruder': 'screw-machine-round-top',
   'Expander X-101': 'screw-machine-flat-top',
+  'Flaking Mill M-102': 'rollerblade',
   'Custom Machine': 'shape-outline',
 };
 
