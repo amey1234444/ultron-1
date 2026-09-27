@@ -422,6 +422,21 @@ LEFT JOIN racks r ON r.gateway_id = m.gateway_id AND r.rack_id = m.rack_id
 WHERE r.id IS NULL;
 ```
 
+The five foreign keys into `ml_predictions` *are* now indexed, by
+`20260927000001_index_ml_prediction_foreign_keys.sql`. `ml_fault_risks`,
+`ml_diagnosis_events`, `ml_anomaly_events`, `ml_data_quality_events` and
+`ml_prediction_explanations` each reference `ml_predictions (prediction_id)`
+`ON DELETE CASCADE` and none indexed the referencing column, so a deleted
+prediction meant five sequential scans to find the rows to cascade to. Nothing
+deletes from `ml_predictions` today — the table is insert-only — so the cascade
+has never fired, and the earlier pass reasonably left these alone under the
+"unless the parent is never deleted" rule in [section 7](#7-changing-the-schema).
+They are added now because that exemption expires the moment retention or an
+erasure request arrives, and the cost of building them is lowest while the tables
+are small. Note that `ml_fault_risks_lookup` and `ml_diagnosis_events_lookup` do
+not cover this: both lead on `machine_id`, and a btree is only usable from its
+leading column.
+
 Two other known items, neither urgent:
 
 - **`measurement_history` is unbounded.** It has no retention and no

@@ -263,6 +263,22 @@ export async function ensureMlSchema(): Promise<void> {
           golden_passed BOOLEAN,
           at            TIMESTAMPTZ NOT NULL DEFAULT now()
         )`);
+
+      // Every table below references ml_predictions (prediction_id) ON DELETE
+      // CASCADE, and none of them indexed the referencing column, so deleting a
+      // prediction would scan all five children in full to find the rows to
+      // cascade to. Nothing deletes from ml_predictions today -- the table is
+      // insert-only -- which is why this was not urgent; it is also why it is
+      // cheap to fix now rather than during the first retention pass, when the
+      // table is at its largest and the delete is the thing being timed.
+      //
+      // The existing *_lookup indexes do not serve this: they lead on
+      // machine_id, and a btree is only usable from its leading column.
+      await query(`CREATE INDEX IF NOT EXISTS ml_fault_risks_prediction ON ml_fault_risks (prediction_id)`);
+      await query(`CREATE INDEX IF NOT EXISTS ml_diagnosis_events_prediction ON ml_diagnosis_events (prediction_id)`);
+      await query(`CREATE INDEX IF NOT EXISTS ml_anomaly_events_prediction ON ml_anomaly_events (prediction_id)`);
+      await query(`CREATE INDEX IF NOT EXISTS ml_data_quality_events_prediction ON ml_data_quality_events (prediction_id)`);
+      await query(`CREATE INDEX IF NOT EXISTS ml_prediction_explanations_prediction ON ml_prediction_explanations (prediction_id)`);
     })();
   }
   return globalRef.__ultronMlSchemaReady;
