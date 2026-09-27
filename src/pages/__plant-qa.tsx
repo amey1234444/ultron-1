@@ -12,6 +12,7 @@ import { DashboardOverview } from '../../components/console/DashboardOverview';
 import { TopBar } from '../../components/console/TopBar';
 import { createSeedData } from '../../lib/seedData';
 import { consolePalette } from '../../lib/consoleTheme';
+import { devOnlyPage } from '../lib/devOnlyPage';
 
 function Harness() {
   const { setColorScheme } = useColorScheme();
@@ -60,3 +61,6 @@ const ClientHarness = dynamic(() => Promise.resolve(Harness), { ssr: false });
 export default function PlantQaPage() {
   return <ClientHarness />;
 }
+
+// Development harness: 404s in production. See src/lib/devOnlyPage.ts.
+export const getServerSideProps = devOnlyPage;

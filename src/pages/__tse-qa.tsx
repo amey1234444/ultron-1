@@ -26,6 +26,7 @@ import {
 import { analyseTwinScrew, THRESHOLD_RULES, type TagSample } from '../../lib/analysis/twinScrew';
 import { factsForMachine } from '../../lib/knowledge/registry';
 import { TSE_TEMPLATE } from '../../lib/knowledge/tse/template';
+import { devOnlyPage } from '../lib/devOnlyPage';
 
 type PadMode = 'idle' | 'linked' | 'live' | 'mixed';
 
@@ -258,3 +259,6 @@ export default function TwinScrewQaPage() {
     </ScrollView>
   );
 }
+
+// Development harness: 404s in production. See src/lib/devOnlyPage.ts.
+export const getServerSideProps = devOnlyPage;

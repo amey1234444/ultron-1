@@ -30,6 +30,7 @@ import type { DeviceNode } from '../../lib/devices';
 import { componentsForTemplate, expectedPointsForTemplate, type MachineNode } from '../../lib/machines';
 import { listChannels, type CardNode } from '../../lib/rack';
 import { ensureSseSimulationWorkspace } from '../../lib/sseSimulationProfile';
+import { devOnlyPage } from '../lib/devOnlyPage';
 
 type Profile = 'healthy' | 'faulty' | 'prediction';
 
@@ -158,3 +159,6 @@ const ClientHarness = dynamic(() => Promise.resolve(Harness), { ssr: false });
 export default function SseDemoQaPage() {
   return <ClientHarness />;
 }
+
+// Development harness: 404s in production. See src/lib/devOnlyPage.ts.
+export const getServerSideProps = devOnlyPage;

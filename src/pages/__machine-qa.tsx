@@ -44,6 +44,7 @@ import {
   type SimulatedChannelKind,
   type SimulationBehaviour,
 } from '../../lib/simulation';
+import { devOnlyPage } from '../lib/devOnlyPage';
 
 const GATEWAY_ID = 'sim-gw-qa';
 const RACK_REAL_ID = 1;
@@ -347,3 +348,6 @@ const ClientHarness = dynamic(() => Promise.resolve(Harness), { ssr: false });
 export default function MachineQaPage() {
   return <ClientHarness />;
 }
+
+// Development harness: 404s in production. See src/lib/devOnlyPage.ts.
+export const getServerSideProps = devOnlyPage;

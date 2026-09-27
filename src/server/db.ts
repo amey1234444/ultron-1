@@ -28,6 +28,27 @@ function needsSsl(url: string): boolean {
 // which rejects Supabase's self-signed certificate chain even when an explicit
 // `ssl` option is passed. Strip ssl params from the URL and control SSL solely
 // through the `ssl` pool option.
+// Server-side guards applied to every connection in the pool.
+//
+// `max` is 5, so five queries that never finish are the whole path: with no
+// statement_timeout a single runaway query holds its connection until the
+// process dies, and five of them take the application down while the database
+// itself stays healthy and idle.
+//
+// 60s rather than the few seconds a web request should need, because this pool
+// also runs migrate() on the first request after a cold start, and a one-time
+// step against an empty database is legitimately slow. This is a backstop
+// against a query that will never finish, not a latency budget.
+//
+// idle_in_transaction_session_timeout matters more than it looks: a connection
+// abandoned mid-transaction holds its locks indefinitely, and the writer that
+// queues behind it looks like a database outage from the outside.
+//
+// lock_timeout is deliberately not set here. supabase/migrations is replayed on
+// every ingest start and takes ACCESS EXCLUSIVE locks; failing that fast would
+// turn a slow reader into a boot loop rather than a brief wait.
+const CONNECTION_GUARDS = '-c statement_timeout=60000 -c idle_in_transaction_session_timeout=60000';
+
 function stripSslParams(url: string): string {
   try {
     const u = new URL(url);
@@ -52,6 +73,7 @@ export function pool(): Pool {
       connectionString: stripSslParams(connectionString),
       max: 5,
       connectionTimeoutMillis: 8000,
+      options: CONNECTION_GUARDS,
       ssl: needsSsl(connectionString) ? { rejectUnauthorized: false } : undefined,
     });
   }

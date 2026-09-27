@@ -75,6 +75,58 @@ in `…000001_schema_integrity.sql`, in that order.
 
 ---
 
+## 1a. How the database is connected
+
+One PostgreSQL database. Three things in the application open connections to
+it, and because `server.mjs` serves Next.js and runs the MQTT ingest in **one
+process**, all three live side by side in that process.
+
+| Owner | Kind | Size | Purpose |
+| --- | --- | --- | --- |
+| `src/server/db.ts` | `Pool` | `max: 5` | Every web request and API route, plus `migrate()` on the first request after a cold start |
+| `src/server/ingest/db.mjs` | `Pool` | `max: 5` | The MQTT ingest path, plus `ensureSchema()` on every start |
+| `src/server/liveFrame.ts` | `Client` | 1 | `LISTEN` for live frames — a single long-lived connection, which is what `LISTEN` requires |
+
+**The connection budget is 11 per instance**, and it multiplies by instance
+count. That is the number to check against the database's own limit before
+scaling the web service out; a pooler in front of Postgres changes the
+arithmetic and is the usual answer if the instance count ever grows.
+
+**Two pools rather than one is deliberate.** Ingest writes continuously, at
+whatever rate the gateways publish. Sharing one pool would let a burst of
+telemetry writes take every connection and leave requests queueing behind it,
+so the two paths are bulkheaded: ingest can exhaust its own five and the web
+path still has five.
+
+**The `LISTEN` client reconnects lazily, not automatically.** On error it clears
+the shared handle, so the next `subscribeLiveFrames()` starts a fresh
+connection; existing subscribers are not dropped. Callers treat an unavailable
+listener as "poll instead", which is why a dead listener degrades rather than
+fails.
+
+### Guards on every pooled connection
+
+Both pools pass `options: '-c statement_timeout=60000 -c
+idle_in_transaction_session_timeout=60000'`.
+
+`max` is 5. With no `statement_timeout`, five queries that never finish are the
+entire path — the application stops serving while the database sits idle and
+healthy. `idle_in_transaction_session_timeout` covers the other shape of the
+same problem: a connection abandoned mid-transaction holds its locks forever,
+and whatever queues behind it looks like an outage from the outside.
+
+60 seconds is a backstop, not a latency budget. Both pools also run schema
+work — `migrate()` on one, the `supabase/migrations` replay on the other — and
+a one-time step against an empty database is legitimately slow. The number is
+set to catch a query that will never finish, not to bound a normal one.
+
+`lock_timeout` is deliberately **not** set. The migration directory replays on
+every ingest start and takes `ACCESS EXCLUSIVE` locks; failing those fast would
+convert one slow reader into a boot loop, which is worse than the brief wait it
+would avoid.
+
+---
+
 ## 2. What a cold start used to cost
 
 `migrate()` was written to be idempotent, and it is. Idempotent is not the same
