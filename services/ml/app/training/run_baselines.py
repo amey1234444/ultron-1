@@ -191,6 +191,36 @@ def _tree_splits(booster, library: str) -> int:
         return -1
 
 
+def verdict(*, any_learned: bool, evaluated: int, skipped: int, split: str) -> str:
+    """What the run means, in the words that send someone to the right place.
+
+    Three outcomes, and the middle one used to be indistinguishable from the
+    last. "No arm beat chance. Investigate data, labels and feature plumbing"
+    was printed under an empty table when in fact no arm had run at all — every
+    output was skipped for having a single class in a split — and the feature
+    plumbing it sent people to inspect was working correctly.
+
+    That happens when no fault has positives on both sides of the split
+    boundary, which a chronological split over one-event-per-fault scenarios
+    produces easily: each fault's whole event history sits in whichever region
+    its scenario ran in. It is a property of how the dataset was built.
+    """
+    if any_learned:
+        return "At least one arm ranks better than chance."
+    if not evaluated:
+        return (
+            f"No output could be evaluated: all {skipped} of them have only one class in "
+            f"the train or {split} split, so every metric would be undefined. This is the "
+            f"dataset, not the features — no fault has positives on both sides of the "
+            f"{split} boundary. Build with more repeats so each fault's events are spread "
+            "across the timeline, or widen the split."
+        )
+    return (
+        "No arm beat chance. Investigate data, labels and feature plumbing "
+        "before tuning anything."
+    )
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = base_parser(__doc__ or "Run baseline experiments.")
     parser.add_argument("--dataset", required=True)
@@ -312,6 +342,21 @@ def main(argv: list[str] | None = None) -> int:
         for arm in entry.get("arms", [])
     )
 
+    # "No arm beat chance" and "no arm ever ran" are different failures and
+    # used to print identically, down to the same instruction to go and look
+    # at the feature plumbing. The feature plumbing was fine; every output had
+    # been skipped for having one class in a split, and the table was empty
+    # because there was nothing to put in it.
+    #
+    # That happens when no fault has positives on both sides of the split
+    # boundary — which a chronological split over one-event-per-fault
+    # scenarios produces easily, since each fault's whole event history sits
+    # in whichever region its scenario ran in. It is a property of how the
+    # dataset was built, not of the features, and saying so is the difference
+    # between a five-minute fix and an afternoon.
+    evaluated = [key for key, entry in results.items() if "arms" in entry]
+    skipped = [key for key, entry in results.items() if "skipped" in entry]
+
     payload = {
         "dataset": args.dataset,
         "evaluated_on": args.split,
@@ -321,11 +366,13 @@ def main(argv: list[str] | None = None) -> int:
         # The headline. If this is false on data built to be separable, stop
         # and fix the data -- do not tune.
         "any_arm_learned": any_learned,
-        "verdict": (
-            "At least one arm ranks better than chance."
-            if any_learned
-            else "No arm beat chance. Investigate data, labels and feature plumbing "
-            "before tuning anything."
+        "outputs_evaluated": len(evaluated),
+        "outputs_skipped_single_class": len(skipped),
+        "verdict": verdict(
+            any_learned=any_learned,
+            evaluated=len(evaluated),
+            skipped=len(skipped),
+            split=args.split,
         ),
         "warning": "SYNTHETIC PIPELINE VALIDATION ONLY. These numbers carry no "
         "evidence about a real machine.",
@@ -367,6 +414,14 @@ def main(argv: list[str] | None = None) -> int:
     print("SYNTHETIC PIPELINE VALIDATION ONLY\n")
     header = f"  {'output':22} {'arm':14} {'PR-AUC':>8} {'rand':>7} {'lift':>7} {'ROC':>6} {'std':>9} {'splits':>7}  gates"
     print(header)
+    if not evaluated:
+        # An empty table under a full header reads as "nothing scored well".
+        # It meant "nothing was scored", which is a different thing to go and
+        # investigate.
+        print(
+            f"\n  (no rows: all {len(skipped)} outputs were skipped for having a single "
+            f"class in the train or {args.split} split)"
+        )
     for key, entry in results.items():
         if "arms" not in entry:
             continue

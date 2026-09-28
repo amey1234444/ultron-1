@@ -107,10 +107,18 @@ jobs:
           python -m pip install --upgrade pip
           # Pinned: 4.7.0 segfaults in LGBM_DatasetSetField on some platforms.
           pip install -e ".[dev]" "lightgbm==4.5.0" "xgboost>=2,<3" scikit-learn
+      # --repeats 3, not 1. The split is chronological and the scenarios run in
+      # a fixed order, so with one pass each fault's entire event history sits
+      # in whichever region its scenario happened to fall in. Nothing then has
+      # positives on both sides of the train/valid boundary, every output is
+      # skipped for having a single class, and the baselines step fails with an
+      # empty table. Three passes spread each fault's events across the
+      # timeline so the "must beat chance" assertion below has something to
+      # assert on.
       - name: Build a small dataset
         working-directory: services/ml
         run: |
-          python -m app.training.build_dataset             --dataset-id ci-smoke --repeats 1 --emit-every 60 --allow-unverified
+          python -m app.training.build_dataset             --dataset-id ci-smoke --repeats 3 --emit-every 60 --allow-unverified
       # The check that matters: a dataset whose feature block is empty is not a
       # dataset, and the builder refuses to write one. Asserted here so a
       # regression in the feature path fails CI rather than a release.
