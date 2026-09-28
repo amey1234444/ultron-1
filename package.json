@@ -89,7 +89,8 @@
     "check:cracking-mill": "npx --yes esbuild components/console/machine/__checks__/crackingMillChecks.ts --bundle --platform=node --format=cjs --alias:react-native=react-native-web --alias:react-native-svg=./node_modules/react-native-svg/lib/commonjs/ReactNativeSVG.web.js --resolve-extensions=.web.tsx,.web.ts,.web.jsx,.web.js,.tsx,.ts,.jsx,.js,.json --loader:.js=jsx --loader:.png=dataurl --outfile=node_modules/.cache/crackingMillChecks.cjs && node node_modules/.cache/crackingMillChecks.cjs",
     "check:conditioner": "npx --yes esbuild components/console/machine/__checks__/conditionerChecks.ts --bundle --platform=node --format=cjs --alias:react-native=react-native-web --alias:react-native-svg=./node_modules/react-native-svg/lib/commonjs/ReactNativeSVG.web.js --resolve-extensions=.web.tsx,.web.ts,.web.jsx,.web.js,.tsx,.ts,.jsx,.js,.json --loader:.js=jsx --loader:.png=dataurl --outfile=node_modules/.cache/conditionerChecks.cjs && node node_modules/.cache/conditionerChecks.cjs",
     "check:boundaries": "node scripts/checkBoundaries.mjs",
-    "check:ml-prognosis": "npx --yes esbuild lib/knowledge/ml/__checks__/prognosisContractChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/prognosisContractChecks.cjs && node node_modules/.cache/prognosisContractChecks.cjs"
+    "check:ml-prognosis": "npx --yes esbuild lib/knowledge/ml/__checks__/prognosisContractChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/prognosisContractChecks.cjs && node node_modules/.cache/prognosisContractChecks.cjs",
+    "check:channel-propagation": "npx --yes esbuild lib/knowledge/tse/__checks__/channelPropagationChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/channelPropagationChecks.cjs && node node_modules/.cache/channelPropagationChecks.cjs"
   },
   "private": true
 }
