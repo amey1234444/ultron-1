@@ -7,6 +7,8 @@ import { AUTO_BAGGER_POINT_REGISTRY } from '../../../lib/machinePoints/autoBagge
 import { HAMMER_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/hammerMillPoints';
 import { MEAL_CONVEYING_STORAGE_POINT_REGISTRY } from '../../../lib/machinePoints/mealConveyingStoragePoints';
 import { MEAL_SIFTER_POINT_REGISTRY } from '../../../lib/machinePoints/mealSifterPoints';
+import { MISCELLA_DISTILLATION_POINT_REGISTRY } from '../../../lib/machinePoints/miscellaDistillationPoints';
+import { SOLVENT_RECOVERY_POINT_REGISTRY } from '../../../lib/machinePoints/solventRecoveryPoints';
 import { DTDC_POINT_REGISTRY } from '../../../lib/machinePoints/dtdcPoints';
 import { SEED_DRYER_COOLER_POINT_REGISTRY } from '../../../lib/machinePoints/seedDryerCoolerPoints';
 import { SOLVENT_EXTRACTOR_POINT_REGISTRY } from '../../../lib/machinePoints/solventExtractorPoints';
@@ -161,6 +163,8 @@ const HAMMER_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(HAMMER
 const MEAL_SIFTER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_SIFTER_POINT_REGISTRY);
 const MEAL_CONVEYING_STORAGE_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_CONVEYING_STORAGE_POINT_REGISTRY);
 const AUTO_BAGGER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(AUTO_BAGGER_POINT_REGISTRY);
+const MISCELLA_DISTILLATION_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MISCELLA_DISTILLATION_POINT_REGISTRY);
+const SOLVENT_RECOVERY_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SOLVENT_RECOVERY_POINT_REGISTRY);
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
@@ -178,6 +182,8 @@ const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Meal Sifter': MEAL_SIFTER_TEMPLATE_POINTS,
   'Meal Conveying & Storage': MEAL_CONVEYING_STORAGE_TEMPLATE_POINTS,
   'Auto Bagger & Stitcher': AUTO_BAGGER_TEMPLATE_POINTS,
+  'Miscella Distillation': MISCELLA_DISTILLATION_TEMPLATE_POINTS,
+  'Solvent Recovery': SOLVENT_RECOVERY_TEMPLATE_POINTS,
 };
 
 function makeId(prefix: string) {

@@ -40,6 +40,11 @@ import {
   type MealConveyingStorageComponent,
 } from './machinePoints/mealConveyingStoragePoints';
 import {
+  MISCELLA_DISTILLATION_COMPONENT_ORDER,
+  miscellaDistillationPointsForComponent,
+  type MiscellaDistillationComponent,
+} from './machinePoints/miscellaDistillationPoints';
+import {
   MEAL_SIFTER_COMPONENT_ORDER,
   mealSifterPointsForComponent,
   type MealSifterComponent,
@@ -54,6 +59,11 @@ import {
   seedDryerCoolerPointsForComponent,
   type SeedDryerCoolerComponent,
 } from './machinePoints/seedDryerCoolerPoints';
+import {
+  SOLVENT_RECOVERY_COMPONENT_ORDER,
+  solventRecoveryPointsForComponent,
+  type SolventRecoveryComponent,
+} from './machinePoints/solventRecoveryPoints';
 import {
   SOLVENT_EXTRACTOR_COMPONENT_ORDER,
   solventExtractorPointsForComponent,
@@ -95,6 +105,10 @@ export const MACHINE_TEMPLATES = [
   'Meal Sifter',
   'Meal Conveying & Storage',
   'Auto Bagger & Stitcher',
+  // Solvent side of the plant: what happens to the miscella the extractor
+  // produces, and to the hexane that carried it.
+  'Miscella Distillation',
+  'Solvent Recovery',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -275,6 +289,21 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
     { type: 'Custom Component', label: 'Bagging' },
     { type: 'Motor', label: 'Stitching' },
     { type: 'Custom Component', label: 'Checkweighing' },
+  ],
+  // Grouped in process order rather than by hardware. Three pumps on the
+  // distillation train sit in three different components because what a
+  // failing feed pump means is not what a failing oil pump means.
+  'Miscella Distillation': [
+    { type: 'Pump', label: 'Feed' },
+    { type: 'Custom Component', label: 'Evaporation' },
+    { type: 'Custom Component', label: 'Stripping' },
+    { type: 'Pump', label: 'Oil' },
+  ],
+  'Solvent Recovery': [
+    { type: 'Custom Component', label: 'Condensing' },
+    { type: 'Custom Component', label: 'Separation' },
+    { type: 'Pump', label: 'Hexane' },
+    { type: 'Custom Component', label: 'Absorber' },
   ],
   'Custom Machine': [],
 };
@@ -553,6 +582,31 @@ const AUTO_BAGGER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = AUTO_BAGGER_COMP
   points: autoBaggerPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
 }));
 
+// The solvent side. Supplied point sets, like the two sets above.
+const MISCELLA_DISTILLATION_COMPONENT_TYPES: Record<MiscellaDistillationComponent, ComponentType> = {
+  Feed: 'Pump',
+  Evaporation: 'Custom Component',
+  Stripping: 'Custom Component',
+  Oil: 'Pump',
+};
+const MISCELLA_DISTILLATION_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = MISCELLA_DISTILLATION_COMPONENT_ORDER.map((component) => ({
+  type: MISCELLA_DISTILLATION_COMPONENT_TYPES[component],
+  label: component,
+  points: miscellaDistillationPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+const SOLVENT_RECOVERY_COMPONENT_TYPES: Record<SolventRecoveryComponent, ComponentType> = {
+  Condensing: 'Custom Component',
+  Separation: 'Custom Component',
+  Hexane: 'Pump',
+  Absorber: 'Custom Component',
+};
+const SOLVENT_RECOVERY_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = SOLVENT_RECOVERY_COMPONENT_ORDER.map((component) => ({
+  type: SOLVENT_RECOVERY_COMPONENT_TYPES[component],
+  label: component,
+  points: solventRecoveryPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.
 const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
@@ -571,6 +625,8 @@ const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[
   'Meal Sifter': MEAL_SIFTER_ANALYSIS_COMPONENTS,
   'Meal Conveying & Storage': MEAL_CONVEYING_STORAGE_ANALYSIS_COMPONENTS,
   'Auto Bagger & Stitcher': AUTO_BAGGER_ANALYSIS_COMPONENTS,
+  'Miscella Distillation': MISCELLA_DISTILLATION_ANALYSIS_COMPONENTS,
+  'Solvent Recovery': SOLVENT_RECOVERY_ANALYSIS_COMPONENTS,
 };
 
 /**

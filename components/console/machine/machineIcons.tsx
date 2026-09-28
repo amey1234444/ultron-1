@@ -8,9 +8,11 @@ import {
   DTDCIcon,
   HammerMillIcon,
   MealConveyingStorageIcon,
+  MiscellaDistillationIcon,
   MealSifterIcon,
   SeedDryerCoolerIcon,
   SolventExtractorIcon,
+  SolventRecoveryIcon,
   type TemplateIconProps,
 } from './templateIcons';
 
@@ -31,6 +33,8 @@ const TEMPLATE_DRAWN_ICON: Partial<Record<MachineTemplate, React.ComponentType<T
   'Meal Sifter': MealSifterIcon,
   'Meal Conveying & Storage': MealConveyingStorageIcon,
   'Auto Bagger & Stitcher': AutoBaggerIcon,
+  'Miscella Distillation': MiscellaDistillationIcon,
+  'Solvent Recovery': SolventRecoveryIcon,
 };
 
 export const MACHINE_TEMPLATE_ICON: Record<MachineTemplate, keyof typeof MaterialCommunityIcons.glyphMap> = {
@@ -59,6 +63,8 @@ export const MACHINE_TEMPLATE_ICON: Record<MachineTemplate, keyof typeof Materia
   'Meal Sifter': 'filter-outline',
   'Meal Conveying & Storage': 'silo',
   'Auto Bagger & Stitcher': 'package-variant-closed',
+  'Miscella Distillation': 'test-tube',
+  'Solvent Recovery': 'water-circle',
   'Custom Machine': 'shape-outline',
 };
 

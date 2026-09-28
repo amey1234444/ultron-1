@@ -139,7 +139,14 @@ ok('every pad is the accent colour unless it is refusing a drop',
 // Which means the count that matters is how many machines show green pads.
 const instrumented = withPads.length;
 ok('every instrumented template shows its pads in the accent colour',
-  instrumented === 15, `${instrumented} templates, ${totalPads} pads`);
+  instrumented === 17, `${instrumented} templates, ${totalPads} pads`);
+// The eight that have none are the generic templates — Motor, Gearbox, Fan
+// and so on. They have no machine drawing at all, only the component-tree
+// canvas, so there is nothing to place a pad on. Asserted so that a template
+// quietly losing its pads shows up as a number here rather than as an empty
+// machine somebody notices later.
+ok('exactly the generic templates have no pads',
+  (MACHINE_TEMPLATES as readonly string[]).filter((t) => connectorsForTemplate(t).length === 0).length === 8);
 
 // State is carried by weight, not by a second hue, so it survives greyscale.
 ok('state is carried by fill weight rather than another colour',

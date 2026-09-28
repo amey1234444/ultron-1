@@ -1,9 +1,10 @@
 /**
- * The eight templates whose point registries were supplied with them.
+ * The ten templates whose point registries were supplied with them.
  *
- * Two archives: the oilseed four (DTDC, Solvent Extractor, Collet Cooler,
- * Seed Dryer Cooler) and the meal-handling four (Hammer Mill, Meal Sifter,
- * Meal Conveying & Storage, Auto Bagger & Stitcher). One file, because they
+ * Three archives: the oilseed four (DTDC, Solvent Extractor, Collet Cooler,
+ * Seed Dryer Cooler), the meal-handling four (Hammer Mill, Meal Sifter, Meal
+ * Conveying & Storage, Auto Bagger & Stitcher) and the solvent two (Miscella
+ * Distillation, Solvent Recovery). One file, because they
  * share the property that makes them different from every machine integrated
  * before them: their point registries were **supplied** rather than written
  * during integration.
@@ -15,6 +16,20 @@
  * artwork's own sensor list and the canvas connectors are three copies of the
  * same 43 points, and two of them being right is not good enough.
  */
+import {
+  MISCELLA_DISTILLATION_ARTWORK_HEIGHT,
+  MISCELLA_DISTILLATION_ARTWORK_WIDTH,
+  MISCELLA_DISTILLATION_COMPONENT_ORDER,
+  MISCELLA_DISTILLATION_PART_LABELS,
+  MISCELLA_DISTILLATION_POINT_REGISTRY,
+} from '../../../../lib/machinePoints/miscellaDistillationPoints';
+import {
+  SOLVENT_RECOVERY_ARTWORK_HEIGHT,
+  SOLVENT_RECOVERY_ARTWORK_WIDTH,
+  SOLVENT_RECOVERY_COMPONENT_ORDER,
+  SOLVENT_RECOVERY_PART_LABELS,
+  SOLVENT_RECOVERY_POINT_REGISTRY,
+} from '../../../../lib/machinePoints/solventRecoveryPoints';
 import {
   AUTO_BAGGER_ARTWORK_HEIGHT,
   AUTO_BAGGER_ARTWORK_WIDTH,
@@ -79,6 +94,8 @@ import {
   type MachineTemplate,
 } from '../../../../lib/machines';
 import { AUTOBAGGER_SCENE, AUTOBAGGER_SENSORS, AUTOBAGGER_PARTS } from '../artwork/autoBaggerScene';
+import { MISCELLADISTILLATION_SCENE, MISCELLADISTILLATION_SENSORS, MISCELLADISTILLATION_PARTS } from '../artwork/miscellaDistillationScene';
+import { SOLVENTRECOVERY_SCENE, SOLVENTRECOVERY_SENSORS, SOLVENTRECOVERY_PARTS } from '../artwork/solventRecoveryScene';
 import { COLLETCOOLER_SCENE, COLLETCOOLER_SENSORS, COLLETCOOLER_PARTS } from '../artwork/colletCoolerScene';
 import { HAMMERMILL_SCENE, HAMMERMILL_SENSORS, HAMMERMILL_PARTS } from '../artwork/hammerMillScene';
 import { MEALCONVEYINGSTORAGE_SCENE, MEALCONVEYINGSTORAGE_SENSORS, MEALCONVEYINGSTORAGE_PARTS } from '../artwork/mealConveyingStorageScene';
@@ -96,6 +113,8 @@ import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
 import { AutoBagger } from '../artwork/AutoBagger';
+import { MiscellaDistillation } from '../artwork/MiscellaDistillation';
+import { SolventRecovery } from '../artwork/SolventRecovery';
 import { ColletCooler } from '../artwork/ColletCooler';
 import { HammerMill } from '../artwork/HammerMill';
 import { MealConveyingStorage } from '../artwork/MealConveyingStorage';
@@ -227,6 +246,32 @@ const MACHINES = [
     expected: 4,
     utilities: 1,
   },
+  {
+    template: 'Miscella Distillation' as MachineTemplate,
+    points: MISCELLA_DISTILLATION_POINT_REGISTRY as readonly Point[],
+    sensors: MISCELLADISTILLATION_SENSORS as readonly Sensor[],
+    scene: MISCELLADISTILLATION_SCENE as readonly SceneNode[],
+    parts: MISCELLADISTILLATION_PARTS as readonly { id: string }[],
+    partLabels: MISCELLA_DISTILLATION_PART_LABELS,
+    order: MISCELLA_DISTILLATION_COMPONENT_ORDER,
+    width: MISCELLA_DISTILLATION_ARTWORK_WIDTH,
+    height: MISCELLA_DISTILLATION_ARTWORK_HEIGHT,
+    expected: 13,
+    utilities: 2,
+  },
+  {
+    template: 'Solvent Recovery' as MachineTemplate,
+    points: SOLVENT_RECOVERY_POINT_REGISTRY as readonly Point[],
+    sensors: SOLVENTRECOVERY_SENSORS as readonly Sensor[],
+    scene: SOLVENTRECOVERY_SCENE as readonly SceneNode[],
+    parts: SOLVENTRECOVERY_PARTS as readonly { id: string }[],
+    partLabels: SOLVENT_RECOVERY_PART_LABELS,
+    order: SOLVENT_RECOVERY_COMPONENT_ORDER,
+    width: SOLVENT_RECOVERY_ARTWORK_WIDTH,
+    height: SOLVENT_RECOVERY_ARTWORK_HEIGHT,
+    expected: 14,
+    utilities: 4,
+  },
 ];
 
 function walk(nodes: readonly SceneNode[], visit: (node: SceneNode) => void) {
@@ -351,9 +396,9 @@ for (const m of MACHINES) {
   ok('every point starts Not Configured', components.every((c) => c.points.every((p) => p.status === 'Not Configured')));
 }
 
-console.log('\n--- across all eight ---');
-ok('57 logical connection groups in total', totalPoints === 57,
-  `got ${totalPoints} (43 oilseed + 14 meal)`);
+console.log('\n--- across all ten ---');
+ok('84 logical connection groups in total', totalPoints === 84,
+  `got ${totalPoints} (43 oilseed + 14 meal + 27 solvent)`);
 
 // Unit matching, one assertion per kind these machines introduced.
 const dtdc = connectorsForTemplate('DTDC');
@@ -396,6 +441,14 @@ ok('the extractor keeps its own 1200x850 frame',
 ok('the other three share 1200x1000',
   ['DTDC', 'Collet Cooler', 'Seed Dryer Cooler']
     .every((t) => artworkSizeForTemplate(t).width === 1200 && artworkSizeForTemplate(t).height === 1000));
+// The solvent pair are process trains drawn end to end, so they are wider
+// and shallower than everything else. Nothing may assume a shared frame.
+ok('the solvent pair keep their own 2048x1100 frame',
+  ['Miscella Distillation', 'Solvent Recovery']
+    .every((t) => artworkSizeForTemplate(t).width === 2048 && artworkSizeForTemplate(t).height === 1100));
+ok('three distinct artwork frames are in use across the supplied templates',
+  new Set(MACHINES.map((m) => `${m.width}x${m.height}`)).size === 3,
+  [...new Set(MACHINES.map((m) => `${m.width}x${m.height}`))].join(', '));
 
 // A pad carrying three measurements stays one logical point.
 const drive = SOLVENT_EXTRACTOR_POINT_REGISTRY.find((p) => p.code === 'EX-DRV-01')!;
@@ -458,6 +511,8 @@ const ARTWORK = [
   ['Meal Sifter', MealSifter],
   ['Meal Conveying & Storage', MealConveyingStorage],
   ['Auto Bagger & Stitcher', AutoBagger],
+  ['Miscella Distillation', MiscellaDistillation],
+  ['Solvent Recovery', SolventRecovery],
 ] as const;
 
 for (const [name, Component] of ARTWORK) {

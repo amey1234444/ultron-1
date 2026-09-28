@@ -53,6 +53,11 @@ import {
   MEAL_CONVEYING_STORAGE_POINT_REGISTRY,
 } from '../../../lib/machinePoints/mealConveyingStoragePoints';
 import {
+  MISCELLA_DISTILLATION_ARTWORK_HEIGHT,
+  MISCELLA_DISTILLATION_ARTWORK_WIDTH,
+  MISCELLA_DISTILLATION_POINT_REGISTRY,
+} from '../../../lib/machinePoints/miscellaDistillationPoints';
+import {
   MEAL_SIFTER_ARTWORK_HEIGHT,
   MEAL_SIFTER_ARTWORK_WIDTH,
   MEAL_SIFTER_POINT_REGISTRY,
@@ -67,6 +72,11 @@ import {
   SEED_DRYER_COOLER_ARTWORK_WIDTH,
   SEED_DRYER_COOLER_POINT_REGISTRY,
 } from '../../../lib/machinePoints/seedDryerCoolerPoints';
+import {
+  SOLVENT_RECOVERY_ARTWORK_HEIGHT,
+  SOLVENT_RECOVERY_ARTWORK_WIDTH,
+  SOLVENT_RECOVERY_POINT_REGISTRY,
+} from '../../../lib/machinePoints/solventRecoveryPoints';
 import {
   SOLVENT_EXTRACTOR_ARTWORK_HEIGHT,
   SOLVENT_EXTRACTOR_ARTWORK_WIDTH,
@@ -106,6 +116,10 @@ export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {
   'Meal Sifter': { width: MEAL_SIFTER_ARTWORK_WIDTH, height: MEAL_SIFTER_ARTWORK_HEIGHT },
   'Meal Conveying & Storage': { width: MEAL_CONVEYING_STORAGE_ARTWORK_WIDTH, height: MEAL_CONVEYING_STORAGE_ARTWORK_HEIGHT },
   'Auto Bagger & Stitcher': { width: AUTO_BAGGER_ARTWORK_WIDTH, height: AUTO_BAGGER_ARTWORK_HEIGHT },
+  // Wider and shallower than everything above: these two are process trains
+  // drawn end to end rather than single machines.
+  'Miscella Distillation': { width: MISCELLA_DISTILLATION_ARTWORK_WIDTH, height: MISCELLA_DISTILLATION_ARTWORK_HEIGHT },
+  'Solvent Recovery': { width: SOLVENT_RECOVERY_ARTWORK_WIDTH, height: SOLVENT_RECOVERY_ARTWORK_HEIGHT },
 };
 
 const DEFAULT_ARTWORK = { width: 1200, height: 760 };
@@ -256,6 +270,15 @@ const MEAL_CONVEYING_STORAGE_CONNECTOR_LIST: MachineConnector[] = MEAL_CONVEYING
 const AUTO_BAGGER_CONNECTOR_LIST: MachineConnector[] = AUTO_BAGGER_POINT_REGISTRY.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Auto Bagger & Stitcher']),
 );
+// The solvent side, derived from their supplied registries. No analyzerTag,
+// as with every other supplied template: real instruments, no commissioned
+// model reading them yet.
+const MISCELLA_DISTILLATION_CONNECTOR_LIST: MachineConnector[] = MISCELLA_DISTILLATION_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Miscella Distillation']),
+);
+const SOLVENT_RECOVERY_CONNECTOR_LIST: MachineConnector[] = SOLVENT_RECOVERY_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Solvent Recovery']),
+);
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
 );
@@ -276,6 +299,8 @@ const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Meal Sifter': MEAL_SIFTER_CONNECTOR_LIST,
   'Meal Conveying & Storage': MEAL_CONVEYING_STORAGE_CONNECTOR_LIST,
   'Auto Bagger & Stitcher': AUTO_BAGGER_CONNECTOR_LIST,
+  'Miscella Distillation': MISCELLA_DISTILLATION_CONNECTOR_LIST,
+  'Solvent Recovery': SOLVENT_RECOVERY_CONNECTOR_LIST,
 };
 
 export function connectorsForTemplate(machineTemplate: string): MachineConnector[] {

@@ -38,6 +38,7 @@ import { CrackingMill } from './artwork/CrackingMill';
 import { DTDC } from './artwork/DTDC';
 import { HammerMill } from './artwork/HammerMill';
 import { MealConveyingStorage } from './artwork/MealConveyingStorage';
+import { MiscellaDistillation } from './artwork/MiscellaDistillation';
 import { MealSifter } from './artwork/MealSifter';
 import { Expander } from './artwork/Expander';
 import { FlakingMill } from './artwork/FlakingMill';
@@ -45,6 +46,7 @@ import { RotaryAirlockValve } from './artwork/RotaryAirlockValve';
 import { SeedDryerCooler } from './artwork/SeedDryerCooler';
 import { SingleScrewExtruder } from './artwork/SingleScrewExtruder';
 import { SolventExtractor } from './artwork/SolventExtractor';
+import { SolventRecovery } from './artwork/SolventRecovery';
 import { TwinScrewExtruder } from './artwork/TwinScrewExtruder';
 import {
   mergeProjectedConnectorPositions,
@@ -105,6 +107,8 @@ const ARTWORK_TEMPLATES = new Set<string>([
   'Meal Sifter',
   'Meal Conveying & Storage',
   'Auto Bagger & Stitcher',
+  'Miscella Distillation',
+  'Solvent Recovery',
 ]);
 
 /**
@@ -597,6 +601,10 @@ export function MachineWorkspace({
                 <MealConveyingStorage showBackground={false} showGrid={false} showSensors={false} />
               ) : machine.template === 'Auto Bagger & Stitcher' ? (
                 <AutoBagger showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Miscella Distillation' ? (
+                <MiscellaDistillation showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Solvent Recovery' ? (
+                <SolventRecovery showBackground={false} showGrid={false} showSensors={false} />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}

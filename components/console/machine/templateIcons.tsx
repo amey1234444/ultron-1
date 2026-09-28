@@ -134,3 +134,21 @@ export function MealSifterIcon({ size = 18, color }: TemplateIconProps) {
     </IconFrame>
   );
 }
+
+/** Two evaporator bodies and the stripper column beside them. */
+export function MiscellaDistillationIcon({ size = 18, color }: TemplateIconProps) {
+  return (
+    <IconFrame size={size} color={color} strokeWidth={MEAL_STROKE}>
+      <Path d="M2 5H30M7 5V11M17 5V11M26 5V8M4 12Q7 9 10 12V25Q7 28 4 25ZM14 12Q17 9 20 12V25Q17 28 14 25ZM23 9Q26 6 29 9V27H23ZM25 13H27M25 17H27M25 21H27M3 29H30" />
+    </IconFrame>
+  );
+}
+
+/** The condenser bank over the separator, with the absorber column at right. */
+export function SolventRecoveryIcon({ size = 18, color }: TemplateIconProps) {
+  return (
+    <IconFrame size={size} color={color} strokeWidth={MEAL_STROKE}>
+      <Path d="M2 4H20M5 4V8M12 4V8M19 4V8M2 8H8V12H2ZM9 8H15V12H9ZM16 8H22V12H16ZM5 12V17H17V12M3 20H16V26H3ZM6 22H13M24 10Q27 7 30 10V27H24ZM26 13H28M26 17H28M26 21H28M27 8V3" />
+    </IconFrame>
+  );
+}
