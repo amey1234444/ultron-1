@@ -366,6 +366,11 @@ export function TrailBoard({
   // channel picker. Cleared once consumed, or the picker would reopen on the
   // next render after being dismissed.
   const [autoPickerBoxId, setAutoPickerBoxId] = useState<string | null>(null);
+  // The pad the pointer is over, for the detail card. One piece of state and
+  // one card rather than a tooltip per pad: the Solvent Extractor has twenty,
+  // and twenty mounted-but-hidden cards is twenty things to lay out on every
+  // frame for the one that might be visible.
+  const [hoveredConnector, setHoveredConnector] = useState<string | null>(null);
 
   // Consumed on the render after it is set: MappableBox reads the flag once,
   // at mount, so holding it any longer only risks reopening a picker the
@@ -1363,7 +1368,10 @@ export function TrailBoard({
             an endpoint is in the air the pads switch to drop-target styling,
             including the struck-through refusal for a unit that cannot fit. */}
         {!readOnly && machineRect && connectors.length > 0 && (
-          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+          <View
+            pointerEvents="box-none"
+            style={{ pointerEvents: 'box-none', position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}
+          >
             {connectors.map((connector) => {
               if (connector.projectionVisible === false) return null;
               const flashed = flashedConnector === connector.code;
@@ -1416,11 +1424,9 @@ export function TrailBoard({
               return (
                 <Pressable
                   key={connector.code}
-                  // Not a drop target while an endpoint is being dragged: the
-                  // drag owns the gesture, and a Pressable swallowing it would
-                  // break the magnet.
-                  pointerEvents={wiring ? 'none' : 'auto'}
                   onPress={() => mapConnector(connector)}
+                  onHoverIn={() => setHoveredConnector(connector.code)}
+                  onHoverOut={() => setHoveredConnector((current) => (current === connector.code ? null : current))}
                   accessibilityRole="button"
                   accessibilityLabel={
                     wired
@@ -1431,6 +1437,13 @@ export function TrailBoard({
                   // pressable is padded out beyond the mark it draws.
                   hitSlop={12}
                   style={{
+                    // Not a drop target while an endpoint is being dragged:
+                    // the drag owns the gesture, and a Pressable swallowing it
+                    // would break the magnet. This has to be a style rather
+                    // than the `pointerEvents` prop — react-native-web
+                    // deprecated the prop and newer versions ignore it, which
+                    // would silently hand the pad the drag.
+                    pointerEvents: wiring ? 'none' : 'auto',
                     position: 'absolute',
                     left: padPoint.x - size / 2,
                     top: padPoint.y - size / 2,
@@ -1448,6 +1461,76 @@ export function TrailBoard({
                 </Pressable>
               );
             })}
+
+            {/* What the hovered pad is.
+                
+                A pad is a small dot on a drawing of a machine; on the Solvent
+                Extractor there are twenty of them and five are called "pump
+                N vibration". Which one the pointer is over, what it wants,
+                and whether it is already mapped are all things you would
+                otherwise have to map it to find out.
+
+                Positioned above the pad and clamped to the board, so a pad
+                near an edge does not put its own description off-screen.
+                Pointer-transparent, so it can never sit between the pointer
+                and the pad it describes. */}
+            {hoveredConnector && !wiring ? (() => {
+              const connector = connectors.find((entry) => entry.code === hoveredConnector);
+              if (!connector) return null;
+              const at = connectorStagePoint(connector, machineRect);
+              const state = connectorState[connector.code];
+              const trail = trails.find(
+                (entry) => entry.startMachinePointCode === connector.code || entry.endMachinePointCode === connector.code,
+              );
+              const boxId = trail
+                ? (trail.startMachinePointCode === connector.code ? trail.endBoxId : trail.startBoxId)
+                : undefined;
+              const box = boxId ? boxes.find((entry) => entry.id === boxId) : undefined;
+              const channel = box?.channelId ? channels.find((entry) => entry.id === box.channelId) ?? null : null;
+              const CARD = 260;
+              return (
+                <View
+                  pointerEvents="none"
+                  style={{
+                    pointerEvents: 'none',
+                    position: 'absolute',
+                    // Clamped to the placeable area, so a pad near an edge
+                    // does not put its own description off-screen.
+                    left: Math.max(
+                      (stageBounds?.minX ?? 0) + 8,
+                      Math.min(at.x - CARD / 2, (stageBounds?.maxX ?? 1600) - CARD - 8),
+                    ),
+                    top: Math.max((stageBounds?.minY ?? 0) + 8, at.y - 86),
+                    width: CARD,
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: palette.lineStrong,
+                    backgroundColor: palette.panelRaised,
+                    paddingHorizontal: 10,
+                    paddingVertical: 8,
+                    gap: 2,
+                    zIndex: 40,
+                  }}
+                >
+                  <Text style={{ color: palette.inkStrong, fontSize: 12, fontWeight: '600' }}>{connector.label}</Text>
+                  <Text style={{ color: palette.inkMuted, fontSize: 11 }}>
+                    {connector.code}
+                    {connector.kind ? ` · ${connector.kind}` : ''}
+                  </Text>
+                  <Text style={{ color: palette.inkMuted, fontSize: 11 }}>Expects {connectorExpectation(connector)}</Text>
+                  <Text style={{ color: state ? palette.accent : palette.inkFaint, fontSize: 11 }}>
+                    {channel
+                      ? `Mapped to ${channel.code}${state === 'live' ? ' · reporting' : ''}`
+                      : state
+                        ? 'Mapped — no channel chosen yet'
+                        : 'Not mapped — tap to map'}
+                  </Text>
+                  {connector.analyzerNote ? (
+                    <Text style={{ color: palette.inkFaint, fontSize: 10 }}>{connector.analyzerNote}</Text>
+                  ) : null}
+                </View>
+              );
+            })() : null}
 
             {/* Name the pad the endpoint is locked onto, so a connection is
                 confirmed before the mouse is released rather than after. */}

@@ -112,8 +112,12 @@ ok('the pad layer lets presses through to the pads',
   board.includes('<View pointerEvents="box-none"'),
   'a "none" layer would draw the pads and swallow every tap');
 ok('a pad is not a press target while an endpoint is being dragged',
-  board.includes("pointerEvents={wiring ? 'none' : 'auto'}"),
+  board.includes("pointerEvents: wiring ? 'none' : 'auto',"),
   'otherwise the Pressable swallows the drag and breaks the magnet');
+// In the style, not the prop: react-native-web deprecated the prop form and
+// newer versions ignore it, which would silently hand the pad the drag.
+ok('and that is expressed in the style rather than the deprecated prop',
+  !board.includes("pointerEvents={wiring ?"));
 ok('pads carry a spoken name saying whether they are mapped',
   board.includes('— mapped. Select its card.') && board.includes('— not mapped. Map this instrument.'));
 ok('a small pad is given a larger touch target', board.includes('hitSlop={12}'));
@@ -140,6 +144,33 @@ ok('every instrumented template shows its pads in the accent colour',
 // State is carried by weight, not by a second hue, so it survives greyscale.
 ok('state is carried by fill weight rather than another colour',
   board.includes("wired === 'live' ? 0.34") && board.includes('wired ? 0.18'));
+
+console.log('\n--- hovering a pad says what it is ---');
+
+// A pad is a small dot on a drawing. On the Solvent Extractor there are
+// twenty and five of them are "pump N vibration"; which one the pointer is
+// over, what it expects and whether it is already mapped are otherwise
+// things you have to map it to discover.
+ok('a pad reports hover', board.includes('onHoverIn={() => setHoveredConnector(connector.code)}'));
+ok('and clears it only for itself',
+  board.includes("setHoveredConnector((current) => (current === connector.code ? null : current))"),
+  'clearing unconditionally would blank the card when the pointer crosses between pads');
+ok('there is one detail card, not one per pad',
+  (board.match(/hoveredConnector && !wiring/g) ?? []).length === 1,
+  'twenty hidden cards is twenty things to lay out for the one that might show');
+ok('the card names the instrument and its code',
+  board.includes('{connector.label}') && board.includes('{connector.code}'));
+ok('it says what the point expects', board.includes('Expects {connectorExpectation(connector)}'));
+ok('it says whether the point is mapped, and to what',
+  board.includes('`Mapped to ${channel.code}') && board.includes("'Not mapped — tap to map'"));
+ok('it is clamped to the placeable area',
+  board.includes('(stageBounds?.maxX ?? 1600) - CARD - 8'),
+  'a pad near an edge must not put its own description off-screen');
+ok('it cannot sit between the pointer and the pad it describes',
+  board.includes("pointerEvents: 'none',"),
+  'react-native-web deprecated the prop form, so the style has to carry it');
+ok('the card is hidden while an endpoint is being dragged',
+  board.includes('hoveredConnector && !wiring'));
 
 console.log('\n--- tapping the same pad twice does not make two cards ---');
 ok('an already-wired pad selects its card instead of adding another',
