@@ -21,6 +21,7 @@ import {
   type Variant,
 } from '../../ui';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
+import { ConnectorPad } from './ConnectorPad';
 import {
   artworkSizeForTemplate,
   connectorExpectation,
@@ -158,7 +159,32 @@ export type TrailBoardLayers = {
  * reproducible. Absent means no size was ever saved, which is not the same as
  * 100% — see `resolveMachineZoom`.
  */
-export type SavedLayout = { trails: Trail[]; boxes: Box[]; machineZoom?: number };
+export type SavedLayout = {
+  trails: Trail[];
+  boxes: Box[];
+  machineZoom?: number;
+  /**
+   * Instrument pads this machine has moved, keyed by connector code.
+   *
+   * The registry says where an instrument sits on the *drawing*, which is a
+   * statement about the template. A particular machine may have its bearing
+   * probe somewhere else, or the drawing may be a near-enough relative of the
+   * machine actually installed, and a pad in the wrong place is a pad nobody
+   * trusts. So a pad can be moved, and the move belongs to the machine rather
+   * than to the template — moving one on this conditioner must not move it on
+   * every other conditioner in the plant.
+   *
+   * Stored as the same `{ rx, ry }` fractions of the machine rect that
+   * everything else on this canvas uses, so a moved pad survives zoom, stage
+   * scale and screen size exactly as a trail anchor does. A code absent from
+   * this map is at its registry position, which is what makes "reset" simply
+   * deleting the entry.
+   *
+   * Carried by "Save Template" too, where it means the opposite and correct
+   * thing: a template whose drawing is wrong for every machine built from it.
+   */
+  connectorOverrides?: Record<string, Anchor>;
+};
 
 // v3: coordinates are stage units on the fixed 1600×900 design stage, so saved
 // layouts are resolution-independent. Shared with MachineWorkspace, which reads
@@ -325,7 +351,7 @@ export function TrailBoard({
   onSaveLayout,
   onSaveTemplate,
   canSaveTemplate = false,
-  connectors = [],
+  connectors: templateConnectors = [],
   onConnectorStateChange,
   renderWorkspace,
   machineZoom = DEFAULT_MACHINE_ZOOM,
@@ -372,6 +398,35 @@ export function TrailBoard({
   // and twenty mounted-but-hidden cards is twenty things to lay out on every
   // frame for the one that might be visible.
   const [hoveredConnector, setHoveredConnector] = useState<string | null>(null);
+  /** Pads this machine has moved. Empty means every pad is where the registry puts it. */
+  const [connectorOverrides, setConnectorOverrides] = useState<Record<string, Anchor>>(
+    () => initialLayoutRef.current?.connectorOverrides ?? {},
+  );
+  const connectorOverridesRef = useRef(connectorOverrides);
+  connectorOverridesRef.current = connectorOverrides;
+  /** Whether pads are drag handles rather than map-this-point buttons. */
+  const [movingPads, setMovingPads] = useState(false);
+
+  /**
+   * The pads as this machine actually has them.
+   *
+   * The prop is the template's registry, which says where each instrument
+   * sits on the drawing. Anything this machine has moved replaces its
+   * position here, once, so that everything downstream — the pads themselves,
+   * the magnet that snaps a dragged endpoint, `withResolvedConnectors` which
+   * re-anchors trails on zoom, and the wired-state map the artwork reads —
+   * all agree about where the instrument is. Applying the override in the
+   * renderer alone would draw a pad in one place and snap trails to another.
+   */
+  const movedCount = Object.keys(connectorOverrides).length;
+
+  const connectors = useMemo(() => {
+    if (Object.keys(connectorOverrides).length === 0) return templateConnectors;
+    return templateConnectors.map((connector) => {
+      const moved = connectorOverrides[connector.code];
+      return moved ? { ...connector, rx: moved.rx, ry: moved.ry } : connector;
+    });
+  }, [templateConnectors, connectorOverrides]);
 
   /**
    * Stage units per artwork unit.
@@ -569,6 +624,12 @@ export function TrailBoard({
       // Read through a ref rather than closed over, so a save triggered by a
       // stale callback still records the size on screen at the time it fires.
       machineZoom: machineZoomRef.current,
+      // Omitted entirely when nothing has moved, so an untouched machine
+      // saves the same layout it always did and a diff of saved layouts does
+      // not fill with empty objects.
+      ...(Object.keys(connectorOverridesRef.current).length > 0
+        ? { connectorOverrides: connectorOverridesRef.current }
+        : {}),
     };
   }, []);
 
@@ -642,6 +703,10 @@ export function TrailBoard({
     boxesRef.current = incoming.boxes;
     setTrails(incoming.trails);
     setBoxes(incoming.boxes);
+    // Moved pads travel with the layout, so another user's move arrives here
+    // like their trails do. Absent means "every pad at its registry position",
+    // which is also what clearing them looks like.
+    setConnectorOverrides(incoming.connectorOverrides ?? {});
     setSelectedId(null);
   }, [initialLayout, machineRect, machineTemplate]);
 
@@ -665,6 +730,11 @@ export function TrailBoard({
     boxesRef.current = layout.boxes;
     setTrails(layout.trails);
     setBoxes(layout.boxes);
+    // A template that moved its pads moves this machine's too: the template
+    // is a statement that the drawing is wrong for every machine built from
+    // it, which is exactly when you would want that to propagate.
+    setConnectorOverrides(layout.connectorOverrides ?? {});
+    connectorOverridesRef.current = layout.connectorOverrides ?? {};
     persistLayout(layout.trails, layout.boxes);
     setSelectedId(null);
   };
@@ -784,6 +854,60 @@ export function TrailBoard({
    * second one. Two cards on one instrument is not a thing anyone means to
    * do, and it would make the connector state ambiguous.
    */
+  /**
+   * Move an instrument pad.
+   *
+   * The position is stored as a fraction of the machine rect, which is the
+   * same form the registry uses and the same form every trail anchor uses, so
+   * a moved pad survives zoom, stage scale and screen size without any
+   * further conversion.
+   *
+   * Clamped to the machine. A pad dragged off the drawing is a pad attached
+   * to nothing — the artwork is the only thing that gives the position
+   * meaning — and letting one land in open canvas would produce a connection
+   * that points at a place the machine does not have.
+   *
+   * `commit` marks the end of the gesture. The move is applied live either
+   * way so the trail follows the pad under the pointer, and the layout is
+   * only persisted on release, because saving on every frame of a drag would
+   * write a few hundred layouts to the server for one decision.
+   */
+  const moveConnector = (code: string, to: Point, options: { commit?: boolean } = {}) => {
+    if (!machineRect || readOnly) return;
+    const rx = (to.x - machineRect.x) / machineRect.width;
+    const ry = (to.y - machineRect.y) / machineRect.height;
+    const next = {
+      ...connectorOverridesRef.current,
+      [code]: { rx: Math.min(1, Math.max(0, rx)), ry: Math.min(1, Math.max(0, ry)) },
+    };
+    connectorOverridesRef.current = next;
+    setConnectorOverrides(next);
+    if (options.commit) persistLayout(trailsRef.current, boxesRef.current);
+  };
+
+  /**
+   * Put a pad back where the template says the instrument is.
+   *
+   * Deleting the entry rather than writing the registry position into it, so
+   * the pad goes on tracking the template: a later correction to the drawing
+   * moves it, which is what "not moved" should mean.
+   */
+  const resetConnector = (code: string) => {
+    if (!connectorOverridesRef.current[code]) return;
+    const next = { ...connectorOverridesRef.current };
+    delete next[code];
+    connectorOverridesRef.current = next;
+    setConnectorOverrides(next);
+    persistLayout(trailsRef.current, boxesRef.current);
+  };
+
+  const resetAllConnectors = () => {
+    if (Object.keys(connectorOverridesRef.current).length === 0) return;
+    connectorOverridesRef.current = {};
+    setConnectorOverrides({});
+    persistLayout(trailsRef.current, boxesRef.current);
+  };
+
   const flashConnector = (code: string) => {
     setFlashedConnector(code);
     if (flashTimer.current) clearTimeout(flashTimer.current);
@@ -1278,6 +1402,24 @@ export function TrailBoard({
         <Button tone="secondary" onPress={addBox} accessibilityLabel="Add data box">
           + Add Box
         </Button>
+        {/* Moving pads is a mode rather than a gesture on the same element.
+            Tapping a pad maps it and wants a large forgiving target; dragging
+            one relocates an instrument and wants to be impossible to do by
+            accident while aiming for a tap. */}
+        {connectors.length > 0 && (
+          <Button
+            tone={movingPads ? 'primary' : 'secondary'}
+            onPress={() => setMovingPads((on) => !on)}
+            accessibilityLabel={movingPads ? 'Finish moving instrument points' : 'Move instrument points'}
+          >
+            {movingPads ? '✓ Done Moving' : '✥ Move Points'}
+          </Button>
+        )}
+        {movingPads && movedCount > 0 && (
+          <Button tone="secondary" onPress={resetAllConnectors} accessibilityLabel="Put every moved point back">
+            {`⟲ Reset ${movedCount}`}
+          </Button>
+        )}
       </ToolbarGroup>
 
       {(hasDefaultLayout(machineTemplate) || (canSaveTemplate && onSaveTemplate)) && (
@@ -1439,37 +1581,26 @@ export function TrailBoard({
               const centreR = 2 * padUnitScale;
               const box = Math.max(haloR, ringR) * 2;
               return (
-                <Pressable
+                <ConnectorPad
                   key={connector.code}
-                  onPress={() => mapConnector(connector)}
-                  onHoverIn={() => setHoveredConnector(connector.code)}
-                  onHoverOut={() => setHoveredConnector((current) => (current === connector.code ? null : current))}
-                  accessibilityRole="button"
+                  connector={connector}
+                  at={padPoint}
+                  unitScale={padUnitScale}
+                  moving={movingPads && !wiring}
+                  wiring={Boolean(wiring)}
+                  stageScale={stageScale}
+                  overridden={Boolean(connectorOverrides[connector.code])}
                   accessibilityLabel={
                     wired
                       ? `${connector.label} — mapped. Select its card.`
                       : `${connector.label} — not mapped. Map this instrument.`
                   }
-                  // The mark scales with the machine, so at a small zoom it
-                  // drops below a comfortable touch target. The pressable is
-                  // padded out to meet it without growing the mark.
-                  hitSlop={Math.max(0, 22 - box / 2)}
-                  style={{
-                    // Not a drop target while an endpoint is being dragged:
-                    // the drag owns the gesture, and a Pressable swallowing it
-                    // would break the magnet. This has to be a style rather
-                    // than the `pointerEvents` prop — react-native-web
-                    // deprecated the prop and newer versions ignore it, which
-                    // would silently hand the pad the drag.
-                    pointerEvents: wiring ? 'none' : 'auto',
-                    position: 'absolute',
-                    left: padPoint.x - box / 2,
-                    top: padPoint.y - box / 2,
-                    width: box,
-                    height: box,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
+                  onPress={() => mapConnector(connector)}
+                  onHoverIn={() => setHoveredConnector(connector.code)}
+                  onHoverOut={() => setHoveredConnector((current) => (current === connector.code ? null : current))}
+                  onMove={(to) => moveConnector(connector.code, to)}
+                  onMoveEnd={(to) => moveConnector(connector.code, to, { commit: true })}
+                  onReset={() => resetConnector(connector.code)}
                 >
                   {/* Halo — only once the card on the other end is reporting. */}
                   {wired === 'live' && !rejects ? (
@@ -1511,12 +1642,27 @@ export function TrailBoard({
                       }}
                     />
                   ) : null}
+                  {/* A moved pad carries a dashed ring while the move mode is
+                      on. Outside the mode it is left alone: where an
+                      instrument is is not something the reader of a canvas
+                      needs decorating, and the hover card says it anyway. */}
+                  {movingPads && connectorOverrides[connector.code] && !rejects ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        width: ringR * 2.6, height: ringR * 2.6, borderRadius: ringR * 1.3,
+                        borderWidth: Math.max(1, 1.2 * padUnitScale),
+                        borderStyle: 'dashed',
+                        borderColor: alpha(palette.accent, 0.7),
+                      }}
+                    />
+                  ) : null}
                   {/* A pad that cannot take the unit being dragged is struck
                       through rather than quietly offered. */}
                   {rejects ? (
                     <View style={{ position: 'absolute', width: ringR * 1.6, height: Math.max(1, 1.5 * padUnitScale), backgroundColor: alpha(colour, 0.55) }} />
                   ) : null}
-                </Pressable>
+                </ConnectorPad>
               );
             })}
 
@@ -1583,6 +1729,12 @@ export function TrailBoard({
                         ? 'Mapped — no channel chosen yet'
                         : 'Not mapped — tap to map'}
                   </Text>
+                  {connectorOverrides[connector.code] ? (
+                    <Text style={{ color: palette.inkFaint, fontSize: 10 }}>
+                      Moved from its template position
+                      {movingPads ? ' — double-tap the pad to put it back' : ''}
+                    </Text>
+                  ) : null}
                   {connector.analyzerNote ? (
                     <Text style={{ color: palette.inkFaint, fontSize: 10 }}>{connector.analyzerNote}</Text>
                   ) : null}

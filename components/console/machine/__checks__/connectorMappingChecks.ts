@@ -100,6 +100,7 @@ ok('an unknown template returns null',
 console.log('\n--- the pads are visible for the whole of configure mode ---');
 
 const board = readFileSync(join(process.cwd(), 'components/console/machine/TrailBoard.tsx'), 'utf8');
+const pad = readFileSync(join(process.cwd(), 'components/console/machine/ConnectorPad.tsx'), 'utf8');
 
 // The old condition. Its return would make the pads invisible again.
 ok('pad visibility is no longer gated on an endpoint being dragged',
@@ -119,16 +120,16 @@ ok('the pad layer lets presses through to the pads',
   board.includes('<View pointerEvents="box-none"'),
   'a "none" layer would draw the pads and swallow every tap');
 ok('a pad is not a press target while an endpoint is being dragged',
-  board.includes("pointerEvents: wiring ? 'none' : 'auto',"),
+  pad.includes("pointerEvents: wiring ? 'none' : 'auto',"),
   'otherwise the Pressable swallows the drag and breaks the magnet');
 // In the style, not the prop: react-native-web deprecated the prop form and
 // newer versions ignore it, which would silently hand the pad the drag.
 ok('and that is expressed in the style rather than the deprecated prop',
-  !board.includes("pointerEvents={wiring ?"));
+  !pad.includes("pointerEvents={wiring ?"));
 ok('pads carry a spoken name saying whether they are mapped',
   board.includes('— mapped. Select its card.') && board.includes('— not mapped. Map this instrument.'));
 ok('a small pad is given a larger touch target',
-  board.includes('hitSlop={Math.max(0, 22 - box / 2)}'),
+  pad.includes('const hitSlop = Math.max(0, 22 - box / 2);'),
   'the mark scales with the machine, so at a small zoom it falls below a comfortable target');
 
 console.log('\n--- every pad reads as a connection point ---');
@@ -217,6 +218,77 @@ const mappable = readFileSync(join(process.cwd(), 'components/console/machine/Ma
 ok('the picker opens at mount only, not on every render',
   mappable.includes('useState(() => Boolean(autoOpenPicker))'),
   'reacting to the prop would reopen a picker the operator had closed');
+
+console.log('\n--- moving an instrument point ---');
+
+
+// The registry says where an instrument sits on the *drawing*. A particular
+// machine may have its probe somewhere else, and a pad in the wrong place is
+// a pad nobody trusts — so a pad can be moved, and the move belongs to the
+// machine rather than to the template.
+ok('a moved pad is stored in the machine layout, not the template registry',
+  board.includes('connectorOverrides?: Record<string, Anchor>;'),
+  'moving one on this conditioner must not move it on every conditioner');
+ok('positions are fractions of the machine rect, like every other anchor',
+  board.includes('const rx = (to.x - machineRect.x) / machineRect.width;')
+  && board.includes('const ry = (to.y - machineRect.y) / machineRect.height;'),
+  'so a moved pad survives zoom, stage scale and screen size');
+ok('a pad cannot be dragged off the machine',
+  board.includes('rx: Math.min(1, Math.max(0, rx)), ry: Math.min(1, Math.max(0, ry))'),
+  'the artwork is the only thing that gives the position meaning');
+
+// Applied once, at the source, so everything downstream agrees.
+ok('the override replaces the connector before anything reads it',
+  board.includes('return moved ? { ...connector, rx: moved.rx, ry: moved.ry } : connector;'),
+  'applying it in the renderer alone would draw a pad where trails do not snap');
+
+// Persisted, and shared, the same way the rest of the layout is.
+ok('moved pads are written into every saved layout',
+  board.includes('{ connectorOverrides: connectorOverridesRef.current }'));
+ok('and omitted entirely when nothing has moved',
+  board.includes('Object.keys(connectorOverridesRef.current).length > 0'),
+  'an untouched machine saves the layout it always did');
+ok('another user\u2019s move arrives with their layout',
+  board.includes('setConnectorOverrides(incoming.connectorOverrides ?? {});'));
+ok('applying a template adopts the template\u2019s moved pads',
+  board.includes('setConnectorOverrides(layout.connectorOverrides ?? {});'));
+
+// Saving on every frame of a drag would write hundreds of layouts for one
+// decision, so the move is live and the persist is on release.
+ok('the layout is persisted on release, not on every frame',
+  board.includes('if (options.commit) persistLayout('));
+
+// Reset deletes the entry rather than writing the registry position into it,
+// so the pad goes on tracking the template.
+ok('reset removes the override rather than freezing today\u2019s position',
+  board.includes('delete next[code];'),
+  'a later correction to the drawing should still move the pad');
+ok('there is a reset for one pad and a reset for all',
+  board.includes('const resetConnector =') && board.includes('const resetAllConnectors ='));
+
+console.log('\n--- tap and drag are not the same gesture ---');
+
+// Tapping maps and wants a large forgiving target; dragging relocates an
+// instrument and must be impossible to do by accident while aiming for a tap.
+ok('moving is a mode rather than a gesture on the same element',
+  board.includes('const [movingPads, setMovingPads] = useState(false);')
+  && pad.includes('if (moving) {'));
+ok('the toolbar can turn it on and off', board.includes('Move Points'));
+ok('a pad is a press target out of the mode and a drag handle in it',
+  pad.includes('<Pressable') && pad.includes('{...pan.panHandlers}'));
+ok('the responder is created once, not per render',
+  pad.includes('const pan = useRef(') && pad.includes(').current;'),
+  'rebuilding it mid-gesture swaps the handlers under a live touch and stalls the drag');
+ok('it reads position, scale and callbacks through refs',
+  pad.includes('atRef.current = at;') && pad.includes('scaleRef.current = stageScale;'));
+ok('gesture pixels are converted to stage units',
+  pad.includes('gesture.dx / s') && pad.includes('gesture.dy / s'),
+  'deltas arrive in screen pixels; pad coordinates live under a scale transform');
+ok('a release that barely travelled is a tap, not a drag',
+  pad.includes('if (travelled < TAP_SLOP)'));
+ok('and two of them on a moved pad put it back',
+  pad.includes('now - lastTap.current < DOUBLE_TAP_MS') && pad.includes('onResetRef.current();'),
+  'a single tap would undo a careful placement by accident');
 
 console.log(failures === 0 ? '\nconnector mapping: all checks passed' : `\nconnector mapping: ${failures} check(s) failed`);
 if (failures > 0) process.exit(1);
