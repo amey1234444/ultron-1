@@ -4,6 +4,11 @@ import {
   type ConditionerComponent,
 } from './machinePoints/conditionerPoints';
 import {
+  COLLET_COOLER_COMPONENT_ORDER,
+  colletCoolerPointsForComponent,
+  type ColletCoolerComponent,
+} from './machinePoints/colletCoolerPoints';
+import {
   CRACKING_MILL_COMPONENT_ORDER,
   crackingMillPointsForComponent,
   type CrackingMillComponent,
@@ -13,12 +18,27 @@ import {
   expanderPointsForComponent,
   type ExpanderComponent,
 } from './machinePoints/expanderPoints';
+import {
+  DTDC_COMPONENT_ORDER,
+  dtdcPointsForComponent,
+  type DtdcComponent,
+} from './machinePoints/dtdcPoints';
 import { EXTRUDER_POINT_REGISTRY } from './machinePoints/extruderPoints';
 import {
   FLAKING_MILL_COMPONENT_ORDER,
   flakingMillPointsForComponent,
   type FlakingMillComponent,
 } from './machinePoints/flakingMillPoints';
+import {
+  SEED_DRYER_COOLER_COMPONENT_ORDER,
+  seedDryerCoolerPointsForComponent,
+  type SeedDryerCoolerComponent,
+} from './machinePoints/seedDryerCoolerPoints';
+import {
+  SOLVENT_EXTRACTOR_COMPONENT_ORDER,
+  solventExtractorPointsForComponent,
+  type SolventExtractorComponent,
+} from './machinePoints/solventExtractorPoints';
 import {
   TWIN_SCREW_COMPONENT_ORDER,
   twinScrewPointsForComponent,
@@ -40,6 +60,14 @@ export const MACHINE_TEMPLATES = [
   'Flaking Mill M-102',
   'Cracking Mill M-101',
   'Conditioner E-102',
+  // The oilseed set from the four-machine template archive. Named as the
+  // archive names them: these arrived without the asset tags the four above
+  // carry, and inventing an "M-103" would put a plant tag on a machine
+  // nobody has tagged.
+  'DTDC',
+  'Solvent Extractor',
+  'Collet Cooler',
+  'Seed Dryer Cooler',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -50,7 +78,25 @@ export type ComponentType = (typeof COMPONENT_TYPES)[number];
 // 'Flow' is the gravimetric-feeder quantity (kg/h): a twin screw meters its
 // material by rate, so a feed-rate point is neither a level nor a speed and
 // must not be locked to a channel reporting either.
-export type MeasurementPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Power' | 'Level' | 'Flow';
+//
+// The last four arrived with the oilseed machines and are here for the same
+// reason 'Flow' is: each is a quantity the existing kinds cannot stand in for
+// without lying to the channel matcher about what the pad expects.
+//
+//   Moisture  product moisture, in per cent. Not 'Level' — a per-cent reading
+//             of how wet meal is has nothing to do with how full a hopper is,
+//             and a matcher that treats them alike would offer a hopper float
+//             as a moisture probe.
+//   Gas       gas concentration, in ppm. The seed dryer's CO detector is a
+//             safety instrument; nothing else in the set reads ppm.
+//   Leak      a discrete wet/dry or passing/holding state — the extractor's
+//             pump seal leaks and the seed dryer's steam trap monitor. No
+//             engineering unit, so it must never be matched on one.
+//   Position  linear travel in mm, for the extractor's chain take-up. It is a
+//             distance, not a level and not a speed.
+export type MeasurementPointKind =
+  | 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Power' | 'Level' | 'Flow'
+  | 'Moisture' | 'Gas' | 'Leak' | 'Position';
 
 // Point lifecycle per spec Flow 5 — starts Not Configured, ends at a live-view
 // state once mapped, commissioned, and streaming.
@@ -145,6 +191,40 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
     { type: 'Custom Component', label: 'Decks' },
     { type: 'Custom Component', label: 'Steam' },
     { type: 'Custom Component', label: 'Vapour' },
+    { type: 'Custom Component', label: 'Discharge' },
+  ],
+  // Grouped by process stage rather than by hardware. Two fans on the DTDC
+  // are the same kind of machine, but a hot-air fan failing and a cooling fan
+  // failing say different things about the meal leaving the bottom, so they
+  // are not one "Fans" component.
+  DTDC: [
+    { type: 'Motor', label: 'Drive' },
+    { type: 'Custom Component', label: 'Trays' },
+    { type: 'Custom Component', label: 'Steam' },
+    { type: 'Fan', label: 'Drying' },
+    { type: 'Fan', label: 'Cooling' },
+    { type: 'Fan', label: 'Vapour' },
+    { type: 'Custom Component', label: 'Discharge' },
+  ],
+  // Five hoppers and five pumps stay one component each. Which stage leaked
+  // is the whole diagnostic value, and the point codes carry the stage.
+  'Solvent Extractor': [
+    { type: 'Motor', label: 'Drive' },
+    { type: 'Custom Component', label: 'Chain' },
+    { type: 'Custom Component', label: 'Hoppers' },
+    { type: 'Pump', label: 'Pumps' },
+    { type: 'Custom Component', label: 'Discharge' },
+  ],
+  'Collet Cooler': [
+    { type: 'Fan', label: 'Cooling' },
+    { type: 'Fan', label: 'Exhaust' },
+    { type: 'Custom Component', label: 'Discharge' },
+  ],
+  'Seed Dryer Cooler': [
+    { type: 'Fan', label: 'Heating' },
+    { type: 'Fan', label: 'Cooling' },
+    { type: 'Fan', label: 'Exhaust' },
+    { type: 'Custom Component', label: 'Steam' },
     { type: 'Custom Component', label: 'Discharge' },
   ],
   'Custom Machine': [],
@@ -324,6 +404,62 @@ const CONDITIONER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = CONDITIONER_COMP
   points: conditionerPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
 }));
 
+// The oilseed four. Unlike every registry above, these point sets were
+// supplied with the templates rather than written during integration, so the
+// labels below are the vendor's own and the component grouping is the only
+// editorial decision in them.
+const DTDC_COMPONENT_TYPES: Record<DtdcComponent, ComponentType> = {
+  Drive: 'Motor',
+  Trays: 'Custom Component',
+  Steam: 'Custom Component',
+  Drying: 'Fan',
+  Cooling: 'Fan',
+  Vapour: 'Fan',
+  Discharge: 'Custom Component',
+};
+const DTDC_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = DTDC_COMPONENT_ORDER.map((component) => ({
+  type: DTDC_COMPONENT_TYPES[component],
+  label: component,
+  points: dtdcPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+const SOLVENT_EXTRACTOR_COMPONENT_TYPES: Record<SolventExtractorComponent, ComponentType> = {
+  Drive: 'Motor',
+  Chain: 'Custom Component',
+  Hoppers: 'Custom Component',
+  Pumps: 'Pump',
+  Discharge: 'Custom Component',
+};
+const SOLVENT_EXTRACTOR_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = SOLVENT_EXTRACTOR_COMPONENT_ORDER.map((component) => ({
+  type: SOLVENT_EXTRACTOR_COMPONENT_TYPES[component],
+  label: component,
+  points: solventExtractorPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+const COLLET_COOLER_COMPONENT_TYPES: Record<ColletCoolerComponent, ComponentType> = {
+  Cooling: 'Fan',
+  Exhaust: 'Fan',
+  Discharge: 'Custom Component',
+};
+const COLLET_COOLER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = COLLET_COOLER_COMPONENT_ORDER.map((component) => ({
+  type: COLLET_COOLER_COMPONENT_TYPES[component],
+  label: component,
+  points: colletCoolerPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+const SEED_DRYER_COOLER_COMPONENT_TYPES: Record<SeedDryerCoolerComponent, ComponentType> = {
+  Heating: 'Fan',
+  Cooling: 'Fan',
+  Exhaust: 'Fan',
+  Steam: 'Custom Component',
+  Discharge: 'Custom Component',
+};
+const SEED_DRYER_COOLER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = SEED_DRYER_COOLER_COMPONENT_ORDER.map((component) => ({
+  type: SEED_DRYER_COOLER_COMPONENT_TYPES[component],
+  label: component,
+  points: seedDryerCoolerPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.
 const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
@@ -334,6 +470,10 @@ const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[
   'Flaking Mill M-102': FLAKING_MILL_ANALYSIS_COMPONENTS,
   'Cracking Mill M-101': CRACKING_MILL_ANALYSIS_COMPONENTS,
   'Conditioner E-102': CONDITIONER_ANALYSIS_COMPONENTS,
+  DTDC: DTDC_ANALYSIS_COMPONENTS,
+  'Solvent Extractor': SOLVENT_EXTRACTOR_ANALYSIS_COMPONENTS,
+  'Collet Cooler': COLLET_COOLER_ANALYSIS_COMPONENTS,
+  'Seed Dryer Cooler': SEED_DRYER_COOLER_ANALYSIS_COMPONENTS,
 };
 
 /**

@@ -2,6 +2,10 @@ import { EXPANDER_POINT_REGISTRY } from '../../../lib/machinePoints/expanderPoin
 import { CONDITIONER_POINT_REGISTRY } from '../../../lib/machinePoints/conditionerPoints';
 import { CRACKING_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/crackingMillPoints';
 import { FLAKING_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/flakingMillPoints';
+import { COLLET_COOLER_POINT_REGISTRY } from '../../../lib/machinePoints/colletCoolerPoints';
+import { DTDC_POINT_REGISTRY } from '../../../lib/machinePoints/dtdcPoints';
+import { SEED_DRYER_COOLER_POINT_REGISTRY } from '../../../lib/machinePoints/seedDryerCoolerPoints';
+import { SOLVENT_EXTRACTOR_POINT_REGISTRY } from '../../../lib/machinePoints/solventExtractorPoints';
 import type { ChannelRef } from '../../../lib/rack';
 import {
   normalizeTwinScrewPointCode,
@@ -142,6 +146,13 @@ const EXPANDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXPANDER_
 const FLAKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(FLAKING_MILL_POINT_REGISTRY);
 const CRACKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CRACKING_MILL_POINT_REGISTRY);
 const CONDITIONER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CONDITIONER_POINT_REGISTRY);
+// The oilseed four. `side` comes from the supplied x against the drawing's
+// midline, so drive-side pads stack left and process-side pads stack right
+// without a trail crossing the machine to reach its card.
+const DTDC_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(DTDC_POINT_REGISTRY);
+const SOLVENT_EXTRACTOR_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SOLVENT_EXTRACTOR_POINT_REGISTRY);
+const COLLET_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(COLLET_COOLER_POINT_REGISTRY);
+const SEED_DRYER_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SEED_DRYER_COOLER_POINT_REGISTRY);
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
@@ -151,6 +162,10 @@ const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Flaking Mill M-102': FLAKING_MILL_TEMPLATE_POINTS,
   'Cracking Mill M-101': CRACKING_MILL_TEMPLATE_POINTS,
   'Conditioner E-102': CONDITIONER_TEMPLATE_POINTS,
+  DTDC: DTDC_TEMPLATE_POINTS,
+  'Solvent Extractor': SOLVENT_EXTRACTOR_TEMPLATE_POINTS,
+  'Collet Cooler': COLLET_COOLER_TEMPLATE_POINTS,
+  'Seed Dryer Cooler': SEED_DRYER_COOLER_TEMPLATE_POINTS,
 };
 
 function makeId(prefix: string) {

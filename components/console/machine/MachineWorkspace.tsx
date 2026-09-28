@@ -31,12 +31,16 @@ import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { TwinScrewDiagnosisView } from './TwinScrewDiagnosisView';
+import { ColletCooler } from './artwork/ColletCooler';
 import { Conditioner } from './artwork/Conditioner';
 import { CrackingMill } from './artwork/CrackingMill';
+import { DTDC } from './artwork/DTDC';
 import { Expander } from './artwork/Expander';
 import { FlakingMill } from './artwork/FlakingMill';
 import { RotaryAirlockValve } from './artwork/RotaryAirlockValve';
+import { SeedDryerCooler } from './artwork/SeedDryerCooler';
 import { SingleScrewExtruder } from './artwork/SingleScrewExtruder';
+import { SolventExtractor } from './artwork/SolventExtractor';
 import { TwinScrewExtruder } from './artwork/TwinScrewExtruder';
 import {
   mergeProjectedConnectorPositions,
@@ -89,6 +93,10 @@ const ARTWORK_TEMPLATES = new Set<string>([
   'Flaking Mill M-102',
   'Cracking Mill M-101',
   'Conditioner E-102',
+  'DTDC',
+  'Solvent Extractor',
+  'Collet Cooler',
+  'Seed Dryer Cooler',
 ]);
 
 /**
@@ -561,6 +569,18 @@ export function MachineWorkspace({
                 <CrackingMill showBackground={false} showGrid={false} />
               ) : machine.template === 'Conditioner E-102' ? (
                 <Conditioner showBackground={false} showGrid={false} />
+              ) : machine.template === 'DTDC' ? (
+                // These four ship pads inside the drawing, so `showSensors`
+                // stays off: the canvas is the only thing that renders pads,
+                // and a second overlay would draw every point twice and fire
+                // two selection events for one tap.
+                <DTDC showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Solvent Extractor' ? (
+                <SolventExtractor showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Collet Cooler' ? (
+                <ColletCooler showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Seed Dryer Cooler' ? (
+                <SeedDryerCooler showBackground={false} showGrid={false} showSensors={false} />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}

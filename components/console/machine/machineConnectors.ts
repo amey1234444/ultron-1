@@ -12,6 +12,11 @@
 // instruments the current model does not read, and they say so.
 
 import {
+  COLLET_COOLER_ARTWORK_HEIGHT,
+  COLLET_COOLER_ARTWORK_WIDTH,
+  COLLET_COOLER_POINT_REGISTRY,
+} from '../../../lib/machinePoints/colletCoolerPoints';
+import {
   CONDITIONER_ARTWORK_HEIGHT,
   CONDITIONER_ARTWORK_WIDTH,
   CONDITIONER_POINT_REGISTRY,
@@ -26,12 +31,27 @@ import {
   EXPANDER_ARTWORK_WIDTH,
   EXPANDER_POINT_REGISTRY,
 } from '../../../lib/machinePoints/expanderPoints';
+import {
+  DTDC_ARTWORK_HEIGHT,
+  DTDC_ARTWORK_WIDTH,
+  DTDC_POINT_REGISTRY,
+} from '../../../lib/machinePoints/dtdcPoints';
 import { EXTRUDER_POINT_REGISTRY } from '../../../lib/machinePoints/extruderPoints';
 import {
   FLAKING_MILL_ARTWORK_HEIGHT,
   FLAKING_MILL_ARTWORK_WIDTH,
   FLAKING_MILL_POINT_REGISTRY,
 } from '../../../lib/machinePoints/flakingMillPoints';
+import {
+  SEED_DRYER_COOLER_ARTWORK_HEIGHT,
+  SEED_DRYER_COOLER_ARTWORK_WIDTH,
+  SEED_DRYER_COOLER_POINT_REGISTRY,
+} from '../../../lib/machinePoints/seedDryerCoolerPoints';
+import {
+  SOLVENT_EXTRACTOR_ARTWORK_HEIGHT,
+  SOLVENT_EXTRACTOR_ARTWORK_WIDTH,
+  SOLVENT_EXTRACTOR_POINT_REGISTRY,
+} from '../../../lib/machinePoints/solventExtractorPoints';
 import {
   TWIN_SCREW_ARTWORK_HEIGHT,
   TWIN_SCREW_ARTWORK_WIDTH,
@@ -55,6 +75,13 @@ export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {
   'Flaking Mill M-102': { width: FLAKING_MILL_ARTWORK_WIDTH, height: FLAKING_MILL_ARTWORK_HEIGHT },
   'Cracking Mill M-101': { width: CRACKING_MILL_ARTWORK_WIDTH, height: CRACKING_MILL_ARTWORK_HEIGHT },
   'Conditioner E-102': { width: CONDITIONER_ARTWORK_WIDTH, height: CONDITIONER_ARTWORK_HEIGHT },
+  DTDC: { width: DTDC_ARTWORK_WIDTH, height: DTDC_ARTWORK_HEIGHT },
+  // The one wide machine in the oilseed set — a chain extractor is long and
+  // low, and the archive draws it on 1200x850 rather than the 1200x1000 the
+  // other three share.
+  'Solvent Extractor': { width: SOLVENT_EXTRACTOR_ARTWORK_WIDTH, height: SOLVENT_EXTRACTOR_ARTWORK_HEIGHT },
+  'Collet Cooler': { width: COLLET_COOLER_ARTWORK_WIDTH, height: COLLET_COOLER_ARTWORK_HEIGHT },
+  'Seed Dryer Cooler': { width: SEED_DRYER_COOLER_ARTWORK_WIDTH, height: SEED_DRYER_COOLER_ARTWORK_HEIGHT },
 };
 
 const DEFAULT_ARTWORK = { width: 1200, height: 760 };
@@ -169,6 +196,27 @@ const CRACKING_MILL_CONNECTOR_LIST: MachineConnector[] = CRACKING_MILL_POINT_REG
 const CONDITIONER_CONNECTOR_LIST: MachineConnector[] = CONDITIONER_POINT_REGISTRY.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Conditioner E-102']),
 );
+/**
+ * The oilseed four, derived from their registries.
+ *
+ * These are the first templates in the set whose pad positions were *supplied*
+ * rather than written during integration — each archive ships a
+ * `connections.json` and the registries are that file. No `analyzerTag` is
+ * carried, for the same reason the expander carries none: every pad is a real
+ * instrument, and no commissioned model reads any of them yet.
+ */
+const DTDC_CONNECTOR_LIST: MachineConnector[] = DTDC_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['DTDC']),
+);
+const SOLVENT_EXTRACTOR_CONNECTOR_LIST: MachineConnector[] = SOLVENT_EXTRACTOR_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Solvent Extractor']),
+);
+const COLLET_COOLER_CONNECTOR_LIST: MachineConnector[] = COLLET_COOLER_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Collet Cooler']),
+);
+const SEED_DRYER_COOLER_CONNECTOR_LIST: MachineConnector[] = SEED_DRYER_COOLER_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Seed Dryer Cooler']),
+);
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
 );
@@ -181,6 +229,10 @@ const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Flaking Mill M-102': FLAKING_MILL_CONNECTOR_LIST,
   'Cracking Mill M-101': CRACKING_MILL_CONNECTOR_LIST,
   'Conditioner E-102': CONDITIONER_CONNECTOR_LIST,
+  DTDC: DTDC_CONNECTOR_LIST,
+  'Solvent Extractor': SOLVENT_EXTRACTOR_CONNECTOR_LIST,
+  'Collet Cooler': COLLET_COOLER_CONNECTOR_LIST,
+  'Seed Dryer Cooler': SEED_DRYER_COOLER_CONNECTOR_LIST,
 };
 
 export function connectorsForTemplate(machineTemplate: string): MachineConnector[] {
@@ -208,7 +260,11 @@ export type ConnectorState = 'idle' | 'linked' | 'live';
  * value in it — it is not a connection at all, and the canvas refuses it rather
  * than letting the analysis layer discover the contradiction later.
  */
-export type ParameterKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Electrical' | 'Level' | 'Flow';
+export type ParameterKind =
+  | 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Electrical' | 'Level' | 'Flow'
+  // Both arrived with the oilseed machines and both have a unit nothing else
+  // in the set uses, so neither can be confused with anything above.
+  | 'Gas' | 'Position';
 
 /**
  * The quantity a unit denotes.
@@ -231,6 +287,13 @@ export function parameterKindForUnit(unit: string | undefined | null): Parameter
   // Gravimetric feeder throughput. Tested after '%' so a rate expressed as a
   // percentage of setpoint still reads as a level, which is what it is.
   if (['kg/h', 'kg/hr', 'kgh', 'kg/min', 'g/min', 'lb/h', 'lb/hr', 't/h', 'kg/s'].includes(value)) return 'Flow';
+  // Gas concentration, for the seed dryer's CO detector. Tested after the
+  // electrical list so a bare 'ppm' cannot be read as anything else.
+  if (['ppm', 'ppmv', 'vol%', '%lel'].includes(value)) return 'Gas';
+  // Linear travel, for the extractor's chain take-up. Not a level: a take-up
+  // that has run out of adjustment is measured in millimetres of remaining
+  // travel, not in per cent of anything.
+  if (['mm', 'cm', 'm', 'in', 'inch', 'thou', 'mil'].includes(value)) return 'Position';
   return null;
 }
 
@@ -254,6 +317,21 @@ export function parameterKindForConnector(connector: MachineConnector): Paramete
       return 'Level';
     case 'Flow':
       return 'Flow';
+    case 'Gas':
+      return 'Gas';
+    case 'Position':
+      return 'Position';
+    // 'Moisture' and 'Leak' fall through deliberately.
+    //
+    // A moisture probe reports per cent and so does a hopper level, so the
+    // unit — which this module's own comment calls the only trustworthy
+    // declaration of what a channel carries — cannot tell them apart. A seal
+    // leak or a steam trap monitor reports no engineering unit at all.
+    //
+    // Returning null makes the fit 'unknown', which is permissive by design
+    // and is the honest answer: the canvas does not know. Claiming 'match'
+    // would let a hopper float bind to a moisture pad with a tick beside it,
+    // and claiming 'mismatch' would refuse the correct channel.
     default:
       return null;
   }
@@ -294,6 +372,10 @@ export function connectorExpectation(connector: MachineConnector): string {
       return 'a level channel (%)';
     case 'Flow':
       return 'a feed-rate channel (kg/h)';
+    case 'Gas':
+      return 'a gas-concentration channel (ppm)';
+    case 'Position':
+      return 'a position channel (mm)';
     default:
       return 'a matching channel';
   }
