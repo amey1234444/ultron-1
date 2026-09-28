@@ -26,6 +26,7 @@ import { AdvancedDiagnosisPage, type SignalContext } from './AdvancedDiagnosisPa
 import { MachineDiagnosisPage } from './MachineDiagnosisPage';
 import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineProDiagnosisPage } from './MachineProDiagnosisPage';
+import { PrognosisAdvancedPage } from './PrognosisAdvancedPage';
 import type { AnalysisDepth } from './analysis/AnalysisTabs';
 import type { MachinePrognosticsResult } from './analysis/prognosticsModel';
 import type { TrainNode } from './analysis/TrainHealth';
@@ -202,7 +203,7 @@ function MachinePicker({
 export function AnalysisWorkspace({
   machines,
   initialMachineId,
-  initialDepth = 'overview',
+  initialDepth = 'diagnosis-overview',
   initialView,
   dataFor,
   overviewFor,
@@ -212,7 +213,7 @@ export function AnalysisWorkspace({
 }: AnalysisWorkspaceProps) {
   const [machineId, setMachineId] = useState(initialMachineId ?? machines[0]?.id ?? '');
   const [depth, setDepth] = useState<AnalysisDepth>(initialDepth);
-  const [view, setView] = useState<WorkspaceView>(initialView ?? 'overview');
+  const [view, setView] = useState<WorkspaceView>(initialView ?? 'diagnosis-overview');
   const [pickerOpen, setPickerOpen] = useState(false);
   const [receipt, setReceipt] = useState<string | null>(null);
 
@@ -320,13 +321,13 @@ export function AnalysisWorkspace({
       if (target) setSelectedSignalId(target);
       setReceipt(`Diagnosis focused on ${issue.componentLabel} · ${issue.title}.`);
     }
-    goTo('diagnosis');
+    goTo('prognosis-overview');
   };
 
   const openAdvancedFor = (label: string) => {
     const target = signalIdFor(label);
     if (target) setSelectedSignalId(target);
-    goTo('advanced');
+    goTo('diagnosis-advanced');
     setReceipt(`Workbench opened at ${label}.`);
   };
 
@@ -403,7 +404,7 @@ export function AnalysisWorkspace({
               return;
             }
             setSelectedSignalId(found.node.id);
-            goTo('advanced');
+            goTo('diagnosis-advanced');
             setReceipt(
               `Workbench opened at ${found.componentLabel ? `${found.componentLabel} · ` : ''}${found.node.name}.`,
             );
@@ -412,7 +413,7 @@ export function AnalysisWorkspace({
         />
       ) : null}
 
-      {view === 'overview' ? (
+      {view === 'diagnosis-overview' ? (
         <MachineDiagnosisPage
           machineName={machine.name}
           template={machine.template}
@@ -429,7 +430,7 @@ export function AnalysisWorkspace({
         />
       ) : null}
 
-      {view === 'diagnosis' ? (
+      {view === 'prognosis-overview' ? (
         <MachineProDiagnosisPage
           machineName={machine.name}
           template={machine.template}
@@ -467,7 +468,21 @@ export function AnalysisWorkspace({
         />
       ) : null}
 
-      {view === 'advanced' ? (
+      {view === 'prognosis-advanced' ? (
+        <PrognosisAdvancedPage
+          machineName={machine.name}
+          template={machine.template}
+          hierarchyPath={machine.hierarchyPath}
+          feed={ageSeconds > 30 ? 'delayed' : 'live'}
+          ageSeconds={ageSeconds}
+          prognostics={data.prognostics}
+          onSelectDepth={goTo}
+          tabsTrailing={toMachineOverview.trailing}
+          {...headerWiring}
+        />
+      ) : null}
+
+      {view === 'diagnosis-advanced' ? (
         <AdvancedDiagnosisPage
           machineName={machine.name}
           template={machine.template}

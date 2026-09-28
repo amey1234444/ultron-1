@@ -1093,7 +1093,7 @@ export function AdvancedDiagnosisPage({
         </View>
       </View>
 
-      <AnalysisTabs active="advanced" onSelect={onSelectDepth} trailing={tabsTrailing} />
+      <AnalysisTabs active="diagnosis-advanced" onSelect={onSelectDepth} trailing={tabsTrailing} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View className="flex-row gap-1.5">

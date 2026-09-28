@@ -753,13 +753,13 @@ export function MachineDiagnosisPage({
         onRefresh={onRefresh}
       />
 
-      <AnalysisTabs active="overview" onSelect={onSelectDepth} trailing={tabsTrailing} />
+      <AnalysisTabs active="diagnosis-overview" onSelect={onSelectDepth} trailing={tabsTrailing} />
 
       {model.problems.length === 0 ? (
         <HealthyState
           data={data}
           isPredictiveSseDemo={isPredictiveSseDemo}
-          onOpenPrognosis={onSelectDepth ? () => onSelectDepth('diagnosis') : undefined}
+          onOpenPrognosis={onSelectDepth ? () => onSelectDepth('prognosis-overview') : undefined}
         />
       ) : (
         <View className="flex-row flex-wrap items-start gap-4">

@@ -164,7 +164,7 @@ export function MachineProDiagnosisPage({
         onRefresh={onRefresh}
       />
 
-      <AnalysisTabs active="diagnosis" onSelect={onSelectDepth} trailing={tabsTrailing} />
+      <AnalysisTabs active="prognosis-overview" onSelect={onSelectDepth} trailing={tabsTrailing} />
 
       {loading ? (
         <PrognosisLoadingState />
