@@ -30,6 +30,7 @@ import {
   type PredictionStatus,
 } from './analysis/prognosticsModel';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
+import { HealthRulSection, type RulComponentOption } from './prognosis/HealthRulSection';
 import { useMlPrognosis } from './ml/useMlPrognosis';
 import { dominantHorizon, type MlPrognosisFault } from '../../../lib/knowledge/ml/contract';
 import type { ReactNode } from 'react';
@@ -38,6 +39,15 @@ type Props = {
   /** Needed to ask the ML service about this machine; the name is for the reader. */
   machineId: string;
   machineName: string;
+  /**
+   * Components this machine has a health model for.
+   *
+   * Passed in rather than derived: the machine tree knows its components, and
+   * which of them the service can answer about is the host's business, not
+   * this page's. An empty list hides the section rather than showing an empty
+   * selector.
+   */
+  rulComponents?: readonly RulComponentOption[];
   template: string;
   hierarchyPath?: string;
   feed: FeedStatus;
@@ -128,6 +138,7 @@ function Panel({ title, caption, children }: { title: string; caption?: string; 
 export function PrognosisAdvancedPage({
   machineId,
   machineName,
+  rulComponents = [],
   template,
   hierarchyPath,
   feed,
@@ -245,6 +256,15 @@ export function PrognosisAdvancedPage({
           })}
         </View>
       </View>
+
+      {rulComponents.length > 0 ? (
+        <Panel
+          title="COMPONENT HEALTH AND REMAINING LIFE"
+          caption="Per component, from the health model. The index and every projection below come from the service; nothing on this page is computed in the browser."
+        >
+          <HealthRulSection machineId={machineId} components={rulComponents} />
+        </Panel>
+      ) : null}
 
       <Panel
         title="MODEL"

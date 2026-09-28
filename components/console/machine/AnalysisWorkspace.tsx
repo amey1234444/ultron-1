@@ -27,6 +27,7 @@ import { MachineDiagnosisPage } from './MachineDiagnosisPage';
 import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineProDiagnosisPage } from './MachineProDiagnosisPage';
 import { PrognosisAdvancedPage } from './PrognosisAdvancedPage';
+import { RUL_FIXTURE_COMPONENTS } from '../../../lib/knowledge/ml/rulFixtures';
 import type { AnalysisDepth } from './analysis/AnalysisTabs';
 import type { MachinePrognosticsResult } from './analysis/prognosticsModel';
 import type { TrainNode } from './analysis/TrainHealth';
@@ -471,6 +472,18 @@ export function AnalysisWorkspace({
       {view === 'prognosis-advanced' ? (
         <PrognosisAdvancedPage
           machineId={machine.id}
+          /*
+           * Which components the health model can answer about.
+           *
+           * Empty in production, deliberately. There is no component registry
+           * yet — no component_type, no installed_at, no end-of-life
+           * definition — so there is nothing truthful to offer, and the section
+           * hides rather than presenting a selector that resolves to nothing.
+           * With ULTRON_RUL_FIXTURES on, the fixture set is offered so the
+           * section can be built and reviewed. When a registry exists, this is
+           * the one line that changes.
+           */
+          rulComponents={process.env.ULTRON_RUL_FIXTURES === '1' ? RUL_FIXTURE_COMPONENTS : []}
           machineName={machine.name}
           template={machine.template}
           hierarchyPath={machine.hierarchyPath}
