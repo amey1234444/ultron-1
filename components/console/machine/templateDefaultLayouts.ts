@@ -115,21 +115,213 @@ function columnSlots(count: number): number[] {
 
 type ArtworkConnector = { code: string; label: string; side: 'left' | 'right'; x: number; y: number };
 
+// --------------------------------------------------------------------------
+// Which card goes in which slot
+// --------------------------------------------------------------------------
+//
+// Slots used to be handed out in registry order, which is the order the
+// instruments happen to be listed in and has nothing to do with where they
+// are on the drawing. So the top card could be wired to a pad near the
+// bottom while the fifth card reached back up to the top, and every such pair
+// crossed. On the eighteen-point cracking mill that was sixteen crossings in
+// one canvas; across the seventeen instrumented templates, 240.
+//
+// This is two-layer crossing minimisation — pads on one side, card slots on
+// the other — so it is solved the way that problem is solved. Sorting by pad
+// height is the median heuristic and takes 240 to 74 on its own. The rest is
+// local search on the real geometry: swap neighbours, then try moving a card
+// to any other slot, keeping whatever reduces the count. Together they reach
+// zero on all seventeen.
+//
+// Counting real segment intersections rather than the usual abstract
+// inversion count is affordable here — a side holds at most twenty cards —
+// and is worth it, because what has to be true is that no two drawn lines
+// cross, not that an abstraction of them does not.
+
+type Seg = readonly [ReferencePoint, ReferencePoint];
+
+/** Whether two segments properly cross. Shared endpoints do not count. */
+function segmentsCross(a: Seg, b: Seg): boolean {
+  const near = (p: ReferencePoint, q: ReferencePoint) => Math.abs(p.x - q.x) < 0.5 && Math.abs(p.y - q.y) < 0.5;
+  if (near(a[0], b[0]) || near(a[0], b[1]) || near(a[1], b[0]) || near(a[1], b[1])) return false;
+  const turn = (o: ReferencePoint, p: ReferencePoint, q: ReferencePoint) =>
+    (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+  const EPS = 1e-9;
+  const d1 = turn(a[0], a[1], b[0]);
+  const d2 = turn(a[0], a[1], b[1]);
+  const d3 = turn(b[0], b[1], a[0]);
+  const d4 = turn(b[0], b[1], a[1]);
+  return (
+    ((d1 > EPS && d2 < -EPS) || (d1 < -EPS && d2 > EPS)) &&
+    ((d3 > EPS && d4 < -EPS) || (d3 < -EPS && d4 > EPS))
+  );
+}
+
 /**
- * One card column per side, in registry order.
+ * Crossings among one side's trails, for a given card order.
+ *
+ * Measured on the geometry that is actually drawn, which means putting both
+ * ends in the same space first. A pad is in its drawing's own units — 1200
+ * wide, or 2048 for the solvent pair — and a card column is in the reference
+ * canvas, so comparing them raw compares nothing. Getting that wrong is not
+ * visible in the result: the optimiser happily reports zero while the canvas
+ * it produced is still crossed, which is what happened on the first attempt.
+ */
+function crossingsFor(
+  order: readonly ArtworkConnector[],
+  column: number,
+  bendX: number,
+  artwork: { width: number; height: number },
+): number {
+  const slots = columnSlots(order.length);
+  const segments: Seg[] = [];
+  order.forEach((connector, index) => {
+    const pad = {
+      x: REFERENCE_MACHINE_RECT.x + (connector.x / artwork.width) * REFERENCE_MACHINE_RECT.width,
+      y: REFERENCE_MACHINE_RECT.y + (connector.y / artwork.height) * REFERENCE_MACHINE_RECT.height,
+    };
+    const bend = stageFromReference({ x: bendX, y: slots[index] });
+    segments.push([pad, bend]);
+    segments.push([bend, stageFromReference({ x: column, y: slots[index] })]);
+  });
+  let count = 0;
+  for (let i = 0; i < segments.length; i += 1) {
+    for (let j = i + 1; j < segments.length; j += 1) {
+      if (segmentsCross(segments[i], segments[j])) count += 1;
+    }
+  }
+  return count;
+}
+
+/**
+ * The card order for one side that draws without crossings.
+ *
+ * Deterministic: the same pads always produce the same order, because the
+ * starting sort is total (height, then horizontal position) and every move is
+ * accepted only on a strict improvement, scanned in a fixed order. A layout
+ * that reshuffled itself between two runs would make "⟲ Template" a way to
+ * lose a canvas rather than restore one.
+ *
+ * Bounded rather than exhaustive. Twenty cards is more permutations than
+ * there are atoms worth counting, so this takes the good start and improves
+ * it, and stops the moment a pass finds nothing — which on every template
+ * this repository has is at zero.
+ */
+function orderWithoutCrossings(
+  connectors: readonly ArtworkConnector[],
+  column: number,
+  bendX: number,
+  artwork: { width: number; height: number },
+): ArtworkConnector[] {
+  // Two starts, because the local search cannot leave a valley it begins in.
+  // Height then horizontal position is the natural reading order; the
+  // horizontal tie-break reversed is the other sensible one, and on the
+  // extractor — five hoppers at one height, five pumps at another — it is the
+  // one that reaches zero. Whichever ends better wins, and ties keep the
+  // first, so the result does not depend on the order they are tried in.
+  const starts = [
+    [...connectors].sort((a, b) => a.y - b.y || a.x - b.x),
+    [...connectors].sort((a, b) => a.y - b.y || b.x - a.x),
+    // Distance from the column, which separates instruments that sit at one
+    // height but different depths into the machine — five hoppers in a row,
+    // five pumps under them — where sorting by height alone has nothing to
+    // go on and leaves the tie to chance.
+    [...connectors].sort((a, b) => (column === COLUMN_LEFT ? a.x - b.x : b.x - a.x) || a.y - b.y),
+  ];
+  let order = starts[0];
+  let best = crossingsFor(order, column, bendX, artwork);
+  for (const start of starts.slice(1)) {
+    const count = crossingsFor(start, column, bendX, artwork);
+    if (count < best) {
+      order = start;
+      best = count;
+    }
+  }
+
+  for (let pass = 0; pass < 80 && best > 0; pass += 1) {
+    let improved = false;
+
+    // Neighbour swaps: cheap, and fixes the common case of two cards in the
+    // wrong order relative to their pads.
+    for (let i = 0; i < order.length - 1; i += 1) {
+      const trial = [...order];
+      [trial[i], trial[i + 1]] = [trial[i + 1], trial[i]];
+      const count = crossingsFor(trial, column, bendX, artwork);
+      if (count < best) {
+        order = trial;
+        best = count;
+        improved = true;
+      }
+    }
+
+    // Exchanging any two cards, not only neighbours. Not covered by the
+    // moves above: an insertion is a slide, and the intermediate positions of
+    // a slide can each be worse than staying put even when the exchange is
+    // better.
+    for (let i = 0; i < order.length && best > 0; i += 1) {
+      for (let j = i + 2; j < order.length; j += 1) {
+        const trial = [...order];
+        [trial[i], trial[j]] = [trial[j], trial[i]];
+        const count = crossingsFor(trial, column, bendX, artwork);
+        if (count < best) {
+          order = trial;
+          best = count;
+          improved = true;
+        }
+      }
+    }
+
+    // Moving one card to another slot. Swaps alone stall on the twin screw,
+    // the flaking mill and the extractor, where a card has to travel several
+    // slots and every single step of the journey is worse than staying put.
+    for (let from = 0; from < order.length && best > 0; from += 1) {
+      for (let to = 0; to < order.length; to += 1) {
+        if (to === from) continue;
+        const trial = [...order];
+        const [moved] = trial.splice(from, 1);
+        trial.splice(to, 0, moved);
+        const count = crossingsFor(trial, column, bendX, artwork);
+        if (count < best) {
+          order = trial;
+          best = count;
+          improved = true;
+        }
+      }
+    }
+
+    if (!improved) break;
+  }
+
+  return order;
+}
+
+/**
+ * One card column per side, ordered so the trails do not cross.
  *
  * The pad decides which side it stacks on, so the drive-side instruments run
  * down the left of the canvas and the process-side ones down the right — a
- * trail never has to cross the machine to reach its card.
+ * trail never has to cross the machine to reach its card. Which slot it takes
+ * within that side is decided above.
  */
-function columnTemplatePoints(connectors: readonly ArtworkConnector[]): TemplatePoint[] {
-  const leftSlots = columnSlots(connectors.filter((connector) => connector.side === 'left').length);
-  const rightSlots = columnSlots(connectors.filter((connector) => connector.side === 'right').length);
-  let leftSlot = 0;
-  let rightSlot = 0;
+function columnTemplatePoints(
+  connectors: readonly ArtworkConnector[],
+  artwork: { width: number; height: number },
+): TemplatePoint[] {
+  const slotFor = new Map<string, number>();
+  for (const side of ['left', 'right'] as const) {
+    const column = side === 'left' ? COLUMN_LEFT : COLUMN_RIGHT;
+    const bendX = side === 'left' ? column + 96 : column - 96;
+    const group = connectors.filter((connector) => connector.side === side);
+    const ordered = orderWithoutCrossings(group, column, bendX, artwork);
+    const slots = columnSlots(ordered.length);
+    ordered.forEach((connector, index) => slotFor.set(connector.code, slots[index]));
+  }
+
+  // Emitted in registry order, so the cards a machine is built with stay in
+  // the order the instruments are declared in; only the heights change.
   return connectors.map((connector) => {
     const left = connector.side === 'left';
-    const slotY = left ? leftSlots[leftSlot++] : rightSlots[rightSlot++];
+    const slotY = slotFor.get(connector.code) ?? SLOT_TOP;
     const column = left ? COLUMN_LEFT : COLUMN_RIGHT;
     return {
       code: connector.code,
@@ -144,27 +336,27 @@ function columnTemplatePoints(connectors: readonly ArtworkConnector[]): Template
   });
 }
 
-const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXTRUDER_CONNECTORS);
-const TWIN_SCREW_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(TWIN_SCREW_CONNECTORS);
+const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXTRUDER_CONNECTORS, artworkSizeForTemplate('Single Screw Extruder'));
+const TWIN_SCREW_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(TWIN_SCREW_CONNECTORS, artworkSizeForTemplate('Twin Screw Extruder'));
 // Taken from the registry rather than from the drawing, so the default layout
 // does not pull the SVG scene into a module that only needs coordinates.
-const EXPANDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXPANDER_POINT_REGISTRY);
-const FLAKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(FLAKING_MILL_POINT_REGISTRY);
-const CRACKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CRACKING_MILL_POINT_REGISTRY);
-const CONDITIONER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CONDITIONER_POINT_REGISTRY);
+const EXPANDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXPANDER_POINT_REGISTRY, artworkSizeForTemplate('Expander X-101'));
+const FLAKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(FLAKING_MILL_POINT_REGISTRY, artworkSizeForTemplate('Flaking Mill M-102'));
+const CRACKING_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CRACKING_MILL_POINT_REGISTRY, artworkSizeForTemplate('Cracking Mill M-101'));
+const CONDITIONER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(CONDITIONER_POINT_REGISTRY, artworkSizeForTemplate('Conditioner E-102'));
 // The oilseed four. `side` comes from the supplied x against the drawing's
 // midline, so drive-side pads stack left and process-side pads stack right
 // without a trail crossing the machine to reach its card.
-const DTDC_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(DTDC_POINT_REGISTRY);
-const SOLVENT_EXTRACTOR_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SOLVENT_EXTRACTOR_POINT_REGISTRY);
-const COLLET_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(COLLET_COOLER_POINT_REGISTRY);
-const SEED_DRYER_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SEED_DRYER_COOLER_POINT_REGISTRY);
-const HAMMER_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(HAMMER_MILL_POINT_REGISTRY);
-const MEAL_SIFTER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_SIFTER_POINT_REGISTRY);
-const MEAL_CONVEYING_STORAGE_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_CONVEYING_STORAGE_POINT_REGISTRY);
-const AUTO_BAGGER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(AUTO_BAGGER_POINT_REGISTRY);
-const MISCELLA_DISTILLATION_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MISCELLA_DISTILLATION_POINT_REGISTRY);
-const SOLVENT_RECOVERY_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SOLVENT_RECOVERY_POINT_REGISTRY);
+const DTDC_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(DTDC_POINT_REGISTRY, artworkSizeForTemplate('DTDC'));
+const SOLVENT_EXTRACTOR_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SOLVENT_EXTRACTOR_POINT_REGISTRY, artworkSizeForTemplate('Solvent Extractor'));
+const COLLET_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(COLLET_COOLER_POINT_REGISTRY, artworkSizeForTemplate('Collet Cooler'));
+const SEED_DRYER_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SEED_DRYER_COOLER_POINT_REGISTRY, artworkSizeForTemplate('Seed Dryer Cooler'));
+const HAMMER_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(HAMMER_MILL_POINT_REGISTRY, artworkSizeForTemplate('Hammer Mill'));
+const MEAL_SIFTER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_SIFTER_POINT_REGISTRY, artworkSizeForTemplate('Meal Sifter'));
+const MEAL_CONVEYING_STORAGE_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_CONVEYING_STORAGE_POINT_REGISTRY, artworkSizeForTemplate('Meal Conveying & Storage'));
+const AUTO_BAGGER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(AUTO_BAGGER_POINT_REGISTRY, artworkSizeForTemplate('Auto Bagger & Stitcher'));
+const MISCELLA_DISTILLATION_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MISCELLA_DISTILLATION_POINT_REGISTRY, artworkSizeForTemplate('Miscella Distillation'));
+const SOLVENT_RECOVERY_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SOLVENT_RECOVERY_POINT_REGISTRY, artworkSizeForTemplate('Solvent Recovery'));
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
