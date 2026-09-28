@@ -479,11 +479,11 @@ export function AnalysisWorkspace({
            * yet — no component_type, no installed_at, no end-of-life
            * definition — so there is nothing truthful to offer, and the section
            * hides rather than presenting a selector that resolves to nothing.
-           * With ULTRON_RUL_FIXTURES on, the fixture set is offered so the
+           * With NEXT_PUBLIC_ULTRON_RUL_FIXTURES on, the fixture set is offered so the
            * section can be built and reviewed. When a registry exists, this is
            * the one line that changes.
            */
-          rulComponents={process.env.ULTRON_RUL_FIXTURES === '1' ? RUL_FIXTURE_COMPONENTS : []}
+          rulComponents={process.env.NEXT_PUBLIC_ULTRON_RUL_FIXTURES === '1' ? RUL_FIXTURE_COMPONENTS : []}
           machineName={machine.name}
           template={machine.template}
           hierarchyPath={machine.hierarchyPath}

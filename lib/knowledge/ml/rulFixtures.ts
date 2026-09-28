@@ -11,7 +11,7 @@
  * `trained_on_real_data` is false in all of them, which is what keeps the
  * "Experimental · synthetic validation only" badge lit wherever they are shown.
  *
- * They are reachable only behind `ULTRON_RUL_FIXTURES`. There is no path from a
+ * They are reachable only behind `NEXT_PUBLIC_ULTRON_RUL_FIXTURES`. There is no path from a
  * production build to this file's data: see `useComponentRul`, which asks the
  * service first and only falls back when the flag is on.
  *

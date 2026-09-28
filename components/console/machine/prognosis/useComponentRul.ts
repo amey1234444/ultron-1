@@ -7,7 +7,7 @@ import { RUL_FIXTURES } from '../../../../lib/knowledge/ml/rulFixtures';
  * Component health and remaining life, from the service.
  *
  * The service is asked first, always. Fixtures are a fallback and only when
- * `ULTRON_RUL_FIXTURES` is on, so the day a real endpoint exists this hook
+ * `NEXT_PUBLIC_ULTRON_RUL_FIXTURES` is on, so the day a real endpoint exists this hook
  * starts using it with no change here and no change at the call site. A
  * production build has no path to fixture data.
  *
@@ -35,7 +35,7 @@ export type ComponentRulState = {
 };
 
 const FIXTURES_ENABLED =
-  typeof process !== 'undefined' && process.env?.ULTRON_RUL_FIXTURES === '1';
+  typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_ULTRON_RUL_FIXTURES === '1';
 
 function fixtureFor(componentId: string): unknown | null {
   if (!FIXTURES_ENABLED) return null;
