@@ -1375,16 +1375,24 @@ export function TrailBoard({
               // being one of the available targets.
               const rejects = fit === 'mismatch';
               const wired = connectorState[connector.code];
-              // Wired pads take the accent; unwired ones stay neutral unless
-              // the analyser reads them. Live is not a fourth colour — it is
-              // the same accent carried heavier, so the three states survive
-              // greyscale and colour-blind viewing the way the pads drawn
-              // into the artwork do.
-              const colour = rejects
-                ? palette.critical
-                : wired || connector.analyzerTag
-                  ? palette.accent
-                  : palette.neutral;
+              // Every instrument pad is green. Green here means "there is a
+              // connection point here", which is true of all of them.
+              //
+              // It used to mean "and a commissioned model reads it", because
+              // the colour was driven by `analyzerTag`. That is a different
+              // question, and letting it pick the colour left thirteen of the
+              // fifteen instrumented machines showing every unwired pad in
+              // grey — 184 dots that did not read as connection points at
+              // all, on exactly the machines where nothing was mapped yet and
+              // the points most needed finding.
+              //
+              // State is carried by weight instead: hollow when unmapped,
+              // filled when wired, heavier again when reporting. Shape and
+              // weight survive greyscale and colour-blind viewing, which a
+              // green/grey distinction does not. The one exception is a unit
+              // that cannot fit the pad being dragged onto it, which is a
+              // refusal and is drawn as one.
+              const colour = rejects ? palette.critical : palette.accent;
               // At rest a pad is small and quiet; it grows while it is a live
               // drop target or has just been wired. An unwired pad is hollow
               // and a wired one is filled, so which instruments are still to
@@ -1396,7 +1404,9 @@ export function TrailBoard({
                 : locked || flashed ? 0.22
                 : wired === 'live' ? 0.34
                 : wired ? 0.18
-                : idle ? 0.04 : 0.08;
+                // Barely filled rather than empty: a hollow ring on a dark
+                // machine body needs some ground behind it to stay legible.
+                : idle ? 0.05 : 0.09;
               const stroke = rejects
                 ? 0.5
                 : locked || flashed ? 0.95

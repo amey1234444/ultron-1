@@ -118,6 +118,29 @@ ok('pads carry a spoken name saying whether they are mapped',
   board.includes('— mapped. Select its card.') && board.includes('— not mapped. Map this instrument.'));
 ok('a small pad is given a larger touch target', board.includes('hitSlop={12}'));
 
+console.log('\n--- every pad reads as a connection point ---');
+
+// The colour used to be driven by `analyzerTag`, which answers "does a
+// commissioned model read this?" — a different question from "is there an
+// instrument here?". Thirteen of the fifteen instrumented machines carry no
+// analyzer tags at all, so every unwired pad on them rendered grey: 184 dots
+// that did not read as connection points, on exactly the machines where
+// nothing was mapped yet.
+ok('pad colour does not depend on whether a model reads the pad',
+  !board.includes('wired || connector.analyzerTag'),
+  'analyzerTag answers a different question and must not pick the colour');
+ok('every pad is the accent colour unless it is refusing a drop',
+  board.includes('const colour = rejects ? palette.critical : palette.accent;'));
+
+// Which means the count that matters is how many machines show green pads.
+const instrumented = withPads.length;
+ok('every instrumented template shows its pads in the accent colour',
+  instrumented === 15, `${instrumented} templates, ${totalPads} pads`);
+
+// State is carried by weight, not by a second hue, so it survives greyscale.
+ok('state is carried by fill weight rather than another colour',
+  board.includes("wired === 'live' ? 0.34") && board.includes('wired ? 0.18'));
+
 console.log('\n--- tapping the same pad twice does not make two cards ---');
 ok('an already-wired pad selects its card instead of adding another',
   board.includes('if (existing) {') && board.includes('setSelectedId(boxId ?? existing.id)'),
