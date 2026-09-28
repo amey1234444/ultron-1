@@ -17,7 +17,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     if (req.method === 'GET') {
       await enforceRateLimit(req, res, 'api');
-      const workspace = await getWorkspace();
+      // The caller's own workspace, from their session. Never a default:
+      // a wrong id here would show one account another's plant.
+      const workspace = await getWorkspace(user.workspaceId);
       return res.status(200).json({ persisted: true, workspace });
     }
 
@@ -33,7 +35,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if (!data || !Array.isArray(data.projects) || !Array.isArray(data.folders) || !Array.isArray(data.machines) || !Array.isArray(data.devices) || !Array.isArray(data.cards)) {
         return res.status(400).json({ error: 'Invalid workspace payload.' });
       }
-      const result = await replaceHierarchy(data, body.baseRevision);
+      const result = await replaceHierarchy(user.workspaceId, data, body.baseRevision);
       if ('conflict' in result) {
         return res.status(409).json({ error: 'Workspace changed since last load.', hierRevision: result.hierRevision });
       }

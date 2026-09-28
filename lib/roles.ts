@@ -66,6 +66,15 @@ export type PublicUser = {
   username: string;
   name: string;
   email: string;
+  /**
+   * Which studio workspace this account signs in to.
+   *
+   * Accounts sharing a workspace share its asset hierarchy, devices, cards and
+   * canvas layouts; accounts in different workspaces cannot see each other's
+   * at all. Everything that existed before workspaces did is in 'default', and
+   * that is what a new account gets unless it is given another one.
+   */
+  workspaceId: string;
   role: Role;
   status: UserStatus;
   permissions: UserPermission[];

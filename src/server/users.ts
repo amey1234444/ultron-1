@@ -14,6 +14,7 @@ import {
 } from '../../lib/roles';
 import { ensureSchema, isDbEnabled, query } from './db';
 import { ApiError } from './errors';
+import { DEFAULT_WORKSPACE_ID } from './workspace';
 
 export { ApiError };
 
@@ -69,7 +70,7 @@ function id(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
-type Seed = { username: string; name: string; email: string; role: Role; password: string };
+type Seed = { username: string; name: string; email: string; role: Role; password: string; workspaceId: string };
 
 /**
  * An extra super admin, provisioned entirely from the environment.
@@ -77,7 +78,7 @@ type Seed = { username: string; name: string; email: string; role: Role; passwor
  * The three seeds below carry a committed fallback password, which is
  * tolerable for `superadmin@ultron.local` on a developer's laptop and is not
  * tolerable for a named account on a real deployment. So this one has no
- * fallback: with `BOOTSTRAP_SUPER_ADMIN_PASSWORD` unset the account is simply
+ * fallback: with `SOYA_SUPER_ADMIN_PASSWORD` unset the account is simply
  * not created, and nothing about it is ever committed to the repository.
  *
  * It exists because the username rules and the login path together make the
@@ -97,15 +98,15 @@ type Seed = { username: string; name: string; email: string; role: Role; passwor
  * change one after it exists.
  */
 function bootstrapSuperAdmin(): Seed | null {
-  const password = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD;
+  const password = process.env.SOYA_SUPER_ADMIN_PASSWORD;
   if (!password) return null;
 
-  const username = (process.env.BOOTSTRAP_SUPER_ADMIN_USERNAME || '').trim();
-  const email = (process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL || '').trim();
+  const username = (process.env.SOYA_SUPER_ADMIN_USERNAME || '').trim();
+  const email = (process.env.SOYA_SUPER_ADMIN_EMAIL || '').trim();
   if (!username || !email) {
     console.warn(
-      '[users] BOOTSTRAP_SUPER_ADMIN_PASSWORD is set but BOOTSTRAP_SUPER_ADMIN_USERNAME ' +
-      'and/or BOOTSTRAP_SUPER_ADMIN_EMAIL are not. No bootstrap account was created.',
+      '[users] SOYA_SUPER_ADMIN_PASSWORD is set but SOYA_SUPER_ADMIN_USERNAME ' +
+      'and/or SOYA_SUPER_ADMIN_EMAIL are not. No bootstrap account was created.',
     );
     return null;
   }
@@ -113,9 +114,9 @@ function bootstrapSuperAdmin(): Seed | null {
     // Refused rather than created, because a seeded username the rest of the
     // app considers invalid is one Manage Users cannot subsequently edit.
     console.warn(
-      `[users] BOOTSTRAP_SUPER_ADMIN_USERNAME "${username}" is not 3-32 characters of ` +
+      `[users] SOYA_SUPER_ADMIN_USERNAME "${username}" is not 3-32 characters of ` +
       'letters, numbers, dot, underscore or hyphen. No bootstrap account was created. ' +
-      'Put the address in BOOTSTRAP_SUPER_ADMIN_EMAIL — it can be logged in with.',
+      'Put the address in SOYA_SUPER_ADMIN_EMAIL — it can be logged in with.',
     );
     return null;
   }
@@ -125,17 +126,22 @@ function bootstrapSuperAdmin(): Seed | null {
     // from the environment is making a deliberate choice, and failing closed
     // here would leave them with no way in and no explanation.
     console.warn(
-      '[users] BOOTSTRAP_SUPER_ADMIN_PASSWORD is shorter than the eight characters ' +
+      '[users] SOYA_SUPER_ADMIN_PASSWORD is shorter than the eight characters ' +
       'this application requires everywhere else. The account will still be created.',
     );
   }
 
   return {
     username,
-    name: process.env.BOOTSTRAP_SUPER_ADMIN_NAME || 'Super Admin',
+    name: process.env.SOYA_SUPER_ADMIN_NAME || 'Super Admin',
     email,
     role: 'super_admin',
     password,
+    // Its own workspace, separate from the one every other account shares.
+    // Created empty on first sign-in and never seeded with the demo
+    // hierarchy, so what this account sees is only what it puts there.
+    // Overridable, so a second account can be pointed at the same one.
+    workspaceId: (process.env.SOYA_SUPER_ADMIN_WORKSPACE_ID || 'soya').trim() || 'soya',
   };
 }
 
@@ -149,6 +155,7 @@ function seedSpecs(): Seed[] {
       email: 'superadmin@ultron.local',
       role: 'super_admin',
       password: process.env.SUPER_ADMIN_PASSWORD || 'superadmin123',
+      workspaceId: DEFAULT_WORKSPACE_ID,
     },
     {
       username: 'admin',
@@ -156,6 +163,7 @@ function seedSpecs(): Seed[] {
       email: 'admin@ultron.local',
       role: 'admin',
       password: process.env.ADMIN_PASSWORD || 'admin123',
+      workspaceId: DEFAULT_WORKSPACE_ID,
     },
     {
       username: 'user',
@@ -163,6 +171,7 @@ function seedSpecs(): Seed[] {
       email: 'user@ultron.local',
       role: 'user',
       password: process.env.USER_PASSWORD || 'user123',
+      workspaceId: DEFAULT_WORKSPACE_ID,
     },
   ];
 }
@@ -175,6 +184,7 @@ function buildSeedUser(s: Seed): StoredUser {
     name: s.name,
     email: s.email,
     role: s.role,
+    workspaceId: s.workspaceId,
     // Seed accounts are provisioned by the operator, so they are active out of
     // the box; only self-service signups arrive as `pending`.
     status: 'active',
@@ -244,6 +254,7 @@ type UserRow = {
   email: string;
   email_lc: string;
   role: string;
+  workspace_id: string | null;
   status: string;
   permissions: unknown;
   password_hash: string;
@@ -268,6 +279,9 @@ function rowToStored(r: UserRow): StoredUser {
     username: r.username,
     name: r.name,
     email: r.email,
+    // A row written before the column existed reads as the default workspace,
+    // which is where its data already is.
+    workspaceId: r.workspace_id || DEFAULT_WORKSPACE_ID,
     role,
     status: isUserStatus(r.status) ? r.status : 'pending',
     permissions: normalizePermissions(r.permissions, role),
@@ -284,8 +298,8 @@ function rowToStored(r: UserRow): StoredUser {
 
 async function insertRow(u: StoredUser): Promise<void> {
   await query(
-    `INSERT INTO users (id, username, username_lc, name, email, email_lc, role, status, permissions, password_hash, created_at, last_login_at, last_seen_at, reputation_status, reputation_score, reputation_checked_at, reputation_data)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9::jsonb,$10,$11,$12,$13,$14,$15,$16,$17::jsonb)`,
+    `INSERT INTO users (id, username, username_lc, name, email, email_lc, workspace_id, role, status, permissions, password_hash, created_at, last_login_at, last_seen_at, reputation_status, reputation_score, reputation_checked_at, reputation_data)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18::jsonb)`,
     [
       u.id,
       u.username,
@@ -293,6 +307,7 @@ async function insertRow(u: StoredUser): Promise<void> {
       u.name,
       u.email,
       emailKey(u.email),
+      u.workspaceId || DEFAULT_WORKSPACE_ID,
       u.role,
       u.status,
       JSON.stringify(u.permissions),
@@ -397,6 +412,8 @@ export async function touchLastSeen(userId: string): Promise<void> {
 }
 
 export type CreateUserInput = {
+  /** Which workspace the account joins. Defaults to the shared one. */
+  workspaceId?: string;
   username: string;
   name: string;
   email: string;
@@ -429,6 +446,9 @@ export async function createUser(input: CreateUserInput): Promise<PublicUser> {
     username,
     name: input.name.trim() || username,
     email,
+    // Accounts created through Manage Users join the workspace of whoever is
+    // creating them unless told otherwise, which keeps a team together.
+    workspaceId: input.workspaceId?.trim() || DEFAULT_WORKSPACE_ID,
     role: input.role,
     status: input.status ?? 'pending',
     permissions: normalizePermissions(input.permissions, input.role),

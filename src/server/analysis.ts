@@ -7,7 +7,7 @@ import { applyLiveStatus, latestMeasurementForChannel } from '../../lib/liveTele
 import { listChannels, type CardNode } from '../../lib/rack';
 import { ensureSchema, isDbEnabled, query } from './db';
 import { ApiError } from './errors';
-import { getWorkspace, type Layout } from './workspace';
+import { getWorkspace, workspaceIdForMachine, type Layout } from './workspace';
 import { getLiveState } from './telemetry';
 
 type LayoutBox = {
@@ -127,7 +127,13 @@ const ANALYSIS_TEMPLATES = new Set(['Rotary Airlock Valve', 'Single Screw Extrud
 export async function runMachineAnalysis(machineId: string): Promise<MachineAnalysisResult> {
   if (!isDbEnabled()) throw new ApiError(503, 'DATABASE_URL is required for durable analysis.');
   await ensureSchema();
-  const workspace = await getWorkspace();
+  // Analysis runs on a machine id rather than on behalf of a signed-in
+  // account, so the workspace is resolved from the machine instead of from a
+  // session. It still reads exactly one workspace's devices, cards and
+  // layouts — the machine's own.
+  const workspaceId = await workspaceIdForMachine(machineId);
+  if (!workspaceId) throw new ApiError(404, 'Machine not found.');
+  const workspace = await getWorkspace(workspaceId);
   if (!workspace) throw new ApiError(503, 'Workspace persistence is not available.');
   const machine = workspace.machines.find((candidate) => candidate.id === machineId);
   if (!machine) throw new ApiError(404, 'Machine not found.');
@@ -244,7 +250,8 @@ export async function persistOverviewAnalysis(
 ): Promise<{ snapshotId: number; overviewId: string }> {
   if (!isDbEnabled()) throw new ApiError(503, 'DATABASE_URL is required for durable analysis.');
   await ensureSchema();
-  const workspace = await getWorkspace();
+  const workspaceId = await workspaceIdForMachine(machineId);
+  const workspace = workspaceId ? await getWorkspace(workspaceId) : null;
   const machine = workspace?.machines.find((candidate) => candidate.id === machineId);
   if (!machine) throw new ApiError(404, 'Machine not found.');
 

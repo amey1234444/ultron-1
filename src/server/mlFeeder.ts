@@ -37,7 +37,7 @@ import { listChannels } from '../../lib/rack';
 import { mlConfigured, runInference } from './mlClient';
 import { persistMlDiagnosis } from './mlPersistence';
 import { getLiveState } from './telemetry';
-import { getWorkspace, type Layout } from './workspace';
+import { getWorkspace, listWorkspaceIds, type Layout } from './workspace';
 
 /** The console template whose mapped points carry twin-screw analyser tags. */
 const TWIN_SCREW_TEMPLATE = 'Twin Screw Extruder';
@@ -87,13 +87,32 @@ export type FeedOutcome = {
 export async function feedOnce(): Promise<FeedOutcome[]> {
   if (!mlConfigured()) return [];
 
-  const workspace = await getWorkspace();
+  // Every workspace, not one. The feeder is a background tick with no session
+  // behind it, and a twin screw belonging to one account is no less worth
+  // feeding than a twin screw belonging to another. The live state is read
+  // once and shared, because devices report to the gateway regardless of
+  // which workspace models them.
+  const workspaceIds = await listWorkspaceIds();
+  if (workspaceIds.length === 0) return [];
+
+  const outcomes: FeedOutcome[] = [];
+  const live = await getLiveState();
+  for (const workspaceId of workspaceIds) {
+    outcomes.push(...(await feedWorkspace(workspaceId, live)));
+  }
+  return outcomes;
+}
+
+async function feedWorkspace(
+  workspaceId: string,
+  live: Awaited<ReturnType<typeof getLiveState>>,
+): Promise<FeedOutcome[]> {
+  const workspace = await getWorkspace(workspaceId);
   if (!workspace) return [];
 
   const machines = workspace.machines.filter((entry) => entry.template === TWIN_SCREW_TEMPLATE);
   if (machines.length === 0) return [];
 
-  const live = await getLiveState();
   const liveDevices = applyLiveStatus(workspace.devices, live);
   const channels = listChannels(liveDevices, workspace.cards);
   const byId = new Map(channels.map((channel) => [channel.id, channel]));

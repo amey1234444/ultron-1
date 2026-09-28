@@ -27,7 +27,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!body.machineTemplate || !body.layout || !Array.isArray(body.layout.trails) || !Array.isArray(body.layout.boxes)) {
       return res.status(400).json({ error: 'Invalid template payload.' });
     }
-    const result = await saveMachineTemplate(body.machineTemplate, body.layout);
+    const result = await saveMachineTemplate(user.workspaceId, body.machineTemplate, body.layout);
     return res.status(200).json({ layoutRevision: result.layoutRevision });
   } catch (err) {
     return sendApiError(res, err, 'api/workspace/template');

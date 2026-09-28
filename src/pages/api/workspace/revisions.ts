@@ -14,7 +14,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await getSessionUser(req);
     if (!user) return res.status(401).json({ error: 'Not authenticated.' });
     if (!isDbEnabled()) return res.status(200).json({ persisted: false });
-    const revisions = await getRevisions();
+    const revisions = await getRevisions(user.workspaceId);
     return res.status(200).json({ persisted: true, ...revisions });
   } catch (err) {
     return sendApiError(res, err, 'api/workspace/revisions');

@@ -1,5 +1,5 @@
 /**
- * The env-provisioned super admin, and login by email.
+ * The SOYA super admin, provisioned from the environment, and login by email.
  *
  * Runs itself as child processes because the seed is read once, at module
  * load, into a module-global store — so each configuration needs its own
@@ -14,7 +14,7 @@
  */
 import { spawnSync } from 'node:child_process';
 
-const PASSWORD = 'bootstrap-check-password';
+const PASSWORD = 'soya-check-password';
 
 type Case = {
   name: string;
@@ -24,8 +24,8 @@ type Case = {
 };
 
 // -- child mode -------------------------------------------------------------
-// Invoked with ULTRON_BOOTSTRAP_CHECK_CHILD=1, prints one line of findings.
-if (process.env.ULTRON_BOOTSTRAP_CHECK_CHILD === '1') {
+// Invoked with ULTRON_SOYA_CHECK_CHILD=1, prints one line of findings.
+if (process.env.ULTRON_SOYA_CHECK_CHILD === '1') {
   void (async () => {
     const users = await import('../users');
     const byUsername = await users.findByUsername(process.env.PROBE_USERNAME ?? '');
@@ -37,6 +37,8 @@ if (process.env.ULTRON_BOOTSTRAP_CHECK_CHILD === '1') {
       exists: Boolean(byUsername),
       sameRowByEmail: Boolean(byEmail) && byEmail?.id === byUsername?.id,
       role: byUsername?.role ?? null,
+      workspaceId: byUsername?.workspaceId ?? null,
+      stockWorkspaceId: (await users.findByUsername('superadmin'))?.workspaceId ?? null,
       status: byUsername?.status ?? null,
       permissions: byUsername?.permissions ?? [],
       email: byUsername?.email ?? null,
@@ -61,15 +63,15 @@ if (process.env.ULTRON_BOOTSTRAP_CHECK_CHILD === '1') {
     const result = spawnSync(process.execPath, [process.argv[1]], {
       env: {
         ...process.env,
-        ULTRON_BOOTSTRAP_CHECK_CHILD: '1',
+        ULTRON_SOYA_CHECK_CHILD: '1',
         NODE_ENV: 'development',
         DATABASE_URL: '',
-        BOOTSTRAP_SUPER_ADMIN_USERNAME: undefined,
-        BOOTSTRAP_SUPER_ADMIN_EMAIL: undefined,
-        BOOTSTRAP_SUPER_ADMIN_NAME: undefined,
-        BOOTSTRAP_SUPER_ADMIN_PASSWORD: undefined,
-        PROBE_USERNAME: 'bootstrap',
-        PROBE_EMAIL: 'bootstrap@example.test',
+        SOYA_SUPER_ADMIN_USERNAME: undefined,
+        SOYA_SUPER_ADMIN_EMAIL: undefined,
+        SOYA_SUPER_ADMIN_NAME: undefined,
+        SOYA_SUPER_ADMIN_PASSWORD: undefined,
+        PROBE_USERNAME: 'demo',
+        PROBE_EMAIL: 'demo@example.test',
         ...env,
       } as NodeJS.ProcessEnv,
       encoding: 'utf8',
@@ -80,10 +82,10 @@ if (process.env.ULTRON_BOOTSTRAP_CHECK_CHILD === '1') {
 
   console.log('--- fully configured ---');
   const configured = run({
-    BOOTSTRAP_SUPER_ADMIN_USERNAME: 'bootstrap',
-    BOOTSTRAP_SUPER_ADMIN_EMAIL: 'bootstrap@example.test',
-    BOOTSTRAP_SUPER_ADMIN_NAME: 'Bootstrap Super Admin',
-    BOOTSTRAP_SUPER_ADMIN_PASSWORD: PASSWORD,
+    SOYA_SUPER_ADMIN_USERNAME: 'demo',
+    SOYA_SUPER_ADMIN_EMAIL: 'demo@example.test',
+    SOYA_SUPER_ADMIN_NAME: 'Demo Super Admin',
+    SOYA_SUPER_ADMIN_PASSWORD: PASSWORD,
   });
   const r = JSON.parse(configured.out.split('\n').pop() ?? '{}');
   ok('the account is created', r.exists === true);
@@ -91,18 +93,26 @@ if (process.env.ULTRON_BOOTSTRAP_CHECK_CHILD === '1') {
   ok('it is active, not pending', r.status === 'active', String(r.status),);
   ok('it carries the super-admin permission', Array.isArray(r.permissions) && r.permissions.length > 0,
     JSON.stringify(r.permissions));
-  ok('the email is the one configured', r.email === 'bootstrap@example.test', String(r.email));
-  ok('the display name is the one configured', r.name === 'Bootstrap Super Admin', String(r.name));
+  ok('the email is the one configured', r.email === 'demo@example.test', String(r.email));
+  ok('the display name is the one configured', r.name === 'Demo Super Admin', String(r.name));
   ok('username and email resolve the same row', r.sameRowByEmail === true);
   ok('it logs in by username', r.loginByUsername === true);
   ok('it logs in by email address', r.loginByEmail === true);
   ok('a wrong password is refused', r.wrongPasswordRejected === true);
   ok('the stock seed accounts still exist', r.stockSuperAdmin === true && r.stockUser === true);
+  // The whole point of the separate account: its own workspace, and not the
+  // one every existing account is already in.
+  ok('it has its own workspace', typeof r.workspaceId === 'string' && r.workspaceId.length > 0,
+    String(r.workspaceId));
+  ok('which is not the shared default', r.workspaceId !== r.stockWorkspaceId,
+    `soya=${r.workspaceId} stock=${r.stockWorkspaceId}`);
+  ok('and the stock accounts stay in the default workspace', r.stockWorkspaceId === 'default',
+    String(r.stockWorkspaceId));
 
   console.log('\n--- no password configured ---');
   const noPassword = run({
-    BOOTSTRAP_SUPER_ADMIN_USERNAME: 'bootstrap',
-    BOOTSTRAP_SUPER_ADMIN_EMAIL: 'bootstrap@example.test',
+    SOYA_SUPER_ADMIN_USERNAME: 'demo',
+    SOYA_SUPER_ADMIN_EMAIL: 'demo@example.test',
   });
   const n = JSON.parse(noPassword.out.split('\n').pop() ?? '{}');
   // The whole point of having no fallback: absent configuration creates
@@ -111,35 +121,35 @@ if (process.env.ULTRON_BOOTSTRAP_CHECK_CHILD === '1') {
   ok('and the stock seeds are unaffected', n.stockSuperAdmin === true);
 
   console.log('\n--- password set, identity missing ---');
-  const noIdentity = run({ BOOTSTRAP_SUPER_ADMIN_PASSWORD: PASSWORD });
+  const noIdentity = run({ SOYA_SUPER_ADMIN_PASSWORD: PASSWORD });
   const i = JSON.parse(noIdentity.out.split('\n').pop() ?? '{}');
   ok('no account is created', i.exists === false);
-  ok('and it says why', /BOOTSTRAP_SUPER_ADMIN_USERNAME/.test(noIdentity.stderr),
+  ok('and it says why', /SOYA_SUPER_ADMIN_USERNAME/.test(noIdentity.stderr),
     'a silent no-op here is indistinguishable from a broken deploy');
 
   console.log('\n--- an email address given as the username ---');
   const badUsername = run({
-    BOOTSTRAP_SUPER_ADMIN_USERNAME: 'bootstrap@example.test',
-    BOOTSTRAP_SUPER_ADMIN_EMAIL: 'bootstrap@example.test',
-    BOOTSTRAP_SUPER_ADMIN_PASSWORD: PASSWORD,
+    SOYA_SUPER_ADMIN_USERNAME: 'demo@example.test',
+    SOYA_SUPER_ADMIN_EMAIL: 'demo@example.test',
+    SOYA_SUPER_ADMIN_PASSWORD: PASSWORD,
   });
   const b = JSON.parse(badUsername.out.split('\n').pop() ?? '{}');
   // Refused rather than created: the signup form's own rule excludes '@', and
   // a seeded username the app considers invalid cannot be edited afterwards.
   ok('it is refused, not created with an invalid username', b.exists === false);
   ok('and it says to use the email field instead',
-    /BOOTSTRAP_SUPER_ADMIN_EMAIL/.test(badUsername.stderr));
+    /SOYA_SUPER_ADMIN_EMAIL/.test(badUsername.stderr));
 
   console.log('\n--- a password below the application minimum ---');
   const shortPassword = run({
-    BOOTSTRAP_SUPER_ADMIN_USERNAME: 'bootstrap',
-    BOOTSTRAP_SUPER_ADMIN_EMAIL: 'bootstrap@example.test',
+    SOYA_SUPER_ADMIN_USERNAME: 'demo',
+    SOYA_SUPER_ADMIN_EMAIL: 'demo@example.test',
     // Seven characters, one below the application's minimum. A literal
     // rather than a real account's password: this file is about the
     // mechanism, and a test fixture is not a place to publish a
     // credential someone actually intends to use.
-    BOOTSTRAP_SUPER_ADMIN_PASSWORD: 'short12',
-    PROBE_USERNAME: 'bootstrap',
+    SOYA_SUPER_ADMIN_PASSWORD: 'short12',
+    PROBE_USERNAME: 'demo',
   });
   const sp = JSON.parse(shortPassword.out.split('\n').pop() ?? '{}');
   // Warned about, but still created. An operator provisioning from the
@@ -148,6 +158,6 @@ if (process.env.ULTRON_BOOTSTRAP_CHECK_CHILD === '1') {
   ok('the account is still created', sp.exists === true);
   ok('and the short password is warned about', /eight characters/.test(shortPassword.stderr));
 
-  console.log(failures === 0 ? '\nbootstrap admin: all checks passed' : `\nbootstrap admin: ${failures} check(s) failed`);
+  console.log(failures === 0 ? '\nsoya admin: all checks passed' : `\nsoya admin: ${failures} check(s) failed`);
   if (failures > 0) process.exit(1);
 }

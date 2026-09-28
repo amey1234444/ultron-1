@@ -1,8 +1,17 @@
-// Durable, shared workspace: the asset hierarchy shown in the left rail
-// (projects -> folders -> machines, plus devices and their rack cards) and the
-// per-machine canvas layouts. All authenticated users read and write the same
-// rows, so an edit made by one user becomes visible to everyone else (clients
-// poll the revision counters exposed by getWorkspace / getRevisions).
+// Durable workspace: the asset hierarchy shown in the left rail (projects ->
+// folders -> machines, plus devices and their rack cards) and the per-machine
+// canvas layouts.
+//
+// Every row belongs to a workspace, and every function here takes the id of
+// the one it is acting on. Accounts in the same workspace share their rows, so
+// an edit by one becomes visible to the others (clients poll the revision
+// counters exposed by getWorkspace / getRevisions); accounts in different
+// workspaces cannot see each other's hierarchy at all.
+//
+// The id is never defaulted in this module. It arrives from the session user's
+// `workspaceId` at the API boundary, and a missing one is a bug worth an
+// exception rather than a silent fall back to 'default' — which, on a write,
+// would mean one workspace's save landing in another's.
 //
 // Persistence is Supabase/PostgreSQL only (via DATABASE_URL). When no database
 // is configured this module is inert — callers fall back to their local seed
@@ -57,7 +66,16 @@ export type HierarchyInput = {
   cards: CardNode[];
 };
 
-const globalRef = globalThis as unknown as { __ultronWorkspaceSeeded?: boolean };
+const globalRef = globalThis as unknown as { __ultronWorkspaceReady?: Set<string> };
+
+/** The workspace every account belonged to before workspaces existed. */
+export const DEFAULT_WORKSPACE_ID = 'default';
+
+function assertWorkspaceId(workspaceId: string): string {
+  const id = (workspaceId ?? '').trim();
+  if (!id) throw new ApiError(500, 'No workspace was resolved for this request.');
+  return id;
+}
 
 function makeId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
@@ -67,34 +85,60 @@ function numericValue(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 }
 
-// Ensure schema exists and the workspace is seeded with demo data exactly once
-// for a brand-new database. Never re-seeds an already-seeded database, so data
-// survives redeploys/restarts.
-async function ready(): Promise<void> {
+/**
+ * Make sure the schema exists and this workspace has a row.
+ *
+ * Only the default workspace is ever seeded with demo content, and only once
+ * on a brand-new database. Every other workspace is created **empty** and
+ * marked seeded immediately, so nothing is ever written into it that its owner
+ * did not put there — which is the whole point of having a separate one.
+ */
+async function ready(workspaceId: string): Promise<void> {
   await ensureSchema();
-  if (globalRef.__ultronWorkspaceSeeded) return;
-  const meta = await query<{ seeded: boolean }>('SELECT seeded FROM studio_meta WHERE id = 1');
-  if (meta.rows[0]?.seeded) {
-    globalRef.__ultronWorkspaceSeeded = true;
+  const memo = (globalRef.__ultronWorkspaceReady ??= new Set<string>());
+  if (memo.has(workspaceId)) return;
+
+  const existing = await query<{ seeded: boolean }>(
+    'SELECT seeded FROM studio_workspaces WHERE id = $1',
+    [workspaceId],
+  );
+  if (existing.rows[0]?.seeded) {
+    memo.add(workspaceId);
     return;
   }
-  await seedWorkspace();
-  globalRef.__ultronWorkspaceSeeded = true;
+  if (existing.rowCount === 0) {
+    // A workspace named by an account that has never signed in yet. Created
+    // empty, and marked seeded so the demo hierarchy is never poured into it.
+    await query(
+      `INSERT INTO studio_workspaces (id, name, seeded) VALUES ($1, $2, $3)
+       ON CONFLICT (id) DO NOTHING`,
+      [workspaceId, workspaceId, workspaceId !== DEFAULT_WORKSPACE_ID],
+    );
+    if (workspaceId !== DEFAULT_WORKSPACE_ID) {
+      memo.add(workspaceId);
+      return;
+    }
+  }
+  await seedWorkspace(workspaceId);
+  memo.add(workspaceId);
 }
 
-async function seedWorkspace(): Promise<void> {
+async function seedWorkspace(workspaceId: string): Promise<void> {
   const seed = createSeedData(makeId);
   await withClient(async (client) => {
     await client.query('BEGIN');
     try {
       // Guard against a concurrent seeder: re-check inside the transaction.
-      const check = await client.query<{ seeded: boolean }>('SELECT seeded FROM studio_meta WHERE id = 1 FOR UPDATE');
+      const check = await q<{ seeded: boolean }>(
+        client, 'SELECT seeded FROM studio_workspaces WHERE id = $1 FOR UPDATE', [workspaceId]);
       if (check.rows[0]?.seeded) {
         await client.query('COMMIT');
         return;
       }
-      await writeHierarchyRows(client, seed);
-      await client.query('UPDATE studio_meta SET seeded = true, hier_revision = hier_revision + 1, updated_at = now() WHERE id = 1');
+      await writeHierarchyRows(client, workspaceId, seed);
+      await q(client,
+        `UPDATE studio_workspaces SET seeded = true, hier_revision = hier_revision + 1, updated_at = now()
+         WHERE id = $1`, [workspaceId]);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -143,19 +187,22 @@ function normalizeHierarchyForPersistence(data: HierarchyInput): HierarchyInput 
 
 // Delete every hierarchy row and re-insert from the given snapshot. Callers wrap
 // this in a transaction. FK cascades keep folders/machines/cards consistent.
-async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise<void> {
-  await q(client, 'DELETE FROM studio_cards', []);
-  await q(client, 'DELETE FROM studio_devices', []);
-  await q(client, 'DELETE FROM studio_machines', []);
-  await q(client, 'DELETE FROM studio_folders', []);
-  await q(client, 'DELETE FROM studio_projects', []);
+async function writeHierarchyRows(client: Client, workspaceId: string, data: HierarchyInput): Promise<void> {
+  // Every delete is scoped. Unscoped, a single workspace pressing Save would
+  // empty the hierarchy of every other one — this function replaces the whole
+  // tree rather than diffing it.
+  await q(client, 'DELETE FROM studio_cards WHERE workspace_id = $1', [workspaceId]);
+  await q(client, 'DELETE FROM studio_devices WHERE workspace_id = $1', [workspaceId]);
+  await q(client, 'DELETE FROM studio_machines WHERE workspace_id = $1', [workspaceId]);
+  await q(client, 'DELETE FROM studio_folders WHERE workspace_id = $1', [workspaceId]);
+  await q(client, 'DELETE FROM studio_projects WHERE workspace_id = $1', [workspaceId]);
 
   let order = 0;
   for (const p of data.projects) {
     await q(
       client,
-      `INSERT INTO studio_projects (id, name, code, description, sort_order) VALUES ($1,$2,$3,$4,$5)`,
-      [p.id, p.name ?? '', p.code ?? '', p.description ?? '', order++],
+      `INSERT INTO studio_projects (id, workspace_id, name, code, description, sort_order) VALUES ($1,$2,$3,$4,$5,$6)`,
+      [p.id, workspaceId, p.name ?? '', p.code ?? '', p.description ?? '', order++],
     );
   }
   // Insert parents before children so the self-referencing FK is satisfied.
@@ -171,9 +218,9 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
     }
     await q(
       client,
-      `INSERT INTO studio_folders (id, project_id, parent_id, name, type, code, description, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [f.id, f.projectId, f.parentId, f.name ?? '', f.type ?? 'Custom Folder', f.code ?? '', f.description ?? '', order++],
+      `INSERT INTO studio_folders (id, workspace_id, project_id, parent_id, name, type, code, description, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [f.id, workspaceId, f.projectId, f.parentId, f.name ?? '', f.type ?? 'Custom Folder', f.code ?? '', f.description ?? '', order++],
     );
     inserted.add(f.id);
   }
@@ -182,22 +229,23 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
   for (const m of data.machines) {
     await q(
       client,
-      `INSERT INTO studio_machines (id, project_id, folder_id, name, template, components, variant_id, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8)`,
+      `INSERT INTO studio_machines (id, workspace_id, project_id, folder_id, name, template, components, variant_id, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9)`,
       // The variant is normalised against the template on the way in, so an id
       // that does not belong to this template — or no longer exists at all — is
       // stored as NULL rather than as a variant the machine is not.
-      [m.id, m.projectId, m.folderId, m.name ?? '', m.template, JSON.stringify(m.components ?? []), normaliseVariantId(m.template, m.variantId), order++],
+      [m.id, workspaceId, m.projectId, m.folderId, m.name ?? '', m.template, JSON.stringify(m.components ?? []), normaliseVariantId(m.template, m.variantId), order++],
     );
   }
   order = 0;
   for (const d of data.devices) {
     await q(
       client,
-      `INSERT INTO studio_devices (id, name, type, model, ip, port, protocol, description, status, project_id, gateway_id, real_gateway_id, real_rack_id, archived, simulated, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
+      `INSERT INTO studio_devices (id, workspace_id, name, type, model, ip, port, protocol, description, status, project_id, gateway_id, real_gateway_id, real_rack_id, archived, simulated, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
       [
         d.id,
+        workspaceId,
         d.name ?? '',
         d.type,
         d.model ?? '',
@@ -220,8 +268,9 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
     if (d.type !== 'Rack' || !d.gatewayId) continue;
     await q(
       client,
-      'UPDATE studio_devices SET gateway_id = $1 WHERE id = $2 AND EXISTS (SELECT 1 FROM studio_devices WHERE id = $1 AND type = $3)',
-      [d.gatewayId, d.id, 'Gateway'],
+      `UPDATE studio_devices SET gateway_id = $1 WHERE id = $2 AND workspace_id = $4
+         AND EXISTS (SELECT 1 FROM studio_devices WHERE id = $1 AND type = $3 AND workspace_id = $4)`,
+      [d.gatewayId, d.id, 'Gateway', workspaceId],
     );
   }
   order = 0;
@@ -232,10 +281,11 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
   for (const c of cardBySlot.values()) {
     await q(
       client,
-      `INSERT INTO studio_cards (id, device_id, slot, type, enabled, config, simulation, sort_order)
-       VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7::jsonb,$8)`,
+      `INSERT INTO studio_cards (id, workspace_id, device_id, slot, type, enabled, config, simulation, sort_order)
+       VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8::jsonb,$9)`,
       [
         c.id,
+        workspaceId,
         c.deviceId,
         c.slot,
         c.type,
@@ -252,11 +302,15 @@ async function writeHierarchyRows(client: Client, data: HierarchyInput): Promise
   await q(
     client,
     `DELETE FROM studio_machine_layouts l
-     WHERE NOT EXISTS (SELECT 1 FROM studio_machines m WHERE m.id = l.machine_id)`,
-    [],
+     WHERE l.workspace_id = $1
+       AND NOT EXISTS (SELECT 1 FROM studio_machines m WHERE m.id = l.machine_id)`,
+    [workspaceId],
   );
   await q(
     client,
+    // No workspace column here: canvas cards are only ever reached through a
+    // machine id, which is generated and unique across workspaces, so the
+    // machine's own existence is already the scope.
     `DELETE FROM studio_machine_canvas_cards c
      WHERE NOT EXISTS (SELECT 1 FROM studio_machines m WHERE m.id = c.machine_id)`,
     [],
@@ -277,19 +331,21 @@ type CardRow = { id: string; device_id: string; slot: number; type: string; enab
 type LayoutRow = { machine_id: string; trails: unknown; boxes: unknown; machine_zoom: number | null };
 type TemplateLayoutRow = { machine_template: string; trails: unknown; boxes: unknown; machine_zoom: number | null };
 
-export async function getWorkspace(): Promise<Workspace | null> {
+export async function getWorkspace(workspaceId: string): Promise<Workspace | null> {
   if (!isDbEnabled()) return null;
-  await ready();
+  const ws = assertWorkspaceId(workspaceId);
+  await ready(ws);
 
   const [projects, folders, machines, devices, cards, layouts, templates, meta] = await Promise.all([
-    query<ProjectRow>('SELECT * FROM studio_projects ORDER BY sort_order ASC'),
-    query<FolderRow>('SELECT * FROM studio_folders ORDER BY sort_order ASC'),
-    query<MachineRow>('SELECT * FROM studio_machines ORDER BY sort_order ASC'),
-    query<DeviceRow>('SELECT * FROM studio_devices ORDER BY sort_order ASC'),
-    query<CardRow>('SELECT * FROM studio_cards ORDER BY sort_order ASC'),
-    query<LayoutRow>('SELECT * FROM studio_machine_layouts'),
-    query<TemplateLayoutRow>('SELECT * FROM studio_machine_templates'),
-    query<{ hier_revision: string; layout_revision: string }>('SELECT hier_revision, layout_revision FROM studio_meta WHERE id = 1'),
+    query<ProjectRow>('SELECT * FROM studio_projects WHERE workspace_id = $1 ORDER BY sort_order ASC', [ws]),
+    query<FolderRow>('SELECT * FROM studio_folders WHERE workspace_id = $1 ORDER BY sort_order ASC', [ws]),
+    query<MachineRow>('SELECT * FROM studio_machines WHERE workspace_id = $1 ORDER BY sort_order ASC', [ws]),
+    query<DeviceRow>('SELECT * FROM studio_devices WHERE workspace_id = $1 ORDER BY sort_order ASC', [ws]),
+    query<CardRow>('SELECT * FROM studio_cards WHERE workspace_id = $1 ORDER BY sort_order ASC', [ws]),
+    query<LayoutRow>('SELECT * FROM studio_machine_layouts WHERE workspace_id = $1', [ws]),
+    query<TemplateLayoutRow>('SELECT * FROM studio_machine_templates WHERE workspace_id = $1', [ws]),
+    query<{ hier_revision: string; layout_revision: string }>(
+      'SELECT hier_revision, layout_revision FROM studio_workspaces WHERE id = $1', [ws]),
   ]);
 
   const layoutMap: Record<string, Layout> = {};
@@ -340,10 +396,81 @@ export async function getWorkspace(): Promise<Workspace | null> {
   };
 }
 
-export async function getRevisions(): Promise<{ hierRevision: number; layoutRevision: number }> {
-  await ready();
+/**
+ * Which workspace a machine belongs to, or null if there is no such machine.
+ *
+ * Machine ids are generated and unique across workspaces, so this is
+ * unambiguous. Background work that needs a whole workspace — the analysis
+ * runner needs its devices, cards and layouts, not just the machine — resolves
+ * the id with this and then loads that workspace normally, rather than reading
+ * unscoped rows.
+ */
+export async function workspaceIdForMachine(machineId: string): Promise<string | null> {
+  if (!isDbEnabled()) return null;
+  await ensureSchema();
+  const res = await query<{ workspace_id: string }>(
+    'SELECT workspace_id FROM studio_machines WHERE id = $1', [machineId]);
+  return res.rows[0]?.workspace_id ?? null;
+}
+
+/**
+ * Every workspace that currently exists.
+ *
+ * For background passes that must cover all of them — the ML feeder ticks for
+ * every twin screw anywhere, not for one account's.
+ */
+export async function listWorkspaceIds(): Promise<string[]> {
+  if (!isDbEnabled()) return [];
+  await ensureSchema();
+  const res = await query<{ id: string }>('SELECT id FROM studio_workspaces ORDER BY id ASC');
+  return res.rows.map((r) => r.id);
+}
+
+/**
+ * Look a machine up without knowing its workspace.
+ *
+ * For background work — the analysis runner, the ML feeder — which acts on a
+ * machine id or a template rather than on behalf of a signed-in account, so
+ * there is no session to take a workspace from. Deliberately unscoped, and
+ * separate from `getWorkspace` so that being unscoped is a decision at the
+ * call site rather than an omission inside one.
+ *
+ * Machine ids are generated and unique across workspaces, so a lookup by id
+ * is unambiguous even though it is unfiltered.
+ */
+export async function findMachineAnywhere(machineId: string): Promise<MachineNode | null> {
+  if (!isDbEnabled()) return null;
+  await ensureSchema();
+  const res = await query<MachineRow>('SELECT * FROM studio_machines WHERE id = $1', [machineId]);
+  const r = res.rows[0];
+  if (!r) return null;
+  return {
+    id: r.id, projectId: r.project_id, folderId: r.folder_id, name: r.name,
+    template: r.template as MachineNode['template'],
+    components: (Array.isArray(r.components) ? r.components : []) as MachineNode['components'],
+    variantId: normaliseVariantId(r.template as MachineNode['template'], r.variant_id),
+  };
+}
+
+/** Every machine on a template, in any workspace. See `findMachineAnywhere`. */
+export async function machinesByTemplateAnywhere(template: string): Promise<MachineNode[]> {
+  if (!isDbEnabled()) return [];
+  await ensureSchema();
+  const res = await query<MachineRow>(
+    'SELECT * FROM studio_machines WHERE template = $1 ORDER BY sort_order ASC', [template]);
+  return res.rows.map((r) => ({
+    id: r.id, projectId: r.project_id, folderId: r.folder_id, name: r.name,
+    template: r.template as MachineNode['template'],
+    components: (Array.isArray(r.components) ? r.components : []) as MachineNode['components'],
+    variantId: normaliseVariantId(r.template as MachineNode['template'], r.variant_id),
+  }));
+}
+
+export async function getRevisions(workspaceId: string): Promise<{ hierRevision: number; layoutRevision: number }> {
+  const ws = assertWorkspaceId(workspaceId);
+  await ready(ws);
   const meta = await query<{ hier_revision: string; layout_revision: string }>(
-    'SELECT hier_revision, layout_revision FROM studio_meta WHERE id = 1',
+    'SELECT hier_revision, layout_revision FROM studio_workspaces WHERE id = $1', [ws],
   );
   return {
     hierRevision: Number(meta.rows[0]?.hier_revision ?? 0),
@@ -354,23 +481,25 @@ export async function getRevisions(): Promise<{ hierRevision: number; layoutRevi
 // Replace the entire hierarchy in one transaction and bump the hierarchy
 // revision. Optimistic concurrency: if baseRevision is provided and no longer
 // matches, the write is rejected so the client can refetch and retry.
-export async function replaceHierarchy(data: HierarchyInput, baseRevision?: number): Promise<{ hierRevision: number } | { conflict: true; hierRevision: number }> {
+export async function replaceHierarchy(workspaceId: string, data: HierarchyInput, baseRevision?: number): Promise<{ hierRevision: number } | { conflict: true; hierRevision: number }> {
+  const ws = assertWorkspaceId(workspaceId);
   const normalized = normalizeHierarchyForPersistence(data);
   assertUniqueConfiguredIps(normalized);
   assertUniqueConfiguredDeviceNames(normalized);
-  await ready();
+  await ready(ws);
   return withClient(async (client) => {
     await client.query('BEGIN');
     try {
-      const cur = await client.query<{ hier_revision: string }>('SELECT hier_revision FROM studio_meta WHERE id = 1 FOR UPDATE');
+      const cur = await q<{ hier_revision: string }>(
+        client, 'SELECT hier_revision FROM studio_workspaces WHERE id = $1 FOR UPDATE', [ws]);
       const current = Number(cur.rows[0]?.hier_revision ?? 0);
       if (baseRevision !== undefined && baseRevision !== current) {
         await client.query('ROLLBACK');
         return { conflict: true as const, hierRevision: current };
       }
-      await writeHierarchyRows(client, normalized);
+      await writeHierarchyRows(client, ws, normalized);
       const next = current + 1;
-      await client.query('UPDATE studio_meta SET hier_revision = $1, updated_at = now() WHERE id = 1', [String(next)] as never[]);
+      await q(client, 'UPDATE studio_workspaces SET hier_revision = $1, updated_at = now() WHERE id = $2', [String(next), ws]);
       await client.query('COMMIT');
       return { hierRevision: next };
     } catch (err) {
@@ -383,8 +512,9 @@ export async function replaceHierarchy(data: HierarchyInput, baseRevision?: numb
 // Upsert a single machine's canvas layout and bump the layout revision. Keeping
 // layouts on their own endpoint/revision means a "Save Config" never clobbers a
 // concurrent hierarchy edit, and vice versa.
-export async function saveMachineLayout(machineId: string, layout: Layout): Promise<{ layoutRevision: number }> {
-  await ready();
+export async function saveMachineLayout(workspaceId: string, machineId: string, layout: Layout): Promise<{ layoutRevision: number }> {
+  const ws = assertWorkspaceId(workspaceId);
+  await ready(ws);
   return withClient(async (client) => {
     await client.query('BEGIN');
     try {
@@ -393,11 +523,12 @@ export async function saveMachineLayout(machineId: string, layout: Layout): Prom
       const machineZoom = clampMachineZoom(layout.machineZoom);
       await q(
         client,
-        `INSERT INTO studio_machine_layouts (machine_id, trails, boxes, machine_zoom, updated_at)
-         VALUES ($1, $2::jsonb, $3::jsonb, $4, now())
+        `INSERT INTO studio_machine_layouts (machine_id, workspace_id, trails, boxes, machine_zoom, updated_at)
+         VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, now())
          ON CONFLICT (machine_id) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes,
-           machine_zoom = EXCLUDED.machine_zoom, updated_at = now()`,
-        [machineId, JSON.stringify(trails), JSON.stringify(boxes), machineZoom],
+           machine_zoom = EXCLUDED.machine_zoom, updated_at = now()
+         WHERE studio_machine_layouts.workspace_id = EXCLUDED.workspace_id`,
+        [machineId, ws, JSON.stringify(trails), JSON.stringify(boxes), machineZoom],
       );
       await q(client, 'DELETE FROM studio_machine_canvas_cards WHERE machine_id = $1', [machineId]);
       let sortOrder = 0;
@@ -430,9 +561,10 @@ export async function saveMachineLayout(machineId: string, layout: Layout): Prom
           ],
         );
       }
-      const cur = await client.query<{ layout_revision: string }>('SELECT layout_revision FROM studio_meta WHERE id = 1 FOR UPDATE');
+      const cur = await q<{ layout_revision: string }>(
+        client, 'SELECT layout_revision FROM studio_workspaces WHERE id = $1 FOR UPDATE', [ws]);
       const next = Number(cur.rows[0]?.layout_revision ?? 0) + 1;
-      await client.query('UPDATE studio_meta SET layout_revision = $1, updated_at = now() WHERE id = 1', [String(next)] as never[]);
+      await q(client, 'UPDATE studio_workspaces SET layout_revision = $1, updated_at = now() WHERE id = $2', [String(next), ws]);
       await client.query('COMMIT');
       return { layoutRevision: next };
     } catch (err) {
@@ -442,8 +574,9 @@ export async function saveMachineLayout(machineId: string, layout: Layout): Prom
   });
 }
 
-export async function saveMachineTemplate(machineTemplate: string, layout: Layout): Promise<{ layoutRevision: number }> {
-  await ready();
+export async function saveMachineTemplate(workspaceId: string, machineTemplate: string, layout: Layout): Promise<{ layoutRevision: number }> {
+  const ws = assertWorkspaceId(workspaceId);
+  await ready(ws);
   return withClient(async (client) => {
     await client.query('BEGIN');
     try {
@@ -454,15 +587,16 @@ export async function saveMachineTemplate(machineTemplate: string, layout: Layou
       const machineZoom = clampMachineZoom(layout.machineZoom);
       await q(
         client,
-        `INSERT INTO studio_machine_templates (machine_template, trails, boxes, machine_zoom, updated_at)
-         VALUES ($1, $2::jsonb, $3::jsonb, $4, now())
-         ON CONFLICT (machine_template) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes,
+        `INSERT INTO studio_machine_templates (machine_template, workspace_id, trails, boxes, machine_zoom, updated_at)
+         VALUES ($1, $2, $3::jsonb, $4::jsonb, $5, now())
+         ON CONFLICT (workspace_id, machine_template) DO UPDATE SET trails = EXCLUDED.trails, boxes = EXCLUDED.boxes,
            machine_zoom = EXCLUDED.machine_zoom, updated_at = now()`,
-        [template, JSON.stringify(trails), JSON.stringify(boxes), machineZoom],
+        [template, ws, JSON.stringify(trails), JSON.stringify(boxes), machineZoom],
       );
-      const cur = await client.query<{ layout_revision: string }>('SELECT layout_revision FROM studio_meta WHERE id = 1 FOR UPDATE');
+      const cur = await q<{ layout_revision: string }>(
+        client, 'SELECT layout_revision FROM studio_workspaces WHERE id = $1 FOR UPDATE', [ws]);
       const next = Number(cur.rows[0]?.layout_revision ?? 0) + 1;
-      await client.query('UPDATE studio_meta SET layout_revision = $1, updated_at = now() WHERE id = 1', [String(next)] as never[]);
+      await q(client, 'UPDATE studio_workspaces SET layout_revision = $1, updated_at = now() WHERE id = $2', [String(next), ws]);
       await client.query('COMMIT');
       return { layoutRevision: next };
     } catch (err) {

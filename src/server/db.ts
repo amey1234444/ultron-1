@@ -1189,6 +1189,65 @@ async function migrate(): Promise<void> {
   await query(`CREATE INDEX IF NOT EXISTS sap_audit_log_recent ON sap_audit_log (created_at DESC);`);
   await query(`CREATE INDEX IF NOT EXISTS sap_audit_log_connection ON sap_audit_log (connection_id, created_at DESC);`);
 
+  // --- Workspace tenancy ---------------------------------------------------
+  //
+  // Until this step the studio was one global workspace: projects, folders,
+  // machines, devices, cards and layouts had no owner column, so every account
+  // read and wrote the same rows. `studio_meta` even enforced it, with a
+  // `CHECK (id = 1)` singleton holding the one pair of revision counters.
+  //
+  // Each of those tables now carries a `workspace_id`, defaulting to 'default'
+  // so every existing row keeps belonging to the workspace it was already in
+  // and nothing an existing account sees changes. `studio_workspaces` replaces
+  // the singleton and takes its counters and seeded flag with it, one row per
+  // workspace. `studio_meta` is left where it is rather than dropped: it costs
+  // nothing, and dropping the table that holds the old revision numbers is not
+  // a step to take in the same release that starts ignoring them.
+  //
+  // `studio_machine_templates` is re-keyed. Its primary key was the template
+  // name, which is shared vocabulary — two workspaces both saving a layout for
+  // 'DTDC' would have collided on it. Every other table keys on a generated id
+  // that is already unique across workspaces.
+  await once('20260928000000_workspace_tenancy', [
+    `CREATE TABLE IF NOT EXISTS studio_workspaces (
+       id              TEXT PRIMARY KEY,
+       name            TEXT NOT NULL DEFAULT '',
+       seeded          BOOLEAN NOT NULL DEFAULT false,
+       hier_revision   BIGINT NOT NULL DEFAULT 0,
+       layout_revision BIGINT NOT NULL DEFAULT 0,
+       created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+       updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+     );`,
+    // The default workspace inherits the singleton's state, so a database that
+    // has been running keeps its revision counters and does not re-seed.
+    `INSERT INTO studio_workspaces (id, name, seeded, hier_revision, layout_revision)
+     SELECT 'default', 'Default workspace', seeded, hier_revision, layout_revision
+       FROM studio_meta WHERE id = 1
+     ON CONFLICT (id) DO NOTHING;`,
+    `INSERT INTO studio_workspaces (id, name) VALUES ('default', 'Default workspace')
+     ON CONFLICT (id) DO NOTHING;`,
+
+    `ALTER TABLE studio_projects         ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+    `ALTER TABLE studio_folders          ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+    `ALTER TABLE studio_machines         ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+    `ALTER TABLE studio_devices          ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+    `ALTER TABLE studio_cards            ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+    `ALTER TABLE studio_machine_layouts  ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+    `ALTER TABLE studio_machine_templates ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+    `ALTER TABLE users                   ADD COLUMN IF NOT EXISTS workspace_id TEXT NOT NULL DEFAULT 'default';`,
+
+    `ALTER TABLE studio_machine_templates DROP CONSTRAINT IF EXISTS studio_machine_templates_pkey;`,
+    `ALTER TABLE studio_machine_templates ADD PRIMARY KEY (workspace_id, machine_template);`,
+
+    `CREATE INDEX IF NOT EXISTS studio_projects_workspace         ON studio_projects (workspace_id, sort_order);`,
+    `CREATE INDEX IF NOT EXISTS studio_folders_workspace          ON studio_folders (workspace_id, sort_order);`,
+    `CREATE INDEX IF NOT EXISTS studio_machines_workspace         ON studio_machines (workspace_id, sort_order);`,
+    `CREATE INDEX IF NOT EXISTS studio_devices_workspace          ON studio_devices (workspace_id, sort_order);`,
+    `CREATE INDEX IF NOT EXISTS studio_cards_workspace            ON studio_cards (workspace_id, sort_order);`,
+    `CREATE INDEX IF NOT EXISTS studio_machine_layouts_workspace  ON studio_machine_layouts (workspace_id);`,
+    `CREATE INDEX IF NOT EXISTS users_workspace                   ON users (workspace_id);`,
+  ]);
+
   await hardenSchema();
 }
 

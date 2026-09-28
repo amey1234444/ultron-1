@@ -28,7 +28,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (!body.machineId || !body.layout || !Array.isArray(body.layout.trails) || !Array.isArray(body.layout.boxes)) {
       return res.status(400).json({ error: 'Invalid layout payload.' });
     }
-    const result = await saveMachineLayout(body.machineId, body.layout);
+    const result = await saveMachineLayout(user.workspaceId, body.machineId, body.layout);
     return res.status(200).json({ layoutRevision: result.layoutRevision });
   } catch (err) {
     return sendApiError(res, err, 'api/workspace/layout');
