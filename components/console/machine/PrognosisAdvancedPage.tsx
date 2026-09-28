@@ -30,9 +30,13 @@ import {
   type PredictionStatus,
 } from './analysis/prognosticsModel';
 import { MachineHeader, type FeedStatus } from './overview/MachineHeader';
+import { useMlPrognosis } from './ml/useMlPrognosis';
+import { dominantHorizon, type MlPrognosisFault } from '../../../lib/knowledge/ml/contract';
 import type { ReactNode } from 'react';
 
 type Props = {
+  /** Needed to ask the ML service about this machine; the name is for the reader. */
+  machineId: string;
   machineName: string;
   template: string;
   hierarchyPath?: string;
@@ -122,6 +126,7 @@ function Panel({ title, caption, children }: { title: string; caption?: string; 
 }
 
 export function PrognosisAdvancedPage({
+  machineId,
   machineName,
   template,
   hierarchyPath,
@@ -138,6 +143,12 @@ export function PrognosisAdvancedPage({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
   const hairline = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
+
+  // The learned model, alongside the deterministic one rather than instead of
+  // it. They answer the same question from different evidence, and the local
+  // model keeps working when the service does not — so this page shows both and
+  // says which is which, rather than silently preferring one.
+  const ml = useMlPrognosis(machineId);
 
   const result = prognostics ?? emptyPrognostics();
   const predictions = result.predictions;
@@ -304,6 +315,52 @@ export function PrognosisAdvancedPage({
           <Tile label="DANGER THRESHOLD" value={num(a.dangerThreshold, 3)} tint={toneHex('danger', isDark)} />
           <Tile label="HEALTH INDICATOR" value={num(selected.healthIndicator, 3)} />
         </View>
+      </Panel>
+
+      <Panel
+        title="LEARNED MODEL · FAULT RISK"
+        caption="From the ML service, beside the deterministic model above rather than instead of it. Probability is judged against the raise threshold, and a crossing only counts once persistence is met — a single cycle over the line is noise, not a forecast."
+      >
+        {ml.unavailable ? (
+          <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
+            {ml.unavailable}
+          </Text>
+        ) : ml.loading && !ml.response ? (
+          <Text className={cn('font-body text-[11.5px] italic', mutedClass)}>Asking the forecasting service…</Text>
+        ) : (ml.response?.faults.length ?? 0) === 0 ? (
+          <Text className={cn('font-body text-[11.5px] leading-[17px]', mutedClass)}>
+            The model returned no fault risks for this machine. That is not the same as a healthy forecast: it means
+            nothing was eligible to score.
+          </Text>
+        ) : (
+          <View className="gap-2.5">
+            {(ml.response?.faults ?? []).map((fault: MlPrognosisFault) => {
+              const horizon = dominantHorizon(fault);
+              if (!horizon) return null;
+              const tint = horizon.crossed ? toneHex('danger', isDark) : horizon.persistenceMet ? toneHex('attention', isDark) : undefined;
+              return (
+                <View key={fault.faultId} className="gap-1.5">
+                  <View className="flex-row flex-wrap items-baseline" style={{ gap: 8 }}>
+                    <Text className={cn('font-mono text-[11px] font-bold tracking-wide', inkClass)}>
+                      {fault.faultName ?? fault.faultId}
+                    </Text>
+                    <Text style={tint ? { color: tint } : undefined} className="font-mono text-[10px] tracking-wider">
+                      {horizon.crossed ? 'THRESHOLD CROSSED' : horizon.persistenceMet ? 'PERSISTENCE MET' : 'BELOW THRESHOLD'}
+                    </Text>
+                  </View>
+                  <View className="flex-row flex-wrap" style={{ gap: 10 }}>
+                    <Tile label="HORIZON" value={`${horizon.horizonMinutes} min`} />
+                    <Tile label="PROBABILITY" value={num(horizon.probability * 100, 1, '%')} tint={tint} />
+                    <Tile label="RAISE / CLEAR" value={`${num(horizon.raiseThreshold * 100, 0, '%')} / ${num(horizon.clearThreshold * 100, 0, '%')}`} />
+                    <Tile label="CALIBRATED" value={horizon.calibrated ? 'YES' : 'NO'} note={horizon.calibrated ? undefined : 'Raw score; treat as a ranking'} />
+                    <Tile label="ELIGIBLE CYCLES" value={String(horizon.consecutiveEligibleCycles)} />
+                    <Tile label="STORED TREND" value={`${fault.history.length} pt`} note={fault.history.length === 0 ? 'Nothing persisted yet' : undefined} />
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
       </Panel>
 
       <Panel

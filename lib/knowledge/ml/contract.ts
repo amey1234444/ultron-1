@@ -458,6 +458,95 @@ function parseDiagnosisEntry(raw: Record<string, unknown>, index: number): MlDia
 }
 
 /** Parse and validate a response from the ML service. */
+/**
+ * `/api/ml/prognosis/:id` — fault risk per horizon, plus its stored trend.
+ *
+ * A separate response from the diagnosis, and deliberately so: the route exists
+ * to keep a predictive risk from being rendered as a present alarm. The risk
+ * horizons are the same shape the diagnosis carries, so `MlRiskHorizon` is
+ * reused rather than restated — a second definition is how the two drift.
+ *
+ * `history` is the part the service cannot supply. The model holds only what is
+ * in memory since its last restart, so the route reads the trend for each
+ * fault's dominant horizon out of Postgres and attaches it here.
+ */
+export type MlPrognosisPoint = {
+  observedAt: string;
+  probability: number;
+};
+
+export type MlPrognosisFault = {
+  faultId: string;
+  faultName: string | null;
+  horizons: MlRiskHorizon[];
+  /** Stored trend for the dominant horizon. Empty when nothing is persisted yet. */
+  history: MlPrognosisPoint[];
+};
+
+export type MlPrognosisResponse = {
+  machineId: string;
+  /** True when the service could not be reached; `faults` is then empty. */
+  degraded: boolean;
+  /** Why it is degraded, when the route said. */
+  detail: string | null;
+  generatedAt: string | null;
+  faults: MlPrognosisFault[];
+};
+
+function parsePrognosisPoint(raw: Record<string, unknown>): MlPrognosisPoint {
+  return {
+    observedAt: optionalStr(raw, 'observed_at') ?? optionalStr(raw, 'observedAt') ?? '',
+    probability: num(raw, 'probability'),
+  };
+}
+
+/**
+ * Parse defensively, because this payload crosses a service boundary.
+ *
+ * The route passes the model's own JSON through with `history` bolted on, so
+ * the field names arriving here are the service's snake_case. A malformed or
+ * partial payload resolves to a degraded response rather than throwing into a
+ * render: a prognosis panel that says the model is unreachable is useful, and
+ * one that crashes the analysis tab is not.
+ */
+export function parsePrognosis(payload: unknown): MlPrognosisResponse {
+  if (!payload || typeof payload !== 'object') {
+    return { machineId: '', degraded: true, detail: 'Malformed prognosis payload.', generatedAt: null, faults: [] };
+  }
+  const source = payload as Record<string, unknown>;
+  const degraded = source.degraded === true;
+
+  const faults = list(source, 'prognosis').map((entry) => ({
+    faultId: optionalStr(entry, 'fault_id') ?? optionalStr(entry, 'faultId') ?? '',
+    faultName: optionalStr(entry, 'fault_name') ?? optionalStr(entry, 'faultName'),
+    horizons: list(entry, 'horizons').map(parseRisk),
+    history: list(entry, 'history').map(parsePrognosisPoint),
+  }));
+
+  return {
+    machineId: optionalStr(source, 'machine_id') ?? optionalStr(source, 'machineId') ?? '',
+    degraded,
+    detail: optionalStr(source, 'detail'),
+    generatedAt: optionalStr(source, 'generated_at') ?? optionalStr(source, 'generatedAt'),
+    faults,
+  };
+}
+
+/** The horizon a fault is judged on: the longest one the model reported. */
+export function dominantHorizon(fault: MlPrognosisFault): MlRiskHorizon | null {
+  return fault.horizons.reduce<MlRiskHorizon | null>(
+    (best, candidate) => (best === null || candidate.horizonMinutes > best.horizonMinutes ? candidate : best),
+    null,
+  );
+}
+
+/** Faults whose dominant horizon has crossed its raise threshold, worst first. */
+export function crossedFaults(response: MlPrognosisResponse): MlPrognosisFault[] {
+  return response.faults
+    .filter((fault) => dominantHorizon(fault)?.crossed === true)
+    .sort((a, b) => (dominantHorizon(b)?.probability ?? 0) - (dominantHorizon(a)?.probability ?? 0));
+}
+
 export function parseDiagnosis(payload: unknown): MlDiagnosisResponse {
   const raw = asRecord(payload, 'response');
   const version = str(raw, 'schema_version', 'response');

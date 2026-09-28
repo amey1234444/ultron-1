@@ -470,6 +470,7 @@ export function AnalysisWorkspace({
 
       {view === 'prognosis-advanced' ? (
         <PrognosisAdvancedPage
+          machineId={machine.id}
           machineName={machine.name}
           template={machine.template}
           hierarchyPath={machine.hierarchyPath}
