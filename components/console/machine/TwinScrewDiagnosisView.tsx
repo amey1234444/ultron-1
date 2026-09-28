@@ -28,14 +28,14 @@ import {
   SectionLabel,
   Separator,
   StatTile,
-  Tabs,
   VerdictBanner,
   alpha,
   type Column,
   type IconName,
-  type TabItem,
   type Variant,
 } from '../../ui';
+import { AnalysisTabs } from './analysis/AnalysisTabs';
+import type { AnalysisDepth } from './analysis/analysisNav';
 import { StatusBand, type StatusCount } from './analyzer/StatusBand';
 import { ExplanationPanel } from './ml/ExplanationPanel';
 import { PrognosisPanel } from './ml/PrognosisPanel';
@@ -46,12 +46,23 @@ import type { MappedChannel } from './RackOccupancyView';
  * Twin-screw Analysis.
  *
  * Built in the single screw's shape — one status band answering "how is the
- * machine" before anything else, then tabs that go progressively deeper — and
- * filled with the DOC-01..DOC-07 chain. Three tabs, three depths:
+ * machine" before anything else, then the shared analysis navigation — and
+ * filled with the DOC-01..DOC-07 chain.
  *
- *   Diagnosis  the conclusion and what to do about it
- *   Evidence   what the conclusion rests on, and the gates it passed
- *   Signals    every reading, its expected value and its data quality
+ * It answers the same two questions as every other template, at the same two
+ * depths, so a reader moving between machines does not have to relearn the
+ * navigation because this one has a knowledge chain behind it:
+ *
+ *   Diagnosis · Overview   the conclusion and what to do about it
+ *   Diagnosis · Advanced   what the conclusion rests on: the anomalies that
+ *                          fired and the gates they passed, then every reading
+ *                          with its expected value and data quality
+ *   Prognosis · Overview   the model's predictive risk
+ *   Prognosis · Advanced   why it says so — the SHAP explanation per fault
+ *
+ * Prognosis · Advanced is offered only when the model actually returned
+ * explanations. An empty depth that still opens is worse than one that says it
+ * has nothing behind it.
  *
  * The presentation follows one rule throughout: a number is never shown without
  * the thing it is measured against. A pressure of 14 MPa means nothing alone;
@@ -69,7 +80,10 @@ type Props = {
   live?: LiveState;
 };
 
-type TabKey = 'diagnosis' | 'evidence' | 'signals' | 'prognosis';
+// The depth is the shared analysis model, not a private tab set: this machine
+// answers the same two questions as every other one, and a reader moving
+// between machines should not have to relearn the navigation because this
+// template happens to have a knowledge chain behind it.
 
 function severityVariant(severity: string): Variant {
   if (severity === 'DANGER') return 'destructive';
@@ -178,7 +192,7 @@ type SignalRow = {
 export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards, live }: Props) {
   const { isDark } = useAppTheme();
   const palette = consolePalette(isDark);
-  const [tab, setTab] = useState<TabKey>('diagnosis');
+  const [depth, setDepth] = useState<AnalysisDepth>('diagnosis-overview');
 
   // The learned layer, fetched separately and allowed to be absent. The three
   // deterministic tabs below never wait on it and never fail because of it —
@@ -280,33 +294,11 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
     0,
   );
 
-  const tabs: TabItem<TabKey>[] = [
-    { value: 'diagnosis', label: 'Diagnosis', icon: 'stethoscope' },
-    {
-      value: 'evidence',
-      label: 'Evidence',
-      icon: 'clipboard-text-outline',
-      count: firedAnomalies.length || undefined,
-      countVariant: 'warning',
-    },
-    {
-      value: 'signals',
-      label: 'Signals',
-      icon: 'access-point',
-      count: badQuality.length + uncertainQuality.length || undefined,
-      countVariant: badQuality.length > 0 ? 'destructive' : 'warning',
-    },
-    {
-      // A fourth tab rather than a panel inside Diagnosis. Predictive risk is
-      // a different claim from a present condition, and putting the two on one
-      // page is how an operator comes to read them as the same thing.
-      value: 'prognosis',
-      label: 'Prognosis',
-      icon: 'chart-timeline-variant',
-      count: mlRiskCount || undefined,
-      countVariant: 'info',
-    },
-  ];
+  // SHAP explanations are the only Prognosis · Advanced content this machine
+  // has. When the model returned none there is nothing behind that depth, and
+  // the control says so rather than opening an empty page.
+  const explained = (ml.response?.diagnoses ?? []).filter((entry) => entry.risk.length > 0 || entry.shapAvailable);
+  const depthAvailable = { 'prognosis-advanced': explained.length > 0 };
 
   const signalColumns: Column<SignalRow>[] = [
     {
@@ -414,10 +406,10 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
           {result.commissioningNotice}
         </Alert>
 
-        <Tabs items={tabs} value={tab} onChange={setTab} />
+        <AnalysisTabs active={depth} onSelect={setDepth} available={depthAvailable} />
 
         {/* ---------------- Diagnosis ---------------- */}
-        {tab === 'diagnosis' ? (
+        {depth === 'diagnosis-overview' ? (
           <View className="gap-3">
             <VerdictBanner
               variant={diagnosis.sendToDoc05 ? severityVariant(decision.severity) : 'muted'}
@@ -564,7 +556,7 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
         ) : null}
 
         {/* ---------------- Evidence ---------------- */}
-        {tab === 'evidence' ? (
+        {depth === 'diagnosis-advanced' ? (
           <View className="gap-3">
             <View className="flex-row flex-wrap gap-2">
               <StatTile
@@ -748,7 +740,7 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
         ) : null}
 
         {/* ---------------- Signals ---------------- */}
-        {tab === 'signals' ? (
+        {depth === 'diagnosis-advanced' ? (
           <View className="gap-3">
             <View className="flex-row flex-wrap gap-2">
               <StatTile
@@ -848,23 +840,25 @@ export function TwinScrewDiagnosisView({ machine, mappedChannels, devices, cards
           </View>
         ) : null}
 
-        {tab === 'prognosis' ? (
+        {depth === 'prognosis-overview' ? (
           <View className="gap-3 px-3 pb-6">
             <PrognosisPanel response={ml.response} unavailable={ml.unavailable} />
+          </View>
+        ) : null}
 
-            {ml.response?.diagnoses
-              .filter((entry) => entry.risk.length > 0 || entry.shapAvailable)
-              .map((entry) => (
-                <Collapsible
-                  key={`explain-${entry.faultId}`}
-                  title={`Why — ${entry.diagnosis}`}
-                  summary={`${entry.diagnosisState} · ${entry.faultConfidence.level} fault confidence`}
-                  icon="help-circle-outline"
-                  variant="info"
-                >
-                  <ExplanationPanel diagnosis={entry} />
-                </Collapsible>
-              ))}
+        {depth === 'prognosis-advanced' ? (
+          <View className="gap-3 px-3 pb-6">
+            {explained.map((entry) => (
+              <Collapsible
+                key={`explain-${entry.faultId}`}
+                title={`Why — ${entry.diagnosis}`}
+                summary={`${entry.diagnosisState} · ${entry.faultConfidence.level} fault confidence`}
+                icon="help-circle-outline"
+                variant="info"
+              >
+                <ExplanationPanel diagnosis={entry} />
+              </Collapsible>
+            ))}
           </View>
         ) : null}
       </ScrollView>
