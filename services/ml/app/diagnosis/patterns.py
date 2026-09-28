@@ -1,4 +1,4 @@
-"""Matching the DOC-04 §7 abnormal patterns against observed anomalies.
+"""Matching the abnormal patterns against observed anomalies.
 
 The patterns are the bridge between "this signal is abnormal" and "this fault
 is a candidate". DOC-04 states each one as a sentence of evidence — *"Pressure
@@ -23,6 +23,20 @@ P-012 is the safety net and the point of the whole exercise: a strong
 multi-signal anomaly that fits nothing known returns FAULT_UNKNOWN rather than
 the nearest match. DOC-04 §20 is explicit about it, and it is the behaviour
 that separates a diagnostic system from a classifier.
+
+**Past §7.** P-001 to P-012 come from DOC-04 §7 and cover the melt path and
+the instrumentation. P-013 onwards do not: the document does not state them,
+so each takes its evidence from its target fault's own minimum required
+evidence in DOC-07 instead. They exist because the resolver can only name a
+fault that some pattern points at, so before they were written every
+mechanical, drive-thermal, zone and shear condition resolved to FAULT_UNKNOWN
+no matter how cleanly the anomaly layer saw it.
+
+Every rule here must have a matching entry in the knowledge layer, and every
+declared pattern must have a rule here or be one the resolver owns by name.
+That is not a convention — it is enforced, in
+``tests/unit/test_resolver_and_filters.py``, because the two halves drifted
+once already and the symptom was silence rather than an error.
 """
 
 from __future__ import annotations
@@ -201,6 +215,101 @@ def _mechanical_drag(view: SignalView) -> bool:
     return view.high("TS-PM1") and not view.high("TS-P3") and drive_evidence
 
 
+_ZONES = tuple(f"TS-TZ{index}" for index in range(1, 10))
+
+
+def _bearing_thermal_rise(view: SignalView) -> bool:
+    """P-013. Motor bearing temperature leads; the drive load has not changed.
+
+    The load term is the whole discriminator against a process cause. A motor
+    running hot because the machine is asking more of it is not a bearing
+    fault, and the way to tell is that the asking would show in TS-PM1.
+    """
+    return (view.high("TS-T1") or view.rising("TS-T1")) and view.stable("TS-PM1")
+
+
+def _gearbox_thermal_rise(view: SignalView) -> bool:
+    """P-014. Gearbox oil or thrust bearing hot with the load steady."""
+    hot = (
+        view.high("TS-T2")
+        or view.rising("TS-T2")
+        or view.high("TS-T3")
+        or view.rising("TS-T3")
+    )
+    return hot and view.stable("TS-PM1")
+
+
+def _drive_looseness(view: SignalView) -> bool:
+    """P-015. The mirror of P-013: vibration leads and the bearing stays cool.
+
+    Looseness, misalignment and imbalance all put energy into the casing
+    without first putting it into the bearing, so a motor temperature that is
+    *not* anomalous is positive evidence here rather than a missing signal.
+    Excluding it also keeps this mutually exclusive with P-013, so one drive
+    problem cannot be reported twice under two names.
+    """
+    vibration_high = view.high("TS-V1") or view.high("TS-V2")
+    return (
+        vibration_high
+        and not (view.high("TS-T1") or view.rising("TS-T1"))
+        and view.stable("TS-PM1")
+    )
+
+
+def _zone_below_setpoint(view: SignalView) -> bool:
+    """P-016. A zone fallen away from its envelope, with the heat input steady.
+
+    ``not oscillating`` is what separates a zone that has dropped from one
+    that is hunting through the bottom of its swing; the hunting case is
+    P-007's, and a directed residual is the distinction.
+    """
+    if any(view.oscillating(tag) for tag in _ZONES):
+        return False
+    return (
+        any(view.low(tag) for tag in _ZONES)
+        and view.stable("TS-F1")
+        and view.stable("TS-S1")
+    )
+
+
+def _reduced_resistance(view: SignalView) -> bool:
+    """P-017. Both taps fallen with feed and screw speed unchanged.
+
+    The inverse of P-001. Feed stability is required rather than assumed:
+    pressure falling because less material is going in is P-005, and the two
+    are told apart at the feeder, not at the tap.
+    """
+    return (
+        view.low("TS-P3")
+        and view.low("TS-P4")
+        and view.stable("TS-F1")
+        and view.stable("TS-S1")
+    )
+
+
+def _pressure_pulsation(view: SignalView) -> bool:
+    """P-018. Pressure swinging while the feed holds.
+
+    The inverse of P-004, and exclusive with it: there the feed oscillates and
+    pressure follows, so requiring a stable feed here puts the origin
+    downstream of the screws.
+    """
+    return (view.oscillating("TS-P3") or view.oscillating("TS-P4")) and view.stable("TS-F1")
+
+
+def _shear_overheating(view: SignalView) -> bool:
+    """P-019. The melt is hot and the barrel is not what made it hot.
+
+    Melt temperature and drive load rise together while every zone sits inside
+    its envelope, which puts the energy in at the screws. A zone that is also
+    high makes this a thermal fault instead, so the zones are checked and the
+    match withheld rather than reported with a competing explanation.
+    """
+    if any(view.high(tag) or view.rising(tag) for tag in _ZONES):
+        return False
+    return view.high("TS-TM") and view.high("TS-PM1")
+
+
 #: The patterns, in match order. Specific before general, as the module
 #: docstring explains; P-011 and P-012 are handled by the resolver rather than
 #: here, because they are decisions about the *absence* of a match.
@@ -228,6 +337,19 @@ PATTERN_RULES: tuple[PatternRule, ...] = (
         evidence=lambda view: (
             "Both melt pressure taps are high",
             "The drop across the screen is not dominant, which points past the screen",
+        ),
+    ),
+    PatternRule(
+        pattern_id="P-019",
+        name="Shear-Driven Overheating",
+        fault_candidates=("TSE-PROC-003",),
+        requires=("TS-TM", "TS-PM1", "TS-TZ1"),
+        sharpened_by=("TS-TZ4", "TS-TZ5", "TS-S1"),
+        predicate=_shear_overheating,
+        evidence=lambda view: (
+            f"Melt temperature is high at {view.value('TS-TM'):.4g} °C",
+            "Drive load is high with it, so the energy is going in at the screws",
+            "Every barrel zone is inside its envelope, so the barrel did not add the heat",
         ),
     ),
     PatternRule(
@@ -293,7 +415,7 @@ PATTERN_RULES: tuple[PatternRule, ...] = (
     PatternRule(
         pattern_id="P-007",
         name="Thermal Control Instability",
-        fault_candidates=("TSE-CTRL-001",),
+        fault_candidates=("TSE-CTRL-001", "TSE-THERM-009"),
         requires=("TS-TZ1",),
         sharpened_by=("TS-TZ4",),
         predicate=_thermal_instability,
@@ -318,6 +440,80 @@ PATTERN_RULES: tuple[PatternRule, ...] = (
         evidence=lambda view: (
             "Drive load is high with no matching melt-pressure rise",
             "Gearbox thermal or vibration evidence accompanies it",
+        ),
+    ),
+    PatternRule(
+        pattern_id="P-013",
+        name="Drive Bearing Thermal Rise",
+        fault_candidates=("TSE-MECH-001",),
+        requires=("TS-T1", "TS-PM1"),
+        sharpened_by=("TS-V1", "TS-V2"),
+        predicate=_bearing_thermal_rise,
+        evidence=lambda view: (
+            f"Motor temperature is above its envelope at {view.value('TS-T1'):.4g} °C",
+            "Drive load is unchanged, so the machine is not asking more of the motor",
+        ),
+    ),
+    PatternRule(
+        pattern_id="P-014",
+        name="Gearbox Thermal Rise",
+        fault_candidates=("TSE-MECH-002",),
+        requires=("TS-T2", "TS-PM1"),
+        sharpened_by=("TS-T3", "TS-V3"),
+        predicate=_gearbox_thermal_rise,
+        evidence=lambda view: (
+            f"Gearbox temperature is above its envelope at {view.value('TS-T2'):.4g} °C",
+            "Drive load is unchanged, so the heat is not coming from the duty",
+        ),
+    ),
+    PatternRule(
+        pattern_id="P-015",
+        name="Drive Mechanical Looseness",
+        fault_candidates=("TSE-MECH-004",),
+        requires=("TS-V1", "TS-T1", "TS-PM1"),
+        sharpened_by=("TS-V2", "TS-V3"),
+        predicate=_drive_looseness,
+        evidence=lambda view: (
+            f"Motor vibration is above its envelope at {view.value('TS-V1'):.3g} mm/s RMS",
+            "Motor temperature is normal, which separates this from a bearing running hot",
+            "Drive load is unchanged, so the excitation is mechanical rather than process",
+        ),
+    ),
+    PatternRule(
+        pattern_id="P-016",
+        name="Zone Below Setpoint",
+        fault_candidates=("TSE-THERM-008",),
+        requires=("TS-TZ1", "TS-F1", "TS-S1"),
+        sharpened_by=("TS-TZ4", "TS-TM"),
+        predicate=_zone_below_setpoint,
+        evidence=lambda view: (
+            "A barrel zone has fallen below its contextual envelope and stayed there",
+            "The residual has a direction, so the zone has dropped rather than hunting",
+            "Feed and screw speed are steady, so the heat demand has not changed",
+        ),
+    ),
+    PatternRule(
+        pattern_id="P-017",
+        name="Reduced Process Resistance",
+        fault_candidates=("TSE-DOWN-005",),
+        requires=("TS-P3", "TS-P4", "TS-F1", "TS-S1"),
+        sharpened_by=("TS-PM1",),
+        predicate=_reduced_resistance,
+        evidence=lambda view: (
+            f"Both melt pressure taps are low, at {view.value('TS-P3'):.3g} and {view.value('TS-P4'):.3g} MPa",
+            "Feed rate and screw speed are unchanged, so less material is not the cause",
+        ),
+    ),
+    PatternRule(
+        pattern_id="P-018",
+        name="Discharge Pressure Pulsation",
+        fault_candidates=("TSE-DOWN-006",),
+        requires=("TS-P3", "TS-F1"),
+        sharpened_by=("TS-P4", "TS-S1"),
+        predicate=_pressure_pulsation,
+        evidence=lambda view: (
+            "Melt pressure is swinging well outside its learned variability",
+            "Feed rate is steady, so the swing originates downstream of the feeder",
         ),
     ),
 )

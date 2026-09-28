@@ -832,6 +832,63 @@ export const DOC04_PATTERNS: readonly PatternDefinition[] = [
     'Strong multi-signal anomaly but no known pattern fits',
     'FAULT_UNKNOWN; engineering review',
   ),
+
+  // P-013..P-020 extend the bridge to families it did not reach.
+  //
+  // P-001..P-012 cover the melt path and instrumentation, so a mechanical,
+  // thermal-zone or shear condition resolved to FAULT_UNKNOWN however clearly
+  // the anomaly layer saw it: the resolver cannot name a fault no pattern
+  // points at. Each entry below takes its evidence from that fault's own
+  // "minimum required evidence" in DOC-07 rather than from DOC-04 §7, which
+  // does not define them, and each names a direction rather than a single
+  // fault so the resolver still discriminates within the family.
+  //
+  // The look-alike pairs are split on what leads, not on amplitude: a bearing
+  // running hot shows temperature first and vibration late, looseness shows
+  // vibration with the bearing cool, and a zone that has fallen differs from
+  // one that is hunting by whether the residual has a direction at all.
+  pattern(
+    'P-013',
+    'Drive Bearing Thermal Rise',
+    'Motor bearing temperature HIGH against baseline + vibration normal or lagging + load STABLE',
+    'Motor bearing thermal candidates (TSE-MECH-001)',
+  ),
+  pattern(
+    'P-014',
+    'Gearbox Thermal Rise',
+    'Gearbox oil/thrust temperature HIGH against baseline + drive load STABLE',
+    'Gearbox lubrication and loading candidates (TSE-MECH-002)',
+  ),
+  pattern(
+    'P-015',
+    'Drive Mechanical Looseness',
+    'Overall vibration HIGH + bearing temperature normal + load STABLE',
+    'Motor mechanical candidates: looseness, misalignment, imbalance (TSE-MECH-004)',
+  ),
+  pattern(
+    'P-016',
+    'Zone Below Setpoint',
+    'Zone actual below setpoint, residual directed and persistent + heat input unchanged',
+    'Zone heating and heat-loss candidates (TSE-THERM-008)',
+  ),
+  pattern(
+    'P-017',
+    'Reduced Process Resistance',
+    'Melt pressure LOW across taps + feed and RPM STABLE',
+    'Loss of resistance candidates: starvation, leak, open flow (TSE-DOWN-005)',
+  ),
+  pattern(
+    'P-018',
+    'Discharge Pressure Pulsation',
+    'Pressure variability/oscillation HIGH + feed STABLE and not leading',
+    'Downstream surging candidates (TSE-DOWN-006)',
+  ),
+  pattern(
+    'P-019',
+    'Shear-Driven Overheating',
+    'Melt temperature HIGH + specific energy HIGH + barrel zones at setpoint',
+    'Shear and specific-energy candidates (TSE-PROC-003)',
+  ),
 ];
 
 const BY_ID = new Map(DOC04_FAULTS.map((entry) => [entry.faultId, entry]));

@@ -267,11 +267,22 @@ SCENARIOS: tuple[Scenario, ...] = (
     _scenario(
         "SC-UNKNOWN-ANOMALY",
         "Unknown abnormal pattern",
-        "Vibration and hopper level move together while the process stays normal.",
+        "Throat and vent zone run hot while the side feeder falls, process normal.",
         "unknown_anomaly",
         ScenarioExpectation(
             condition_verdict="FAULT_UNKNOWN",
-            forbid_fault_ids=("TSE-DOWN-001", "TSE-PROC-001", "TSE-FEED-001"),
+            forbid_fault_ids=(
+                "TSE-DOWN-001",
+                "TSE-PROC-001",
+                "TSE-FEED-001",
+                # The nearest classes once the mechanical and thermal patterns
+                # exist. Naming any of them here would be the exact failure
+                # DOC-04 §20 forbids, so they are forbidden explicitly.
+                "TSE-FEED-002",
+                "TSE-MECH-004",
+                "TSE-THERM-008",
+                "TSE-THERM-012",
+            ),
             notes="DOC-04 §20. The nearest known fault is not offered.",
         ),
         seed=116,

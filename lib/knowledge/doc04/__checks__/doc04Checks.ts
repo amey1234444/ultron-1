@@ -46,7 +46,26 @@ function check(name: string, condition: boolean, detail?: string) {
 
 console.log('\n--- §7/§11: the fault and pattern library ---');
 check('ninety faults are declared', DOC04_FAULTS.length === 90, String(DOC04_FAULTS.length));
-check('twelve abnormal patterns are declared', DOC04_PATTERNS.length === 12, String(DOC04_PATTERNS.length));
+// DOC-04 §7 defines twelve patterns and all twelve must survive intact; the
+// bridge is also extended past them, so the assertion is that the documented
+// set is present and unmodified rather than that nothing was ever added. A
+// renumbering or a quiet deletion still fails here.
+const DOC04_SECTION_7 = ['P-001', 'P-002', 'P-003', 'P-004', 'P-005', 'P-006',
+  'P-007', 'P-008', 'P-009', 'P-010', 'P-011', 'P-012'];
+check(
+  "DOC-04 §7's twelve patterns are all present",
+  DOC04_SECTION_7.every((id) => patternById(id) !== undefined),
+  DOC04_SECTION_7.filter((id) => patternById(id) === undefined).join(', ') || 'all present',
+);
+check(
+  'patterns beyond §7 are numbered after it, not interleaved',
+  DOC04_PATTERNS.slice(0, 12).every((entry, index) => entry.patternId === DOC04_SECTION_7[index]),
+);
+check('pattern ids are unique', new Set(DOC04_PATTERNS.map((p) => p.patternId)).size === DOC04_PATTERNS.length);
+check(
+  'every pattern declares evidence and a candidate direction',
+  DOC04_PATTERNS.every((p) => p.typicalEvidence.length > 0 && p.faultCandidateDirection.length > 0),
+);
 check('fault ids are unique', new Set(DOC04_FAULTS.map((f) => f.faultId)).size === 90);
 check('all ten families are populated', new Set(DOC04_FAULTS.map((f) => f.family)).size === 10);
 check('every fault declares required evidence', DOC04_FAULTS.every((f) => f.minimumRequiredEvidence.length > 0));

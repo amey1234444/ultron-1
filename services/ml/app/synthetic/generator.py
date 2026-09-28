@@ -368,17 +368,32 @@ def _missing_mandatory(values: dict[str, float | None], elapsed: float, scenario
 def _unknown_anomaly(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
     """Several signals abnormal in a combination no pattern describes.
 
-    Vibration and gearbox temperature climb while the whole process side stays
-    exactly normal. Real, corroborated, and matching nothing in the library —
-    which must produce FAULT_UNKNOWN, not the nearest fit.
+    The feed throat and the vent zone both run hot while the side feeder falls
+    away, and the entire process side — pressure, load, melt temperature,
+    barrel zones, drive temperature and vibration — stays exactly normal.
+    Three corroborating anomalies in three locations, and nothing in the
+    library describes the combination, which must produce FAULT_UNKNOWN rather
+    than the nearest fit.
+
+    The signals are chosen because no pattern reads them as primary evidence:
+    TS-TT0 is not a barrel zone, TS-TV is not the vacuum tap P-009 watches,
+    and TS-F2 is the side feeder rather than the main one P-004 and P-005
+    watch. That is what makes the combination genuinely outside the library
+    rather than merely unusual.
+
+    This scenario previously moved motor vibration instead. That stopped being
+    an unknown pattern the moment P-015 was added — vibration high with the
+    bearing cool and the load steady is TSE-MECH-004, a fault the library now
+    names — so a signature the library had not grown into was needed for
+    GT-010 to keep testing the safety net rather than a coverage gap.
     """
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
     progress = min(1.0, (elapsed - onset) / (400.0 / scenario.progression_rate))
-    values["TS-V1"] = (values["TS-V1"] or 0.0) * (1.0 + 1.6 * progress)
-    values["TS-V2"] = (values["TS-V2"] or 0.0) * (1.0 + 1.5 * progress)
-    values["TS-L1"] = (values["TS-L1"] or 0.0) * (1.0 - 0.5 * progress)
+    values["TS-TT0"] = (values["TS-TT0"] or 0.0) + 34.0 * progress
+    values["TS-TV"] = (values["TS-TV"] or 0.0) + 34.0 * progress
+    values["TS-F2"] = (values["TS-F2"] or 0.0) * (1.0 - 0.42 * progress)
 
 
 def _two_independent_faults(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
@@ -495,8 +510,16 @@ def _zone_temperature_oscillation(values: dict[str, float | None], elapsed: floa
     onset = scenario.onset_second or 240
     if elapsed < onset:
         return
+    # The amplitude is set by what "hunting" has to mean against this zone's
+    # own spread, not by what looks dramatic. The variability gate calls a
+    # signal oscillating at three times its baseline standard deviation, and
+    # TS-TZ3's template baseline carries 6 °C, so a swing of ±34 °C puts the
+    # five-minute spread at ~24 °C — clear of the gate rather than sitting on
+    # it. A smaller swing is a zone wandering inside its tolerance, which is
+    # what the template says is normal, and labelling that "hunting" would
+    # teach the model a fault that the evidence does not support.
     phase = 2 * math.pi * (elapsed - onset) / 90.0
-    values["TS-TZ3"] = (values["TS-TZ3"] or 0.0) + 11.0 * math.sin(phase)
+    values["TS-TZ3"] = (values["TS-TZ3"] or 0.0) + 34.0 * math.sin(phase)
 
 
 def _melt_pressure_low(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
@@ -505,8 +528,14 @@ def _melt_pressure_low(values: dict[str, float | None], elapsed: float, scenario
     if elapsed < onset:
         return
     progress = min(1.0, (elapsed - onset) / (420.0 / scenario.progression_rate))
+    # The same fraction off both taps, because that is what losing resistance
+    # does — it is not a per-tap effect. The fraction is 52% rather than a
+    # gentler one because TS-P4's baseline is proportionally tighter than
+    # TS-P3's, so a drop that takes the inlet clear of its anomaly band leaves
+    # the outlet inside its own. Anything shallower is a scenario labelled
+    # "low melt pressure" in which the outlet tap reads normal.
     for tag in ("TS-P3", "TS-P4"):
-        values[tag] = (values[tag] or 0.0) * (1.0 - 0.45 * progress)
+        values[tag] = (values[tag] or 0.0) * (1.0 - 0.52 * progress)
     values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 - 0.18 * progress)
 
 
@@ -519,9 +548,18 @@ def _pressure_pulsation(values: dict[str, float | None], elapsed: float, scenari
     onset = scenario.onset_second or 300
     if elapsed < onset:
         return
+    # Sized against TS-P3's baseline spread the same way the zone-hunting
+    # scenario is: ±78% of an 8 MPa median puts the five-minute spread near
+    # 4.4 MPa against a 1.2 MPa baseline, which clears the variability gate.
+    #
+    # The outlet swing is deliberately much smaller. The screen and the volume
+    # behind it damp the pulsation, so TS-P4 follows at roughly half the
+    # amplitude and stays inside its own envelope — which keeps it reporting
+    # NOT_ANOMALOUS instead of tripping a spurious level anomaly at the peaks,
+    # and leaves the match resting on the tap where the evidence actually is.
     phase = 2 * math.pi * (elapsed - onset) / 30.0
-    values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.26 * math.sin(phase))
-    values["TS-P4"] = (values["TS-P4"] or 0.0) * (1.0 + 0.22 * math.sin(phase - 0.2))
+    values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.78 * math.sin(phase))
+    values["TS-P4"] = (values["TS-P4"] or 0.0) * (1.0 + 0.45 * math.sin(phase - 0.2))
 
 
 def _excessive_shear(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
@@ -534,8 +572,19 @@ def _excessive_shear(values: dict[str, float | None], elapsed: float, scenario: 
     if elapsed < onset:
         return
     progress = min(1.0, (elapsed - onset) / (600.0 / scenario.progression_rate))
-    values["TS-TM"] = (values["TS-TM"] or 0.0) + 24.0 * progress
-    values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.32 * progress)
+    # Both terms clear their anomaly bands with margin rather than landing on
+    # them: +30 °C puts melt temperature at 245 against a 238.8 threshold, and
+    # +45% puts drive load at 65 against 62.9. At the previous +24 °C and +32%
+    # the melt temperature crossed by 0.2 °C and the load did not cross at all,
+    # so the scenario carried a specific-energy label with no anomalous
+    # specific energy in it.
+    #
+    # TS-P3 rises only slightly and stays inside its envelope on purpose: a
+    # melt that is hot because of shear is not a melt path that is restricted,
+    # and a pressure rise large enough to be anomalous would make the two
+    # readings compete.
+    values["TS-TM"] = (values["TS-TM"] or 0.0) + 30.0 * progress
+    values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.45 * progress)
     values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.10 * progress)
 
 

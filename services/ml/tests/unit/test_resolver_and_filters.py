@@ -364,3 +364,75 @@ def test_shipped_threshold_config_loads(isolated_settings) -> None:
     config = FilterConfigSet.load(path)
     assert config.for_output("TSE-DOWN-001@15").raise_threshold == pytest.approx(0.75)
     assert config.for_output("TSE-THERM-012@5").raise_threshold == pytest.approx(0.90)
+
+
+# --- the knowledge / runtime bridge --------------------------------------
+#
+# DOC04_PATTERNS in the TypeScript knowledge layer is what the documentation,
+# the export and the UI all read. PATTERN_RULES here is what actually runs.
+# Nothing connected the two, so eight patterns were once added to the
+# knowledge layer, exported cleanly, passed every check, and changed no
+# behaviour at all: the resolver cannot name a fault that no executable rule
+# points at, so every one of those conditions still resolved to FAULT_UNKNOWN.
+#
+# These tests are the bridge. A pattern that exists only on one side is now a
+# failure rather than a silent no-op.
+
+
+def test_every_executable_rule_is_a_declared_pattern():
+    from app.diagnosis.patterns import PATTERN_RULES
+    from app.knowledge.loader import knowledge
+
+    declared = {entry.pattern_id for entry in knowledge().patterns}
+    for rule in PATTERN_RULES:
+        assert rule.pattern_id in declared, (
+            f"{rule.pattern_id} is implemented in patterns.py but is not in the "
+            "knowledge layer, so nothing documents what it claims."
+        )
+
+
+def test_every_declared_pattern_is_reachable():
+    """Either an executable rule matches it, or the resolver owns it by name.
+
+    P-011 and P-012 are decisions about the *absence* of a match, so they live
+    in the resolver rather than the rule table. Everything else must have a
+    predicate, or it is knowledge that can never fire.
+    """
+    from app.diagnosis.patterns import PATTERN_RULES
+    from app.knowledge.loader import knowledge
+
+    resolver_owned = {"P-011", "P-012"}
+    implemented = {rule.pattern_id for rule in PATTERN_RULES} | resolver_owned
+    declared = {entry.pattern_id for entry in knowledge().patterns}
+    unreachable = sorted(declared - implemented)
+    assert not unreachable, (
+        f"{unreachable} are declared in the knowledge layer with no predicate "
+        "behind them, so no evidence can ever match them."
+    )
+
+
+def test_every_rule_candidate_exists_in_the_fault_library():
+    from app.diagnosis.patterns import PATTERN_RULES
+    from app.knowledge.loader import knowledge
+
+    book = knowledge()
+    for rule in PATTERN_RULES:
+        assert rule.fault_candidates, f"{rule.pattern_id} points at no fault."
+        for fault_id in rule.fault_candidates:
+            assert book.fault(fault_id) is not None, (
+                f"{rule.pattern_id} points at {fault_id}, which the fault "
+                "library does not contain. The resolver would silently drop it."
+            )
+
+
+def test_every_rule_reads_only_real_tags():
+    """A predicate guarded by a tag that does not exist never evaluates."""
+    from app.diagnosis.patterns import PATTERN_RULES
+    from app.knowledge.loader import knowledge
+
+    book = knowledge()
+    for rule in PATTERN_RULES:
+        for tag in rule.requires + rule.sharpened_by:
+            assert book.tag(tag) is not None, (
+                f"{rule.pattern_id} requires {tag}, which is not a tag on this template."
+            )

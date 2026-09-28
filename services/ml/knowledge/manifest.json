@@ -13,7 +13,7 @@
     "operatingStates": 13,
     "formulas": 49,
     "faults": 90,
-    "patterns": 12,
+    "patterns": 19,
     "anomalies": 40,
     "tags": 35
   },
@@ -21,7 +21,7 @@
     "signals.json": "42ef86ba5f5a779b986ac4ccea407eb403b7a09f212546872c6b32f617cc7e81",
     "operating_states.json": "659b0b86590b0df659dafb11f4ed5676196b7fca65011c287d7a5012bc02920e",
     "formulas.json": "652fe9153894a213946f6fe7409567a4c11b7a3c6400cb049bcc57c7a1ec8fc7",
-    "faults.json": "7849210ccdd77927aaf43b693c1cf943a74807dd62a232f331d810934d26a246",
+    "faults.json": "fae34a74f30ece5f0576b417ccfd638b77232b517db0bfaa82ee805424eeddd1",
     "anomalies.json": "e3e49250b6c2ee5af289041aee4bb5fa857749ba3cb4df9c3e3f8763337d8283",
     "tags.json": "cf0b68f2f5bbf91af9c11d7e4b2d3ec01966e4daf33601f3757c9abba822ed8e",
     "enums.json": "4e88417bc4002b7e8ea2a39d560d3aad77b74bc4874290027f1c6c2aad009cad",

@@ -884,6 +884,48 @@
       "name": "Unknown Abnormal Pattern",
       "typicalEvidence": "Strong multi-signal anomaly but no known pattern fits",
       "faultCandidateDirection": "FAULT_UNKNOWN; engineering review"
+    },
+    {
+      "patternId": "P-013",
+      "name": "Drive Bearing Thermal Rise",
+      "typicalEvidence": "Motor bearing temperature HIGH against baseline + vibration normal or lagging + load STABLE",
+      "faultCandidateDirection": "Motor bearing thermal candidates (TSE-MECH-001)"
+    },
+    {
+      "patternId": "P-014",
+      "name": "Gearbox Thermal Rise",
+      "typicalEvidence": "Gearbox oil/thrust temperature HIGH against baseline + drive load STABLE",
+      "faultCandidateDirection": "Gearbox lubrication and loading candidates (TSE-MECH-002)"
+    },
+    {
+      "patternId": "P-015",
+      "name": "Drive Mechanical Looseness",
+      "typicalEvidence": "Overall vibration HIGH + bearing temperature normal + load STABLE",
+      "faultCandidateDirection": "Motor mechanical candidates: looseness, misalignment, imbalance (TSE-MECH-004)"
+    },
+    {
+      "patternId": "P-016",
+      "name": "Zone Below Setpoint",
+      "typicalEvidence": "Zone actual below setpoint, residual directed and persistent + heat input unchanged",
+      "faultCandidateDirection": "Zone heating and heat-loss candidates (TSE-THERM-008)"
+    },
+    {
+      "patternId": "P-017",
+      "name": "Reduced Process Resistance",
+      "typicalEvidence": "Melt pressure LOW across taps + feed and RPM STABLE",
+      "faultCandidateDirection": "Loss of resistance candidates: starvation, leak, open flow (TSE-DOWN-005)"
+    },
+    {
+      "patternId": "P-018",
+      "name": "Discharge Pressure Pulsation",
+      "typicalEvidence": "Pressure variability/oscillation HIGH + feed STABLE and not leading",
+      "faultCandidateDirection": "Downstream surging candidates (TSE-DOWN-006)"
+    },
+    {
+      "patternId": "P-019",
+      "name": "Shear-Driven Overheating",
+      "typicalEvidence": "Melt temperature HIGH + specific energy HIGH + barrel zones at setpoint",
+      "faultCandidateDirection": "Shear and specific-energy candidates (TSE-PROC-003)"
     }
   ]
 }
