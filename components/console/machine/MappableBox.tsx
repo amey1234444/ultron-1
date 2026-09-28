@@ -76,6 +76,16 @@ export type MappableBoxProps = {
   // the live channel readout.
   readOnly?: boolean;
   hideUnlink?: boolean;
+  /**
+   * Open the channel picker as soon as this card appears.
+   *
+   * Set for a card created by tapping an instrument pad on the machine. That
+   * gesture means "map this point", so the card arrives with the question
+   * already asked rather than making the operator find it and click it again.
+   * Honoured once, on mount: re-renders must not reopen a picker the operator
+   * has since dismissed.
+   */
+  autoOpenPicker?: boolean;
   onDrag: (point: Point) => void;
   // Moves the connector dot itself, independently of the card. Absent (or in
   // read-only) the dot is not draggable — and in read-only it is not drawn at
@@ -111,6 +121,7 @@ export function MappableBox({
   boxScale = 1,
   readOnly = false,
   hideUnlink = false,
+  autoOpenPicker,
   onDrag,
   onConnectorDrag,
   onLabelChange,
@@ -124,7 +135,10 @@ export function MappableBox({
   const mutedClass = isDark ? 'text-ink-muted' : 'text-ink-inverse-muted';
   const inkClass = isDark ? 'text-ink' : 'text-ink-inverse';
 
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // Mount-time only, and deliberately not reactive to `autoOpenPicker`
+  // afterwards: the prop stays true for the life of the card, so reacting to
+  // it would reopen the picker every render after the operator closed it.
+  const [pickerOpen, setPickerOpen] = useState(() => Boolean(autoOpenPicker));
   const [channelSearch, setChannelSearch] = useState('');
   const [selectedGatewayId, setSelectedGatewayId] = useState<string | null>(null);
   const [selectedRackId, setSelectedRackId] = useState<string | null>(null);

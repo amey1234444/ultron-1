@@ -235,6 +235,54 @@ export function hasDefaultLayout(machineTemplate: string) {
   return machineTemplate in TEMPLATE_POINTS_BY_TEMPLATE;
 }
 
+/**
+ * One card, wired to one instrument pad, placed where the template says that
+ * pad's card belongs.
+ *
+ * This is `createTemplateDefaultLayout` for a single connector, and it exists
+ * so that tapping a pad on the machine produces exactly the card the template
+ * would have produced for it — same side, same column slot, same bend. A pad
+ * mapped by hand and a pad mapped by "⟲ Template" then look identical,
+ * because they are.
+ *
+ * Returns null for a pad the template has no placement for. That is not an
+ * error: a machine can have instrument pads the default layout does not lay a
+ * card out for, and the caller falls back to placing one beside the pad.
+ */
+export function createCardForConnector(
+  machineTemplate: string,
+  connectorCode: string,
+  machineRect?: MachineRect | null,
+): { box: Box; trail: Trail } | null {
+  const templatePoints = TEMPLATE_POINTS_BY_TEMPLATE[machineTemplate];
+  const templatePoint = templatePoints?.find((candidate) => candidate.code === connectorCode);
+  if (!templatePoint) return null;
+
+  const rect = machineRect ?? REFERENCE_MACHINE_RECT;
+  const artwork = artworkSizeForTemplate(machineTemplate);
+
+  const referenceBoxEnd = stageFromReference(templatePoint.boxEnd);
+  const box = boxFromEndpoint(referenceBoxEnd, templatePoint.side, templatePoint.label, templatePoint.code);
+  const boxEnd = boxEndpoint(box, templatePoint.side);
+  const machineEnd = {
+    x: rect.x + (templatePoint.anchor.x / artwork.width) * rect.width,
+    y: rect.y + (templatePoint.anchor.y / artwork.height) * rect.height,
+  };
+  const bends = templatePoint.bend ? [stageFromReference(templatePoint.bend)] : [];
+
+  return {
+    box,
+    trail: {
+      id: makeId('trail'),
+      points: [machineEnd, ...bends, boxEnd],
+      startMachineAnchor: machineAnchor(templatePoint.anchor.x, templatePoint.anchor.y, artwork),
+      startMachinePointCode: templatePoint.code,
+      endBoxId: box.id,
+      endBoxAnchor: boxAnchorFor(box, boxEnd),
+    },
+  };
+}
+
 export function createTemplateDefaultLayout(
   machineTemplate: string,
   _channels: ChannelRef[],

@@ -32,6 +32,7 @@ import {
 import { MappableBox, MAPPABLE_BOX_HEIGHT, MAPPABLE_BOX_WIDTH, UNLINKED_BOX_WIDTH } from './MappableBox';
 import { DEFAULT_STAGE_BOUNDS, type StageBounds } from './StageGrid';
 import { createTemplateDefaultLayout, hasDefaultLayout, migrateTemplateLayout } from './templateDefaultLayouts';
+import { createCardForConnector } from './templateDefaultLayouts';
 import { connectorStagePoint, rerouteBend, withResolvedConnectors } from './trailRouting';
 
 export type Anchor = { rx: number; ry: number };
@@ -361,6 +362,19 @@ export function TrailBoard({
   const [boxes, setBoxes] = useState<Box[]>(initialLayoutRef.current.boxes);
   const appliedRemoteLayout = useRef<SavedLayout | null>(initialLayout);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The card just created by tapping a pad, so exactly that one opens its
+  // channel picker. Cleared once consumed, or the picker would reopen on the
+  // next render after being dismissed.
+  const [autoPickerBoxId, setAutoPickerBoxId] = useState<string | null>(null);
+
+  // Consumed on the render after it is set: MappableBox reads the flag once,
+  // at mount, so holding it any longer only risks reopening a picker the
+  // operator has closed.
+  useEffect(() => {
+    if (!autoPickerBoxId) return;
+    const timer = setTimeout(() => setAutoPickerBoxId(null), 0);
+    return () => clearTimeout(timer);
+  }, [autoPickerBoxId]);
   const [boardSize, setBoardSize] = useState({ width: 0, height: 0 });
   const [boxLiveValues, setBoxLiveValues] = useState<Record<string, number>>({});
   const [boxSizes, setBoxSizes] = useState<Record<string, { width: number; height: number }>>({});
@@ -727,6 +741,83 @@ export function TrailBoard({
       },
     ]);
     setSelectedId(id);
+  };
+
+  /**
+   * Map an instrument pad by tapping it.
+   *
+   * The board's original and only way to declare a connection was to add a
+   * card and drag its trail endpoint onto a pad. That is two gestures and a
+   * drag, and it requires knowing that the pads exist at all — they were only
+   * drawn while an endpoint was already in the air, so the affordance was
+   * invisible until after you had committed to using it.
+   *
+   * Tapping a pad now does the whole thing: it places the card where the
+   * template says that pad's card belongs, wires the trail to the pad, and
+   * opens the channel picker. Dragging still works exactly as before, and a
+   * card made either way is the same object.
+   *
+   * A pad that already has a card selects that card instead of making a
+   * second one. Two cards on one instrument is not a thing anyone means to
+   * do, and it would make the connector state ambiguous.
+   */
+  const flashConnector = (code: string) => {
+    setFlashedConnector(code);
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    flashTimer.current = setTimeout(() => setFlashedConnector(null), 2000);
+  };
+
+  const mapConnector = (connector: MachineConnector) => {
+    if (readOnly) return;
+
+    const existing = trailsRef.current.find(
+      (trail) => trail.startMachinePointCode === connector.code || trail.endMachinePointCode === connector.code,
+    );
+    if (existing) {
+      const boxId = existing.startMachinePointCode === connector.code ? existing.endBoxId : existing.startBoxId;
+      setSelectedId(boxId ?? existing.id);
+      flashConnector(connector.code);
+      return;
+    }
+
+    const placed = createCardForConnector(machineTemplate, connector.code, machineRect);
+    if (placed) {
+      replaceBoxes((prev) => [...prev, placed.box]);
+      replaceTrails((prev) => [...prev, placed.trail]);
+      setAutoPickerBoxId(placed.box.id);
+      setSelectedId(placed.box.id);
+      flashConnector(connector.code);
+      return;
+    }
+
+    // No template placement for this pad — a machine may have instrument pads
+    // the default layout lays no card out for. The card goes beside the pad,
+    // on whichever side has more room, rather than not appearing at all.
+    if (!machineRect) return;
+    const padPoint = connectorStagePoint(connector, machineRect);
+    const toLeft = padPoint.x > machineRect.x + machineRect.width / 2;
+    const box: Box = {
+      id: makeId('box'),
+      x: toLeft ? padPoint.x + 90 : padPoint.x - UNLINKED_BOX_WIDTH - 90,
+      y: padPoint.y - MAPPABLE_BOX_HEIGHT / 2,
+      label: connector.label,
+      templatePointCode: connector.code,
+    };
+    const boxEnd = { x: toLeft ? box.x : box.x + UNLINKED_BOX_WIDTH, y: padPoint.y };
+    replaceBoxes((prev) => [...prev, box]);
+    replaceTrails((prev) => [
+      ...prev,
+      {
+        id: makeId('trail'),
+        points: [padPoint, boxEnd],
+        startMachineAnchor: { rx: connector.rx, ry: connector.ry },
+        startMachinePointCode: connector.code,
+        endBoxId: box.id,
+      },
+    ]);
+    setAutoPickerBoxId(box.id);
+    setSelectedId(box.id);
+    flashConnector(connector.code);
   };
 
   const addBox = () => {
@@ -1257,16 +1348,25 @@ export function TrailBoard({
         style={[stageStyle, { userSelect: 'none' }]}
         onLayout={(e) => setBoardSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
       >
-        {/* Instrument pads as drop targets. They appear the moment an endpoint
-            is picked up, so where a connection may land is shown rather than
-            guessed, and the pad just wired keeps a ring for the life of the
-            confirmation toast. */}
-        {!readOnly && machineRect && connectors.length > 0 && (wiring || flashedConnector) && (
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
+        {/* Instrument pads.
+            
+            Visible for the whole of configure mode, not only while an endpoint
+            is in the air. They used to appear on drag and vanish on release,
+            which made the machine's own instrumentation invisible until after
+            you had committed to wiring something — you had to know the pads
+            were there to discover that they were there.
+
+            Shown, they are the map: every point this machine can report, and
+            which of them are wired. Tapping one maps it, so the whole gesture
+            is "press the instrument you want" rather than "add a card, find
+            the pad, drag to it". Dragging still works and is unchanged; while
+            an endpoint is in the air the pads switch to drop-target styling,
+            including the struck-through refusal for a unit that cannot fit. */}
+        {!readOnly && machineRect && connectors.length > 0 && (
+          <View pointerEvents="box-none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0 }}>
             {connectors.map((connector) => {
               if (connector.projectionVisible === false) return null;
               const flashed = flashedConnector === connector.code;
-              if (!wiring && !flashed) return null;
               const padPoint = connectorStagePoint(connector, machineRect);
               const fit = wiring ? connectorFitForUnit(connector, wiring.unit) : 'unknown';
               const locked = magnetTarget?.connector.code === connector.code;
@@ -1274,11 +1374,52 @@ export function TrailBoard({
               // struck through in the critical colour — instead of quietly
               // being one of the available targets.
               const rejects = fit === 'mismatch';
-              const colour = rejects ? palette.critical : connector.analyzerTag ? palette.accent : palette.neutral;
-              const size = locked || flashed ? 36 : rejects ? 18 : 26;
+              const wired = connectorState[connector.code];
+              // Wired pads take the accent; unwired ones stay neutral unless
+              // the analyser reads them. Live is not a fourth colour — it is
+              // the same accent carried heavier, so the three states survive
+              // greyscale and colour-blind viewing the way the pads drawn
+              // into the artwork do.
+              const colour = rejects
+                ? palette.critical
+                : wired || connector.analyzerTag
+                  ? palette.accent
+                  : palette.neutral;
+              // At rest a pad is small and quiet; it grows while it is a live
+              // drop target or has just been wired. An unwired pad is hollow
+              // and a wired one is filled, so which instruments are still to
+              // do is readable without reading any labels.
+              const idle = !wiring && !flashed;
+              const size = locked || flashed ? 36 : rejects ? 18 : idle ? 20 : 26;
+              const fill = rejects
+                ? 0.06
+                : locked || flashed ? 0.22
+                : wired === 'live' ? 0.34
+                : wired ? 0.18
+                : idle ? 0.04 : 0.08;
+              const stroke = rejects
+                ? 0.5
+                : locked || flashed ? 0.95
+                : wired === 'live' ? 0.85
+                : wired ? 0.6
+                : idle ? 0.34 : 0.42;
               return (
-                <View
+                <Pressable
                   key={connector.code}
+                  // Not a drop target while an endpoint is being dragged: the
+                  // drag owns the gesture, and a Pressable swallowing it would
+                  // break the magnet.
+                  pointerEvents={wiring ? 'none' : 'auto'}
+                  onPress={() => mapConnector(connector)}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    wired
+                      ? `${connector.label} — mapped. Select its card.`
+                      : `${connector.label} — not mapped. Map this instrument.`
+                  }
+                  // A 20px pad is below a comfortable touch target, so the
+                  // pressable is padded out beyond the mark it draws.
+                  hitSlop={12}
                   style={{
                     position: 'absolute',
                     left: padPoint.x - size / 2,
@@ -1287,14 +1428,14 @@ export function TrailBoard({
                     height: size,
                     borderRadius: size / 2,
                     borderWidth: locked || flashed ? 2 : 1.5,
-                    borderColor: alpha(colour, rejects ? 0.5 : locked || flashed ? 0.95 : 0.42),
-                    backgroundColor: alpha(colour, rejects ? 0.06 : locked || flashed ? 0.22 : 0.08),
+                    borderColor: alpha(colour, stroke),
+                    backgroundColor: alpha(colour, fill),
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
                   {rejects ? <View style={{ width: size - 6, height: 1.5, backgroundColor: alpha(colour, 0.55) }} /> : null}
-                </View>
+                </Pressable>
               );
             })}
 
@@ -1376,6 +1517,7 @@ export function TrailBoard({
               boxScale={machineZoom}
               readOnly={readOnly}
               hideUnlink={hideUnlink}
+              autoOpenPicker={autoPickerBoxId === box.id}
               onDrag={(point) => updateBoxPosition(box.id, point)}
               onConnectorDrag={(point) => updateBoxConnector(box.id, point)}
               onLabelChange={(label) => updateBoxLabel(box.id, label)}
