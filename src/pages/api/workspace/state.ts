@@ -39,7 +39,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       if ('conflict' in result) {
         return res.status(409).json({ error: 'Workspace changed since last load.', hierRevision: result.hierRevision });
       }
-      return res.status(200).json({ hierRevision: result.hierRevision });
+      // The repairs travel back so the console can say what was changed. A
+      // save that silently dropped a machine is how this went unnoticed for
+      // as long as it did; a cap keeps a pathological tree from returning a
+      // response larger than the workspace.
+      return res.status(200).json({ hierRevision: result.hierRevision, repairs: result.repairs.slice(0, 50) });
     }
 
     res.setHeader('Allow', 'GET, PUT');

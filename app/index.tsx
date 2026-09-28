@@ -251,6 +251,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     saveLayout,
     saveTemplateLayout,
     saveError,
+    saveNotice,
+    dismissSaveNotice,
     dismissSaveError,
   } = useWorkspaceStore();
 
@@ -720,10 +722,21 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   };
 
   // Machines always live inside a folder, so the project-root option is a no-op.
+  //
+  // The destination folder decides the project too. Moving a machine across
+  // projects used to change only its folder, leaving `projectId` on the
+  // project it came from — a disagreement nothing showed, until that old
+  // project was deleted and took the machine's new folder's sibling rows with
+  // it while the machine itself, filtered by the stale id, stayed behind
+  // pointing at nothing. The database refuses such a row, and refuses the
+  // whole snapshot with it.
   const handleMoveMachine = (destFolderId: string | null) => {
     if (!moveMachineId) return;
-    if (destFolderId) {
-      setMachines((prev) => prev.map((m) => (m.id === moveMachineId ? { ...m, folderId: destFolderId } : m)));
+    const destination = destFolderId ? folders.find((f) => f.id === destFolderId) : null;
+    if (destFolderId && destination) {
+      setMachines((prev) =>
+        prev.map((m) => (m.id === moveMachineId ? { ...m, folderId: destFolderId, projectId: destination.projectId } : m)),
+      );
     }
     setMoveMachineId(null);
   };
@@ -737,9 +750,18 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   const handleDelete = () => {
     if (!deleteTarget) return;
     if (deleteTarget.kind === 'project') {
+      // By folder as well as by project. A machine whose `projectId` had
+      // drifted from the folder it actually sits in would survive a filter on
+      // the project alone, and be left pointing at a folder deleted on the
+      // line above.
+      const orphanedFolderIds = new Set(
+        folders.filter((f) => f.projectId === deleteTarget.id).map((f) => f.id),
+      );
       setProjects((prev) => prev.filter((p) => p.id !== deleteTarget.id));
       setFolders((prev) => prev.filter((f) => f.projectId !== deleteTarget.id));
-      setMachines((prev) => prev.filter((m) => m.projectId !== deleteTarget.id));
+      setMachines((prev) =>
+        prev.filter((m) => m.projectId !== deleteTarget.id && !orphanedFolderIds.has(m.folderId)),
+      );
       setDevices((prev) => prev.map((d) => (d.projectId === deleteTarget.id ? { ...d, projectId: null } : d)));
       if (selected.kind === 'project' && selected.id === deleteTarget.id) setSelected({ kind: 'none' });
       if (selected.kind === 'folder' && folders.find((f) => f.id === selected.id)?.projectId === deleteTarget.id) {
@@ -1147,6 +1169,35 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
             </Text>
             <View className="mt-4 flex-row justify-end">
               <ActionButton label="Close" variant="secondary" onPress={dismissSaveError} />
+            </View>
+          </View>
+        </View>
+      )}
+
+      {/* The save went through, but not on exactly what was sent. A row the
+          database cannot store — a machine whose folder is gone, a card whose
+          rack is gone — is dropped so the rest of the workspace can be
+          written at all, and the alternative to saying so is an operator
+          discovering it themselves days later. */}
+      {saveNotice && (
+        <View
+          className="absolute inset-0 z-50 items-center justify-center px-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.28)' }}
+        >
+          <View
+            className={cn(
+              'w-full max-w-[460px] rounded-xl border px-5 py-4 shadow-xl',
+              isDark ? 'border-status-warning/50 bg-surface-darkpanel' : 'border-status-warning/60 bg-surface-lightpanel',
+            )}
+          >
+            <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              Saved, with changes
+            </Text>
+            <Text className={cn('mt-2 font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+              {saveNotice}
+            </Text>
+            <View className="mt-4 flex-row justify-end">
+              <ActionButton label="Close" variant="secondary" onPress={dismissSaveNotice} />
             </View>
           </View>
         </View>

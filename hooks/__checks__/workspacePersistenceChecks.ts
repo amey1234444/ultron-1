@@ -44,6 +44,7 @@ const store = readFileSync(join(process.cwd(), 'hooks/useWorkspaceStore.ts'), 'u
 const page = readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');
 const api = readFileSync(join(process.cwd(), 'src/pages/api/workspace/state.ts'), 'utf8');
 const server = readFileSync(join(process.cwd(), 'src/server/workspace.ts'), 'utf8');
+const db = readFileSync(join(process.cwd(), 'src/server/db.ts'), 'utf8');
 
 console.log('--- the two kinds of 409 ---');
 ok('the server answers a concurrency conflict with the revision to rebase on',
@@ -98,6 +99,43 @@ ok('it says the work is still there and not to reload',
   page.includes('Your work is still here') && page.includes('do not reload first'),
   'the edit is on screen and in memory; only a reload destroys it');
 ok('it can be dismissed', page.includes('onPress={dismissSaveError}'));
+
+console.log('\n--- one unstorable row cannot cost the whole workspace ---');
+// The write deletes this workspace's rows and re-inserts the tree in one
+// transaction, so any foreign key in it is a way for a single bad row to
+// abort the save — permanently, since that row is in every payload after it.
+ok('the snapshot is reconciled before it is written',
+  server.includes('const { data: sound, repairs } = reconcileHierarchy(data);'));
+ok('and it is the reconciled copy that is normalised and stored',
+  server.includes('normalizeHierarchyForPersistence(sound)'),
+  'reconciling and then writing the original would change nothing at all');
+ok('the constraints it mirrors are still the ones the schema has',
+  db.includes('folder_id   TEXT NOT NULL REFERENCES studio_folders(id)')
+  && db.includes('project_id  TEXT NOT NULL REFERENCES studio_projects(id)')
+  && db.includes('parent_id   TEXT REFERENCES studio_folders(id)')
+  && db.includes('device_id   TEXT NOT NULL REFERENCES studio_devices(id)'),
+  'if a column changes here, lib/hierarchyIntegrity has to change with it');
+ok('what was repaired is returned rather than dropped on the floor',
+  server.includes('return { hierRevision: next, repairs };')
+  && api.includes('repairs: result.repairs.slice(0, 50)'));
+ok('and shown', page.includes('{saveNotice && (') && page.includes('Saved, with changes'));
+
+console.log('\n--- the client stops producing rows the schema refuses ---');
+// A machine moved between projects used to keep the project id it came from.
+// Deleting that project then removed the machine's folder while the machine,
+// filtered by the stale id, stayed behind pointing at nothing.
+ok('a moved machine takes its destination\'s project with it',
+  page.includes('folderId: destFolderId, projectId: destination.projectId'));
+ok('and a move to a folder that is not there does nothing',
+  page.includes('const destination = destFolderId ? folders.find((f) => f.id === destFolderId) : null;')
+  && page.includes('if (destFolderId && destination) {'));
+ok('deleting a project removes machines by folder as well as by project id',
+  page.includes('!orphanedFolderIds.has(m.folderId)'),
+  'filtering on the project alone leaves a drifted machine behind');
+ok('every id collision with another workspace is named, not left as a 500',
+  server.includes('assertIdsAreNotHeldElsewhere')
+  && server.includes('is already used by another workspace'),
+  'ids are primary keys table-wide while the delete before the insert is not');
 
 console.log('\n--- a malformed stored device does not take the hierarchy with it ---');
 // The duplicate pass runs on load, before anything is drawn. It reads fields

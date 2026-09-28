@@ -7,6 +7,7 @@ import type { MachineNode } from '../lib/machines';
 import type { CardNode } from '../lib/rack';
 import { createSeedData } from '../lib/seedData';
 import { apiFetch } from '../lib/apiClient';
+import { describeRepairs, type HierarchyRepair } from '../lib/hierarchyIntegrity';
 import type { SavedLayout } from '../components/console/machine/TrailBoard';
 
 function makeId() {
@@ -29,6 +30,9 @@ export type WorkspaceStore = Hierarchy & {
   /** Why the last hierarchy write was refused, or null. */
   saveError: string | null;
   dismissSaveError: () => void;
+  /** What the last write had to change to be storable, or null. */
+  saveNotice: string | null;
+  dismissSaveNotice: () => void;
   setProjects: Dispatch<SetStateAction<ProjectNode[]>>;
   setFolders: Dispatch<SetStateAction<FolderNode[]>>;
   setMachines: Dispatch<SetStateAction<MachineNode[]>>;
@@ -79,6 +83,15 @@ export function useWorkspaceStore(): WorkspaceStore {
   const [saveError, setSaveError] = useState<string | null>(null);
   const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const retryDelay = useRef(0);
+  /**
+   * What the server had to repair to store the snapshot, or null.
+   *
+   * Distinct from `saveError`: the save succeeded. But it succeeded on
+   * something other than what was sent — a machine whose folder was gone, a
+   * card whose rack was gone — and dropping a row without saying so is how
+   * the workspace quietly stopped matching what the operator had built.
+   */
+  const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
   const applyWorkspace = useCallback((w: {
     projects: ProjectNode[]; folders: FolderNode[]; machines: MachineNode[];
@@ -149,11 +162,16 @@ export function useWorkspaceStore(): WorkspaceStore {
       });
 
       if (res.ok) {
-        const json = (await res.json()) as { hierRevision?: number };
+        const json = (await res.json()) as { hierRevision?: number; repairs?: HierarchyRepair[] };
         if (typeof json.hierRevision === 'number') hierRev.current = json.hierRevision;
         hierDirty.current = false;
         retryDelay.current = 0;
         setSaveError(null);
+        // Only ever replaced by another notice, never cleared by a later
+        // clean save: an operator who has not read this one yet should not
+        // have it vanish because they moved a box afterwards.
+        const repaired = describeRepairs(json.repairs ?? []);
+        if (repaired) setSaveNotice(repaired);
         return;
       }
 
@@ -341,7 +359,9 @@ export function useWorkspaceStore(): WorkspaceStore {
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
 
   return {
-    ready, persisted, saveError, dismissSaveError: () => setSaveError(null),
+    ready, persisted,
+    saveError, dismissSaveError: () => setSaveError(null),
+    saveNotice, dismissSaveNotice: () => setSaveNotice(null),
     projects, folders, machines, devices, cards,
     setProjects, setFolders, setMachines, setDevices, setCards,
     getLayout, getTemplateLayout, saveLayout, saveTemplateLayout,

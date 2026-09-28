@@ -30,6 +30,7 @@ import { normaliseVariantId } from '../../lib/machineVariants';
 import { clampMachineZoom } from '../../lib/machineZoom';
 import type { CardNode } from '../../lib/rack';
 import { createSeedData } from '../../lib/seedData';
+import { reconcileHierarchy, type HierarchyRepair } from '../../lib/hierarchyIntegrity';
 import { DEFAULT_WORKSPACE_ID } from '../../lib/workspaces';
 import { ensureSchema, isDbEnabled, query, withClient } from './db';
 import { ApiError } from './errors';
@@ -483,9 +484,19 @@ export async function getRevisions(workspaceId: string): Promise<{ hierRevision:
 // Replace the entire hierarchy in one transaction and bump the hierarchy
 // revision. Optimistic concurrency: if baseRevision is provided and no longer
 // matches, the write is rejected so the client can refetch and retry.
-export async function replaceHierarchy(workspaceId: string, data: HierarchyInput, baseRevision?: number): Promise<{ hierRevision: number } | { conflict: true; hierRevision: number }> {
+export async function replaceHierarchy(
+  workspaceId: string,
+  data: HierarchyInput,
+  baseRevision?: number,
+): Promise<{ hierRevision: number; repairs: HierarchyRepair[] } | { conflict: true; hierRevision: number }> {
   const ws = assertWorkspaceId(workspaceId);
-  const normalized = normalizeHierarchyForPersistence(data);
+  // Before anything else: make the snapshot storable. The write below replaces
+  // the whole tree in one transaction, so a single row pointing at something
+  // absent would roll the entire save back — and, since that row stays in the
+  // client's memory, would roll back every save after it too. See
+  // `lib/hierarchyIntegrity`.
+  const { data: sound, repairs } = reconcileHierarchy(data);
+  const normalized = normalizeHierarchyForPersistence(sound);
   assertUniqueConfiguredIps(normalized);
   assertUniqueConfiguredDeviceNames(normalized);
   await ready(ws);
@@ -499,16 +510,62 @@ export async function replaceHierarchy(workspaceId: string, data: HierarchyInput
         await client.query('ROLLBACK');
         return { conflict: true as const, hierRevision: current };
       }
+      await assertIdsAreNotHeldElsewhere(client, ws, normalized);
       await writeHierarchyRows(client, ws, normalized);
       const next = current + 1;
       await q(client, 'UPDATE studio_workspaces SET hier_revision = $1, updated_at = now() WHERE id = $2', [String(next), ws]);
       await client.query('COMMIT');
-      return { hierRevision: next };
+      return { hierRevision: next, repairs };
     } catch (err) {
       await client.query('ROLLBACK');
       throw err;
     }
   });
+}
+
+/**
+ * Refuse a save that would collide with another workspace's row, and say so.
+ *
+ * Every hierarchy id is a primary key across the whole table, but the delete
+ * that precedes the insert is scoped to one workspace — as it must be, or
+ * saving here would empty everyone else's plant. So an id already held by a
+ * different workspace survives the delete and then collides on the insert.
+ *
+ * Postgres answers that with a unique-violation, which reaches the console as
+ * a bare 500 on every save forever, with nothing to act on. The row belongs
+ * to another tenant and must not be touched, so this cannot be repaired here
+ * — but it can be named, which is the difference between a diagnosable
+ * problem and an unusable workspace.
+ */
+async function assertIdsAreNotHeldElsewhere(client: Client, workspaceId: string, data: HierarchyInput): Promise<void> {
+  // Written out per table rather than interpolated. These are the only
+  // statements here that look outside the caller's workspace, so they are the
+  // ones that most need to be readable as SQL — by a person and by
+  // `check:workspace-scoping`, which cannot vouch for a table name it cannot
+  // see. They are read-only, and return an id this workspace already claims.
+  const lookups: { sql: string; ids: string[]; kind: string }[] = [
+    { kind: 'project', ids: data.projects.map((row) => row.id),
+      sql: 'SELECT id FROM studio_projects WHERE workspace_id <> $1 AND id = ANY($2::text[]) LIMIT 1' },
+    { kind: 'folder', ids: data.folders.map((row) => row.id),
+      sql: 'SELECT id FROM studio_folders WHERE workspace_id <> $1 AND id = ANY($2::text[]) LIMIT 1' },
+    { kind: 'machine', ids: data.machines.map((row) => row.id),
+      sql: 'SELECT id FROM studio_machines WHERE workspace_id <> $1 AND id = ANY($2::text[]) LIMIT 1' },
+    { kind: 'device', ids: data.devices.map((row) => row.id),
+      sql: 'SELECT id FROM studio_devices WHERE workspace_id <> $1 AND id = ANY($2::text[]) LIMIT 1' },
+    { kind: 'card', ids: data.cards.map((row) => row.id),
+      sql: 'SELECT id FROM studio_cards WHERE workspace_id <> $1 AND id = ANY($2::text[]) LIMIT 1' },
+  ];
+  for (const { sql, ids, kind } of lookups) {
+    if (ids.length === 0) continue;
+    const clash = await q<{ id: string }>(client, sql, [workspaceId, ids]);
+    const held = clash.rows[0]?.id;
+    if (held) {
+      throw new ApiError(
+        409,
+        `A ${kind} id in this workspace (${held}) is already used by another workspace. It cannot be saved until that id is changed.`,
+      );
+    }
+  }
 }
 
 // Upsert a single machine's canvas layout and bump the layout revision. Keeping
