@@ -43,53 +43,45 @@ export type ConditionerPointDefinition = {
 };
 
 /**
- * Every instrument pad on the drawing, at the spot where that instrument sits.
+ * Every instrument pad on the drawing.
  *
- * **Written during integration, not supplied** — this template ships no sensor
- * registry either. Positions come from the drawn geometry, measured per
- * assembly, so each pad lands inside the part it names: the six decks at
- * y 307..393, 395..481, 483..569, 571..657, 659..745 and 747..811, the agitator
- * drive at (491..680, 165..234), the fan motor at (874..956, 77..130).
+ * Eight, down from eighteen. Two deck temperatures rather than six: the
+ * profile down the stack is the process, and the top and the bottom of it
+ * describe that profile — four more points between them measure the same
+ * curve at finer resolution than a fault needs. The agitator reports
+ * vibration and current, the steam side reports header pressure and
+ * condensate temperature (a cold return is a trap that has failed open), the
+ * exhaust fan reports vibration, and the discharge reports the temperature
+ * the meal actually leaves at.
  *
- * The selection follows how a steam conditioner is actually run: one product
- * temperature per deck, because the profile down the stack *is* the process;
- * vibration, temperature and current on the agitator drive with a shaft speed;
- * header pressure and control-valve position on the steam side, with a
- * condensate return temperature that shows whether traps are passing; fan
- * speed, fan vibration and duct temperature on the vapour side; and speed plus
- * product temperature at the discharge.
+ * These positions were not supplied with the template — no reference drawing
+ * for this machine ships a sensor overlay — so the set is a proposal, chosen
+ * the way the drawings that *do* ship one choose theirs: what has to be
+ * watched for the machine to be diagnosable, and nothing that is merely
+ * available. The reference drawings for the eleven machines that have them
+ * mark between three and fourteen pads each and caption them "minimum
+ * sensors"; this follows that, rather than instrumenting every part that
+ * could carry a transducer.
  *
- * Two labels are hedged on purpose, because the source drawing does not
- * identify the equipment: the discharge device's type is unconfirmed, and the
- * condensate line is described by the template as a *likely* return. The pads
- * are named for what they measure rather than for an unverified part function.
+ * Where a bearing is watched it carries vibration *and* temperature on one
+ * pad, as the hammer mill's rotor bearings and the flaking mill's rolls
+ * already do here: the temperature says it is failing and the vibration says
+ * how.
  *
- * **Nobody has confirmed any of this against a real E-102.** No analyzer tags
- * are set; no model here is commissioned on this machine.
+ * Coordinates are unchanged from the fuller set — each was measured off the
+ * drawn geometry, so every surviving pad still lands inside the part it names.
+ *
+ * **Nobody has confirmed this against a real machine.** Treat it as a
+ * commissioning proposal.
  */
 export const CONDITIONER_POINT_REGISTRY: readonly ConditionerPointDefinition[] = [
-  // Agitator drive and the shaft common to all six decks.
   { code: 'CD_AGITATOR_VIB', label: 'Agitator Drive Vibration', kind: 'Vibration', x: 586, y: 180, side: 'left', part: 'agitator-drive', component: 'Agitator' },
-  { code: 'CD_AGITATOR_TEMP', label: 'Agitator Drive Temperature', kind: 'Temperature', x: 520, y: 220, side: 'left', part: 'agitator-drive', component: 'Agitator' },
   { code: 'CD_AGITATOR_CURRENT', label: 'Agitator Drive Current', kind: 'Current', x: 650, y: 220, side: 'left', part: 'agitator-drive', component: 'Agitator' },
-  { code: 'CD_AGITATOR_SPEED', label: 'Agitator Shaft Speed', kind: 'Speed', x: 545, y: 400, side: 'left', part: 'agitator-shaft', component: 'Agitator' },
-  // One product temperature per deck: the profile down the stack is the process.
-  { code: 'CD_DECK_1_TEMP', label: 'Deck 1 Product Temperature', kind: 'Temperature', x: 537, y: 350, side: 'left', part: 'deck-1', component: 'Decks' },
-  { code: 'CD_DECK_2_TEMP', label: 'Deck 2 Product Temperature', kind: 'Temperature', x: 552, y: 438, side: 'right', part: 'deck-2', component: 'Decks' },
-  { code: 'CD_DECK_3_TEMP', label: 'Deck 3 Product Temperature', kind: 'Temperature', x: 537, y: 526, side: 'left', part: 'deck-3', component: 'Decks' },
-  { code: 'CD_DECK_4_TEMP', label: 'Deck 4 Product Temperature', kind: 'Temperature', x: 552, y: 614, side: 'right', part: 'deck-4', component: 'Decks' },
-  { code: 'CD_DECK_5_TEMP', label: 'Deck 5 Product Temperature', kind: 'Temperature', x: 537, y: 702, side: 'left', part: 'deck-5', component: 'Decks' },
-  { code: 'CD_DECK_6_TEMP', label: 'Deck 6 Product Temperature', kind: 'Temperature', x: 552, y: 779, side: 'right', part: 'deck-6', component: 'Decks' },
-  // Steam side.
+  { code: 'CD_DECK_2_TEMP', label: 'Upper Deck Product Temperature', kind: 'Temperature', x: 552, y: 438, side: 'right', part: 'deck-2', component: 'Decks' },
+  { code: 'CD_DECK_5_TEMP', label: 'Lower Deck Product Temperature', kind: 'Temperature', x: 537, y: 702, side: 'left', part: 'deck-5', component: 'Decks' },
   { code: 'CD_STEAM_PRESSURE', label: 'Steam Header Pressure', kind: 'Pressure', x: 910, y: 400, side: 'right', part: 'steam-header', component: 'Steam' },
-  { code: 'CD_STEAM_VALVE_POS', label: 'Steam Control Valve Position', kind: 'Level', x: 887, y: 273, side: 'right', part: 'steam-control-valve', component: 'Steam' },
   { code: 'CD_CONDENSATE_TEMP', label: 'Condensate Return Temperature', kind: 'Temperature', x: 277, y: 618, side: 'left', part: 'condensate-return', component: 'Steam' },
-  // Vapour extraction.
   { code: 'CD_FAN_VIB', label: 'Exhaust Fan Vibration', kind: 'Vibration', x: 915, y: 104, side: 'right', part: 'fan-drive', component: 'Vapour' },
-  { code: 'CD_FAN_SPEED', label: 'Exhaust Fan Speed', kind: 'Speed', x: 839, y: 106, side: 'right', part: 'exhaust-fan', component: 'Vapour' },
-  { code: 'CD_DUCT_TEMP', label: 'Vapour Duct Temperature', kind: 'Temperature', x: 762, y: 133, side: 'right', part: 'vapour-duct', component: 'Vapour' },
-  // Discharge.
-  { code: 'CD_DISCHARGE_SPEED', label: 'Discharge Drive Speed', kind: 'Speed', x: 453, y: 887, side: 'left', part: 'discharge-drive', component: 'Discharge' },
   { code: 'CD_DISCHARGE_TEMP', label: 'Discharge Product Temperature', kind: 'Temperature', x: 545, y: 889, side: 'left', part: 'discharge-device', component: 'Discharge' },
 ];
 

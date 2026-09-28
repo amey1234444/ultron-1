@@ -463,8 +463,21 @@ const drive = SOLVENT_EXTRACTOR_POINT_REGISTRY.find((p) => p.code === 'EX-DRV-01
 ok('the extractor drive is one point carrying three measurements',
   drive.measurements.length === 3, drive.measurements.join(' + '));
 
-// Existing templates must be untouched by all of this.
-ok('the conditioner still exposes 18 pads', connectorsForTemplate('Conditioner E-102').length === 18);
+// The templates that came from elsewhere, pinned so this file's work cannot
+// disturb them. The three preparation machines were cut to the instruments a
+// fault shows up in — eighteen, eighteen and thirteen before — which is the
+// same cut the flaking mill and the extractor took above.
+for (const [template, expected] of [
+  ['Conditioner E-102', 8],
+  ['Cracking Mill M-101', 7],
+  ['Expander X-101', 6],
+  ['Rotary Airlock Valve', 9],
+  ['Single Screw Extruder', 17],
+  ['Twin Screw Extruder', 35],
+] as [string, number][]) {
+  ok(`${template} exposes ${expected} pads`, connectorsForTemplate(template).length === expected,
+    `${connectorsForTemplate(template).length}`);
+}
 ok('the twin screw still has a default layout', hasDefaultLayout('Twin Screw Extruder'));
 
 // --------------------------------------------------------------------------

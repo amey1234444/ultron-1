@@ -415,7 +415,6 @@ const TWIN_SCREW_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = TWIN_SCREW_COMPON
 const EXPANDER_COMPONENT_TYPES: Record<ExpanderComponent, ComponentType> = {
   'Main Motor': 'Motor',
   Gearbox: 'Gearbox',
-  Feed: 'Custom Component',
   Barrel: 'Custom Component',
   Discharge: 'Custom Component',
 };

@@ -37,7 +37,9 @@ function ok(name: string, condition: boolean, detail = '') {
 const TEMPLATE = 'Expander X-101' as MachineTemplate;
 
 ok('template is registered', (MACHINE_TEMPLATES as readonly string[]).includes(TEMPLATE));
-ok('registry has 13 points', EXPANDER_POINT_REGISTRY.length === 13, `got ${EXPANDER_POINT_REGISTRY.length}`);
+// Six. It was thirteen, which instrumented every part that could carry a
+// transducer rather than the ones a fault shows up in.
+ok('registry has 6 points', EXPANDER_POINT_REGISTRY.length === 6, `got ${EXPANDER_POINT_REGISTRY.length}`);
 ok('point codes are unique', new Set(EXPANDER_POINT_REGISTRY.map((p) => p.code)).size === EXPANDER_POINT_REGISTRY.length);
 ok(
   'every point belongs to exactly one component',
@@ -52,7 +54,7 @@ const size = artworkSizeForTemplate(TEMPLATE);
 ok('artwork frame is 1200x760', size.width === 1200 && size.height === 760, `got ${size.width}x${size.height}`);
 
 const connectors = connectorsForTemplate(TEMPLATE);
-ok('canvas exposes all 13 pads', connectors.length === 13, `got ${connectors.length}`);
+ok('canvas exposes all 6 pads', connectors.length === 6, `got ${connectors.length}`);
 ok('pad fractions are in bounds', connectors.every((c) => c.rx >= 0 && c.rx <= 1 && c.ry >= 0 && c.ry <= 1));
 ok(
   'no pad claims an analyzer tag',
@@ -62,7 +64,7 @@ ok(
 ok('every pad resolves a parameter kind', connectors.every((c) => parameterKindForConnector(c) !== null));
 
 // Parameter locking: a pad must refuse a channel reporting the wrong quantity.
-const barrel = connectors.find((c) => c.code === 'EX_BARREL_TEMP_1')!;
+const barrel = connectors.find((c) => c.code === 'EX_BARREL_TEMP_2')!;
 ok('barrel thermocouple accepts degC', connectorFitForUnit(barrel, 'degC') === 'match');
 ok('barrel thermocouple refuses bar', connectorFitForUnit(barrel, 'bar') === 'mismatch');
 const cone = connectors.find((c) => c.code === 'EX_CONE_POSITION')!;
@@ -72,7 +74,7 @@ ok('outlet transducer accepts bar', connectorFitForUnit(pressure, 'bar') === 'ma
 ok('outlet transducer refuses degC', connectorFitForUnit(pressure, 'degC') === 'mismatch');
 
 ok('template has a default card layout', hasDefaultLayout(TEMPLATE));
-ok('expected point count is 13', expectedPointsForTemplate(TEMPLATE) === 13, `got ${expectedPointsForTemplate(TEMPLATE)}`);
+ok('expected point count is 6', expectedPointsForTemplate(TEMPLATE) === 6, `got ${expectedPointsForTemplate(TEMPLATE)}`);
 ok(
   'expected labels come from the registry, in order',
   expectedPointLabelsForTemplate(TEMPLATE).join('|') === EXPANDER_POINT_REGISTRY.map((p) => p.label).join('|'),
@@ -80,8 +82,8 @@ ok(
 
 let seq = 0;
 const components = componentsForTemplate(TEMPLATE, () => `id-${seq++}`);
-ok('machine tree has 5 components', components.length === 5, `got ${components.length}`);
-ok('tree carries all 13 points', components.reduce((n, c) => n + c.points.length, 0) === 13);
+ok('machine tree has 4 components', components.length === 4, `got ${components.length}`);
+ok('tree carries all 6 points', components.reduce((n, c) => n + c.points.length, 0) === 6);
 ok('every point starts Not Configured', components.every((c) => c.points.every((p) => p.status === 'Not Configured')));
 
 // The drawing itself. expanderScene is pure data, so it can be built and

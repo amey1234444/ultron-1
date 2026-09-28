@@ -46,7 +46,7 @@ export type ExpanderPartId =
  * Ordered the way the machine is actually built and runs: drive train, then
  * feed, then the barrel it processes in, then the discharge end.
  */
-export const EXPANDER_COMPONENT_ORDER = ['Main Motor', 'Gearbox', 'Feed', 'Barrel', 'Discharge'] as const;
+export const EXPANDER_COMPONENT_ORDER = ['Main Motor', 'Gearbox', 'Barrel', 'Discharge'] as const;
 export type ExpanderComponent = (typeof EXPANDER_COMPONENT_ORDER)[number];
 
 export type ExpanderPointKind = 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Level';
@@ -71,52 +71,40 @@ export type ExpanderPointDefinition = {
 };
 
 /**
- * Every instrument pad on the drawing, at the spot where that instrument sits.
+ * Every instrument pad on the drawing.
  *
- * Positions come from the supplied template unchanged. The `kind` on each entry
- * does not: the template ships code, label, side, part and coordinates only,
- * and this console needs the measured quantity as well, because a pad is a
- * locking point — it accepts a channel only when the channel reports the
- * quantity the instrument at that spot measures. Without a kind every pad would
- * accept every channel, and a thermocouple wired to the outlet-pressure
- * transducer would be discovered by the analysis layer rather than refused at
- * the canvas.
+ * Six, down from thirteen. The drive is watched for vibration and current,
+ * the gearbox for vibration, and the process is the barrel temperature, the
+ * outlet pressure and where the discharge cone is sitting — which together
+ * say whether the expander is making collets or choking.
  *
- * **These positions are proposed, not commissioned.** The source drawing
- * documented no sensors, so each one is an engineering reading of where the
- * instrument would physically go. Confirm against the real installation before
- * anyone maps a channel to them in anger.
+ * These positions were not supplied with the template — no reference drawing
+ * for this machine ships a sensor overlay — so the set is a proposal, chosen
+ * the way the drawings that *do* ship one choose theirs: what has to be
+ * watched for the machine to be diagnosable, and nothing that is merely
+ * available. The reference drawings for the eleven machines that have them
+ * mark between three and fourteen pads each and caption them "minimum
+ * sensors"; this follows that, rather than instrumenting every part that
+ * could carry a transducer.
  *
- * No analyzer tags are set. The extruder and twin-screw models read their own
- * machines' tags, and reusing one here would silently feed expander readings to
- * a model commissioned on a different machine.
+ * Where a bearing is watched it carries vibration *and* temperature on one
+ * pad, as the hammer mill's rotor bearings and the flaking mill's rolls
+ * already do here: the temperature says it is failing and the vibration says
+ * how.
+ *
+ * Coordinates are unchanged from the fuller set — each was measured off the
+ * drawn geometry, so every surviving pad still lands inside the part it names.
+ *
+ * **Nobody has confirmed this against a real machine.** Treat it as a
+ * commissioning proposal.
  */
 export const EXPANDER_POINT_REGISTRY: readonly ExpanderPointDefinition[] = [
-  // Main drive — rear shaft, housing, frame and terminal box.
-  { code: 'EX_MOTOR_RPM', label: 'Main Motor Speed', kind: 'Speed', x: 43, y: 445, side: 'left', part: 'main-motor' , component: 'Main Motor' },
-  { code: 'EX_MOTOR_VIB', label: 'Main Motor Vibration', kind: 'Vibration', x: 170, y: 445, side: 'left', part: 'main-motor' , component: 'Main Motor' },
-  { code: 'EX_MOTOR_TEMP', label: 'Main Motor Temperature', kind: 'Temperature', x: 73, y: 483, side: 'left', part: 'main-motor' , component: 'Main Motor' },
-  { code: 'EX_MOTOR_CURRENT', label: 'Main Motor Current', kind: 'Current', x: 112, y: 388, side: 'left', part: 'main-motor' , component: 'Main Motor' },
-  // Gearbox — housing and oil sight glass.
-  { code: 'EX_GEARBOX_VIB', label: 'Gearbox Vibration', kind: 'Vibration', x: 321, y: 397, side: 'left', part: 'gearbox' , component: 'Gearbox' },
-  { code: 'EX_GEARBOX_TEMP', label: 'Gearbox Temperature', kind: 'Temperature', x: 278, y: 493, side: 'left', part: 'gearbox' , component: 'Gearbox' },
-  // Feed — hopper and the separate feeder drive.
-  { code: 'EX_HOPPER_LEVEL', label: 'Hopper Level', kind: 'Level', x: 520, y: 123, side: 'right', part: 'hopper' , component: 'Feed' },
-  { code: 'EX_FEEDER_RPM', label: 'Feeder Screw Speed', kind: 'Speed', x: 722, y: 267, side: 'right', part: 'feeder-motor' , component: 'Feed' },
-  // Barrel — three section thermocouples and the outlet transducer.
-  { code: 'EX_BARREL_TEMP_1', label: 'Barrel Section 1 Temperature', kind: 'Temperature', x: 560, y: 505, side: 'right', part: 'barrel' , component: 'Barrel' },
-  { code: 'EX_BARREL_TEMP_2', label: 'Barrel Section 2 Temperature', kind: 'Temperature', x: 678, y: 505, side: 'right', part: 'barrel' , component: 'Barrel' },
-  { code: 'EX_BARREL_TEMP_3', label: 'Barrel Section 3 Temperature', kind: 'Temperature', x: 796, y: 505, side: 'right', part: 'barrel' , component: 'Barrel' },
-  { code: 'EX_OUTLET_PRESSURE', label: 'Barrel Outlet Pressure', kind: 'Pressure', x: 933, y: 386, side: 'right', part: 'barrel' , component: 'Barrel' },
-  // Discharge — the cone's position feedback.
-  //
-  // Typed as a Level, which is what makes it lock correctly: the actuator
-  // reports a normalised opening, `parameterKindForUnit` reads '%' and
-  // 'fraction' as Level, and a position channel in those units therefore
-  // matches. There is no Position kind, and adding one for a single pad would
-  // put a new case through every kind switch in the analysis and rack layers
-  // for no gain. Revisit if a second machine reports a travel in millimetres.
-  { code: 'EX_CONE_POSITION', label: 'Outlet Cone Position', kind: 'Level', x: 1055, y: 420, side: 'right', part: 'cone-actuator' , component: 'Discharge' },
+  { code: 'EX_MOTOR_VIB', label: 'Main Motor Vibration', kind: 'Vibration', x: 170, y: 445, side: 'left', part: 'main-motor', component: 'Main Motor' },
+  { code: 'EX_MOTOR_CURRENT', label: 'Main Motor Current', kind: 'Current', x: 112, y: 388, side: 'left', part: 'main-motor', component: 'Main Motor' },
+  { code: 'EX_GEARBOX_VIB', label: 'Gearbox Vibration', kind: 'Vibration', x: 321, y: 397, side: 'left', part: 'gearbox', component: 'Gearbox' },
+  { code: 'EX_BARREL_TEMP_2', label: 'Barrel Temperature', kind: 'Temperature', x: 678, y: 505, side: 'right', part: 'barrel', component: 'Barrel' },
+  { code: 'EX_OUTLET_PRESSURE', label: 'Barrel Outlet Pressure', kind: 'Pressure', x: 933, y: 386, side: 'right', part: 'barrel', component: 'Barrel' },
+  { code: 'EX_CONE_POSITION', label: 'Outlet Cone Position', kind: 'Level', x: 1055, y: 420, side: 'right', part: 'cone-actuator', component: 'Discharge' },
 ];
 
 /** Human labels for the named assemblies, for part selection on the canvas. */

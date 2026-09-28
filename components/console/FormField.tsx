@@ -4,7 +4,13 @@ import { useAppTheme } from '../../hooks/useAppTheme';
 import { cn } from '../../lib/cn';
 
 type FormFieldProps = {
-  label: string;
+  /**
+   * Omitted for a field whose purpose is obvious from its placeholder — a
+   * search box above the thing it searches. An empty string is not the same
+   * thing: it renders a blank line of label and leaves a gap where a label
+   * would be.
+   */
+  label?: string;
   required?: boolean;
   value: string;
   onChangeText: (text: string) => void;
@@ -18,10 +24,12 @@ export function FormField({ label, required, value, onChangeText, placeholder, m
 
   return (
     <View className="gap-1.5">
-      <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
-        {label}
-        {required ? ' *' : ''}
-      </Text>
+      {label ? (
+        <Text className={cn('font-body-medium text-xs', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+          {label}
+          {required ? ' *' : ''}
+        </Text>
+      ) : null}
       <TextInput
         value={value}
         onChangeText={onChangeText}

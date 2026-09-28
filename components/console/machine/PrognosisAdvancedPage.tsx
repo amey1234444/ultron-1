@@ -20,7 +20,7 @@ import { useAppTheme } from '../../../hooks/useAppTheme';
 import { cn } from '../../../lib/cn';
 import type { PrognosisTone } from './analysis/prognosisViewModel';
 import { toneHex } from './prognosis/PrognosisHero';
-import { AnalysisTabs } from './analysis/AnalysisTabs';
+import { AnalysisTabs, type AnalysisSection } from './analysis/AnalysisTabs';
 import type { AnalysisDepth } from './analysis/analysisNav';
 import {
   emptyPrognostics,
@@ -55,6 +55,8 @@ type Props = {
   prognostics?: MachinePrognosticsResult;
   onSelectDepth?: (depth: AnalysisDepth) => void;
   tabsTrailing?: ReactNode;
+  /** Open items per section, badged on the tabs. See `AnalysisTabs`. */
+  tabsCounts?: Partial<Record<AnalysisSection, number>>;
   onSelectMachine?: () => void;
   onRefresh?: () => void;
   loading?: boolean;
@@ -146,6 +148,7 @@ export function PrognosisAdvancedPage({
   prognostics,
   onSelectDepth,
   tabsTrailing,
+  tabsCounts,
   onSelectMachine,
   onRefresh,
   loading = false,
@@ -186,7 +189,7 @@ export function PrognosisAdvancedPage({
         onSelectMachine={onSelectMachine}
         onRefresh={onRefresh}
       />
-      <AnalysisTabs active="prognosis-advanced" onSelect={onSelectDepth} trailing={tabsTrailing} />
+      <AnalysisTabs active="prognosis-advanced" onSelect={onSelectDepth} counts={tabsCounts} trailing={tabsTrailing} />
     </>
   );
 

@@ -362,6 +362,18 @@ export function AnalysisWorkspace({
     );
   }
 
+  /**
+   * What each section has to report, for the tab badges.
+   *
+   * Diagnosis counts the open issues; prognosis counts the forecasts that are
+   * actually live, not every prediction the model emitted — a forecast that
+   * is not tracking anything is not something to go and look at.
+   */
+  const tabsCounts = {
+    diagnosis: data.issues.length,
+    prognosis: data.prognostics?.activeForecasts.length ?? 0,
+  };
+
   const toMachineOverview = overview
     ? {
         trailing: (
@@ -426,6 +438,7 @@ export function AnalysisWorkspace({
           onSelectProblem={setSelectedIssueId}
           onSelectDepth={goTo}
           onOpenProDiagnosis={(problemId) => openDiagnosisFor(data.issues.find((issue) => issue.id === problemId))}
+          tabsCounts={tabsCounts}
           tabsTrailing={toMachineOverview.trailing}
           {...headerWiring}
         />
@@ -456,6 +469,7 @@ export function AnalysisWorkspace({
           selectedProblemId={selectedIssueId}
           onSelectProblem={setSelectedIssueId}
           onSelectDepth={goTo}
+          tabsCounts={tabsCounts}
           tabsTrailing={toMachineOverview.trailing}
           onVerifyChain={() =>
             setReceipt(
@@ -491,6 +505,7 @@ export function AnalysisWorkspace({
           ageSeconds={ageSeconds}
           prognostics={data.prognostics}
           onSelectDepth={goTo}
+          tabsCounts={tabsCounts}
           tabsTrailing={toMachineOverview.trailing}
           {...headerWiring}
         />
@@ -534,6 +549,7 @@ export function AnalysisWorkspace({
           selectedSignalId={selectedSignalId}
           onSelectSignal={setSelectedSignalId}
           onSelectDepth={goTo}
+          tabsCounts={tabsCounts}
           tabsTrailing={toMachineOverview.trailing}
           onConclusionAction={recordDecision}
         />

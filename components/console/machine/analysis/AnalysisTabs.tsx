@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { useAppTheme } from '../../../../hooks/useAppTheme';
 import { cn } from '../../../../lib/cn';
@@ -33,12 +34,23 @@ export function AnalysisTabs({
   active,
   onSelect,
   available,
+  counts,
   trailing,
 }: {
   active: AnalysisDepth;
   onSelect?: (depth: AnalysisDepth) => void;
   /** Depths the host cannot open yet render as unavailable rather than vanishing. */
   available?: Partial<Record<AnalysisDepth, boolean>>;
+  /**
+   * How many things each section has to say, shown as a badge.
+   *
+   * A reader on the prognosis page could not tell whether the diagnosis page
+   * had anything on it without opening it, which on a healthy machine is a
+   * wasted trip and on a failing one is a missed one. Absent or zero renders
+   * no badge: "nothing to report" is better said by the absence of a count
+   * than by a nought.
+   */
+  counts?: Partial<Record<AnalysisSection, number>>;
   trailing?: ReactNode;
 }) {
   const { isDark } = useAppTheme();
@@ -64,6 +76,7 @@ export function AnalysisTabs({
           const target = enabled(wanted) ? wanted : depthOf(entry.key, 'overview');
           const isActive = entry.key === section;
           const usable = enabled(target);
+          const count = counts?.[entry.key] ?? 0;
 
           return (
             <Pressable
@@ -72,17 +85,36 @@ export function AnalysisTabs({
               disabled={!usable || isActive}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive, disabled: !usable }}
-              accessibilityLabel={`${entry.label}: ${entry.hint}`}
+              accessibilityLabel={
+                `${entry.label}: ${entry.hint}${count > 0 ? `, ${count} open` : ''}`
+              }
               className={cn(
-                'gap-0.5 rounded-lg border px-3.5 py-2',
+                'flex-row items-center gap-2.5 overflow-hidden rounded-lg border py-2 pr-3.5',
                 isActive ? 'border-accent/50 bg-accent/10' : lineClass,
                 !usable && 'opacity-45',
               )}
             >
-              <Text className={cn('font-mono text-[11.5px] font-bold tracking-wider', isActive ? 'text-accent' : mutedClass)}>
-                {entry.label}
-              </Text>
-              <Text className={cn('font-body text-[10.5px]', mutedClass)}>{usable ? entry.hint : 'not available yet'}</Text>
+              {/* A filled edge on the active card. The tint alone reads as a
+                  hover state at a glance; an edge reads as "you are here". */}
+              <View className={cn('h-full w-1 self-stretch', isActive ? 'bg-accent' : 'bg-transparent')} />
+              <MaterialCommunityIcons
+                name={entry.icon}
+                size={16}
+                color={isActive ? '#4F9D69' : isDark ? '#A1A3A0' : '#5F625F'}
+              />
+              <View className="gap-0.5">
+                <View className="flex-row items-center gap-1.5">
+                  <Text className={cn('font-mono text-[11.5px] font-bold tracking-wider', isActive ? 'text-accent' : mutedClass)}>
+                    {entry.label}
+                  </Text>
+                  {usable && count > 0 ? (
+                    <View className={cn('rounded-full px-1.5 py-px', isActive ? 'bg-accent/25' : isDark ? 'bg-surface-dark' : 'bg-surface-light')}>
+                      <Text className={cn('font-mono text-[9.5px] font-bold', isActive ? 'text-accent' : mutedClass)}>{count}</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text className={cn('font-body text-[10.5px]', mutedClass)}>{usable ? entry.hint : 'not available yet'}</Text>
+              </View>
             </Pressable>
           );
         })}

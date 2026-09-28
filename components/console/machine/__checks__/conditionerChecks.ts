@@ -41,7 +41,9 @@ const REG = CONDITIONER_POINT_REGISTRY;
 const COUNT = REG.length;
 
 ok('template is registered', (MACHINE_TEMPLATES as readonly string[]).includes(TEMPLATE));
-ok('registry has 18 points', COUNT === 18, `got ${COUNT}`);
+// Eight. It was eighteen, six of them one temperature per deck — the same
+// curve sampled at finer resolution than a fault needs.
+ok('registry has 8 points', COUNT === 8, `got ${COUNT}`);
 ok('point codes are unique', new Set(REG.map((p) => p.code)).size === COUNT);
 ok('no two points share a position', new Set(REG.map((p) => `${p.x},${p.y}`)).size === COUNT);
 ok(
@@ -101,28 +103,32 @@ ok(
 );
 
 const connectors = connectorsForTemplate(TEMPLATE);
-ok('canvas exposes all 18 pads', connectors.length === 18, `got ${connectors.length}`);
+ok('canvas exposes all 8 pads', connectors.length === 8, `got ${connectors.length}`);
 ok('pad fractions are in bounds', connectors.every((c) => c.rx >= 0 && c.rx <= 1 && c.ry >= 0 && c.ry <= 1));
 ok('no pad claims an analyzer tag', connectors.every((c) => c.analyzerTag === undefined), 'no model is commissioned on this machine');
 ok('every pad resolves a parameter kind', connectors.every((c) => parameterKindForConnector(c) !== null));
 
-const deck = connectors.find((c) => c.code === 'CD_DECK_3_TEMP')!;
+const deck = connectors.find((c) => c.code === 'CD_DECK_2_TEMP')!;
 ok('deck thermocouple accepts degC', connectorFitForUnit(deck, 'degC') === 'match');
 ok('deck thermocouple refuses bar', connectorFitForUnit(deck, 'bar') === 'mismatch');
 const steam = connectors.find((c) => c.code === 'CD_STEAM_PRESSURE')!;
 ok('header pressure accepts bar', connectorFitForUnit(steam, 'bar') === 'match');
-const fan = connectors.find((c) => c.code === 'CD_FAN_SPEED')!;
-ok('fan speed accepts rpm', connectorFitForUnit(fan, 'rpm') === 'match');
-// The profile down the stack is the process, so every deck needs its own
-// temperature; five of six would leave a blind step in the middle of it.
-ok('all six decks have a product temperature',
-  [1, 2, 3, 4, 5, 6].every((i) => connectors.some((c) => c.code === `CD_DECK_${i}_TEMP`)));
-ok('deck temperatures descend the vessel in order',
-  [1, 2, 3, 4, 5, 6].map((i) => REG.find((p) => p.code === `CD_DECK_${i}_TEMP`)!.y)
-    .every((y, i, all) => i === 0 || y > all[i - 1]));
+const fan = connectors.find((c) => c.code === 'CD_FAN_VIB')!;
+ok('fan vibration accepts mm/s', connectorFitForUnit(fan, 'mm/s') === 'match');
+// The profile down the stack is the process, so the two deck temperatures
+// that remain have to be at opposite ends of it — two readings a deck apart
+// describe nothing.
+const upper = REG.find((p) => p.code === 'CD_DECK_2_TEMP')!;
+const lower = REG.find((p) => p.code === 'CD_DECK_5_TEMP')!;
+ok('the two deck temperatures sit at opposite ends of the stack',
+  lower.y - upper.y > 200, `${(lower.y - upper.y).toFixed(0)} apart`);
+// A cold condensate return is a steam trap that has failed open, which is
+// why it survives the cut while the valve position does not.
+ok('the steam side keeps pressure and condensate return',
+  ['CD_STEAM_PRESSURE', 'CD_CONDENSATE_TEMP'].every((code) => connectors.some((c) => c.code === code)));
 
 ok('template has a default card layout', hasDefaultLayout(TEMPLATE));
-ok('expected point count is 18', expectedPointsForTemplate(TEMPLATE) === 18, `got ${expectedPointsForTemplate(TEMPLATE)}`);
+ok('expected point count is 8', expectedPointsForTemplate(TEMPLATE) === 8, `got ${expectedPointsForTemplate(TEMPLATE)}`);
 ok(
   'expected labels come from the registry, in order',
   expectedPointLabelsForTemplate(TEMPLATE).join('|') === REG.map((p) => p.label).join('|'),
@@ -131,7 +137,7 @@ ok(
 let seq = 0;
 const components = componentsForTemplate(TEMPLATE, () => `id-${seq++}`);
 ok('machine tree has 5 components', components.length === 5, `got ${components.length}`);
-ok('tree carries all 18 points', components.reduce((n, c) => n + c.points.length, 0) === 18);
+ok('tree carries all 8 points', components.reduce((n, c) => n + c.points.length, 0) === 8);
 ok('every point starts Not Configured', components.every((c) => c.points.every((p) => p.status === 'Not Configured')));
 
 const turned = buildConditionerScene({ idPrefix: 'check', dark: true, showGrid: true, showLabels: true, agitatorRotation: 360, fanRotation: 360 });

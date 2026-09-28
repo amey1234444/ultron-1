@@ -40,7 +40,7 @@ import { cn } from '../../../lib/cn';
 import { consolePalette } from '../../../lib/consoleTheme';
 import { ConfirmDialog } from '../ConfirmDialog';
 import { Panel } from '../../Panel';
-import { AnalysisTabs, type AnalysisDepth } from './analysis/AnalysisTabs';
+import { AnalysisTabs, type AnalysisDepth, type AnalysisSection } from './analysis/AnalysisTabs';
 import { emptyPrognostics, type MachinePrognosticsResult } from './analysis/prognosticsModel';
 import { AnalysisTree } from './advanced/AnalysisTree';
 import { InvestigationWorkArea } from './advanced/Investigation';
@@ -127,6 +127,8 @@ export type AdvancedDiagnosisPageProps = {
   // Rendered at the end of the depth row — used for the link out to the machine
   // overview, so that cross-link lives in an existing row.
   tabsTrailing?: ReactNode;
+  /** Open items per section, badged on the tabs. See `AnalysisTabs`. */
+  tabsCounts?: Partial<Record<AnalysisSection, number>>;
   onConclusionAction?: (action: string) => void;
 };
 
@@ -447,6 +449,7 @@ export function AdvancedDiagnosisPage({
   onSelectSignal,
   onSelectDepth,
   tabsTrailing,
+  tabsCounts,
   onConclusionAction,
 }: AdvancedDiagnosisPageProps) {
   const { isDark } = useAppTheme();
@@ -1093,7 +1096,7 @@ export function AdvancedDiagnosisPage({
         </View>
       </View>
 
-      <AnalysisTabs active="diagnosis-advanced" onSelect={onSelectDepth} trailing={tabsTrailing} />
+      <AnalysisTabs active="diagnosis-advanced" onSelect={onSelectDepth} counts={tabsCounts} trailing={tabsTrailing} />
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false}>
         <View className="flex-row gap-1.5">

@@ -41,7 +41,10 @@ const REG = CRACKING_MILL_POINT_REGISTRY;
 const COUNT = REG.length;
 
 ok('template is registered', (MACHINE_TEMPLATES as readonly string[]).includes(TEMPLATE));
-ok('registry has 18 points', COUNT === 18, `got ${COUNT}`);
+// Seven. It was eighteen — motor vibration, winding temperature and a speed
+// pickup on all four rolls as well — which measured the settings as closely
+// as the condition.
+ok('registry has 7 points', COUNT === 7, `got ${COUNT}`);
 ok('point codes are unique', new Set(REG.map((p) => p.code)).size === COUNT);
 ok('no two points share a position', new Set(REG.map((p) => `${p.x},${p.y}`)).size === COUNT);
 ok(
@@ -101,27 +104,27 @@ ok(
 );
 
 const connectors = connectorsForTemplate(TEMPLATE);
-ok('canvas exposes all 18 pads', connectors.length === 18, `got ${connectors.length}`);
+ok('canvas exposes all 7 pads', connectors.length === 7, `got ${connectors.length}`);
 ok('pad fractions are in bounds', connectors.every((c) => c.rx >= 0 && c.rx <= 1 && c.ry >= 0 && c.ry <= 1));
 ok('no pad claims an analyzer tag', connectors.every((c) => c.analyzerTag === undefined), 'no model is commissioned on this machine');
 ok('every pad resolves a parameter kind', connectors.every((c) => parameterKindForConnector(c) !== null));
 
-const brg = connectors.find((c) => c.code === 'CM_TOP_BRG_TEMP')!;
-ok('bearing thermocouple accepts degC', connectorFitForUnit(brg, 'degC') === 'match');
-ok('bearing thermocouple refuses bar', connectorFitForUnit(brg, 'bar') === 'mismatch');
-const spd = connectors.find((c) => c.code === 'CM_TOP_FAST_SPEED')!;
-ok('roll speed accepts rpm', connectorFitForUnit(spd, 'rpm') === 'match');
-ok('roll speed refuses degC', connectorFitForUnit(spd, 'degC') === 'mismatch');
-// A cracking mill is set by the fast/slow differential in each pair, so all
-// four rolls need their own pickup; an averaged speed per stage loses it.
-ok('all four rolls have an independent speed pickup',
-  ['CM_TOP_FAST_SPEED', 'CM_TOP_SLOW_SPEED', 'CM_BOT_FAST_SPEED', 'CM_BOT_SLOW_SPEED']
-    .every((code) => connectors.some((c) => c.code === code)));
-ok('both stages have their own motor, bearings and gap',
-  ['TOP', 'BOT'].every((s) => ['MOTOR_VIB', 'BRG_TEMP', 'GAP'].every((k) => connectors.some((c) => c.code === `CM_${s}_${k}`))));
+// The bearing pad carries vibration and temperature together, and is matched
+// on vibration — the quantity that says how it is failing.
+const brg = connectors.find((c) => c.code === 'CM_TOP_BRG_VIB')!;
+ok('roll bearing accepts mm/s', connectorFitForUnit(brg, 'mm/s') === 'match');
+ok('roll bearing refuses bar', connectorFitForUnit(brg, 'bar') === 'mismatch');
+const cur = connectors.find((c) => c.code === 'CM_TOP_MOTOR_CURRENT')!;
+ok('drive current accepts A', connectorFitForUnit(cur, 'A') === 'match');
+ok('drive current refuses degC', connectorFitForUnit(cur, 'degC') === 'mismatch');
+// Both stages stay instrumented. A cracking mill is judged on whether each
+// pair of rolls is still round and still set, so neither may lose its
+// bearing or its gap.
+ok('both stages keep their bearing, gap and drive current',
+  ['TOP', 'BOT'].every((s) => ['BRG_VIB', 'GAP', 'MOTOR_CURRENT'].every((k) => connectors.some((c) => c.code === `CM_${s}_${k}`))));
 
 ok('template has a default card layout', hasDefaultLayout(TEMPLATE));
-ok('expected point count is 18', expectedPointsForTemplate(TEMPLATE) === 18, `got ${expectedPointsForTemplate(TEMPLATE)}`);
+ok('expected point count is 7', expectedPointsForTemplate(TEMPLATE) === 7, `got ${expectedPointsForTemplate(TEMPLATE)}`);
 ok(
   'expected labels come from the registry, in order',
   expectedPointLabelsForTemplate(TEMPLATE).join('|') === REG.map((p) => p.label).join('|'),
@@ -130,7 +133,7 @@ ok(
 let seq = 0;
 const components = componentsForTemplate(TEMPLATE, () => `id-${seq++}`);
 ok('machine tree has 5 components', components.length === 5, `got ${components.length}`);
-ok('tree carries all 18 points', components.reduce((n, c) => n + c.points.length, 0) === 18);
+ok('tree carries all 7 points', components.reduce((n, c) => n + c.points.length, 0) === 7);
 ok('every point starts Not Configured', components.every((c) => c.points.every((p) => p.status === 'Not Configured')));
 
 // Phase wrapping, and the gearing it has to respect.

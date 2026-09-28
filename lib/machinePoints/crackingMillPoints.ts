@@ -44,53 +44,42 @@ export type CrackingMillPointDefinition = {
 };
 
 /**
- * Every instrument pad on the drawing, at the spot where that instrument sits.
+ * Every instrument pad on the drawing.
  *
- * **Written during integration, not supplied.** Like the flaking mill and
- * unlike the expander, this template ships no sensor registry, and without pads
- * it could hold no cards, have no default layout and build no machine tree.
+ * Seven, down from eighteen. Both roll pairs are watched at the bearing and
+ * at the gap — a cracking mill is judged on whether the rolls are still round
+ * and still set — each drive reports its current, and the hopper reports its
+ * level. The roll speeds went: their ratio is a setting, not a condition,
+ * and it is read off the drives.
  *
- * Positions are taken from the drawn geometry — the scene was built and each
- * assembly's bounding box measured from the primitives that carry explicit
- * coordinates — so every pad lands inside the part it names: the motors at
- * (80..246, 354..472) and (80..246, 590..708), the bearing covers at
- * (493..737, 384..436) and (493..734, 620..672), the relief springs at
- * (737..976, 386..434) and (734..976, 622..670).
+ * These positions were not supplied with the template — no reference drawing
+ * for this machine ships a sensor overlay — so the set is a proposal, chosen
+ * the way the drawings that *do* ship one choose theirs: what has to be
+ * watched for the machine to be diagnosable, and nothing that is merely
+ * available. The reference drawings for the eleven machines that have them
+ * mark between three and fourteen pads each and caption them "minimum
+ * sensors"; this follows that, rather than instrumenting every part that
+ * could carry a transducer.
  *
- * The selection is standard for a four-roll mill: vibration, winding
- * temperature and current on each stage motor; a speed pickup on all four
- * rolls, because each pair is set by its fast/slow differential; vibration and
- * temperature at each stage's bearing block; the tramp-relief spring position
- * per stage; and hopper level with feed-roll speed on the inlet.
+ * Where a bearing is watched it carries vibration *and* temperature on one
+ * pad, as the hammer mill's rotor bearings and the flaking mill's rolls
+ * already do here: the temperature says it is failing and the vibration says
+ * how.
  *
- * **Nobody has confirmed any of this against a real M-101.** Every position and
- * every choice is a proposal to check at commissioning. No analyzer tags are
- * set, because no model here is commissioned on this machine.
+ * Coordinates are unchanged from the fuller set — each was measured off the
+ * drawn geometry, so every surviving pad still lands inside the part it names.
+ *
+ * **Nobody has confirmed this against a real machine.** Treat it as a
+ * commissioning proposal.
  */
 export const CRACKING_MILL_POINT_REGISTRY: readonly CrackingMillPointDefinition[] = [
-  // Top-pair motor.
-  { code: 'CM_TOP_MOTOR_VIB', label: 'Top Stage Motor Vibration', kind: 'Vibration', x: 163, y: 366, side: 'left', part: 'top-drive', component: 'Top Drive' },
-  { code: 'CM_TOP_MOTOR_TEMP', label: 'Top Stage Motor Temperature', kind: 'Temperature', x: 110, y: 450, side: 'left', part: 'top-drive', component: 'Top Drive' },
   { code: 'CM_TOP_MOTOR_CURRENT', label: 'Top Stage Motor Current', kind: 'Current', x: 216, y: 450, side: 'left', part: 'top-drive', component: 'Top Drive' },
-  // Bottom-pair motor.
-  { code: 'CM_BOT_MOTOR_VIB', label: 'Bottom Stage Motor Vibration', kind: 'Vibration', x: 163, y: 602, side: 'left', part: 'bottom-drive', component: 'Bottom Drive' },
-  { code: 'CM_BOT_MOTOR_TEMP', label: 'Bottom Stage Motor Temperature', kind: 'Temperature', x: 110, y: 686, side: 'left', part: 'bottom-drive', component: 'Bottom Drive' },
   { code: 'CM_BOT_MOTOR_CURRENT', label: 'Bottom Stage Motor Current', kind: 'Current', x: 216, y: 686, side: 'left', part: 'bottom-drive', component: 'Bottom Drive' },
-  // Coarse pair — both speeds, because their ratio is the crack setting.
-  { code: 'CM_TOP_FAST_SPEED', label: 'Top Fast Roll Speed', kind: 'Speed', x: 519, y: 350, side: 'left', part: 'top-fast-roll', component: 'Top Rolls' },
-  { code: 'CM_TOP_SLOW_SPEED', label: 'Top Slow Roll Speed', kind: 'Speed', x: 711, y: 350, side: 'right', part: 'top-slow-roll', component: 'Top Rolls' },
-  { code: 'CM_TOP_BRG_VIB', label: 'Top Roll Bearing Vibration', kind: 'Vibration', x: 519, y: 410, side: 'left', part: 'top-bearings', component: 'Top Rolls' },
-  { code: 'CM_TOP_BRG_TEMP', label: 'Top Roll Bearing Temperature', kind: 'Temperature', x: 711, y: 410, side: 'right', part: 'top-bearings', component: 'Top Rolls' },
+  { code: 'CM_TOP_BRG_VIB', label: 'Top Roll Bearing Vibration + Temperature', kind: 'Vibration', x: 519, y: 410, side: 'left', part: 'top-bearings', component: 'Top Rolls' },
   { code: 'CM_TOP_GAP', label: 'Top Roll Gap Position', kind: 'Level', x: 857, y: 410, side: 'right', part: 'top-gap-spring', component: 'Top Rolls' },
-  // Fine pair.
-  { code: 'CM_BOT_FAST_SPEED', label: 'Bottom Fast Roll Speed', kind: 'Speed', x: 519, y: 586, side: 'left', part: 'bottom-fast-roll', component: 'Bottom Rolls' },
-  { code: 'CM_BOT_SLOW_SPEED', label: 'Bottom Slow Roll Speed', kind: 'Speed', x: 708, y: 586, side: 'right', part: 'bottom-slow-roll', component: 'Bottom Rolls' },
-  { code: 'CM_BOT_BRG_VIB', label: 'Bottom Roll Bearing Vibration', kind: 'Vibration', x: 519, y: 646, side: 'left', part: 'bottom-bearings', component: 'Bottom Rolls' },
-  { code: 'CM_BOT_BRG_TEMP', label: 'Bottom Roll Bearing Temperature', kind: 'Temperature', x: 708, y: 646, side: 'right', part: 'bottom-bearings', component: 'Bottom Rolls' },
+  { code: 'CM_BOT_BRG_VIB', label: 'Bottom Roll Bearing Vibration + Temperature', kind: 'Vibration', x: 519, y: 646, side: 'left', part: 'bottom-bearings', component: 'Bottom Rolls' },
   { code: 'CM_BOT_GAP', label: 'Bottom Roll Gap Position', kind: 'Level', x: 855, y: 646, side: 'right', part: 'bottom-gap-spring', component: 'Bottom Rolls' },
-  // Inlet.
   { code: 'CM_HOPPER_LEVEL', label: 'Hopper Level', kind: 'Level', x: 626, y: 143, side: 'right', part: 'hopper', component: 'Feed' },
-  { code: 'CM_FEED_ROLL_SPEED', label: 'Feed Roll Speed', kind: 'Speed', x: 873, y: 235, side: 'right', part: 'feeder-drive', component: 'Feed' },
 ];
 
 /** Human labels for the named assemblies, for part selection on the canvas. */

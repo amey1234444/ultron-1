@@ -7,7 +7,7 @@ import { CONDITION_LABEL, conditionHexes, type OverviewCondition } from '../../.
 import { cn } from '../../../lib/cn';
 import { consolePalette } from '../../../lib/consoleTheme';
 import { Panel } from '../../Panel';
-import { AnalysisTabs, type AnalysisDepth } from './analysis/AnalysisTabs';
+import { AnalysisTabs, type AnalysisDepth, type AnalysisSection } from './analysis/AnalysisTabs';
 import {
   FAULTY_SSE_CAUSE_RANKING,
   FAULTY_SSE_DIAGNOSIS_ROWS,
@@ -691,6 +691,8 @@ export type MachineDiagnosisPageProps = {
   onOpenProDiagnosis?: (problemId: string) => void;
   onSelectDepth?: (depth: AnalysisDepth) => void;
   tabsTrailing?: ReactNode;
+  /** Open items per section, badged on the tabs. See `AnalysisTabs`. */
+  tabsCounts?: Partial<Record<AnalysisSection, number>>;
   onSelectMachine?: () => void;
   onRefresh?: () => void;
 };
@@ -707,6 +709,7 @@ export function MachineDiagnosisPage({
   onOpenProDiagnosis,
   onSelectDepth,
   tabsTrailing,
+  tabsCounts,
   onSelectMachine,
   onRefresh,
 }: MachineDiagnosisPageProps) {
@@ -753,7 +756,7 @@ export function MachineDiagnosisPage({
         onRefresh={onRefresh}
       />
 
-      <AnalysisTabs active="diagnosis-overview" onSelect={onSelectDepth} trailing={tabsTrailing} />
+      <AnalysisTabs active="diagnosis-overview" onSelect={onSelectDepth} counts={tabsCounts} trailing={tabsTrailing} />
 
       {model.problems.length === 0 ? (
         <HealthyState

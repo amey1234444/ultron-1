@@ -24,9 +24,19 @@ export const ANALYSIS_SECTIONS: readonly {
   key: AnalysisSection;
   label: string;
   hint: string;
+  /**
+   * A glyph per section.
+   *
+   * The two cards were distinguishable only by reading them, and they sit
+   * above pages that look broadly alike — a reader coming back to the screen
+   * had to read the label to find out where they were. A stethoscope for the
+   * machine's condition now and a rising trend for what is coming is the
+   * difference at a glance.
+   */
+  icon: 'stethoscope' | 'chart-line-variant';
 }[] = [
-  { key: 'diagnosis', label: 'DIAGNOSIS', hint: 'What is wrong now' },
-  { key: 'prognosis', label: 'PROGNOSIS', hint: 'What is coming, and when' },
+  { key: 'diagnosis', label: 'DIAGNOSIS', hint: 'What is wrong now', icon: 'stethoscope' },
+  { key: 'prognosis', label: 'PROGNOSIS', hint: 'What is coming, and when', icon: 'chart-line-variant' },
 ];
 
 export const ANALYSIS_VIEWS: readonly {

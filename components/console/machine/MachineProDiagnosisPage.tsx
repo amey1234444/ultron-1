@@ -26,7 +26,7 @@ import type { AnalysisSignal, Finding, Hypothesis } from '../../../lib/analysisD
 import { type Issue, type OverviewCondition, type ProgressionEvent } from '../../../lib/analysisOverview';
 import { QUALITY_LABEL, type AnalystHypothesis, type ChainStep, type Conclusion, type DataQuality } from '../../../lib/advancedDiagnosis';
 import { consolePalette, text } from '../../ui';
-import { AnalysisTabs, type AnalysisDepth } from './analysis/AnalysisTabs';
+import { AnalysisTabs, type AnalysisDepth, type AnalysisSection } from './analysis/AnalysisTabs';
 import type { ActionPriority } from './analysis/ActionList';
 import { buildPrognosisViewModel } from './analysis/prognosisViewModel';
 import { emptyPrognostics, type MachinePrognosticsResult } from './analysis/prognosticsModel';
@@ -72,6 +72,8 @@ export type MachineProDiagnosisPageProps = {
   selectedProblemId?: string | null;
   onSelectProblem?: (problemId: string) => void;
   tabsTrailing?: ReactNode;
+  /** Open items per section, badged on the tabs. See `AnalysisTabs`. */
+  tabsCounts?: Partial<Record<AnalysisSection, number>>;
   onSelectMachine?: () => void;
   onRefresh?: () => void;
   /** True while the analysis payload for this machine is still being read. */
@@ -99,6 +101,7 @@ export function MachineProDiagnosisPage({
   selectedProblemId,
   onSelectProblem,
   tabsTrailing,
+  tabsCounts,
   onSelectMachine,
   onRefresh,
   loading = false,
@@ -164,7 +167,7 @@ export function MachineProDiagnosisPage({
         onRefresh={onRefresh}
       />
 
-      <AnalysisTabs active="prognosis-overview" onSelect={onSelectDepth} trailing={tabsTrailing} />
+      <AnalysisTabs active="prognosis-overview" onSelect={onSelectDepth} counts={tabsCounts} trailing={tabsTrailing} />
 
       {loading ? (
         <PrognosisLoadingState />
