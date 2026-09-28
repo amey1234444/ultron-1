@@ -66,6 +66,20 @@ type Store = { users: StoredUser[] };
 
 const globalRef = globalThis as unknown as { __ultronUserStore?: Store; __ultronSeeded?: boolean };
 
+/**
+ * Log a configuration warning once per process.
+ *
+ * `seedSpecs()` is evaluated on every call to `ready()`, so an unchanging
+ * complaint about an environment variable was being repeated for every
+ * request that touched the user store rather than once at start-up.
+ */
+const warned = new Set<string>();
+function warnOnce(key: string, message: string): void {
+  if (warned.has(key)) return;
+  warned.add(key);
+  console.warn(message);
+}
+
 function id(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
@@ -125,7 +139,8 @@ function bootstrapSuperAdmin(): Seed | null {
     // enforce eight characters; an operator provisioning a bootstrap account
     // from the environment is making a deliberate choice, and failing closed
     // here would leave them with no way in and no explanation.
-    console.warn(
+    warnOnce(
+      'soya-short-password',
       '[users] SOYA_SUPER_ADMIN_PASSWORD is shorter than the eight characters ' +
       'this application requires everywhere else. The account will still be created.',
     );
@@ -239,7 +254,10 @@ async function ready(): Promise<void> {
   for (const spec of seedSpecs()) {
     const existing = await query('SELECT id FROM users WHERE username_lc = $1', [spec.username.toLowerCase()]);
     if (existing.rowCount === 0) {
-      await insertRow(buildSeedUser(spec));
+      // The SELECT above is an optimisation, not the guard. The guard is the
+      // ON CONFLICT: between that read and this write another instance may
+      // have inserted the same seed, and losing that race is not an error.
+      await insertRow(buildSeedUser(spec), { ifAbsent: true });
     }
   }
   globalRef.__ultronSeeded = true;
@@ -296,10 +314,25 @@ function rowToStored(r: UserRow): StoredUser {
   };
 }
 
-async function insertRow(u: StoredUser): Promise<void> {
+/**
+ * Insert a user row.
+ *
+ * `ifAbsent` appends ON CONFLICT DO NOTHING and is for seeding only. Seeding
+ * is check-then-insert across however many instances and cold starts a
+ * deployment has, and two of them arriving together both saw the row missing
+ * and both inserted — which is a unique violation on users_username_key, and
+ * was crashing whichever request happened to lose. A conflict there means
+ * "somebody else seeded it", which is success.
+ *
+ * `createUser` deliberately does not pass it: a conflict there is a real
+ * collision the caller has to be told about, and swallowing it would report a
+ * successful signup that created nothing.
+ */
+async function insertRow(u: StoredUser, options: { ifAbsent?: boolean } = {}): Promise<void> {
   await query(
     `INSERT INTO users (id, username, username_lc, name, email, email_lc, workspace_id, role, status, permissions, password_hash, created_at, last_login_at, last_seen_at, reputation_status, reputation_score, reputation_checked_at, reputation_data)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18::jsonb)`,
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12,$13,$14,$15,$16,$17,$18::jsonb)
+     ${options.ifAbsent ? 'ON CONFLICT DO NOTHING' : ''}`,
     [
       u.id,
       u.username,

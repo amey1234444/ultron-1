@@ -30,6 +30,7 @@ import { normaliseVariantId } from '../../lib/machineVariants';
 import { clampMachineZoom } from '../../lib/machineZoom';
 import type { CardNode } from '../../lib/rack';
 import { createSeedData } from '../../lib/seedData';
+import { DEFAULT_WORKSPACE_ID } from '../../lib/workspaces';
 import { ensureSchema, isDbEnabled, query, withClient } from './db';
 import { ApiError } from './errors';
 
@@ -68,8 +69,9 @@ export type HierarchyInput = {
 
 const globalRef = globalThis as unknown as { __ultronWorkspaceReady?: Set<string> };
 
-/** The workspace every account belonged to before workspaces existed. */
-export const DEFAULT_WORKSPACE_ID = 'default';
+// Re-exported, not redefined: the console needs the same constant and the
+// shared tree cannot import from `src/`.
+export { DEFAULT_WORKSPACE_ID };
 
 function assertWorkspaceId(workspaceId: string): string {
   const id = (workspaceId ?? '').trim();

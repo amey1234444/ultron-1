@@ -42,6 +42,7 @@ import {
   type SimulatedChannel,
 } from '../lib/simulation';
 import { ensureSseSimulationWorkspace } from '../lib/sseSimulationProfile';
+import { isDefaultWorkspace as isDefaultWorkspaceId } from '../lib/workspaces';
 import { archiveDuplicateConfiguredDeviceIps, archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
 import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
 import { SapIntegrationPage } from '../components/console/sap/SapIntegrationPage';
@@ -524,12 +525,26 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     });
   }, [setDevices, storedDevices]);
 
+  // The SSE demo gateways belong to the default workspace only.
+  //
+  // This effect creates three gateways, six racks and their cards outright —
+  // it is an "ensure these exist", not a repair of ones already there — and
+  // it then persists them. Run unconditionally it filled every workspace,
+  // including ones deliberately created empty, with hardware nobody had
+  // added and could not meaningfully remove: deleting a device only had it
+  // rebuilt on the next render.
+  //
+  // Scoped to the default workspace the demo behaves exactly as it always
+  // has, and every other workspace starts empty and keeps whatever its owner
+  // actually adds.
+  const isDefaultWorkspace = isDefaultWorkspaceId(currentUser?.workspaceId);
   useEffect(() => {
+    if (!isDefaultWorkspace) return;
     const repaired = ensureSseSimulationWorkspace(storedDevices, cards);
     if (!repaired.changed) return;
     setDevices(repaired.devices);
     setCards(repaired.cards);
-  }, [cards, setCards, setDevices, storedDevices]);
+  }, [cards, isDefaultWorkspace, setCards, setDevices, storedDevices]);
 
   useEffect(() => {
     const byName = archiveDuplicateConfiguredDeviceNames(storedDevices);
@@ -1201,6 +1216,36 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
                 />
               </View>
             )
+          ) : projects.length === 0 && gateways.length === 0 ? (
+            // A genuinely empty workspace.
+            //
+            // Without this the dashboard rendered anyway, with every tile at
+            // zero and no hierarchy in the rail beside it — which does not
+            // read as "empty", it reads as "still loading", and there was
+            // nothing on the page telling anyone where to start. A workspace
+            // created deliberately empty is now the case with the clearest
+            // answer rather than the most ambiguous one.
+            <EmptyState
+              eyebrow="Empty workspace"
+              title="Nothing here yet"
+              description={
+                canEditDeleteSchema
+                  ? 'Start with a project to hold the asset hierarchy, or add the gateway and racks this plant reports through. Everything you add is saved to this workspace.'
+                  : 'No projects or devices have been added to this workspace yet. Someone with configure access can set it up.'
+              }
+            >
+              {canEditDeleteSchema && (
+                <>
+                  <ActionButton label="Create Project" onPress={() => setCreateProjectVisible(true)} />
+                  <ActionButton
+                    label="Add Device"
+                    variant="secondary"
+                    permission={PERMISSIONS.DEVICE_CREATE}
+                    onPress={() => openAddDevice()}
+                  />
+                </>
+              )}
+            </EmptyState>
           ) : selected.kind === 'none' || projects.length === 0 ? (
             <DashboardOverview
               projects={overviewProjects}
