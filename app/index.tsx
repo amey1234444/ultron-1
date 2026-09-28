@@ -43,6 +43,10 @@ import {
 } from '../lib/simulation';
 import { ensureSseSimulationWorkspace } from '../lib/sseSimulationProfile';
 import { isDefaultWorkspace as isDefaultWorkspaceId } from '../lib/workspaces';
+import {
+  describeWiringPlan,
+  planMachineWiring,
+} from '../components/console/machine/generateMachineWiring';
 import { archiveDuplicateConfiguredDeviceIps, archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
 import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
 import { SapIntegrationPage } from '../components/console/sap/SapIntegrationPage';
@@ -557,6 +561,60 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     }
   }, [setCards, setDevices, storedDevices]);
 
+  /**
+   * Generate the gateways, racks and cards every machine's instruments need,
+   * and wire the canvases to them.
+   *
+   * Doing this by hand is a gateway, a rack sized to the point count, a card
+   * configured per instrument, and then a trail dragged from every pad to the
+   * channel that matches it — for each of the three demo variants of each
+   * machine. On a plant of seven machines that is over two hundred deliberate
+   * acts, none of which is a judgement call: the registry already says what
+   * every instrument measures, and a vibration point needs a vibration card
+   * reporting mm/s.
+   *
+   * Additive. Existing devices and cards are left exactly as they are and the
+   * generated ones are appended, so a machine somebody has already wired by
+   * hand is not quietly replaced. Re-running it would generate a second set,
+   * which is why the confirmation says what it is about to create.
+   */
+  const [wiringNotice, setWiringNotice] = useState<string | null>(null);
+  const generateMachineHardware = () => {
+    const targets = machines.map((machine) => ({
+      id: machine.id,
+      name: machine.name,
+      template: machine.template,
+      projectId: machine.projectId ?? null,
+    }));
+    const plan = planMachineWiring(targets);
+    if (plan.machines.length === 0) {
+      setWiringNotice(
+        machines.length === 0
+          ? 'No machines yet — add machines to the hierarchy first.'
+          : 'None of these machines has instrument points to wire.',
+      );
+      return;
+    }
+
+    setDevices((prev) => [...prev, ...plan.devices]);
+    setCards((prev) => [...prev, ...plan.cards]);
+    for (const [machineId, layout] of Object.entries(plan.layouts)) saveLayout(machineId, layout);
+
+    const gateways = plan.devices.filter((device) => device.type === 'Gateway').length;
+    const racks = plan.devices.length - gateways;
+    setWiringNotice(
+      `Generated ${gateways} gateway${gateways === 1 ? '' : 's'}, ${racks} rack${racks === 1 ? '' : 's'} and ` +
+      `${plan.cards.length} channels for ${plan.machines.length} machines.` +
+      (plan.skipped.length > 0 ? ` ${plan.skipped.length} skipped: ${plan.skipped[0].reason}.` : ''),
+    );
+    // Reported rather than swallowed: a machine that generated nothing is
+    // something the operator needs to know about before the visit, not after.
+    if (plan.skipped.length > 0) {
+      console.warn('[wiring] skipped:', plan.skipped.map((entry) => `${entry.name} (${entry.reason})`).join('; '));
+    }
+    console.info('[wiring]', describeWiringPlan(plan).join('\n'));
+  };
+
   const [createProjectVisible, setCreateProjectVisible] = useState(false);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [createFolderTarget, setCreateFolderTarget] = useState<{ projectId: string; parentId: string | null } | null>(null);
@@ -1051,6 +1109,34 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
         </View>
       )}
 
+      {/* What the generator did. A modal rather than a toast: it reports a
+          change to the whole workspace — tens of devices and hundreds of
+          channels — and that is not something to let slide off the screen
+          after two seconds while somebody is looking elsewhere. */}
+      {wiringNotice && (
+        <View
+          className="absolute inset-0 z-50 items-center justify-center px-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.28)' }}
+        >
+          <View
+            className={cn(
+              'w-full max-w-[460px] rounded-xl border px-5 py-4 shadow-xl',
+              isDark ? 'border-line-dark bg-surface-darkpanel' : 'border-line-light bg-surface-lightpanel',
+            )}
+          >
+            <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              Machine hardware
+            </Text>
+            <Text className={cn('mt-2 font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+              {wiringNotice}
+            </Text>
+            <View className="mt-4 flex-row justify-end">
+              <ActionButton label="Close" variant="secondary" onPress={() => setWiringNotice(null)} />
+            </View>
+          </View>
+        </View>
+      )}
+
       {ipConflictNotice && (
         <View
           className="absolute inset-0 z-50 items-center justify-center px-6"
@@ -1174,7 +1260,14 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
             />
           ) : selected.kind === 'devices' ? (
             gateways.length === 0 ? (
-              <EmptyState title="DEVICES" description="No devices added.">
+              <EmptyState
+                title="DEVICES"
+                description={
+                  machines.length > 0
+                    ? `No devices added. ${machines.length} machine${machines.length === 1 ? '' : 's'} in this workspace can have their gateways, racks and channels generated from their own instrument points.`
+                    : 'No devices added.'
+                }
+              >
                 {canEditDeleteSchema && (
                   <>
                     <ActionButton
@@ -1182,6 +1275,13 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
                       permission={PERMISSIONS.DEVICE_CREATE}
                       onPress={() => openAddDevice()}
                     />
+                    {machines.length > 0 && (
+                      <ActionButton
+                        label="Generate From Machines"
+                        permission={PERMISSIONS.DEVICE_CREATE}
+                        onPress={generateMachineHardware}
+                      />
+                    )}
                     <ActionButton label="Simulation Mode" variant="secondary" onPress={() => setSelected({ kind: 'simulation' })} />
                   </>
                 )}
