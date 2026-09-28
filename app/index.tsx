@@ -42,8 +42,7 @@ import {
   type SimulatedChannel,
 } from '../lib/simulation';
 import { ensureSseSimulationWorkspace } from '../lib/sseSimulationProfile';
-import { isDefaultWorkspace as isDefaultWorkspaceId, isSoyaDemoWorkspace } from '../lib/workspaces';
-import { overlaySoyaDemoPlant, soyaDemoPlant } from '../components/console/machine/soyaDemoPlant';
+import { isDefaultWorkspace as isDefaultWorkspaceId } from '../lib/workspaces';
 import {
   describeWiringPlan,
   planMachineWiring,
@@ -237,11 +236,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // layouts loaded from the server, persisted on edit, and polled so changes by
   // other authenticated users appear here too.
   const {
-    projects: workspaceProjects,
-    folders: workspaceFolders,
-    devices: workspaceDevices,
-    cards: workspaceCards,
-    machines: workspaceMachines,
+    projects,
+    folders,
+    devices: storedDevices,
+    cards,
+    machines,
     setProjects,
     setFolders,
     setDevices,
@@ -257,33 +256,6 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     dismissSaveError,
   } = useWorkspaceStore();
 
-  /**
-   * The demo workspace's built-in plant, merged over whatever is stored.
-   *
-   * Seventeen machines in three variants, with their gateways, racks, cards
-   * and mapped canvases, declared in the app rather than created by hand
-   * against a database. Anything the workspace actually holds wins; the
-   * built-ins fill what is missing. See `soyaDemoPlant.ts`.
-   *
-   * Merged here, at the one place the workspace enters the console, so every
-   * reader below — the hierarchy rail, the devices table, the canvas, and the
-   * duplicate-name and duplicate-IP checks that have to see a built-in
-   * gateway to refuse a clash with it — sees the same plant. Persistence is
-   * not a concern at this level: the store strips these rows from every
-   * payload, so no handler here can write one.
-   */
-  const isSoyaDemo = isSoyaDemoWorkspace(currentUser?.workspaceId);
-  const workspaceView = useMemo(() => {
-    const stored = {
-      projects: workspaceProjects,
-      folders: workspaceFolders,
-      machines: workspaceMachines,
-      devices: workspaceDevices,
-      cards: workspaceCards,
-    };
-    return isSoyaDemo ? overlaySoyaDemoPlant(stored) : stored;
-  }, [isSoyaDemo, workspaceProjects, workspaceFolders, workspaceMachines, workspaceDevices, workspaceCards]);
-  const { projects, folders, machines, devices: storedDevices, cards } = workspaceView;
 
   // Real gateway/rack connectivity from the MQTT ingestion pipeline overlays
   // the stored device statuses, so the devices strip shows Online the moment a
@@ -574,20 +546,6 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // Scoped to the default workspace the demo behaves exactly as it always
   // has, and every other workspace starts empty and keeps whatever its owner
   // actually adds.
-  /**
-   * A machine's canvas: the operator's if they have saved one, else the
-   * built-in plant's.
-   *
-   * A built-in machine has no row in the layouts table and never will, so
-   * without this its canvas would fall back to the bare template — the right
-   * pads in the right places, but nothing mapped to a channel. The plant
-   * ships the bound version, which is the point of it.
-   */
-  const layoutForMachine = useCallback(
-    (machineId: string) => getLayout(machineId) ?? (isSoyaDemo ? soyaDemoPlant().layouts[machineId] ?? null : null),
-    [getLayout, isSoyaDemo],
-  );
-
   const isDefaultWorkspace = isDefaultWorkspaceId(currentUser?.workspaceId);
   useEffect(() => {
     if (!isDefaultWorkspace) return;
@@ -1338,7 +1296,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
               devices={devices}
               cards={visibleCards}
               live={plantLive}
-              layout={layoutForMachine(selectedMachine.id)}
+              layout={getLayout(selectedMachine.id)}
               templateLayout={getTemplateLayout(selectedMachine.template)}
               onSaveLayout={saveLayout}
               onSaveTemplate={saveTemplateLayout}

@@ -16,19 +16,3 @@ export function isDefaultWorkspace(workspaceId: string | null | undefined): bool
   return (workspaceId ?? DEFAULT_WORKSPACE_ID) === DEFAULT_WORKSPACE_ID;
 }
 
-/**
- * The demo account's workspace.
- *
- * Kept beside the default because the same question gets asked about it: the
- * console needs to know whether it is looking at the workspace the built-in
- * oilseed plant belongs to. The id is the fallback in `src/server/users.ts`
- * for `SOYA_SUPER_ADMIN_WORKSPACE_ID`, and the two have to agree — a
- * deployment that overrides that variable also overrides this, which
- * `check:soya-admin` is where it would be noticed.
- */
-export const SOYA_DEMO_WORKSPACE_ID = 'soya';
-
-/** Whether an account's workspace is the one the built-in plant is shown in. */
-export function isSoyaDemoWorkspace(workspaceId: string | null | undefined): boolean {
-  return (workspaceId ?? '') === SOYA_DEMO_WORKSPACE_ID;
-}

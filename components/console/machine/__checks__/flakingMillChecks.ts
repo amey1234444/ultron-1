@@ -41,7 +41,12 @@ const TEMPLATE = 'Flaking Mill M-102' as MachineTemplate;
 const COUNT = FLAKING_MILL_POINT_REGISTRY.length;
 
 ok('template is registered', (MACHINE_TEMPLATES as readonly string[]).includes(TEMPLATE));
-ok('registry has 17 points', COUNT === 17, `got ${COUNT}`);
+// Three, because the reference drawing marks three: both roll bearings and
+// the hydraulic circuit. It carried seventeen while the extra fourteen —
+// drive vibration, winding temperature, currents, roll speeds, hopper level,
+// feeder speed, roll gap, oil temperature — were written here rather than
+// taken from the drawing.
+ok('registry has the drawing\'s 3 points', COUNT === 3, `got ${COUNT}`);
 ok('point codes are unique', new Set(FLAKING_MILL_POINT_REGISTRY.map((p) => p.code)).size === COUNT);
 ok(
   'every point belongs to exactly one component',
@@ -102,25 +107,27 @@ ok(
 ok('every point names a real part', FLAKING_MILL_POINT_REGISTRY.every((p) => FLAKING_MILL_PART_LABELS.some((q) => q.id === p.part)));
 
 const connectors = connectorsForTemplate(TEMPLATE);
-ok('canvas exposes all 17 pads', connectors.length === 17, `got ${connectors.length}`);
+ok('canvas exposes all 3 pads', connectors.length === 3, `got ${connectors.length}`);
 ok('pad fractions are in bounds', connectors.every((c) => c.rx >= 0 && c.rx <= 1 && c.ry >= 0 && c.ry <= 1));
 ok('no pad claims an analyzer tag', connectors.every((c) => c.analyzerTag === undefined), 'no model is commissioned on this machine');
 ok('every pad resolves a parameter kind', connectors.every((c) => parameterKindForConnector(c) !== null));
 
-const brg = connectors.find((c) => c.code === 'FM_ROLL_1_BRG_TEMP')!;
-ok('bearing thermocouple accepts degC', connectorFitForUnit(brg, 'degC') === 'match');
-ok('bearing thermocouple refuses mm/s', connectorFitForUnit(brg, 'mm/s') === 'mismatch');
+// A bearing pad carries vibration and temperature together, as the drawing
+// labels it and as the hammer mill's rotor bearings already do here. It is
+// matched on vibration, which is the quantity that says how it is failing.
+const brg = connectors.find((c) => c.code === 'FM_ROLL_1_BRG_VIB')!;
+ok('roll bearing accepts mm/s', connectorFitForUnit(brg, 'mm/s') === 'match');
+ok('roll bearing refuses bar', connectorFitForUnit(brg, 'bar') === 'mismatch');
 const hyd = connectors.find((c) => c.code === 'FM_HYD_PRESSURE')!;
 ok('loading pressure accepts bar', connectorFitForUnit(hyd, 'bar') === 'match');
-const speed = connectors.find((c) => c.code === 'FM_ROLL_1_SPEED')!;
-ok('roll speed accepts rpm', connectorFitForUnit(speed, 'rpm') === 'match');
-ok('roll speed refuses degC', connectorFitForUnit(speed, 'degC') === 'mismatch');
-// Differential roll speed is the process variable, so both must exist.
-ok('both rolls have an independent speed pickup',
-  ['FM_ROLL_1_SPEED', 'FM_ROLL_2_SPEED'].every((code) => connectors.some((c) => c.code === code)));
+ok('loading pressure refuses rpm', connectorFitForUnit(hyd, 'rpm') === 'mismatch');
+// Both rolls are instrumented, which is what the drawing's "fixed & floating
+// roll" means.
+ok('both roll bearings are instrumented',
+  ['FM_ROLL_1_BRG_VIB', 'FM_ROLL_2_BRG_VIB'].every((code) => connectors.some((c) => c.code === code)));
 
 ok('template has a default card layout', hasDefaultLayout(TEMPLATE));
-ok('expected point count is 17', expectedPointsForTemplate(TEMPLATE) === 17, `got ${expectedPointsForTemplate(TEMPLATE)}`);
+ok('expected point count is 3', expectedPointsForTemplate(TEMPLATE) === 3, `got ${expectedPointsForTemplate(TEMPLATE)}`);
 ok(
   'expected labels come from the registry, in order',
   expectedPointLabelsForTemplate(TEMPLATE).join('|') === FLAKING_MILL_POINT_REGISTRY.map((p) => p.label).join('|'),
@@ -128,8 +135,8 @@ ok(
 
 let seq = 0;
 const components = componentsForTemplate(TEMPLATE, () => `id-${seq++}`);
-ok('machine tree has 5 components', components.length === 5, `got ${components.length}`);
-ok('tree carries all 17 points', components.reduce((n, c) => n + c.points.length, 0) === 17);
+ok('machine tree has 2 components', components.length === 2, `got ${components.length}`);
+ok('tree carries all 3 points', components.reduce((n, c) => n + c.points.length, 0) === 3);
 ok('every point starts Not Configured', components.every((c) => c.points.every((p) => p.status === 'Not Configured')));
 
 // Phase wrapping and the decorative inputs the renderer exposes.

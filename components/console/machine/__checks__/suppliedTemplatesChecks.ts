@@ -165,7 +165,11 @@ const MACHINES = [
     order: SOLVENT_EXTRACTOR_COMPONENT_ORDER,
     width: SOLVENT_EXTRACTOR_ARTWORK_WIDTH,
     height: SOLVENT_EXTRACTOR_ARTWORK_HEIGHT,
-    expected: 20,
+    // Eight, matching the eight dots the reference drawing marks. It was
+    // twenty: the drawing labels the hopper level "(each stage)" and the two
+    // pump measurements "(each pump)", and those had been expanded to five
+    // hoppers and five pumps.
+    expected: 8,
     utilities: 0,
   },
   {
@@ -397,8 +401,8 @@ for (const m of MACHINES) {
 }
 
 console.log('\n--- across all ten ---');
-ok('84 logical connection groups in total', totalPoints === 84,
-  `got ${totalPoints} (43 oilseed + 14 meal + 27 solvent)`);
+ok('72 logical connection groups in total', totalPoints === 72,
+  `got ${totalPoints} (31 oilseed + 14 meal + 27 solvent)`);
 
 // Unit matching, one assertion per kind these machines introduced.
 const dtdc = connectorsForTemplate('DTDC');
@@ -424,15 +428,19 @@ ok('chain take-up refuses %', connectorFitForUnit(takeup, '%') === 'mismatch',
   'travel is a distance, not a level');
 const leak = extractor.find((c) => c.code === 'EX-PMP-01-LEAK')!;
 ok('a seal leak claims no unit fit', parameterKindForConnector(leak) === null);
-// Five stages, five pumps, five hoppers: the stage number is the diagnosis.
-ok('all five hoppers have a high level',
-  [1, 2, 3, 4, 5].every((i) => extractor.some((c) => c.code === `EX-HOP-0${i}-HL`)));
-ok('all five pumps have vibration and a seal leak',
-  [1, 2, 3, 4, 5].every((i) =>
-    extractor.some((c) => c.code === `EX-PMP-0${i}-VIB`) && extractor.some((c) => c.code === `EX-PMP-0${i}-LEAK`)));
-ok('hoppers run left to right across the machine',
-  [1, 2, 3, 4, 5].map((i) => SOLVENT_EXTRACTOR_POINT_REGISTRY.find((p) => p.code === `EX-HOP-0${i}-HL`)!.x)
-    .every((x, i, all) => i === 0 || x > all[i - 1]));
+// One pad per measurement, as the drawing marks it. How many stages and
+// pumps a particular extractor has is not something this registry knows, and
+// guessing five put twenty instruments on a machine drawn with eight.
+ok('the repeated measurements are represented once each',
+  ['EX-HOP-01-HL', 'EX-PMP-01-VIB', 'EX-PMP-01-LEAK'].every((code) => extractor.some((c) => c.code === code)));
+ok('and their labels say they repeat',
+  ['EX-HOP-01-HL', 'EX-PMP-01-VIB', 'EX-PMP-01-LEAK']
+    .map((code) => extractor.find((c) => c.code === code)!.label)
+    .every((label) => label.includes('each')),
+  'so nobody reads one pad as one instrument on the whole machine');
+ok('no per-stage or per-pump duplicates were left behind',
+  !SOLVENT_EXTRACTOR_POINT_REGISTRY.some((p) => /-0[2-9]-/.test(p.code)),
+  SOLVENT_EXTRACTOR_POINT_REGISTRY.filter((p) => /-0[2-9]-/.test(p.code)).map((p) => p.code).join(', '));
 
 // The extractor is the one wide machine; squeezing it onto 1200x1000 would
 // distort every proportion in it.

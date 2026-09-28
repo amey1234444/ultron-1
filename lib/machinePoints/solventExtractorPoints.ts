@@ -80,26 +80,29 @@ export type SolventExtractorPointDefinition = {
  * that do not exist. `measurements` records all three; `kind` names the one
  * the channel matcher should expect.
  */
+/*
+ * Eight pads, which is what the reference drawing marks.
+ *
+ * It used to be twenty: the drawing labels the hopper level "(each stage)"
+ * and the two pump measurements "(each pump)", and those were expanded to
+ * one pad per hopper and two per pump across five of each. That reads as
+ * twenty instruments on a machine the drawing shows eight dots on, and it
+ * put nine cards in a column that fits eight.
+ *
+ * The parenthetical is kept in the label instead. One pad stands for the
+ * measurement as the drawing does, and a plant that wires all five hoppers
+ * adds the other four itself — which is the right way round, because how
+ * many stages a particular extractor has is not something this registry
+ * knows.
+ */
 export const SOLVENT_EXTRACTOR_POINT_REGISTRY: readonly SolventExtractorPointDefinition[] = [
   { code: 'EX-DRV-01', label: 'Drive vibration / torque / current', kind: 'Vibration', x: 1109, y: 232, side: 'right', utility: false, location: 'Main motor / VFD', measurements: ['Vibration', 'Torque', 'Current'], component: 'Drive' },
   { code: 'EX-GBX-01', label: 'Main gearbox vibration', kind: 'Vibration', x: 1005, y: 403, side: 'right', utility: false, location: 'Main gearbox housing', measurements: ['Vibration'], component: 'Drive' },
   { code: 'EX-TAKEUP-01', label: 'Chain take-up position', kind: 'Position', x: 107, y: 385, side: 'left', utility: false, location: 'Tail-end take-up adjuster', measurements: ['Position'], component: 'Chain' },
   { code: 'EX-TAIL-ZS-01', label: 'Tail sprocket zero-speed', kind: 'Speed', x: 159, y: 407, side: 'left', utility: false, location: 'Tail shaft / sprocket', measurements: ['Zero-speed'], component: 'Chain' },
-  { code: 'EX-HOP-01-HL', label: 'Hopper 1 high level', kind: 'Level', x: 237, y: 523, side: 'left', utility: false, location: 'Miscella hopper 1', measurements: ['High level'], component: 'Hoppers' },
-  { code: 'EX-HOP-02-HL', label: 'Hopper 2 high level', kind: 'Level', x: 362, y: 523, side: 'left', utility: false, location: 'Miscella hopper 2', measurements: ['High level'], component: 'Hoppers' },
-  { code: 'EX-HOP-03-HL', label: 'Hopper 3 high level', kind: 'Level', x: 487, y: 523, side: 'left', utility: false, location: 'Miscella hopper 3', measurements: ['High level'], component: 'Hoppers' },
-  { code: 'EX-HOP-04-HL', label: 'Hopper 4 high level', kind: 'Level', x: 612, y: 523, side: 'right', utility: false, location: 'Miscella hopper 4', measurements: ['High level'], component: 'Hoppers' },
-  { code: 'EX-HOP-05-HL', label: 'Hopper 5 high level', kind: 'Level', x: 737, y: 523, side: 'right', utility: false, location: 'Miscella hopper 5', measurements: ['High level'], component: 'Hoppers' },
-  { code: 'EX-PMP-01-VIB', label: 'Pump 1 vibration', kind: 'Vibration', x: 247, y: 628, side: 'left', utility: false, location: 'Pump 1 bearing / housing', measurements: ['Vibration'], component: 'Pumps' },
-  { code: 'EX-PMP-02-VIB', label: 'Pump 2 vibration', kind: 'Vibration', x: 372, y: 628, side: 'left', utility: false, location: 'Pump 2 bearing / housing', measurements: ['Vibration'], component: 'Pumps' },
-  { code: 'EX-PMP-03-VIB', label: 'Pump 3 vibration', kind: 'Vibration', x: 497, y: 628, side: 'left', utility: false, location: 'Pump 3 bearing / housing', measurements: ['Vibration'], component: 'Pumps' },
-  { code: 'EX-PMP-04-VIB', label: 'Pump 4 vibration', kind: 'Vibration', x: 622, y: 628, side: 'right', utility: false, location: 'Pump 4 bearing / housing', measurements: ['Vibration'], component: 'Pumps' },
-  { code: 'EX-PMP-05-VIB', label: 'Pump 5 vibration', kind: 'Vibration', x: 747, y: 628, side: 'right', utility: false, location: 'Pump 5 bearing / housing', measurements: ['Vibration'], component: 'Pumps' },
-  { code: 'EX-PMP-01-LEAK', label: 'Pump 1 seal leak', kind: 'Leak', x: 282, y: 644, side: 'left', utility: false, location: 'Pump 1 mechanical seal', measurements: ['Seal leak'], component: 'Pumps' },
-  { code: 'EX-PMP-02-LEAK', label: 'Pump 2 seal leak', kind: 'Leak', x: 407, y: 644, side: 'left', utility: false, location: 'Pump 2 mechanical seal', measurements: ['Seal leak'], component: 'Pumps' },
-  { code: 'EX-PMP-03-LEAK', label: 'Pump 3 seal leak', kind: 'Leak', x: 532, y: 644, side: 'left', utility: false, location: 'Pump 3 mechanical seal', measurements: ['Seal leak'], component: 'Pumps' },
-  { code: 'EX-PMP-04-LEAK', label: 'Pump 4 seal leak', kind: 'Leak', x: 657, y: 644, side: 'right', utility: false, location: 'Pump 4 mechanical seal', measurements: ['Seal leak'], component: 'Pumps' },
-  { code: 'EX-PMP-05-LEAK', label: 'Pump 5 seal leak', kind: 'Leak', x: 782, y: 644, side: 'right', utility: false, location: 'Pump 5 mechanical seal', measurements: ['Seal leak'], component: 'Pumps' },
+  { code: 'EX-HOP-01-HL', label: 'Hopper high level (each stage)', kind: 'Level', x: 237, y: 523, side: 'left', utility: false, location: 'Miscella hopper', measurements: ['High level'], component: 'Hoppers' },
+  { code: 'EX-PMP-01-VIB', label: 'Pump vibration (each pump)', kind: 'Vibration', x: 247, y: 628, side: 'left', utility: false, location: 'Pump bearing / housing', measurements: ['Vibration'], component: 'Pumps' },
+  { code: 'EX-PMP-01-LEAK', label: 'Pump seal leak (each pump)', kind: 'Leak', x: 282, y: 644, side: 'left', utility: false, location: 'Pump mechanical seal', measurements: ['Seal leak'], component: 'Pumps' },
   { code: 'EX-MARC-ZS-01', label: 'Marc conveyor zero-speed', kind: 'Speed', x: 1132, y: 683, side: 'right', utility: false, location: 'Marc conveyor drive', measurements: ['Zero-speed'], component: 'Discharge' },
 ];
 

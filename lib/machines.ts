@@ -428,17 +428,15 @@ const EXPANDER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = EXPANDER_COMPONENT_
 
 // Flaking Mill M-102 — the machine tree, derived from its point registry.
 //
-// The two roll drives are separate components because they are two motors on
-// two rolls, and the difference between their speeds is the flaking parameter.
-// Folding them into one Drive would lose the measurement that matters most.
+// Two components, holding the three instruments the drawing marks: the two
+// roll bearings and the hydraulic circuit that loads them. The drives and the
+// feed were components here while the registry carried points for them that
+// the drawing does not show.
 //
 // As with the expander, no analyzer tags are attached: no model in this repo is
 // commissioned on a flaking mill.
 const FLAKING_MILL_COMPONENT_TYPES: Record<FlakingMillComponent, ComponentType> = {
-  'Upper Drive': 'Motor',
-  'Lower Drive': 'Motor',
-  Rolls: 'Custom Component',
-  Feed: 'Custom Component',
+  Rolls: 'Bearing',
   Hydraulics: 'Custom Component',
 };
 
