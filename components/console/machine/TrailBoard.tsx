@@ -22,6 +22,7 @@ import {
 } from '../../ui';
 import { AdjustableTrail, type Point, type TrailStatus } from './AdjustableTrail';
 import {
+  artworkSizeForTemplate,
   connectorExpectation,
   connectorFitForUnit,
   parameterKindForUnit,
@@ -371,6 +372,23 @@ export function TrailBoard({
   // and twenty mounted-but-hidden cards is twenty things to lay out on every
   // frame for the one that might be visible.
   const [hoveredConnector, setHoveredConnector] = useState<string | null>(null);
+
+  /**
+   * Stage units per artwork unit.
+   *
+   * Pads are drawn from radii declared in the machine drawing's own
+   * coordinate system — 9 units across, whatever that machine's viewBox is —
+   * and converted here. That is what makes a pad keep its proportion to the
+   * machine at every zoom, which is how they were drawn when they lived
+   * inside the artwork's SVG. Sizing them in stage pixels instead left them
+   * the same size while the machine grew and shrank around them, which is
+   * exactly the thing `MeasurementPad` warns about.
+   */
+  const padUnitScale = useMemo(() => {
+    if (!machineRect) return 1;
+    const artwork = artworkSizeForTemplate(machineTemplate);
+    return artwork.width > 0 ? machineRect.width / artwork.width : 1;
+  }, [machineRect, machineTemplate]);
 
   // Consumed on the render after it is set: MappableBox reads the flag once,
   // at mount, so holding it any longer only risks reopening a picker the
@@ -1401,26 +1419,25 @@ export function TrailBoard({
               // that cannot fit the pad being dragged onto it, which is a
               // refusal and is drawn as one.
               const colour = rejects ? palette.critical : palette.accent;
-              // At rest a pad is small and quiet; it grows while it is a live
-              // drop target or has just been wired. An unwired pad is hollow
-              // and a wired one is filled, so which instruments are still to
-              // do is readable without reading any labels.
-              const idle = !wiring && !flashed;
-              const size = locked || flashed ? 36 : rejects ? 18 : idle ? 20 : 26;
-              const fill = rejects
-                ? 0.06
-                : locked || flashed ? 0.22
-                : wired === 'live' ? 0.34
-                : wired ? 0.18
-                // Barely filled rather than empty: a hollow ring on a dark
-                // machine body needs some ground behind it to stay legible.
-                : idle ? 0.05 : 0.09;
-              const stroke = rejects
-                ? 0.5
-                : locked || flashed ? 0.95
-                : wired === 'live' ? 0.85
-                : wired ? 0.6
-                : idle ? 0.34 : 0.42;
+
+              // The mark itself, in the machine drawing's own units.
+              //
+              // Three concentric rings, as `MeasurementPad` draws them: a
+              // soft outer ground, a core, and a white centre once the point
+              // is wired, with a wider halo when its card is reporting. The
+              // states are three different *marks* rather than three shades
+              // of one, so they survive greyscale, colour-blind viewing and
+              // a projector.
+              //
+              // Multiplied by `padUnitScale`, so 9 units on a 1200-wide
+              // drawing and 9 units on a 2048-wide one both come out the same
+              // fraction of their machine, at any zoom.
+              const grown = locked || flashed;
+              const ringR = (grown ? 13 : rejects ? 7 : 9) * padUnitScale;
+              const coreR = (grown ? 7 : rejects ? 4 : 5) * padUnitScale;
+              const haloR = 12 * padUnitScale;
+              const centreR = 2 * padUnitScale;
+              const box = Math.max(haloR, ringR) * 2;
               return (
                 <Pressable
                   key={connector.code}
@@ -1433,9 +1450,10 @@ export function TrailBoard({
                       ? `${connector.label} — mapped. Select its card.`
                       : `${connector.label} — not mapped. Map this instrument.`
                   }
-                  // A 20px pad is below a comfortable touch target, so the
-                  // pressable is padded out beyond the mark it draws.
-                  hitSlop={12}
+                  // The mark scales with the machine, so at a small zoom it
+                  // drops below a comfortable touch target. The pressable is
+                  // padded out to meet it without growing the mark.
+                  hitSlop={Math.max(0, 22 - box / 2)}
                   style={{
                     // Not a drop target while an endpoint is being dragged:
                     // the drag owns the gesture, and a Pressable swallowing it
@@ -1445,19 +1463,59 @@ export function TrailBoard({
                     // would silently hand the pad the drag.
                     pointerEvents: wiring ? 'none' : 'auto',
                     position: 'absolute',
-                    left: padPoint.x - size / 2,
-                    top: padPoint.y - size / 2,
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    borderWidth: locked || flashed ? 2 : 1.5,
-                    borderColor: alpha(colour, stroke),
-                    backgroundColor: alpha(colour, fill),
+                    left: padPoint.x - box / 2,
+                    top: padPoint.y - box / 2,
+                    width: box,
+                    height: box,
                     alignItems: 'center',
                     justifyContent: 'center',
                   }}
                 >
-                  {rejects ? <View style={{ width: size - 6, height: 1.5, backgroundColor: alpha(colour, 0.55) }} /> : null}
+                  {/* Halo — only once the card on the other end is reporting. */}
+                  {wired === 'live' && !rejects ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        width: haloR * 2, height: haloR * 2, borderRadius: haloR,
+                        backgroundColor: alpha(colour, 0.16),
+                      }}
+                    />
+                  ) : null}
+                  {/* Outer ground. */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      width: ringR * 2, height: ringR * 2, borderRadius: ringR,
+                      backgroundColor: alpha(colour, rejects ? 0.06 : wired ? 0.18 : 0.08),
+                    }}
+                  />
+                  {/* Core: filled once wired, hollow — panel-filled, ringed in
+                      the accent — until then. */}
+                  <View
+                    style={{
+                      position: 'absolute',
+                      width: coreR * 2, height: coreR * 2, borderRadius: coreR,
+                      backgroundColor: wired && !rejects ? colour : palette.panel,
+                      borderWidth: Math.max(1, (wired ? 1.4 : 1.6) * padUnitScale),
+                      borderColor: wired && !rejects ? palette.panel : alpha(colour, grown ? 1 : 0.75),
+                      opacity: rejects ? 0.75 : 1,
+                    }}
+                  />
+                  {/* The white centre is the "this is wired" mark. */}
+                  {wired && !rejects ? (
+                    <View
+                      style={{
+                        position: 'absolute',
+                        width: centreR * 2, height: centreR * 2, borderRadius: centreR,
+                        backgroundColor: '#ffffff', opacity: 0.82,
+                      }}
+                    />
+                  ) : null}
+                  {/* A pad that cannot take the unit being dragged is struck
+                      through rather than quietly offered. */}
+                  {rejects ? (
+                    <View style={{ position: 'absolute', width: ringR * 1.6, height: Math.max(1, 1.5 * padUnitScale), backgroundColor: alpha(colour, 0.55) }} />
+                  ) : null}
                 </Pressable>
               );
             })}

@@ -107,6 +107,13 @@ ok('pad visibility is no longer gated on an endpoint being dragged',
   'that gate is what made the pads invisible until you were already wiring');
 ok('pads render whenever the board is editable',
   board.includes('{!readOnly && machineRect && connectors.length > 0 && ('));
+// And nowhere else. The Actual view is a dashboard: `readOnlyCanvas` is
+// `!canConfigure || isActual`, so a reader without configure access and
+// anyone on the Actual tab get no pads and nothing to press.
+ok('and not at all outside configure mode',
+  board.indexOf('{!readOnly && machineRect && connectors.length > 0 && (') > 0
+  && !board.includes('{machineRect && connectors.length > 0 && ('),
+  'read-only is a dashboard, not a wiring surface');
 ok('a pad is pressable', board.includes('onPress={() => mapConnector(connector)}'));
 ok('the pad layer lets presses through to the pads',
   board.includes('<View pointerEvents="box-none"'),
@@ -120,7 +127,9 @@ ok('and that is expressed in the style rather than the deprecated prop',
   !board.includes("pointerEvents={wiring ?"));
 ok('pads carry a spoken name saying whether they are mapped',
   board.includes('— mapped. Select its card.') && board.includes('— not mapped. Map this instrument.'));
-ok('a small pad is given a larger touch target', board.includes('hitSlop={12}'));
+ok('a small pad is given a larger touch target',
+  board.includes('hitSlop={Math.max(0, 22 - box / 2)}'),
+  'the mark scales with the machine, so at a small zoom it falls below a comfortable target');
 
 console.log('\n--- every pad reads as a connection point ---');
 
@@ -148,9 +157,26 @@ ok('every instrumented template shows its pads in the accent colour',
 ok('exactly the generic templates have no pads',
   (MACHINE_TEMPLATES as readonly string[]).filter((t) => connectorsForTemplate(t).length === 0).length === 8);
 
-// State is carried by weight, not by a second hue, so it survives greyscale.
-ok('state is carried by fill weight rather than another colour',
-  board.includes("wired === 'live' ? 0.34") && board.includes('wired ? 0.18'));
+// State is three different marks rather than three shades of one, so it
+// survives greyscale, colour-blind viewing and a projector.
+ok('an unwired pad is hollow and a wired one is filled',
+  board.includes('backgroundColor: wired && !rejects ? colour : palette.panel'));
+ok('a wired pad carries the white centre mark',
+  board.includes("backgroundColor: '#ffffff', opacity: 0.82"));
+ok('only a reporting pad carries the halo',
+  board.includes("wired === 'live' && !rejects ?"));
+
+// The size is declared in the machine drawing's own units and converted, so a
+// pad keeps its proportion to the machine at every zoom. Sizing in stage
+// pixels left pads the same size while the machine grew around them.
+ok('pad geometry is declared in artwork units',
+  board.includes('const ringR = (grown ? 13 : rejects ? 7 : 9) * padUnitScale;')
+  && board.includes('const coreR = (grown ? 7 : rejects ? 4 : 5) * padUnitScale;'));
+ok('the scale is the machine rect against the artwork frame',
+  board.includes('return artwork.width > 0 ? machineRect.width / artwork.width : 1;'));
+ok('no pad dimension is a bare pixel constant',
+  !/const (ringR|coreR|haloR|centreR) = [0-9]+;/.test(board),
+  'a fixed size would stop tracking the machine at the extremes of zoom');
 
 console.log('\n--- hovering a pad says what it is ---');
 
