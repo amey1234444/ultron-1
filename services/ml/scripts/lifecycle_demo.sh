@@ -29,7 +29,7 @@ step "1/7  Build a dataset"
 python -m app.training.build_dataset \
     --dataset-id "$DATASET" \
     --source synthetic \
-    --scenarios SC-HEALTHY SC-SCREEN-RESTRICTION SC-DIE-RESTRICTION \
+    --scenarios SC-HEALTHY SC-SCREEN-RESTRICTION SC-ADAPTER-RESTRICTION \
                 SC-FEED-INSTABILITY SC-COOLING-FAILURE \
     --repeats 6 \
     --emit-every 15

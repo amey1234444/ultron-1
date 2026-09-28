@@ -430,6 +430,115 @@ def _rpm_change(values: dict[str, float | None], elapsed: float, scenario: Scena
     values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 - 0.08 * progress)
 
 
+# -- DOC-07 coverage: representative faults from previously unmodelled families.
+#
+# Each moves the signal DOC-07 names as that fault's minimum required evidence
+# and deliberately leaves the others alone. A fault the generator cannot
+# distinguish from its neighbour teaches the classifier nothing except to guess
+# the more common one, so the look-alike pairs below each differ in which
+# signal leads: MECH-001 against MECH-004, DOWN-006 against FEED-002, and
+# THERM-008 against THERM-009.
+
+
+def _motor_bearing_hot(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-MECH-001. Bearing temperature climbs; vibration follows, weakly."""
+    onset = scenario.onset_second or 300
+    if elapsed < onset:
+        return
+    progress = min(1.0, (elapsed - onset) / (540.0 / scenario.progression_rate))
+    values["TS-T1"] = (values["TS-T1"] or 0.0) + 26.0 * progress
+    values["TS-V1"] = (values["TS-V1"] or 0.0) * (1.0 + 0.18 * max(0.0, progress - 0.35))
+
+
+def _gearbox_oil_hot(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-MECH-002. Gearbox oil temperature rising with the drive load steady."""
+    onset = scenario.onset_second or 300
+    if elapsed < onset:
+        return
+    progress = min(1.0, (elapsed - onset) / (600.0 / scenario.progression_rate))
+    values["TS-T2"] = (values["TS-T2"] or 0.0) + 22.0 * progress
+    values["TS-T3"] = (values["TS-T3"] or 0.0) + 8.0 * progress
+
+
+def _motor_vibration_high(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-MECH-004. Overall vibration rises with temperature essentially flat.
+
+    The mirror of MECH-001: vibration leads and the bearing stays cool, which
+    separates mechanical looseness from a thermal bearing problem.
+    """
+    onset = scenario.onset_second or 300
+    if elapsed < onset:
+        return
+    progress = min(1.0, (elapsed - onset) / (420.0 / scenario.progression_rate))
+    for tag in ("TS-V1", "TS-V2"):
+        values[tag] = (values[tag] or 0.0) * (1.0 + 1.10 * progress)
+    values["TS-T1"] = (values["TS-T1"] or 0.0) + 2.0 * progress
+
+
+def _zone_temperature_low(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-THERM-008. One zone falling away from its neighbours, monotonically."""
+    onset = scenario.onset_second or 300
+    if elapsed < onset:
+        return
+    progress = min(1.0, (elapsed - onset) / (540.0 / scenario.progression_rate))
+    values["TS-TZ3"] = (values["TS-TZ3"] or 0.0) - 30.0 * progress
+    values["TS-TM"] = (values["TS-TM"] or 0.0) - 6.0 * progress
+
+
+def _zone_temperature_oscillation(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-THERM-009. A zone hunting around setpoint rather than drifting.
+
+    The same zone as THERM-008 on purpose: the two differ only in whether the
+    residual has a direction, which is the distinction the feature set has to
+    carry if hunting is ever to be told from a genuine drop.
+    """
+    onset = scenario.onset_second or 240
+    if elapsed < onset:
+        return
+    phase = 2 * math.pi * (elapsed - onset) / 90.0
+    values["TS-TZ3"] = (values["TS-TZ3"] or 0.0) + 11.0 * math.sin(phase)
+
+
+def _melt_pressure_low(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-DOWN-005. Both taps fall together with feed and speed unchanged."""
+    onset = scenario.onset_second or 300
+    if elapsed < onset:
+        return
+    progress = min(1.0, (elapsed - onset) / (420.0 / scenario.progression_rate))
+    for tag in ("TS-P3", "TS-P4"):
+        values[tag] = (values[tag] or 0.0) * (1.0 - 0.45 * progress)
+    values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 - 0.18 * progress)
+
+
+def _pressure_pulsation(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-DOWN-006. Pressure oscillating with the feed steady.
+
+    The inverse of FEED-002: there the feed leads and pressure follows; here
+    the feed does not move, so the oscillation originates downstream.
+    """
+    onset = scenario.onset_second or 300
+    if elapsed < onset:
+        return
+    phase = 2 * math.pi * (elapsed - onset) / 30.0
+    values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.26 * math.sin(phase))
+    values["TS-P4"] = (values["TS-P4"] or 0.0) * (1.0 + 0.22 * math.sin(phase - 0.2))
+
+
+def _excessive_shear(values: dict[str, float | None], elapsed: float, scenario: Scenario) -> None:
+    """TSE-PROC-003. Melt temperature and specific energy rise; zones steady.
+
+    The barrel is not heating the material, the screws are. Leaving the zone
+    thermocouples alone is what makes this separable from a thermal fault.
+    """
+    onset = scenario.onset_second or 300
+    if elapsed < onset:
+        return
+    progress = min(1.0, (elapsed - onset) / (600.0 / scenario.progression_rate))
+    values["TS-TM"] = (values["TS-TM"] or 0.0) + 24.0 * progress
+    values["TS-PM1"] = (values["TS-PM1"] or 0.0) * (1.0 + 0.32 * progress)
+    values["TS-P3"] = (values["TS-P3"] or 0.0) * (1.0 + 0.10 * progress)
+
+
 MUTATORS: dict[str, Callable[[dict[str, float | None], float, Scenario], None]] = {
     "healthy": _healthy,
     "startup": _startup,
@@ -450,4 +559,12 @@ MUTATORS: dict[str, Callable[[dict[str, float | None], float, Scenario], None]] 
     "two_independent_faults": _two_independent_faults,
     "causal_chain": _causal_chain,
     "sensor_drift": _sensor_drift_gradual,
+    "motor_bearing_hot": _motor_bearing_hot,
+    "gearbox_oil_hot": _gearbox_oil_hot,
+    "motor_vibration_high": _motor_vibration_high,
+    "zone_temperature_low": _zone_temperature_low,
+    "zone_temperature_oscillation": _zone_temperature_oscillation,
+    "melt_pressure_low": _melt_pressure_low,
+    "pressure_pulsation": _pressure_pulsation,
+    "excessive_shear": _excessive_shear,
 }

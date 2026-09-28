@@ -149,8 +149,12 @@ SCENARIOS: tuple[Scenario, ...] = (
         fault_id="TSE-DOWN-001",
     ),
     _scenario(
-        "SC-DIE-RESTRICTION",
-        "Downstream die restriction",
+        # Named for the fault it labels. DOC-07 reserves TSE-DOWN-002 for the
+        # die; this generator raises both taps together, which is the adapter
+        # and transfer-channel signature, so the id was right and the name was
+        # not.
+        "SC-ADAPTER-RESTRICTION",
+        "Adapter / transfer restriction",
         "Both pressure taps climb together — past the screen, not at it.",
         "die_restriction",
         ScenarioExpectation(
@@ -316,6 +320,101 @@ SCENARIOS: tuple[Scenario, ...] = (
         duration=_LONG,
         onset=300,
         fault_id="TSE-INST-004",
+    ),
+    _scenario(
+        "SC-MOTOR-BEARING-HOT",
+        "Motor bearing running hot",
+        "Bearing temperature climbs; vibration trails it.",
+        "motor_bearing_hot",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-MECH-001",),
+            forbid_fault_ids=("TSE-MECH-004",),
+            notes="Temperature leads. The look-alike is SC-MOTOR-VIBRATION, where vibration does.",
+        ),
+        seed=131, duration=_LONG, onset=420, fault_id="TSE-MECH-001",
+    ),
+    _scenario(
+        "SC-GEARBOX-OIL-HOT",
+        "Gearbox oil temperature high",
+        "Oil and thrust bearing warming with the drive load steady.",
+        "gearbox_oil_hot",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-MECH-002",),
+            notes="Steady load rules out the temperature being a consequence of work done.",
+        ),
+        seed=132, duration=_LONG, onset=420, fault_id="TSE-MECH-002",
+    ),
+    _scenario(
+        "SC-MOTOR-VIBRATION",
+        "Motor vibration high",
+        "Overall vibration rising with the bearing temperature flat.",
+        "motor_vibration_high",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-MECH-004",),
+            forbid_fault_ids=("TSE-MECH-001",),
+            notes="The mirror of SC-MOTOR-BEARING-HOT: vibration leads and the bearing stays cool.",
+        ),
+        seed=133, duration=_LONG, onset=420, fault_id="TSE-MECH-004",
+    ),
+    _scenario(
+        "SC-ZONE-TEMP-LOW",
+        "Zone temperature low",
+        "One zone falling away from its neighbours, monotonically.",
+        "zone_temperature_low",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-THERM-008",),
+            forbid_fault_ids=("TSE-THERM-009",),
+            notes="A directed residual. SC-ZONE-TEMP-OSCILLATION is the undirected case.",
+        ),
+        seed=134, duration=_LONG, onset=420, fault_id="TSE-THERM-008",
+    ),
+    _scenario(
+        "SC-ZONE-TEMP-OSCILLATION",
+        "Zone temperature hunting",
+        "The same zone oscillating about its setpoint rather than drifting.",
+        "zone_temperature_oscillation",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-THERM-009",),
+            forbid_fault_ids=("TSE-THERM-008",),
+            notes="Same zone as SC-ZONE-TEMP-LOW on purpose; only the direction differs.",
+        ),
+        seed=135, duration=_LONG, onset=300, fault_id="TSE-THERM-009",
+    ),
+    _scenario(
+        "SC-MELT-PRESSURE-LOW",
+        "Melt pressure low",
+        "Both taps falling together with feed and speed unchanged.",
+        "melt_pressure_low",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-DOWN-005",),
+            forbid_fault_ids=("TSE-DOWN-001",),
+            notes="The opposite sign to a restriction, and the reason sign matters.",
+        ),
+        seed=136, duration=_LONG, onset=420, fault_id="TSE-DOWN-005",
+    ),
+    _scenario(
+        "SC-PRESSURE-PULSATION",
+        "Pressure pulsation / surging",
+        "Pressure oscillating with the feed steady.",
+        "pressure_pulsation",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-DOWN-006",),
+            forbid_fault_ids=("TSE-FEED-002",),
+            notes="The inverse of SC-FEED-INSTABILITY: there the feed leads, here it does not move.",
+        ),
+        seed=137, duration=_LONG, onset=420, fault_id="TSE-DOWN-006",
+    ),
+    _scenario(
+        "SC-EXCESSIVE-SHEAR",
+        "Excessive shear / process overheating",
+        "Melt temperature and specific energy rising with the zones steady.",
+        "excessive_shear",
+        ScenarioExpectation(
+            expect_fault_ids=("TSE-PROC-003",),
+            forbid_fault_ids=("TSE-THERM-012",),
+            notes="The screws heat the melt, not the barrel, which separates it from a thermal fault.",
+        ),
+        seed=138, duration=_LONG, onset=420, fault_id="TSE-PROC-003",
     ),
 )
 
