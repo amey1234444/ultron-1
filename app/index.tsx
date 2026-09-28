@@ -250,6 +250,8 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
     getTemplateLayout,
     saveLayout,
     saveTemplateLayout,
+    saveError,
+    dismissSaveError,
   } = useWorkspaceStore();
 
   // Real gateway/rack connectivity from the MQTT ingestion pipeline overlays
@@ -1116,6 +1118,40 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
           change to the whole workspace — tens of devices and hundreds of
           channels — and that is not something to let slide off the screen
           after two seconds while somebody is looking elsewhere. */}
+      {/* A refused save.
+          
+          This has to be loud. The edit is still on screen and still in
+          memory, so nothing looks wrong — and a reload throws it away. That
+          is how three machines created in a folder could simply not be there
+          afterwards, with nothing having said a word. */}
+      {saveError && (
+        <View
+          className="absolute inset-0 z-50 items-center justify-center px-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.28)' }}
+        >
+          <View
+            className={cn(
+              'w-full max-w-[460px] rounded-xl border px-5 py-4 shadow-xl',
+              isDark ? 'border-status-critical/50 bg-surface-darkpanel' : 'border-status-critical/60 bg-surface-lightpanel',
+            )}
+          >
+            <Text className={cn('font-body-bold text-base', isDark ? 'text-ink' : 'text-ink-inverse')}>
+              This change has not been saved
+            </Text>
+            <Text className={cn('mt-2 font-body text-sm', isDark ? 'text-ink-muted' : 'text-ink-inverse-muted')}>
+              {saveError}
+            </Text>
+            <Text className={cn('mt-2 font-body text-xs', isDark ? 'text-ink-faint' : 'text-ink-inverse-muted')}>
+              Your work is still here. Fix what the message describes and make any edit to save again —
+              but do not reload first, or this change will be lost.
+            </Text>
+            <View className="mt-4 flex-row justify-end">
+              <ActionButton label="Close" variant="secondary" onPress={dismissSaveError} />
+            </View>
+          </View>
+        </View>
+      )}
+
       {wiringNotice && (
         <View
           className="absolute inset-0 z-50 items-center justify-center px-6"

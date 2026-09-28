@@ -17,8 +17,22 @@ function isUniqueNameDevice(device: DeviceNode): device is DeviceNode & { type: 
   return !device.archived && (device.type === 'Gateway' || device.type === 'Rack');
 }
 
+/**
+ * Tolerant of a missing name on purpose.
+ *
+ * Every caller here runs over devices read back from storage, including rows
+ * written by a build that predates a field. A device short of one is a device
+ * with nothing to compare, not a reason to throw — and throwing happens
+ * during load, which takes the whole asset hierarchy down with it.
+ */
 export function normalizeDeviceNameForUniqueness(name: string): string {
+  if (typeof name !== 'string') return '';
   return name.trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+/** See `normalizeDeviceNameForUniqueness` — same reasoning. */
+function configuredIp(device: Pick<DeviceNode, 'ip'>): string {
+  return typeof device.ip === 'string' ? device.ip.trim() : '';
 }
 
 export function findDuplicateConfiguredDeviceName(devices: DeviceNode[]): DeviceNameConflict | null {
@@ -72,7 +86,7 @@ export function findDuplicateConfiguredDeviceIp(devices: DeviceNode[]): DeviceIp
   const byIp = new Map<string, DeviceNode>();
   for (const device of devices) {
     if (!isUniqueNameDevice(device)) continue;
-    const ip = device.ip.trim();
+    const ip = configuredIp(device);
     if (!ip) continue;
     const existing = byIp.get(ip);
     if (existing && existing.id !== device.id) return { ip, device: existing };
@@ -82,7 +96,7 @@ export function findDuplicateConfiguredDeviceIp(devices: DeviceNode[]): DeviceIp
 }
 
 export function archiveDuplicateConfiguredDeviceIps(devices: DeviceNode[]): { devices: DeviceNode[]; changed: boolean; archivedIds: Set<string> } {
-  return archiveDuplicateConfiguredDevicesBy(devices, (device) => device.ip.trim());
+  return archiveDuplicateConfiguredDevicesBy(devices, (device) => configuredIp(device));
 }
 
 function archiveDuplicateConfiguredDevicesBy(
@@ -99,7 +113,7 @@ function archiveDuplicateConfiguredDevicesBy(
   const winnerByName = new Map<string, DeviceNode>();
   const archivedIds = new Set<string>();
   const score = (device: DeviceNode) => {
-    const hasIp = device.ip.trim() ? 1000 : 0;
+    const hasIp = configuredIp(device) ? 1000 : 0;
     const children = device.type === 'Gateway' ? (childCountByGateway.get(device.id) ?? 0) * 10 : 0;
     const online = device.status === 'Online' ? 1 : 0;
     const originalIndex = indexById.get(device.id) ?? 0;

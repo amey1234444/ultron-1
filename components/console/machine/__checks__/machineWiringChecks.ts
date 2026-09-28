@@ -20,6 +20,10 @@ import { join } from 'node:path';
 
 import { connectorFitForUnit, connectorsForTemplate } from '../machineConnectors';
 import { planMachineWiring } from '../generateMachineWiring';
+import {
+  findDuplicateConfiguredDeviceIp,
+  findDuplicateConfiguredDeviceName,
+} from '../../../../lib/deviceUniqueness';
 import { profileFromName, specForKind, SLOTS_PER_RACK } from '../../../../lib/machineSimulationProfile';
 import { MACHINE_TEMPLATES, type MachineTemplate } from '../../../../lib/machines';
 
@@ -201,6 +205,59 @@ const withStray = planMachineWiring(targets.slice(0, 3), RECT, stray);
 ok('an unrelated device in the workspace does not block generation',
   withStray.machines.length === 3,
   'the check is per machine, not "does this workspace have any devices"');
+
+console.log('\n--- generating in batches does not collide with what is there ---');
+// This is the bug that lost three machines. The IP block used to come from
+// the machine's position in the batch, so a second run started at block 10
+// again and handed its first gateway 10.80.10.1 — an address the first run's
+// first gateway already had. The device list refuses duplicate configured
+// IPs with a 409, and that 409 is raised by the endpoint that saves the whole
+// workspace, so from then on *every* hierarchy edit failed: create a machine,
+// see it appear, reload, find it gone.
+const firstBatch = planMachineWiring(targets.slice(0, 3), RECT);
+const secondBatch = planMachineWiring(targets.slice(3, 6), RECT, firstBatch.devices);
+ok('the second batch generates', secondBatch.machines.length === 3,
+  secondBatch.skipped.map((entry) => entry.reason).join('; ') || `${secondBatch.machines.length}`);
+const combined = [...firstBatch.devices, ...secondBatch.devices];
+const ipClash = findDuplicateConfiguredDeviceIp(combined);
+ok('and shares no address with the first', ipClash === null,
+  ipClash ? `${ipClash.ip} is on ${ipClash.device.name} as well` : `${combined.length} devices, all distinct`);
+const nameClash = findDuplicateConfiguredDeviceName(combined);
+ok('and no name either', nameClash === null,
+  nameClash ? `${nameClash.type} "${nameClash.name}" twice` : '');
+ok('the same rule holds within a single batch',
+  findDuplicateConfiguredDeviceIp(plan.devices) === null
+  && findDuplicateConfiguredDeviceName(plan.devices) === null);
+
+// Machines live in folders, so two of them may legitimately carry one name.
+// Devices may not, and the operator's name in the hierarchy is not ours to
+// rewrite — so the suffix goes on the hardware.
+const sameName = planMachineWiring(
+  [
+    { id: 'dup-a-111111', name: 'Cracking Mill', template: 'Cracking Mill M-101', projectId: 'p1' },
+    { id: 'dup-b-222222', name: 'Cracking Mill', template: 'Cracking Mill M-101', projectId: 'p1' },
+  ],
+  RECT,
+);
+ok('two machines sharing a name both get hardware', sameName.machines.length === 2,
+  sameName.skipped.map((entry) => entry.reason).join('; '));
+ok('with distinct device names', findDuplicateConfiguredDeviceName(sameName.devices) === null,
+  sameName.devices.filter((device) => device.type === 'Gateway').map((device) => device.name).join(' / '));
+ok('and distinct addresses', findDuplicateConfiguredDeviceIp(sameName.devices) === null);
+
+// Re-running must not renumber the machines it skips, or every card's
+// gateway would move under it.
+const topUpAfterSkip = planMachineWiring(targets.slice(0, 6), RECT, firstBatch.devices);
+ok('a re-run skips what exists and wires only the rest',
+  topUpAfterSkip.machines.length === 3 && topUpAfterSkip.skipped.length === 3,
+  `${topUpAfterSkip.machines.length} wired, ${topUpAfterSkip.skipped.length} skipped`);
+ok('the skipped machines keep the addresses they already had',
+  findDuplicateConfiguredDeviceIp([...firstBatch.devices, ...topUpAfterSkip.devices]) === null);
+// If the id this predicts ever drifted from the one `planMachine` builds,
+// nothing would ever be reported as already generated — which the skip count
+// above would catch immediately.
+ok('and are recognised by id, not by name',
+  topUpAfterSkip.skipped.every((entry) => entry.reason === 'already has generated hardware'));
 
 console.log('\n--- the action is reachable ---');
 const page = readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');

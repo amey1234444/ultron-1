@@ -235,32 +235,55 @@ function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28) || 'machine';
 }
 
+/** The two things a plan cannot work out for itself. */
+export type PlanAddressing = {
+  /**
+   * Third octet of the machine's 10.80.x.0 block.
+   *
+   * The caller allocates it, because only the caller knows which blocks the
+   * workspace has already handed out. It used to be the machine's position in
+   * the batch, which is fine for one run and wrong for every run after it:
+   * generating a second batch restarted at the first block and handed the new
+   * gateway an address an existing one already had. The device list refuses
+   * duplicate configured IPs with a 409, so that collision did not produce a
+   * confusing canvas — it made every later save of the workspace fail.
+   */
+  block: number;
+  /**
+   * What to call the hardware.
+   *
+   * Defaults to the machine's name. The caller overrides it when two machines
+   * share a name — legal in the hierarchy, since they sit in different
+   * folders, but not for a device, which the list also refuses to duplicate.
+   */
+  hardwareName?: string;
+};
+
 /**
  * Hardware for one machine.
  *
- * `index` only picks the IP block, so two machines never collide on an
- * address — the device list refuses duplicate configured IPs, and two
- * generated gateways sharing one would archive each other.
+ * Addresses and names come from `addressing` rather than being derived here,
+ * so that uniqueness is decided once, against the whole workspace, by whoever
+ * can see all of it. See `PlanAddressing`.
  */
 export function planMachine(
   target: SimulationTarget,
   points: readonly SimulationPoint[],
-  index: number,
+  addressing: PlanAddressing,
 ): MachinePlan | null {
   if (points.length === 0) return null;
 
   const profile = profileFromName(target.name);
   const key = `${slug(target.name)}-${target.id.slice(-6)}`;
   const gatewayId = `sim-${key}-gw`;
-  // 10.80.x.y, stepping the third octet per machine. 254 machines before a
-  // collision, which is more than a plant this canvas can draw.
-  const block = 10 + (index % 240);
-  const ipPrefix = `10.80.${block}`;
+  const hardwareName = addressing.hardwareName ?? target.name;
+  // 10.80.x.y, one third octet per machine, allocated by the caller.
+  const ipPrefix = `10.80.${addressing.block}`;
 
   const rackCount = Math.max(1, Math.ceil(points.length / SLOTS_PER_RACK));
   const racks: DeviceNode[] = Array.from({ length: rackCount }, (_, i) => ({
     id: `${gatewayId}-r${i + 1}`,
-    name: `${target.name} R${i + 1}`,
+    name: `${hardwareName} R${i + 1}`,
     type: 'Rack' as const,
     model: 'RACK-12-R',
     ip: `${ipPrefix}.${11 + i}`,
@@ -278,7 +301,7 @@ export function planMachine(
 
   const gateway: DeviceNode = {
     id: gatewayId,
-    name: `GW ${target.name}`,
+    name: `GW ${hardwareName}`,
     type: 'Gateway',
     model: 'GW-100',
     ip: `${ipPrefix}.1`,

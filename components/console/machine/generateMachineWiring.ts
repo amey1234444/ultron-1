@@ -11,9 +11,11 @@
 // instrument. Nothing here invents geometry; it binds.
 import {
   planMachine,
+  SLOTS_PER_RACK,
   type MachinePlan,
   type SimulationTarget,
 } from '../../../lib/machineSimulationProfile';
+import { normalizeDeviceNameForUniqueness } from '../../../lib/deviceUniqueness';
 import type { CardNode } from '../../../lib/rack';
 import type { DeviceNode } from '../../../lib/devices';
 import { connectorsForTemplate } from './machineConnectors';
@@ -52,13 +54,14 @@ export function planMachineWiring(
   existingDevices: readonly DeviceNode[] = [],
 ): WiringPlan {
   const present = new Set(existingDevices.map((device) => device.id));
+  const taken = takenAddresses(existingDevices);
   const devices: DeviceNode[] = [];
   const cards: CardNode[] = [];
   const layouts: Record<string, SavedLayout> = {};
   const machines: MachinePlan[] = [];
   const skipped: WiringPlan['skipped'] = [];
 
-  targets.forEach((target, index) => {
+  targets.forEach((target) => {
     const connectors = connectorsForTemplate(target.template);
     if (connectors.length === 0) {
       skipped.push({
@@ -69,17 +72,33 @@ export function planMachineWiring(
       return;
     }
 
+    // Before planning, not after: a machine that already has its hardware must
+    // not consume a block or a name, or re-running the generator would shift
+    // every later machine onto different addresses than it had last time.
+    const gatewayId = generatedGatewayId(target);
+    if (present.has(gatewayId)) {
+      skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
+      return;
+    }
+
+    const rackCount = Math.max(1, Math.ceil(connectors.length / SLOTS_PER_RACK));
+    const addressing = taken.reserve(target.name, rackCount);
+    if (!addressing) {
+      skipped.push({
+        id: target.id,
+        name: target.name,
+        reason: 'no free address block is left in 10.80.0.0/16',
+      });
+      return;
+    }
+
     const plan = planMachine(
       target,
       connectors.map((connector) => ({ code: connector.code, label: connector.label, kind: connector.kind })),
-      index,
+      addressing,
     );
     if (!plan) {
       skipped.push({ id: target.id, name: target.name, reason: 'no hardware could be planned' });
-      return;
-    }
-    if (present.has(plan.gateway.id)) {
-      skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
       return;
     }
 
@@ -102,6 +121,87 @@ export function planMachineWiring(
   });
 
   return { devices, cards, layouts, machines, skipped };
+}
+
+/**
+ * The gateway id `planMachine` will produce for a machine.
+ *
+ * Duplicated here so that "does this machine already have hardware?" can be
+ * answered without planning it, which is what keeps a re-run from renumbering
+ * the machines it is about to skip. Kept in step by
+ * `generateMachineWiringChecks`, which plans a machine and compares.
+ */
+function generatedGatewayId(target: SimulationTarget): string {
+  const slug = target.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28) || 'machine';
+  return `sim-${slug}-${target.id.slice(-6)}-gw`;
+}
+
+/** Third octets we will hand out, in order. `10.80.10.0` through `10.80.249.0`. */
+const FIRST_BLOCK = 10;
+const LAST_BLOCK = 249;
+
+/**
+ * What the workspace has already used, and what is still free.
+ *
+ * Both dimensions the device list refuses to duplicate — configured IPs, and
+ * names within a type — are tracked together, because a machine needs a block
+ * and a name that are *both* free, and reserving one without the other would
+ * only move the collision.
+ *
+ * Archived devices are ignored, matching `lib/deviceUniqueness`: archiving is
+ * how the console retires a device, and a retired address is free again.
+ */
+function takenAddresses(existing: readonly DeviceNode[]) {
+  const ips = new Set<string>();
+  const names = new Set<string>();
+  for (const device of existing) {
+    if (device.archived || (device.type !== 'Gateway' && device.type !== 'Rack')) continue;
+    // Read defensively: this is persisted data, and a row written by an
+    // older build can be missing a field the type promises.
+    const ip = typeof device.ip === 'string' ? device.ip.trim() : '';
+    if (ip) ips.add(ip);
+    const name = typeof device.name === 'string' ? normalizeDeviceNameForUniqueness(device.name) : '';
+    if (name) names.add(`${device.type}:${name}`);
+  }
+
+  /** Addresses a machine planned earlier in this same run needs. */
+  const addressesFor = (block: number, rackCount: number) => [
+    `10.80.${block}.1`,
+    ...Array.from({ length: rackCount }, (_, i) => `10.80.${block}.${11 + i}`),
+  ];
+  const namesFor = (hardwareName: string, rackCount: number) => [
+    `Gateway:${normalizeDeviceNameForUniqueness(`GW ${hardwareName}`)}`,
+    ...Array.from({ length: rackCount }, (_, i) => `Rack:${normalizeDeviceNameForUniqueness(`${hardwareName} R${i + 1}`)}`),
+  ];
+
+  return {
+    /**
+     * Claim a free block and a free name, or null when the space is full.
+     *
+     * A machine name may repeat across folders, so the name is disambiguated
+     * with a counted suffix when it has to be — the hierarchy keeps the name
+     * the operator chose, and only the hardware carries the suffix.
+     */
+    reserve(machineName: string, rackCount: number): { block: number; hardwareName?: string } | null {
+      let block = -1;
+      for (let candidate = FIRST_BLOCK; candidate <= LAST_BLOCK; candidate++) {
+        if (addressesFor(candidate, rackCount).every((ip) => !ips.has(ip))) {
+          block = candidate;
+          break;
+        }
+      }
+      if (block < 0) return null;
+
+      let hardwareName = machineName;
+      for (let attempt = 2; namesFor(hardwareName, rackCount).some((key) => names.has(key)); attempt++) {
+        hardwareName = `${machineName} (${attempt})`;
+      }
+
+      for (const ip of addressesFor(block, rackCount)) ips.add(ip);
+      for (const key of namesFor(hardwareName, rackCount)) names.add(key);
+      return hardwareName === machineName ? { block } : { block, hardwareName };
+    },
+  };
 }
 
 /** One line per machine, for the confirmation the operator reads before applying. */
