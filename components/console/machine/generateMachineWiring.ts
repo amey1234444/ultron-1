@@ -41,7 +41,17 @@ export type WiringPlan = {
 export function planMachineWiring(
   targets: readonly SimulationTarget[],
   machineRect?: MachineRect | null,
+  /**
+   * What the workspace already has.
+   *
+   * Machines whose generated gateway is already present are skipped, so
+   * pressing the button twice tops up what is missing rather than producing a
+   * second copy of everything. Generated device ids are derived from the
+   * machine, so "already generated" is a lookup rather than a guess.
+   */
+  existingDevices: readonly DeviceNode[] = [],
 ): WiringPlan {
+  const present = new Set(existingDevices.map((device) => device.id));
   const devices: DeviceNode[] = [];
   const cards: CardNode[] = [];
   const layouts: Record<string, SavedLayout> = {};
@@ -66,6 +76,10 @@ export function planMachineWiring(
     );
     if (!plan) {
       skipped.push({ id: target.id, name: target.name, reason: 'no hardware could be planned' });
+      return;
+    }
+    if (present.has(plan.gateway.id)) {
+      skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
       return;
     }
 

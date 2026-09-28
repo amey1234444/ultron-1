@@ -586,12 +586,15 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       template: machine.template,
       projectId: machine.projectId ?? null,
     }));
-    const plan = planMachineWiring(targets);
+    const plan = planMachineWiring(targets, null, storedDevices);
     if (plan.machines.length === 0) {
+      const already = plan.skipped.filter((entry) => entry.reason === 'already has generated hardware').length;
       setWiringNotice(
         machines.length === 0
           ? 'No machines yet — add machines to the hierarchy first.'
-          : 'None of these machines has instrument points to wire.',
+          : already > 0
+            ? `Nothing to do — all ${already} machine${already === 1 ? '' : 's'} already have their generated hardware.`
+            : 'None of these machines has instrument points to wire.',
       );
       return;
     }
@@ -1298,6 +1301,19 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
                       variant="secondary"
                       onPress={() => setSelected({ kind: 'simulation' })}
                     />
+                    {canEditDeleteSchema && machines.length > 0 && (
+                      // Also offered here, not only from the empty state. A
+                      // workspace that already has one device never shows that
+                      // state, so putting the action there alone made it
+                      // unreachable on exactly the workspaces that had a
+                      // stray gateway in them and most needed generating the
+                      // rest.
+                      <ActionButton
+                        label="Generate From Machines"
+                        permission={PERMISSIONS.DEVICE_CREATE}
+                        onPress={generateMachineHardware}
+                      />
+                    )}
                     {canEditDeleteSchema && (
                       <ActionButton label="Add Device" permission={PERMISSIONS.DEVICE_CREATE} onPress={() => openAddDevice()} />
                     )}
