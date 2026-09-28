@@ -155,6 +155,33 @@ def test_cadence_returns_the_previous_answer_rather_than_recomputing(
     assert service._counters["inference_skipped_cadence"] == 1
 
 
+def test_an_unavailable_explanation_always_says_why(
+    isolated_settings, tmp_path, steady_run
+) -> None:
+    """`shap_available: false` with a null reason is an empty panel and no cause.
+
+    Four separate conditions used to return a bare None here — no model output
+    for the fault, an empty feature vector, no ensemble, and a probability
+    under the floor — and every one of them rendered identically.
+    """
+    reset_settings(
+        Settings(
+            knowledge_dir=isolated_settings.knowledge_dir,
+            artifacts_dir=tmp_path / "a",
+            registry_dir=tmp_path / "a" / "registry",
+            config_dir=tmp_path / "c",
+        )
+    )
+    service = MLService()
+    for frame in steady_run(6):
+        payload = service.infer(InferenceRequest(frame=frame, explain=True))
+        for diagnosis in payload.get("diagnoses") or []:
+            if not diagnosis.get("shap_available"):
+                assert diagnosis.get("shap_unavailable_reason"), (
+                    f"{diagnosis['fault_id']} has no contributions and does not say why."
+                )
+
+
 # -- the FastAPI wiring, when FastAPI is present ---------------------------
 
 

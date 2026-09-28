@@ -49,7 +49,12 @@ from ..core.timeutil import iso, seconds_between
 from ..core.versions import version_block
 from ..decision.engine import DecisionEngine, DecisionResult
 from ..diagnosis.resolver import DiagnosisResolver, ResolvedDiagnosis, ResolutionResult
-from ..explanation.shap_explainer import Explanation, explain_output, should_explain
+from ..explanation.shap_explainer import (
+    UNAVAILABLE_NO_MODEL,
+    Explanation,
+    explain_output,
+    should_explain,
+)
 from ..features.engine import FeatureEngine, FeatureFrame, union_feature_ids
 from ..features.registry import reset_registry_cache
 from ..knowledge.loader import knowledge
@@ -125,6 +130,11 @@ class MachineState:
         self.history.append(response)
         if len(self.history) > limit:
             del self.history[: len(self.history) - limit]
+
+
+def _no_explanation(reason: str) -> Explanation:
+    """An explanation that is not available, and says so."""
+    return Explanation(available=False, output="", top_positive=[], top_negative=[], reason=reason)
 
 
 class InferencePipeline:
@@ -721,8 +731,21 @@ class InferencePipeline:
         machine: MachineState,
         frame: TelemetryFrame,
     ) -> Explanation | None:
-        if not resolved.risk or not vector or not self.ensemble.available:
-            return None
+        # Every path out of here says why. Returning a bare None left
+        # `shap_unavailable_reason` null for four different causes, so a
+        # missing explanation looked identical to a broken one and the UI had
+        # nothing to show but an empty panel.
+        if not resolved.risk:
+            return _no_explanation(
+                "No model output names this fault, so there are no contributions to attribute."
+            )
+        if not vector:
+            return _no_explanation(
+                "The feature vector was empty for this frame, so nothing could be attributed."
+            )
+        if not self.ensemble.available:
+            return _no_explanation(self.ensemble.reason or UNAVAILABLE_NO_MODEL)
+
         horizon, verdict = max(resolved.risk.items(), key=lambda item: item[1].probability)
         if not should_explain(
             probability=verdict.probability,
@@ -731,7 +754,11 @@ class InferencePipeline:
             requested=explain,
             floor=self.settings.explanation_probability_floor,
         ):
-            return None
+            return _no_explanation(
+                f"The highest probability for this fault is {verdict.probability:.3f}, below the "
+                f"{self.settings.explanation_probability_floor:.3f} floor at which explanations "
+                "are computed unprompted. Ask for one to have it computed now."
+            )
         explanation = explain_output(
             self.ensemble, features, self._feature_ids, vector, verdict.key
         )
