@@ -12,6 +12,11 @@
 // instruments the current model does not read, and they say so.
 
 import {
+  AUTO_BAGGER_ARTWORK_HEIGHT,
+  AUTO_BAGGER_ARTWORK_WIDTH,
+  AUTO_BAGGER_POINT_REGISTRY,
+} from '../../../lib/machinePoints/autoBaggerPoints';
+import {
   COLLET_COOLER_ARTWORK_HEIGHT,
   COLLET_COOLER_ARTWORK_WIDTH,
   COLLET_COOLER_POINT_REGISTRY,
@@ -37,6 +42,21 @@ import {
   DTDC_POINT_REGISTRY,
 } from '../../../lib/machinePoints/dtdcPoints';
 import { EXTRUDER_POINT_REGISTRY } from '../../../lib/machinePoints/extruderPoints';
+import {
+  HAMMER_MILL_ARTWORK_HEIGHT,
+  HAMMER_MILL_ARTWORK_WIDTH,
+  HAMMER_MILL_POINT_REGISTRY,
+} from '../../../lib/machinePoints/hammerMillPoints';
+import {
+  MEAL_CONVEYING_STORAGE_ARTWORK_HEIGHT,
+  MEAL_CONVEYING_STORAGE_ARTWORK_WIDTH,
+  MEAL_CONVEYING_STORAGE_POINT_REGISTRY,
+} from '../../../lib/machinePoints/mealConveyingStoragePoints';
+import {
+  MEAL_SIFTER_ARTWORK_HEIGHT,
+  MEAL_SIFTER_ARTWORK_WIDTH,
+  MEAL_SIFTER_POINT_REGISTRY,
+} from '../../../lib/machinePoints/mealSifterPoints';
 import {
   FLAKING_MILL_ARTWORK_HEIGHT,
   FLAKING_MILL_ARTWORK_WIDTH,
@@ -82,6 +102,10 @@ export const ARTWORK_SIZE: Record<string, { width: number; height: number }> = {
   'Solvent Extractor': { width: SOLVENT_EXTRACTOR_ARTWORK_WIDTH, height: SOLVENT_EXTRACTOR_ARTWORK_HEIGHT },
   'Collet Cooler': { width: COLLET_COOLER_ARTWORK_WIDTH, height: COLLET_COOLER_ARTWORK_HEIGHT },
   'Seed Dryer Cooler': { width: SEED_DRYER_COOLER_ARTWORK_WIDTH, height: SEED_DRYER_COOLER_ARTWORK_HEIGHT },
+  'Hammer Mill': { width: HAMMER_MILL_ARTWORK_WIDTH, height: HAMMER_MILL_ARTWORK_HEIGHT },
+  'Meal Sifter': { width: MEAL_SIFTER_ARTWORK_WIDTH, height: MEAL_SIFTER_ARTWORK_HEIGHT },
+  'Meal Conveying & Storage': { width: MEAL_CONVEYING_STORAGE_ARTWORK_WIDTH, height: MEAL_CONVEYING_STORAGE_ARTWORK_HEIGHT },
+  'Auto Bagger & Stitcher': { width: AUTO_BAGGER_ARTWORK_WIDTH, height: AUTO_BAGGER_ARTWORK_HEIGHT },
 };
 
 const DEFAULT_ARTWORK = { width: 1200, height: 760 };
@@ -217,6 +241,21 @@ const COLLET_COOLER_CONNECTOR_LIST: MachineConnector[] = COLLET_COOLER_POINT_REG
 const SEED_DRYER_COOLER_CONNECTOR_LIST: MachineConnector[] = SEED_DRYER_COOLER_POINT_REGISTRY.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Seed Dryer Cooler']),
 );
+// The meal-handling four, derived from their supplied registries. As with the
+// oilseed set, no analyzerTag: every pad is a real instrument and no
+// commissioned model reads any of them yet.
+const HAMMER_MILL_CONNECTOR_LIST: MachineConnector[] = HAMMER_MILL_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Hammer Mill']),
+);
+const MEAL_SIFTER_CONNECTOR_LIST: MachineConnector[] = MEAL_SIFTER_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Meal Sifter']),
+);
+const MEAL_CONVEYING_STORAGE_CONNECTOR_LIST: MachineConnector[] = MEAL_CONVEYING_STORAGE_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Meal Conveying & Storage']),
+);
+const AUTO_BAGGER_CONNECTOR_LIST: MachineConnector[] = AUTO_BAGGER_POINT_REGISTRY.map((point) =>
+  fromArtwork(point, ARTWORK_SIZE['Auto Bagger & Stitcher']),
+);
 const RAV_CONNECTOR_LIST: MachineConnector[] = RAV_CONNECTOR_POINTS.map((point) =>
   fromArtwork(point, ARTWORK_SIZE['Rotary Airlock Valve']),
 );
@@ -233,6 +272,10 @@ const BY_TEMPLATE: Record<string, MachineConnector[]> = {
   'Solvent Extractor': SOLVENT_EXTRACTOR_CONNECTOR_LIST,
   'Collet Cooler': COLLET_COOLER_CONNECTOR_LIST,
   'Seed Dryer Cooler': SEED_DRYER_COOLER_CONNECTOR_LIST,
+  'Hammer Mill': HAMMER_MILL_CONNECTOR_LIST,
+  'Meal Sifter': MEAL_SIFTER_CONNECTOR_LIST,
+  'Meal Conveying & Storage': MEAL_CONVEYING_STORAGE_CONNECTOR_LIST,
+  'Auto Bagger & Stitcher': AUTO_BAGGER_CONNECTOR_LIST,
 };
 
 export function connectorsForTemplate(machineTemplate: string): MachineConnector[] {
@@ -264,7 +307,7 @@ export type ParameterKind =
   | 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Electrical' | 'Level' | 'Flow'
   // Both arrived with the oilseed machines and both have a unit nothing else
   // in the set uses, so neither can be confused with anything above.
-  | 'Gas' | 'Position';
+  | 'Gas' | 'Position' | 'Weight';
 
 /**
  * The quantity a unit denotes.
@@ -294,6 +337,9 @@ export function parameterKindForUnit(unit: string | undefined | null): Parameter
   // that has run out of adjustment is measured in millimetres of remaining
   // travel, not in per cent of anything.
   if (['mm', 'cm', 'm', 'in', 'inch', 'thou', 'mil'].includes(value)) return 'Position';
+  // Mass on a load cell. Distinct from Flow: a bagger weighs a static charge,
+  // it does not measure a rate.
+  if (['kg', 'g', 't', 'tonne', 'lb', 'lbs'].includes(value)) return 'Weight';
   return null;
 }
 
@@ -321,6 +367,8 @@ export function parameterKindForConnector(connector: MachineConnector): Paramete
       return 'Gas';
     case 'Position':
       return 'Position';
+    case 'Weight':
+      return 'Weight';
     // 'Moisture' and 'Leak' fall through deliberately.
     //
     // A moisture probe reports per cent and so does a hopper level, so the
@@ -376,6 +424,8 @@ export function connectorExpectation(connector: MachineConnector): string {
       return 'a gas-concentration channel (ppm)';
     case 'Position':
       return 'a position channel (mm)';
+    case 'Weight':
+      return 'a weight channel (kg)';
     default:
       return 'a matching channel';
   }

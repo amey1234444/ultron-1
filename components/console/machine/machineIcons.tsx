@@ -3,8 +3,12 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { ComponentType } from '../../../lib/machines';
 import type { MachineTemplate } from '../../../lib/machines';
 import {
+  AutoBaggerIcon,
   ColletCoolerIcon,
   DTDCIcon,
+  HammerMillIcon,
+  MealConveyingStorageIcon,
+  MealSifterIcon,
   SeedDryerCoolerIcon,
   SolventExtractorIcon,
   type TemplateIconProps,
@@ -23,6 +27,10 @@ const TEMPLATE_DRAWN_ICON: Partial<Record<MachineTemplate, React.ComponentType<T
   'Solvent Extractor': SolventExtractorIcon,
   'Collet Cooler': ColletCoolerIcon,
   'Seed Dryer Cooler': SeedDryerCoolerIcon,
+  'Hammer Mill': HammerMillIcon,
+  'Meal Sifter': MealSifterIcon,
+  'Meal Conveying & Storage': MealConveyingStorageIcon,
+  'Auto Bagger & Stitcher': AutoBaggerIcon,
 };
 
 export const MACHINE_TEMPLATE_ICON: Record<MachineTemplate, keyof typeof MaterialCommunityIcons.glyphMap> = {
@@ -47,6 +55,10 @@ export const MACHINE_TEMPLATE_ICON: Record<MachineTemplate, keyof typeof Materia
   'Solvent Extractor': 'tray-full',
   'Collet Cooler': 'snowflake',
   'Seed Dryer Cooler': 'grain',
+  'Hammer Mill': 'hammer',
+  'Meal Sifter': 'filter-outline',
+  'Meal Conveying & Storage': 'silo',
+  'Auto Bagger & Stitcher': 'package-variant-closed',
   'Custom Machine': 'shape-outline',
 };
 

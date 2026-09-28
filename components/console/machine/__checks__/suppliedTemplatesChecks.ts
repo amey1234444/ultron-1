@@ -1,10 +1,12 @@
 /**
- * DTDC, Solvent Extractor, Collet Cooler and Seed Dryer Cooler wiring.
+ * The eight templates whose point registries were supplied with them.
  *
- * One file for four templates, because they were integrated together from one
- * archive and share the property that makes them different from every machine
- * already in the console: their point registries were **supplied** rather than
- * written during integration.
+ * Two archives: the oilseed four (DTDC, Solvent Extractor, Collet Cooler,
+ * Seed Dryer Cooler) and the meal-handling four (Hammer Mill, Meal Sifter,
+ * Meal Conveying & Storage, Auto Bagger & Stitcher). One file, because they
+ * share the property that makes them different from every machine integrated
+ * before them: their point registries were **supplied** rather than written
+ * during integration.
  *
  * That changes what is worth checking. For the flaking mill, the cracking mill
  * and the conditioner the interesting question was "does each pad land on the
@@ -13,6 +15,34 @@
  * artwork's own sensor list and the canvas connectors are three copies of the
  * same 43 points, and two of them being right is not good enough.
  */
+import {
+  AUTO_BAGGER_ARTWORK_HEIGHT,
+  AUTO_BAGGER_ARTWORK_WIDTH,
+  AUTO_BAGGER_COMPONENT_ORDER,
+  AUTO_BAGGER_PART_LABELS,
+  AUTO_BAGGER_POINT_REGISTRY,
+} from '../../../../lib/machinePoints/autoBaggerPoints';
+import {
+  HAMMER_MILL_ARTWORK_HEIGHT,
+  HAMMER_MILL_ARTWORK_WIDTH,
+  HAMMER_MILL_COMPONENT_ORDER,
+  HAMMER_MILL_PART_LABELS,
+  HAMMER_MILL_POINT_REGISTRY,
+} from '../../../../lib/machinePoints/hammerMillPoints';
+import {
+  MEAL_CONVEYING_STORAGE_ARTWORK_HEIGHT,
+  MEAL_CONVEYING_STORAGE_ARTWORK_WIDTH,
+  MEAL_CONVEYING_STORAGE_COMPONENT_ORDER,
+  MEAL_CONVEYING_STORAGE_PART_LABELS,
+  MEAL_CONVEYING_STORAGE_POINT_REGISTRY,
+} from '../../../../lib/machinePoints/mealConveyingStoragePoints';
+import {
+  MEAL_SIFTER_ARTWORK_HEIGHT,
+  MEAL_SIFTER_ARTWORK_WIDTH,
+  MEAL_SIFTER_COMPONENT_ORDER,
+  MEAL_SIFTER_PART_LABELS,
+  MEAL_SIFTER_POINT_REGISTRY,
+} from '../../../../lib/machinePoints/mealSifterPoints';
 import {
   COLLET_COOLER_ARTWORK_HEIGHT,
   COLLET_COOLER_ARTWORK_WIDTH,
@@ -48,7 +78,11 @@ import {
   MACHINE_TEMPLATES,
   type MachineTemplate,
 } from '../../../../lib/machines';
+import { AUTOBAGGER_SCENE, AUTOBAGGER_SENSORS, AUTOBAGGER_PARTS } from '../artwork/autoBaggerScene';
 import { COLLETCOOLER_SCENE, COLLETCOOLER_SENSORS, COLLETCOOLER_PARTS } from '../artwork/colletCoolerScene';
+import { HAMMERMILL_SCENE, HAMMERMILL_SENSORS, HAMMERMILL_PARTS } from '../artwork/hammerMillScene';
+import { MEALCONVEYINGSTORAGE_SCENE, MEALCONVEYINGSTORAGE_SENSORS, MEALCONVEYINGSTORAGE_PARTS } from '../artwork/mealConveyingStorageScene';
+import { MEALSIFTER_SCENE, MEALSIFTER_SENSORS, MEALSIFTER_PARTS } from '../artwork/mealSifterScene';
 import { DTDC_SCENE, DTDC_SENSORS, DTDC_PARTS } from '../artwork/dtdcScene';
 import { SEEDDRYERCOOLER_SCENE, SEEDDRYERCOOLER_SENSORS, SEEDDRYERCOOLER_PARTS } from '../artwork/seedDryerCoolerScene';
 import { SOLVENTEXTRACTOR_SCENE, SOLVENTEXTRACTOR_SENSORS, SOLVENTEXTRACTOR_PARTS } from '../artwork/solventExtractorScene';
@@ -61,7 +95,11 @@ import {
 import { createElement, Fragment } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 
+import { AutoBagger } from '../artwork/AutoBagger';
 import { ColletCooler } from '../artwork/ColletCooler';
+import { HammerMill } from '../artwork/HammerMill';
+import { MealConveyingStorage } from '../artwork/MealConveyingStorage';
+import { MealSifter } from '../artwork/MealSifter';
 import { DTDC as DTDCArtwork } from '../artwork/DTDC';
 import { SeedDryerCooler } from '../artwork/SeedDryerCooler';
 import { SolventExtractor } from '../artwork/SolventExtractor';
@@ -136,6 +174,58 @@ const MACHINES = [
     height: SEED_DRYER_COOLER_ARTWORK_HEIGHT,
     expected: 8,
     utilities: 2,
+  },
+  {
+    template: 'Hammer Mill' as MachineTemplate,
+    points: HAMMER_MILL_POINT_REGISTRY as readonly Point[],
+    sensors: HAMMERMILL_SENSORS as readonly Sensor[],
+    scene: HAMMERMILL_SCENE as readonly SceneNode[],
+    parts: HAMMERMILL_PARTS as readonly { id: string }[],
+    partLabels: HAMMER_MILL_PART_LABELS,
+    order: HAMMER_MILL_COMPONENT_ORDER,
+    width: HAMMER_MILL_ARTWORK_WIDTH,
+    height: HAMMER_MILL_ARTWORK_HEIGHT,
+    expected: 3,
+    utilities: 0,
+  },
+  {
+    template: 'Meal Sifter' as MachineTemplate,
+    points: MEAL_SIFTER_POINT_REGISTRY as readonly Point[],
+    sensors: MEALSIFTER_SENSORS as readonly Sensor[],
+    scene: MEALSIFTER_SCENE as readonly SceneNode[],
+    parts: MEALSIFTER_PARTS as readonly { id: string }[],
+    partLabels: MEAL_SIFTER_PART_LABELS,
+    order: MEAL_SIFTER_COMPONENT_ORDER,
+    width: MEAL_SIFTER_ARTWORK_WIDTH,
+    height: MEAL_SIFTER_ARTWORK_HEIGHT,
+    expected: 3,
+    utilities: 0,
+  },
+  {
+    template: 'Meal Conveying & Storage' as MachineTemplate,
+    points: MEAL_CONVEYING_STORAGE_POINT_REGISTRY as readonly Point[],
+    sensors: MEALCONVEYINGSTORAGE_SENSORS as readonly Sensor[],
+    scene: MEALCONVEYINGSTORAGE_SCENE as readonly SceneNode[],
+    parts: MEALCONVEYINGSTORAGE_PARTS as readonly { id: string }[],
+    partLabels: MEAL_CONVEYING_STORAGE_PART_LABELS,
+    order: MEAL_CONVEYING_STORAGE_COMPONENT_ORDER,
+    width: MEAL_CONVEYING_STORAGE_ARTWORK_WIDTH,
+    height: MEAL_CONVEYING_STORAGE_ARTWORK_HEIGHT,
+    expected: 4,
+    utilities: 0,
+  },
+  {
+    template: 'Auto Bagger & Stitcher' as MachineTemplate,
+    points: AUTO_BAGGER_POINT_REGISTRY as readonly Point[],
+    sensors: AUTOBAGGER_SENSORS as readonly Sensor[],
+    scene: AUTOBAGGER_SCENE as readonly SceneNode[],
+    parts: AUTOBAGGER_PARTS as readonly { id: string }[],
+    partLabels: AUTO_BAGGER_PART_LABELS,
+    order: AUTO_BAGGER_COMPONENT_ORDER,
+    width: AUTO_BAGGER_ARTWORK_WIDTH,
+    height: AUTO_BAGGER_ARTWORK_HEIGHT,
+    expected: 4,
+    utilities: 1,
   },
 ];
 
@@ -261,8 +351,9 @@ for (const m of MACHINES) {
   ok('every point starts Not Configured', components.every((c) => c.points.every((p) => p.status === 'Not Configured')));
 }
 
-console.log('\n--- across all four ---');
-ok('43 logical connection groups in total', totalPoints === 43, `got ${totalPoints}`);
+console.log('\n--- across all eight ---');
+ok('57 logical connection groups in total', totalPoints === 57,
+  `got ${totalPoints} (43 oilseed + 14 meal)`);
 
 // Unit matching, one assertion per kind these machines introduced.
 const dtdc = connectorsForTemplate('DTDC');
@@ -323,6 +414,38 @@ ok('the twin screw still has a default layout', hasDefaultLayout('Twin Screw Ext
 // drawing: the renderer resolves each tag through a lookup and returns null on
 // a miss, so a component can produce a perfectly valid, perfectly empty SVG
 // and every assertion above would still pass.
+console.log('\n--- templates are workspace-independent ---');
+
+// A machine template is a definition in code — its artwork, its point
+// registry, its connectors and its default card layout. None of that is
+// stored per workspace, so every template is offered in every workspace and
+// behaves identically in each.
+//
+// What *is* per workspace is `studio_machine_templates`, and that is a
+// different thing: a workspace's own saved card layout for a template. Those
+// have to stay separate, or one workspace rearranging the cards on a Hammer
+// Mill canvas would rearrange them for everybody.
+//
+// These assertions are the mechanical form of that: every function the picker
+// and canvas use to resolve a template takes the template name and nothing
+// else. A workspace argument appearing in any of them is the regression.
+ok('the picker offers every template, with no workspace filter',
+  MACHINE_TEMPLATES.length === new Set(MACHINE_TEMPLATES).size && MACHINE_TEMPLATES.length > 0,
+  `${MACHINE_TEMPLATES.length} templates, all distinct`);
+
+for (const m of MACHINES) {
+  const byName = connectorsForTemplate(m.template);
+  ok(`${m.template}: connectors resolve from the name alone`,
+    connectorsForTemplate.length === 1 && byName.length === m.expected);
+  ok(`${m.template}: the same call twice gives the same pads`,
+    JSON.stringify(connectorsForTemplate(m.template)) === JSON.stringify(byName),
+    'no hidden per-caller state');
+}
+ok('artwork sizing takes only a template name', artworkSizeForTemplate.length === 1);
+ok('default layouts take only a template name', hasDefaultLayout.length === 1);
+ok('the machine tree builder takes a template and an id factory, not a workspace',
+  componentsForTemplate.length === 2);
+
 console.log('\n--- rendering ---');
 
 const CANVAS_PROPS = { showBackground: false, showGrid: false, showSensors: false };
@@ -331,6 +454,10 @@ const ARTWORK = [
   ['Solvent Extractor', SolventExtractor],
   ['Collet Cooler', ColletCooler],
   ['Seed Dryer Cooler', SeedDryerCooler],
+  ['Hammer Mill', HammerMill],
+  ['Meal Sifter', MealSifter],
+  ['Meal Conveying & Storage', MealConveyingStorage],
+  ['Auto Bagger & Stitcher', AutoBagger],
 ] as const;
 
 for (const [name, Component] of ARTWORK) {
@@ -365,5 +492,5 @@ ok('showSensors={false} removes the pad layer', padsOff.length < padsOn.length,
 const gridOff = renderToStaticMarkup(createElement(ColletCooler, { showGrid: false }));
 ok('showGrid={false} removes the grid', gridOff.length < padsOn.length);
 
-console.log(failures === 0 ? '\noilseed templates: all checks passed' : `\noilseed templates: ${failures} check(s) failed`);
+console.log(failures === 0 ? '\nsupplied templates: all checks passed' : `\nsupplied templates: ${failures} check(s) failed`);
 if (failures > 0) process.exit(1);

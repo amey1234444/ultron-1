@@ -22,8 +22,22 @@ import Svg, { Circle, Path, Rect } from 'react-native-svg';
  */
 export type TemplateIconProps = { size?: number; color: string };
 
-/** Shared frame, so all four line up with the glyph icons beside them. */
-function IconFrame({ size, color, children }: TemplateIconProps & { children: React.ReactNode }) {
+/**
+ * Shared frame, so every drawn icon lines up with the glyphs beside it.
+ *
+ * `strokeWidth` is a parameter because the two archives chose differently:
+ * the oilseed set is drawn at 1.8 and the meal set at 1.4. That is not an
+ * inconsistency to flatten — the meal icons carry more detail in the same
+ * 32-unit box (the bagger has a gantry, a hopper, a stitcher and a
+ * check-weigher in it), and at 1.8 those strokes start to merge. Each icon
+ * keeps the weight it was drawn for.
+ */
+function IconFrame({
+  size,
+  color,
+  strokeWidth = 1.8,
+  children,
+}: TemplateIconProps & { strokeWidth?: number; children: React.ReactNode }) {
   return (
     <Svg
       viewBox="0 0 32 32"
@@ -31,7 +45,7 @@ function IconFrame({ size, color, children }: TemplateIconProps & { children: Re
       height={size}
       fill="none"
       stroke={color}
-      strokeWidth={1.8}
+      strokeWidth={strokeWidth}
       strokeLinecap="round"
       strokeLinejoin="round"
     >
@@ -39,6 +53,9 @@ function IconFrame({ size, color, children }: TemplateIconProps & { children: Re
     </Svg>
   );
 }
+
+/** The meal archive's lighter weight, for the four icons drawn at it. */
+const MEAL_STROKE = 1.4;
 
 /** Domed vessel, collet bed, discharge and an offset cooling fan. */
 export function ColletCoolerIcon({ size = 18, color }: TemplateIconProps) {
@@ -78,6 +95,42 @@ export function SolventExtractorIcon({ size = 18, color }: TemplateIconProps) {
     <IconFrame size={size} color={color}>
       <Rect x="3" y="10" width="26" height="12" rx="3" />
       <Path d="M6 3H13L11 10H8ZM9 22L11 26 13 22M17 22L19 26 21 22M25 22L27 26 29 22M8 14V18M14 14V18M20 14V18M26 14V18M22 10V5H29" />
+    </IconFrame>
+  );
+}
+
+/** Gantry, weigh hopper on load cells, stitcher column and check-weigher. */
+export function AutoBaggerIcon({ size = 18, color }: TemplateIconProps) {
+  return (
+    <IconFrame size={size} color={color} strokeWidth={MEAL_STROKE}>
+      <Path d="M3 3H16L12 8H7ZM7 8V10H12V8M4 11H16V29M5 11V29M7 12H13L11 17H9ZM9 17V20M7 20H13V27H7ZM2 28H30M20 16H25V20H20ZM21 21H26V27H21M28 18V27" />
+    </IconFrame>
+  );
+}
+
+/** Feed hopper, grinding chamber and the coupled motor beside it. */
+export function HammerMillIcon({ size = 18, color }: TemplateIconProps) {
+  return (
+    <IconFrame size={size} color={color} strokeWidth={MEAL_STROKE}>
+      <Path d="M10 3H22L19 9H13ZM13 9V12H19V9M9 12H23V25H9ZM11 15H21V22H11ZM3 20H9M23 20H28M3 18V23M26 17H30V23H26M12 25L15 29H18L21 25" />
+    </IconFrame>
+  );
+}
+
+/** Screw conveyor, elevator leg and the bin it discharges into. */
+export function MealConveyingStorageIcon({ size = 18, color }: TemplateIconProps) {
+  return (
+    <IconFrame size={size} color={color} strokeWidth={MEAL_STROKE}>
+      <Path d="M2 25H13V29H2ZM10 25V5Q13 1 16 5V28M12 7V25M16 6L25 10M20 12Q25 8 30 12V24L26 28H24L20 24ZM20 17H30M20 22H30M22 26V30M28 26V30" />
+    </IconFrame>
+  );
+}
+
+/** The inclined screen deck, on its isolation mounts. */
+export function MealSifterIcon({ size = 18, color }: TemplateIconProps) {
+  return (
+    <IconFrame size={size} color={color} strokeWidth={MEAL_STROKE}>
+      <Path d="M5 10L27 14V19L5 15ZM8 15L13 23H21L26 19M16 23V28M6 16L5 20L7 22L5 24V28M26 20L25 23L27 25V28M8 10V4H12V11M12 15V18M20 17V20" />
     </IconFrame>
   );
 }

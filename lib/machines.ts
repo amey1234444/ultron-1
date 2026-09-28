@@ -4,6 +4,11 @@ import {
   type ConditionerComponent,
 } from './machinePoints/conditionerPoints';
 import {
+  AUTO_BAGGER_COMPONENT_ORDER,
+  autoBaggerPointsForComponent,
+  type AutoBaggerComponent,
+} from './machinePoints/autoBaggerPoints';
+import {
   COLLET_COOLER_COMPONENT_ORDER,
   colletCoolerPointsForComponent,
   type ColletCoolerComponent,
@@ -24,6 +29,21 @@ import {
   type DtdcComponent,
 } from './machinePoints/dtdcPoints';
 import { EXTRUDER_POINT_REGISTRY } from './machinePoints/extruderPoints';
+import {
+  HAMMER_MILL_COMPONENT_ORDER,
+  hammerMillPointsForComponent,
+  type HammerMillComponent,
+} from './machinePoints/hammerMillPoints';
+import {
+  MEAL_CONVEYING_STORAGE_COMPONENT_ORDER,
+  mealConveyingStoragePointsForComponent,
+  type MealConveyingStorageComponent,
+} from './machinePoints/mealConveyingStoragePoints';
+import {
+  MEAL_SIFTER_COMPONENT_ORDER,
+  mealSifterPointsForComponent,
+  type MealSifterComponent,
+} from './machinePoints/mealSifterPoints';
 import {
   FLAKING_MILL_COMPONENT_ORDER,
   flakingMillPointsForComponent,
@@ -68,6 +88,13 @@ export const MACHINE_TEMPLATES = [
   'Solvent Extractor',
   'Collet Cooler',
   'Seed Dryer Cooler',
+  // The meal-handling set, from the four-meal-machine archive. Downstream of
+  // the extraction machines above: what happens to the meal once it leaves
+  // the DTDC.
+  'Hammer Mill',
+  'Meal Sifter',
+  'Meal Conveying & Storage',
+  'Auto Bagger & Stitcher',
   'Custom Machine',
 ] as const;
 export type MachineTemplate = (typeof MACHINE_TEMPLATES)[number];
@@ -94,9 +121,12 @@ export type ComponentType = (typeof COMPONENT_TYPES)[number];
 //             engineering unit, so it must never be matched on one.
 //   Position  linear travel in mm, for the extractor's chain take-up. It is a
 //             distance, not a level and not a speed.
+//   Weight    mass on a load cell, in kg. The bagger weighs a hopper and then
+//             weighs the finished bag; neither is a level, and a check-weigher
+//             offered a hopper float would be a recall waiting to happen.
 export type MeasurementPointKind =
   | 'Vibration' | 'Temperature' | 'Speed' | 'Pressure' | 'Current' | 'Power' | 'Level' | 'Flow'
-  | 'Moisture' | 'Gas' | 'Leak' | 'Position';
+  | 'Moisture' | 'Gas' | 'Leak' | 'Position' | 'Weight';
 
 // Point lifecycle per spec Flow 5 — starts Not Configured, ends at a live-view
 // state once mapped, commissioned, and streaming.
@@ -226,6 +256,25 @@ const TEMPLATE_COMPONENTS: Record<MachineTemplate, TemplateComponentDef[]> = {
     { type: 'Fan', label: 'Exhaust' },
     { type: 'Custom Component', label: 'Steam' },
     { type: 'Custom Component', label: 'Discharge' },
+  ],
+  'Hammer Mill': [
+    { type: 'Custom Component', label: 'Rotor' },
+    { type: 'Motor', label: 'Drive' },
+  ],
+  'Meal Sifter': [
+    { type: 'Custom Component', label: 'Inlet' },
+    { type: 'Motor', label: 'Drive' },
+  ],
+  'Meal Conveying & Storage': [
+    { type: 'Custom Component', label: 'Screw' },
+    { type: 'Custom Component', label: 'Elevator' },
+    { type: 'Custom Component', label: 'Bin' },
+  ],
+  'Auto Bagger & Stitcher': [
+    { type: 'Custom Component', label: 'Weighing' },
+    { type: 'Custom Component', label: 'Bagging' },
+    { type: 'Motor', label: 'Stitching' },
+    { type: 'Custom Component', label: 'Checkweighing' },
   ],
   'Custom Machine': [],
 };
@@ -460,6 +509,50 @@ const SEED_DRYER_COOLER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = SEED_DRYER
   points: seedDryerCoolerPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
 }));
 
+// The meal-handling four. Supplied point sets, like the oilseed set above.
+const HAMMER_MILL_COMPONENT_TYPES: Record<HammerMillComponent, ComponentType> = {
+  Rotor: 'Custom Component',
+  Drive: 'Motor',
+};
+const HAMMER_MILL_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = HAMMER_MILL_COMPONENT_ORDER.map((component) => ({
+  type: HAMMER_MILL_COMPONENT_TYPES[component],
+  label: component,
+  points: hammerMillPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+const MEAL_SIFTER_COMPONENT_TYPES: Record<MealSifterComponent, ComponentType> = {
+  Inlet: 'Custom Component',
+  Drive: 'Motor',
+};
+const MEAL_SIFTER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = MEAL_SIFTER_COMPONENT_ORDER.map((component) => ({
+  type: MEAL_SIFTER_COMPONENT_TYPES[component],
+  label: component,
+  points: mealSifterPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+const MEAL_CONVEYING_STORAGE_COMPONENT_TYPES: Record<MealConveyingStorageComponent, ComponentType> = {
+  Screw: 'Custom Component',
+  Elevator: 'Custom Component',
+  Bin: 'Custom Component',
+};
+const MEAL_CONVEYING_STORAGE_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = MEAL_CONVEYING_STORAGE_COMPONENT_ORDER.map((component) => ({
+  type: MEAL_CONVEYING_STORAGE_COMPONENT_TYPES[component],
+  label: component,
+  points: mealConveyingStoragePointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
+const AUTO_BAGGER_COMPONENT_TYPES: Record<AutoBaggerComponent, ComponentType> = {
+  Weighing: 'Custom Component',
+  Bagging: 'Custom Component',
+  Stitching: 'Motor',
+  Checkweighing: 'Custom Component',
+};
+const AUTO_BAGGER_ANALYSIS_COMPONENTS: AnalysisComponentDef[] = AUTO_BAGGER_COMPONENT_ORDER.map((component) => ({
+  type: AUTO_BAGGER_COMPONENT_TYPES[component],
+  label: component,
+  points: autoBaggerPointsForComponent(component).map((point) => ({ label: point.label, kind: point.kind })),
+}));
+
 // Templates whose canvas artwork ships a hand-tuned point set; everything else
 // falls back to the generic per-component point labels below.
 const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[]>> = {
@@ -474,6 +567,10 @@ const ANALYSIS_COMPONENTS: Partial<Record<MachineTemplate, AnalysisComponentDef[
   'Solvent Extractor': SOLVENT_EXTRACTOR_ANALYSIS_COMPONENTS,
   'Collet Cooler': COLLET_COOLER_ANALYSIS_COMPONENTS,
   'Seed Dryer Cooler': SEED_DRYER_COOLER_ANALYSIS_COMPONENTS,
+  'Hammer Mill': HAMMER_MILL_ANALYSIS_COMPONENTS,
+  'Meal Sifter': MEAL_SIFTER_ANALYSIS_COMPONENTS,
+  'Meal Conveying & Storage': MEAL_CONVEYING_STORAGE_ANALYSIS_COMPONENTS,
+  'Auto Bagger & Stitcher': AUTO_BAGGER_ANALYSIS_COMPONENTS,
 };
 
 /**

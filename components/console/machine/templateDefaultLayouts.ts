@@ -3,6 +3,10 @@ import { CONDITIONER_POINT_REGISTRY } from '../../../lib/machinePoints/condition
 import { CRACKING_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/crackingMillPoints';
 import { FLAKING_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/flakingMillPoints';
 import { COLLET_COOLER_POINT_REGISTRY } from '../../../lib/machinePoints/colletCoolerPoints';
+import { AUTO_BAGGER_POINT_REGISTRY } from '../../../lib/machinePoints/autoBaggerPoints';
+import { HAMMER_MILL_POINT_REGISTRY } from '../../../lib/machinePoints/hammerMillPoints';
+import { MEAL_CONVEYING_STORAGE_POINT_REGISTRY } from '../../../lib/machinePoints/mealConveyingStoragePoints';
+import { MEAL_SIFTER_POINT_REGISTRY } from '../../../lib/machinePoints/mealSifterPoints';
 import { DTDC_POINT_REGISTRY } from '../../../lib/machinePoints/dtdcPoints';
 import { SEED_DRYER_COOLER_POINT_REGISTRY } from '../../../lib/machinePoints/seedDryerCoolerPoints';
 import { SOLVENT_EXTRACTOR_POINT_REGISTRY } from '../../../lib/machinePoints/solventExtractorPoints';
@@ -153,6 +157,10 @@ const DTDC_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(DTDC_POINT_RE
 const SOLVENT_EXTRACTOR_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SOLVENT_EXTRACTOR_POINT_REGISTRY);
 const COLLET_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(COLLET_COOLER_POINT_REGISTRY);
 const SEED_DRYER_COOLER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(SEED_DRYER_COOLER_POINT_REGISTRY);
+const HAMMER_MILL_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(HAMMER_MILL_POINT_REGISTRY);
+const MEAL_SIFTER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_SIFTER_POINT_REGISTRY);
+const MEAL_CONVEYING_STORAGE_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(MEAL_CONVEYING_STORAGE_POINT_REGISTRY);
+const AUTO_BAGGER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(AUTO_BAGGER_POINT_REGISTRY);
 
 const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Rotary Airlock Valve': RAV_TEMPLATE_POINTS,
@@ -166,6 +174,10 @@ const TEMPLATE_POINTS_BY_TEMPLATE: Record<string, TemplatePoint[]> = {
   'Solvent Extractor': SOLVENT_EXTRACTOR_TEMPLATE_POINTS,
   'Collet Cooler': COLLET_COOLER_TEMPLATE_POINTS,
   'Seed Dryer Cooler': SEED_DRYER_COOLER_TEMPLATE_POINTS,
+  'Hammer Mill': HAMMER_MILL_TEMPLATE_POINTS,
+  'Meal Sifter': MEAL_SIFTER_TEMPLATE_POINTS,
+  'Meal Conveying & Storage': MEAL_CONVEYING_STORAGE_TEMPLATE_POINTS,
+  'Auto Bagger & Stitcher': AUTO_BAGGER_TEMPLATE_POINTS,
 };
 
 function makeId(prefix: string) {

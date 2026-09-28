@@ -31,10 +31,14 @@ import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineCanvas } from './MachineCanvas';
 import { RackOccupancyView, type MappedChannel } from './RackOccupancyView';
 import { TwinScrewDiagnosisView } from './TwinScrewDiagnosisView';
+import { AutoBagger } from './artwork/AutoBagger';
 import { ColletCooler } from './artwork/ColletCooler';
 import { Conditioner } from './artwork/Conditioner';
 import { CrackingMill } from './artwork/CrackingMill';
 import { DTDC } from './artwork/DTDC';
+import { HammerMill } from './artwork/HammerMill';
+import { MealConveyingStorage } from './artwork/MealConveyingStorage';
+import { MealSifter } from './artwork/MealSifter';
 import { Expander } from './artwork/Expander';
 import { FlakingMill } from './artwork/FlakingMill';
 import { RotaryAirlockValve } from './artwork/RotaryAirlockValve';
@@ -97,6 +101,10 @@ const ARTWORK_TEMPLATES = new Set<string>([
   'Solvent Extractor',
   'Collet Cooler',
   'Seed Dryer Cooler',
+  'Hammer Mill',
+  'Meal Sifter',
+  'Meal Conveying & Storage',
+  'Auto Bagger & Stitcher',
 ]);
 
 /**
@@ -581,6 +589,14 @@ export function MachineWorkspace({
                 <ColletCooler showBackground={false} showGrid={false} showSensors={false} />
               ) : machine.template === 'Seed Dryer Cooler' ? (
                 <SeedDryerCooler showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Hammer Mill' ? (
+                <HammerMill showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Meal Sifter' ? (
+                <MealSifter showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Meal Conveying & Storage' ? (
+                <MealConveyingStorage showBackground={false} showGrid={false} showSensors={false} />
+              ) : machine.template === 'Auto Bagger & Stitcher' ? (
+                <AutoBagger showBackground={false} showGrid={false} showSensors={false} />
               ) : (
                 <MachineCanvas components={machine.components} selectedId={selectedComponentId} onSelect={selectComponent} />
               )}
