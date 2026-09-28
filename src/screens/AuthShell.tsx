@@ -10,6 +10,7 @@ import {
   useWindowDimensions,
   View,
   type TextInputProps,
+  type TextStyle,
   type ViewStyle,
 } from 'react-native';
 
@@ -239,7 +240,11 @@ export function AuthField({
               backgroundColor: 'transparent',
               borderWidth: 0,
               outlineStyle: 'none',
-            } as unknown as ViewStyle
+              // TextStyle, not ViewStyle: this is a TextInput's style, and the
+              // cast was to the wrong one. It only surfaces as an error once
+              // Expo's generated types are present, which is why `tsc` passes
+              // on a clean checkout and fails after `expo start` has run.
+            } as unknown as TextStyle
           }
           {...props}
         />

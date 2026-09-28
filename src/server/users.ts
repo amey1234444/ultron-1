@@ -71,8 +71,78 @@ function id(): string {
 
 type Seed = { username: string; name: string; email: string; role: Role; password: string };
 
+/**
+ * An extra super admin, provisioned entirely from the environment.
+ *
+ * The three seeds below carry a committed fallback password, which is
+ * tolerable for `superadmin@ultron.local` on a developer's laptop and is not
+ * tolerable for a named account on a real deployment. So this one has no
+ * fallback: with `BOOTSTRAP_SUPER_ADMIN_PASSWORD` unset the account is simply
+ * not created, and nothing about it is ever committed to the repository.
+ *
+ * It exists because the username rules and the login path together make the
+ * obvious approach impossible. `createUser` requires a username matching
+ * `^[a-zA-Z0-9._-]{3,32}$`, so an address cannot be a username, and until
+ * recently `verifyCredentials` only ever looked one up by username — which
+ * meant an account described by its email address could not be logged into by
+ * that address at all. The email fallback further down closes that; this
+ * closes the other half by letting the operator name the account without
+ * touching code.
+ *
+ * Idempotent, like the rest of the seeding: `ready()` keys on the username and
+ * skips a user that already exists. Changing the password here therefore does
+ * **not** rotate an existing account's password — that is deliberate, because
+ * a redeploy silently resetting a super admin's credentials would be a way to
+ * lock a real operator out. Use Manage Users, or the password-reset flow, to
+ * change one after it exists.
+ */
+function bootstrapSuperAdmin(): Seed | null {
+  const password = process.env.BOOTSTRAP_SUPER_ADMIN_PASSWORD;
+  if (!password) return null;
+
+  const username = (process.env.BOOTSTRAP_SUPER_ADMIN_USERNAME || '').trim();
+  const email = (process.env.BOOTSTRAP_SUPER_ADMIN_EMAIL || '').trim();
+  if (!username || !email) {
+    console.warn(
+      '[users] BOOTSTRAP_SUPER_ADMIN_PASSWORD is set but BOOTSTRAP_SUPER_ADMIN_USERNAME ' +
+      'and/or BOOTSTRAP_SUPER_ADMIN_EMAIL are not. No bootstrap account was created.',
+    );
+    return null;
+  }
+  if (!/^[a-zA-Z0-9._-]{3,32}$/.test(username)) {
+    // Refused rather than created, because a seeded username the rest of the
+    // app considers invalid is one Manage Users cannot subsequently edit.
+    console.warn(
+      `[users] BOOTSTRAP_SUPER_ADMIN_USERNAME "${username}" is not 3-32 characters of ` +
+      'letters, numbers, dot, underscore or hyphen. No bootstrap account was created. ' +
+      'Put the address in BOOTSTRAP_SUPER_ADMIN_EMAIL — it can be logged in with.',
+    );
+    return null;
+  }
+  if (password.length < 8) {
+    // A warning, not a refusal. Self-service signup and Manage Users both
+    // enforce eight characters; an operator provisioning a bootstrap account
+    // from the environment is making a deliberate choice, and failing closed
+    // here would leave them with no way in and no explanation.
+    console.warn(
+      '[users] BOOTSTRAP_SUPER_ADMIN_PASSWORD is shorter than the eight characters ' +
+      'this application requires everywhere else. The account will still be created.',
+    );
+  }
+
+  return {
+    username,
+    name: process.env.BOOTSTRAP_SUPER_ADMIN_NAME || 'Super Admin',
+    email,
+    role: 'super_admin',
+    password,
+  };
+}
+
 function seedSpecs(): Seed[] {
+  const bootstrap = bootstrapSuperAdmin();
   return [
+    ...(bootstrap ? [bootstrap] : []),
     {
       username: 'superadmin',
       name: 'Super Admin',
@@ -271,9 +341,32 @@ export async function findByEmail(email: string): Promise<StoredUser | undefined
   return res.rows[0] ? rowToStored(res.rows[0]) : undefined;
 }
 
-export async function verifyCredentials(username: string, password: string): Promise<StoredUser | null> {
-  const user = await findByUsername(username);
-  if (!user) return null;
+/**
+ * Check a login, by username or by email address.
+ *
+ * The email path exists because an account is often known to its owner by the
+ * address it was created with rather than by a username they never chose. The
+ * two namespaces cannot collide: a username must match
+ * `^[a-zA-Z0-9._-]{3,32}$`, which excludes `@`, and an email must contain one,
+ * so no string is ever both. Each column is unique in its own right.
+ *
+ * Username is tried first, so an existing login costs exactly one lookup and
+ * nothing about the current behaviour changes.
+ *
+ * The password is compared in both branches, including when no user was
+ * found — `bcrypt.compare` against a dummy hash — so a wrong username and a
+ * wrong password take the same time. Returning early on an unknown identifier
+ * makes the endpoint a membership oracle: the caller learns which addresses
+ * have accounts by timing it.
+ */
+const ABSENT_USER_HASH = bcrypt.hashSync('there-is-no-such-user', 10);
+
+export async function verifyCredentials(identifier: string, password: string): Promise<StoredUser | null> {
+  const user = (await findByUsername(identifier)) ?? (await findByEmail(identifier));
+  if (!user) {
+    await bcrypt.compare(password, ABSENT_USER_HASH);
+    return null;
+  }
   const ok = await bcrypt.compare(password, user.passwordHash);
   return ok ? user : null;
 }
