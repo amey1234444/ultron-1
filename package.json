@@ -91,7 +91,8 @@
     "check:boundaries": "node scripts/checkBoundaries.mjs",
     "check:ml-prognosis": "npx --yes esbuild lib/knowledge/ml/__checks__/prognosisContractChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/prognosisContractChecks.cjs && node node_modules/.cache/prognosisContractChecks.cjs",
     "check:channel-propagation": "npx --yes esbuild lib/knowledge/tse/__checks__/channelPropagationChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/channelPropagationChecks.cjs && node node_modules/.cache/channelPropagationChecks.cjs",
-    "check:rul-contract": "npx --yes esbuild lib/knowledge/ml/__checks__/rulContractChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/rulContractChecks.cjs && node node_modules/.cache/rulContractChecks.cjs"
+    "check:rul-contract": "npx --yes esbuild lib/knowledge/ml/__checks__/rulContractChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/rulContractChecks.cjs && node node_modules/.cache/rulContractChecks.cjs",
+    "check:rul-series": "npx --yes esbuild components/console/machine/prognosis/__checks__/rulSeriesChecks.ts --bundle --platform=node --format=cjs --outfile=node_modules/.cache/rulSeriesChecks.cjs && node node_modules/.cache/rulSeriesChecks.cjs"
   },
   "private": true
 }
