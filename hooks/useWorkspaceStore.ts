@@ -8,6 +8,7 @@ import type { CardNode } from '../lib/rack';
 import { createSeedData } from '../lib/seedData';
 import { apiFetch } from '../lib/apiClient';
 import { describeRepairs, type HierarchyRepair } from '../lib/hierarchyIntegrity';
+import { soyaDemoRowIds } from '../components/console/machine/soyaDemoPlant';
 import type { SavedLayout } from '../components/console/machine/TrailBoard';
 
 function makeId() {
@@ -93,6 +94,29 @@ export function useWorkspaceStore(): WorkspaceStore {
    */
   const [saveNotice, setSaveNotice] = useState<string | null>(null);
 
+  /**
+   * Everything except the built-in plant.
+   *
+   * The demo plant is merged into the console's view of the workspace but is
+   * not part of it: it is declared in the app, identical on every load, and
+   * belongs in no database. Stripping it here rather than trusting every
+   * handler to is the difference between a convention and a guarantee — a
+   * single `setDevices(mergedList)` anywhere would otherwise write fifty-one
+   * machines' worth of hardware into somebody's plant, where it would then
+   * collide with the built-ins on the next load.
+   */
+  const withoutBuiltIns = (snapshot: Hierarchy): Hierarchy => {
+    const builtIn = soyaDemoRowIds();
+    if (builtIn.size === 0) return snapshot;
+    return {
+      projects: snapshot.projects.filter((row) => !builtIn.has(row.id)),
+      folders: snapshot.folders.filter((row) => !builtIn.has(row.id)),
+      machines: snapshot.machines.filter((row) => !builtIn.has(row.id)),
+      devices: snapshot.devices.filter((row) => !builtIn.has(row.id)),
+      cards: snapshot.cards.filter((row) => !builtIn.has(row.id)),
+    };
+  };
+
   const applyWorkspace = useCallback((w: {
     projects: ProjectNode[]; folders: FolderNode[]; machines: MachineNode[];
     devices: DeviceNode[]; cards: CardNode[]; layouts?: Record<string, SavedLayout>;
@@ -155,7 +179,7 @@ export function useWorkspaceStore(): WorkspaceStore {
     try {
       const res = await apiFetch('/api/workspace/state', {
         method: 'PUT',
-        body: JSON.stringify({ data: latest.current, baseRevision: hierRev.current }),
+        body: JSON.stringify({ data: withoutBuiltIns(latest.current), baseRevision: hierRev.current }),
         // Set when the page is going away: the browser keeps the request
         // alive past unload instead of cancelling it on the spot.
         ...(options.keepalive ? { keepalive: true } : {}),

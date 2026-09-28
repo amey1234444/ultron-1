@@ -50,34 +50,22 @@ type TemplatePoint = {
   bend?: ReferencePoint;
 };
 
-// Card column, bend and side per pad. The pad's own position comes from
-// `RAV_CONNECTOR_POINTS`, which is also what the canvas snaps trail endpoints
-// to — so a generated trail and a hand-drawn one land on the same spot.
-const RAV_CARD_PLACEMENT: Record<string, { side: 'left' | 'right'; boxEnd: ReferencePoint; bend: ReferencePoint }> = {
-  C1: { side: 'left', boxEnd: { x: 255, y: 79 }, bend: { x: 415, y: 79 } },
-  S1: { side: 'left', boxEnd: { x: 255, y: 184 }, bend: { x: 355, y: 184 } },
-  P1: { side: 'left', boxEnd: { x: 255, y: 289 }, bend: { x: 355, y: 289 } },
-  P2: { side: 'left', boxEnd: { x: 255, y: 394 }, bend: { x: 410, y: 394 } },
-  T3: { side: 'left', boxEnd: { x: 255, y: 499 }, bend: { x: 410, y: 499 } },
-  V1: { side: 'right', boxEnd: { x: 1185, y: 79 }, bend: { x: 1035, y: 79 } },
-  V2: { side: 'right', boxEnd: { x: 1185, y: 184 }, bend: { x: 1040, y: 184 } },
-  T1: { side: 'right', boxEnd: { x: 1185, y: 289 }, bend: { x: 1045, y: 289 } },
-  T2: { side: 'right', boxEnd: { x: 1185, y: 394 }, bend: { x: 1040, y: 394 } },
+// Which side of the machine each pad's card sits on.
+//
+// The only thing still stated by hand for this template, and deliberately:
+// the drawing is not left/right symmetric, and deriving the side from whether
+// a pad lies past the artwork's midpoint would put the material temperature
+// on the opposite side from the two pressures it is read with. Slot heights
+// are not stated here — those come from `columnTemplatePoints`, the same as
+// every other template, and that is what keeps these trails from crossing.
+const RAV_CARD_SIDE: Record<string, 'left' | 'right'> = {
+  C1: 'left', S1: 'left', P1: 'left', P2: 'left', T3: 'left',
+  V1: 'right', V2: 'right', T1: 'right', T2: 'right',
 };
 
-const RAV_TEMPLATE_POINTS: TemplatePoint[] = RAV_CONNECTOR_POINTS.flatMap((connector) => {
-  const placement = RAV_CARD_PLACEMENT[connector.code];
-  if (!placement) return [];
-  return [
-    {
-      code: connector.code,
-      label: connector.label,
-      side: placement.side,
-      anchor: { x: connector.x, y: connector.y },
-      boxEnd: placement.boxEnd,
-      bend: placement.bend,
-    },
-  ];
+const RAV_ARTWORK_CONNECTORS: ArtworkConnector[] = RAV_CONNECTOR_POINTS.flatMap((connector) => {
+  const side = RAV_CARD_SIDE[connector.code];
+  return side ? [{ code: connector.code, label: connector.label, side, x: connector.x, y: connector.y }] : [];
 });
 
 /**
@@ -336,6 +324,7 @@ function columnTemplatePoints(
   });
 }
 
+const RAV_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(RAV_ARTWORK_CONNECTORS, artworkSizeForTemplate('Rotary Airlock Valve'));
 const EXTRUDER_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(EXTRUDER_CONNECTORS, artworkSizeForTemplate('Single Screw Extruder'));
 const TWIN_SCREW_TEMPLATE_POINTS: TemplatePoint[] = columnTemplatePoints(TWIN_SCREW_CONNECTORS, artworkSizeForTemplate('Twin Screw Extruder'));
 // Taken from the registry rather than from the drawing, so the default layout

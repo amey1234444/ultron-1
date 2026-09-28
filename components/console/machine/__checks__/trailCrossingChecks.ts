@@ -56,23 +56,24 @@ function crossingsIn(template: string): number {
 const instrumented = (MACHINE_TEMPLATES as readonly string[]).filter((t) => connectorsForTemplate(t).length > 0);
 
 /**
- * The Rotary Airlock Valve is placed by hand.
+ * No template is exempt any more.
  *
- * `RAV_CARD_PLACEMENT` gives every pad its own column, bend and side, authored
- * rather than generated, so the ordering search never runs on it and its two
- * crossings are a property of that design. Listed rather than silently
- * excluded: changing it is a decision about somebody's layout, not a fix.
+ * The Rotary Airlock Valve used to be: every pad had its column, bend and
+ * height written out by hand, so the ordering search never ran on it and the
+ * two trails that crossed were a property of that authoring. It now states
+ * only which side of the machine each card sits on — the asymmetric drawing
+ * makes that a real decision — and takes its heights from the same search as
+ * everything else. This map stays, empty, because an exemption should be
+ * something you have to add on purpose.
  */
-const HAND_PLACED: Record<string, number> = { 'Rotary Airlock Valve': 2 };
+const HAND_PLACED: Record<string, number> = {};
 
 console.log('--- every generated canvas ---');
 let total = 0;
-let generatedTotal = 0;
 for (const template of instrumented) {
   const count = crossingsIn(template);
   total += count;
   const allowed = HAND_PLACED[template] ?? 0;
-  if (!(template in HAND_PLACED)) generatedTotal += count;
   ok(
     `${template}: ${allowed === 0 ? 'no trail crosses another' : `at most its ${allowed} hand-placed crossings`}`,
     count <= allowed,
@@ -81,17 +82,10 @@ for (const template of instrumented) {
 }
 
 console.log('\n--- across every template ---');
-ok('no generated layout crosses at all', generatedTotal === 0, `${generatedTotal} crossings`);
-ok('and the total is only what the hand-placed template carries',
-  total === Object.values(HAND_PLACED).reduce((a, b) => a + b, 0),
-  `${total} in total, was 208 before slots were ordered`);
-
-// A hand-placed allowance that is no longer needed is a stale exemption
-// hiding a template that has since been fixed.
-for (const [template, allowed] of Object.entries(HAND_PLACED)) {
-  ok(`the ${template} allowance is still needed`, crossingsIn(template) === allowed,
-    `expected ${allowed}, found ${crossingsIn(template)}`);
-}
+ok('not one trail crosses another, on any template', total === 0,
+  `${total} in total, was 208 before slots were ordered and 2 while the airlock valve was placed by hand`);
+ok('and nothing is exempt from that', Object.keys(HAND_PLACED).length === 0,
+  'an allowance here is a template somebody decided not to fix');
 
 console.log('\n--- the layout is the same every time ---');
 // The ordering is a search, so it has to be deterministic or "⟲ Template"
