@@ -259,6 +259,51 @@ ok('the skipped machines keep the addresses they already had',
 ok('and are recognised by id, not by name',
   topUpAfterSkip.skipped.every((entry) => entry.reason === 'already has generated hardware'));
 
+console.log('\n--- a machine is wired without anybody pressing anything ---');
+const home = readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');
+// Creating a machine and wiring it were two acts, and the second was a
+// button somebody had to know about. A machine created and left unwired
+// looks finished — drawing, instrument pads — and reads nothing.
+ok('the console wires unwired machines on its own',
+  home.includes('const unwired = machines.filter((machine) => {'),
+  'an effect, not only the button');
+ok('and still offers the button, for re-running it by hand',
+  home.includes('onPress={generateMachineHardware}'));
+
+console.log('  gates:');
+ok('  it waits for the workspace to load',
+  home.includes('if (!workspaceReady || !hasConfigureAccess) return;'),
+  'otherwise it generates against the seed and writes that into somebody\'s plant');
+ok('  and for the permission to write',
+  home.includes('hasConfigureAccess') && !home.includes('if (!workspaceReady || !canEditDeleteSchema)'),
+  'the permission, not the configure-mode toggle — otherwise leaving the mode stops the wiring');
+ok('  a template with no pads is skipped',
+  home.includes('if (connectorsForTemplate(machine.template).length === 0) return false;'),
+  'generic equipment has no drawing to wire');
+ok('  a canvas with channels already mapped is left alone',
+  home.includes('if (layout?.boxes.some((box) => box.channelId)) return false;'),
+  'that is somebody who wired it and then removed the hardware on purpose');
+ok('  the existing devices are passed, so nothing is generated twice',
+  home.includes('      null,\n      storedDevices,\n    );'));
+
+console.log('  termination:');
+// The effect writes state it also reads, so it has to stop. Two independent
+// reasons why the second pass is a no-op, checked on the data rather than
+// asserted about the effect.
+const targets6 = targets.slice(0, 6);
+const first = planMachineWiring(targets6, RECT, []);
+ok('  a wired machine has its gateway on the next pass',
+  planMachineWiring(targets6, RECT, first.devices).machines.length === 0,
+  `${planMachineWiring(targets6, RECT, first.devices).machines.length} would be wired again`);
+ok('  and the canvas it was given has its channels mapped',
+  targets6.every((target) => {
+    const layout = first.layouts[target.id];
+    return Boolean(layout) && layout.boxes.length > 0 && layout.boxes.every((box) => box.channelId);
+  }),
+  'which is the other reason the filter above drops it');
+ok('  so a second pass writes nothing at all',
+  planMachineWiring(targets6, RECT, first.devices).devices.length === 0);
+
 console.log('\n--- the action is reachable ---');
 const page = readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');
 // It was originally offered only from the devices empty state, which a

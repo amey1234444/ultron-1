@@ -47,6 +47,7 @@ import {
   describeWiringPlan,
   planMachineWiring,
 } from '../components/console/machine/generateMachineWiring';
+import { connectorsForTemplate } from '../components/console/machine/machineConnectors';
 import { archiveDuplicateConfiguredDeviceIps, archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
 import { SimulationPanel } from '../components/console/simulation/SimulationPanel';
 import { SapIntegrationPage } from '../components/console/sap/SapIntegrationPage';
@@ -236,6 +237,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   // layouts loaded from the server, persisted on edit, and polled so changes by
   // other authenticated users appear here too.
   const {
+    ready: workspaceReady,
     projects,
     folders,
     devices: storedDevices,
@@ -583,6 +585,69 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
    * hand is not quietly replaced. Re-running it would generate a second set,
    * which is why the confirmation says what it is about to create.
    */
+  /**
+   * Wire a machine as soon as it exists, without anybody pressing anything.
+   *
+   * Creating a machine and then wiring it were two separate acts, and the
+   * second one was a button in the devices area that a person had to know
+   * about. A machine created and left unwired looks finished — it has a
+   * drawing and its instrument pads — and shows no readings at all, which is
+   * a state nobody would choose and everybody arrived at.
+   *
+   * There is no judgement in the second act. The registry already says what
+   * every pad measures, `planMachine` already knows what card reads that, and
+   * the template already says where the card belongs. So it is done here.
+   *
+   * Three things decide whether a machine is wired, and between them they
+   * make this safe to run on every render:
+   *
+   *   - it must have instrument pads. Generic equipment — a bare Motor, a
+   *     Custom Machine — has no drawing to wire and is skipped.
+   *   - it must not already have its generated gateway. That id is derived
+   *     from the machine, so this is a lookup and not a guess.
+   *   - and if it has a canvas with channels already mapped on it, it is left
+   *     alone. That is the case where somebody wired it and then deleted the
+   *     hardware on purpose, and regenerating it would be arguing with them.
+   *     A canvas with no mapped channel is a machine that was never wired,
+   *     which is exactly the one to wire.
+   *
+   * Gated on the workspace having loaded, or it would generate against the
+   * seed state and write it into somebody's plant; and on the permission to
+   * edit the schema, because without it every one of these writes would come
+   * back 403 and the console would fill with save failures for something the
+   * operator never asked for.
+   *
+   * It terminates: a machine wired here has its gateway on the next pass and
+   * is skipped. The button remains for re-running it by hand.
+   */
+  useEffect(() => {
+    if (!workspaceReady || !hasConfigureAccess) return;
+
+    const unwired = machines.filter((machine) => {
+      if (connectorsForTemplate(machine.template).length === 0) return false;
+      const layout = getLayout(machine.id);
+      if (layout?.boxes.some((box) => box.channelId)) return false;
+      return true;
+    });
+    if (unwired.length === 0) return;
+
+    const plan = planMachineWiring(
+      unwired.map((machine) => ({
+        id: machine.id,
+        name: machine.name,
+        template: machine.template,
+        projectId: machine.projectId ?? null,
+      })),
+      null,
+      storedDevices,
+    );
+    if (plan.machines.length === 0) return;
+
+    setDevices((prev) => [...prev, ...plan.devices]);
+    setCards((prev) => [...prev, ...plan.cards]);
+    for (const [machineId, layout] of Object.entries(plan.layouts)) saveLayout(machineId, layout);
+  }, [workspaceReady, hasConfigureAccess, machines, storedDevices, getLayout, setDevices, setCards, saveLayout]);
+
   const [wiringNotice, setWiringNotice] = useState<string | null>(null);
   const generateMachineHardware = () => {
     const targets = machines.map((machine) => ({
