@@ -19,7 +19,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { connectorFitForUnit, connectorsForTemplate } from '../machineConnectors';
-import { planMachineWiring } from '../generateMachineWiring';
+import { planMachineWiring, withMissingPads } from '../generateMachineWiring';
 import {
   findDuplicateConfiguredDeviceIp,
   findDuplicateConfiguredDeviceName,
@@ -398,8 +398,51 @@ for (const state of STATES) {
     `${afterDevices.length === new Set(afterDevices.map((d) => d.id)).size ? 'no duplicate ids' : 'DUPLICATE IDS'}`);
 }
 
-console.log('\n--- a machine is wired without anybody pressing anything ---');
 const home = readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');
+console.log('\n--- a machine that is only partly wired ---');
+// The state that stuck. The console asked "does this canvas have any channel
+// on it", and one pad of four answers yes — so a machine showing one
+// connection kept showing one connection, on every load, for good. The meal
+// machines are where it showed, because three and four pads is few enough
+// that one of them looks like a wired machine at a glance.
+for (const template of ['Hammer Mill', 'Auto Bagger & Stitcher', 'Meal Conveying & Storage', 'Meal Sifter'] as const) {
+  const pads = connectorsForTemplate(template).length;
+  const target = { id: `m-${template.replace(/\W/g, '')}-abcdef`, name: `${template} Healthy`, template, projectId: 'p' };
+  const complete = planMachineWiring([target], RECT, [], []).layouts[target.id];
+
+  const partial = { ...complete, boxes: complete.boxes.slice(0, 1), trails: complete.trails.slice(0, 1) };
+  const topped = withMissingPads(partial, complete);
+  ok(`  ${template}: one card of ${pads} is topped up to ${pads}`,
+    Boolean(topped) && topped!.boxes.length === pads && topped!.trails.length === pads
+    && topped!.boxes.every((box) => box.channelId),
+    topped ? `${topped.boxes.length} cards, ${topped.boxes.filter((b) => b.channelId).length} bound` : 'not repaired');
+
+  const unbound = { ...complete, boxes: complete.boxes.map((box, i) => (i === 0 ? { ...box, channelId: undefined } : box)) };
+  const rebound = withMissingPads(unbound, complete);
+  ok(`  ${template}: a card bound to nothing is bound`,
+    Boolean(rebound) && rebound!.boxes.filter((box) => box.channelId).length === pads);
+
+  ok(`  ${template}: a complete canvas is left alone`,
+    withMissingPads(complete, complete) === null,
+    'null, so a load that changes nothing writes nothing');
+
+  // The whole reason this tops up instead of replacing.
+  const arranged = {
+    ...complete,
+    boxes: complete.boxes.slice(0, 1).map((box) => ({ ...box, x: 7, y: 9 })),
+    trails: complete.trails.slice(0, 1),
+  };
+  const merged = withMissingPads(arranged, complete);
+  ok(`  ${template}: a card the operator moved stays where they put it`,
+    Boolean(merged) && merged!.boxes.length === pads
+    && (merged!.boxes[0] as { x?: number }).x === 7 && (merged!.boxes[0] as { y?: number }).y === 9,
+    'replacing the canvas would fix the wiring and lose the arrangement');
+}
+ok('the console tops up rather than skipping',
+  home.includes('const merged = current ? withMissingPads(current, complete) : complete;'),
+  'and a machine with no canvas at all takes the complete one');
+
+console.log('\n--- a machine is wired without anybody pressing anything ---');
 // Creating a machine and wiring it were two acts, and the second was a
 // button somebody had to know about. A machine created and left unwired
 // looks finished — drawing, instrument pads — and reads nothing.
@@ -419,10 +462,10 @@ ok('  and for the permission to write',
 ok('  a template with no pads is skipped',
   home.includes('connectorsForTemplate(machine.template).length > 0'),
   'generic equipment has no drawing to wire');
-ok('  a canvas with channels already mapped is left alone',
-  home.includes('return !layout || !layout.boxes.some((box) => box.channelId);')
-  && home.includes('Object.entries(plan.rebind).filter(([machineId]) => unbound(machineId))'),
-  'that canvas is somebody\'s arrangement and is never overwritten from here');
+ok('  a canvas is topped up, never replaced',
+  home.includes('const merged = current ? withMissingPads(current, complete) : complete;')
+  && home.includes('return merged ? [[machineId, merged] as const] : [];'),
+  'the cards an operator has arranged stay where they are, and a complete canvas writes nothing');
 ok('  the existing devices and cards are both passed',
   home.includes('      storedDevices,\n      cards,\n    );'),
   'without the cards it cannot tell correct hardware from hardware built for an older template');

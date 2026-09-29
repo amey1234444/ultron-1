@@ -288,6 +288,61 @@ function bindLayout(target: SimulationTarget, plan: MachinePlan, machineRect: Ma
   };
 }
 
+/**
+ * Add what a canvas is missing, without disturbing what it has.
+ *
+ * A machine can be partly wired: some pads carded and mapped, others not.
+ * That happens when a template gains a point, when a canvas was saved
+ * half-finished, and — the case this was written for — when a template's
+ * instrument list is trimmed and the cards for the pads that went are
+ * removed, leaving the rest bound and the machine looking finished.
+ *
+ * Replacing the whole canvas would fix it and throw away wherever the
+ * operator had dragged their cards to. Leaving it alone was what the console
+ * did, and it left a four-point machine showing one connection for good,
+ * because "does this canvas have any channel on it" answered yes.
+ *
+ * So: a pad with no card gets the card the template would have given it, a
+ * card that exists but is bound to nothing gets bound, and everything else
+ * is returned exactly as it was. Null when there was nothing to do, so a load
+ * that changes nothing writes nothing.
+ */
+export function withMissingPads(current: SavedLayout, complete: SavedLayout): SavedLayout | null {
+  const wanted = new Map(
+    complete.boxes.filter((box) => box.templatePointCode).map((box) => [box.templatePointCode as string, box]),
+  );
+  const present = new Set(
+    current.boxes.map((box) => box.templatePointCode).filter((code): code is string => Boolean(code)),
+  );
+  let changed = false;
+
+  // A card the operator has already placed keeps its position and its label.
+  // Only an empty binding is filled in.
+  const boxes = current.boxes.map((box) => {
+    if (!box.templatePointCode || box.channelId) return box;
+    const channelId = wanted.get(box.templatePointCode)?.channelId;
+    if (!channelId) return box;
+    changed = true;
+    return { ...box, channelId };
+  });
+
+  const missing = complete.boxes.filter(
+    (box) => box.templatePointCode && !present.has(box.templatePointCode),
+  );
+  if (missing.length > 0) changed = true;
+  const missingIds = new Set(missing.map((box) => box.id));
+
+  if (!changed) return null;
+  return {
+    ...current,
+    boxes: [...boxes, ...missing],
+    trails: [
+      ...current.trails,
+      ...complete.trails.filter((trail) => trail.endBoxId && missingIds.has(trail.endBoxId)),
+    ],
+  };
+}
+
 /** One line per machine, for the confirmation the operator reads before applying. */
 export function describeWiringPlan(plan: WiringPlan): string[] {
   return plan.machines.map((machine) => {

@@ -46,6 +46,7 @@ import { isDefaultWorkspace as isDefaultWorkspaceId } from '../lib/workspaces';
 import {
   describeWiringPlan,
   planMachineWiring,
+  withMissingPads,
 } from '../components/console/machine/generateMachineWiring';
 import { connectorsForTemplate } from '../components/console/machine/machineConnectors';
 import { archiveDuplicateConfiguredDeviceIps, archiveDuplicateConfiguredDeviceNames, findDuplicateNameForDevice } from '../lib/deviceUniqueness';
@@ -638,15 +639,20 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       cards,
     );
 
-    // A canvas with nothing mapped on it is a machine that was never wired,
-    // or one whose cards were dropped when its template's instrument list
-    // changed. A canvas with channels on it is somebody's arrangement and is
-    // never overwritten from here.
-    const unbound = (machineId: string) => {
-      const layout = getLayout(machineId);
-      return !layout || !layout.boxes.some((box) => box.channelId);
-    };
-    const restores = Object.entries(plan.rebind).filter(([machineId]) => unbound(machineId));
+    // Machines whose hardware is already right but whose canvas is not.
+    //
+    // Topped up rather than replaced, and rather than skipped. Asking only
+    // "does this canvas have any channel on it" left a partly wired machine
+    // partly wired for good — one pad of four connected reads as connected.
+    // `withMissingPads` adds the cards a pad is missing and binds the ones
+    // that are there and empty, and leaves every card the operator has moved
+    // exactly where they put it. It returns null when there is nothing to do,
+    // which is what stops this writing on every load.
+    const restores = Object.entries(plan.rebind).flatMap(([machineId, complete]) => {
+      const current = getLayout(machineId);
+      const merged = current ? withMissingPads(current, complete) : complete;
+      return merged ? [[machineId, merged] as const] : [];
+    });
 
     if (plan.machines.length === 0 && restores.length === 0) return;
 
