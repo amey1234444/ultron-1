@@ -752,12 +752,63 @@ export function createTemplateDefaultLayout(
  * Complete template-shaped layouts also recover dynamic routing for their
  * single authored bend.
  */
+/**
+ * Drop cards and trails bound to pads the template no longer has.
+ *
+ * A saved canvas is a snapshot of a template as it was on the day somebody
+ * saved it. Trim the template's instrument list afterwards — as the flaking
+ * mill went from seventeen pads to three and the solvent extractor from
+ * twenty to eight — and every machine already configured keeps the canvas it
+ * had. The pads themselves come from the registry and do shrink, so what is
+ * left is the worst of both: the operator sees the same crowded column of
+ * cards, and fourteen of them are wired to pads that are no longer on the
+ * drawing. Reducing the registry looked like it had done nothing.
+ *
+ * A card generated for a pad exists to show that pad's channel, so when the
+ * pad goes the card goes with it, and so does its trail. A card with no
+ * `templatePointCode` was placed by hand and is left alone — that is somebody's
+ * work, and it is not addressed to a pad that has vanished.
+ *
+ * View-time, not a rewrite: the stored rows are untouched until the operator
+ * saves the canvas themselves. A migration that silently rewrote every saved
+ * layout on load would be a much larger promise than this needs to make.
+ */
+export function pruneLayoutToTemplate(machineTemplate: string, layout: SavedLayout): SavedLayout {
+  const connectors = CONNECTORS_BY_TEMPLATE[machineTemplate];
+  // A template with no pad registry at all — the generic equipment — never
+  // generated a bound card, so there is nothing here that could be stale.
+  if (!connectors) return layout;
+  const known = new Set(connectors.map((connector) => connector.code));
+
+  const staleBoxIds = new Set(
+    layout.boxes.filter((box) => box.templatePointCode && !known.has(box.templatePointCode)).map((box) => box.id),
+  );
+  const staleCode = (code: string | undefined) => Boolean(code) && !known.has(code as string);
+  const staleTrail = (trail: Trail) =>
+    staleCode(trail.startMachinePointCode)
+    || staleCode(trail.endMachinePointCode)
+    || Boolean(trail.startBoxId && staleBoxIds.has(trail.startBoxId))
+    || Boolean(trail.endBoxId && staleBoxIds.has(trail.endBoxId));
+
+  const trails = layout.trails.filter((trail) => !staleTrail(trail));
+  if (staleBoxIds.size === 0 && trails.length === layout.trails.length) return layout;
+  return {
+    ...layout,
+    boxes: layout.boxes.filter((box) => !staleBoxIds.has(box.id)),
+    trails,
+  };
+}
+
 export function migrateTemplateLayout(
   machineTemplate: string,
   layout: SavedLayout,
   machineRect?: MachineRect | null,
 ): SavedLayout {
-  if (machineTemplate !== 'Twin Screw Extruder') return layout;
+  // Every template gets the stale-pad prune. Only the twin screw gets the
+  // rest, which is about its own superseded drawing.
+  const pruned = pruneLayoutToTemplate(machineTemplate, layout);
+  if (machineTemplate !== 'Twin Screw Extruder') return pruned;
+  layout = pruned;
 
   const knownCodes = new Set(TWIN_SCREW_POINT_REGISTRY.map((point) => point.code));
   const retiredBoxIds = new Set(

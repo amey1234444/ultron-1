@@ -16,7 +16,7 @@
  * what makes that impossible to repeat.
  */
 import { connectorsForTemplate } from '../machineConnectors';
-import { createTemplateDefaultLayout } from '../templateDefaultLayouts';
+import { createTemplateDefaultLayout, migrateTemplateLayout, pruneLayoutToTemplate } from '../templateDefaultLayouts';
 import { MACHINE_TEMPLATES } from '../../../../lib/machines';
 import { MAX_MACHINE_ZOOM, MIN_MACHINE_ZOOM, MACHINE_ZOOM_STEP } from '../../../../lib/machineZoom';
 
@@ -201,6 +201,76 @@ for (const template of instrumented) {
 }
 ok('crowding is reported, and is separate from crossing', true,
   `${crowded} of ${instrumented.length} templates stack more cards than a column fits`);
+
+console.log('\n--- a canvas saved against an older, larger template ---');
+// Trimming a registry does not touch a canvas somebody already saved. The
+// pads come from the registry and do shrink, so a machine configured when
+// the flaking mill had seventeen of them kept seventeen cards, fourteen of
+// them wired to pads that are no longer on the drawing — which looked, from
+// the console, exactly as though reducing the registry had done nothing.
+const RETIRED = [
+  'FM_MOTOR_1_VIB', 'FM_MOTOR_1_TEMP', 'FM_MOTOR_1_CURRENT', 'FM_MOTOR_2_VIB', 'FM_MOTOR_2_TEMP',
+  'FM_MOTOR_2_CURRENT', 'FM_ROLL_1_BRG_TEMP', 'FM_ROLL_1_SPEED', 'FM_ROLL_2_BRG_TEMP',
+  'FM_ROLL_2_SPEED', 'FM_HOPPER_LEVEL', 'FM_FEEDER_RPM', 'FM_ROLL_GAP', 'FM_HYD_OIL_TEMP',
+];
+const LIVE = ['FM_ROLL_1_BRG_VIB', 'FM_ROLL_2_BRG_VIB', 'FM_HYD_PRESSURE'];
+const oldCodes = [...RETIRED, ...LIVE];
+const oldLayout = {
+  boxes: oldCodes.map((code, i) => ({ id: `b${i}`, x: 100, y: 40 + i * 46, label: code, templatePointCode: code, channelId: `ch-${i}` })),
+  trails: oldCodes.map((code, i) => ({
+    id: `t${i}`,
+    points: [{ x: 500, y: 300 }, { x: 200, y: 40 + i * 46 }],
+    startMachinePointCode: code,
+    endBoxId: `b${i}`,
+  })),
+} as unknown as Parameters<typeof pruneLayoutToTemplate>[1];
+
+const pruned = pruneLayoutToTemplate('Flaking Mill M-102', oldLayout);
+ok('the cards come down to the template\'s own points',
+  pruned.boxes.length === connectorsForTemplate('Flaking Mill M-102').length,
+  `${oldCodes.length} saved -> ${pruned.boxes.length}`);
+ok('and their trails go with them', pruned.trails.length === pruned.boxes.length,
+  `${pruned.trails.length} trails`);
+const live = new Set(connectorsForTemplate('Flaking Mill M-102').map((c) => c.code));
+ok('every surviving card is wired to a pad that exists',
+  pruned.boxes.every((box) => !box.templatePointCode || live.has(box.templatePointCode)),
+  'a trail addressing a pad the drawing no longer has cannot be drawn or mapped');
+ok('no trail addresses a retired pad',
+  !pruned.trails.some((trail) => RETIRED.includes(trail.startMachinePointCode ?? '')));
+ok('the surviving cards keep their channel',
+  pruned.boxes.every((box) => Boolean((box as { channelId?: string }).channelId)),
+  'the pad survived, so what it was reading is still what it reads');
+
+// A card nobody generated carries no template code: it is somebody's own
+// work and is addressed to nothing that can go away.
+const withManual = {
+  ...oldLayout,
+  boxes: [{ id: 'manual', x: 10, y: 10, label: 'Placed by hand' }, ...oldLayout.boxes],
+} as typeof oldLayout;
+ok('a hand-placed card is left alone',
+  pruneLayoutToTemplate('Flaking Mill M-102', withManual).boxes.some((box) => box.id === 'manual'));
+
+ok('a canvas that is already correct is returned untouched',
+  pruneLayoutToTemplate('Flaking Mill M-102', pruned) === pruned,
+  'by identity, so a load does not churn state for nothing');
+ok('a template with no pad registry is left alone',
+  pruneLayoutToTemplate('Motor', oldLayout) === oldLayout,
+  'generic equipment never generated a bound card');
+
+// The prune has to be on the path a machine actually loads through, or it is
+// a function nobody calls.
+ok('it runs for every template, through migrateTemplateLayout',
+  migrateTemplateLayout('Flaking Mill M-102', oldLayout, RECT).boxes.length === 3,
+  `${migrateTemplateLayout('Flaking Mill M-102', oldLayout, RECT).boxes.length} cards`);
+for (const [template, pads] of [['Solvent Extractor', 8], ['Conditioner E-102', 8], ['Cracking Mill M-101', 7], ['Expander X-101', 6]] as [string, number][]) {
+  const stale = {
+    boxes: Array.from({ length: 20 }, (_, i) => ({ id: `s${i}`, x: 0, y: 0, label: 'gone', templatePointCode: `RETIRED-${i}` })),
+    trails: [],
+  } as unknown as typeof oldLayout;
+  ok(`  ${template} sheds cards for pads it no longer has`,
+    migrateTemplateLayout(template, stale, RECT).boxes.length === 0,
+    `template now has ${pads} pads`);
+}
 
 console.log('\n--- the layout is the same every time ---');
 // The ordering is a search, so it has to be deterministic or "⟲ Template"
