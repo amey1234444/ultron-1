@@ -330,73 +330,91 @@ ok('it is offered, not applied — the caller decides',
   Object.keys(intact.layouts).length === 0,
   'a canvas somebody arranged by hand must not be overwritten by a load');
 
-console.log('\n--- every state a machine that already exists can be in ---');
+console.log('\n--- every template, in every state it can already be in ---');
 /**
- * The question is not whether a new machine gets wired. It is whether a
- * machine that already exists does, whatever state it is in — and a plant
- * that has been edited, generated against, and had its templates trimmed
- * underneath it contains most of these.
+ * The question is not whether a new machine wires. It is whether a machine
+ * that already exists does, whatever state it is in — and a plant that has
+ * been edited, generated against, and had its templates trimmed underneath
+ * it is in none of the states a new machine is in.
  *
- * Each case is driven through the generator, the plan applied the way the
- * console applies it, and the result checked on four things: the machine has
- * its gateway, it has exactly one channel per instrument point, its canvas is
- * bound, and a further pass does nothing. The last matters most — the console
- * runs this on every render, so a state it cannot settle is a write loop.
+ * Every instrumented template is driven through every state, each plan
+ * applied the way the console applies it, and the result checked on seven
+ * things. Two of them were bugs found by writing this:
+ *
+ *   - a deleted rack leaves its cards behind. They name a rack id nothing
+ *     owns, so they were not recognised as the machine's, and regenerating
+ *     the rack under that same id gave every slot two cards and a plan that
+ *     rebuilt the machine again on the next pass.
+ *   - a machine can carry a card per pad and still be missing the rack they
+ *     sit in, which reads as complete by channel count alone and is not
+ *     something anything can read.
+ *
+ * The settling check is the one with teeth: this runs on every render, so a
+ * state it cannot settle is a write loop rather than a wrong canvas.
  */
-const one2 = [targets[0]];
-const pads2 = connectorsForTemplate(one2[0].template).length;
-const base2 = planMachineWiring(one2, RECT, [], []);
-const gw2 = base2.machines[0].gateway;
-const rack2 = base2.machines[0].racks[0];
-const spare = {
-  id: `${rack2.id}-slot-99`, deviceId: rack2.id, slot: 99,
-  type: 'Vibration Card', enabled: true, config: {},
-} as unknown as (typeof base2.cards)[number];
+let stateFailures = 0;
+for (const template of instrumented) {
+  const pads = connectorsForTemplate(template).length;
+  const target = { id: `m-${template.replace(/\W/g, '')}-abcdef`, name: `${template} Healthy`, template, projectId: 'p' } as (typeof targets)[number];
+  const base = planMachineWiring([target], RECT, [], []);
+  const built = base.machines[0];
+  const gateway = built.gateway;
+  const lastRack = built.racks[built.racks.length - 1];
+  const spare = {
+    id: `${built.racks[0].id}-slot-99`, deviceId: built.racks[0].id, slot: 99,
+    type: 'Vibration Card', enabled: true, config: {},
+  } as unknown as (typeof base.cards)[number];
 
-const STATES: { label: string; devices: typeof base2.devices; cards: typeof base2.cards }[] = [
-  { label: 'never wired at all', devices: [], cards: [] },
-  { label: 'fully and correctly wired', devices: base2.devices, cards: base2.cards },
-  { label: 'gateway and racks, but no cards', devices: base2.devices, cards: [] },
-  { label: 'cards for a larger, older template', devices: base2.devices, cards: [...base2.cards, spare] },
-  { label: 'cards for a smaller, older template', devices: base2.devices, cards: base2.cards.slice(0, 2) },
-  // This one was a write loop: the gateway's absence read as "never wired",
-  // so a second gateway and a second set of racks were generated under ids
-  // the orphans already held.
-  { label: 'gateway deleted, racks left behind', devices: base2.devices.filter((d) => d.type === 'Rack'), cards: base2.cards },
-  { label: 'racks deleted, gateway left behind', devices: base2.devices.filter((d) => d.type === 'Gateway'), cards: [] },
-  { label: 'gateway re-addressed by hand, off the block', devices: base2.devices.map((d) => (d.id === gw2.id ? { ...d, ip: '192.168.4.7' } : d)), cards: base2.cards },
-  { label: 'an unrelated gateway somebody added', devices: [{ ...gw2, id: 'hand-made', name: 'PLANT GW', ip: '192.168.1.1' }], cards: [] },
-];
-
-for (const state of STATES) {
-  const plan = planMachineWiring(one2, RECT, state.devices, state.cards);
-  const afterDevices = [
-    ...state.devices.filter((device) => !plan.supersededDeviceIds.includes(device.id)),
-    ...plan.devices,
+  const states: { label: string; devices: typeof base.devices; cards: typeof base.cards }[] = [
+    { label: 'never wired', devices: [], cards: [] },
+    { label: 'correctly wired', devices: base.devices, cards: base.cards },
+    { label: 'no cards', devices: base.devices, cards: [] },
+    { label: 'cards for a larger, older template', devices: base.devices, cards: [...base.cards, spare] },
+    { label: 'cards for a smaller, older template', devices: base.devices, cards: base.cards.slice(0, 1) },
+    { label: 'last rack deleted, its cards orphaned', devices: base.devices.filter((d) => d.id !== lastRack.id), cards: base.cards },
+    { label: 'all racks deleted, cards orphaned', devices: base.devices.filter((d) => d.type === 'Gateway'), cards: base.cards },
+    { label: 'gateway deleted, racks left behind', devices: base.devices.filter((d) => d.type === 'Rack'), cards: base.cards },
+    { label: 'gateway re-addressed by hand, off the block', devices: base.devices.map((d) => (d.id === gateway.id ? { ...d, ip: '192.168.4.7' } : d)), cards: base.cards },
   ];
-  const afterCards = [
-    ...state.cards.filter((card) => !plan.supersededCardIds.includes(card.id)),
-    ...plan.cards,
-  ];
-  const rackIds = new Set(
-    afterDevices.filter((d) => d.type === 'Rack' && d.id.startsWith(`${gw2.id}-r`)).map((d) => d.id),
-  );
-  const channels = afterCards.filter((card) => rackIds.has(card.deviceId)).length;
-  const canvas = plan.layouts[one2[0].id] ?? plan.rebind[one2[0].id];
-  const settled = planMachineWiring(one2, RECT, afterDevices, afterCards);
 
-  ok(`  ${state.label}`,
-    afterDevices.some((device) => device.id === gw2.id)
-    && channels === pads2
-    && Boolean(canvas) && canvas.boxes.length === pads2 && canvas.boxes.every((box) => box.channelId)
-    && settled.machines.length === 0 && settled.supersededDeviceIds.length === 0
-    && afterDevices.length === new Set(afterDevices.map((d) => d.id)).size
-    && afterCards.length === new Set(afterCards.map((c) => c.id)).size,
-    `${channels}/${pads2} channels, ` +
-    `${canvas ? `${canvas.boxes.filter((b) => b.channelId).length}/${canvas.boxes.length} bound` : 'no canvas'}, ` +
-    `${settled.machines.length === 0 ? 'settles' : 'REBUILDS AGAIN'}, ` +
-    `${afterDevices.length === new Set(afterDevices.map((d) => d.id)).size ? 'no duplicate ids' : 'DUPLICATE IDS'}`);
+  const broken: string[] = [];
+  for (const state of states) {
+    const plan = planMachineWiring([target], RECT, state.devices, state.cards);
+    const devices = [...state.devices.filter((d) => !plan.supersededDeviceIds.includes(d.id)), ...plan.devices];
+    const cardsNow = [...state.cards.filter((c) => !plan.supersededCardIds.includes(c.id)), ...plan.cards];
+    const racks = devices.filter((d) => d.type === 'Rack' && d.id.startsWith(`${gateway.id}-r`));
+    const rackIds = new Set(racks.map((r) => r.id));
+    const channels = cardsNow.filter((c) => rackIds.has(c.deviceId)).length;
+    const orphans = cardsNow.filter((c) => c.deviceId.startsWith(gateway.id) && !rackIds.has(c.deviceId)).length;
+    const canvas = plan.layouts[target.id] ?? plan.rebind[target.id];
+    const settled = planMachineWiring([target], RECT, devices, cardsNow);
+
+    const good =
+      devices.some((d) => d.id === gateway.id)
+      && racks.length === built.racks.length
+      && channels === pads
+      && orphans === 0
+      && Boolean(canvas) && canvas.boxes.length === pads && canvas.boxes.every((box) => box.channelId)
+      && settled.machines.length === 0 && settled.supersededDeviceIds.length === 0
+      && devices.length === new Set(devices.map((d) => d.id)).size
+      && cardsNow.length === new Set(cardsNow.map((c) => c.id)).size
+      && findDuplicateConfiguredDeviceIp(devices) === null
+      && findDuplicateConfiguredDeviceName(devices) === null;
+
+    if (!good) {
+      broken.push(
+        `${state.label} [racks ${racks.length}/${built.racks.length}, channels ${channels}/${pads}` +
+        `${orphans > 0 ? `, ${orphans} orphaned` : ''}${settled.machines.length > 0 ? ', REBUILDS AGAIN' : ''}]`,
+      );
+    }
+  }
+  if (broken.length > 0) stateFailures += 1;
+  ok(`  ${template} (${pads} pads, ${built.racks.length} rack${built.racks.length === 1 ? '' : 's'})`,
+    broken.length === 0,
+    broken.join('  ') || `all ${states.length} states wired, bound and settled`);
 }
+ok('no template has a state it cannot recover from', stateFailures === 0,
+  `${instrumented.length} templates x 9 states`);
 
 const home = readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');
 console.log('\n--- a machine that is only partly wired ---');

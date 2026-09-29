@@ -107,11 +107,19 @@ export function planMachineWiring(
     // This machine's own generated hardware. Matched on the id the generator
     // derives from the machine, so a gateway somebody added by hand is not
     // mistaken for one of ours and is never superseded below.
-    const ownDevices = existingDevices.filter(
-      (device) => device.id === gatewayId || device.id.startsWith(`${gatewayId}-r`),
-    );
-    const ownRackIds = new Set(ownDevices.filter((device) => device.type === 'Rack').map((device) => device.id));
-    const ownCards = existingCards.filter((card: CardNode) => ownRackIds.has(card.deviceId));
+    //
+    // Cards are matched the same way, on the id of the rack they name rather
+    // than on that rack still being there. A deleted rack leaves its cards
+    // behind: they belong to no device, they are invisible in the devices
+    // table, and a rebuild regenerates the rack under the very id those cards
+    // still name — so they have to be found and cleared, or the machine ends
+    // with two cards in every slot and a plan that rebuilds it again on the
+    // next pass.
+    const ownsDevice = (id: string) => id === gatewayId || id.startsWith(`${gatewayId}-r`);
+    const ownDevices = existingDevices.filter((device) => ownsDevice(device.id));
+    const ownCards = existingCards.filter((card: CardNode) => ownsDevice(card.deviceId));
+    const expectedRacks = Math.max(1, Math.ceil(connectors.length / SLOTS_PER_RACK));
+    const ownRackCount = ownDevices.filter((device) => device.type === 'Rack').length;
 
     // Reclaims the block off whatever of this machine's hardware is still
     // there, gateway or rack — a rebuild is the same gateway and must not be
@@ -126,7 +134,14 @@ export function planMachineWiring(
 
     // The hardware is there and still matches the template: nothing to build,
     // and a canvas offered in case the machine has lost its own.
-    if (present.has(gatewayId) && ownCards.length === connectors.length) {
+    //
+    // The rack count is part of "matches". A machine can carry a card per pad
+    // and still be missing the rack those cards sit in, which reads as
+    // complete by channel count alone and is not something anything can read.
+    const intact = present.has(gatewayId)
+      && ownRackCount === expectedRacks
+      && ownCards.length === connectors.length;
+    if (intact) {
       rebind[target.id] = boundLayout;
       skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
       return;
@@ -143,9 +158,11 @@ export function planMachineWiring(
       skipped.push({
         id: target.id,
         name: target.name,
-        reason: present.has(gatewayId)
-          ? `rebuilt: ${ownCards.length} channels for ${connectors.length} instrument points`
-          : `rebuilt: its gateway was missing, ${ownDevices.length} orphaned device${ownDevices.length === 1 ? '' : 's'} replaced`,
+        reason: !present.has(gatewayId)
+          ? `rebuilt: its gateway was missing, ${ownDevices.length} orphaned device${ownDevices.length === 1 ? '' : 's'} replaced`
+          : ownRackCount !== expectedRacks
+            ? `rebuilt: ${ownRackCount} rack${ownRackCount === 1 ? '' : 's'} where ${expectedRacks} ${expectedRacks === 1 ? 'is' : 'are'} needed`
+            : `rebuilt: ${ownCards.length} channels for ${connectors.length} instrument points`,
       });
     }
 
