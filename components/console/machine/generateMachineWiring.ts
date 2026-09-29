@@ -30,6 +30,26 @@ export type WiringPlan = {
   machines: MachinePlan[];
   /** Machines that produced nothing, and why — reported rather than dropped. */
   skipped: { id: string; name: string; reason: string }[];
+  /**
+   * Generated rows this plan replaces. Remove them when applying it.
+   *
+   * A machine wired before its template's instrument list changed keeps a
+   * rack built for the old list — twenty cards for a machine that now has
+   * eight, in slots the new canvas does not address. It is not enough to
+   * leave it be and not enough to add beside it: the old rack has to go.
+   * Only ever generated rows, whose ids are derived from the machine.
+   */
+  supersededDeviceIds: string[];
+  supersededCardIds: string[];
+  /**
+   * Canvases for machines whose hardware is already right.
+   *
+   * Kept apart from `layouts` on purpose. These machines are not being
+   * rewired, and their canvas may be one somebody has arranged by hand — so
+   * this is offered rather than applied, and the caller uses it only for a
+   * machine whose canvas has nothing mapped on it at all.
+   */
+  rebind: Record<string, SavedLayout>;
 };
 
 /**
@@ -52,14 +72,25 @@ export function planMachineWiring(
    * machine, so "already generated" is a lookup rather than a guess.
    */
   existingDevices: readonly DeviceNode[] = [],
+  /**
+   * The cards already installed.
+   *
+   * Needed to tell hardware that is still right from hardware built for an
+   * older version of the template: the generator makes one card per pad, so
+   * a count that no longer matches is the signal to rebuild.
+   */
+  existingCards: readonly CardNode[] = [],
 ): WiringPlan {
   const present = new Set(existingDevices.map((device) => device.id));
   const taken = takenAddresses(existingDevices);
   const devices: DeviceNode[] = [];
   const cards: CardNode[] = [];
   const layouts: Record<string, SavedLayout> = {};
+  const rebind: Record<string, SavedLayout> = {};
   const machines: MachinePlan[] = [];
   const skipped: WiringPlan['skipped'] = [];
+  const supersededDeviceIds: string[] = [];
+  const supersededCardIds: string[] = [];
 
   targets.forEach((target) => {
     const connectors = connectorsForTemplate(target.template);
@@ -72,55 +103,49 @@ export function planMachineWiring(
       return;
     }
 
-    // Before planning, not after: a machine that already has its hardware must
-    // not consume a block or a name, or re-running the generator would shift
-    // every later machine onto different addresses than it had last time.
     const gatewayId = generatedGatewayId(target);
-    if (present.has(gatewayId)) {
-      skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
-      return;
-    }
-
-    const rackCount = Math.max(1, Math.ceil(connectors.length / SLOTS_PER_RACK));
-    const addressing = taken.reserve(target.name, rackCount);
-    if (!addressing) {
-      skipped.push({
-        id: target.id,
-        name: target.name,
-        reason: 'no free address block is left in 10.80.0.0/16',
-      });
-      return;
-    }
-
-    const plan = planMachine(
-      target,
-      connectors.map((connector) => ({ code: connector.code, label: connector.label, kind: connector.kind })),
-      addressing,
+    // This machine's own generated hardware. Matched on the id the generator
+    // derives from the machine, so a gateway somebody added by hand is not
+    // mistaken for one of ours and is never superseded below.
+    const ownDevices = existingDevices.filter(
+      (device) => device.id === gatewayId || device.id.startsWith(`${gatewayId}-r`),
     );
+    const ownRackIds = new Set(ownDevices.filter((device) => device.type === 'Rack').map((device) => device.id));
+    const ownCards = existingCards.filter((card: CardNode) => ownRackIds.has(card.deviceId));
+
+    const plan = planMachineFor(target, connectors, taken, present.has(gatewayId) ? ownDevices : null);
     if (!plan) {
       skipped.push({ id: target.id, name: target.name, reason: 'no hardware could be planned' });
       return;
     }
 
+    const boundLayout = bindLayout(target, plan, machineRect ?? null);
+
+    if (present.has(gatewayId)) {
+      // The hardware is there. Whether it is still the right hardware is a
+      // different question: a card per pad is what the generator makes, so a
+      // count that no longer matches means the template changed underneath it.
+      if (ownCards.length === connectors.length) {
+        rebind[target.id] = boundLayout;
+        skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
+        return;
+      }
+      for (const device of ownDevices) supersededDeviceIds.push(device.id);
+      for (const card of ownCards) supersededCardIds.push(card.id);
+      skipped.push({
+        id: target.id,
+        name: target.name,
+        reason: `rebuilt: ${ownCards.length} channels for ${connectors.length} instrument points`,
+      });
+    }
+
     machines.push(plan);
     devices.push(plan.gateway, ...plan.racks);
     cards.push(...plan.cards);
-
-    // The template's own layout, then bound. Every generated card carries the
-    // pad's `templatePointCode`, which is what the channel is matched on —
-    // not the label, which two machines can share and an operator can edit.
-    const layout = createTemplateDefaultLayout(target.template, [], machineRect ?? null);
-    const channelByCode = new Map(plan.points.map((point) => [point.code, point.channelId]));
-    layouts[target.id] = {
-      ...layout,
-      boxes: layout.boxes.map((box) => {
-        const channelId = box.templatePointCode ? channelByCode.get(box.templatePointCode) : undefined;
-        return channelId ? { ...box, channelId } : box;
-      }),
-    };
+    layouts[target.id] = boundLayout;
   });
 
-  return { devices, cards, layouts, machines, skipped };
+  return { devices, cards, layouts, machines, skipped, supersededDeviceIds, supersededCardIds, rebind };
 }
 
 /**
@@ -201,6 +226,55 @@ function takenAddresses(existing: readonly DeviceNode[]) {
       for (const key of namesFor(hardwareName, rackCount)) names.add(key);
       return hardwareName === machineName ? { block } : { block, hardwareName };
     },
+  };
+}
+
+/**
+ * Plan one machine's hardware, reusing its addresses when it already has them.
+ *
+ * A rebuild must not move the machine to a different address block: the
+ * gateway is the same gateway, and renumbering it would look like a new one
+ * to anything watching. So when the machine already has hardware its block is
+ * read back off it, and only a genuinely new machine claims a free one.
+ */
+function planMachineFor(
+  target: SimulationTarget,
+  connectors: readonly { code: string; label: string; kind?: string }[],
+  taken: ReturnType<typeof takenAddresses>,
+  existingOwn: readonly DeviceNode[] | null,
+): MachinePlan | null {
+  const points = connectors.map((connector) => ({ code: connector.code, label: connector.label, kind: connector.kind }));
+  const rackCount = Math.max(1, Math.ceil(connectors.length / SLOTS_PER_RACK));
+
+  if (existingOwn && existingOwn.length > 0) {
+    const gateway = existingOwn.find((device) => device.type === 'Gateway') ?? existingOwn[0];
+    const block = blockOf(gateway.ip);
+    const hardwareName = gateway.name.startsWith('GW ') ? gateway.name.slice(3) : target.name;
+    if (block !== null) return planMachine(target, points, { block, hardwareName });
+  }
+
+  const addressing = taken.reserve(target.name, rackCount);
+  return addressing ? planMachine(target, points, addressing) : null;
+}
+
+/** The third octet of a 10.80.x.y address, or null if it is not one. */
+function blockOf(ip: string | undefined): number | null {
+  const match = typeof ip === 'string' ? ip.match(/^10\.80\.(\d{1,3})\.\d{1,3}$/) : null;
+  if (!match) return null;
+  const block = Number(match[1]);
+  return Number.isFinite(block) ? block : null;
+}
+
+/** The template's own canvas, with each card bound to its pad's channel. */
+function bindLayout(target: SimulationTarget, plan: MachinePlan, machineRect: MachineRect | null): SavedLayout {
+  const layout = createTemplateDefaultLayout(target.template, [], machineRect);
+  const channelByCode = new Map(plan.points.map((point) => [point.code, point.channelId]));
+  return {
+    ...layout,
+    boxes: layout.boxes.map((box) => {
+      const channelId = box.templatePointCode ? channelByCode.get(box.templatePointCode) : undefined;
+      return channelId ? { ...box, channelId } : box;
+    }),
   };
 }
 

@@ -623,16 +623,11 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
   useEffect(() => {
     if (!workspaceReady || !hasConfigureAccess) return;
 
-    const unwired = machines.filter((machine) => {
-      if (connectorsForTemplate(machine.template).length === 0) return false;
-      const layout = getLayout(machine.id);
-      if (layout?.boxes.some((box) => box.channelId)) return false;
-      return true;
-    });
-    if (unwired.length === 0) return;
+    const candidates = machines.filter((machine) => connectorsForTemplate(machine.template).length > 0);
+    if (candidates.length === 0) return;
 
     const plan = planMachineWiring(
-      unwired.map((machine) => ({
+      candidates.map((machine) => ({
         id: machine.id,
         name: machine.name,
         template: machine.template,
@@ -640,13 +635,34 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       })),
       null,
       storedDevices,
+      cards,
     );
-    if (plan.machines.length === 0) return;
 
-    setDevices((prev) => [...prev, ...plan.devices]);
-    setCards((prev) => [...prev, ...plan.cards]);
+    // A canvas with nothing mapped on it is a machine that was never wired,
+    // or one whose cards were dropped when its template's instrument list
+    // changed. A canvas with channels on it is somebody's arrangement and is
+    // never overwritten from here.
+    const unbound = (machineId: string) => {
+      const layout = getLayout(machineId);
+      return !layout || !layout.boxes.some((box) => box.channelId);
+    };
+    const restores = Object.entries(plan.rebind).filter(([machineId]) => unbound(machineId));
+
+    if (plan.machines.length === 0 && restores.length === 0) return;
+
+    if (plan.supersededDeviceIds.length > 0 || plan.supersededCardIds.length > 0) {
+      const staleDevices = new Set(plan.supersededDeviceIds);
+      const staleCards = new Set(plan.supersededCardIds);
+      setDevices((prev) => [...prev.filter((device) => !staleDevices.has(device.id)), ...plan.devices]);
+      setCards((prev) => [...prev.filter((card) => !staleCards.has(card.id)), ...plan.cards]);
+    } else if (plan.machines.length > 0) {
+      setDevices((prev) => [...prev, ...plan.devices]);
+      setCards((prev) => [...prev, ...plan.cards]);
+    }
+
     for (const [machineId, layout] of Object.entries(plan.layouts)) saveLayout(machineId, layout);
-  }, [workspaceReady, hasConfigureAccess, machines, storedDevices, getLayout, setDevices, setCards, saveLayout]);
+    for (const [machineId, layout] of restores) saveLayout(machineId, layout);
+  }, [workspaceReady, hasConfigureAccess, machines, storedDevices, cards, getLayout, setDevices, setCards, saveLayout]);
 
   const [wiringNotice, setWiringNotice] = useState<string | null>(null);
   const generateMachineHardware = () => {
@@ -656,7 +672,7 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       template: machine.template,
       projectId: machine.projectId ?? null,
     }));
-    const plan = planMachineWiring(targets, null, storedDevices);
+    const plan = planMachineWiring(targets, null, storedDevices, cards);
     if (plan.machines.length === 0) {
       const already = plan.skipped.filter((entry) => entry.reason === 'already has generated hardware').length;
       setWiringNotice(
@@ -669,8 +685,10 @@ export default function Home({ sidebarFooter, currentUser }: { sidebarFooter?: R
       return;
     }
 
-    setDevices((prev) => [...prev, ...plan.devices]);
-    setCards((prev) => [...prev, ...plan.cards]);
+    const staleDevices = new Set(plan.supersededDeviceIds);
+    const staleCards = new Set(plan.supersededCardIds);
+    setDevices((prev) => [...prev.filter((device) => !staleDevices.has(device.id)), ...plan.devices]);
+    setCards((prev) => [...prev.filter((card) => !staleCards.has(card.id)), ...plan.cards]);
     for (const [machineId, layout] of Object.entries(plan.layouts)) saveLayout(machineId, layout);
 
     const gateways = plan.devices.filter((device) => device.type === 'Gateway').length;
