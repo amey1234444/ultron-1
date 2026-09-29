@@ -330,6 +330,74 @@ ok('it is offered, not applied — the caller decides',
   Object.keys(intact.layouts).length === 0,
   'a canvas somebody arranged by hand must not be overwritten by a load');
 
+console.log('\n--- every state a machine that already exists can be in ---');
+/**
+ * The question is not whether a new machine gets wired. It is whether a
+ * machine that already exists does, whatever state it is in — and a plant
+ * that has been edited, generated against, and had its templates trimmed
+ * underneath it contains most of these.
+ *
+ * Each case is driven through the generator, the plan applied the way the
+ * console applies it, and the result checked on four things: the machine has
+ * its gateway, it has exactly one channel per instrument point, its canvas is
+ * bound, and a further pass does nothing. The last matters most — the console
+ * runs this on every render, so a state it cannot settle is a write loop.
+ */
+const one2 = [targets[0]];
+const pads2 = connectorsForTemplate(one2[0].template).length;
+const base2 = planMachineWiring(one2, RECT, [], []);
+const gw2 = base2.machines[0].gateway;
+const rack2 = base2.machines[0].racks[0];
+const spare = {
+  id: `${rack2.id}-slot-99`, deviceId: rack2.id, slot: 99,
+  type: 'Vibration Card', enabled: true, config: {},
+} as unknown as (typeof base2.cards)[number];
+
+const STATES: { label: string; devices: typeof base2.devices; cards: typeof base2.cards }[] = [
+  { label: 'never wired at all', devices: [], cards: [] },
+  { label: 'fully and correctly wired', devices: base2.devices, cards: base2.cards },
+  { label: 'gateway and racks, but no cards', devices: base2.devices, cards: [] },
+  { label: 'cards for a larger, older template', devices: base2.devices, cards: [...base2.cards, spare] },
+  { label: 'cards for a smaller, older template', devices: base2.devices, cards: base2.cards.slice(0, 2) },
+  // This one was a write loop: the gateway's absence read as "never wired",
+  // so a second gateway and a second set of racks were generated under ids
+  // the orphans already held.
+  { label: 'gateway deleted, racks left behind', devices: base2.devices.filter((d) => d.type === 'Rack'), cards: base2.cards },
+  { label: 'racks deleted, gateway left behind', devices: base2.devices.filter((d) => d.type === 'Gateway'), cards: [] },
+  { label: 'gateway re-addressed by hand, off the block', devices: base2.devices.map((d) => (d.id === gw2.id ? { ...d, ip: '192.168.4.7' } : d)), cards: base2.cards },
+  { label: 'an unrelated gateway somebody added', devices: [{ ...gw2, id: 'hand-made', name: 'PLANT GW', ip: '192.168.1.1' }], cards: [] },
+];
+
+for (const state of STATES) {
+  const plan = planMachineWiring(one2, RECT, state.devices, state.cards);
+  const afterDevices = [
+    ...state.devices.filter((device) => !plan.supersededDeviceIds.includes(device.id)),
+    ...plan.devices,
+  ];
+  const afterCards = [
+    ...state.cards.filter((card) => !plan.supersededCardIds.includes(card.id)),
+    ...plan.cards,
+  ];
+  const rackIds = new Set(
+    afterDevices.filter((d) => d.type === 'Rack' && d.id.startsWith(`${gw2.id}-r`)).map((d) => d.id),
+  );
+  const channels = afterCards.filter((card) => rackIds.has(card.deviceId)).length;
+  const canvas = plan.layouts[one2[0].id] ?? plan.rebind[one2[0].id];
+  const settled = planMachineWiring(one2, RECT, afterDevices, afterCards);
+
+  ok(`  ${state.label}`,
+    afterDevices.some((device) => device.id === gw2.id)
+    && channels === pads2
+    && Boolean(canvas) && canvas.boxes.length === pads2 && canvas.boxes.every((box) => box.channelId)
+    && settled.machines.length === 0 && settled.supersededDeviceIds.length === 0
+    && afterDevices.length === new Set(afterDevices.map((d) => d.id)).size
+    && afterCards.length === new Set(afterCards.map((c) => c.id)).size,
+    `${channels}/${pads2} channels, ` +
+    `${canvas ? `${canvas.boxes.filter((b) => b.channelId).length}/${canvas.boxes.length} bound` : 'no canvas'}, ` +
+    `${settled.machines.length === 0 ? 'settles' : 'REBUILDS AGAIN'}, ` +
+    `${afterDevices.length === new Set(afterDevices.map((d) => d.id)).size ? 'no duplicate ids' : 'DUPLICATE IDS'}`);
+}
+
 console.log('\n--- a machine is wired without anybody pressing anything ---');
 const home = readFileSync(join(process.cwd(), 'app/index.tsx'), 'utf8');
 // Creating a machine and wiring it were two acts, and the second was a

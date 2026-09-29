@@ -113,7 +113,10 @@ export function planMachineWiring(
     const ownRackIds = new Set(ownDevices.filter((device) => device.type === 'Rack').map((device) => device.id));
     const ownCards = existingCards.filter((card: CardNode) => ownRackIds.has(card.deviceId));
 
-    const plan = planMachineFor(target, connectors, taken, present.has(gatewayId) ? ownDevices : null);
+    // Reclaims the block off whatever of this machine's hardware is still
+    // there, gateway or rack — a rebuild is the same gateway and must not be
+    // renumbered. Only a machine with nothing left claims a free block.
+    const plan = planMachineFor(target, connectors, taken, ownDevices.length > 0 ? ownDevices : null);
     if (!plan) {
       skipped.push({ id: target.id, name: target.name, reason: 'no hardware could be planned' });
       return;
@@ -121,21 +124,28 @@ export function planMachineWiring(
 
     const boundLayout = bindLayout(target, plan, machineRect ?? null);
 
-    if (present.has(gatewayId)) {
-      // The hardware is there. Whether it is still the right hardware is a
-      // different question: a card per pad is what the generator makes, so a
-      // count that no longer matches means the template changed underneath it.
-      if (ownCards.length === connectors.length) {
-        rebind[target.id] = boundLayout;
-        skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
-        return;
-      }
+    // The hardware is there and still matches the template: nothing to build,
+    // and a canvas offered in case the machine has lost its own.
+    if (present.has(gatewayId) && ownCards.length === connectors.length) {
+      rebind[target.id] = boundLayout;
+      skipped.push({ id: target.id, name: target.name, reason: 'already has generated hardware' });
+      return;
+    }
+
+    // Anything left over carrying this machine's generated ids is superseded,
+    // whether or not its gateway survived. Leaving it produces two racks with
+    // one id and twice the cards on them, which the device table refuses and
+    // which the pass after this one would try to rebuild all over again —
+    // the state a deleted gateway used to leave behind.
+    if (ownDevices.length > 0 || ownCards.length > 0) {
       for (const device of ownDevices) supersededDeviceIds.push(device.id);
       for (const card of ownCards) supersededCardIds.push(card.id);
       skipped.push({
         id: target.id,
         name: target.name,
-        reason: `rebuilt: ${ownCards.length} channels for ${connectors.length} instrument points`,
+        reason: present.has(gatewayId)
+          ? `rebuilt: ${ownCards.length} channels for ${connectors.length} instrument points`
+          : `rebuilt: its gateway was missing, ${ownDevices.length} orphaned device${ownDevices.length === 1 ? '' : 's'} replaced`,
       });
     }
 
