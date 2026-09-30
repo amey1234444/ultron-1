@@ -86,3 +86,55 @@ test('direct is the default mode', () => {
   assert.equal(feedMode(), 'direct', 'an unreadable value falls back rather than disabling the layer');
   delete process.env.ML_FEED_MODE;
 });
+
+/**
+ * Logging.
+ *
+ * Silence cost several rounds of this work: a feeder that posted nothing, a
+ * service that received nothing and a panel that said nothing look identical
+ * from outside, and none of the three said which it was. These assert that
+ * the lines exist and that both halves of the path write the same shape, so
+ * one grep spans a Node process and a Python one.
+ */
+import { readFileSync as read } from 'node:fs';
+
+test('the web side logs what it sent and what came back', () => {
+  const direct = read('src/server/mlDirectFeed.ts', 'utf8');
+  assert.match(direct, /log\.info\(\{\s*machine/, 'the outcome of a post is logged');
+  assert.match(direct, /log\.debug\(\{ machine: machine\.name, mapped/, 'and what was built before it');
+  assert.ok(direct.includes("log.warn("), 'a machine that reports nothing is named, not counted');
+  const client = read('src/server/mlClient.ts', 'utf8');
+  assert.ok(client.includes("log.warn({ method, path, status"), 'a non-200 from the service is logged');
+  assert.ok(client.includes("'retrying once'"), 'and so is the retry, or one slow call looks like two');
+});
+
+test('both halves write the same field names', () => {
+  // `grep machine=TSE-01` has to span the Node log and the Python one, which
+  // it only does if the two agree on what the field is called.
+  const web = read('src/server/mlLog.ts', 'utf8');
+  const python = read('services/ml/app/core/logging.py', 'utf8');
+  assert.ok(web.includes('key=value') && python.includes('key=value'), 'the same format is stated in both');
+  for (const field of ['machine', 'latency_ms', 'reporting', 'surfaced']) {
+    assert.ok(
+      read('src/server/mlDirectFeed.ts', 'utf8').includes(field),
+      `the web side logs ${field}`,
+    );
+    assert.ok(read('services/ml/app/api/handlers.py', 'utf8').includes(field), `the service logs ${field}`);
+  }
+});
+
+test('the level is one variable for both', () => {
+  assert.ok(read('src/server/mlLog.ts', 'utf8').includes('ML_LOG_LEVEL'));
+  assert.ok(read('services/ml/app/core/logging.py', 'utf8').includes('ML_LOG_LEVEL'));
+});
+
+test('the service names its champion at boot', () => {
+  // The two things most likely to be wrong at boot, and the two that used to
+  // fail in silence: no champion loaded, and a knowledge snapshot that does
+  // not match.
+  const app = read('services/ml/app/api/app.py', 'utf8');
+  assert.ok(app.includes('configure()'), 'logging is set up before the service is built');
+  assert.ok(app.includes('champion=champion.get("model_id")'), 'the champion is named');
+  assert.ok(app.includes('knowledge=health.get("knowledge", {}).get("digest")'), 'and the knowledge digest');
+  assert.ok(app.includes('boot.warning'), 'an unavailable champion is a warning, not a silence');
+});

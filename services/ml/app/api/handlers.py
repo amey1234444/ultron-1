@@ -14,6 +14,8 @@ shadow, canary and production modes without mutating the environment.
 
 from __future__ import annotations
 
+from uuid import uuid4
+
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,6 +23,7 @@ from typing import Any
 
 from ..core.capability import capability_report
 from ..core.config import Settings, settings as global_settings
+from ..core.logging import configure, fields, logger, set_request
 from ..core.errors import MLServiceError, Unauthorized
 from ..core.timeutil import iso, now as utc_now
 from ..core.versions import version_block
@@ -84,6 +87,9 @@ class FeedbackStore:
 
     def pending(self) -> list[dict[str, Any]]:
         return [row for row in self.records if row["review_status"] == "PENDING_REVIEW"]
+
+
+_log = logger("inference")
 
 
 class MLService:
@@ -194,19 +200,80 @@ class MLService:
 
     def infer(self, request: InferenceRequest) -> dict[str, Any]:
         self._count("inference")
-        if not self.pipeline.should_run(request.frame, force=request.force):
-            self.pipeline.ingest_only(request.frame)
-            latest = self.pipeline.latest(request.frame.machine_id)
+        frame = request.frame
+        # One id per frame, so the stage lines below it can be read as one
+        # frame's journey rather than as interleaved noise from every machine.
+        set_request(uuid4().hex[:8])
+        reporting = sum(
+            1 for channel in frame.channels.values() if getattr(channel, "value", None) is not None
+        )
+        _log.info(
+            fields(
+                machine=frame.machine_id,
+                at=frame.timestamp.isoformat() if hasattr(frame.timestamp, "isoformat") else frame.timestamp,
+                channels=len(frame.channels),
+                reporting=reporting,
+                source=getattr(frame, "data_source", None),
+                recipe=getattr(getattr(frame, "context", None), "recipe_id", None),
+            )
+        )
+        if reporting == 0:
+            # Worth its own line: the chain will run and conclude nothing, and
+            # the cause is upstream of this service entirely.
+            _log.warning(fields(machine=frame.machine_id, reporting=0) + " — no channel carried a value")
+
+        if not self.pipeline.should_run(frame, force=request.force):
+            self.pipeline.ingest_only(frame)
+            latest = self.pipeline.latest(frame.machine_id)
             self._count("inference_skipped_cadence")
+            # Not an error, and the commonest reason a POST returns a result
+            # that did not move: the cadence says this frame is too soon.
+            _log.debug(fields(machine=frame.machine_id, skipped="cadence", served=latest is not None))
             if latest is not None:
                 return latest.model_dump(mode="json")
-        response = self.pipeline.process(request.frame, explain=request.explain)
+
+        response = self.pipeline.process(frame, explain=request.explain)
         if response.ml.inference_latency_ms is not None:
             self._latencies.append(response.ml.inference_latency_ms)
             del self._latencies[:-1000]
+
+        risks = [entry for entry in response.diagnoses if getattr(entry, "risk", None)]
+        _log.info(
+            fields(
+                machine=frame.machine_id,
+                status=response.ml.status,
+                eligible=response.ml.eligible,
+                reason=response.ml.eligibility_reason,
+                mode=response.ml.mode,
+                surfaced=response.ml.surfaced,
+                severity=getattr(response.current_condition, "severity", None),
+                diagnoses=len(response.diagnoses),
+                with_risk=len(risks),
+                quality=getattr(getattr(response, "data_quality", None), "verdict", None),
+                latency_ms=response.ml.inference_latency_ms,
+            )
+        )
+        for entry in risks:
+            _log.debug(
+                fields(
+                    fault=entry.fault_id,
+                    state=entry.diagnosis_state,
+                    surfaced=entry.surfaced,
+                    risk=" ".join(f"{h.horizon_minutes}m:{h.probability:.3f}" for h in entry.risk),
+                )
+            )
         return response.model_dump(mode="json")
 
     def infer_batch(self, request: BatchInferenceRequest) -> dict[str, Any]:
+        # A batch is a replay, so it is summarised rather than narrated: a
+        # hundred and twenty frames at two lines each buries the boot line and
+        # everything after it. The last frame's verdict is the one that stands
+        # as the machine's current state, so that is the one reported.
+        set_request(uuid4().hex[:8])
+        machine = request.frames[0].machine_id if request.frames else "-"
+        _log.info(
+            fields(batch=len(request.frames), machine=machine, emit_every=request.emit_every, explain=request.explain)
+        )
         responses = []
         for index, frame in enumerate(request.frames):
             if index % max(1, request.emit_every) != 0:
@@ -215,6 +282,33 @@ class MLService:
             response = self.pipeline.process(frame, explain=request.explain)
             responses.append(response.model_dump(mode="json"))
         self._count("inference_batch")
+
+        last = self.pipeline.latest(machine) if machine != "-" else None
+        if last is not None:
+            risks = [entry for entry in last.diagnoses if getattr(entry, "risk", None)]
+            _log.info(
+                fields(
+                    batch="done",
+                    machine=machine,
+                    scored=len(responses),
+                    status=last.ml.status,
+                    eligible=last.ml.eligible,
+                    reason=last.ml.eligibility_reason,
+                    surfaced=last.ml.surfaced,
+                    diagnoses=len(last.diagnoses),
+                    with_risk=len(risks),
+                    latency_ms=last.ml.inference_latency_ms,
+                )
+            )
+            for entry in risks:
+                _log.info(
+                    fields(
+                        fault=entry.fault_id,
+                        state=entry.diagnosis_state,
+                        surfaced=entry.surfaced,
+                        risk=" ".join(f"{h.horizon_minutes}m:{h.probability:.3f}" for h in entry.risk),
+                    )
+                )
         return {"count": len(responses), "responses": responses}
 
     def diagnosis(self, machine_id: str) -> dict[str, Any]:

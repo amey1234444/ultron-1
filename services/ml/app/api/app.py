@@ -25,6 +25,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..core.errors import MLServiceError
+from ..core.logging import configure, fields, logger
 from ..schemas.telemetry import BatchInferenceRequest, InferenceRequest
 from .handlers import MLService, require_internal_token
 
@@ -33,6 +34,12 @@ def create_app(service: MLService | None = None) -> Any:
     """Build the ASGI application. Requires FastAPI to be installed."""
     from fastapi import Depends, FastAPI, Header, HTTPException, Query
     from fastapi.responses import JSONResponse
+
+    # Before the service is constructed, so model loading and knowledge
+    # verification — the two things most likely to go wrong at boot and the
+    # two that used to fail in silence — are logged as they happen.
+    configure()
+    boot = logger("service")
 
     app = FastAPI(
         title="ULTRON ML service",
@@ -44,6 +51,25 @@ def create_app(service: MLService | None = None) -> Any:
         ),
     )
     ml = service or MLService()
+    health = ml.health()
+    champion = health.get("models", {}).get("champion", {})
+    boot.info(
+        fields(
+            mode=health.get("mode"),
+            publishes_alerts=health.get("publishes_alerts"),
+            champion=champion.get("model_id") or "none",
+            capability=champion.get("capability"),
+            outputs=champion.get("output_count"),
+            trained_on_real_data=champion.get("trained_on_real_data"),
+            knowledge=health.get("knowledge", {}).get("digest"),
+            faults=health.get("knowledge", {}).get("counts", {}).get("faults"),
+        )
+    )
+    if champion.get("capability") != "AVAILABLE":
+        boot.warning(
+            fields(champion="unavailable", reason=champion.get("reason"))
+            + " — diagnoses will carry the rules only"
+        )
     app.state.ml = ml
 
     def current() -> MLService:

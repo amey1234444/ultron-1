@@ -21,8 +21,11 @@
  *                       measured p99 inference latency.
  */
 
+import { mlLog } from './mlLog';
 import type { MlDiagnosisResponse } from '../../lib/knowledge/ml/contract';
 import { MlContractError, parseDiagnosis } from '../../lib/knowledge/ml/contract';
+
+const log = mlLog('client');
 
 export type MlUnavailableReason =
   | 'NOT_CONFIGURED'
@@ -73,6 +76,7 @@ type CallOptions = {
 async function call<T>(path: string, options: CallOptions = {}): Promise<MlResult<T>> {
   const base = serviceUrl();
   const started = Date.now();
+  const method = options.method ?? 'GET';
 
   if (!base) {
     return {
@@ -115,7 +119,14 @@ async function call<T>(path: string, options: CallOptions = {}): Promise<MlResul
       if (!response.ok) {
         const text = await response.text().catch(() => '');
         // A 5xx may be transient; a 4xx will not change on a retry.
-        if (response.status >= 500 && attempt === 0) continue;
+        if (response.status >= 500 && attempt === 0) {
+          log.warn({ method, path, status: response.status, attempt: attempt + 1 }, 'retrying once');
+          continue;
+        }
+        log.warn(
+          { method, path, status: response.status, latency_ms: Date.now() - started },
+          text.slice(0, 200) || 'no body',
+        );
         return {
           ok: false,
           reason: 'SERVICE_ERROR',

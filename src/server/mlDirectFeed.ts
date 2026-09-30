@@ -41,8 +41,11 @@ import { generatedGatewayId } from '../../lib/machineSimulationProfile';
 import { normaliseReading, UnitError } from '../../lib/analysis/twinScrew/signalMap';
 import { twinScrewPointByCode } from '../../lib/machinePoints/twinScrewExtruderPoints';
 import { mlConfigured, runInference } from './mlClient';
+import { mlLog } from './mlLog';
 import { isDbEnabled } from './db';
 import { getWorkspace, listWorkspaceIds } from './workspace';
+
+const log = mlLog('direct');
 
 const TWIN_SCREW = 'Twin Screw Extruder';
 const DEFAULT_INTERVAL_MS = 5_000;
@@ -184,7 +187,15 @@ export async function feedDirectOnce(nowMs = Date.now()): Promise<DirectFeedOutc
         elapsedMs,
       );
       const reporting = readings.filter((reading) => reading.value !== null).length;
+      log.debug({ machine: machine.name, mapped: boxes.length, tags: readings.length, reporting });
       if (reporting === 0) {
+        // Named rather than counted: a machine that produces no reading is
+        // the one fact that stops everything downstream, and "0 of 35" is a
+        // different problem from "no boxes are mapped".
+        log.warn(
+          { machine: machine.name, mapped: boxes.length, tags: readings.length, reporting: 0 },
+          boxes.length === 0 ? 'its canvas maps no channels' : 'every mapped channel withheld its value',
+        );
         outcomes.push({ machineId: machine.id, sent: false, reason: 'no mapped channel is reporting' });
         continue;
       }
@@ -221,6 +232,26 @@ export async function feedDirectOnce(nowMs = Date.now()): Promise<DirectFeedOutc
         ingest_metadata: { mapped_channels: readings.length, reporting, unknown_points: [], unit_problems: [] },
       });
 
+      if (response.ok) {
+        const ml = (response.value as { ml?: Record<string, unknown> }).ml ?? {};
+        log.info({
+          machine: machine.name,
+          tags: readings.length,
+          reporting,
+          status: ml.status,
+          eligible: ml.eligible,
+          surfaced: ml.surfaced,
+          mode: ml.mode,
+          prediction: response.value.predictionId,
+          latency_ms: response.latencyMs,
+        });
+      } else {
+        log.warn(
+          { machine: machine.name, reporting, reason: response.reason, latency_ms: response.latencyMs },
+          response.detail,
+        );
+      }
+
       // Deliberately not persisted. This path stores nothing; see the file
       // comment for what that costs.
       outcomes.push(
@@ -239,9 +270,12 @@ export function startMlDirectFeed(): void {
   if (feedMode() !== 'direct' || !mlConfigured() || !isDbEnabled()) return;
   const store = state();
   if (store.timer) return;
+  log.info({ mode: 'direct', every_ms: intervalMs() }, 'posting simulated readings, storing nothing');
   store.timer = setInterval(() => {
-    void feedDirectOnce().catch(() => {
-      // A tick that fails is a tick; the next is along shortly.
+    void feedDirectOnce().catch((error: Error) => {
+      // A tick that fails is a tick; the next is along shortly. Logged
+      // because a tick that fails every time is not.
+      log.error({ tick: 'failed' }, error.message);
     });
   }, intervalMs());
   if (typeof store.timer.unref === 'function') store.timer.unref();
