@@ -10,19 +10,22 @@
  *
  * This is the short way round. The simulation already knows what every
  * channel reads; that value is put straight into a canonical frame, posted,
- * and the answer returned to the caller. No row is written, nothing is
- * persisted, and the prediction is not stored either. Turning it off leaves
- * no trace behind it, which is the point of running it this way while the
- * storage design is still being decided.
+ * and the answer returned to the caller. No telemetry row is written — not
+ * one, which is the point of running it this way while the storage design is
+ * still being decided.
+ *
+ * The prediction *is* kept, unless `ML_STORE_PREDICTIONS=0`. That is a
+ * different decision about a different thing and the volumes are not
+ * comparable: telemetry is a row per channel per tick, a prediction is a row
+ * per scored fault. Without it the prognosis trend charts have nothing to
+ * draw, because they read `ml_fault_risks`.
  *
  * What is given up, said plainly, because both are real:
  *
- *   - **No history.** Nothing accumulates, so the health index and remaining
- *     life have nothing to trend and will report INSUFFICIENT_HISTORY for as
- *     long as this is the only path running. Those read `measurement_history`.
- *   - **No audit trail.** A prediction nobody stored cannot be compared later
- *     against what actually happened, which is the whole basis on which a
- *     model earns promotion.
+ *   - **No measurement history.** Component health and remaining life trend
+ *     `measurement_history` and will report INSUFFICIENT_HISTORY for as long
+ *     as this is the only path running. Fault risk trends are unaffected:
+ *     those come from the stored predictions.
  *
  * Both come back by turning the stored path on. Neither is a reason not to
  * have this one while the machines are simulated and the question is whether
@@ -41,6 +44,7 @@ import { generatedGatewayId } from '../../lib/machineSimulationProfile';
 import { normaliseReading, UnitError } from '../../lib/analysis/twinScrew/signalMap';
 import { twinScrewPointByCode } from '../../lib/machinePoints/twinScrewExtruderPoints';
 import { mlConfigured, runInference } from './mlClient';
+import { persistMlDiagnosis } from './mlPersistence';
 import { mlLog } from './mlLog';
 import { isDbEnabled } from './db';
 import { getWorkspace, listWorkspaceIds } from './workspace';
@@ -57,6 +61,8 @@ export type DirectFeedOutcome = {
   reporting?: number;
   reason?: string;
   predictionId?: string;
+  /** Whether the prediction was kept, so the trend charts have a point. */
+  stored?: boolean;
 };
 
 const globalRef = globalThis as unknown as {
@@ -74,6 +80,28 @@ function state() {
  * `direct` posts simulated readings straight to the model and stores nothing.
  * `database` is the stored path: ingest, persist, poll, feed.
  */
+/**
+ * Whether to keep the prediction. Not the telemetry — that is the whole point
+ * of this path — but the answer.
+ *
+ * On by default, and the reason is the trend charts. Prognosis draws its
+ * history from `ml_fault_risks`, which only `persistMlDiagnosis` writes, so a
+ * path that stores nothing at all produces current risks with a flat empty
+ * chart beside every one of them.
+ *
+ * The volumes are not comparable. Telemetry is a row per channel per tick —
+ * thirty-five rows every five seconds for one machine. A prediction is a row
+ * per fault per horizon, and on a healthy machine that is usually none: only
+ * faults the model actually scored are written. Declining to store the first
+ * and storing the second is not a compromise between them, it is two
+ * different decisions about two different things.
+ *
+ * `ML_STORE_PREDICTIONS=0` turns it off, and then nothing whatever is kept.
+ */
+export function storePredictions(): boolean {
+  return (process.env.ML_STORE_PREDICTIONS ?? '1').trim() !== '0';
+}
+
 export function feedMode(): 'direct' | 'database' | 'off' {
   const raw = (process.env.ML_FEED_MODE ?? 'direct').trim().toLowerCase();
   return raw === 'database' || raw === 'off' ? raw : 'direct';
@@ -252,11 +280,18 @@ export async function feedDirectOnce(nowMs = Date.now()): Promise<DirectFeedOutc
         );
       }
 
-      // Deliberately not persisted. This path stores nothing; see the file
-      // comment for what that costs.
+      // The prediction, not the telemetry. See `storePredictions`.
+      let stored = false;
+      if (response.ok && storePredictions()) {
+        stored = (await persistMlDiagnosis(response.value).catch((error: Error) => {
+          log.warn({ machine: machine.name, store: 'failed' }, error.message);
+          return { stored: false };
+        })).stored;
+      }
+
       outcomes.push(
         response.ok
-          ? { machineId: machine.id, sent: true, reporting, predictionId: response.value.predictionId }
+          ? { machineId: machine.id, sent: true, reporting, predictionId: response.value.predictionId, stored }
           : { machineId: machine.id, sent: false, reporting, reason: response.detail },
       );
     }

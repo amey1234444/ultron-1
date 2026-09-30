@@ -15,6 +15,7 @@ import test from 'node:test';
 const {
   readingsFor,
   feedMode,
+  storePredictions,
   createSimulationRuntime,
   planMachineWiring,
   connectorsForTemplate,
@@ -137,4 +138,27 @@ test('the service names its champion at boot', () => {
   assert.ok(app.includes('champion=champion.get("model_id")'), 'the champion is named');
   assert.ok(app.includes('knowledge=health.get("knowledge", {}).get("digest")'), 'and the knowledge digest');
   assert.ok(app.includes('boot.warning'), 'an unavailable champion is a warning, not a silence');
+});
+
+test('the prediction is kept even though the telemetry is not', () => {
+  // Prognosis draws its trend from ml_fault_risks, which only
+  // persistMlDiagnosis writes. A path that stores nothing at all shows a
+  // current risk beside an empty chart, every time.
+  delete process.env.ML_STORE_PREDICTIONS;
+  assert.equal(storePredictions(), true, 'on by default, or there is nothing to plot');
+  process.env.ML_STORE_PREDICTIONS = '0';
+  assert.equal(storePredictions(), false, 'and one variable turns it off');
+  delete process.env.ML_STORE_PREDICTIONS;
+
+  const direct = read('src/server/mlDirectFeed.ts', 'utf8');
+  assert.ok(direct.includes('persistMlDiagnosis(response.value)'), 'the prediction is persisted');
+  // Checked on what the file imports, not on what it mentions: it discusses
+  // measurement_history in prose precisely to say it does not write there,
+  // and a substring match on the comment is how that reads as a violation.
+  const imports = direct.split('\n').filter((line) => line.startsWith('import '));
+  assert.ok(
+    !imports.some((line) => line.includes('/ingest/') || line.includes('simulatedGateway')),
+    'no telemetry is published on this path',
+  );
+  assert.ok(!/INSERT INTO/i.test(direct), 'and it writes no row of its own');
 });

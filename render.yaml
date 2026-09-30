@@ -118,6 +118,10 @@ services:
         value: direct
       - key: ML_DIRECT_INTERVAL_MS
         value: 5000
+      # The prediction, not the telemetry. Off means the prognosis trend
+      # charts have nothing to draw.
+      - key: ML_STORE_PREDICTIONS
+        value: 1
       # Used by ML_FEED_MODE=database. Publishes readings for devices marked
       # `simulated`, through the real ingest path.
       - key: SIMULATE_GATEWAYS
