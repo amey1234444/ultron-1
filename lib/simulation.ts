@@ -612,7 +612,21 @@ type SlotPayload = Record<string, unknown>;
 
 // One telemetry record, shaped exactly like a Communication Controller v3 slot
 // record — `buildLiveFrame` reads these field names and nothing else.
-function slotPayload(
+/**
+ * One channel's reading, as a card reports it.
+ *
+ * Exported because the browser is no longer the only thing that simulates.
+ * The server publishes the same readings through the ingest path so that
+ * everything reading from the database — the ML feeder, the health index,
+ * anything asking what a machine did yesterday — sees a simulated machine at
+ * all. Two builders would drift, and the drift would show up as a channel
+ * that reads one way on the canvas and another in a diagnosis.
+ *
+ * The envelope around it is *not* shared: the browser's internal frame and
+ * the gateway's v2 MQTT message are different shapes for different
+ * transports, and each is built where its transport is.
+ */
+export function simulatedSlotPayload(
   slot: number,
   channelNumber: number,
   cardType: CardType,
@@ -746,7 +760,7 @@ export function simulationFramesForGateway(
         const value = nextChannelValue(key, channel, runtime, reconfigured ? publishIntervalMs : elapsedSincePublishMs);
         const current = runtime.channels.get(key);
         if (current) current.lastPublishMs = nowMs;
-        slots.push(slotPayload(card.slot, channelNumber, card.type, names[index]?.trim() ?? '', channel, value));
+        slots.push(simulatedSlotPayload(card.slot, channelNumber, card.type, names[index]?.trim() ?? '', channel, value));
       }
     }
 

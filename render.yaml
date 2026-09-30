@@ -111,6 +111,12 @@ services:
           name: ultron-ml
           type: web
           envVarKey: ML_INTERNAL_TOKEN
+      # Publishes readings for devices marked `simulated`, through the real
+      # ingest path. Set to 0 once real gateways are the only source.
+      - key: SIMULATE_GATEWAYS
+        value: 1
+      - key: SIMULATE_GATEWAYS_INTERVAL_MS
+        value: 10000
       - key: ML_TIMEOUT_MS
         value: 4000
       - key: ML_FEED_INTERVAL_MS
