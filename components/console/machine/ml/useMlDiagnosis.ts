@@ -4,6 +4,17 @@ import type { MlDiagnosisResponse } from '../../../../lib/knowledge/ml/contract'
 import { ML_CONTRACT_VERSION } from '../../../../lib/knowledge/ml/contract';
 
 /**
+ * Which build is on screen.
+ *
+ * Put in the failure text because the commonest question after a fix is
+ * shipped is whether the page showing the old message is running the old
+ * code, and a browser holding a cached bundle answers that question wrongly
+ * by looking identical. Render sets RENDER_GIT_COMMIT; anything else shows
+ * `dev`.
+ */
+const BUILD_ID = (process.env.NEXT_PUBLIC_BUILD_ID ?? 'dev').slice(0, 7);
+
+/**
  * Fetch the ML diagnosis for a machine, without ever breaking the page.
  *
  * The hook returns `{ response, unavailable }` and exactly one of them is set.
@@ -121,8 +132,9 @@ export function useMlDiagnosis(
         if (diagnosis.schemaVersion !== ML_CONTRACT_VERSION) {
           setResponse(null);
           setUnavailable(
-            `This page understands ML contract ${ML_CONTRACT_VERSION}; the server sent ` +
-            `${diagnosis.schemaVersion ?? 'no version'}. Reload to pick up the current build.`,
+            `This page (build ${BUILD_ID}) understands ML contract ${ML_CONTRACT_VERSION}; ` +
+            `the server sent ${diagnosis.schemaVersion ?? 'no version'}. ` +
+            'Reload with a hard refresh to pick up the current build.',
           );
           return;
         }
@@ -131,8 +143,16 @@ export function useMlDiagnosis(
       } catch (error) {
         if (!mounted.current) return;
         setResponse(null);
+        // Whatever threw, it threw *here*, in this browser, after the request
+        // had already come back — the request itself is handled above and
+        // never reaches this block. Calling that "could not reach the
+        // analysis service" sent a reader to the service's logs to look for
+        // a request that had arrived perfectly, and it did so for months
+        // while the real cause was this page parsing a payload twice.
         setUnavailable(
-          `Could not reach the analysis service: ${(error as Error).message}. The deterministic analysis is unaffected.`,
+          `This page could not read the analysis it received: ${(error as Error).message}. ` +
+          `Build ${BUILD_ID}, ML contract ${ML_CONTRACT_VERSION}. ` +
+          'The deterministic analysis is unaffected.',
         );
       } finally {
         if (mounted.current) setLoading(false);

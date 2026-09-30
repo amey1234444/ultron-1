@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
+import { ML_CONTRACT_VERSION } from '../../../../lib/knowledge/ml/contract';
 import { health, mlConfigured } from '../../../server/mlClient';
 import { sendApiError } from '../../../server/errors';
 import { guardRequest } from '../../../server/security';
@@ -21,8 +22,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const user = await getSessionUser(req);
     if (!user) return res.status(401).json({ error: 'Not authenticated.' });
 
+    // Which build is answering, and which ML contract it speaks. Both are
+    // here because the first question after shipping a fix is whether the
+    // thing showing the old behaviour is running the old code, and a cached
+    // browser bundle or a deploy still in flight both answer that wrongly by
+    // looking identical.
+    const build = {
+      build: (process.env.NEXT_PUBLIC_BUILD_ID || process.env.RENDER_GIT_COMMIT || 'dev').slice(0, 7),
+      mlContract: ML_CONTRACT_VERSION,
+      feedMode: process.env.ML_FEED_MODE ?? 'direct',
+    };
+
     if (!mlConfigured()) {
       return res.status(200).json({
+        ...build,
         configured: false,
         reachable: false,
         detail:
@@ -34,6 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const result = await health();
     if (!result.ok) {
       return res.status(200).json({
+        ...build,
         configured: true,
         reachable: false,
         reason: result.reason,
@@ -42,6 +56,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       });
     }
     return res.status(200).json({
+      ...build,
       configured: true,
       reachable: true,
       latencyMs: result.latencyMs,

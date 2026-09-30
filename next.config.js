@@ -54,6 +54,14 @@ const securityHeaders = [
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // The commit this bundle was built from, readable in the browser. The ML
+  // panel prints it when it cannot read a payload, because "is this page
+  // running the fix" is the first question after a fix ships, and a browser
+  // holding a cached bundle answers it wrongly by looking identical.
+  env: {
+    NEXT_PUBLIC_BUILD_ID:
+      process.env.NEXT_PUBLIC_BUILD_ID || process.env.RENDER_GIT_COMMIT || 'dev',
+  },
   reactStrictMode: true,
   poweredByHeader: false, // don't advertise the framework/version
   async headers() {
