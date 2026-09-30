@@ -52,6 +52,19 @@ export function useMlDiagnosis(
   }, []);
 
   const fetchOnce = useCallback(
+/**
+ * What a non-200 from our own route actually means.
+ *
+ * Every problem with the ML service — unset, unreachable, timed out, no
+ * champion — comes back from that route as a 200 carrying `degraded` and a
+ * sentence. Deliberately: an advisory subsystem being down is a normal state
+ * and must not read as a broken page.
+ *
+ * So a non-200 is never the ML service. It is this application: the session
+ * lookup, the database behind it, or the route itself. Reporting it as "the
+ * analysis service answered 503" sends whoever reads it to the wrong machine,
+ * and the status alone does not say which. The body does, so it is read.
+ */
     async (explain = false) => {
       if (!machineId || !enabled) return;
       setLoading(true);
@@ -66,8 +79,14 @@ export function useMlDiagnosis(
 
         if (!result.ok) {
           setResponse(null);
+          const said = await result
+            .json()
+            .then((body: { error?: string; detail?: string }) => body.error ?? body.detail ?? null)
+            .catch(() => null);
           setUnavailable(
-            `The analysis service answered ${result.status}. The deterministic analysis on the other tabs is unaffected.`,
+            said
+              ? `${said} (HTTP ${result.status} from this application, not the analysis service.)`
+              : `This application answered ${result.status} for the analysis request. The deterministic analysis on the other tabs is unaffected.`,
           );
           return;
         }

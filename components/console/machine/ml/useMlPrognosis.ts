@@ -58,10 +58,24 @@ export function useMlPrognosis(
 
       if (!mounted.current) return;
 
+      // A non-200 here is never the forecasting service. Every problem with
+      // it — unset, unreachable, timed out, no champion — comes back from our
+      // route as a 200 carrying `degraded` and a sentence, because an
+      // advisory subsystem being down is a normal state and must not read as
+      // a broken page. So this is the application: the session lookup, the
+      // database behind it, or the route. Saying "the forecasting service
+      // answered 503" sends the reader to the wrong machine, and the status
+      // alone does not say which. The body does.
       if (!result.ok) {
         setResponse(null);
+        const said = await result
+          .json()
+          .then((body: { error?: string; detail?: string }) => body.error ?? body.detail ?? null)
+          .catch(() => null);
         setUnavailable(
-          `The forecasting service answered ${result.status}. The deterministic prognostics on this page are unaffected.`,
+          said
+            ? `${said} (HTTP ${result.status} from this application, not the forecasting service.)`
+            : `This application answered ${result.status} for the forecast request. The deterministic prognostics on this page are unaffected.`,
         );
         return;
       }

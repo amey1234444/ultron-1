@@ -36,6 +36,9 @@ const tabs = readFileSync(join(process.cwd(), 'components/console/machine/analys
 const nav = readFileSync(join(process.cwd(), 'components/console/machine/analysis/analysisNav.ts'), 'utf8');
 const workspace = readFileSync(join(process.cwd(), 'components/console/machine/AnalysisWorkspace.tsx'), 'utf8');
 const field = readFileSync(join(process.cwd(), 'components/console/FormField.tsx'), 'utf8');
+const mlDiagnosisHook = readFileSync(join(process.cwd(), 'components/console/machine/ml/useMlDiagnosis.ts'), 'utf8');
+const mlPrognosisHook = readFileSync(join(process.cwd(), 'components/console/machine/ml/useMlPrognosis.ts'), 'utf8');
+const diagnosisRoute = readFileSync(join(process.cwd(), 'src/pages/api/ml/diagnosis/[id].ts'), 'utf8');
 
 console.log('--- add machine: every template is reachable ---');
 // The family map is typed Record<MachineTemplate, string>, so a missing
@@ -103,6 +106,33 @@ ok('a forecast that is not tracking anything is not counted',
   'activeForecasts, not every prediction the model emitted');
 const wired = (workspace.match(/tabsCounts=\{tabsCounts\}/g) ?? []).length;
 ok('every analysis page receives them', wired === 4, `${wired} of 4 pages`);
+
+console.log('\n--- a failure is blamed on the thing that failed ---');
+// The panel reported "the analysis service answered 503" for a status the ML
+// service cannot produce. That route answers 200 for every ML problem —
+// unset, unreachable, timed out, no champion — carrying `degraded` and a
+// sentence, because an advisory subsystem being down is a normal state. So a
+// non-200 is this application: the session lookup, the database behind it,
+// or the route. Naming the wrong machine sends whoever reads it to the wrong
+// logs, and on a plant floor that is the expensive kind of wrong.
+ok('the route answers 200 when the ML service is unavailable',
+  diagnosisRoute.includes('degraded: true')
+  && diagnosisRoute.includes('// 200, not 503.'),
+  'which is what makes a non-200 provably local');
+for (const [label, source, subject] of [
+  ['diagnosis', mlDiagnosisHook, 'analysis'],
+  ['prognosis', mlPrognosisHook, 'forecasting'],
+] as const) {
+  ok(`  the ${label} hook reads what the body said`,
+    source.includes('body.error ?? body.detail ?? null'),
+    'the status alone does not say which of the local causes it was');
+  ok(`  and does not attribute it to the ${subject} service`,
+    source.includes(`not the ${subject} service`)
+    && !source.includes(`The ${subject} service answered \${result.status}`),
+    'the sentence that was there stated as fact something the hook never learned');
+  ok(`  a body it cannot read still names this application`,
+    source.includes('This application answered ${result.status}'));
+}
 
 console.log(failures === 0 ? '\nconsole UI: all checks passed' : `\nconsole UI: ${failures} check(s) failed`);
 if (failures > 0) process.exit(1);
