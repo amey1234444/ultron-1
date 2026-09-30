@@ -13,6 +13,7 @@
  */
 import { strict as assert } from 'node:assert';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
 
 import { SCHEMA_FOR_KIND, validateEnvelope, validatePayload } from '../ingest/validate.mjs';
 import { topicForMessage, parseTopic } from '../ingest/topics.mjs';
@@ -20,9 +21,10 @@ import { topicForMessage, parseTopic } from '../ingest/topics.mjs';
 // The TypeScript under test, bundled by `check:simulated-gateway` before this
 // runs. Imported rather than reimplemented so the message checked here is the
 // message the server publishes.
-const { telemetryEnvelope, createSimulationRuntime, defaultSimulationForCard } = await import(
-  '../../../node_modules/.cache/simGateway.cjs'
-);
+const { telemetryEnvelope, SIMULATED_TEMPLATES, createSimulationRuntime, defaultSimulationForCard } =
+  await import('../../../node_modules/.cache/simGateway.cjs');
+
+const SOURCE = readFileSync('src/server/simulatedGateway.ts', 'utf8');
 
 const GATEWAY = { realGatewayId: 'sim-gw-real-1', ip: '10.80.10.1' };
 
@@ -80,4 +82,27 @@ test('the sequence advances, so dedup sees distinct messages', () => {
   assert.ok(second.gateway_sequence > first.gateway_sequence, 'gateway_sequence increases');
   assert.notEqual(second.message_id, first.message_id, 'each message is its own');
   assert.equal(second.gateway_boot_id, first.gateway_boot_id, 'one boot id per process');
+});
+
+test('only the twin screw is published for', () => {
+  // Every simulated channel is a row in measurement_history on every tick.
+  // The whole oilseed plant writes far more than the one machine anything
+  // currently reads, and the twin screw is that machine: it is what the ML
+  // service is trained against and the only template with a component
+  // breakdown behind the health index.
+  assert.deepEqual([...SIMULATED_TEMPLATES], ['Twin Screw Extruder']);
+});
+
+test('a gateway is matched to its machine by derived id, not by description', () => {
+  // The description is a sentence written for a person to read. Matching on
+  // it means a reworded string silently stops a machine being simulated.
+  assert.ok(SOURCE.includes('generatedGatewayId({'), 'the id is derived from the machine');
+  assert.ok(!/description === `Generated for/.test(SOURCE), 'and not recovered from prose');
+});
+
+test('nothing is published for a device that is not simulated', () => {
+  assert.ok(
+    SOURCE.includes('isSimulatedDevice(device)'),
+    'a silent real gateway is telling the truth about a real machine',
+  );
 });

@@ -26,6 +26,7 @@ import {
   channelCountForCardType,
   type CardNode,
 } from '../../lib/rack';
+import { generatedGatewayId } from '../../lib/machineSimulationProfile';
 import {
   channelRuntimeKey,
   createSimulationRuntime,
@@ -40,6 +41,21 @@ import { onMessage } from './ingest/pipeline.mjs';
 import { topicForMessage } from './ingest/topics.mjs';
 import { isDbEnabled } from './db';
 import { getWorkspace, listWorkspaceIds } from './workspace';
+
+/**
+ * Which machines are published for.
+ *
+ * The twin screw only, for now. Every simulated channel is a row in
+ * `measurement_history` on every tick, and the whole oilseed plant at fifty
+ * machines writes far more than the one machine anything currently reads.
+ * The twin screw is that machine: it is what the ML service is trained
+ * against, what `mlFeeder` feeds, and the only template with a component
+ * breakdown behind the health index.
+ *
+ * Widening this is a line. Do it when the storage for it has been decided,
+ * not before — the reason it is narrow is cost, not capability.
+ */
+export const SIMULATED_TEMPLATES = new Set<string>(['Twin Screw Extruder']);
 
 /** Default cadence. See `intervalMs` for why this is not one second. */
 const DEFAULT_INTERVAL_MS = 10_000;
@@ -153,8 +169,22 @@ export async function simulateOnce(nowMs = Date.now()): Promise<SimulationTickRe
     const workspace = await getWorkspace(workspaceId);
     if (!workspace) continue;
 
+    // The gateway id is derived from the machine, so which machine a gateway
+    // belongs to is a lookup rather than a string match on its description.
+    const wanted = new Set(
+      workspace.machines
+        .filter((machine) => SIMULATED_TEMPLATES.has(machine.template))
+        .map((machine) =>
+          generatedGatewayId({ id: machine.id, name: machine.name }),
+        ),
+    );
+
     const simulated = workspace.devices.filter(
-      (device) => device.type === 'Gateway' && !device.archived && isSimulatedDevice(device),
+      (device) =>
+        device.type === 'Gateway'
+        && !device.archived
+        && isSimulatedDevice(device)
+        && wanted.has(device.id),
     );
 
     for (const gateway of simulated) {

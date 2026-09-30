@@ -235,6 +235,22 @@ function slug(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28) || 'machine';
 }
 
+/**
+ * The gateway id `planMachine` gives a machine.
+ *
+ * Here rather than beside the generator because the server needs it too, to
+ * tell which gateway belongs to which machine, and the generator lives in the
+ * component tree — importing that from a server module drags React through
+ * `instrumentation.ts` and the build refuses it, correctly.
+ *
+ * Derived from the machine, so "which machine is this gateway for" is a
+ * lookup rather than a match on the description, which is a sentence written
+ * for a person and free to be reworded.
+ */
+export function generatedGatewayId(target: Pick<SimulationTarget, 'id' | 'name'>): string {
+  return `sim-${slug(target.name)}-${target.id.slice(-6)}-gw`;
+}
+
 /** The two things a plan cannot work out for itself. */
 export type PlanAddressing = {
   /**

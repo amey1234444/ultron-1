@@ -43,6 +43,236 @@ agent), `polymer-plant-3d` (Blender pipeline), `supabase/migrations` (replayed
 on every ingest start — see `docs/database-schema.md`), `contracts` (MQTT JSON
 schemas), `export` (standalone landing page).
 
+## Database
+
+The schema is created in code — `src/server/db.ts` for the application and
+`src/server/mlPersistence.ts` for the ML layer — so the diagram below is read
+from those files rather than drawn beside them. A migration that adds a table
+and leaves this untouched fails `npm run check:schema-diagram`.
+
+<!-- schema:begin -->
+
+_Generated from `src/server/db.ts` and `src/server/mlPersistence.ts` by `npm run schema:diagram`._
+_57 tables, 28 foreign keys. `npm run check:schema-diagram` fails when this is out of date._
+
+```mermaid
+erDiagram
+  analysis_maintenance_cases {
+    bigserial id PK
+    bigint snapshot_id FK
+  }
+  analysis_signal_quality {
+    bigserial id PK
+    bigint snapshot_id FK
+  }
+  analysis_snapshots {
+    bigserial id PK
+  }
+  auth_sessions {
+    text token_hash PK
+    text user_id FK
+  }
+  ml_anomaly_events {
+    bigserial id PK
+    uuid prediction_id FK
+  }
+  ml_data_quality_events {
+    bigserial id PK
+    uuid prediction_id FK
+  }
+  ml_diagnosis_events {
+    bigserial id PK
+    uuid prediction_id FK
+  }
+  ml_fault_risks {
+    bigserial id PK
+    uuid prediction_id FK
+  }
+  ml_prediction_explanations {
+    bigserial id PK
+    uuid prediction_id FK
+  }
+  ml_predictions {
+    bigserial id PK
+  }
+  password_reset_tokens {
+    text token_hash PK
+    text user_id FK
+  }
+  sap_asset_mappings {
+    bigserial id PK
+    text connection_id FK
+    text ultron_machine_id FK
+  }
+  sap_audit_log {
+    bigserial id PK
+    text connection_id FK
+  }
+  sap_case_links {
+    bigserial id PK
+    text connection_id FK
+    bigint maintenance_case_id FK
+  }
+  sap_connections {
+    text id PK
+  }
+  sap_material_mappings {
+    bigserial id PK
+    text connection_id FK
+    text ultron_machine_id FK
+  }
+  sap_object_cache {
+    text connection_id FK
+  }
+  sap_outbox {
+    bigserial id PK
+    text connection_id FK
+  }
+  sap_project_bindings {
+    text project_id PK
+    text connection_id FK
+  }
+  sap_sync_runs {
+    bigserial id PK
+    text connection_id FK
+  }
+  studio_cards {
+    text id PK
+    text device_id FK
+  }
+  studio_devices {
+    text id PK
+    text project_id FK
+    text gateway_id FK
+  }
+  studio_folders {
+    text id PK
+    text project_id FK
+    text parent_id FK
+  }
+  studio_machines {
+    text id PK
+    text project_id FK
+    text folder_id FK
+  }
+  studio_projects {
+    text id PK
+  }
+  users {
+    text id PK
+  }
+  analysis_maintenance_cases ||--o{ sap_case_links : "maintenance_case_id"
+  analysis_snapshots ||--o| analysis_maintenance_cases : "snapshot_id"
+  analysis_snapshots ||--o{ analysis_signal_quality : "snapshot_id"
+  ml_predictions ||--o{ ml_anomaly_events : "prediction_id"
+  ml_predictions ||--o{ ml_data_quality_events : "prediction_id"
+  ml_predictions ||--o{ ml_diagnosis_events : "prediction_id"
+  ml_predictions ||--o{ ml_fault_risks : "prediction_id"
+  ml_predictions ||--o{ ml_prediction_explanations : "prediction_id"
+  sap_connections ||--o{ sap_asset_mappings : "connection_id"
+  sap_connections ||--o| sap_audit_log : "connection_id"
+  sap_connections ||--o{ sap_case_links : "connection_id"
+  sap_connections ||--o{ sap_material_mappings : "connection_id"
+  sap_connections ||--o{ sap_object_cache : "connection_id"
+  sap_connections ||--o{ sap_outbox : "connection_id"
+  sap_connections ||--o{ sap_project_bindings : "connection_id"
+  sap_connections ||--o{ sap_sync_runs : "connection_id"
+  studio_devices ||--o{ studio_cards : "device_id"
+  studio_devices ||--o| studio_devices : "gateway_id"
+  studio_folders ||--o| studio_folders : "parent_id"
+  studio_folders ||--o{ studio_machines : "folder_id"
+  studio_machines ||--o{ sap_asset_mappings : "ultron_machine_id"
+  studio_machines ||--o{ sap_material_mappings : "ultron_machine_id"
+  studio_projects ||--o| sap_project_bindings : "project_id"
+  studio_projects ||--o| studio_devices : "project_id"
+  studio_projects ||--o{ studio_folders : "project_id"
+  studio_projects ||--o{ studio_machines : "project_id"
+  users ||--o{ auth_sessions : "user_id"
+  users ||--o{ password_reset_tokens : "user_id"
+```
+
+<details>
+<summary>Every table, by area</summary>
+
+**Asset hierarchy** — 10 tables
+
+- `studio_cards` · 10 columns · 1 foreign key
+- `studio_devices` · 18 columns · 2 foreign keys
+- `studio_folders` · 10 columns · 2 foreign keys
+- `studio_machine_canvas_cards` · 9 columns
+- `studio_machine_layouts` · 6 columns
+- `studio_machine_templates` · 6 columns
+- `studio_machines` · 9 columns · 2 foreign keys
+- `studio_meta` · 5 columns
+- `studio_projects` · 7 columns
+- `studio_workspaces` · 7 columns
+
+**Live telemetry** — 8 tables
+
+- `gateway_events` · 7 columns
+- `gateway_ip_history` · 6 columns
+- `gateways` · 22 columns
+- `measurement_history` · 20 columns
+- `measurement_latest` · 19 columns
+- `rack_inventory_slots` · 15 columns
+- `rack_slot_latest` · 34 columns
+- `racks` · 23 columns
+
+**Analysis and ML** — 17 tables
+
+- `analysis_anomaly_episodes` · 10 columns
+- `analysis_baselines` · 9 columns
+- `analysis_maintenance_cases` · 12 columns · 1 foreign key
+- `analysis_overview_snapshots` · 20 columns
+- `analysis_signal_quality` · 9 columns · 1 foreign key
+- `analysis_snapshots` · 13 columns
+- `ml_anomaly_events` · 14 columns · 1 foreign key
+- `ml_baseline_versions` · 15 columns
+- `ml_data_quality_events` · 9 columns · 1 foreign key
+- `ml_diagnosis_events` · 18 columns · 1 foreign key
+- `ml_fault_risks` · 12 columns · 1 foreign key
+- `ml_feedback` · 19 columns
+- `ml_model_promotions` · 9 columns
+- `ml_models` · 19 columns
+- `ml_prediction_explanations` · 8 columns · 1 foreign key
+- `ml_predictions` · 33 columns
+- `ml_training_runs` · 12 columns
+
+**SAP integration** — 9 tables
+
+- `sap_asset_mappings` · 12 columns · 2 foreign keys
+- `sap_audit_log` · 13 columns · 1 foreign key
+- `sap_case_links` · 10 columns · 2 foreign keys
+- `sap_connections` · 17 columns
+- `sap_material_mappings` · 12 columns · 2 foreign keys
+- `sap_object_cache` · 7 columns · 1 foreign key
+- `sap_outbox` · 16 columns · 1 foreign key
+- `sap_project_bindings` · 6 columns · 2 foreign keys
+- `sap_sync_runs` · 11 columns · 1 foreign key
+
+**Accounts and access** — 3 tables
+
+- `email_reputation` · 13 columns
+- `password_reset_tokens` · 5 columns · 1 foreign key
+- `users` · 18 columns
+
+**Other** — 10 tables
+
+- `app_settings` · 3 columns
+- `auth_sessions` · 6 columns · 1 foreign key
+- `mqtt_ingest_metrics` · 3 columns
+- `mqtt_messages` · 10 columns
+- `mqtt_quarantine` · 8 columns
+- `rate_events` · 4 columns
+- `rejected_email_reputation` · 8 columns
+- `reputation_queue` · 10 columns
+- `schema_migrations` · 3 columns
+- `security_alerts` · 9 columns
+
+</details>
+
+<!-- schema:end -->
+
 ## Web app (Next.js)
 
 ```bash

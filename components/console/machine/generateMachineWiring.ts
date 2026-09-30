@@ -10,6 +10,7 @@
 // card's `channelId` already set to the channel generated for that same
 // instrument. Nothing here invents geometry; it binds.
 import {
+  generatedGatewayId,
   planMachine,
   SLOTS_PER_RACK,
   type MachinePlan,
@@ -175,18 +176,7 @@ export function planMachineWiring(
   return { devices, cards, layouts, machines, skipped, supersededDeviceIds, supersededCardIds, rebind };
 }
 
-/**
- * The gateway id `planMachine` will produce for a machine.
- *
- * Duplicated here so that "does this machine already have hardware?" can be
- * answered without planning it, which is what keeps a re-run from renumbering
- * the machines it is about to skip. Kept in step by
- * `generateMachineWiringChecks`, which plans a machine and compares.
- */
-function generatedGatewayId(target: SimulationTarget): string {
-  const slug = target.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28) || 'machine';
-  return `sim-${slug}-${target.id.slice(-6)}-gw`;
-}
+
 
 /** Third octets we will hand out, in order. `10.80.10.0` through `10.80.249.0`. */
 const FIRST_BLOCK = 10;
