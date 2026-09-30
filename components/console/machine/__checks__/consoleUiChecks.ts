@@ -35,10 +35,12 @@ const dialog = readFileSync(join(process.cwd(), 'components/console/machine/AddM
 const tabs = readFileSync(join(process.cwd(), 'components/console/machine/analysis/AnalysisTabs.tsx'), 'utf8');
 const nav = readFileSync(join(process.cwd(), 'components/console/machine/analysis/analysisNav.ts'), 'utf8');
 const workspace = readFileSync(join(process.cwd(), 'components/console/machine/AnalysisWorkspace.tsx'), 'utf8');
+const contract = readFileSync(join(process.cwd(), 'lib/knowledge/ml/contract.ts'), 'utf8');
 const field = readFileSync(join(process.cwd(), 'components/console/FormField.tsx'), 'utf8');
 const mlDiagnosisHook = readFileSync(join(process.cwd(), 'components/console/machine/ml/useMlDiagnosis.ts'), 'utf8');
 const mlPrognosisHook = readFileSync(join(process.cwd(), 'components/console/machine/ml/useMlPrognosis.ts'), 'utf8');
 const diagnosisRoute = readFileSync(join(process.cwd(), 'src/pages/api/ml/diagnosis/[id].ts'), 'utf8');
+const mlClient = readFileSync(join(process.cwd(), 'src/server/mlClient.ts'), 'utf8');
 
 console.log('--- add machine: every template is reachable ---');
 // The family map is typed Record<MachineTemplate, string>, so a missing
@@ -133,6 +135,37 @@ for (const [label, source, subject] of [
   ok(`  a body it cannot read still names this application`,
     source.includes('This application answered ${result.status}'));
 }
+
+console.log('\n--- the payload is parsed once, on the side that received it ---');
+/**
+ * This failed for every diagnosis that ever succeeded.
+ *
+ * `latestDiagnosis` runs the service's payload through `parseDiagnosis` and
+ * returns the domain object — `schemaVersion`, camelCase. The route sends
+ * that. The hook then parsed it a second time, looking for the wire shape
+ * (`schema_version`) in a value that had stopped being the wire shape, and
+ * threw on the first field. The panel reported it as "could not reach the
+ * analysis service", which is the one thing it was not, and no successful
+ * diagnosis could ever reach the screen.
+ */
+ok('the server parses the wire payload',
+  mlClient.includes('parseDiagnosis(result.value)'),
+  'once, where the untrusted JSON arrives');
+ok('and the hook does not parse it again',
+  !mlDiagnosisHook.includes('parseDiagnosis('),
+  'the second parse was looking for snake_case in a camelCase object');
+ok('the hook takes the domain object as it is',
+  mlDiagnosisHook.includes('const diagnosis = payload.diagnosis as MlDiagnosisResponse;'));
+ok('but checks the contract version before rendering it',
+  mlDiagnosisHook.includes('diagnosis.schemaVersion !== ML_CONTRACT_VERSION'),
+  'a deployed server and a cached bundle can be different builds');
+ok('the two namings are what they are for',
+  contract.includes('schemaVersion: string;') && contract.includes("str(raw, 'schema_version'"),
+  'camelCase is the domain shape and snake_case is the wire; confusing them is this bug');
+ok('prognosis is parsed on the client, because the route sends it raw',
+  mlPrognosisHook.includes('parsePrognosis(await result.json())')
+  && mlClient.includes("export async function prognosis(machineId: string): Promise<MlResult<unknown>>"),
+  'the other half of the same decision, made the other way and consistent with itself');
 
 console.log(failures === 0 ? '\nconsole UI: all checks passed' : `\nconsole UI: ${failures} check(s) failed`);
 if (failures > 0) process.exit(1);

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { MlDiagnosisResponse } from '../../../../lib/knowledge/ml/contract';
-import { parseDiagnosis } from '../../../../lib/knowledge/ml/contract';
+import { ML_CONTRACT_VERSION } from '../../../../lib/knowledge/ml/contract';
 
 /**
  * Fetch the ML diagnosis for a machine, without ever breaking the page.
@@ -94,7 +94,7 @@ export function useMlDiagnosis(
         const payload = (await result.json()) as {
           degraded?: boolean;
           detail?: string;
-          diagnosis?: unknown;
+          diagnosis?: MlDiagnosisResponse;
         };
         if (!mounted.current) return;
 
@@ -104,7 +104,29 @@ export function useMlDiagnosis(
           return;
         }
 
-        setResponse(parseDiagnosis(payload.diagnosis));
+        // Already parsed. `/api/ml/diagnosis` calls `latestDiagnosis`, which
+        // runs the payload through `parseDiagnosis` on the server and sends
+        // the domain object — so what arrives here carries `schemaVersion`,
+        // not `schema_version`. Parsing it a second time looked for the wire
+        // shape in a value that had stopped being the wire shape, threw on
+        // the very first field, and did so for every diagnosis that had ever
+        // succeeded. The panel reported it as "could not reach the analysis
+        // service", which is the one thing it was not.
+        //
+        // Checked rather than cast: the server validated the payload, but a
+        // deployed server and a cached client bundle can be different builds,
+        // and a contract change between them would otherwise arrive as a
+        // render error somewhere further down.
+        const diagnosis = payload.diagnosis as MlDiagnosisResponse;
+        if (diagnosis.schemaVersion !== ML_CONTRACT_VERSION) {
+          setResponse(null);
+          setUnavailable(
+            `This page understands ML contract ${ML_CONTRACT_VERSION}; the server sent ` +
+            `${diagnosis.schemaVersion ?? 'no version'}. Reload to pick up the current build.`,
+          );
+          return;
+        }
+        setResponse(diagnosis);
         setUnavailable(null);
       } catch (error) {
         if (!mounted.current) return;
