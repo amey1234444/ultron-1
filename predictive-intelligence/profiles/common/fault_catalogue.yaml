@@ -1,0 +1,56 @@
+# Profile-agnostic records: data-quality and sensor faults. Each record must list the
+# profiles it applies to explicitly (no implicit TSE<->SSE sharing).
+version: "common-faults-1.0.0"
+families:
+  - {family_id: DATA_QUALITY_FAULT, name: Data quality / sensor fault, machine_part: sensing, predictive: false, source_document_reference: "brief: DATA QUALITY ENGINE"}
+faults:
+  - fault_id: DQ_SENSOR_FROZEN
+    machine_profile: common
+    applies_to: [tse, sse]
+    machine_part: sensing
+    fault_name: Sensor frozen / flatline
+    fault_family: DATA_QUALITY_FAULT
+    occurrence_class: SOMETIMES
+    detectability: D1
+    primary_sensors: []
+    temporal_evidence: "Identical value beyond freeze_seconds while other coupled channels move."
+    maintenance_confirmation: "Inspect transmitter / wiring."
+    source_document_reference: "brief: DATA QUALITY ENGINE (sensor freezing, flatline)"
+  - fault_id: DQ_SENSOR_DROPOUT
+    machine_profile: common
+    applies_to: [tse, sse]
+    machine_part: sensing
+    fault_name: Sensor dropout / missing channel
+    fault_family: DATA_QUALITY_FAULT
+    occurrence_class: SOMETIMES
+    detectability: D1
+    primary_sensors: []
+    temporal_evidence: "Channel missing from packets; must not be treated as physical zero."
+    maintenance_confirmation: "Check network / channel mapping."
+    source_document_reference: "brief: DATA QUALITY ENGINE (missing channels)"
+  - fault_id: DQ_IMPLAUSIBLE_VALUE
+    machine_profile: common
+    applies_to: [tse, sse]
+    machine_part: sensing
+    fault_name: Physically impossible value or rate of change
+    fault_family: DATA_QUALITY_FAULT
+    occurrence_class: SOMETIMES
+    detectability: D1
+    primary_sensors: []
+    temporal_evidence: "Value outside plausible range or step exceeding max_rate_per_s."
+    maintenance_confirmation: "Check scaling / units / mapping."
+    source_document_reference: "brief: DATA QUALITY ENGINE (impossible values, rates, unit mismatch)"
+  - fault_id: DQ_CROSS_SENSOR_CONTRADICTION
+    machine_profile: common
+    applies_to: [tse, sse]
+    machine_part: sensing
+    fault_name: Contradictory cross-sensor state
+    fault_family: DATA_QUALITY_FAULT
+    occurrence_class: RARE
+    detectability: D2
+    primary_sensors: []
+    ambiguity_group: SENSOR_CONTRADICTION
+    alternative_causes: [scaling error, channel mapping error, single-sensor fault]
+    temporal_evidence: "e.g. P far above normal while I and RPM unchanged => suspect P sensor."
+    maintenance_confirmation: "Cross-check with independent instrument."
+    source_document_reference: "brief: DATA QUALITY ENGINE (contradictory cross-sensor states); false cascade tests"

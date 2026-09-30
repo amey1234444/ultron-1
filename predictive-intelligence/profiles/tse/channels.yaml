@@ -1,0 +1,186 @@
+# TSE baseline channels - transcribed from Document A, Section 3 "Input Channel Data
+# Dictionary" (TSE Predictive Diagnosis & Prognosis HLD v1.0, 03 Sep 2026).
+# "Min" in the HLD is the minimum plausibility/low reference; "Severe/Max" is the severe band.
+# Where the HLD gives one-sided limits (e.g. VM >= 3.00) the other side is open (null).
+# These are engineering *diagnostic* limits, not protection trips (HLD 19.1).
+version: "tse-channels-1.0.0"
+machine_profile: tse
+sample_rate_hz: 1.0
+gear_ratio: 20.0            # SRPM = RPM/20 (HLD nominal 2000 -> 100 rpm; Doc B "Derived screw RPM (20:1)")
+channels:
+  - code: RPM
+    name: Motor RPM
+    unit: rpm
+    plausible: {low: 0, high: 3000}
+    nominal: 2000
+    normal:  {low: 1950, high: 2050}
+    warning: {low: 1900, high: 2100}     # <=1900 or >=2100 => WARNING
+    severe:  {low: 1800, high: 2250}     # <=1800 or >=2250 => SEVERE
+    max_rate_per_s: 100
+    freeze_tolerance: 0.0
+    freeze_seconds: 300
+    critical: true
+    description: "Integer channel in HLD"
+    source_document_reference: "Doc A §3 table row RPM (Min 1800, Nom 2000, Normal 1950-2050, Warn <=1900/>=2100, Severe <=1800/>=2250)"
+  - code: SRPM
+    name: Derived Screw RPM
+    unit: rpm
+    kind: derived
+    plausible: {low: 0, high: 150}
+    nominal: 100.0
+    normal:  {low: 97.5, high: 102.5}
+    warning: {low: 95, high: 105}
+    severe:  {low: 90, high: 112.5}
+    max_rate_per_s: 5
+    freeze_seconds: 300
+    description: "If purely RPM/gear_ratio it is not independent information (HLD §3 note); use srpm_error when an independent measurement exists."
+    source_document_reference: "Doc A §3 table row SRPM (Min 90, Nom 100, Normal 97.5-102.5, Warn <=95/>=105, Severe <=90/>=112.5)"
+  - code: VM
+    name: Motor Vibration
+    unit: mm/s RMS
+    plausible: {low: 0, high: 50}
+    nominal: 1.67
+    normal:  {low: 0, high: 2.00}
+    warning: {low: null, high: 2.50}    # >=2.50 => WARNING
+    severe:  {low: null, high: 3.00}    # >=3.00 => SEVERE
+    max_rate_per_s: 2
+    freeze_tolerance: 0.001
+    freeze_seconds: 300
+    description: "Min 0.20 in HLD is a plausibility floor for a running machine (Doc B §4)."
+    source_document_reference: "Doc A §3 table row VM (Min 0.20, Nom 1.67, Normal 0-2.00, Warn >=2.50, Severe >=3.00)"
+  - code: VG
+    name: Gearbox Vibration
+    unit: mm/s RMS
+    plausible: {low: 0, high: 50}
+    nominal: 1.67
+    normal:  {low: 0, high: 2.00}
+    warning: {low: null, high: 2.50}
+    severe:  {low: null, high: 3.00}
+    max_rate_per_s: 2
+    freeze_tolerance: 0.001
+    freeze_seconds: 300
+    source_document_reference: "Doc A §3 table row VG (Min 0.20, Nom 1.67, Normal 0-2.00, Warn >=2.50, Severe >=3.00)"
+  - code: TMOT
+    name: Motor Temperature
+    unit: degC
+    plausible: {low: -20, high: 200}
+    nominal: 40.0
+    normal:  {low: 30, high: 70}
+    warning: {low: null, high: 80}      # >=80 => WARNING (no low-side limit in HLD)
+    severe:  {low: null, high: 90}      # >=90 => SEVERE
+    max_rate_per_s: 1
+    freeze_tolerance: 0.01
+    freeze_seconds: 900
+    source_document_reference: "Doc A §3 table row TMOT (Min 30, Nom 40, Normal 30-70, Warn >=80, Severe >=90)"
+  - code: TGB
+    name: Gearbox Temperature
+    unit: degC
+    plausible: {low: -20, high: 200}
+    nominal: 40.0
+    normal:  {low: 30, high: 70}
+    warning: {low: null, high: 80}
+    severe:  {low: null, high: 90}
+    max_rate_per_s: 1
+    freeze_tolerance: 0.01
+    freeze_seconds: 900
+    source_document_reference: "Doc A §3 table row TGB (Min 30, Nom 40, Normal 30-70, Warn >=80, Severe >=90)"
+  - code: Z1
+    name: Barrel Temperature Zone 1
+    unit: degC
+    plausible: {low: 0, high: 400}
+    nominal: 180.0
+    normal:  {low: 170, high: 190}
+    warning: {low: 160, high: 200}
+    severe:  {low: 150, high: 210}
+    max_rate_per_s: 2
+    freeze_tolerance: 0.01
+    freeze_seconds: 900
+    source_document_reference: "Doc A §3 table row Z1 (Min 150, Nom 180, Normal 170-190, Warn <=160/>=200, Severe <=150/>=210)"
+  - code: Z2
+    name: Barrel Temperature Zone 2
+    unit: degC
+    plausible: {low: 0, high: 400}
+    nominal: 210.0
+    normal:  {low: 195, high: 215}
+    warning: {low: 180, high: 220}
+    severe:  {low: 170, high: 230}
+    max_rate_per_s: 2
+    freeze_tolerance: 0.01
+    freeze_seconds: 900
+    source_document_reference: "Doc A §3 table row Z2 (Min 170, Nom 210, Normal 195-215, Warn <=180/>=220, Severe <=170/>=230)"
+  - code: Z3
+    name: Barrel Temperature Zone 3
+    unit: degC
+    plausible: {low: 0, high: 400}
+    nominal: 220.0
+    normal:  {low: 210, high: 230}
+    warning: {low: 200, high: 240}
+    severe:  {low: 190, high: 250}
+    max_rate_per_s: 2
+    freeze_tolerance: 0.01
+    freeze_seconds: 900
+    source_document_reference: "Doc A §3 table row Z3 (Min 190, Nom 220, Normal 210-230, Warn <=200/>=240, Severe <=190/>=250)"
+  - code: MT
+    name: Melt Temperature
+    unit: degC
+    plausible: {low: 0, high: 400}
+    nominal: 210.0
+    normal:  {low: 200, high: 220}
+    warning: {low: 190, high: 230}
+    severe:  {low: 180, high: 240}
+    max_rate_per_s: 2
+    freeze_tolerance: 0.01
+    freeze_seconds: 900
+    critical: true
+    source_document_reference: "Doc A §3 table row MT (Min 180, Nom 210, Normal 200-220, Warn <=190/>=230, Severe <=180/>=240)"
+  - code: P
+    name: Melt Pressure
+    unit: MPa
+    plausible: {low: 0, high: 20}
+    nominal: 4.0
+    normal:  {low: 3.5, high: 4.5}
+    warning: {low: 2.0, high: 5.4}
+    severe:  {low: 1.0, high: 6.0}
+    max_rate_per_s: 0.5
+    freeze_tolerance: 0.0005
+    freeze_seconds: 300
+    critical: true
+    source_document_reference: "Doc A §3 table row P (Min 1.0, Nom 4.0, Normal 3.5-4.5, Warn <=2.0/>=5.4, Severe <=1.0/>=6.0)"
+  - code: L
+    name: Hopper Level
+    unit: "%"
+    plausible: {low: 0, high: 100}
+    nominal: 75.0
+    normal:  {low: 40, high: 90}
+    warning: {low: 25, high: 95}        # <=25 or >=95 => WARNING
+    severe:  {low: 10, high: null}      # <=10 => SEVERE (no severe-high in HLD)
+    max_rate_per_s: 2
+    freeze_tolerance: 0.0
+    freeze_seconds: 1800
+    source_document_reference: "Doc A §3 table row L (Min 5, Nom 75, Normal 40-90, Warn <=25/>=95, Severe <=10)"
+  - code: I
+    name: Motor Current
+    unit: A
+    plausible: {low: 0, high: 60}
+    nominal: 10.0
+    normal:  {low: 8, high: 12}
+    warning: {low: 6, high: 15}
+    severe:  {low: 3, high: 20}
+    max_rate_per_s: 3
+    freeze_tolerance: 0.001
+    freeze_seconds: 300
+    critical: true
+    source_document_reference: "Doc A §3 table row I (Min 3, Nom 10, Normal 8-12, Warn <=6/>=15, Severe <=3/>=20)"
+  - code: FR
+    name: Recipe Feed Rate
+    unit: kg/h
+    plausible: {low: 0, high: 200}
+    nominal: 50.0
+    normal: null                        # "Recipe-dependent" - evaluated via recipe FR_error, not a fixed band
+    warning: null                       # "Not specified"
+    severe:  {low: null, high: 80.0}    # Severe/Max 80.0
+    max_rate_per_s: 5
+    freeze_tolerance: 0.0
+    freeze_seconds: 1800
+    critical: true
+    source_document_reference: "Doc A §3 table row FR (Min 10, Nom 50, Normal recipe-dependent, Warning not specified, Severe/Max 80)"
