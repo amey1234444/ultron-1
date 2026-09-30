@@ -28,6 +28,7 @@ import { MachineOverviewPage } from './MachineOverviewPage';
 import { MachineProDiagnosisPage } from './MachineProDiagnosisPage';
 import { PrognosisAdvancedPage } from './PrognosisAdvancedPage';
 import { RUL_FIXTURE_COMPONENTS } from '../../../lib/knowledge/ml/rulFixtures';
+import { rulComponentsForTemplate } from '../../../lib/rul/components';
 import type { AnalysisDepth } from './analysis/AnalysisTabs';
 import type { MachinePrognosticsResult } from './analysis/prognosticsModel';
 import type { TrainNode } from './analysis/TrainHealth';
@@ -497,7 +498,11 @@ export function AnalysisWorkspace({
            * section can be built and reviewed. When a registry exists, this is
            * the one line that changes.
            */
-          rulComponents={process.env.NEXT_PUBLIC_ULTRON_RUL_FIXTURES === '1' ? RUL_FIXTURE_COMPONENTS : []}
+          rulComponents={
+            process.env.NEXT_PUBLIC_ULTRON_RUL_FIXTURES === '1'
+              ? RUL_FIXTURE_COMPONENTS
+              : rulComponentsForTemplate(machine.template)
+          }
           machineName={machine.name}
           template={machine.template}
           hierarchyPath={machine.hierarchyPath}
