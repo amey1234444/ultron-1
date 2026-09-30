@@ -9,10 +9,11 @@
  * is started by `server.mjs` instead, because it owns the HTTP server's
  * WebSocket upgrade path and has to exist before `listen`.
  *
- * Order matters between the two below. The simulator publishes telemetry and
- * the feeder reads it back from the database, so starting the feeder first
- * would spend its first tick or two finding nothing — harmless, and avoidable
- * by starting them the way round the data flows.
+ * Which of them start depends on `ML_FEED_MODE`. In `direct` the simulated
+ * reading goes straight to the model and nothing is written down; in
+ * `database` it travels the path a real gateway's reading travels. They are
+ * exclusive: running both doubles every machine's rate and makes a
+ * prediction impossible to attribute to an input.
  */
 
 export async function register(): Promise<void> {
@@ -20,6 +21,26 @@ export async function register(): Promise<void> {
   // check is not decoration — without it this runs twice and every machine is
   // fed at double rate.
   if (process.env.NEXT_RUNTIME !== 'nodejs') return;
+
+  const { feedMode } = await import('./server/mlDirectFeed');
+  const mode = feedMode();
+
+  // Two ways telemetry reaches the models, and only ever one of them at a
+  // time. `direct` computes a simulated reading and posts it, storing
+  // nothing. `database` is the stored path a real gateway uses: publish,
+  // validate, persist, poll, feed. Running both would double every machine's
+  // rate and make a prediction impossible to attribute to an input.
+  if (mode === 'direct') {
+    try {
+      const { startMlDirectFeed } = await import('./server/mlDirectFeed');
+      startMlDirectFeed();
+    } catch (error) {
+      console.warn('[instrumentation] the direct ML feed did not start:', (error as Error).message);
+    }
+    return;
+  }
+
+  if (mode === 'off') return;
 
   try {
     // Publishes on behalf of devices marked `simulated`, through the same

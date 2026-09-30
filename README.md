@@ -53,6 +53,7 @@ and leaves this untouched fails `npm run check:schema-diagram`.
 <!-- schema:begin -->
 
 _Generated from `src/server/db.ts` and `src/server/mlPersistence.ts` by `npm run schema:diagram`._
+_To explore it interactively, import [`docs/schema.azimutt.aml`](docs/schema.azimutt.aml) into [Azimutt](https://azimutt.app)._
 _57 tables, 28 foreign keys. `npm run check:schema-diagram` fails when this is out of date._
 
 ```mermaid

@@ -111,8 +111,15 @@ services:
           name: ultron-ml
           type: web
           envVarKey: ML_INTERNAL_TOKEN
-      # Publishes readings for devices marked `simulated`, through the real
-      # ingest path. Set to 0 once real gateways are the only source.
+      # direct: simulated readings go straight to the model and nothing is
+      # stored. `database` is the stored path a real gateway uses, and the
+      # only one that accumulates the history the health index trends.
+      - key: ML_FEED_MODE
+        value: direct
+      - key: ML_DIRECT_INTERVAL_MS
+        value: 5000
+      # Used by ML_FEED_MODE=database. Publishes readings for devices marked
+      # `simulated`, through the real ingest path.
       - key: SIMULATE_GATEWAYS
         value: 1
       - key: SIMULATE_GATEWAYS_INTERVAL_MS
