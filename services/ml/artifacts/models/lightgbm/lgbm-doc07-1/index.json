@@ -1,0 +1,830 @@
+{
+  "library": "lightgbm",
+  "outputs": {
+    "TSE-DOWN-001@15": {
+      "file": "TSE-DOWN-001_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9799782999186994,
+        "intercept": -0.2728458730122191,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1430,
+        "positive_count": 60,
+        "metrics": {
+          "brier_before": 0.039213312274141265,
+          "brier_after": 0.038913249381549025
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 215,
+      "metrics": {
+        "average_precision": 0.11429637103665971,
+        "binary_logloss": 0.15869504315107613,
+        "best_iteration": 8.0
+      }
+    },
+    "TSE-DOWN-001@30": {
+      "file": "TSE-DOWN-001_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9799782999186994,
+        "intercept": -0.2728458730122191,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1430,
+        "positive_count": 60,
+        "metrics": {
+          "brier_before": 0.039213312274141265,
+          "brier_after": 0.038913249381549025
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 215,
+      "metrics": {
+        "average_precision": 0.11429637103665971,
+        "binary_logloss": 0.15869504315107613,
+        "best_iteration": 8.0
+      }
+    },
+    "TSE-DOWN-001@5": {
+      "file": "TSE-DOWN-001_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": -2.4538486011615688,
+        "intercept": -14.17544238732852,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1430,
+        "positive_count": 30,
+        "metrics": {
+          "brier_before": 0.021301785881250986,
+          "brier_after": 0.020493031683759013
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 105,
+      "metrics": {
+        "average_precision": 0.05434649591403093,
+        "binary_logloss": 0.11092946037869347,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-DOWN-005@15": {
+      "file": "TSE-DOWN-005_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 2.270761259756521,
+        "intercept": 3.5716358001211654,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1525,
+        "positive_count": 25,
+        "metrics": {
+          "brier_before": 0.015509775398983265,
+          "brier_after": 0.015453839923566038
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 138,
+      "metrics": {
+        "average_precision": 0.08735769561802101,
+        "binary_logloss": 0.07361741216797874,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-DOWN-005@30": {
+      "file": "TSE-DOWN-005_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 2.270761259756521,
+        "intercept": 3.5716358001211654,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1525,
+        "positive_count": 25,
+        "metrics": {
+          "brier_before": 0.015509775398983265,
+          "brier_after": 0.015453839923566038
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 138,
+      "metrics": {
+        "average_precision": 0.08735769561802101,
+        "binary_logloss": 0.07361741216797874,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-DOWN-005@5": {
+      "file": "TSE-DOWN-005_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 2.1758733704169417,
+        "intercept": 2.622294459021459,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1525,
+        "positive_count": 15,
+        "metrics": {
+          "brier_before": 0.009304752304712978,
+          "brier_after": 0.009118860883319485
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 103,
+      "metrics": {
+        "average_precision": 0.08012881302354986,
+        "binary_logloss": 0.048264213073205484,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-DOWN-006@15": {
+      "file": "TSE-DOWN-006_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.0290189318720397,
+        "intercept": -0.37143627789693906,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1527,
+        "positive_count": 24,
+        "metrics": {
+          "brier_before": 0.015498612923471763,
+          "brier_after": 0.015387050672072959
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 147,
+      "metrics": {
+        "average_precision": 0.04904698660084969,
+        "binary_logloss": 0.08069645357411423,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-DOWN-006@30": {
+      "file": "TSE-DOWN-006_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.0290189318720397,
+        "intercept": -0.37143627789693906,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1527,
+        "positive_count": 24,
+        "metrics": {
+          "brier_before": 0.015498612923471763,
+          "brier_after": 0.015387050672072959
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 147,
+      "metrics": {
+        "average_precision": 0.04904698660084969,
+        "binary_logloss": 0.08069645357411423,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-DOWN-006@5": {
+      "file": "TSE-DOWN-006_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.45172249928312586,
+        "intercept": -2.8235225633940955,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1527,
+        "positive_count": 15,
+        "metrics": {
+          "brier_before": 0.010064374938143661,
+          "brier_after": 0.009711753884951308
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 103,
+      "metrics": {
+        "average_precision": 0.03190833814750626,
+        "binary_logloss": 0.05960196306482983,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-FEED-002@15": {
+      "file": "TSE-FEED-002_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.7245637029182773,
+        "intercept": -0.8514507681060891,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1455,
+        "positive_count": 60,
+        "metrics": {
+          "brier_before": 0.03976763159281772,
+          "brier_after": 0.03840912990088416
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 188,
+      "metrics": {
+        "average_precision": 0.11398450263374506,
+        "binary_logloss": 0.1603268335435228,
+        "best_iteration": 13.0
+      }
+    },
+    "TSE-FEED-002@30": {
+      "file": "TSE-FEED-002_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.7245637029182773,
+        "intercept": -0.8514507681060891,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1455,
+        "positive_count": 60,
+        "metrics": {
+          "brier_before": 0.03976763159281772,
+          "brier_after": 0.03840912990088416
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 188,
+      "metrics": {
+        "average_precision": 0.11398450263374506,
+        "binary_logloss": 0.1603268335435228,
+        "best_iteration": 13.0
+      }
+    },
+    "TSE-FEED-002@5": {
+      "file": "TSE-FEED-002_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.4882112367371241,
+        "intercept": -2.0113361298868826,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1455,
+        "positive_count": 30,
+        "metrics": {
+          "brier_before": 0.02131921062212151,
+          "brier_after": 0.020090798910908488
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 105,
+      "metrics": {
+        "average_precision": 0.08524990825614577,
+        "binary_logloss": 0.10305313555973235,
+        "best_iteration": 11.0
+      }
+    },
+    "TSE-MECH-001@15": {
+      "file": "TSE-MECH-001_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.4561067913968309,
+        "intercept": 1.1100105899413661,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1412,
+        "positive_count": 35,
+        "metrics": {
+          "brier_before": 0.02281593846608045,
+          "brier_after": 0.022715657811679297
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 140,
+      "metrics": {
+        "average_precision": 0.1558673012890933,
+        "binary_logloss": 0.09945005058288894,
+        "best_iteration": 3.0
+      }
+    },
+    "TSE-MECH-001@30": {
+      "file": "TSE-MECH-001_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.4561067913968309,
+        "intercept": 1.1100105899413661,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1412,
+        "positive_count": 35,
+        "metrics": {
+          "brier_before": 0.02281593846608045,
+          "brier_after": 0.022715657811679297
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 140,
+      "metrics": {
+        "average_precision": 0.1558673012890933,
+        "binary_logloss": 0.09945005058288894,
+        "best_iteration": 3.0
+      }
+    },
+    "TSE-MECH-001@5": {
+      "file": "TSE-MECH-001_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.6953028726059205,
+        "intercept": -1.2745742807854368,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1412,
+        "positive_count": 30,
+        "metrics": {
+          "brier_before": 0.0216070082099737,
+          "brier_after": 0.02051432891929729
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 104,
+      "metrics": {
+        "average_precision": 0.07419866779012414,
+        "binary_logloss": 0.09892770043183163,
+        "best_iteration": 7.0
+      }
+    },
+    "TSE-MECH-002@15": {
+      "file": "TSE-MECH-002_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.2079272099491523,
+        "intercept": 0.13995217294578077,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1465,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.024307258031908842,
+          "brier_after": 0.02437782890751214
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 128,
+      "metrics": {
+        "average_precision": 0.19593883972142995,
+        "binary_logloss": 0.09425811813448118,
+        "best_iteration": 13.0
+      }
+    },
+    "TSE-MECH-002@30": {
+      "file": "TSE-MECH-002_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.2079272099491523,
+        "intercept": 0.13995217294578077,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1465,
+        "positive_count": 40,
+        "metrics": {
+          "brier_before": 0.024307258031908842,
+          "brier_after": 0.02437782890751214
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 128,
+      "metrics": {
+        "average_precision": 0.19593883972142995,
+        "binary_logloss": 0.09425811813448118,
+        "best_iteration": 13.0
+      }
+    },
+    "TSE-MECH-002@5": {
+      "file": "TSE-MECH-002_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9619840051961795,
+        "intercept": -0.6589607146060396,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1465,
+        "positive_count": 29,
+        "metrics": {
+          "brier_before": 0.01979038800565127,
+          "brier_after": 0.01876937805887199
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 102,
+      "metrics": {
+        "average_precision": 0.15867353643057247,
+        "binary_logloss": 0.08430197049339487,
+        "best_iteration": 9.0
+      }
+    },
+    "TSE-MECH-004@15": {
+      "file": "TSE-MECH-004_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.3253798792760827,
+        "intercept": 0.7814267647008603,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1523,
+        "positive_count": 43,
+        "metrics": {
+          "brier_before": 0.02536442224613153,
+          "brier_after": 0.02524979084197664
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 131,
+      "metrics": {
+        "average_precision": 0.25557931726811506,
+        "binary_logloss": 0.10617509002647287,
+        "best_iteration": 4.0
+      }
+    },
+    "TSE-MECH-004@30": {
+      "file": "TSE-MECH-004_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.3253798792760827,
+        "intercept": 0.7814267647008603,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1523,
+        "positive_count": 43,
+        "metrics": {
+          "brier_before": 0.02536442224613153,
+          "brier_after": 0.02524979084197664
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 131,
+      "metrics": {
+        "average_precision": 0.25557931726811506,
+        "binary_logloss": 0.10617509002647287,
+        "best_iteration": 4.0
+      }
+    },
+    "TSE-MECH-004@5": {
+      "file": "TSE-MECH-004_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.7653921677942717,
+        "intercept": -1.1545168495873437,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1523,
+        "positive_count": 30,
+        "metrics": {
+          "brier_before": 0.02010494474102782,
+          "brier_after": 0.018928411497276365
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 101,
+      "metrics": {
+        "average_precision": 0.09839749683793143,
+        "binary_logloss": 0.09124727151263272,
+        "best_iteration": 10.0
+      }
+    },
+    "TSE-PROC-003@15": {
+      "file": "TSE-PROC-003_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.9972701198640066,
+        "intercept": 2.254000431537959,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1492,
+        "positive_count": 21,
+        "metrics": {
+          "brier_before": 0.013469776456730849,
+          "brier_after": 0.013151618563168174
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 161,
+      "metrics": {
+        "average_precision": 0.09425736279854224,
+        "binary_logloss": 0.06962981972550816,
+        "best_iteration": 2.0
+      }
+    },
+    "TSE-PROC-003@30": {
+      "file": "TSE-PROC-003_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.9972701198640066,
+        "intercept": 2.254000431537959,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1492,
+        "positive_count": 21,
+        "metrics": {
+          "brier_before": 0.013469776456730849,
+          "brier_after": 0.013151618563168174
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 161,
+      "metrics": {
+        "average_precision": 0.09425736279854224,
+        "binary_logloss": 0.06962981972550816,
+        "best_iteration": 2.0
+      }
+    },
+    "TSE-PROC-003@5": {
+      "file": "TSE-PROC-003_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.8011263044409808,
+        "intercept": -1.662381624585852,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1492,
+        "positive_count": 15,
+        "metrics": {
+          "brier_before": 0.010917197401282894,
+          "brier_after": 0.009887425101930455
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 105,
+      "metrics": {
+        "average_precision": 0.04291079749082882,
+        "binary_logloss": 0.06058589381223362,
+        "best_iteration": 4.0
+      }
+    },
+    "TSE-THERM-008@15": {
+      "file": "TSE-THERM-008_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 3.062059019716507,
+        "intercept": 4.074356774083294,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1513,
+        "positive_count": 21,
+        "metrics": {
+          "brier_before": 0.012243796485480912,
+          "brier_after": 0.011271608985265517
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 154,
+      "metrics": {
+        "average_precision": 0.35220968390056956,
+        "binary_logloss": 0.059763552509138965,
+        "best_iteration": 4.0
+      }
+    },
+    "TSE-THERM-008@30": {
+      "file": "TSE-THERM-008_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 3.062059019716507,
+        "intercept": 4.074356774083294,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1513,
+        "positive_count": 21,
+        "metrics": {
+          "brier_before": 0.012243796485480912,
+          "brier_after": 0.011271608985265517
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 154,
+      "metrics": {
+        "average_precision": 0.35220968390056956,
+        "binary_logloss": 0.059763552509138965,
+        "best_iteration": 4.0
+      }
+    },
+    "TSE-THERM-008@5": {
+      "file": "TSE-THERM-008_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 2.524786421588758,
+        "intercept": 2.136150577919708,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1513,
+        "positive_count": 15,
+        "metrics": {
+          "brier_before": 0.00828545189382838,
+          "brier_after": 0.007080078119688686
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 105,
+      "metrics": {
+        "average_precision": 0.5383417510439358,
+        "binary_logloss": 0.04317176011860355,
+        "best_iteration": 7.0
+      }
+    },
+    "TSE-THERM-009@15": {
+      "file": "TSE-THERM-009_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.7740191641280625,
+        "intercept": 0.9907199182686077,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1506,
+        "positive_count": 10,
+        "metrics": {
+          "brier_before": 0.006802939017507325,
+          "brier_after": 0.00636350344469588
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 114,
+      "metrics": {
+        "average_precision": 0.07415050795134945,
+        "binary_logloss": 0.04284546126272873,
+        "best_iteration": 2.0
+      }
+    },
+    "TSE-THERM-009@30": {
+      "file": "TSE-THERM-009_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 1.7740191641280625,
+        "intercept": 0.9907199182686077,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1506,
+        "positive_count": 10,
+        "metrics": {
+          "brier_before": 0.006802939017507325,
+          "brier_after": 0.00636350344469588
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 114,
+      "metrics": {
+        "average_precision": 0.07415050795134945,
+        "binary_logloss": 0.04284546126272873,
+        "best_iteration": 2.0
+      }
+    },
+    "TSE-THERM-009@5": {
+      "file": "TSE-THERM-009_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.5030527651093111,
+        "intercept": -3.0002639846368773,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1506,
+        "positive_count": 10,
+        "metrics": {
+          "brier_before": 0.007164923545184108,
+          "brier_after": 0.006590309041577815
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 98,
+      "metrics": {
+        "average_precision": 0.025323358661316485,
+        "binary_logloss": 0.046817514141229914,
+        "best_iteration": 1.0
+      }
+    },
+    "TSE-THERM-012@15": {
+      "file": "TSE-THERM-012_at_15",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.8018829925387803,
+        "intercept": -0.8051353346257895,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1455,
+        "positive_count": 55,
+        "metrics": {
+          "brier_before": 0.03647628019761325,
+          "brier_after": 0.03549008802274874
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 204,
+      "metrics": {
+        "average_precision": 0.14151471326697868,
+        "binary_logloss": 0.1505641211486992,
+        "best_iteration": 10.0
+      }
+    },
+    "TSE-THERM-012@30": {
+      "file": "TSE-THERM-012_at_30",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.8018829925387803,
+        "intercept": -0.8051353346257895,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1455,
+        "positive_count": 55,
+        "metrics": {
+          "brier_before": 0.03647628019761325,
+          "brier_after": 0.03549008802274874
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 204,
+      "metrics": {
+        "average_precision": 0.14151471326697868,
+        "binary_logloss": 0.1505641211486992,
+        "best_iteration": 10.0
+      }
+    },
+    "TSE-THERM-012@5": {
+      "file": "TSE-THERM-012_at_5",
+      "threshold": 0.5,
+      "calibrator": {
+        "kind": "platt",
+        "slope": 0.9269357434074471,
+        "intercept": -0.5433497916447264,
+        "knots_x": [],
+        "knots_y": [],
+        "fitted_on_split": "valid",
+        "sample_count": 1455,
+        "positive_count": 30,
+        "metrics": {
+          "brier_before": 0.01950882920664594,
+          "brier_after": 0.019052497143231633
+        }
+      },
+      "positive_events": 10,
+      "positive_samples": 105,
+      "metrics": {
+        "average_precision": 0.14184499210459237,
+        "binary_logloss": 0.0852801878429092,
+        "best_iteration": 15.0
+      }
+    }
+  }
+}

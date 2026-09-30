@@ -59,6 +59,12 @@ COPY configs ./configs
 # — a half-updated snapshot fails at boot rather than mid-diagnosis.
 COPY knowledge ./knowledge
 COPY pyproject.toml ./
+# The released champion and the registry entry naming it. Without these the
+# container starts with nothing to serve: /health answers, every diagnosis
+# comes back with the rules only, and the Prognosis tab is empty — which
+# looks exactly like a broken deployment and is not one. Only the one model
+# is committed; see services/ml/.gitignore for why that exception exists.
+COPY artifacts ./artifacts
 
 RUN mkdir -p artifacts/datasets artifacts/registry artifacts/models artifacts/baselines \
     && useradd --create-home --uid 10001 ultron \

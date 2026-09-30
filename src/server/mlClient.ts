@@ -37,7 +37,13 @@ export type MlResult<T> =
 
 function serviceUrl(): string | null {
   const url = process.env.ML_SERVICE_URL?.trim();
-  return url ? url.replace(/\/$/, '') : null;
+  if (!url) return null;
+  // A scheme is optional because the deployment does not supply one: Render
+  // resolves a service reference to `host:port`, and wiring the two services
+  // together that way is better than a hand-typed address that a rename can
+  // silently orphan. Anything already carrying a scheme is left alone.
+  const withScheme = /^https?:\/\//i.test(url) ? url : `http://${url}`;
+  return withScheme.replace(/\/$/, '');
 }
 
 function timeoutMs(): number {

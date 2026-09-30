@@ -1,0 +1,50 @@
+{
+  "run_id": "lgbm-doc07-calibrate",
+  "command": "calibrate",
+  "started_at": "2026-09-28T11:21:36.645Z",
+  "finished_at": "2026-09-28T11:21:37.326Z",
+  "seed": 20260918,
+  "dataset_id": "ds-doc07",
+  "arguments": {
+    "seed": "20260918",
+    "log_level": "None",
+    "out": "None",
+    "dataset": "ds-doc07",
+    "model": "lgbm-doc07",
+    "version": "1",
+    "method": "auto"
+  },
+  "metrics": {
+    "outputs": 33
+  },
+  "artifacts": [
+    "/Users/ameybhagwatkar/Developer/ultron-software/services/ml/artifacts/models/lightgbm/lgbm-doc07-1"
+  ],
+  "notes": [],
+  "code_revision": "d815201842a63601905296847cbcef3d54238773",
+  "knowledge_digest": "b1240e93341dd0d1",
+  "versions": {
+    "contract": "1.0",
+    "service": "1.0.0",
+    "feature_set": "1.0.0",
+    "rule_set": "1.0.0",
+    "baseline_engine": "1.0.0",
+    "decision_rules": "1.0.0",
+    "decision_filter": "1.0.0",
+    "knowledge_schema": "1.0.0",
+    "label_schema": "1.0.0",
+    "fault_taxonomy": "1.0.0"
+  },
+  "environment": {
+    "python": "3.14.7",
+    "platform": "macOS-26.6.1-arm64-arm-64bit-Mach-O",
+    "tensorflow": "unavailable",
+    "lightgbm": "4.7.0",
+    "xgboost": "unavailable",
+    "shap": "0.52.0",
+    "sklearn": "1.9.1",
+    "redis": "unavailable",
+    "mlflow": "unavailable",
+    "optuna": "unavailable"
+  }
+}

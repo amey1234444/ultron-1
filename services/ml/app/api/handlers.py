@@ -110,7 +110,7 @@ class MLService:
                 "lightgbm",
                 "No champion model has been promoted. The deterministic chain answers alone.",
             )
-        ensemble = TreeEnsemble.load(Path(entry.artifact_path))
+        ensemble = TreeEnsemble.load(entry.resolved_path(self.settings.artifacts_dir))
         return ensemble
 
     def _load_temporal(self) -> TemporalRuntime:

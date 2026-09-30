@@ -55,6 +55,27 @@ class RegistryEntry:
     approved_by: str | None = None
     approval_note: str | None = None
 
+    def resolved_path(self, artifacts_dir: Path) -> Path:
+        """Where this model's files actually are, on this host.
+
+        ``artifact_path`` is recorded absolute by the training command, which
+        is right for the machine that trained it and wrong everywhere else.
+        A registry committed with a release, or one restored from a backup,
+        names directories that do not exist on the host now reading it — and
+        the symptom is a champion the registry lists and the service cannot
+        load.
+
+        So the recorded path is preferred when it is there, and otherwise the
+        model is looked up where the convention puts it:
+        ``<artifacts>/models/<kind>/<model_id>-<version>``. That is the layout
+        every training command writes, so the fallback is a restatement of
+        where the file already is rather than a second source of truth.
+        """
+        recorded = Path(self.artifact_path)
+        if recorded.exists():
+            return recorded
+        return artifacts_dir / "models" / self.model_kind.lower() / f"{self.model_id}-{self.version}"
+
     contract: dict[str, Any] = field(default_factory=dict)
     validation_metrics: dict[str, Any] = field(default_factory=dict)
     test_metrics: dict[str, Any] = field(default_factory=dict)

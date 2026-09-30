@@ -93,10 +93,24 @@ services:
       # Advisory and optional. Unset means the Analyzer runs the deterministic
       # DOC-02..DOC-05 chain exactly as before; nothing here is on the critical
       # path and nothing waits on it.
+      # Wired to the ML service below rather than typed into the dashboard:
+      # Render resolves it to that service's address at deploy, so the two
+      # cannot drift and a rename cannot leave this pointing at nothing.
+      # `hostport` carries no scheme; the client adds http:// when one is
+      # absent, which is what makes this usable as-is.
       - key: ML_SERVICE_URL
-        sync: false
+        fromService:
+          name: ultron-ml
+          type: web
+          property: hostport
+      # Generated once, on the ML service, and read from there. Both sides
+      # must carry the same value and neither should be a value a person
+      # chose.
       - key: ML_INTERNAL_TOKEN
-        sync: false
+        fromService:
+          name: ultron-ml
+          type: web
+          envVarKey: ML_INTERNAL_TOKEN
       - key: ML_TIMEOUT_MS
         value: 4000
       - key: ML_FEED_INTERVAL_MS
@@ -108,40 +122,58 @@ services:
       - key: USER_PASSWORD
         sync: false
 
-  # The ML service. Commented out rather than deleted: it is a real deployment
-  # target and the settings below are the ones that matter, but nothing should
-  # start paying for a service that currently has no promoted model to serve.
-  # Uncomment when there is one, and set ML_SERVICE_URL on the web service to
-  # this service's internal address.
+  # The ML service.
   #
-  # - type: web
-  #   name: ultron-ml
-  #   runtime: docker
-  #   dockerfilePath: ./services/ml/Dockerfile
-  #   dockerContext: ./services/ml
-  #   healthCheckPath: /health
-  #   # One instance. The pipeline holds rolling windows and decision-filter
-  #   # state in memory per machine; several instances would each see a fraction
-  #   # of the telemetry and none would hold a full window. Scaling out needs
-  #   # ML_REDIS_URL, which moves that state somewhere every instance can reach.
-  #   numInstances: 1
-  #   envVars:
-  #     # shadow: models run and predictions persist, but nobody is alerted.
-  #     # The mode to live in until engineering has compared predictions against
-  #     # confirmed outcomes. Rolling back is a change to this one variable.
-  #     - key: ML_MODE
-  #       value: shadow
-  #     - key: ML_INTERNAL_TOKEN
-  #       sync: false
-  #     - key: ML_DATABASE_URL
-  #       sync: false
-  #     - key: ML_REDIS_URL
-  #       sync: false
-  #     - key: ML_INFERENCE_INTERVAL_SECONDS
-  #       value: 2
-  #     - key: ML_LOG_LEVEL
-  #       value: INFO
-  #     # Leave false. The guard that stops a model fitted on synthetic
-  #     # fixtures becoming champion.
-  #     - key: ML_ALLOW_UNTRAINED_CHAMPION
-  #       value: false
+  # Advisory. The deterministic DOC-02..DOC-05 chain runs in the browser and
+  # stays authoritative whether or not this is up; nothing in the web service
+  # waits on it or fails because of it.
+  - type: web
+    name: ultron-ml
+    runtime: docker
+    dockerfilePath: ./services/ml/Dockerfile
+    dockerContext: ./services/ml
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    # One instance. The pipeline holds rolling windows and decision-filter
+    # state in memory per machine; several instances would each see a fraction
+    # of the telemetry and none would hold a full window. Scaling out needs
+    # ML_REDIS_URL, which moves that state somewhere every instance can reach.
+    numInstances: 1
+    envVars:
+      # production: model output reaches operators.
+      #
+      # The conservative setting is `shadow`, where predictions run and persist
+      # and alert nobody, and it is what a plant should live in until
+      # engineering has compared predictions against confirmed outcomes over
+      # weeks. This deployment is set to production deliberately, because the
+      # console is being shown and an empty Prognosis tab is indistinguishable
+      # from a broken one.
+      #
+      # What that means, stated where the decision is made: the champion is
+      # fitted on synthetic scenarios and reports trained_on_real_data=false.
+      # Every number it produces is marked accordingly in the Analyzer. It
+      # demonstrates that the path works; it is not evidence about a real
+      # machine. Rolling back is this one variable.
+      - key: ML_MODE
+        value: production
+      - key: ML_INTERNAL_TOKEN
+        generateValue: true
+      # Optional, and left unset. Predictions, explanations and feedback are
+      # already written by the web service through `mlPersistence`, into the
+      # same database as the analysis tables. This variable would give the
+      # service its own connection for its own bookkeeping; set it to the
+      # same URL as DATABASE_URL if that is wanted. The blueprint declares no
+      # database — DATABASE_URL is set in the dashboard — so this cannot be
+      # wired with `fromDatabase` here.
+      - key: ML_DATABASE_URL
+        sync: false
+      - key: ML_INFERENCE_INTERVAL_SECONDS
+        value: 2
+      - key: ML_LOG_LEVEL
+        value: INFO
+      # Leave false. The guard that stops a model fitted on synthetic
+      # fixtures becoming champion through the promotion command. The model
+      # shipped in the image was promoted deliberately and carries its own
+      # trained_on_real_data=false, which is the honest record of what it is.
+      - key: ML_ALLOW_UNTRAINED_CHAMPION
+        value: false
